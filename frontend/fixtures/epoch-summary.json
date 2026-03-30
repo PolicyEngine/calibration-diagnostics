@@ -1,0 +1,14 @@
+[
+  {"group": "snap", "epoch": 10, "mean_abs_rel_error": 0.35},
+  {"group": "snap", "epoch": 50, "mean_abs_rel_error": 0.42},
+  {"group": "snap", "epoch": 100, "mean_abs_rel_error": 0.48},
+  {"group": "person_count", "epoch": 10, "mean_abs_rel_error": 0.08},
+  {"group": "person_count", "epoch": 50, "mean_abs_rel_error": 0.03},
+  {"group": "person_count", "epoch": 100, "mean_abs_rel_error": 0.02},
+  {"group": "self_employment_income", "epoch": 10, "mean_abs_rel_error": 0.15},
+  {"group": "self_employment_income", "epoch": 50, "mean_abs_rel_error": 0.06},
+  {"group": "self_employment_income", "epoch": 100, "mean_abs_rel_error": 0.04},
+  {"group": "ssi", "epoch": 10, "mean_abs_rel_error": 0.28},
+  {"group": "ssi", "epoch": 50, "mean_abs_rel_error": 0.31},
+  {"group": "ssi", "epoch": 100, "mean_abs_rel_error": 0.30}
+]

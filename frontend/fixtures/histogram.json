@@ -1,0 +1,15 @@
+[
+  {"bin_min": 0.001, "bin_max": 0.003, "count": 450000},
+  {"bin_min": 0.003, "bin_max": 0.01, "count": 380000},
+  {"bin_min": 0.01, "bin_max": 0.03, "count": 520000},
+  {"bin_min": 0.03, "bin_max": 0.1, "count": 680000},
+  {"bin_min": 0.1, "bin_max": 0.3, "count": 720000},
+  {"bin_min": 0.3, "bin_max": 1.0, "count": 540000},
+  {"bin_min": 1.0, "bin_max": 3.0, "count": 320000},
+  {"bin_min": 3.0, "bin_max": 10.0, "count": 180000},
+  {"bin_min": 10.0, "bin_max": 30.0, "count": 95000},
+  {"bin_min": 30.0, "bin_max": 100.0, "count": 42000},
+  {"bin_min": 100.0, "bin_max": 300.0, "count": 12000},
+  {"bin_min": 300.0, "bin_max": 1000.0, "count": 3500},
+  {"bin_min": 1000.0, "bin_max": 2000.0, "count": 500}
+]

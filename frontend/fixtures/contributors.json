@@ -1,0 +1,7 @@
+[
+  {"household_idx": 12345, "raw_value": 8400, "weighted_value": 1965600, "income": 18500, "g_weight": 234.0, "in_poverty": true, "state": 6},
+  {"household_idx": 45678, "raw_value": 6200, "weighted_value": 682000, "income": 22100, "g_weight": 110.0, "in_poverty": true, "state": 36},
+  {"household_idx": 89012, "raw_value": 4800, "weighted_value": 336000, "income": 31200, "g_weight": 70.0, "in_poverty": false, "state": 48},
+  {"household_idx": 23456, "raw_value": 7100, "weighted_value": 284000, "income": 15600, "g_weight": 40.0, "in_poverty": true, "state": 12},
+  {"household_idx": 67890, "raw_value": 3600, "weighted_value": 108000, "income": 28400, "g_weight": 30.0, "in_poverty": false, "state": 17}
+]

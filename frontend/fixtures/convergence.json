@@ -1,0 +1,12 @@
+[
+  {"epoch": 10, "estimate": 82000000000, "target": 65000000000, "rel_error": 0.262, "loss": 0.069},
+  {"epoch": 20, "estimate": 78500000000, "target": 65000000000, "rel_error": 0.208, "loss": 0.043},
+  {"epoch": 30, "estimate": 85200000000, "target": 65000000000, "rel_error": 0.311, "loss": 0.097},
+  {"epoch": 40, "estimate": 90100000000, "target": 65000000000, "rel_error": 0.385, "loss": 0.148},
+  {"epoch": 50, "estimate": 93400000000, "target": 65000000000, "rel_error": 0.437, "loss": 0.191},
+  {"epoch": 60, "estimate": 95200000000, "target": 65000000000, "rel_error": 0.464, "loss": 0.215},
+  {"epoch": 70, "estimate": 96800000000, "target": 65000000000, "rel_error": 0.489, "loss": 0.239},
+  {"epoch": 80, "estimate": 97500000000, "target": 65000000000, "rel_error": 0.5, "loss": 0.25},
+  {"epoch": 90, "estimate": 98100000000, "target": 65000000000, "rel_error": 0.509, "loss": 0.259},
+  {"epoch": 100, "estimate": 98500000000, "target": 65000000000, "rel_error": 0.515, "loss": 0.265}
+]

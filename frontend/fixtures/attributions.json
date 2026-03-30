@@ -1,0 +1,6 @@
+[
+  {"target_idx": 0, "target_name": "national/snap/[]", "variable": "snap", "geo_level": "national", "raw_value": 8400, "weighted_value": 1965600, "target_rel_error": 0.515},
+  {"target_idx": 15, "target_name": "state_06/snap/[]", "variable": "snap", "geo_level": "state", "raw_value": 8400, "weighted_value": 1965600, "target_rel_error": 0.42},
+  {"target_idx": 102, "target_name": "district_0622/person_count/[age]", "variable": "person_count", "geo_level": "district", "raw_value": 1, "weighted_value": 280.8, "target_rel_error": -0.015},
+  {"target_idx": 200, "target_name": "district_0622/household_count/[]", "variable": "household_count", "geo_level": "district", "raw_value": 1, "weighted_value": 280.8, "target_rel_error": 0.008}
+]

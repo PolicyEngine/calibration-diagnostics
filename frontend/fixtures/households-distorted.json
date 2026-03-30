@@ -1,0 +1,6 @@
+[
+  {"household_idx": 12345, "income": 18500, "spm_threshold": 28400, "in_poverty": true, "initial_weight": 1.2, "final_weight": 280.8, "g_weight": 234.0, "state": 6, "income_decile": 1, "filter_variable_value": 8400},
+  {"household_idx": 45678, "income": 22100, "spm_threshold": 32100, "in_poverty": true, "initial_weight": 0.8, "final_weight": 88.0, "g_weight": 110.0, "state": 36, "income_decile": 2, "filter_variable_value": 6200},
+  {"household_idx": 89012, "income": 31200, "spm_threshold": 28400, "in_poverty": false, "initial_weight": 1.5, "final_weight": 105.0, "g_weight": 70.0, "state": 48, "income_decile": 3, "filter_variable_value": 4800},
+  {"household_idx": 23456, "income": 15600, "spm_threshold": 24800, "in_poverty": true, "initial_weight": 2.1, "final_weight": 84.0, "g_weight": 40.0, "state": 12, "income_decile": 1, "filter_variable_value": 7100}
+]

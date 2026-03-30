@@ -1,0 +1,18 @@
+{
+  "target_id": 42,
+  "variable": "snap",
+  "value": 65000000000,
+  "period": 2022,
+  "source": "USDA FNS SNAP",
+  "tolerance": 25.0,
+  "notes": null,
+  "active": true,
+  "stratum_id": 42,
+  "constraints": [
+    {"variable": "snap", "operation": ">", "value": "0"}
+  ],
+  "geo_level": "national",
+  "geographic_id": "US",
+  "uprating_factor": 1.08,
+  "uprated_value": 70200000000
+}

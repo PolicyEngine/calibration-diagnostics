@@ -1,0 +1,15 @@
+{
+  "target_name": "national/snap/[]",
+  "stratum_id": 42,
+  "constraints": [
+    {
+      "variable": "snap",
+      "operation": ">",
+      "value": "0",
+      "contributors_satisfying": 245000,
+      "contributors_violating": 0,
+      "pct_violating": 0.0,
+      "status": "OK"
+    }
+  ]
+}
