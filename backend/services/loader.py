@@ -1,6 +1,7 @@
 """Load all calibration artifacts and compute derived fields at startup."""
 
 import logging
+import os
 from pathlib import Path
 
 import numpy as np
@@ -11,10 +12,77 @@ from policyengine_us_data.calibration.unified_calibration import (
     load_calibration_package,
 )
 
+from backend.services.geo_utils import parse_cd_geoids
 from backend.services.sim_service import SimService
 from backend.state import AppState
 
 logger = logging.getLogger(__name__)
+
+HF_REPO = "PolicyEngine/policyengine-us-data-pipeline"
+HF_REPO_TYPE = "model"
+HF_PREFIX = "test"
+
+HF_ARTIFACTS = {
+    "package_path": "calibration_package.pkl",
+    "weights_path": "calibration_weights.npy",
+    "db_path": "policy_data.db",
+    "dataset_path": "source_imputed_stratified_extended_cps.h5",
+    "cal_log_path": "calibration_log.csv",
+    "diagnostics_path": "unified_diagnostics.csv",
+}
+
+
+def _ensure_artifacts(config: dict, cache_dir: str = ".artifacts") -> dict:
+    """Download missing artifacts from HuggingFace.
+
+    For each config key, if the local path doesn't exist, downloads
+    from HF_REPO/HF_PREFIX/{filename}. Returns an updated config
+    with resolved local paths.
+    """
+    from huggingface_hub import hf_hub_download
+
+    cache = Path(cache_dir)
+    cache.mkdir(parents=True, exist_ok=True)
+    resolved = dict(config)
+
+    for key, hf_filename in HF_ARTIFACTS.items():
+        local_path = config.get(key)
+
+        if local_path and Path(local_path).exists():
+            logger.info("Found local %s: %s", key, local_path)
+            continue
+
+        dest = cache / hf_filename
+        if dest.exists():
+            logger.info("Found cached %s: %s", key, dest)
+            resolved[key] = str(dest)
+            continue
+
+        hf_path = f"{HF_PREFIX}/{hf_filename}"
+        logger.info(
+            "Downloading %s from %s/%s ...", key, HF_REPO, hf_path
+        )
+        downloaded = hf_hub_download(
+            repo_id=HF_REPO,
+            filename=hf_path,
+            repo_type=HF_REPO_TYPE,
+            local_dir=str(cache),
+        )
+        # hf_hub_download may nest under HF_PREFIX/
+        nested = cache / HF_PREFIX / hf_filename
+        if nested.exists() and not dest.exists():
+            nested.rename(dest)
+            # Clean up empty prefix dir
+            try:
+                (cache / HF_PREFIX).rmdir()
+            except OSError:
+                pass
+
+        resolved[key] = str(dest)
+        size_mb = dest.stat().st_size / 1e6
+        logger.info("  Downloaded %s (%.1f MB)", hf_filename, size_mb)
+
+    return resolved
 
 
 def load_all_artifacts(config: dict) -> AppState:
@@ -25,6 +93,9 @@ def load_all_artifacts(config: dict) -> AppState:
             package_path, weights_path, db_path, dataset_path,
             cal_log_path (optional), diagnostics_path (optional)
     """
+    # 0. Download any missing artifacts from HuggingFace
+    config = _ensure_artifacts(config)
+
     # 1. Load calibration package
     logger.info("Loading calibration package from %s", config["package_path"])
     package = load_calibration_package(config["package_path"])
@@ -55,7 +126,13 @@ def load_all_artifacts(config: dict) -> AppState:
 
     sim = Microsimulation(dataset=config["dataset_path"])
     time_period = _detect_time_period(sim)
-    sim_service = SimService(sim, time_period)
+    n_base = len(sim.calculate("household_id", map_to="household").values)
+    n_clones = n_households // n_base
+    logger.info(
+        "Base households: %d, clones: %d, total: %d",
+        n_base, n_clones, n_households,
+    )
+    sim_service = SimService(sim, time_period, n_clones)
     logger.info("Microsimulation ready, time_period=%d", time_period)
 
     # 5. Compute core household fields
@@ -72,7 +149,7 @@ def load_all_artifacts(config: dict) -> AppState:
         hh_income, 10, labels=False, duplicates="drop"
     )
 
-    state_fips = cd_geoid // 100 if len(cd_geoid) > 0 else np.zeros(n_households)
+    cd_geoid_int, state_fips = parse_cd_geoids(cd_geoid)
 
     households_df = pd.DataFrame({
         "household_idx": np.arange(n_households),
@@ -82,13 +159,13 @@ def load_all_artifacts(config: dict) -> AppState:
         "initial_weight": initial_weights.astype(np.float32),
         "final_weight": final_weights.astype(np.float32),
         "g_weight": g_weights.astype(np.float32),
-        "state": state_fips.astype(np.int32),
-        "cd_geoid": cd_geoid.astype(np.int64) if len(cd_geoid) > 0 else np.zeros(n_households, dtype=np.int64),
+        "state": state_fips,
+        "cd_geoid": cd_geoid_int,
         "income_decile": income_decile.astype(np.int8),
     })
     logger.info("households_df: %d rows", len(households_df))
 
-    # 7. Enrich targets with error metrics and pull scores
+    # 7. Enrich targets with error metrics and loss contribution
     logger.info("Enriching targets with diagnostics...")
     targets_enriched = _enrich_targets(
         targets_df, target_names, X_csr, final_weights, initial_weights, in_poverty
@@ -143,7 +220,7 @@ def _enrich_targets(
     initial_weights: np.ndarray,
     in_poverty: np.ndarray,
 ) -> pd.DataFrame:
-    """Add estimate, rel_error, pull_score, contributor counts to targets_df."""
+    """Add estimate, rel_error, loss_contribution, contributor counts."""
     enriched = targets_df.copy()
     enriched["target_name"] = target_names[: len(enriched)]
 
@@ -160,31 +237,19 @@ def _enrich_targets(
     enriched["rel_error"] = rel_errors
     enriched["abs_rel_error"] = np.abs(rel_errors)
 
+    # Loss contribution: each target's share of total squared relative error
+    squared_errors = rel_errors ** 2
+    total_loss = squared_errors.sum()
+    if total_loss > 0:
+        enriched["loss_contribution"] = squared_errors / total_loss
+    else:
+        enriched["loss_contribution"] = 0.0
+
+    # Contributor counts (no poverty-specific metrics)
     n_contributors = np.zeros(len(enriched), dtype=np.int32)
-    n_poor_contributors = np.zeros(len(enriched), dtype=np.int32)
-    poor_weight_share = np.zeros(len(enriched), dtype=np.float64)
-
     for i in range(len(enriched)):
-        cols = X_csr[i, :].nonzero()[1]
-        n_contributors[i] = len(cols)
-        if len(cols) > 0:
-            poor_mask = in_poverty[cols]
-            n_poor_contributors[i] = poor_mask.sum()
-            if estimates[i] != 0:
-                row = X_csr[i, :]
-                poor_cols = cols[poor_mask]
-                if len(poor_cols) > 0:
-                    poor_weighted = float(
-                        row[:, poor_cols].multiply(
-                            final_weights[poor_cols]
-                        ).sum()
-                    )
-                    poor_weight_share[i] = poor_weighted / estimates[i]
-
+        n_contributors[i] = len(X_csr[i, :].nonzero()[1])
     enriched["n_contributors"] = n_contributors
-    enriched["n_poor_contributors"] = n_poor_contributors
-    enriched["poor_weight_share"] = poor_weight_share
-    enriched["pull_score"] = poor_weight_share * np.maximum(rel_errors, 0)
 
     return enriched
 

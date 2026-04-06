@@ -77,7 +77,7 @@ export default function ConvergencePage() {
     { key: "epochs", header: "Checkpoints", align: "right" as const },
     {
       key: "last",
-      header: "Final Error",
+      header: "Final error",
       align: "right" as const,
       format: (v: unknown) => `${(Number(v) * 100).toFixed(1)}%`,
     },
@@ -99,25 +99,25 @@ export default function ConvergencePage() {
   return (
     <AppShell>
       <Stack gap="lg">
-        <Title order={2}>Convergence Dashboard</Title>
+        <Title order={2}>Convergence dashboard</Title>
 
         {/* Summary section */}
         <Stack gap="md">
           <Group gap="md" align="end">
-            <Text weight="semibold">Convergence by Category</Text>
+            <Text weight="semibold">Convergence by category</Text>
             <SegmentedControl
               value={groupBy}
               onValueChange={setGroupBy}
               options={[
                 { label: "Variable", value: "variable" },
-                { label: "Geo Level", value: "geo_level" },
+                { label: "Geo level", value: "geo_level" },
                 { label: "Domain", value: "domain_variable" },
               ]}
             />
           </Group>
 
           {chartData.length > 0 ? (
-            <ChartContainer title="Mean Absolute Relative Error by Epoch">
+            <ChartContainer title="Mean absolute relative error by epoch">
               <PELineChart
                 data={chartData}
                 xKey="epoch"
@@ -148,7 +148,7 @@ export default function ConvergencePage() {
         {/* Target comparison */}
         <Card>
           <CardHeader>
-            <CardTitle>Target Comparison</CardTitle>
+            <CardTitle>Target comparison</CardTitle>
           </CardHeader>
           <CardContent>
             <Stack gap="md">

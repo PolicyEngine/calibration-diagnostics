@@ -6,6 +6,7 @@ from typing import Any, Optional
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
+from fastapi import Request
 from sqlalchemy.engine import Engine
 
 
@@ -47,3 +48,8 @@ class AppState:
     time_period: int = 2024
     n_targets: int = 0
     n_households: int = 0
+
+
+def get_state(request: Request) -> "AppState":
+    """FastAPI dependency that returns the loaded AppState."""
+    return request.app.state.diagnostics

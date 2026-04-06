@@ -8,6 +8,8 @@ interface UseTargetsParams {
   sortOrder?: "asc" | "desc";
   variable?: string;
   geoLevel?: string;
+  geographicId?: string;
+  stateFips?: number;
   domainVariable?: string;
   minAbsRelError?: number;
   limit?: number;
@@ -23,6 +25,8 @@ export function useTargets(params: UseTargetsParams = {}) {
         sort_order: params.sortOrder ?? "desc",
         variable: params.variable,
         geo_level: params.geoLevel,
+        geographic_id: params.geographicId,
+        state_fips: params.stateFips,
         domain_variable: params.domainVariable,
         min_abs_rel_error: params.minAbsRelError,
         limit: params.limit ?? 50,
@@ -40,10 +44,10 @@ export function useTargetSearch(variable: string, enabled = true) {
   });
 }
 
-export function useTargetPovertyImpact(limit = 20) {
+export function useWorstFitTargets(limit = 20) {
   return useQuery({
-    queryKey: targetKeys.povertyImpact(),
+    queryKey: targetKeys.worstFit(),
     queryFn: () =>
-      apiGet<Target[]>("/targets/poverty-impact", { limit }),
+      apiGet<Target[]>("/targets/worst-fit", { limit }),
   });
 }

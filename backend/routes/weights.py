@@ -3,9 +3,9 @@
 import operator as op_module
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from backend.app import get_state
+from backend.state import get_state
 from backend.models import (
     HistogramBin,
     WeightDistribution,
@@ -59,10 +59,21 @@ def _weight_stats(w: np.ndarray) -> dict:
     }
 
 
+def _geo_mask(state: AppState, state_fips: int | None, cd_geoid: int | None) -> np.ndarray:
+    mask = np.ones(len(state.g_weights), dtype=bool)
+    if cd_geoid is not None:
+        mask = state.households_df["cd_geoid"].values == cd_geoid
+    elif state_fips is not None:
+        mask = state.households_df["state"].values == state_fips
+    return mask
+
+
 @router.get("/distribution")
 def weight_distribution(
     slice_by: str = "none",
     metric: str = "g_weight",
+    state_fips: int | None = Query(None, alias="state_fips"),
+    cd_geoid: int | None = Query(None, alias="cd_geoid"),
     state: AppState = Depends(get_state),
 ) -> WeightDistribution:
     metric_map = {
@@ -73,7 +84,8 @@ def weight_distribution(
     if metric not in metric_map:
         raise HTTPException(status_code=400, detail=f"Unknown metric: {metric}")
 
-    w = metric_map[metric]
+    mask = _geo_mask(state, state_fips, cd_geoid)
+    w = metric_map[metric][mask]
     overall = _weight_stats(w)
 
     slices = []

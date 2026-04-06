@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from backend.routes import (
     decompose,
     epochs,
+    geography,
     households,
     statistics,
     strata,
@@ -18,7 +19,6 @@ from backend.routes import (
     weights,
 )
 from backend.services.loader import load_all_artifacts
-from backend.state import AppState
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
         ),
         "db_path": os.environ.get("DB_PATH", "policy_data.db"),
         "dataset_path": os.environ.get(
-            "DATASET_PATH", "extended_cps_2024.h5"
+            "DATASET_PATH", "source_imputed_stratified_extended_cps.h5"
         ),
         "cal_log_path": os.environ.get("CAL_LOG_PATH"),
         "diagnostics_path": os.environ.get("DIAGNOSTICS_PATH"),
@@ -54,11 +54,6 @@ async def lifespan(app: FastAPI):
     yield
 
 
-def get_state(request: Request) -> AppState:
-    """FastAPI dependency that returns the loaded AppState."""
-    return request.app.state.diagnostics
-
-
 app = FastAPI(
     title="Calibration Diagnostics API",
     description="Interactive diagnostics for survey weight calibration",
@@ -72,6 +67,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(geography.router, prefix="/geography", tags=["geography"])
 app.include_router(targets.router, prefix="/targets", tags=["targets"])
 app.include_router(decompose.router, tags=["decompose"])
 app.include_router(strata.router, prefix="/strata", tags=["strata"])

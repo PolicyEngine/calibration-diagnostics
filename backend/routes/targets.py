@@ -3,10 +3,12 @@
 import operator as op_module
 
 import numpy as np
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
-from backend.app import get_state
+from backend.services.geo_utils import geo_display_name
+from backend.state import get_state
 from backend.models import (
     ConstraintCheck,
     ConstraintDiffResponse,
@@ -68,33 +70,35 @@ def search_targets(
                 "estimate": float(row.get("estimate", 0)),
                 "rel_error": float(row.get("rel_error", 0)),
                 "abs_rel_error": float(row.get("abs_rel_error", 0)),
-                "pull_score": float(row.get("pull_score", 0)),
+                "loss_contribution": float(row.get("loss_contribution", 0)),
                 "n_contributors": int(row.get("n_contributors", 0)),
             }
         out.append({**r, **error_info})
 
-    if sort_by in ("abs_rel_error", "pull_score", "rel_error"):
+    if sort_by in ("abs_rel_error", "loss_contribution", "rel_error"):
         out.sort(key=lambda x: abs(x.get(sort_by, 0)), reverse=True)
     return out
 
 
-@router.get("/poverty-impact")
-def poverty_impact(
+@router.get("/worst-fit")
+def worst_fit(
     limit: int = 20,
     state: AppState = Depends(get_state),
 ) -> list[TargetRow]:
     enriched = state.targets_enriched.sort_values(
-        "pull_score", ascending=False
+        "loss_contribution", ascending=False
     ).head(limit)
     return [_target_row(enriched, idx) for idx in enriched.index]
 
 
 @router.get("")
 def list_targets(
-    sort_by: str = "pull_score",
+    sort_by: str = "loss_contribution",
     sort_order: str = "desc",
     variable: str | None = None,
     geo_level: str | None = None,
+    geographic_id: str | None = None,
+    state_fips: int | None = Query(None, alias="state_fips"),
     domain_variable: str | None = None,
     min_abs_rel_error: float | None = None,
     limit: int = 50,
@@ -107,6 +111,13 @@ def list_targets(
         df = df[df["variable"].str.contains(variable, case=False, na=False)]
     if geo_level:
         df = df[df["geo_level"] == geo_level]
+    if geographic_id:
+        df = df[df["geographic_id"].astype(str) == str(geographic_id)]
+    if state_fips is not None:
+        df = df[df["geographic_id"].apply(
+            lambda gid: str(gid).isdigit() and int(gid) // 100 == state_fips
+            or str(gid) == str(state_fips)
+        )]
     if domain_variable:
         df = df[
             df["domain_variable"].str.contains(
@@ -394,23 +405,31 @@ def convergence(
 # --- Helpers ---
 
 
+def _nan_to_none(val):
+    """Convert pandas NaN to None for Pydantic compatibility."""
+    if isinstance(val, float) and pd.isna(val):
+        return None
+    return val
+
+
 def _target_row(df, idx: int) -> TargetRow:
     r = df.loc[idx]
+    gl = _nan_to_none(r.get("geo_level")) or "national"
+    gid = str(_nan_to_none(r.get("geographic_id")) or "US")
     return TargetRow(
         target_idx=idx,
         target_name=str(r.get("target_name", "")),
         variable=str(r.get("variable", "")),
-        geo_level=r.get("geo_level"),
-        geographic_id=str(r.get("geographic_id", "")),
-        domain_variable=r.get("domain_variable"),
+        geo_level=gl,
+        geographic_id=gid,
+        geo_display_name=geo_display_name(gl, gid),
+        domain_variable=_nan_to_none(r.get("domain_variable")),
         target_value=float(r["value"]),
         estimate=float(r.get("estimate", 0)),
         rel_error=float(r.get("rel_error", 0)),
         abs_rel_error=float(r.get("abs_rel_error", 0)),
-        poor_weight_share=float(r.get("poor_weight_share", 0)),
-        pull_score=float(r.get("pull_score", 0)),
+        loss_contribution=float(r.get("loss_contribution", 0)),
         n_contributors=int(r.get("n_contributors", 0)),
-        n_poor_contributors=int(r.get("n_poor_contributors", 0)),
     )
 
 

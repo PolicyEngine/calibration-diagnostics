@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
-from backend.app import get_state
+from backend.state import get_state
 from backend.models import StratumDetail
 from backend.services import db_service
 from backend.state import AppState

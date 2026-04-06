@@ -40,13 +40,13 @@ const componentColumns = [
   },
   {
     key: "initial_total",
-    header: "Initial Total",
+    header: "Initial total",
     align: "right" as const,
     format: (val: unknown) => `$${formatNumber(Number(val))}`,
   },
   {
     key: "final_total",
-    header: "Final Total",
+    header: "Final total",
     align: "right" as const,
     format: (val: unknown) => `$${formatNumber(Number(val))}`,
   },
@@ -88,7 +88,7 @@ export default function DecomposePage() {
   return (
     <AppShell>
       <Stack gap="lg">
-        <Title order={2}>Variable Decomposition</Title>
+        <Title order={2}>Variable decomposition</Title>
 
         {/* Input */}
         <Card>

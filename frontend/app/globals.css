@@ -1,2 +1,7 @@
 @import "tailwindcss";
 @import "@policyengine/ui-kit/theme.css";
+
+/* Override ui-kit DataTable wrapper to allow horizontal scroll */
+.bg-card.overflow-hidden {
+  overflow-x: auto !important;
+}

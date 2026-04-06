@@ -3,7 +3,7 @@
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.app import get_state
+from backend.state import get_state
 from backend.models import (
     DecomposeComponent,
     DecomposeRequest,

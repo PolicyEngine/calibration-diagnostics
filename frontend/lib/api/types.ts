@@ -1,18 +1,24 @@
+export interface GeoOption {
+  fips?: number;
+  cd_geoid?: number;
+  name: string;
+  abbrev?: string;
+}
+
 export interface Target {
   target_idx: number;
   target_name: string;
   variable: string;
   geo_level: string | null;
   geographic_id: string | null;
+  geo_display_name: string | null;
   domain_variable: string | null;
   target_value: number;
   estimate: number;
   rel_error: number;
   abs_rel_error: number;
-  poor_weight_share: number;
-  pull_score: number;
+  loss_contribution: number;
   n_contributors: number;
-  n_poor_contributors: number;
 }
 
 export interface PaginatedResponse<T> {
@@ -168,7 +174,8 @@ export interface PovertyRate {
   spm_poverty_rate: number;
   spm_poverty_rate_initial_weights: number;
   n_poor_weighted: number;
-  n_total_weighted: number;
+  n_total_weighted_households: number;
+  n_total_weighted_individuals: number;
   benchmark_census: number;
 }
 

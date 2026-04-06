@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from backend.app import get_state
+from backend.state import get_state
 from backend.models import ConvergencePoint, EpochSummaryRow
 from backend.state import AppState
 

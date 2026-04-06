@@ -22,6 +22,10 @@ import {
   Text,
   formatPercent,
   MetricCard,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
 } from "@policyengine/ui-kit";
 import { AppShell } from "@/components/layout/app-shell";
 import { useTargets } from "@/lib/api/hooks/use-targets";
@@ -32,6 +36,7 @@ import {
   useTargetConvergence,
   useProvenance,
 } from "@/lib/api/hooks/use-target-detail";
+import { useGeo, useGeoParams } from "@/lib/geo-context";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
@@ -39,10 +44,9 @@ import { Suspense } from "react";
 const targetColumns = [
   { key: "target_name", header: "Target" },
   { key: "variable", header: "Variable" },
-  { key: "geo_level", header: "Geo" },
   {
     key: "rel_error",
-    header: "Rel Error",
+    header: "Rel. error",
     align: "right" as const,
     format: (val: unknown) => {
       const v = Number(val);
@@ -51,14 +55,41 @@ const targetColumns = [
     },
   },
   {
-    key: "pull_score",
-    header: "Pull Score",
+    key: "loss_contribution",
+    header: (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="underline decoration-dotted cursor-help">Loss contribution</span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p>This target's share of the total calibration loss (sum of squared relative errors). Higher means the optimizer is struggling most with this target.</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
     align: "right" as const,
-    format: (val: unknown) => Number(val).toFixed(3),
+    format: (val: unknown) => {
+      const v = Number(val);
+      if (v >= 0.01) return `${(v * 100).toFixed(1)}%`;
+      if (v >= 0.001) return `${(v * 100).toFixed(2)}%`;
+      return `${(v * 100).toFixed(3)}%`;
+    },
   },
   {
     key: "n_contributors",
-    header: "Contributors",
+    header: (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="underline decoration-dotted cursor-help">Contributors</span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p>Number of household-clone records that have a non-zero value for this target in the calibration matrix. More contributors means the target is spread across more records.</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
     align: "right" as const,
     format: (val: unknown) => Number(val).toLocaleString(),
   },
@@ -76,7 +107,7 @@ const contributorColumns = [
   },
   {
     key: "g_weight",
-    header: "G-Weight",
+    header: "G-weight",
     align: "right" as const,
     format: (val: unknown) => Number(val).toFixed(1),
   },
@@ -134,6 +165,8 @@ const constraintColumns = [
 function TargetExplorerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { geo } = useGeo();
+  const geoParams = useGeoParams();
   const selectedIdx = searchParams.get("selected")
     ? Number(searchParams.get("selected"))
     : null;
@@ -143,6 +176,8 @@ function TargetExplorerContent() {
     sortBy: "abs_rel_error",
     sortOrder: "desc",
     variable: variableFilter,
+    geoLevel: geo.level,
+    stateFips: geo.stateFips,
     limit: 50,
   });
 
@@ -161,7 +196,7 @@ function TargetExplorerContent() {
   return (
     <AppShell>
       <Stack gap="lg">
-        <Title order={2}>Target Explorer</Title>
+        <Title order={2}>Target explorer: {geo.label === "National" ? "US" : geo.label}</Title>
 
         {/* Filter bar */}
         <Group gap="md">
@@ -182,8 +217,8 @@ function TargetExplorerContent() {
         </Group>
 
         {/* Target table */}
-        <Card>
-          <CardContent>
+        <div className="overflow-x-auto -mx-6 px-6">
+          <div className="min-w-[800px]">
             {targets.data ? (
               <DataTable
                 columns={targetColumns}
@@ -195,14 +230,14 @@ function TargetExplorerContent() {
             ) : (
               <Skeleton className="h-64 w-full" />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Detail panel */}
         {selectedIdx !== null && (
           <Card>
             <CardHeader>
-              <CardTitle>Target Detail: #{selectedIdx}</CardTitle>
+              <CardTitle>Target detail: #{selectedIdx}</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="overview">
@@ -218,7 +253,7 @@ function TargetExplorerContent() {
                     {/* Error decomposition */}
                     {errorDecomp.data && (
                       <Stack gap="sm">
-                        <Text weight="semibold">Error Decomposition</Text>
+                        <Text weight="semibold">Error decomposition</Text>
                         <Group gap="md" wrap="wrap">
                           <MetricCard
                             label="Target"
@@ -226,17 +261,17 @@ function TargetExplorerContent() {
                             format="number"
                           />
                           <MetricCard
-                            label="Raw Sum"
+                            label="Raw sum"
                             value={errorDecomp.data.raw_sum}
                             format="number"
                           />
                           <MetricCard
-                            label="Initial Est"
+                            label="Initial est."
                             value={errorDecomp.data.initial_estimate}
                             format="number"
                           />
                           <MetricCard
-                            label="Final Est"
+                            label="Final est."
                             value={errorDecomp.data.final_estimate}
                             format="number"
                           />
@@ -296,7 +331,7 @@ function TargetExplorerContent() {
                           },
                           {
                             key: "rel_error",
-                            header: "Rel Error",
+                            header: "Rel. error",
                             align: "right" as const,
                             format: (v: unknown) => formatPercent(Number(v), 1),
                           },

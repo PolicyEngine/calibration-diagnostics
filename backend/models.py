@@ -9,15 +9,14 @@ class TargetRow(BaseModel):
     variable: str
     geo_level: str | None = None
     geographic_id: str | None = None
+    geo_display_name: str | None = None
     domain_variable: str | None = None
     target_value: float
     estimate: float
     rel_error: float
     abs_rel_error: float
-    poor_weight_share: float
-    pull_score: float
+    loss_contribution: float
     n_contributors: int
-    n_poor_contributors: int
 
 
 class TargetListResponse(BaseModel):
@@ -159,7 +158,8 @@ class PovertyRateResponse(BaseModel):
     spm_poverty_rate: float
     spm_poverty_rate_initial_weights: float
     n_poor_weighted: float
-    n_total_weighted: float
+    n_total_weighted_households: float
+    n_total_weighted_individuals: float
     benchmark_census: float
 
 

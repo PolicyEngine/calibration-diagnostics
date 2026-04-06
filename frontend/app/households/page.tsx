@@ -26,6 +26,7 @@ import {
   useHouseholdProfile,
   useHouseholdAttributions,
 } from "@/lib/api/hooks/use-households";
+import { useGeo, useGeoParams } from "@/lib/geo-context";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -50,11 +51,14 @@ function HouseholdInspectorContent() {
     searchParams.get("val") ?? "0",
   );
 
+  const { geo } = useGeo();
+  const geoParams = useGeoParams();
   const households = useDistortedHouseholds({
     minGWeight: Number(minGWeight) || 5,
     filterVariable: filterVar || undefined,
     filterOperator: filterOp,
     filterValue: Number(filterVal) || 0,
+    state: geo.level !== "national" ? geo.stateFips : undefined,
     limit: 50,
   });
 
@@ -65,7 +69,7 @@ function HouseholdInspectorContent() {
     { key: "household_idx", header: "Household" },
     {
       key: "g_weight",
-      header: "G-Weight",
+      header: "G-weight",
       align: "right" as const,
       format: (v: unknown) => Number(v).toFixed(1),
     },
@@ -118,7 +122,7 @@ function HouseholdInspectorContent() {
     },
     {
       key: "target_rel_error",
-      header: "Target Error",
+      header: "Target error",
       align: "right" as const,
       format: (v: unknown) => `${(Number(v) * 100).toFixed(1)}%`,
     },
@@ -149,14 +153,14 @@ function HouseholdInspectorContent() {
   return (
     <AppShell>
       <Stack gap="lg">
-        <Title order={2}>Household Inspector</Title>
+        <Title order={2}>Household inspector</Title>
 
         {/* Filters */}
         <Card>
           <CardContent>
             <Group gap="md" align="end" wrap="wrap">
               <Stack gap="xs">
-                <Text size="sm" c="dimmed">Min G-Weight</Text>
+                <Text size="sm" c="dimmed">Min g-weight</Text>
                 <Input
                   type="number"
                   value={minGWeight}
@@ -167,7 +171,7 @@ function HouseholdInspectorContent() {
                 />
               </Stack>
               <Stack gap="xs">
-                <Text size="sm" c="dimmed">Filter Variable</Text>
+                <Text size="sm" c="dimmed">Filter variable</Text>
                 <Input
                   value={filterVar}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -236,12 +240,12 @@ function HouseholdInspectorContent() {
                     <Stack gap="md">
                       <Group gap="md" wrap="wrap">
                         <MetricCard
-                          label="G-Weight"
+                          label="G-weight"
                           value={profile.data.g_weight}
                           format="number"
                         />
                         <MetricCard
-                          label="Final Weight"
+                          label="Final weight"
                           value={profile.data.final_weight}
                           format="number"
                         />
@@ -251,7 +255,7 @@ function HouseholdInspectorContent() {
                           format="number"
                         />
                         <MetricCard
-                          label="In Poverty"
+                          label="In poverty"
                           value={profile.data.in_poverty ? "Yes" : "No"}
                           format="string"
                         />

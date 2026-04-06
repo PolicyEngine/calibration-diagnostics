@@ -4,8 +4,8 @@ export const targetKeys = {
     [...targetKeys.all, "list", params] as const,
   search: (variable: string) =>
     [...targetKeys.all, "search", variable] as const,
-  povertyImpact: () =>
-    [...targetKeys.all, "poverty-impact"] as const,
+  worstFit: () =>
+    [...targetKeys.all, "worst-fit"] as const,
   errorDecomposition: (id: number) =>
     [...targetKeys.all, "error-decomp", id] as const,
   provenance: (id: number) =>

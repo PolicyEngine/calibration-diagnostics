@@ -6,6 +6,8 @@ import type { WeightDistribution, HistogramBin } from "../types";
 interface WeightDistributionParams {
   sliceBy?: string;
   metric?: string;
+  stateFips?: number;
+  cdGeoid?: number;
 }
 
 export function useWeightDistribution(params: WeightDistributionParams = {}) {
@@ -15,6 +17,8 @@ export function useWeightDistribution(params: WeightDistributionParams = {}) {
       apiGet<WeightDistribution>("/weights/distribution", {
         slice_by: params.sliceBy ?? "none",
         metric: params.metric ?? "g_weight",
+        state_fips: params.stateFips,
+        cd_geoid: params.cdGeoid,
       }),
   });
 }
@@ -26,6 +30,8 @@ interface HistogramParams {
   filterVariable?: string;
   filterOperator?: string;
   filterValue?: number;
+  stateFips?: number;
+  cdGeoid?: number;
 }
 
 export function useWeightHistogram(params: HistogramParams = {}) {
@@ -39,6 +45,8 @@ export function useWeightHistogram(params: HistogramParams = {}) {
         filter_variable: params.filterVariable,
         filter_operator: params.filterOperator ?? "gt",
         filter_value: params.filterValue ?? 0,
+        state_fips: params.stateFips,
+        cd_geoid: params.cdGeoid,
       }),
   });
 }

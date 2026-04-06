@@ -3,7 +3,7 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Calibration Diagnostics",
+  title: "Calibration diagnostics",
   description: "Interactive diagnostics for survey weight calibration",
 };
 
