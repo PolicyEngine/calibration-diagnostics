@@ -12,6 +12,7 @@ interface UseTargetsParams {
   stateFips?: number;
   domainVariable?: string;
   minAbsRelError?: number;
+  includedOnly?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -21,7 +22,7 @@ export function useTargets(params: UseTargetsParams = {}) {
     queryKey: targetKeys.list(params),
     queryFn: () =>
       apiGet<PaginatedResponse<Target>>("/targets", {
-        sort_by: params.sortBy ?? "pull_score",
+        sort_by: params.sortBy ?? "loss_contribution",
         sort_order: params.sortOrder ?? "desc",
         variable: params.variable,
         geo_level: params.geoLevel,
@@ -29,6 +30,7 @@ export function useTargets(params: UseTargetsParams = {}) {
         state_fips: params.stateFips,
         domain_variable: params.domainVariable,
         min_abs_rel_error: params.minAbsRelError,
+        included_only: params.includedOnly,
         limit: params.limit ?? 50,
         offset: params.offset ?? 0,
       }),

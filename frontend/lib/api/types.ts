@@ -7,18 +7,20 @@ export interface GeoOption {
 
 export interface Target {
   target_idx: number;
-  target_name: string;
+  target_id: number | null;
   variable: string;
   geo_level: string | null;
   geographic_id: string | null;
   geo_display_name: string | null;
-  domain_variable: string | null;
+  domain: string | null;
+  additional_constraints: string | null;
   target_value: number;
   estimate: number;
   rel_error: number;
   abs_rel_error: number;
   loss_contribution: number;
   n_contributors: number;
+  included: boolean;
 }
 
 export interface PaginatedResponse<T> {

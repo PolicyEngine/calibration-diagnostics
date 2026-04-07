@@ -44,6 +44,9 @@ class AppState:
     cal_log: Optional[pd.DataFrame] = None
     diagnostics_csv: Optional[pd.DataFrame] = None
 
+    # -- Target config --
+    target_config: Optional[dict] = None
+
     # -- Derived scalars --
     time_period: int = 2024
     n_targets: int = 0

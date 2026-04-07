@@ -29,7 +29,6 @@ import {
 } from "@/lib/api/hooks/use-statistics";
 import { useTargets } from "@/lib/api/hooks/use-targets";
 import { useGeo, useGeoParams } from "@/lib/geo-context";
-import Link from "next/link";
 import { getBenchmark, SOURCE_URLS } from "@/lib/census-benchmarks";
 import { STATE_FIPS_TO_NAME } from "@/lib/geo-names";
 
@@ -217,18 +216,33 @@ function FitBreakdownBar({ fit }: { fit: CalibrationFit }) {
 
 const targetTableColumns = [
   {
-    key: "target_name",
-    header: "Target",
-    format: (val: unknown, row: Record<string, unknown>) => (
-      <Link
-        href={`/targets?selected=${row.target_idx}`}
-        className="text-primary hover:underline text-sm"
-      >
-        {String(val)}
-      </Link>
-    ),
+    key: "target_id",
+    header: "ID",
+    format: (val: unknown) => val !== null ? `#${val}` : "",
+  },
+  {
+    key: "geo_display_name",
+    header: "Geography",
+    format: (val: unknown) => String(val ?? "National"),
   },
   { key: "variable", header: "Variable" },
+  {
+    key: "domain",
+    header: "Domain",
+    format: (val: unknown) => val ? String(val) : "",
+  },
+  {
+    key: "target_value",
+    header: "Target value",
+    align: "right" as const,
+    format: (val: unknown) => formatNumber(Number(val)),
+  },
+  {
+    key: "estimate",
+    header: "Estimate",
+    align: "right" as const,
+    format: (val: unknown) => formatNumber(Number(val)),
+  },
   {
     key: "rel_error",
     header: "Rel. error",
@@ -260,12 +274,14 @@ export default function OverviewNewPage() {
   const calibrationFit = useCalibrationFit({
     geoLevel: geo.level,
     stateFips: geo.stateFips,
+    includedOnly: true,
   });
   const worstTargets = useTargets({
     sortBy: "abs_rel_error",
     sortOrder: "desc",
     geoLevel: geo.level,
     stateFips: geo.stateFips,
+    includedOnly: true,
     limit: 10,
   });
   const bestTargets = useTargets({
@@ -273,6 +289,7 @@ export default function OverviewNewPage() {
     sortOrder: "asc",
     geoLevel: geo.level,
     stateFips: geo.stateFips,
+    includedOnly: true,
     limit: 10,
   });
 

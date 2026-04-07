@@ -9,6 +9,19 @@ from policyengine_us_data.db.create_database_tables import (
 )
 
 
+def batch_get_all_stratum_constraints(session: Session) -> dict[int, list[dict]]:
+    """Return all constraints grouped by stratum_id in a single query."""
+    all_constraints = session.exec(select(StratumConstraint)).all()
+    result: dict[int, list[dict]] = {}
+    for c in all_constraints:
+        result.setdefault(c.stratum_id, []).append({
+            "variable": c.constraint_variable,
+            "operation": c.operation,
+            "value": c.value,
+        })
+    return result
+
+
 def get_target_provenance(
     session: Session,
     target_id: int,

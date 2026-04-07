@@ -34,6 +34,7 @@ export function useMedianAgi(params: GeoParams = {}) {
 interface CalibrationFitParams {
   geoLevel?: string;
   stateFips?: number;
+  includedOnly?: boolean;
 }
 
 export interface CalibrationFit {
@@ -55,6 +56,7 @@ export function useCalibrationFit(params: CalibrationFitParams = {}) {
       apiGet<CalibrationFit>("/statistics/calibration-fit", {
         geo_level: params.geoLevel,
         state_fips: params.stateFips,
+        included_only: params.includedOnly ?? true,
       }),
   });
 }

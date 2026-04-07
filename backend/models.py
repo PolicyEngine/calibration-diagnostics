@@ -5,18 +5,20 @@ from pydantic import BaseModel
 
 class TargetRow(BaseModel):
     target_idx: int
-    target_name: str
+    target_id: int | None = None
     variable: str
     geo_level: str | None = None
     geographic_id: str | None = None
     geo_display_name: str | None = None
-    domain_variable: str | None = None
+    domain: str | None = None
+    additional_constraints: str | None = None
     target_value: float
     estimate: float
     rel_error: float
     abs_rel_error: float
     loss_contribution: float
     n_contributors: int
+    included: bool = True
 
 
 class TargetListResponse(BaseModel):

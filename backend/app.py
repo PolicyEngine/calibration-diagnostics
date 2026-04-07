@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
         ),
         "cal_log_path": os.environ.get("CAL_LOG_PATH"),
         "diagnostics_path": os.environ.get("DIAGNOSTICS_PATH"),
+        "target_config_path": os.environ.get("TARGET_CONFIG_PATH"),
     }
     logger.info("Loading artifacts with config: %s", config)
     state = load_all_artifacts(config)

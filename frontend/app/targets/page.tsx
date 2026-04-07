@@ -5,7 +5,6 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  DataTable,
   Badge,
   Tabs,
   TabsList,
@@ -27,6 +26,7 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@policyengine/ui-kit";
+import { DataTable } from "@/components/shared/InteractiveDataTable";
 import { AppShell } from "@/components/layout/app-shell";
 import { useTargets } from "@/lib/api/hooks/use-targets";
 import {
@@ -39,11 +39,26 @@ import {
 import { useGeo, useGeoParams } from "@/lib/geo-context";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 
-const targetColumns = [
-  { key: "target_name", header: "Target" },
+const baseTargetColumns = [
+  { key: "target_id", header: "ID", format: (val: unknown) => val !== null ? `#${val}` : "" },
+  { key: "geo_display_name", header: "Geography", format: (val: unknown) => String(val ?? "National") },
   { key: "variable", header: "Variable" },
+  { key: "domain", header: "Domain", format: (val: unknown) => val ? String(val) : "" },
+  { key: "additional_constraints", header: "Additional constraints", format: (val: unknown) => val ? String(val) : "" },
+  {
+    key: "target_value",
+    header: "Target value",
+    align: "right" as const,
+    format: (val: unknown) => Number(val).toLocaleString(),
+  },
+  {
+    key: "estimate",
+    header: "Estimate",
+    align: "right" as const,
+    format: (val: unknown) => Number(val).toLocaleString(),
+  },
   {
     key: "rel_error",
     header: "Rel. error",
@@ -56,18 +71,7 @@ const targetColumns = [
   },
   {
     key: "loss_contribution",
-    header: (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="underline decoration-dotted cursor-help">Loss contribution</span>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">
-            <p>This target's share of the total calibration loss (sum of squared relative errors). Higher means the optimizer is struggling most with this target.</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    ),
+    header: "Loss contribution",
     align: "right" as const,
     format: (val: unknown) => {
       const v = Number(val);
@@ -78,22 +82,18 @@ const targetColumns = [
   },
   {
     key: "n_contributors",
-    header: (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="underline decoration-dotted cursor-help">Contributors</span>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">
-            <p>Number of household-clone records that have a non-zero value for this target in the calibration matrix. More contributors means the target is spread across more records.</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    ),
+    header: "Contributors",
     align: "right" as const,
     format: (val: unknown) => Number(val).toLocaleString(),
   },
 ];
+
+const statusColumn = {
+  key: "included",
+  header: "Status",
+  format: (val: unknown) =>
+    val ? <Badge variant="success">Included</Badge> : <Badge variant="secondary">Skipped</Badge>,
+};
 
 const contributorColumns = [
   {
@@ -167,19 +167,28 @@ function TargetExplorerContent() {
   const router = useRouter();
   const { geo } = useGeo();
   const geoParams = useGeoParams();
+  const [showAll, setShowAll] = useState(false);
   const selectedIdx = searchParams.get("selected")
     ? Number(searchParams.get("selected"))
     : null;
-  const variableFilter = searchParams.get("variable") ?? undefined;
 
   const targets = useTargets({
     sortBy: "abs_rel_error",
     sortOrder: "desc",
-    variable: variableFilter,
     geoLevel: geo.level,
     stateFips: geo.stateFips,
-    limit: 50,
+    includedOnly: showAll ? undefined : true,
+    limit: 200,
   });
+
+  const handleSort = (col: string) => {
+    if (sortBy === col) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(col);
+      setSortOrder("desc");
+    }
+  };
 
   const errorDecomp = useErrorDecomposition(selectedIdx);
   const constraintDiff = useConstraintDiff(selectedIdx);
@@ -187,33 +196,21 @@ function TargetExplorerContent() {
   const convergence = useTargetConvergence(selectedIdx);
   const provenance = useProvenance(selectedIdx);
 
-  const handleRowClick = (row: Record<string, unknown>) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("selected", String(row.target_idx));
-    router.replace(`?${params.toString()}`);
-  };
-
   return (
     <AppShell>
       <Stack gap="lg">
-        <Title order={2}>Target explorer: {geo.label === "National" ? "US" : geo.label}</Title>
-
-        {/* Filter bar */}
-        <Group gap="md">
-          <Input
-            placeholder="Filter by variable..."
-            defaultValue={variableFilter}
-            className="w-64"
-            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-              if (e.key === "Enter") {
-                const val = (e.target as HTMLInputElement).value;
-                const params = new URLSearchParams(searchParams.toString());
-                if (val) params.set("variable", val);
-                else params.delete("variable");
-                router.replace(`?${params.toString()}`);
-              }
-            }}
-          />
+        <Group gap="md" justify="space-between" align="end">
+          <Title order={2}>Target explorer: {geo.label === "National" ? "US" : geo.label}</Title>
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className={`px-3 py-1.5 rounded text-sm border transition-colors ${
+              showAll
+                ? "bg-yellow-50 border-yellow-300 text-yellow-800"
+                : "bg-white border-border text-muted-foreground hover:bg-gray-50"
+            }`}
+          >
+            {showAll ? "Showing all targets (incl. skipped)" : "View skipped targets"}
+          </button>
         </Group>
 
         {/* Target table */}
@@ -221,7 +218,9 @@ function TargetExplorerContent() {
           <div className="min-w-[800px]">
             {targets.data ? (
               <DataTable
-                columns={targetColumns}
+                columns={showAll ? [...baseTargetColumns, statusColumn] : baseTargetColumns}
+                sortable
+                filterable
                 data={targets.data.items.map((t) => ({
                   ...t,
                   _selected: t.target_idx === selectedIdx,

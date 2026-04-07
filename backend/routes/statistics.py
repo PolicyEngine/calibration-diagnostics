@@ -94,10 +94,14 @@ def median_agi(
 def calibration_fit(
     geo_level: str | None = None,
     state_fips: int | None = Query(None, alias="state_fips"),
+    included_only: bool = True,
     state: AppState = Depends(get_state),
 ) -> dict:
     """Summary of calibration fit quality across targets."""
     df = state.targets_enriched
+
+    if included_only:
+        df = df[df["included"]]
 
     # Filter to geographic level
     if geo_level:

@@ -83,10 +83,14 @@ def search_targets(
 @router.get("/worst-fit")
 def worst_fit(
     limit: int = 20,
+    included_only: bool = True,
     state: AppState = Depends(get_state),
 ) -> list[TargetRow]:
-    enriched = state.targets_enriched.sort_values(
-        "loss_contribution", ascending=False
+    enriched = state.targets_enriched
+    if included_only:
+        enriched = enriched[enriched["included"]]
+    enriched = enriched.sort_values(
+        "abs_rel_error", ascending=False
     ).head(limit)
     return [_target_row(enriched, idx) for idx in enriched.index]
 
@@ -101,12 +105,15 @@ def list_targets(
     state_fips: int | None = Query(None, alias="state_fips"),
     domain_variable: str | None = None,
     min_abs_rel_error: float | None = None,
+    included_only: bool | None = None,
     limit: int = 50,
     offset: int = 0,
     state: AppState = Depends(get_state),
 ) -> TargetListResponse:
     df = state.targets_enriched
 
+    if included_only is not None:
+        df = df[df["included"] == included_only]
     if variable:
         df = df[df["variable"].str.contains(variable, case=False, na=False)]
     if geo_level:
@@ -412,24 +419,32 @@ def _nan_to_none(val):
     return val
 
 
+def _safe_int(val) -> int | None:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    return int(val)
+
+
 def _target_row(df, idx: int) -> TargetRow:
     r = df.loc[idx]
     gl = _nan_to_none(r.get("geo_level")) or "national"
     gid = str(_nan_to_none(r.get("geographic_id")) or "US")
     return TargetRow(
         target_idx=idx,
-        target_name=str(r.get("target_name", "")),
+        target_id=_safe_int(r.get("target_id")),
         variable=str(r.get("variable", "")),
         geo_level=gl,
         geographic_id=gid,
         geo_display_name=geo_display_name(gl, gid),
-        domain_variable=_nan_to_none(r.get("domain_variable")),
+        domain=_nan_to_none(r.get("domain")),
+        additional_constraints=_nan_to_none(r.get("additional_constraints")),
         target_value=float(r["value"]),
         estimate=float(r.get("estimate", 0)),
         rel_error=float(r.get("rel_error", 0)),
         abs_rel_error=float(r.get("abs_rel_error", 0)),
         loss_contribution=float(r.get("loss_contribution", 0)),
         n_contributors=int(r.get("n_contributors", 0)),
+        included=bool(r.get("included", True)),
     )
 
 

@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 
 from policyengine_us_data.calibration.unified_calibration import (
     load_calibration_package,
+    load_target_config,
 )
 
 from backend.services.geo_utils import parse_cd_geoids
@@ -29,6 +30,7 @@ HF_ARTIFACTS = {
     "dataset_path": "source_imputed_stratified_extended_cps.h5",
     "cal_log_path": "calibration_log.csv",
     "diagnostics_path": "unified_diagnostics.csv",
+    "target_config_path": "target_config.yaml",
 }
 
 
@@ -178,7 +180,29 @@ def load_all_artifacts(config: dict) -> AppState:
         db_engine = create_engine(f"sqlite:///{config['db_path']}")
         logger.info("Connected to policy_data.db at %s", config["db_path"])
 
-    # 9. Load optional CSVs
+    # 9. Load target config and mark included/excluded
+    target_config = None
+    tc_path = config.get("target_config_path")
+    if tc_path and Path(tc_path).exists():
+        target_config = load_target_config(tc_path)
+        targets_enriched = _apply_included_flag(targets_enriched, target_config)
+        logger.info(
+            "Target config: %d included, %d excluded",
+            targets_enriched["included"].sum(),
+            (~targets_enriched["included"]).sum(),
+        )
+        # Recompute loss_contribution over included targets only
+        targets_enriched = _recompute_loss_for_included(targets_enriched)
+    else:
+        targets_enriched["included"] = True
+        logger.warning("No target config found — all targets marked as included")
+
+    # 10. Batch-query constraints and add domain/additional columns
+    if db_engine is not None:
+        targets_enriched = _add_constraint_columns(targets_enriched, db_engine)
+        logger.info("Added domain and additional_constraints columns")
+
+    # 11. Load optional CSVs
     cal_log = _load_csv(config.get("cal_log_path"))
     diagnostics_csv = _load_csv(config.get("diagnostics_path"))
 
@@ -198,6 +222,7 @@ def load_all_artifacts(config: dict) -> AppState:
         db_engine=db_engine,
         cal_log=cal_log,
         diagnostics_csv=diagnostics_csv,
+        target_config=target_config,
         time_period=time_period,
         n_targets=n_targets,
         n_households=n_households,
@@ -252,6 +277,99 @@ def _enrich_targets(
     enriched["n_contributors"] = n_contributors
 
     return enriched
+
+
+def _apply_included_flag(
+    targets_enriched: pd.DataFrame,
+    target_config: dict,
+) -> pd.DataFrame:
+    """Mark each target as included or excluded based on target_config rules."""
+    include_rules = target_config.get("include", [])
+    exclude_rules = target_config.get("exclude", [])
+
+    if not include_rules and not exclude_rules:
+        targets_enriched["included"] = True
+        return targets_enriched
+
+    if include_rules:
+        mask = _match_rules(targets_enriched, include_rules)
+    else:
+        mask = np.ones(len(targets_enriched), dtype=bool)
+
+    if exclude_rules:
+        drop = _match_rules(targets_enriched, exclude_rules)
+        mask &= ~drop
+
+    targets_enriched["included"] = mask
+    return targets_enriched
+
+
+def _match_rules(targets_df: pd.DataFrame, rules: list[dict]) -> np.ndarray:
+    """Build a boolean mask matching any of the given rules.
+
+    Reimplements unified_calibration._match_rules for use at the app level.
+    """
+    mask = np.zeros(len(targets_df), dtype=bool)
+    for rule in rules:
+        rule_mask = targets_df["variable"] == rule["variable"]
+        if "geo_level" in rule:
+            rule_mask = rule_mask & (targets_df["geo_level"] == rule["geo_level"])
+        if "domain_variable" in rule:
+            rule_mask = rule_mask & (
+                targets_df["domain_variable"] == rule["domain_variable"]
+            )
+        mask |= rule_mask.values
+    return mask
+
+
+def _recompute_loss_for_included(targets_enriched: pd.DataFrame) -> pd.DataFrame:
+    """Recompute loss_contribution scoped to included targets only."""
+    included = targets_enriched["included"].values
+    sq_errors = targets_enriched["rel_error"].values ** 2
+    total_included_loss = sq_errors[included].sum()
+    if total_included_loss > 0:
+        loss = np.where(included, sq_errors / total_included_loss, 0.0)
+    else:
+        loss = np.zeros(len(targets_enriched))
+    targets_enriched["loss_contribution"] = loss
+    return targets_enriched
+
+
+GEOGRAPHIC_VARS = {"state_fips", "congressional_district_geoid", "ucgid_str"}
+ADDITIONAL_VARS = {"tax_unit_is_filer"}
+
+
+def _add_constraint_columns(
+    targets_enriched: pd.DataFrame,
+    db_engine,
+) -> pd.DataFrame:
+    """Add domain and additional_constraints columns.
+
+    Domain comes from the package's domain_variable column (internally
+    consistent with the package data). Full constraint details from the
+    DB are only reliable when the DB and package are from the same build.
+    """
+    # domain_variable from the package is the GROUP_CONCAT of
+    # non-geographic constraint variable names. Use it directly.
+    targets_enriched["domain"] = targets_enriched["domain_variable"].apply(
+        lambda v: str(v) if pd.notna(v) else None
+    )
+
+    # For additional_constraints, check if the target name contains
+    # tax_unit_is_filer. The target_name encodes all constraints in
+    # its [...] suffix, so we can parse it from there.
+    def _extract_additional(target_name: str) -> str | None:
+        if not isinstance(target_name, str):
+            return None
+        parts = []
+        if "tax_unit_is_filer" in target_name:
+            parts.append("tax_unit_is_filer == 1")
+        return ", ".join(parts) or None
+
+    targets_enriched["additional_constraints"] = targets_enriched["target_name"].apply(
+        _extract_additional
+    )
+    return targets_enriched
 
 
 def _load_csv(path: str | None) -> pd.DataFrame | None:
