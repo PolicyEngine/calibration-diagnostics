@@ -20,6 +20,7 @@ import {
   Title,
   Text,
   formatPercent,
+  formatNumber,
   MetricCard,
   Tooltip,
   TooltipTrigger,
@@ -45,19 +46,32 @@ const baseTargetColumns = [
   { key: "target_id", header: "ID", format: (val: unknown) => val !== null ? `#${val}` : "" },
   { key: "geo_display_name", header: "Geography", format: (val: unknown) => String(val ?? "National") },
   { key: "variable", header: "Variable" },
-  { key: "domain", header: "Domain", format: (val: unknown) => val ? String(val) : "" },
-  { key: "additional_constraints", header: "Additional constraints", format: (val: unknown) => val ? String(val) : "" },
   {
     key: "target_value",
     header: "Target value",
     align: "right" as const,
-    format: (val: unknown) => Number(val).toLocaleString(),
+    format: (val: unknown) => formatNumber(Number(val)),
+  },
+  {
+    key: "constraints",
+    header: "Constraints",
+    format: (val: unknown) => {
+      const arr = val as string[];
+      if (!arr || arr.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
+      return (
+        <div className="flex flex-col gap-0.5">
+          {arr.map((c: string, i: number) => (
+            <span key={i} className="text-sm whitespace-nowrap">{c}</span>
+          ))}
+        </div>
+      );
+    },
   },
   {
     key: "estimate",
     header: "Estimate",
     align: "right" as const,
-    format: (val: unknown) => Number(val).toLocaleString(),
+    format: (val: unknown) => formatNumber(Number(val)),
   },
   {
     key: "rel_error",
@@ -65,9 +79,17 @@ const baseTargetColumns = [
     align: "right" as const,
     format: (val: unknown) => {
       const v = Number(val);
-      const variant = Math.abs(v) > 0.5 ? "error" : Math.abs(v) > 0.2 ? "warning" : "success";
-      return <Badge variant={variant}>{formatPercent(v, 1)}</Badge>;
+      const abs = Math.abs(v);
+      const variant = abs > 0.5 ? "error" : abs > 0.2 ? "warning" : abs > 0.05 ? "secondary" : "success";
+      const display = abs >= 1 ? `${(v * 100).toFixed(0)}%` : `${(v * 100).toFixed(1)}%`;
+      return <Badge variant={variant}>{display}</Badge>;
     },
+  },
+  {
+    key: "abs_error",
+    header: "Abs. error",
+    align: "right" as const,
+    format: (val: unknown) => formatNumber(Number(val)),
   },
   {
     key: "loss_contribution",
@@ -79,12 +101,6 @@ const baseTargetColumns = [
       if (v >= 0.001) return `${(v * 100).toFixed(2)}%`;
       return `${(v * 100).toFixed(3)}%`;
     },
-  },
-  {
-    key: "n_contributors",
-    header: "Contributors",
-    align: "right" as const,
-    format: (val: unknown) => Number(val).toLocaleString(),
   },
 ];
 
@@ -180,15 +196,6 @@ function TargetExplorerContent() {
     includedOnly: showAll ? undefined : true,
     limit: 200,
   });
-
-  const handleSort = (col: string) => {
-    if (sortBy === col) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(col);
-      setSortOrder("desc");
-    }
-  };
 
   const errorDecomp = useErrorDecomposition(selectedIdx);
   const constraintDiff = useConstraintDiff(selectedIdx);

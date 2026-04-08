@@ -12,14 +12,12 @@ export interface Target {
   geo_level: string | null;
   geographic_id: string | null;
   geo_display_name: string | null;
-  domain: string | null;
-  additional_constraints: string | null;
+  constraints: string[];
   target_value: number;
   estimate: number;
   rel_error: number;
-  abs_rel_error: number;
+  abs_error: number;
   loss_contribution: number;
-  n_contributors: number;
   included: boolean;
 }
 

@@ -227,15 +227,25 @@ const targetTableColumns = [
   },
   { key: "variable", header: "Variable" },
   {
-    key: "domain",
-    header: "Domain",
-    format: (val: unknown) => val ? String(val) : "",
-  },
-  {
     key: "target_value",
     header: "Target value",
     align: "right" as const,
     format: (val: unknown) => formatNumber(Number(val)),
+  },
+  {
+    key: "constraints",
+    header: "Constraints",
+    format: (val: unknown) => {
+      const arr = val as string[];
+      if (!arr || arr.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
+      return (
+        <div className="flex flex-col gap-0.5">
+          {arr.map((c: string, i: number) => (
+            <span key={i} className="text-sm whitespace-nowrap">{c}</span>
+          ))}
+        </div>
+      );
+    },
   },
   {
     key: "estimate",
@@ -256,10 +266,21 @@ const targetTableColumns = [
     },
   },
   {
-    key: "n_contributors",
-    header: "Contributors",
+    key: "abs_error",
+    header: "Abs. error",
     align: "right" as const,
-    format: (val: unknown) => Number(val).toLocaleString(),
+    format: (val: unknown) => formatNumber(Number(val)),
+  },
+  {
+    key: "loss_contribution",
+    header: "Loss contribution",
+    align: "right" as const,
+    format: (val: unknown) => {
+      const v = Number(val);
+      if (v >= 0.01) return `${(v * 100).toFixed(1)}%`;
+      if (v >= 0.001) return `${(v * 100).toFixed(2)}%`;
+      return `${(v * 100).toFixed(3)}%`;
+    },
   },
 ];
 

@@ -425,10 +425,26 @@ def _safe_int(val) -> int | None:
     return int(val)
 
 
+def _parse_constraints_from_name(target_name: str) -> list[str]:
+    """Extract non-geographic constraints from target_name.
+
+    Target names look like: national/snap/[tax_unit_is_filer==1,snap>0]
+    or: cd_0622/person_count/[age>=18,age<25]
+    or: national/rent (no brackets = no constraints)
+    """
+    if not isinstance(target_name, str) or "[" not in target_name:
+        return []
+    bracket = target_name[target_name.index("[") + 1 : target_name.rindex("]")]
+    if not bracket:
+        return []
+    return [c.strip() for c in bracket.split(",") if c.strip()]
+
+
 def _target_row(df, idx: int) -> TargetRow:
     r = df.loc[idx]
     gl = _nan_to_none(r.get("geo_level")) or "national"
     gid = str(_nan_to_none(r.get("geographic_id")) or "US")
+    constraints = _parse_constraints_from_name(str(r.get("target_name", "")))
     return TargetRow(
         target_idx=idx,
         target_id=_safe_int(r.get("target_id")),
@@ -436,23 +452,11 @@ def _target_row(df, idx: int) -> TargetRow:
         geo_level=gl,
         geographic_id=gid,
         geo_display_name=geo_display_name(gl, gid),
-        domain=_nan_to_none(r.get("domain")),
-        additional_constraints=_nan_to_none(r.get("additional_constraints")),
+        constraints=constraints,
         target_value=float(r["value"]),
         estimate=float(r.get("estimate", 0)),
         rel_error=float(r.get("rel_error", 0)),
-        abs_rel_error=float(r.get("abs_rel_error", 0)),
+        abs_error=abs(float(r.get("estimate", 0)) - float(r["value"])),
         loss_contribution=float(r.get("loss_contribution", 0)),
-        n_contributors=int(r.get("n_contributors", 0)),
         included=bool(r.get("included", True)),
     )
-
-
-def _parse_value(val: str):
-    """Parse a constraint value string to a numeric type."""
-    if val.lower() in ("true", "false"):
-        return val.lower() == "true"
-    try:
-        return float(val)
-    except ValueError:
-        return val

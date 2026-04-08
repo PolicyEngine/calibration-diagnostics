@@ -10,14 +10,12 @@ class TargetRow(BaseModel):
     geo_level: str | None = None
     geographic_id: str | None = None
     geo_display_name: str | None = None
-    domain: str | None = None
-    additional_constraints: str | None = None
+    constraints: list[str] = []
     target_value: float
     estimate: float
     rel_error: float
-    abs_rel_error: float
+    abs_error: float
     loss_contribution: float
-    n_contributors: int
     included: bool = True
 
 
