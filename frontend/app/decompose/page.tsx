@@ -5,7 +5,6 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  DataTable,
   Badge,
   Button,
   Input,
@@ -20,6 +19,7 @@ import {
   Text,
   formatNumber,
 } from "@policyengine/ui-kit";
+import { DataTable } from "@/components/shared/InteractiveDataTable";
 import { AppShell } from "@/components/layout/app-shell";
 import { useDecompose } from "@/lib/api/hooks/use-decompose";
 import Link from "next/link";

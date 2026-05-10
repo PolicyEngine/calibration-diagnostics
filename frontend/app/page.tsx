@@ -6,7 +6,6 @@ import {
   CardTitle,
   CardContent,
   Badge,
-  DataTable,
   Skeleton,
   Stack,
   Group,
@@ -20,6 +19,7 @@ import {
   PEBarChart,
   ChartContainer,
 } from "@policyengine/ui-kit";
+import { DataTable } from "@/components/shared/InteractiveDataTable";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   usePovertyRate,

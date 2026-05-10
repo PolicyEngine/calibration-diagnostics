@@ -25,7 +25,7 @@ export function GeoSelector({ value, onChange }: GeoSelectorProps) {
   }));
 
   // Auto-select the first district when districts load and we're in district mode
-  const prevDistrictsRef = useRef<string | undefined>();
+  const prevDistrictsRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     const key = `${value.stateFips}-${districts.data?.length}`;
     if (
