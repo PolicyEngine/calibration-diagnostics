@@ -6,7 +6,6 @@ import {
   CardTitle,
   CardContent,
   MetricCard,
-  DataTable,
   SegmentedControl,
   PEBarChart,
   ChartContainer,
@@ -20,6 +19,7 @@ import {
   TooltipProvider,
   formatNumber,
 } from "@policyengine/ui-kit";
+import { DataTable } from "@/components/shared/InteractiveDataTable";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   useWeightDistribution,

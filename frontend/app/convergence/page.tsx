@@ -5,7 +5,6 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  DataTable,
   Badge,
   Input,
   SegmentedControl,
@@ -17,6 +16,7 @@ import {
   Title,
   Text,
 } from "@policyengine/ui-kit";
+import { DataTable } from "@/components/shared/InteractiveDataTable";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   useEpochSummary,

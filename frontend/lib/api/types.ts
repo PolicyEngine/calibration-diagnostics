@@ -1,11 +1,11 @@
-export interface GeoOption {
+export interface GeoOption extends Record<string, unknown> {
   fips?: number;
   cd_geoid?: number;
   name: string;
   abbrev?: string;
 }
 
-export interface Target {
+export interface Target extends Record<string, unknown> {
   target_idx: number;
   target_id: number | null;
   variable: string;
@@ -28,7 +28,7 @@ export interface PaginatedResponse<T> {
   limit: number;
 }
 
-export interface ErrorDecomposition {
+export interface ErrorDecomposition extends Record<string, unknown> {
   target_name: string;
   target_value: number;
   raw_sum: number;
@@ -38,13 +38,13 @@ export interface ErrorDecomposition {
   concentration: { top_1pct_share: number; top_5pct_share: number };
 }
 
-export interface Constraint {
+export interface Constraint extends Record<string, unknown> {
   variable: string;
   operation: string;
   value: string;
 }
 
-export interface Provenance {
+export interface Provenance extends Record<string, unknown> {
   target_id: number | null;
   variable: string;
   value: number | null;
@@ -61,7 +61,7 @@ export interface Provenance {
   uprated_value: number | null;
 }
 
-export interface ConstraintCheck {
+export interface ConstraintCheck extends Record<string, unknown> {
   variable: string;
   operation: string;
   value: string;
@@ -71,13 +71,13 @@ export interface ConstraintCheck {
   status: "OK" | "MINOR_VIOLATION" | "VIOLATION" | "SKIPPED_UNKNOWN_VARIABLE";
 }
 
-export interface ConstraintDiffResult {
+export interface ConstraintDiffResult extends Record<string, unknown> {
   target_name: string;
   stratum_id: number;
   constraints: ConstraintCheck[];
 }
 
-export interface EligibilityAudit {
+export interface EligibilityAudit extends Record<string, unknown> {
   target_name: string;
   total_contributors: number;
   meet_criterion: number;
@@ -88,7 +88,7 @@ export interface EligibilityAudit {
   diagnosis: string;
 }
 
-export interface Contributor {
+export interface Contributor extends Record<string, unknown> {
   household_idx: number;
   raw_value: number;
   weighted_value: number;
@@ -98,7 +98,7 @@ export interface Contributor {
   state: number | null;
 }
 
-export interface ConvergencePoint {
+export interface ConvergencePoint extends Record<string, unknown> {
   epoch: number;
   estimate: number;
   target: number;
@@ -106,7 +106,7 @@ export interface ConvergencePoint {
   loss: number;
 }
 
-export interface Household {
+export interface Household extends Record<string, unknown> {
   household_idx: number;
   income: number;
   spm_threshold: number;
@@ -119,7 +119,7 @@ export interface Household {
   filter_variable_value: number | null;
 }
 
-export interface HouseholdProfile {
+export interface HouseholdProfile extends Record<string, unknown> {
   household_idx: number;
   initial_weight: number;
   final_weight: number;
@@ -130,7 +130,7 @@ export interface HouseholdProfile {
   variables: Record<string, number>;
 }
 
-export interface Attribution {
+export interface Attribution extends Record<string, unknown> {
   target_idx: number;
   target_name: string;
   variable: string | null;
@@ -140,7 +140,7 @@ export interface Attribution {
   target_rel_error: number;
 }
 
-export interface WeightSlice {
+export interface WeightSlice extends Record<string, unknown> {
   label: string;
   n: number;
   kish_effective_n: number;
@@ -148,7 +148,7 @@ export interface WeightSlice {
   median: number;
 }
 
-export interface WeightDistribution {
+export interface WeightDistribution extends Record<string, unknown> {
   kish_effective_n: number;
   cv: number;
   design_effect: number;
@@ -164,13 +164,13 @@ export interface WeightDistribution {
   slices: WeightSlice[];
 }
 
-export interface HistogramBin {
+export interface HistogramBin extends Record<string, unknown> {
   bin_min: number;
   bin_max: number;
   count: number;
 }
 
-export interface PovertyRate {
+export interface PovertyRate extends Record<string, unknown> {
   spm_poverty_rate: number;
   spm_poverty_rate_initial_weights: number;
   n_poor_weighted: number;
@@ -179,7 +179,7 @@ export interface PovertyRate {
   benchmark_census: number;
 }
 
-export interface IncomeQuantiles {
+export interface IncomeQuantiles extends Record<string, unknown> {
   p5: number;
   p10: number;
   p25: number;
@@ -189,36 +189,36 @@ export interface IncomeQuantiles {
   p95: number;
 }
 
-export interface IncomeDistribution {
+export interface IncomeDistribution extends Record<string, unknown> {
   initial_weights: IncomeQuantiles;
   final_weights: IncomeQuantiles;
 }
 
-export interface DecomposeComponent {
+export interface DecomposeComponent extends Record<string, unknown> {
   variable: string;
   initial_total: number;
   final_total: number;
   shift_pct: number;
 }
 
-export interface DecomposeResult {
+export interface DecomposeResult extends Record<string, unknown> {
   components: DecomposeComponent[];
   composite_initial: number | null;
   composite_final: number | null;
 }
 
-export interface EpochSummaryRow {
+export interface EpochSummaryRow extends Record<string, unknown> {
   group: string;
   epoch: number;
   mean_abs_rel_error: number;
 }
 
-export interface TargetEpochTrace {
+export interface TargetEpochTrace extends Record<string, unknown> {
   target_name: string;
   epochs: ConvergencePoint[];
 }
 
-export interface StratumDetail {
+export interface StratumDetail extends Record<string, unknown> {
   stratum_id: number;
   parent_stratum_id: number | null;
   notes: string | null;
