@@ -20,16 +20,6 @@ export const targetKeys = {
     [...targetKeys.all, "convergence", id] as const,
 };
 
-export const householdKeys = {
-  all: ["households"] as const,
-  distorted: (params: object) =>
-    [...householdKeys.all, "distorted", params] as const,
-  profile: (id: number, variables?: string[]) =>
-    [...householdKeys.all, "profile", id, variables] as const,
-  attributions: (id: number) =>
-    [...householdKeys.all, "attributions", id] as const,
-};
-
 export const weightKeys = {
   all: ["weights"] as const,
   distribution: (params: object) =>
@@ -38,22 +28,6 @@ export const weightKeys = {
     [...weightKeys.all, "histogram", params] as const,
 };
 
-export const statisticsKeys = {
-  povertyRate: () => ["statistics", "poverty-rate"] as const,
-  incomeDistribution: () => ["statistics", "income-distribution"] as const,
-};
-
-export const epochKeys = {
-  summary: (groupBy: string) => ["epochs", "summary", groupBy] as const,
-  traces: (params: object) =>
-    ["epochs", "traces", params] as const,
-};
-
 export const strataKeys = {
   byId: (id: number) => ["strata", id] as const,
-};
-
-export const decomposeKeys = {
-  result: (variable: string, subgroup?: string) =>
-    ["decompose", variable, subgroup] as const,
 };

@@ -6,10 +6,14 @@ import type { Target, PaginatedResponse } from "../types";
 interface UseTargetsParams {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
-  variable?: string;
-  geoLevel?: string;
+  search?: string;
+  variables?: string[];
+  geoLevels?: string[];
+  errorBuckets?: string[];
+  variable?: string;            // legacy single-value (substring match)
+  geoLevel?: string;            // legacy single-value
   geographicId?: string;
-  stateFips?: number;
+  stateFips?: number | number[];
   domainVariable?: string;
   minAbsRelError?: number;
   includedOnly?: boolean;
@@ -24,8 +28,19 @@ export function useTargets(params: UseTargetsParams = {}) {
       apiGet<PaginatedResponse<Target>>("/targets", {
         sort_by: params.sortBy ?? "loss_contribution",
         sort_order: params.sortOrder ?? "desc",
-        variable: params.variable,
-        geo_level: params.geoLevel,
+        search: params.search || undefined,
+        variable:
+          params.variables && params.variables.length > 0
+            ? params.variables
+            : params.variable,
+        geo_level:
+          params.geoLevels && params.geoLevels.length > 0
+            ? params.geoLevels
+            : params.geoLevel,
+        error_bucket:
+          params.errorBuckets && params.errorBuckets.length > 0
+            ? params.errorBuckets
+            : undefined,
         geographic_id: params.geographicId,
         state_fips: params.stateFips,
         domain_variable: params.domainVariable,
@@ -33,6 +48,35 @@ export function useTargets(params: UseTargetsParams = {}) {
         included_only: params.includedOnly,
         limit: params.limit ?? 50,
         offset: params.offset ?? 0,
+      }),
+  });
+}
+
+export interface FacetValue {
+  value: string;
+  count: number;
+  total_loss?: number;
+}
+
+export interface FacetsResponse {
+  by_variable: FacetValue[];
+  by_geo_level: FacetValue[];
+  by_error_bucket: FacetValue[];
+  by_status: FacetValue[];
+  buckets_definition: Record<string, { min: number; max: number | null }>;
+}
+
+export function useTargetFacets(params: UseTargetsParams = {}) {
+  return useQuery({
+    queryKey: ["targets", "facets", params],
+    queryFn: () =>
+      apiGet<FacetsResponse>("/targets/facets", {
+        search: params.search || undefined,
+        variable: params.variables,
+        geo_level: params.geoLevels,
+        error_bucket: params.errorBuckets,
+        included_only: params.includedOnly,
+        state_fips: params.stateFips,
       }),
   });
 }

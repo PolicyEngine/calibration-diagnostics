@@ -19,10 +19,6 @@ from backend.state import AppState
 
 logger = logging.getLogger(__name__)
 
-HF_REPO = "PolicyEngine/policyengine-us-data-pipeline"
-HF_REPO_TYPE = "model"
-HF_PREFIX = "test"
-
 HF_ARTIFACTS = {
     "package_path": "calibration_package.pkl",
     "weights_path": "calibration_weights.npy",
@@ -34,57 +30,76 @@ HF_ARTIFACTS = {
 }
 
 
-def _ensure_artifacts(config: dict, cache_dir: str = ".artifacts") -> dict:
-    """Download missing artifacts from HuggingFace.
+def _ensure_artifacts(
+    repo_id: str,
+    repo_type: str,
+    prefix: str,
+    cache_root: str = ".artifacts",
+) -> dict:
+    """Download a run's artifacts from HuggingFace, cached per (repo, prefix).
 
-    For each config key, if the local path doesn't exist, downloads
-    from HF_REPO/HF_PREFIX/{filename}. Returns an updated config
-    with resolved local paths.
+    Returns a config dict mapping artifact keys to resolved local paths.
+    Caches under <cache_root>/<repo_id-slug>/<prefix>/.
     """
     from huggingface_hub import hf_hub_download
 
-    cache = Path(cache_dir)
+    repo_slug = repo_id.replace("/", "__")
+    cache = Path(cache_root) / repo_slug / prefix
     cache.mkdir(parents=True, exist_ok=True)
-    resolved = dict(config)
+    resolved: dict = {}
 
     for key, hf_filename in HF_ARTIFACTS.items():
-        local_path = config.get(key)
-
-        if local_path and Path(local_path).exists():
-            logger.info("Found local %s: %s", key, local_path)
-            continue
-
         dest = cache / hf_filename
         if dest.exists():
             logger.info("Found cached %s: %s", key, dest)
             resolved[key] = str(dest)
             continue
 
-        hf_path = f"{HF_PREFIX}/{hf_filename}"
+        hf_path = f"{prefix}/{hf_filename}"
         logger.info(
-            "Downloading %s from %s/%s ...", key, HF_REPO, hf_path
+            "Downloading %s from %s/%s ...", key, repo_id, hf_path
         )
-        downloaded = hf_hub_download(
-            repo_id=HF_REPO,
-            filename=hf_path,
-            repo_type=HF_REPO_TYPE,
-            local_dir=str(cache),
-        )
-        # hf_hub_download may nest under HF_PREFIX/
-        nested = cache / HF_PREFIX / hf_filename
+        try:
+            hf_hub_download(
+                repo_id=repo_id,
+                filename=hf_path,
+                repo_type=repo_type,
+                local_dir=str(cache),
+            )
+        except Exception as exc:
+            logger.warning("Could not download %s: %s", hf_path, exc)
+            resolved[key] = None
+            continue
+
+        nested = cache / prefix / hf_filename
         if nested.exists() and not dest.exists():
             nested.rename(dest)
-            # Clean up empty prefix dir
             try:
-                (cache / HF_PREFIX).rmdir()
+                (cache / prefix).rmdir()
             except OSError:
                 pass
 
-        resolved[key] = str(dest)
-        size_mb = dest.stat().st_size / 1e6
-        logger.info("  Downloaded %s (%.1f MB)", hf_filename, size_mb)
+        resolved[key] = str(dest) if dest.exists() else None
+        if dest.exists():
+            size_mb = dest.stat().st_size / 1e6
+            logger.info("  Downloaded %s (%.1f MB)", hf_filename, size_mb)
 
     return resolved
+
+
+def load_run(
+    repo_id: str,
+    repo_type: str,
+    prefix: str,
+    cache_root: str = ".artifacts",
+    dataset_id: str = "",
+) -> AppState:
+    """Convenience entrypoint that resolves a run's artifacts and loads them."""
+    config = _ensure_artifacts(repo_id, repo_type, prefix, cache_root)
+    state = load_all_artifacts(config)
+    state.dataset_id = dataset_id
+    state.run_id = prefix
+    return state
 
 
 def load_all_artifacts(config: dict) -> AppState:
@@ -93,10 +108,9 @@ def load_all_artifacts(config: dict) -> AppState:
     Args:
         config: dict with keys:
             package_path, weights_path, db_path, dataset_path,
-            cal_log_path (optional), diagnostics_path (optional)
+            cal_log_path (optional), diagnostics_path (optional),
+            target_config_path (optional)
     """
-    # 0. Download any missing artifacts from HuggingFace
-    config = _ensure_artifacts(config)
 
     # 1. Load calibration package
     logger.info("Loading calibration package from %s", config["package_path"])
@@ -183,8 +197,13 @@ def load_all_artifacts(config: dict) -> AppState:
     # 9. Load target config and mark included/excluded
     target_config = None
     tc_path = config.get("target_config_path")
+    target_config_text: str | None = None
     if tc_path and Path(tc_path).exists():
         target_config = load_target_config(tc_path)
+        try:
+            target_config_text = Path(tc_path).read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.warning("Could not read raw target_config yaml: %s", exc)
         targets_enriched = _apply_included_flag(targets_enriched, target_config)
         logger.info(
             "Target config: %d included, %d excluded",
@@ -223,6 +242,7 @@ def load_all_artifacts(config: dict) -> AppState:
         cal_log=cal_log,
         diagnostics_csv=diagnostics_csv,
         target_config=target_config,
+        target_config_text=target_config_text,
         time_period=time_period,
         n_targets=n_targets,
         n_households=n_households,

@@ -14,7 +14,6 @@ import {
   Alert,
   AlertTitle,
   AlertDescription,
-  Input,
   Stack,
   Group,
   Title,
@@ -22,10 +21,6 @@ import {
   formatPercent,
   formatNumber,
   MetricCard,
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
 } from "@policyengine/ui-kit";
 import { DataTable } from "@/components/shared/InteractiveDataTable";
 import { AppShell } from "@/components/layout/app-shell";
@@ -37,39 +32,95 @@ import {
   useTargetConvergence,
   useProvenance,
 } from "@/lib/api/hooks/use-target-detail";
-import { useGeo, useGeoParams } from "@/lib/geo-context";
+import {
+  TargetFiltersProvider,
+  statusToIncludedOnly,
+  useTargetFilters,
+} from "@/lib/target-filters-context";
+import { TargetChipBar } from "@/components/targets/chip-bar";
+import { TargetSearchAndControls } from "@/components/targets/search-and-controls";
+import { TargetPagination } from "@/components/targets/pagination";
+import { STATE_FIPS_TO_CODE } from "@/lib/geo-names";
+
+/**
+ * Map a target's (geo_level, geographic_id) to the output dataset file the
+ * pipeline builds for it. e.g. district 0612 → "districts/CA-12.h5".
+ */
+function datasetForRow(row: {
+  geo_level?: string | null;
+  geographic_id?: string | null;
+}): string {
+  const level = row.geo_level ?? "";
+  if (level === "national") return "national/US.h5";
+  const gid = row.geographic_id ?? "";
+  if (!gid) return "—";
+  if (level === "state") {
+    const n = parseInt(gid, 10);
+    const code = Number.isFinite(n) ? STATE_FIPS_TO_CODE[n] : null;
+    return `states/${code ?? gid}.h5`;
+  }
+  if (level === "district") {
+    const n = parseInt(gid, 10);
+    if (Number.isFinite(n)) {
+      const state = STATE_FIPS_TO_CODE[Math.floor(n / 100)] ?? String(Math.floor(n / 100));
+      const dist = String(n % 100).padStart(2, "0");
+      return `districts/${state}-${dist}.h5`;
+    }
+    return `districts/${gid}.h5`;
+  }
+  return level;
+}
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 
-const baseTargetColumns = [
-  { key: "target_id", header: "ID", format: (val: unknown) => val !== null ? `#${val}` : "" },
-  { key: "geo_display_name", header: "Geography", format: (val: unknown) => String(val ?? "National") },
-  { key: "variable", header: "Variable" },
+const targetColumns = [
   {
-    key: "target_value",
-    header: "Target value",
-    align: "right" as const,
-    format: (val: unknown) => formatNumber(Number(val)),
+    key: "target_id",
+    header: "ID",
+    format: (val: unknown) =>
+      val != null ? `#${val}` : <span className="text-muted-foreground">—</span>,
   },
   {
-    key: "constraints",
-    header: "Constraints",
-    format: (val: unknown) => {
-      const arr = val as string[];
-      if (!arr || arr.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
+    key: "geo_display_name",
+    header: "Geography",
+    format: (val: unknown) => String(val ?? "National"),
+  },
+  {
+    key: "dataset",
+    header: "Dataset",
+    format: (_val: unknown, row: Record<string, unknown>) => (
+      <span className="font-mono text-xs text-muted-foreground">
+        {datasetForRow(row as never)}
+      </span>
+    ),
+  },
+  {
+    key: "variable",
+    header: "Variable",
+    format: (val: unknown, row: Record<string, unknown>) => {
+      const constraints = (row.constraints as string[] | undefined) ?? [];
+      const sub =
+        constraints.length === 0
+          ? "all population"
+          : constraints.join(", ");
       return (
         <div className="flex flex-col gap-0.5">
-          {arr.map((c: string, i: number) => (
-            <span key={i} className="text-sm whitespace-nowrap">{c}</span>
-          ))}
+          <span>{String(val)}</span>
+          <span className="text-xs text-muted-foreground">· {sub}</span>
         </div>
       );
     },
   },
   {
+    key: "target_value",
+    header: "Target",
+    align: "right" as const,
+    format: (val: unknown) => formatNumber(Number(val)),
+  },
+  {
     key: "estimate",
-    header: "Estimate",
+    header: "PE aggregate",
     align: "right" as const,
     format: (val: unknown) => formatNumber(Number(val)),
   },
@@ -80,43 +131,39 @@ const baseTargetColumns = [
     format: (val: unknown) => {
       const v = Number(val);
       const abs = Math.abs(v);
-      const variant = abs > 0.5 ? "error" : abs > 0.2 ? "warning" : abs > 0.05 ? "secondary" : "success";
+      const variant =
+        abs > 0.5
+          ? "error"
+          : abs > 0.2
+            ? "warning"
+            : abs > 0.05
+              ? "secondary"
+              : "success";
       const display = abs >= 1 ? `${(v * 100).toFixed(0)}%` : `${(v * 100).toFixed(1)}%`;
       return <Badge variant={variant}>{display}</Badge>;
     },
   },
   {
-    key: "abs_error",
-    header: "Abs. error",
-    align: "right" as const,
-    format: (val: unknown) => formatNumber(Number(val)),
-  },
-  {
-    key: "loss_contribution",
-    header: "Loss contribution",
-    align: "right" as const,
-    format: (val: unknown) => {
-      const v = Number(val);
-      if (v >= 0.01) return `${(v * 100).toFixed(1)}%`;
-      if (v >= 0.001) return `${(v * 100).toFixed(2)}%`;
-      return `${(v * 100).toFixed(3)}%`;
-    },
+    key: "included",
+    header: "Status",
+    format: (val: unknown) =>
+      val ? (
+        <Badge variant="success">Used</Badge>
+      ) : (
+        <Badge variant="secondary">Unused</Badge>
+      ),
   },
 ];
-
-const statusColumn = {
-  key: "included",
-  header: "Status",
-  format: (val: unknown) =>
-    val ? <Badge variant="success">Included</Badge> : <Badge variant="secondary">Skipped</Badge>,
-};
 
 const contributorColumns = [
   {
     key: "household_idx",
     header: "Household",
     format: (val: unknown) => (
-      <Link href={`/households?selected=${val}`} className="text-primary hover:underline">
+      <Link
+        href={`/households?selected=${val}`}
+        className="text-primary hover:underline"
+      >
         #{String(val)}
       </Link>
     ),
@@ -144,7 +191,13 @@ const contributorColumns = [
     header: "Poverty",
     align: "center" as const,
     format: (val: unknown) =>
-      val ? <Badge variant="error">Yes</Badge> : <Text size="sm" c="dimmed">No</Text>,
+      val ? (
+        <Badge variant="error">Yes</Badge>
+      ) : (
+        <Text size="sm" c="dimmed">
+          No
+        </Text>
+      ),
   },
 ];
 
@@ -172,30 +225,63 @@ const constraintColumns = [
     header: "Status",
     align: "right" as const,
     format: (val: unknown) => {
-      const variant = val === "OK" ? "success" : val === "MINOR_VIOLATION" ? "warning" : "error";
+      const variant =
+        val === "OK"
+          ? "success"
+          : val === "MINOR_VIOLATION"
+            ? "warning"
+            : "error";
       return <Badge variant={variant}>{String(val)}</Badge>;
     },
   },
 ];
 
-function TargetExplorerContent() {
+function TargetTable() {
+  const { filters } = useTargetFilters();
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const { geo } = useGeo();
-  const geoParams = useGeoParams();
-  const [showAll, setShowAll] = useState(false);
   const selectedIdx = searchParams.get("selected")
     ? Number(searchParams.get("selected"))
     : null;
 
   const targets = useTargets({
-    sortBy: "abs_rel_error",
-    sortOrder: "desc",
-    geoLevel: geo.level,
-    stateFips: geo.stateFips,
-    includedOnly: showAll ? undefined : true,
-    limit: 200,
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder,
+    search: filters.search,
+    variables: filters.variables,
+    geoLevels: filters.geoLevels,
+    errorBuckets: filters.errorBuckets,
+    stateFips:
+      filters.stateFipsList.length > 0 ? filters.stateFipsList : undefined,
+    includedOnly: statusToIncludedOnly(filters.status),
+    limit: filters.pageSize,
+    offset: filters.page * filters.pageSize,
   });
+
+  return (
+    <Stack gap="md">
+      {targets.data ? (
+        <DataTable
+          columns={targetColumns}
+          sortable
+          data={targets.data.items.map((t) => ({
+            ...t,
+            _selected: t.target_idx === selectedIdx,
+          }))}
+        />
+      ) : (
+        <Skeleton className="h-64 w-full" />
+      )}
+      <TargetPagination total={targets.data?.total ?? 0} />
+    </Stack>
+  );
+}
+
+function DetailPanel() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const selectedIdx = searchParams.get("selected")
+    ? Number(searchParams.get("selected"))
+    : null;
 
   const errorDecomp = useErrorDecomposition(selectedIdx);
   const constraintDiff = useConstraintDiff(selectedIdx);
@@ -203,175 +289,181 @@ function TargetExplorerContent() {
   const convergence = useTargetConvergence(selectedIdx);
   const provenance = useProvenance(selectedIdx);
 
+  if (selectedIdx === null) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <Group justify="space-between" align="center">
+          <CardTitle>Target detail: #{selectedIdx}</CardTitle>
+          <button
+            type="button"
+            onClick={() => {
+              const sp = new URLSearchParams(searchParams.toString());
+              sp.delete("selected");
+              router.replace(`?${sp.toString()}`);
+            }}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Close ×
+          </button>
+        </Group>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="overview">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="convergence">Convergence</TabsTrigger>
+            <TabsTrigger value="contributors">Contributors</TabsTrigger>
+            <TabsTrigger value="constraints">Constraints</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
+            <Stack gap="md">
+              {errorDecomp.data && (
+                <Stack gap="sm">
+                  <Text weight="semibold">Error decomposition</Text>
+                  <Group gap="md" wrap="wrap">
+                    <MetricCard
+                      label="Target"
+                      value={errorDecomp.data.target_value}
+                      format="number"
+                    />
+                    <MetricCard
+                      label="Raw sum"
+                      value={errorDecomp.data.raw_sum}
+                      format="number"
+                    />
+                    <MetricCard
+                      label="Initial est."
+                      value={errorDecomp.data.initial_estimate}
+                      format="number"
+                    />
+                    <MetricCard
+                      label="Final est."
+                      value={errorDecomp.data.final_estimate}
+                      format="number"
+                    />
+                  </Group>
+                  <Alert>
+                    <AlertTitle>Diagnosis</AlertTitle>
+                    <AlertDescription>
+                      {errorDecomp.data.diagnosis}
+                    </AlertDescription>
+                  </Alert>
+                </Stack>
+              )}
+
+              {provenance.data && (
+                <Stack gap="sm">
+                  <Text weight="semibold">Provenance</Text>
+                  <Group gap="sm" wrap="wrap">
+                    <Badge variant="outline">
+                      Source: {provenance.data.source}
+                    </Badge>
+                    <Badge variant="outline">
+                      Period: {provenance.data.period}
+                    </Badge>
+                    {provenance.data.tolerance && (
+                      <Badge variant="outline">
+                        Tolerance: {provenance.data.tolerance}%
+                      </Badge>
+                    )}
+                  </Group>
+                  <Group gap="xs" wrap="wrap">
+                    <Text size="sm" c="dimmed">
+                      Constraints:
+                    </Text>
+                    {provenance.data.constraints.map((c, i) => (
+                      <Badge key={i} variant="secondary">
+                        {c.variable} {c.operation} {c.value}
+                      </Badge>
+                    ))}
+                  </Group>
+                </Stack>
+              )}
+            </Stack>
+          </TabsContent>
+
+          <TabsContent value="convergence">
+            {convergence.data && convergence.data.length > 0 ? (
+              <Stack gap="sm">
+                <Text size="sm" c="dimmed">
+                  {convergence.data.length} epoch checkpoints. Final rel_error:{" "}
+                  {formatPercent(
+                    convergence.data[convergence.data.length - 1].rel_error,
+                    1,
+                  )}
+                </Text>
+                <DataTable
+                  columns={[
+                    { key: "epoch", header: "Epoch" },
+                    {
+                      key: "estimate",
+                      header: "Estimate",
+                      align: "right" as const,
+                      format: (v: unknown) => Number(v).toExponential(2),
+                    },
+                    {
+                      key: "rel_error",
+                      header: "Rel. error",
+                      align: "right" as const,
+                      format: (v: unknown) => formatPercent(Number(v), 1),
+                    },
+                  ]}
+                  data={convergence.data}
+                />
+              </Stack>
+            ) : (
+              <Text size="sm" c="dimmed">
+                No convergence data available
+              </Text>
+            )}
+          </TabsContent>
+
+          <TabsContent value="contributors">
+            {contributors.data ? (
+              <DataTable columns={contributorColumns} data={contributors.data} />
+            ) : (
+              <Skeleton className="h-40 w-full" />
+            )}
+          </TabsContent>
+
+          <TabsContent value="constraints">
+            {constraintDiff.data ? (
+              <DataTable
+                columns={constraintColumns}
+                data={constraintDiff.data.constraints}
+              />
+            ) : (
+              <Skeleton className="h-40 w-full" />
+            )}
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TargetExplorerContent() {
   return (
     <AppShell>
       <Stack gap="lg">
-        <Group gap="md" justify="space-between" align="end">
-          <Title order={2}>Target explorer: {geo.label === "National" ? "US" : geo.label}</Title>
-          <button
-            onClick={() => setShowAll(!showAll)}
-            className={`px-3 py-1.5 rounded text-sm border transition-colors ${
-              showAll
-                ? "bg-yellow-50 border-yellow-300 text-yellow-800"
-                : "bg-white border-border text-muted-foreground hover:bg-gray-50"
-            }`}
-          >
-            {showAll ? "Showing all targets (incl. skipped)" : "View skipped targets"}
-          </button>
-        </Group>
-
-        {/* Target table */}
-        <div className="overflow-x-auto -mx-6 px-6">
-          <div className="min-w-[800px]">
-            {targets.data ? (
-              <DataTable
-                columns={showAll ? [...baseTargetColumns, statusColumn] : baseTargetColumns}
-                sortable
-                filterable
-                data={targets.data.items.map((t) => ({
-                  ...t,
-                  _selected: t.target_idx === selectedIdx,
-                }))}
-              />
-            ) : (
-              <Skeleton className="h-64 w-full" />
-            )}
-          </div>
+        <div>
+          <Title order={2}>All targets</Title>
+          <Text c="dimmed" size="sm">
+            Every target known to <code>policy_data.db</code>. Status shows
+            whether the active calibration uses it; Dataset shows which output
+            bundle the pipeline builds it into.
+          </Text>
         </div>
 
-        {/* Detail panel */}
-        {selectedIdx !== null && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Target detail: #{selectedIdx}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="overview">
-                <TabsList>
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="convergence">Convergence</TabsTrigger>
-                  <TabsTrigger value="contributors">Contributors</TabsTrigger>
-                  <TabsTrigger value="constraints">Constraints</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="overview">
-                  <Stack gap="md">
-                    {/* Error decomposition */}
-                    {errorDecomp.data && (
-                      <Stack gap="sm">
-                        <Text weight="semibold">Error decomposition</Text>
-                        <Group gap="md" wrap="wrap">
-                          <MetricCard
-                            label="Target"
-                            value={errorDecomp.data.target_value}
-                            format="number"
-                          />
-                          <MetricCard
-                            label="Raw sum"
-                            value={errorDecomp.data.raw_sum}
-                            format="number"
-                          />
-                          <MetricCard
-                            label="Initial est."
-                            value={errorDecomp.data.initial_estimate}
-                            format="number"
-                          />
-                          <MetricCard
-                            label="Final est."
-                            value={errorDecomp.data.final_estimate}
-                            format="number"
-                          />
-                        </Group>
-                        <Alert>
-                          <AlertTitle>Diagnosis</AlertTitle>
-                          <AlertDescription>
-                            {errorDecomp.data.diagnosis}
-                          </AlertDescription>
-                        </Alert>
-                      </Stack>
-                    )}
-
-                    {/* Provenance */}
-                    {provenance.data && (
-                      <Stack gap="sm">
-                        <Text weight="semibold">Provenance</Text>
-                        <Group gap="sm" wrap="wrap">
-                          <Badge variant="outline">Source: {provenance.data.source}</Badge>
-                          <Badge variant="outline">Period: {provenance.data.period}</Badge>
-                          {provenance.data.tolerance && (
-                            <Badge variant="outline">Tolerance: {provenance.data.tolerance}%</Badge>
-                          )}
-                        </Group>
-                        <Group gap="xs" wrap="wrap">
-                          <Text size="sm" c="dimmed">Constraints:</Text>
-                          {provenance.data.constraints.map((c, i) => (
-                            <Badge key={i} variant="secondary">
-                              {c.variable} {c.operation} {c.value}
-                            </Badge>
-                          ))}
-                        </Group>
-                      </Stack>
-                    )}
-                  </Stack>
-                </TabsContent>
-
-                <TabsContent value="convergence">
-                  {convergence.data && convergence.data.length > 0 ? (
-                    <Stack gap="sm">
-                      <Text size="sm" c="dimmed">
-                        {convergence.data.length} epoch checkpoints. Final
-                        rel_error:{" "}
-                        {formatPercent(
-                          convergence.data[convergence.data.length - 1].rel_error,
-                          1,
-                        )}
-                      </Text>
-                      <DataTable
-                        columns={[
-                          { key: "epoch", header: "Epoch" },
-                          {
-                            key: "estimate",
-                            header: "Estimate",
-                            align: "right" as const,
-                            format: (v: unknown) => Number(v).toExponential(2),
-                          },
-                          {
-                            key: "rel_error",
-                            header: "Rel. error",
-                            align: "right" as const,
-                            format: (v: unknown) => formatPercent(Number(v), 1),
-                          },
-                        ]}
-                        data={convergence.data}
-                      />
-                    </Stack>
-                  ) : (
-                    <Text size="sm" c="dimmed">No convergence data available</Text>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="contributors">
-                  {contributors.data ? (
-                    <DataTable columns={contributorColumns} data={contributors.data} />
-                  ) : (
-                    <Skeleton className="h-40 w-full" />
-                  )}
-                </TabsContent>
-
-                <TabsContent value="constraints">
-                  {constraintDiff.data ? (
-                    <DataTable
-                      columns={constraintColumns}
-                      data={constraintDiff.data.constraints}
-                    />
-                  ) : (
-                    <Skeleton className="h-40 w-full" />
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        )}
+        <div className="flex flex-col gap-3 min-w-0">
+          <TargetSearchAndControls />
+          <TargetChipBar />
+          <TargetTable />
+          <DetailPanel />
+        </div>
       </Stack>
     </AppShell>
   );
@@ -380,7 +472,9 @@ function TargetExplorerContent() {
 export default function TargetExplorerPage() {
   return (
     <Suspense>
-      <TargetExplorerContent />
+      <TargetFiltersProvider>
+        <TargetExplorerContent />
+      </TargetFiltersProvider>
     </Suspense>
   );
 }

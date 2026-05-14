@@ -6,17 +6,16 @@ from typing import Any, Optional
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from fastapi import Request
+from fastapi import HTTPException, Query, Request
 from sqlalchemy.engine import Engine
 
 
 @dataclass
 class AppState:
-    """Immutable container for all loaded calibration data.
+    """Immutable container for all loaded calibration data for one run.
 
-    Created once at startup by loader.load_all_artifacts() and attached
-    to the FastAPI app.  Every route handler receives this via the
-    get_state() dependency.
+    Created by loader.load_all_artifacts() and cached per (dataset, run)
+    in backend.services.registry.RunRegistry.
     """
 
     # -- From calibration_package.pkl --
@@ -46,13 +45,55 @@ class AppState:
 
     # -- Target config --
     target_config: Optional[dict] = None
+    target_config_text: Optional[str] = None   # raw yaml, preserves comments
 
     # -- Derived scalars --
     time_period: int = 2024
     n_targets: int = 0
     n_households: int = 0
 
+    # -- Provenance: which run produced this state --
+    dataset_id: str = ""
+    run_id: str = ""
 
-def get_state(request: Request) -> "AppState":
-    """FastAPI dependency that returns the loaded AppState."""
-    return request.app.state.diagnostics
+
+def get_state(
+    request: Request,
+    dataset: str | None = Query(
+        None, description="Dataset id (e.g. 'us-cps'). Falls back to DEFAULT_DATASET env."
+    ),
+    run: str | None = Query(
+        None, description="Run id (HF prefix). Falls back to DEFAULT_RUN env."
+    ),
+) -> "AppState":
+    """FastAPI dependency that resolves a run and returns its AppState.
+
+    Resolution order:
+    1. ?dataset & ?run query params
+    2. DEFAULT_DATASET / DEFAULT_RUN env vars (set at backend startup)
+    3. 400 error
+    """
+    from backend.services import runs as runs_service
+
+    if dataset is None or run is None:
+        fallback = runs_service.default_selection()
+        if fallback is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "No run selected. Pass ?dataset=&run= query params, or "
+                    "set DEFAULT_DATASET and DEFAULT_RUN env vars."
+                ),
+            )
+        dataset = dataset or fallback[0]
+        run = run or fallback[1]
+
+    registry = request.app.state.registry
+    try:
+        return registry.get(dataset, run)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load run {dataset}/{run}: {exc}"
+        )
