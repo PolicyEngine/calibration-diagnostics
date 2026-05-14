@@ -7,6 +7,7 @@ export interface SummaryHeadline {
   run_id: string;
   n_targets: number;
   n_targets_included: number;
+  n_targets_with_estimate?: number;
   median_abs_rel_error: number | null;
   mean_abs_rel_error: number | null;
   p95_abs_rel_error: number | null;

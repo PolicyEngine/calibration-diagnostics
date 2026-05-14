@@ -185,6 +185,8 @@ def _detect_time_period(sim) -> int:
     return 2024
 
 
+
+
 def load_run_from_dataset(
     dataset: DatasetConfig,
     run_id: str,
@@ -226,18 +228,33 @@ def load_run_from_dataset(
         "final_weight": household_weight.astype(np.float32),
     })
 
-    # Compute estimates for targets we can evaluate (national + simple
-    # geographic). Constrained targets keep NaN and gain an eval_note.
-    logger.info("Evaluating targets against dataset...")
+    # Dataset mode: the canonical us-data repo doesn't publish the X matrix
+    # the calibration pipeline builds internally. Rebuilding it inline takes
+    # ~1h+ per run with the current single-threaded path, which makes the
+    # dashboard unusable. So we use the MVP evaluator (handles ~2% of
+    # targets — the ones with only geographic constraints) and rely on the
+    # data team to publish X_sparse.npz alongside the existing artifacts.
+    # See ARTIFACTS.md for the publishing spec.
+    logger.info("Evaluating targets via MVP evaluator (geographic-only)...")
     from backend.services.stratum_evaluator import evaluate_targets
-    targets_df = evaluate_targets(targets_df, sim, default_period=time_period)
+    targets_df = evaluate_targets(
+        targets_df, sim, default_period=time_period,
+    )
     n_evaluated = int(np.sum(~targets_df["estimate"].isna()))
     logger.info(
-        "Evaluated %d/%d targets (others need entity-mapped constraints)",
+        "MVP evaluator done: %d/%d targets have estimates",
         n_evaluated, len(targets_df),
     )
 
+    # Empty sparse matrices since dataset mode doesn't have the pipeline's
+    # X matrix yet (waiting on data-team publish).
+    from scipy import sparse
+    X_csr = sparse.csr_matrix((len(targets_df), n_households))
+    X_csc = X_csr.tocsc()
+
     state = AppState(
+        X_csr=X_csr,
+        X_csc=X_csc,
         targets_df=targets_df,
         target_names=target_names,
         targets_enriched=targets_df,

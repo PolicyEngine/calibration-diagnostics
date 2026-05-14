@@ -60,7 +60,7 @@ export const DEFAULT_FILTERS: TargetFilters = {
   errorBuckets: [],
   stateFipsList: [],
   status: "all",
-  sortBy: "loss_contribution",
+  sortBy: "abs_rel_error",
   sortOrder: "desc",
   page: 0,
   pageSize: 50,

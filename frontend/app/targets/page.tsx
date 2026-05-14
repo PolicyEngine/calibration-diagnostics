@@ -25,6 +25,7 @@ import {
 import { DataTable } from "@/components/shared/InteractiveDataTable";
 import { AppShell } from "@/components/layout/app-shell";
 import { useTargets } from "@/lib/api/hooks/use-targets";
+import { useSummary } from "@/lib/api/hooks/use-summary";
 import {
   useErrorDecomposition,
   useConstraintDiff,
@@ -122,13 +123,17 @@ const targetColumns = [
     key: "estimate",
     header: "PE aggregate",
     align: "right" as const,
-    format: (val: unknown) => formatNumber(Number(val)),
+    format: (val: unknown) =>
+      val == null
+        ? <span className="text-muted-foreground">—</span>
+        : formatNumber(Number(val)),
   },
   {
     key: "rel_error",
     header: "Rel. error",
     align: "right" as const,
     format: (val: unknown) => {
+      if (val == null) return <span className="text-muted-foreground">—</span>;
       const v = Number(val);
       const abs = Math.abs(v);
       const variant =
@@ -445,6 +450,25 @@ function DetailPanel() {
   );
 }
 
+function CoverageBanner() {
+  const summary = useSummary();
+  if (!summary.data) return null;
+  const h = summary.data.headline;
+  const total = h.n_targets;
+  const withEst = h.n_targets_with_estimate ?? total;
+  if (withEst === total) return null;
+  const pct = total > 0 ? (withEst / total) * 100 : 0;
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
+      <strong>{withEst.toLocaleString()}</strong> of{" "}
+      <strong>{total.toLocaleString()}</strong> targets have a PE aggregate
+      computed ({pct.toFixed(1)}%). The remainder need pipeline-level
+      evaluation (uprating + entity mapping) that this dashboard doesn't yet
+      perform; those rows show <span className="font-mono">—</span> for now.
+    </div>
+  );
+}
+
 function TargetExplorerContent() {
   return (
     <AppShell>
@@ -457,6 +481,8 @@ function TargetExplorerContent() {
             bundle the pipeline builds it into.
           </Text>
         </div>
+
+        <CoverageBanner />
 
         <div className="flex flex-col gap-3 min-w-0">
           <TargetSearchAndControls />

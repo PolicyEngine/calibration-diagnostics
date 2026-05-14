@@ -38,6 +38,7 @@ def get_summary(
         "run_id": state.run_id,
         "n_targets": int(len(df)),
         "n_targets_included": int(len(included)),
+        "n_targets_with_estimate": int(np.sum(~np.isnan(abs_err))),
         "median_abs_rel_error": _safe_float(np.median(abs_err)),
         "mean_abs_rel_error": _safe_float(np.mean(abs_err)),
         "p95_abs_rel_error": _safe_float(np.percentile(abs_err, 95)) if len(abs_err) else None,
