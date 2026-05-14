@@ -12,7 +12,6 @@ import {
   Title,
   Text,
   Badge,
-  Input,
   formatNumber,
 } from "@policyengine/ui-kit";
 import { AppShell } from "@/components/layout/app-shell";
@@ -22,6 +21,14 @@ import {
   type PipelineNode,
   type PipelinePathway,
 } from "@/lib/api/hooks/use-pipeline";
+import { PipelineGraph } from "@/components/pipeline/pipeline-graph";
+
+const PATHWAY_COLORS: Record<string, string> = {
+  data_build: "border-amber-500 bg-amber-50",
+  calibration_package: "border-blue-500 bg-blue-50",
+  weight_fit: "border-green-500 bg-green-50",
+  local_h5: "border-pink-500 bg-pink-50",
+};
 
 const STATUS_VARIANT: Record<string, "success" | "secondary" | "warning" | "error"> = {
   current: "success",
@@ -40,58 +47,78 @@ function PathwayCard({
   active: boolean;
   onClick: () => void;
 }) {
+  const colorClass = PATHWAY_COLORS[pathway.id] ?? "border-border bg-white";
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-start gap-1 rounded-lg border p-4 text-left transition-colors ${
-        active
-          ? "border-primary bg-primary/5"
-          : "border-border bg-white hover:bg-muted/40"
-      }`}
+      className={`flex flex-col items-start gap-1 rounded-lg border-2 p-4 text-left transition-all ${
+        active ? "ring-2 ring-primary" : ""
+      } ${colorClass}`}
     >
       <span className="text-xs uppercase tracking-wide text-muted-foreground">
         {pathway.id}
       </span>
       <span className="text-2xl font-bold">{pathway.node_count}</span>
       <span className="text-xs text-muted-foreground">
-        nodes · {pathway.has_doc ? "deep-dive ready" : "no doc yet"}
+        nodes · {pathway.has_doc ? "deep-dive ready" : "no doc"}
       </span>
     </button>
   );
 }
 
-function NodeRow({ node }: { node: PipelineNode }) {
+function NodeDetail({ node }: { node: PipelineNode }) {
   return (
-    <tr className="border-b border-border/40 hover:bg-muted/30">
-      <td className="py-2 pr-3 font-mono text-xs">{node.id}</td>
-      <td className="py-2 pr-3 text-sm">{node.label}</td>
-      <td className="py-2 pr-3">
+    <div className="space-y-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-sm font-semibold">{node.id}</span>
         <Badge variant={STATUS_VARIANT[node.status ?? "unknown"] ?? "secondary"}>
           {node.status ?? "?"}
         </Badge>
-      </td>
-      <td className="py-2 pr-3 text-xs text-muted-foreground">{node.node_type}</td>
-      <td className="py-2 pr-3 text-xs text-muted-foreground">
-        {(node.pathways ?? []).join(", ")}
-      </td>
-      <td className="py-2 pr-3 font-mono text-xs text-muted-foreground">
-        {node.source_file?.replace("policyengine_us_data/", "")}
-        {node.decorator_line ? `:${node.decorator_line}` : ""}
-      </td>
-    </tr>
+        <Badge variant="secondary">{node.node_type}</Badge>
+        {(node.pathways ?? []).map((p) => (
+          <Badge key={p} variant="outline" className="text-xs">
+            {p}
+          </Badge>
+        ))}
+      </div>
+      {node.label && <div className="text-sm font-medium">{node.label}</div>}
+      {node.description && (
+        <p className="text-sm text-muted-foreground">{node.description}</p>
+      )}
+      <div className="text-xs text-muted-foreground">
+        <span className="font-mono">
+          {node.source_file?.replace("policyengine_us_data/", "")}
+          {node.decorator_line ? `:${node.decorator_line}` : ""}
+        </span>
+      </div>
+      {node.artifacts_in && node.artifacts_in.length > 0 && (
+        <div className="text-xs">
+          <span className="font-semibold">in:</span>{" "}
+          <span className="font-mono text-muted-foreground">
+            {node.artifacts_in.join(", ")}
+          </span>
+        </div>
+      )}
+      {node.artifacts_out && node.artifacts_out.length > 0 && (
+        <div className="text-xs">
+          <span className="font-semibold">out:</span>{" "}
+          <span className="font-mono text-muted-foreground">
+            {node.artifacts_out.join(", ")}
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
 function StageDoc({ stageId }: { stageId: string }) {
   const q = useStageDoc(stageId);
-  if (q.isLoading)
-    return <Skeleton className="h-48 w-full" />;
+  if (q.isLoading) return <Skeleton className="h-48 w-full" />;
   if (q.error)
     return (
       <Text c="dimmed">
-        Deep-dive for <code>{stageId}</code> not available yet
-        (agent may still be writing it).
+        Deep-dive for <code>{stageId}</code> not available yet.
       </Text>
     );
   if (!q.data) return null;
@@ -105,23 +132,12 @@ function StageDoc({ stageId }: { stageId: string }) {
 export default function PipelinePage() {
   const pipeline = usePipeline();
   const [activePathway, setActivePathway] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  const filteredNodes = useMemo(() => {
-    if (!pipeline.data) return [];
-    const s = search.trim().toLowerCase();
-    return pipeline.data.nodes.filter((n) => {
-      if (activePathway && !(n.pathways ?? []).includes(activePathway)) {
-        return false;
-      }
-      if (!s) return true;
-      return (
-        n.id.toLowerCase().includes(s) ||
-        (n.label ?? "").toLowerCase().includes(s) ||
-        (n.description ?? "").toLowerCase().includes(s)
-      );
-    });
-  }, [pipeline.data, activePathway, search]);
+  const selectedNode = useMemo(() => {
+    if (!pipeline.data || !selectedNodeId) return null;
+    return pipeline.data.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  }, [pipeline.data, selectedNodeId]);
 
   return (
     <AppShell>
@@ -130,12 +146,12 @@ export default function PipelinePage() {
           <Title order={2}>Data pipeline</Title>
           <Text c="dimmed" size="sm">
             Every <code>@pipeline_node</code> declared in{" "}
-            <code>policyengine_us_data</code>. Grouped by pathway. Click a
-            pathway card to load its deep-dive.
+            <code>policyengine_us_data</code>, laid out as a DAG. Click a
+            pathway to filter; click a node for its details.
           </Text>
         </div>
 
-        {pipeline.isLoading && <Skeleton className="h-32 w-full" />}
+        {pipeline.isLoading && <Skeleton className="h-64 w-full" />}
         {pipeline.error && (
           <Card>
             <CardContent className="py-6">
@@ -143,9 +159,9 @@ export default function PipelinePage() {
                 Failed to load pipeline: {String(pipeline.error)}
               </Text>
               <Text size="xs" c="dimmed" className="mt-2">
-                If this is a fresh setup, run{" "}
+                Run{" "}
                 <code>python backend/scripts/extract_pipeline_dag.py</code>{" "}
-                to generate the DAG.
+                if this is a fresh setup.
               </Text>
             </CardContent>
           </Card>
@@ -153,36 +169,62 @@ export default function PipelinePage() {
 
         {pipeline.data && (
           <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {pipeline.data.pathways.map((p) => (
+                <PathwayCard
+                  key={p.id}
+                  pathway={p}
+                  active={activePathway === p.id}
+                  onClick={() => {
+                    setActivePathway(activePathway === p.id ? null : p.id);
+                    setSelectedNodeId(null);
+                  }}
+                />
+              ))}
+            </div>
+
             <Card>
               <CardHeader>
                 <CardTitle>
-                  Pathways · {pipeline.data.stats.node_count} nodes total
+                  Graph
+                  {activePathway && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      filtered to <code>{activePathway}</code>
+                    </span>
+                  )}
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    · {formatNumber(pipeline.data.stats.node_count)} nodes,{" "}
+                    {formatNumber(pipeline.data.stats.edge_count)} edges
+                  </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {pipeline.data.pathways.map((p) => (
-                    <PathwayCard
-                      key={p.id}
-                      pathway={p}
-                      active={activePathway === p.id}
-                      onClick={() =>
-                        setActivePathway(activePathway === p.id ? null : p.id)
-                      }
-                    />
-                  ))}
-                </div>
+                <PipelineGraph
+                  nodes={pipeline.data.nodes}
+                  edges={pipeline.data.edges}
+                  activePathway={activePathway}
+                  onNodeSelect={setSelectedNodeId}
+                  selectedId={selectedNodeId}
+                />
+                <Text size="xs" c="dimmed" className="mt-2">
+                  Edges shown where one node&apos;s{" "}
+                  <code>artifacts_out</code> matches another&apos;s{" "}
+                  <code>artifacts_in</code> (
+                  {pipeline.data.edges.length} declared connections).
+                  Isolated nodes are real — most pipeline_node entries don&apos;t
+                  declare formal artifact flow, only their internal description.
+                </Text>
               </CardContent>
             </Card>
 
-            {activePathway && (
+            {selectedNode && (
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    Deep dive: {activePathway}
+                    Node detail
                     <button
                       type="button"
-                      onClick={() => setActivePathway(null)}
+                      onClick={() => setSelectedNodeId(null)}
                       className="ml-3 text-sm text-muted-foreground hover:text-foreground"
                     >
                       ✕
@@ -190,55 +232,21 @@ export default function PipelinePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <StageDoc stageId={activePathway} />
+                  <NodeDetail node={selectedNode} />
                 </CardContent>
               </Card>
             )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  Nodes
-                  {activePathway && (
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      filtered to <code>{activePathway}</code>
-                    </span>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-3 max-w-md">
-                  <Input
-                    placeholder="Search nodes by id, label, or description…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                <div className="text-xs text-muted-foreground mb-2">
-                  Showing {formatNumber(filteredNodes.length)} of{" "}
-                  {formatNumber(pipeline.data.nodes.length)} nodes
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-xs uppercase text-muted-foreground">
-                        <th className="py-2 pr-3">ID</th>
-                        <th className="py-2 pr-3">Label</th>
-                        <th className="py-2 pr-3">Status</th>
-                        <th className="py-2 pr-3">Type</th>
-                        <th className="py-2 pr-3">Pathways</th>
-                        <th className="py-2 pr-3">Source</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredNodes.map((n) => (
-                        <NodeRow key={n.id} node={n} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+            {activePathway && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Deep dive: {activePathway}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <StageDoc stageId={activePathway} />
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </Stack>
