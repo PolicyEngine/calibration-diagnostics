@@ -6,14 +6,16 @@ import pytest
 
 from backend.services import runs as runs_module
 from backend.services.runs import (
+    DEFAULT_REQUIRED_FILES,
     DatasetConfig,
-    REQUIRED_ARTIFACTS,
     RunInfo,
     default_selection,
     get_dataset,
     list_datasets,
     list_runs,
 )
+
+REQUIRED_ARTIFACTS = DEFAULT_REQUIRED_FILES["flat"]
 
 
 def test_list_datasets_returns_defaults():

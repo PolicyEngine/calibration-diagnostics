@@ -35,13 +35,21 @@ class RunRegistry:
                 return self._cache[key]
             dataset = runs_service.get_dataset(dataset_id)
             logger.info(
-                "Loading run %s/%s (cache miss; %d/%d loaded)",
-                dataset_id, run_id, len(self._cache), self.max_size,
+                "Loading run %s/%s (layout=%s, cache miss; %d/%d loaded)",
+                dataset_id, run_id, dataset.layout,
+                len(self._cache), self.max_size,
             )
-            from backend.services.loader import load_run  # lazy: heavy deps
-            state = load_run(
-                dataset.repo_id, dataset.repo_type, run_id, dataset_id=dataset_id,
-            )
+            if dataset.layout == "staging":
+                from backend.services.dataset_loader import (
+                    load_run_from_dataset,
+                )
+                state = load_run_from_dataset(dataset, run_id)
+            else:
+                from backend.services.loader import load_run  # lazy: heavy deps
+                state = load_run(
+                    dataset.repo_id, dataset.repo_type, run_id,
+                    dataset_id=dataset_id,
+                )
             self._cache[key] = state
             while len(self._cache) > self.max_size:
                 evicted_key, _ = self._cache.popitem(last=False)

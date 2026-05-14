@@ -14,17 +14,20 @@ from sqlalchemy.engine import Engine
 class AppState:
     """Immutable container for all loaded calibration data for one run.
 
-    Created by loader.load_all_artifacts() and cached per (dataset, run)
-    in backend.services.registry.RunRegistry.
+    Two load paths populate this:
+    - **pkl mode** (legacy / sandbox): full X matrix, weights from pkl/npy.
+    - **dataset mode** (canonical staging): targets read from policy_data.db,
+      estimates computed by evaluating PE variables on the published h5.
+      X_csr / X_csc / initial_weights stay empty in this mode.
     """
 
-    # -- From calibration_package.pkl --
-    X_csr: sp.csr_matrix  # (n_targets, n_households) row access
-    X_csc: sp.csc_matrix  # same data, column access
-    targets_df: pd.DataFrame  # raw targets_df from package
-    target_names: list[str]
-    initial_weights: np.ndarray  # (n_households,)
-    cd_geoid: np.ndarray  # (n_households,)
+    # -- From calibration_package.pkl (pkl mode) or empty (dataset mode) --
+    X_csr: sp.csr_matrix = field(default_factory=lambda: sp.csr_matrix((0, 0)))
+    X_csc: sp.csc_matrix = field(default_factory=lambda: sp.csc_matrix((0, 0)))
+    targets_df: pd.DataFrame = field(default_factory=pd.DataFrame)
+    target_names: list[str] = field(default_factory=list)
+    initial_weights: np.ndarray = field(default_factory=lambda: np.array([]))
+    cd_geoid: np.ndarray = field(default_factory=lambda: np.array([]))
     metadata: dict = field(default_factory=dict)
 
     # -- From calibration_weights.npy --
