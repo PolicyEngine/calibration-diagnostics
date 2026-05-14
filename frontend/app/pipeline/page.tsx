@@ -203,6 +203,7 @@ export default function PipelinePage() {
                 <PipelineGraph
                   nodes={pipeline.data.nodes}
                   edges={pipeline.data.edges}
+                  unproducedArtifacts={pipeline.data.unproduced_artifacts}
                   activePathway={activePathway}
                   onNodeSelect={setSelectedNodeId}
                   selectedId={selectedNodeId}
