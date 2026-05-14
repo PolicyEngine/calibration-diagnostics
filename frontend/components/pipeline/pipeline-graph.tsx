@@ -18,12 +18,13 @@ import type {
   PipelineEdge,
 } from "@/lib/api/hooks/use-pipeline";
 
-const PATHWAY_COLORS: Record<string, { bg: string; border: string }> = {
-  data_build:           { bg: "#fef3c7", border: "#d97706" },
-  calibration_package:  { bg: "#dbeafe", border: "#2563eb" },
-  weight_fit:           { bg: "#dcfce7", border: "#16a34a" },
-  local_h5:             { bg: "#fce7f3", border: "#db2777" },
-  "(none)":             { bg: "#f3f4f6", border: "#6b7280" },
+// Single neutral palette; "transitional" / "legacy" nodes get a dimmer
+// treatment via opacity. No per-pathway colour by default — keeps the
+// graph readable when many statuses overlap.
+const NODE_STYLE = {
+  current:      { bg: "#ffffff", border: "#475569", text: "#0f172a" },
+  transitional: { bg: "#fef9c3", border: "#a16207", text: "#3f2c00" },
+  legacy:       { bg: "#f1f5f9", border: "#94a3b8", text: "#64748b" },
 };
 
 interface Props {
@@ -32,40 +33,45 @@ interface Props {
   activePathway: string | null;
   onNodeSelect: (id: string | null) => void;
   selectedId: string | null;
+  /** When true, show every node. Otherwise hide isolated nodes (no edges). */
+  showIsolated: boolean;
 }
 
 // --- custom node card ----------------------------------------------------
 
 function NodeCard({ data }: NodeProps<{ node: PipelineNode; selected: boolean }>) {
   const n = data.node;
-  const primaryPathway = (n.pathways ?? ["(none)"])[0];
-  const color = PATHWAY_COLORS[primaryPathway] ?? PATHWAY_COLORS["(none)"];
-  const dim = n.status === "legacy" || n.status === "transitional";
+  const style = NODE_STYLE[(n.status ?? "current") as keyof typeof NODE_STYLE]
+    ?? NODE_STYLE.current;
 
   return (
     <div
-      className={`rounded-md border-2 px-3 py-1.5 shadow-sm transition-all min-w-[140px] max-w-[220px] ${
+      className={`rounded-md border px-3 py-1.5 shadow-sm transition-all min-w-[140px] max-w-[220px] ${
         data.selected ? "ring-2 ring-primary ring-offset-1" : ""
-      } ${dim ? "opacity-60" : ""}`}
-      style={{ backgroundColor: color.bg, borderColor: color.border }}
+      }`}
+      style={{
+        backgroundColor: style.bg,
+        borderColor: style.border,
+        color: style.text,
+      }}
     >
       <Handle
         type="target"
         position={Position.Left}
-        style={{ background: color.border, width: 6, height: 6 }}
+        style={{ background: style.border, width: 6, height: 6 }}
       />
       <div className="font-mono text-[11px] font-semibold truncate" title={n.id}>
         {n.id}
       </div>
       {n.label && n.label !== n.id && (
-        <div className="text-[10px] text-muted-foreground truncate" title={n.label}>
+        <div className="text-[10px] opacity-70 truncate" title={n.label}>
           {n.label}
         </div>
       )}
       <Handle
         type="source"
         position={Position.Right}
-        style={{ background: color.border, width: 6, height: 6 }}
+        style={{ background: style.border, width: 6, height: 6 }}
       />
     </div>
   );
@@ -113,12 +119,31 @@ export function PipelineGraph({
   activePathway,
   onNodeSelect,
   selectedId,
+  showIsolated,
 }: Props) {
   const { laidOutNodes, laidOutEdges } = useMemo(() => {
-    const filtered = activePathway
+    // 1. Pathway filter
+    const byPathway = activePathway
       ? nodes.filter((n) => (n.pathways ?? []).includes(activePathway))
       : nodes;
-    const idSet = new Set(filtered.map((n) => n.id));
+    const idSet = new Set(byPathway.map((n) => n.id));
+
+    // 2. Edges scoped to the visible nodes
+    const visibleEdges = edges.filter(
+      (e) => idSet.has(e.from) && idSet.has(e.to),
+    );
+
+    // 3. Optionally hide isolated nodes (the default — keeps the canvas focused)
+    let filtered = byPathway;
+    if (!showIsolated) {
+      const connectedIds = new Set<string>();
+      visibleEdges.forEach((e) => {
+        connectedIds.add(e.from);
+        connectedIds.add(e.to);
+      });
+      filtered = byPathway.filter((n) => connectedIds.has(n.id));
+    }
+    const visibleIdSet = new Set(filtered.map((n) => n.id));
 
     const rfNodes: Node[] = filtered.map((n) => ({
       id: n.id,
@@ -127,8 +152,8 @@ export function PipelineGraph({
       data: { node: n, selected: n.id === selectedId },
     }));
 
-    const rfEdges: Edge[] = edges
-      .filter((e) => idSet.has(e.from) && idSet.has(e.to))
+    const rfEdges: Edge[] = visibleEdges
+      .filter((e) => visibleIdSet.has(e.from) && visibleIdSet.has(e.to))
       .map((e, i) => ({
         id: `e${i}`,
         source: e.from,
@@ -142,7 +167,7 @@ export function PipelineGraph({
 
     const laid = layoutWithDagre(rfNodes, rfEdges);
     return { laidOutNodes: laid.nodes, laidOutEdges: laid.edges };
-  }, [nodes, edges, activePathway, selectedId]);
+  }, [nodes, edges, activePathway, selectedId, showIsolated]);
 
   const handleNodeClick = useCallback(
     (_evt: React.MouseEvent, node: Node) => {
@@ -167,15 +192,7 @@ export function PipelineGraph({
       >
         <Background gap={20} size={1} />
         <Controls showInteractive={false} />
-        <MiniMap
-          pannable
-          zoomable
-          nodeColor={(n) => {
-            const pn = (n.data as { node?: PipelineNode })?.node;
-            const path = (pn?.pathways ?? ["(none)"])[0];
-            return PATHWAY_COLORS[path]?.border ?? "#6b7280";
-          }}
-        />
+        <MiniMap pannable zoomable nodeColor="#475569" />
       </ReactFlow>
     </div>
   );

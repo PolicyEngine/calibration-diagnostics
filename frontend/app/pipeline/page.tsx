@@ -23,13 +23,6 @@ import {
 } from "@/lib/api/hooks/use-pipeline";
 import { PipelineGraph } from "@/components/pipeline/pipeline-graph";
 
-const PATHWAY_COLORS: Record<string, string> = {
-  data_build: "border-amber-500 bg-amber-50",
-  calibration_package: "border-blue-500 bg-blue-50",
-  weight_fit: "border-green-500 bg-green-50",
-  local_h5: "border-pink-500 bg-pink-50",
-};
-
 const STATUS_VARIANT: Record<string, "success" | "secondary" | "warning" | "error"> = {
   current: "success",
   transitional: "warning",
@@ -47,14 +40,15 @@ function PathwayCard({
   active: boolean;
   onClick: () => void;
 }) {
-  const colorClass = PATHWAY_COLORS[pathway.id] ?? "border-border bg-white";
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-start gap-1 rounded-lg border-2 p-4 text-left transition-all ${
-        active ? "ring-2 ring-primary" : ""
-      } ${colorClass}`}
+      className={`flex flex-col items-start gap-1 rounded-lg border p-4 text-left transition-all bg-white ${
+        active
+          ? "border-primary ring-2 ring-primary"
+          : "border-border hover:bg-muted/40"
+      }`}
     >
       <span className="text-xs uppercase tracking-wide text-muted-foreground">
         {pathway.id}
@@ -133,6 +127,7 @@ export default function PipelinePage() {
   const pipeline = usePipeline();
   const [activePathway, setActivePathway] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [showIsolated, setShowIsolated] = useState(false);
 
   const selectedNode = useMemo(() => {
     if (!pipeline.data || !selectedNodeId) return null;
@@ -185,18 +180,24 @@ export default function PipelinePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>
-                  Graph
-                  {activePathway && (
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      filtered to <code>{activePathway}</code>
-                    </span>
-                  )}
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    · {formatNumber(pipeline.data.stats.node_count)} nodes,{" "}
-                    {formatNumber(pipeline.data.stats.edge_count)} edges
-                  </span>
-                </CardTitle>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle>
+                    Graph
+                    {activePathway && (
+                      <span className="ml-2 text-sm font-normal text-muted-foreground">
+                        filtered to <code>{activePathway}</code>
+                      </span>
+                    )}
+                  </CardTitle>
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={showIsolated}
+                      onChange={(e) => setShowIsolated(e.target.checked)}
+                    />
+                    Show isolated nodes
+                  </label>
+                </div>
               </CardHeader>
               <CardContent>
                 <PipelineGraph
@@ -205,14 +206,15 @@ export default function PipelinePage() {
                   activePathway={activePathway}
                   onNodeSelect={setSelectedNodeId}
                   selectedId={selectedNodeId}
+                  showIsolated={showIsolated}
                 />
                 <Text size="xs" c="dimmed" className="mt-2">
-                  Edges shown where one node&apos;s{" "}
-                  <code>artifacts_out</code> matches another&apos;s{" "}
-                  <code>artifacts_in</code> (
-                  {pipeline.data.edges.length} declared connections).
-                  Isolated nodes are real — most pipeline_node entries don&apos;t
-                  declare formal artifact flow, only their internal description.
+                  Showing only nodes that participate in declared data flow (
+                  {pipeline.data.edges.length} edges). Many pipeline nodes
+                  don&apos;t declare formal <code>artifacts_in/out</code>{" "}
+                  metadata and are hidden by default — toggle{" "}
+                  <em>Show isolated nodes</em> to see all{" "}
+                  {pipeline.data.stats.node_count}.
                 </Text>
               </CardContent>
             </Card>
