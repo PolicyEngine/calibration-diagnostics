@@ -150,7 +150,11 @@ def _load_targets_from_db(db_engine) -> tuple[pd.DataFrame, list[str]]:
     # Build readable target names: <geo_level>/<variable>/<geo_id>/[constraints]
     names: list[str] = []
     for _, r in targets.iterrows():
-        geo_part = r["geographic_id"] or "US"
+        gid = r["geographic_id"]
+        if gid is None or (isinstance(gid, float) and pd.isna(gid)):
+            geo_part = "US"
+        else:
+            geo_part = str(gid)
         constraint_part = (
             ",".join(r["constraints"]) if r["constraints"] else ""
         )

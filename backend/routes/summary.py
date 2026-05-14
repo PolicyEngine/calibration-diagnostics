@@ -54,8 +54,14 @@ def get_summary(
     worst_by_variable = _group_summary(included, "variable", top=worst_n)
     worst_by_geo_level = _group_summary(included, "geo_level", top=worst_n)
 
+    # Rank worst targets by loss_contribution when we have it (pkl mode);
+    # otherwise fall back to abs_rel_error so we still show meaningful rows
+    # in dataset mode where loss_contribution is uniformly 0.
+    rank_col = "loss_contribution"
+    if included[rank_col].max() == 0:
+        rank_col = "abs_rel_error"
     worst_targets = (
-        included.nlargest(worst_n, "loss_contribution")[
+        included.nlargest(worst_n, rank_col)[
             [
                 "target_name", "variable", "geo_level", "value",
                 "estimate", "rel_error", "abs_rel_error", "loss_contribution",
@@ -64,10 +70,9 @@ def get_summary(
         .assign(target_idx=lambda d: d.index.astype(int))
         .to_dict(orient="records")
     )
-
     weight_health = _weight_health(state)
 
-    return {
+    payload = {
         "headline": headline,
         "error_distribution": error_distribution,
         "worst_by_variable": worst_by_variable,
@@ -75,6 +80,20 @@ def get_summary(
         "worst_targets": worst_targets,
         "weight_health": weight_health,
     }
+    return _scrub_nans(payload)
+
+
+def _scrub_nans(obj):
+    """Recursively replace non-finite floats with None so JSON serialisation
+    doesn't choke. Dataset mode produces NaN estimates for any target that
+    needs entity-mapped constraint evaluation."""
+    if isinstance(obj, dict):
+        return {k: _scrub_nans(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_scrub_nans(x) for x in obj]
+    if isinstance(obj, float) and not np.isfinite(obj):
+        return None
+    return obj
 
 
 def _empty_summary(state: AppState) -> dict:
