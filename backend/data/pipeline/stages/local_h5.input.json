@@ -1,0 +1,984 @@
+{
+  "stage_id": "local_h5",
+  "label": "local_h5",
+  "nodes": [
+    {
+      "decorator_line": 37,
+      "description": "Build typed local H5 requests from US states, districts, and supported city rules.",
+      "id": "local_h5_area_catalog",
+      "label": "USAreaCatalog",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/area_catalog.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "USAreaCatalog",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_area_catalog.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "calibration_weights.npy",
+        "source_imputed_stratified_extended_cps.h5",
+        "geography_assignment.npz",
+        "policy_data.db"
+      ],
+      "artifacts_out": [
+        "worker_bootstrap.json",
+        "entity_graph.npz"
+      ],
+      "decorator_line": 52,
+      "description": "Persisted deterministic worker setup facts for one local H5 scope.",
+      "id": "local_h5_worker_bootstrap_bundle",
+      "label": "WorkerBootstrapBundle",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/bootstrap.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "WorkerBootstrapBundle",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_bootstrap.py"
+      ]
+    },
+    {
+      "artifacts_out": [
+        "bootstrap/{scope}/worker_bootstrap.json",
+        "bootstrap/{scope}/entity_graph.npz"
+      ],
+      "decorator_line": 198,
+      "description": "Filesystem path adapter for run-scoped local H5 bootstrap artifacts.",
+      "id": "local_h5_worker_bootstrap_store",
+      "label": "WorkerBootstrapStore",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/bootstrap.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "WorkerBootstrapStore",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_bootstrap.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "calibration_weights.npy",
+        "source_imputed_stratified_extended_cps.h5",
+        "geography_assignment.npz",
+        "policy_data.db"
+      ],
+      "artifacts_out": [
+        "bootstrap/{scope}/worker_bootstrap.json",
+        "bootstrap/{scope}/entity_graph.npz"
+      ],
+      "decorator_line": 259,
+      "description": "Materialize deterministic local H5 worker bootstrap artifacts.",
+      "id": "local_h5_worker_bootstrap_builder",
+      "label": "WorkerBootstrapBuilder",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/bootstrap.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "WorkerBootstrapBuilder",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_bootstrap.py"
+      ]
+    },
+    {
+      "decorator_line": 71,
+      "description": "In-memory local H5 payload and diagnostics for one area.",
+      "id": "local_h5_build_result",
+      "label": "LocalAreaBuildResult",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/builder.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "LocalAreaBuildResult",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_builder.py"
+      ]
+    },
+    {
+      "decorator_line": 139,
+      "description": "Build the in-memory payload for one local-area or national H5 output.",
+      "id": "local_h5_dataset_builder",
+      "label": "LocalAreaDatasetBuilder",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/builder.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "LocalAreaDatasetBuilder",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_builder.py"
+      ]
+    },
+    {
+      "decorator_line": 31,
+      "description": "Input artifact and run metadata bundle for one local H5 publish scope.",
+      "id": "local_h5_publishing_input_bundle",
+      "label": "PublishingInputBundle",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/fingerprinting.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "PublishingInputBundle"
+    },
+    {
+      "decorator_line": 78,
+      "description": "Stable content identity for one local H5 publication input artifact.",
+      "id": "local_h5_artifact_identity",
+      "label": "ArtifactIdentity",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/fingerprinting.py",
+      "stability": "stable",
+      "status": "current",
+      "target_symbol": "ArtifactIdentity",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_fingerprinting.py"
+      ]
+    },
+    {
+      "decorator_line": 113,
+      "description": "Provenance and resumability material for one local H5 publish scope.",
+      "id": "local_h5_traceability_bundle",
+      "label": "TraceabilityBundle",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/fingerprinting.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "TraceabilityBundle",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_fingerprinting.py"
+      ]
+    },
+    {
+      "decorator_line": 188,
+      "description": "Build traceability bundles and deterministic scope fingerprints for local H5 publication.",
+      "id": "local_h5_traceability",
+      "label": "FingerprintingService",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/fingerprinting.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "FingerprintingService",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_fingerprinting.py"
+      ]
+    },
+    {
+      "decorator_line": 40,
+      "description": "Resolved physical source used to recover exact calibration geography.",
+      "id": "local_h5_resolved_geography_source",
+      "label": "ResolvedGeographySource",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/geography_loader.py",
+      "stability": "stable",
+      "status": "current",
+      "target_symbol": "ResolvedGeographySource",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_geography_loader.py"
+      ]
+    },
+    {
+      "decorator_line": 77,
+      "description": "Resolve and load saved, package-backed, or legacy calibration geography artifacts.",
+      "id": "calibration_geography_loader",
+      "label": "CalibrationGeographyLoader",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/geography_loader.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "CalibrationGeographyLoader",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_geography_loader.py"
+      ]
+    },
+    {
+      "decorator_line": 29,
+      "description": "Assign weighted area work items to worker batches using longest-processing-time scheduling.",
+      "id": "local_h5_partition",
+      "label": "Partition Local H5 Work",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/partitioning.py",
+      "stability": "stable",
+      "status": "current",
+      "target_symbol": "partition_weighted_work_items",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_partitioning.py"
+      ]
+    },
+    {
+      "decorator_line": 43,
+      "description": "Validated in-memory period-grouped payload for one local H5 output.",
+      "id": "local_h5_payload",
+      "label": "H5Payload",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/payload.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "H5Payload",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_payload.py"
+      ]
+    },
+    {
+      "decorator_line": 122,
+      "description": "Context passed to payload postprocessors during one H5 build.",
+      "id": "local_h5_payload_build_context",
+      "label": "PayloadBuildContext",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/payload.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "PayloadBuildContext",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_payload.py"
+      ]
+    },
+    {
+      "decorator_line": 20,
+      "description": "Reindex selected household, person, and subentity rows for local H5 outputs.",
+      "id": "local_h5_entity_reindexer",
+      "label": "EntityReindexer",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/reindexing.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "EntityReindexer",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_reindexing.py"
+      ]
+    },
+    {
+      "decorator_line": 111,
+      "description": "Output entity IDs and source row indices after local H5 clone selection.",
+      "id": "local_h5_reindexed_entities",
+      "label": "ReindexedEntities",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/reindexing.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "ReindexedEntities",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_reindexing.py"
+      ]
+    },
+    {
+      "decorator_line": 61,
+      "description": "Typed geography predicate for local H5 output selection.",
+      "id": "local_h5_area_filter",
+      "label": "AreaFilter",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/requests.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "AreaFilter",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_requests.py"
+      ]
+    },
+    {
+      "decorator_line": 137,
+      "description": "Typed request contract for one national, state, district, city, or custom H5 output.",
+      "id": "local_h5_area_request",
+      "label": "AreaBuildRequest",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/requests.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "AreaBuildRequest",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_requests.py"
+      ]
+    },
+    {
+      "decorator_line": 19,
+      "description": "Select active clone-household rows for one local H5 output.",
+      "id": "local_h5_area_selector",
+      "label": "AreaSelector",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/selection.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "AreaSelector",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_selection.py"
+      ]
+    },
+    {
+      "decorator_line": 101,
+      "description": "Selected clone-household rows for one local H5 output.",
+      "id": "local_h5_clone_selection",
+      "label": "CloneSelection",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/selection.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "CloneSelection",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_selection.py"
+      ]
+    },
+    {
+      "decorator_line": 63,
+      "description": "Explicit source-dataset entity spine for local H5 worker setup.",
+      "id": "local_h5_entity_graph",
+      "label": "EntityGraph",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/source_dataset.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "EntityGraph",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_source_dataset.py"
+      ]
+    },
+    {
+      "decorator_line": 370,
+      "description": "Lazy source variable access wrapper for local H5 source snapshots.",
+      "id": "local_h5_microsimulation_variable_provider",
+      "label": "MicrosimulationVariableProvider",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/source_dataset.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "MicrosimulationVariableProvider",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_source_dataset.py"
+      ]
+    },
+    {
+      "decorator_line": 469,
+      "description": "In-memory source H5 dataset contract for local H5 worker setup.",
+      "id": "local_h5_source_dataset_snapshot",
+      "label": "SourceDatasetSnapshot",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/source_dataset.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "SourceDatasetSnapshot",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_source_dataset.py"
+      ]
+    },
+    {
+      "decorator_line": 546,
+      "description": "PolicyEngine H5 dataset adapter for local H5 source snapshots.",
+      "id": "local_h5_policyengine_dataset_reader",
+      "label": "PolicyEngineDatasetReader",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/source_dataset.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "PolicyEngineDatasetReader",
+      "validation_commands": [
+        "uv run pytest tests/integration/build_outputs/h5_worker_runtime/test_worker_script_tiny_fixture.py"
+      ]
+    },
+    {
+      "decorator_line": 54,
+      "description": "US entity ID and household-weight local H5 payload data.",
+      "id": "local_h5_us_entity_postprocessor_result",
+      "label": "USEntityPostProcessorResult",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "USEntityPostProcessorResult",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_us_augmentations.py"
+      ]
+    },
+    {
+      "decorator_line": 80,
+      "description": "US geography local H5 payload data and block-derived geography.",
+      "id": "local_h5_us_geography_postprocessor_result",
+      "label": "USGeographyPostProcessorResult",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "USGeographyPostProcessorResult",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_us_augmentations.py"
+      ]
+    },
+    {
+      "decorator_line": 107,
+      "description": "US take-up local H5 payload data and generated take-up variables.",
+      "id": "local_h5_us_takeup_postprocessor_result",
+      "label": "USTakeupPostProcessorResult",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "USTakeupPostProcessorResult",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_us_augmentations.py"
+      ]
+    },
+    {
+      "decorator_line": 134,
+      "description": "Apply US entity ID and household-weight fields to local H5 payloads.",
+      "id": "local_h5_us_entity_postprocessor",
+      "label": "USEntityPostProcessor",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "USEntityPostProcessor",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_us_augmentations.py"
+      ]
+    },
+    {
+      "decorator_line": 187,
+      "description": "Apply US geography fields to local H5 payloads.",
+      "id": "local_h5_us_geography_postprocessor",
+      "label": "USGeographyPostProcessor",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "USGeographyPostProcessor",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_us_augmentations.py"
+      ]
+    },
+    {
+      "decorator_line": 292,
+      "description": "Apply US take-up fields to local H5 payloads.",
+      "id": "local_h5_us_takeup_postprocessor",
+      "label": "USTakeupPostProcessor",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "USTakeupPostProcessor",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_us_augmentations.py"
+      ]
+    },
+    {
+      "decorator_line": 23,
+      "description": "Worker-scoped local H5 validation policy contract.",
+      "id": "local_h5_validation_policy",
+      "label": "ValidationPolicy",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/validation.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "ValidationPolicy",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_validation.py"
+      ]
+    },
+    {
+      "decorator_line": 41,
+      "description": "Prepared per-worker local H5 validation target context.",
+      "id": "local_h5_validation_context",
+      "label": "ValidationContext",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/validation.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "ValidationContext",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_validation.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "policy_data.db",
+        "target_config.yaml",
+        "target_config_full.yaml"
+      ],
+      "decorator_line": 115,
+      "description": "Prepare local H5 validation targets once per worker session.",
+      "id": "local_h5_area_validation_service",
+      "label": "AreaValidationService",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/validation.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "AreaValidationService",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_validation.py"
+      ]
+    },
+    {
+      "decorator_line": 38,
+      "description": "Clone selected source variables into period-grouped local H5 payloads.",
+      "id": "local_h5_variable_cloner",
+      "label": "VariableCloner",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/variables.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "VariableCloner",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_variables.py"
+      ]
+    },
+    {
+      "decorator_line": 126,
+      "description": "Period-grouped cloned source variables for one local H5 output.",
+      "id": "local_h5_variable_clone_payload",
+      "label": "VariableClonePayload",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/variables.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "VariableClonePayload",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_variables.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "calibration_weights.npy",
+        "national_calibration_weights.npy"
+      ],
+      "decorator_line": 20,
+      "description": "Explicit shape contract for flat clone-level calibration weights.",
+      "id": "clone_weight_matrix",
+      "label": "CloneWeightMatrix",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/weights.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "CloneWeightMatrix",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_weights.py"
+      ]
+    },
+    {
+      "decorator_line": 50,
+      "description": "Normalized worker-execution input payload for local H5 builds.",
+      "id": "local_h5_worker_calibration_inputs",
+      "label": "WorkerCalibrationInputs",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/worker_inputs.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "WorkerCalibrationInputs",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_worker_inputs.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "calibration_weights.npy",
+        "source_imputed_stratified_extended_cps.h5",
+        "geography_assignment.npz",
+        "policy_data.db",
+        "worker_bootstrap.json"
+      ],
+      "decorator_line": 34,
+      "description": "Worker-scoped local H5 setup state reused across queued requests.",
+      "id": "local_h5_worker_session",
+      "label": "WorkerSession",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/worker_session.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "WorkerSession",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_worker_session.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "calibration_weights.npy",
+        "source_imputed_stratified_extended_cps.h5",
+        "geography_assignment.npz",
+        "policy_data.db",
+        "bootstrap/{scope}/worker_bootstrap.json",
+        "bootstrap/{scope}/entity_graph.npz"
+      ],
+      "decorator_line": 69,
+      "description": "Load local H5 source, weights, geography, and validation context once per worker.",
+      "id": "local_h5_worker_session_factory",
+      "label": "WorkerSessionFactory",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/worker_session.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "WorkerSessionFactory",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_worker_session.py",
+        "uv run pytest tests/integration/build_outputs/h5_worker_runtime/test_worker_script_tiny_fixture.py"
+      ]
+    },
+    {
+      "decorator_line": 18,
+      "description": "Post-write verification summary for one local H5 file.",
+      "id": "local_h5_write_result",
+      "label": "H5WriteResult",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/writer.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "H5WriteResult",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_writer.py"
+      ]
+    },
+    {
+      "decorator_line": 40,
+      "description": "Write one period-grouped local H5 payload to disk.",
+      "id": "local_h5_writer",
+      "label": "H5Writer",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/build_outputs/writer.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "H5Writer",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_writer.py"
+      ]
+    },
+    {
+      "decorator_line": 540,
+      "description": "Derive state, county, tract, PUMA, place, district, and other geography from block GEOIDs.",
+      "id": "geo_derive",
+      "label": "Derive Geography From Blocks",
+      "node_type": "library",
+      "pathways": [
+        "local_h5",
+        "calibration_package"
+      ],
+      "source_file": "policyengine_us_data/calibration/block_assignment.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "derive_geography_from_blocks",
+      "validation_commands": [
+        "uv run pytest tests/unit/calibration/test_clone_and_assign.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "local_area_build/**/*.h5"
+      ],
+      "decorator_line": 96,
+      "description": "Upload locally built H5 files into Hugging Face staging paths.",
+      "id": "local_stage_upload",
+      "label": "Stage Local H5 Files",
+      "node_type": "entrypoint",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/promote_local_h5s.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "stage",
+      "validation_commands": [
+        "uv run pytest tests/unit/test_promote_local_h5s.py"
+      ]
+    },
+    {
+      "artifacts_out": [
+        "production H5 release",
+        "release manifest"
+      ],
+      "decorator_line": 116,
+      "description": "Promote staged H5 files to production storage and publish release manifests.",
+      "id": "atomic_promote",
+      "label": "Atomic Promote Local H5 Files",
+      "node_type": "entrypoint",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/promote_local_h5s.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "promote",
+      "validation_commands": [
+        "uv run pytest tests/unit/test_promote_local_h5s.py"
+      ]
+    },
+    {
+      "api_refs": [
+        "policyengine_us_data.build_outputs.fingerprinting.FingerprintingService"
+      ],
+      "decorator_line": 60,
+      "description": "Compute a scope fingerprint for local H5 checkpoint and resume decisions.",
+      "id": "local_h5_input_fingerprint",
+      "label": "Compute Local H5 Input Fingerprint",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/publish_local_area.py",
+      "stability": "moving",
+      "status": "legacy",
+      "target_symbol": "compute_input_fingerprint",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_fingerprinting.py"
+      ]
+    },
+    {
+      "api_refs": [
+        "policyengine_us_data.build_outputs.geography_loader.CalibrationGeographyLoader"
+      ],
+      "artifacts_in": [
+        "calibration_weights.npy",
+        "geography_assignment.npz",
+        "stacked_blocks.npy"
+      ],
+      "decorator_line": 114,
+      "description": "Resolve exact geography from saved bundles, package metadata, or legacy block artifacts.",
+      "id": "load_calibration_geography",
+      "label": "Load Calibration Geography",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/publish_local_area.py",
+      "stability": "moving",
+      "status": "legacy",
+      "target_symbol": "load_calibration_geography",
+      "validation_commands": [
+        "uv run pytest tests/unit/build_outputs/test_geography_loader.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "calibration_weights.npy",
+        "source_imputed_stratified_extended_cps*.h5"
+      ],
+      "artifacts_out": [
+        "states/*.h5",
+        "districts/*.h5",
+        "cities/*.h5",
+        "US.h5"
+      ],
+      "decorator_line": 306,
+      "description": "Expand calibrated clone weights into local-area H5 datasets with geography and takeup updates.",
+      "details": "This is the main bundled H5 construction routine and remains a critical transitional waypoint.",
+      "id": "build_h5",
+      "label": "Build Local Area H5",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/publish_local_area.py",
+      "stability": "moving",
+      "status": "transitional",
+      "target_symbol": "build_h5",
+      "validation_commands": [
+        "uv run pytest tests/unit/calibration/test_publish_local_area.py",
+        "uv run pytest tests/integration/test_tiny_h5_pipeline.py"
+      ]
+    },
+    {
+      "artifacts_out": [
+        "states/*.h5"
+      ],
+      "decorator_line": 441,
+      "description": "Build state-level H5 files from calibrated weights and exact geography.",
+      "id": "build_states",
+      "label": "Build State H5 Files",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/publish_local_area.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "build_states"
+    },
+    {
+      "artifacts_out": [
+        "districts/*.h5"
+      ],
+      "decorator_line": 527,
+      "description": "Build congressional-district H5 files from calibrated weights and exact geography.",
+      "id": "build_districts",
+      "label": "Build District H5 Files",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/publish_local_area.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "build_districts"
+    },
+    {
+      "artifacts_out": [
+        "cities/*.h5"
+      ],
+      "decorator_line": 614,
+      "description": "Build supported city H5 files with county probability filtering.",
+      "id": "build_cities",
+      "label": "Build City H5 Files",
+      "node_type": "library",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/publish_local_area.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "build_cities"
+    },
+    {
+      "decorator_line": 312,
+      "description": "Check calibrated H5 structure, weights, IDs, mappings, takeup, and aggregate sanity.",
+      "id": "sanity_checks",
+      "label": "Run H5 Sanity Checks",
+      "node_type": "validation",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/sanity_checks.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "run_sanity_checks",
+      "validation_commands": [
+        "uv run pytest tests/unit/calibration/test_validate_staging.py"
+      ]
+    },
+    {
+      "decorator_line": 302,
+      "description": "Run microsimulation target comparisons for one staged area.",
+      "id": "target_validation",
+      "label": "Validate Area Against Targets",
+      "node_type": "validation",
+      "pathways": [
+        "local_h5"
+      ],
+      "source_file": "policyengine_us_data/calibration/validate_staging.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "validate_area",
+      "validation_commands": [
+        "uv run pytest tests/unit/calibration/test_validate_staging.py"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "stage_id": "weight_fit",
+  "label": "weight_fit",
+  "nodes": [
+    {
+      "artifacts_in": [
+        "calibration_package.pkl"
+      ],
+      "decorator_line": 696,
+      "description": "Build population-proportional initial weights from geography and targets.",
+      "id": "init_weights",
+      "label": "Compute Initial Weights",
+      "node_type": "library",
+      "pathways": [
+        "weight_fit"
+      ],
+      "source_file": "policyengine_us_data/calibration/unified_calibration.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "compute_initial_weights",
+      "validation_commands": [
+        "uv run pytest tests/unit/calibration/test_unified_calibration.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "calibration_package.pkl"
+      ],
+      "artifacts_out": [
+        "calibration_weights.npy",
+        "unified_diagnostics.csv"
+      ],
+      "decorator_line": 774,
+      "description": "Optimize sparse calibration weights with HardConcrete gates and diagnostics.",
+      "id": "fit_model",
+      "label": "Fit L0 Calibration Weights",
+      "node_type": "library",
+      "pathways": [
+        "weight_fit"
+      ],
+      "source_file": "policyengine_us_data/calibration/unified_calibration.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "fit_l0_weights",
+      "validation_commands": [
+        "uv run pytest tests/unit/calibration/test_unified_calibration.py"
+      ]
+    },
+    {
+      "artifacts_out": [
+        "unified_diagnostics.csv"
+      ],
+      "decorator_line": 1131,
+      "description": "Compare fitted weighted sums to calibration targets and summarize error.",
+      "id": "calibration_diagnostics",
+      "label": "Compute Calibration Diagnostics",
+      "node_type": "library",
+      "pathways": [
+        "weight_fit"
+      ],
+      "source_file": "policyengine_us_data/calibration/unified_calibration.py",
+      "stability": "moving",
+      "status": "current",
+      "target_symbol": "compute_diagnostics",
+      "validation_commands": [
+        "uv run pytest tests/unit/calibration/test_unified_calibration.py"
+      ]
+    },
+    {
+      "artifacts_in": [
+        "source_imputed_stratified_extended_cps*.h5",
+        "policy_data.db"
+      ],
+      "artifacts_out": [
+        "calibration_package.pkl",
+        "calibration_weights.npy",
+        "unified_diagnostics.csv",
+        "unified_run_config.json"
+      ],
+      "decorator_line": 1250,
+      "description": "Build or load the calibration package, fit sparse weights, and write diagnostics.",
+      "details": "This remains a bundled orchestration function; decorators document the semantic pathway until the implementation is further decomposed.",
+      "id": "run_calibration",
+      "label": "Run Unified Calibration",
+      "node_type": "entrypoint",
+      "pathways": [
+        "calibration_package",
+        "weight_fit"
+      ],
+      "source_file": "policyengine_us_data/calibration/unified_calibration.py",
+      "stability": "moving",
+      "status": "transitional",
+      "target_symbol": "run_calibration",
+      "validation_commands": [
+        "uv run pytest tests/unit/calibration/test_unified_calibration.py"
+      ]
+    }
+  ]
+}

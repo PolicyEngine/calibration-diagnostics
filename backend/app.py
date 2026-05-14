@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from backend.routes import (
     geography,
+    pipeline,
     runs as runs_route,
     strata,
     summary,
@@ -68,6 +69,7 @@ app.add_middleware(
 
 app.include_router(runs_route.router, tags=["runs"])
 app.include_router(summary.router, tags=["summary"])
+app.include_router(pipeline.router, tags=["pipeline"])
 app.include_router(geography.router, prefix="/geography", tags=["geography"])
 app.include_router(targets.router, prefix="/targets", tags=["targets"])
 app.include_router(strata.router, prefix="/strata", tags=["strata"])

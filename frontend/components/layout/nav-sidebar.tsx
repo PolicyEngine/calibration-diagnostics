@@ -8,6 +8,7 @@ const navItems = [
   { href: "/", label: "Summary" },
   { href: "/targets", label: "All targets" },
   { href: "/weights", label: "Weight landscape" },
+  { href: "/pipeline", label: "Data pipeline" },
 ];
 
 export function NavSidebar() {
