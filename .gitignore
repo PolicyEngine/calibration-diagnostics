@@ -17,5 +17,9 @@ frontend/tsconfig.tsbuildinfo
 .vscode/
 *.swp
 
+# Artifact cache (HuggingFace-downloaded calibration bundles, large binary files)
+.artifacts/
+frontend/.artifacts/
+
 # OS
 .DS_Store

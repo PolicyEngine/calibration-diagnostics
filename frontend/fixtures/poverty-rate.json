@@ -1,7 +1,0 @@
-{
-  "spm_poverty_rate": 0.219,
-  "spm_poverty_rate_initial_weights": 0.134,
-  "n_poor_weighted": 72345678,
-  "n_total_weighted": 330000000,
-  "benchmark_census": 0.127
-}

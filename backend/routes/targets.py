@@ -1,6 +1,7 @@
 """Target analysis endpoints."""
 
 import operator as op_module
+from typing import Annotated
 
 import numpy as np
 import pandas as pd
@@ -95,36 +96,67 @@ def worst_fit(
     return [_target_row(enriched, idx) for idx in enriched.index]
 
 
-@router.get("")
-def list_targets(
-    sort_by: str = "loss_contribution",
-    sort_order: str = "desc",
-    variable: str | None = None,
-    geo_level: str | None = None,
+# Error buckets — abs_rel_error ranges. Order matters for display.
+ERROR_BUCKETS = {
+    "excellent": (0.0, 0.05),
+    "good":      (0.05, 0.20),
+    "poor":      (0.20, 0.50),
+    "extreme":   (0.50, float("inf")),
+}
+
+
+def _apply_target_filters(
+    df,
+    *,
+    search: str | None = None,
+    variables: list[str] | None = None,
+    geo_levels: list[str] | None = None,
+    error_buckets: list[str] | None = None,
+    sources: list[str] | None = None,
     geographic_id: str | None = None,
-    state_fips: int | None = Query(None, alias="state_fips"),
+    state_fips: list[int] | None = None,
     domain_variable: str | None = None,
     min_abs_rel_error: float | None = None,
     included_only: bool | None = None,
-    limit: int = 50,
-    offset: int = 0,
-    state: AppState = Depends(get_state),
-) -> TargetListResponse:
-    df = state.targets_enriched
-
+):
+    """Apply the standard filter set used by list_targets and facets."""
     if included_only is not None:
         df = df[df["included"] == included_only]
-    if variable:
-        df = df[df["variable"].str.contains(variable, case=False, na=False)]
-    if geo_level:
-        df = df[df["geo_level"] == geo_level]
+    if variables:
+        df = df[df["variable"].isin(variables)]
+    if geo_levels:
+        df = df[df["geo_level"].isin(geo_levels)]
+    if error_buckets:
+        # Strict: if user passed bucket names but none are recognised, return
+        # an empty result rather than silently ignoring the filter.
+        masks = []
+        for bucket in error_buckets:
+            if bucket not in ERROR_BUCKETS:
+                continue
+            lo, hi = ERROR_BUCKETS[bucket]
+            masks.append((df["abs_rel_error"] >= lo) & (df["abs_rel_error"] < hi))
+        if not masks:
+            df = df.iloc[0:0]
+        else:
+            combined = masks[0]
+            for m in masks[1:]:
+                combined = combined | m
+            df = df[combined]
+    if sources and "source" in df.columns:
+        df = df[df["source"].isin(sources)]
     if geographic_id:
         df = df[df["geographic_id"].astype(str) == str(geographic_id)]
-    if state_fips is not None:
-        df = df[df["geographic_id"].apply(
-            lambda gid: str(gid).isdigit() and int(gid) // 100 == state_fips
-            or str(gid) == str(state_fips)
-        )]
+    if state_fips:
+        fips_set = set(state_fips)
+        def _matches_any_state(gid):
+            s = str(gid)
+            if not s.isdigit():
+                return s in {str(f) for f in fips_set}
+            try:
+                return int(s) in fips_set or (int(s) // 100) in fips_set
+            except ValueError:
+                return False
+        df = df[df["geographic_id"].apply(_matches_any_state)]
     if domain_variable:
         df = df[
             df["domain_variable"].str.contains(
@@ -133,6 +165,51 @@ def list_targets(
         ]
     if min_abs_rel_error is not None:
         df = df[df["abs_rel_error"] >= min_abs_rel_error]
+    if search:
+        # Search across target_name + variable + domain (case-insensitive)
+        s = search.lower()
+        haystack = (
+            df["target_name"].fillna("").astype(str).str.lower()
+            + " "
+            + df["variable"].fillna("").astype(str).str.lower()
+            + " "
+            + df.get("domain", df.get("domain_variable", "")).fillna("").astype(str).str.lower()
+        )
+        df = df[haystack.str.contains(s, regex=False, na=False)]
+    return df
+
+
+@router.get("")
+def list_targets(
+    sort_by: str = "loss_contribution",
+    sort_order: str = "desc",
+    search: str | None = None,
+    variable: Annotated[list[str] | None, Query()] = None,
+    geo_level: Annotated[list[str] | None, Query()] = None,
+    error_bucket: Annotated[list[str] | None, Query()] = None,
+    source: Annotated[list[str] | None, Query()] = None,
+    geographic_id: str | None = None,
+    state_fips: Annotated[list[int] | None, Query(alias="state_fips")] = None,
+    domain_variable: str | None = None,
+    min_abs_rel_error: float | None = None,
+    included_only: bool | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    state: AppState = Depends(get_state),
+) -> TargetListResponse:
+    df = _apply_target_filters(
+        state.targets_enriched,
+        search=search,
+        variables=variable,
+        geo_levels=geo_level,
+        error_buckets=error_bucket,
+        sources=source,
+        geographic_id=geographic_id,
+        state_fips=state_fips,
+        domain_variable=domain_variable,
+        min_abs_rel_error=min_abs_rel_error,
+        included_only=included_only,
+    )
 
     total = len(df)
     ascending = sort_order == "asc"
@@ -146,6 +223,140 @@ def list_targets(
         offset=offset,
         limit=limit,
     )
+
+
+@router.get("/facets")
+def get_facets(
+    search: str | None = None,
+    variable: Annotated[list[str] | None, Query()] = None,
+    geo_level: Annotated[list[str] | None, Query()] = None,
+    error_bucket: Annotated[list[str] | None, Query()] = None,
+    source: Annotated[list[str] | None, Query()] = None,
+    included_only: bool | None = None,
+    state_fips: Annotated[list[int] | None, Query(alias="state_fips")] = None,
+    state: AppState = Depends(get_state),
+):
+    """Per-facet counts. For each facet, counts are computed against the
+    other active filters (so a facet doesn't suppress its own selection)."""
+
+    def _filtered(exclude: str):
+        return _apply_target_filters(
+            state.targets_enriched,
+            search=search,
+            variables=variable if exclude != "variable" else None,
+            geo_levels=geo_level if exclude != "geo_level" else None,
+            error_buckets=error_bucket if exclude != "error_bucket" else None,
+            sources=source if exclude != "source" else None,
+            included_only=included_only,
+            state_fips=state_fips,
+        )
+
+    def _value_counts_with_loss(df, col: str):
+        if col not in df.columns:
+            return []
+        grouped = (
+            df.groupby(col, dropna=False)
+            .agg(count=(col, "size"),
+                 total_loss=("loss_contribution", "sum"))
+            .sort_values("total_loss", ascending=False)
+        )
+        out = []
+        for key, row in grouped.iterrows():
+            out.append({
+                "value": "(none)" if key is None or (isinstance(key, float) and key != key) else str(key),
+                "count": int(row["count"]),
+                "total_loss": float(row["total_loss"]),
+            })
+        return out
+
+    by_variable = _value_counts_with_loss(_filtered("variable"), "variable")
+    by_geo_level = _value_counts_with_loss(_filtered("geo_level"), "geo_level")
+    by_source = _value_counts_with_loss(_filtered("source"), "source")
+
+    # Error buckets — count distribution within the current selection-aware df.
+    df_for_buckets = _filtered("error_bucket")
+    abs_err = df_for_buckets["abs_rel_error"].to_numpy() if "abs_rel_error" in df_for_buckets.columns else []
+    by_error_bucket = []
+    for name, (lo, hi) in ERROR_BUCKETS.items():
+        if len(abs_err) == 0:
+            count = 0
+        else:
+            count = int(((abs_err >= lo) & (abs_err < hi)).sum())
+        by_error_bucket.append({"value": name, "count": count})
+
+    # Status: included vs skipped
+    df_status = _apply_target_filters(
+        state.targets_enriched,
+        search=search,
+        variables=variable,
+        geo_levels=geo_level,
+        error_buckets=error_bucket,
+        state_fips=state_fips,
+    )
+    by_status = []
+    if "included" in df_status.columns:
+        included_ct = int(df_status["included"].sum())
+        skipped_ct = int((~df_status["included"]).sum())
+        by_status = [
+            {"value": "included", "count": included_ct},
+            {"value": "skipped",  "count": skipped_ct},
+        ]
+
+    return {
+        "by_variable": by_variable,
+        "by_geo_level": by_geo_level,
+        "by_source": by_source,
+        "by_error_bucket": by_error_bucket,
+        "by_status": by_status,
+        "buckets_definition": {
+            k: {"min": v[0], "max": None if v[1] == float("inf") else v[1]}
+            for k, v in ERROR_BUCKETS.items()
+        },
+    }
+
+
+@router.get("/source-summary")
+def get_source_summary(
+    included_only: bool | None = True,
+    state: AppState = Depends(get_state),
+):
+    """Per-source stats: count, mean/median |rel_error|, % within ±10%.
+    Useful for spotting upstream sources the calibration fits well vs poorly.
+    """
+    df = state.targets_enriched
+    if df.empty or "source" not in df.columns:
+        return {"sources": []}
+    if included_only and "included" in df.columns:
+        df = df[df["included"].astype(bool)]
+
+    grouped = (
+        df.dropna(subset=["source"])
+        .groupby("source", dropna=False)
+        .agg(
+            n_targets=("source", "size"),
+            mean_abs_rel_error=("abs_rel_error", "mean"),
+            median_abs_rel_error=("abs_rel_error", "median"),
+            total_loss=("loss_contribution", "sum"),
+        )
+        .reset_index()
+        .sort_values("n_targets", ascending=False)
+    )
+    out = []
+    for _, r in grouped.iterrows():
+        # Pct within 10%
+        sub = df[df["source"] == r["source"]]
+        abs_err = sub["abs_rel_error"].to_numpy()
+        finite = abs_err[np.isfinite(abs_err)]
+        within_10 = float((finite <= 0.10).mean()) if len(finite) else None
+        out.append({
+            "source": str(r["source"]),
+            "n_targets": int(r["n_targets"]),
+            "mean_abs_rel_error": _safe_float(r["mean_abs_rel_error"]),
+            "median_abs_rel_error": _safe_float(r["median_abs_rel_error"]),
+            "total_loss": _safe_float(r["total_loss"]),
+            "pct_within_10pct": within_10,
+        })
+    return {"sources": out}
 
 
 # --- Parametric routes ---
@@ -422,7 +633,19 @@ def _nan_to_none(val):
 def _safe_int(val) -> int | None:
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return None
-    return int(val)
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_float(val) -> float | None:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_constraints_from_name(target_name: str) -> list[str]:
@@ -459,4 +682,8 @@ def _target_row(df, idx: int) -> TargetRow:
         abs_error=abs(float(r.get("estimate", 0)) - float(r["value"])),
         loss_contribution=float(r.get("loss_contribution", 0)),
         included=bool(r.get("included", True)),
+        source=_nan_to_none(r.get("source")),
+        period=_safe_int(r.get("period")),
+        tolerance=_safe_float(r.get("tolerance")),
+        notes=_nan_to_none(r.get("notes")),
     )
