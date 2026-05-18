@@ -194,6 +194,33 @@ def load_all_artifacts(config: dict) -> AppState:
         db_engine = create_engine(f"sqlite:///{config['db_path']}")
         logger.info("Connected to policy_data.db at %s", config["db_path"])
 
+    # 8b. Join provenance fields (source / period / tolerance / notes) from
+    #     policy_data.db into targets_enriched. The pkl's targets_df doesn't
+    #     carry these — they're the calibration team's "what is this target,
+    #     where did it come from" annotations.
+    if db_engine is not None and "target_id" in targets_enriched.columns:
+        try:
+            prov = pd.read_sql(
+                "SELECT target_id, source, period, tolerance, notes FROM targets",
+                db_engine,
+            )
+            targets_enriched = targets_enriched.merge(
+                prov, on="target_id", how="left", suffixes=("", "_db"),
+            )
+            # Prefer DB period over pkl's if both exist
+            if "period_db" in targets_enriched.columns:
+                targets_enriched["period"] = targets_enriched["period_db"].fillna(
+                    targets_enriched.get("period")
+                )
+                targets_enriched = targets_enriched.drop(columns=["period_db"])
+            n_with_source = int(targets_enriched["source"].notna().sum())
+            logger.info(
+                "Joined %d target provenance rows (source/period/tolerance/notes)",
+                n_with_source,
+            )
+        except Exception:
+            logger.exception("Could not join target provenance from DB")
+
     # 9. Load target config and mark included/excluded
     target_config = None
     tc_path = config.get("target_config_path")

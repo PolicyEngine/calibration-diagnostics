@@ -41,6 +41,7 @@ import {
 import { TargetChipBar } from "@/components/targets/chip-bar";
 import { TargetSearchAndControls } from "@/components/targets/search-and-controls";
 import { TargetPagination } from "@/components/targets/pagination";
+import { SourceSummary } from "@/components/targets/source-summary";
 import { STATE_FIPS_TO_CODE } from "@/lib/geo-names";
 
 /**
@@ -74,6 +75,30 @@ function datasetForRow(row: {
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
+
+/** Render free-text notes, linkifying URLs. */
+function NotesWithLinks({ notes }: { notes: string }) {
+  const parts = notes.split(/(https?:\/\/\S+)/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        /^https?:\/\//.test(p) ? (
+          <a
+            key={i}
+            href={p}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline break-all"
+          >
+            {p}
+          </a>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
+  );
+}
 
 const targetColumns = [
   {
@@ -147,6 +172,16 @@ const targetColumns = [
       const display = abs >= 1 ? `${(v * 100).toFixed(0)}%` : `${(v * 100).toFixed(1)}%`;
       return <Badge variant={variant}>{display}</Badge>;
     },
+  },
+  {
+    key: "source",
+    header: "Source",
+    format: (val: unknown) =>
+      val == null || val === "" ? (
+        <span className="text-muted-foreground">—</span>
+      ) : (
+        <span className="text-xs">{String(val)}</span>
+      ),
   },
   {
     key: "included",
@@ -257,6 +292,7 @@ function TargetTable() {
     errorBuckets: filters.errorBuckets,
     stateFips:
       filters.stateFipsList.length > 0 ? filters.stateFipsList : undefined,
+    sources: filters.sources.length > 0 ? filters.sources : undefined,
     includedOnly: statusToIncludedOnly(filters.status),
     limit: filters.pageSize,
     offset: filters.page * filters.pageSize,
@@ -375,6 +411,12 @@ function DetailPanel() {
                       </Badge>
                     )}
                   </Group>
+                  {provenance.data.notes && (
+                    <div className="text-xs text-muted-foreground border-l-2 border-border pl-3 py-1">
+                      <span className="font-semibold">Notes: </span>
+                      <NotesWithLinks notes={provenance.data.notes} />
+                    </div>
+                  )}
                   <Group gap="xs" wrap="wrap">
                     <Text size="sm" c="dimmed">
                       Constraints:
@@ -483,6 +525,8 @@ function TargetExplorerContent() {
         </div>
 
         <CoverageBanner />
+
+        <SourceSummary />
 
         <div className="flex flex-col gap-3 min-w-0">
           <TargetSearchAndControls />

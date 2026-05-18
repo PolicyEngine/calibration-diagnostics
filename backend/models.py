@@ -17,6 +17,12 @@ class TargetRow(BaseModel):
     abs_error: float
     loss_contribution: float
     included: bool = True
+    # Provenance from policy_data.db (joined at load time in pkl mode,
+    # read directly in dataset mode).
+    source: str | None = None
+    period: int | None = None
+    tolerance: float | None = None
+    notes: str | None = None
 
 
 class TargetListResponse(BaseModel):

@@ -14,6 +14,7 @@ interface UseTargetsParams {
   geoLevel?: string;            // legacy single-value
   geographicId?: string;
   stateFips?: number | number[];
+  sources?: string[];
   domainVariable?: string;
   minAbsRelError?: number;
   includedOnly?: boolean;
@@ -41,6 +42,10 @@ export function useTargets(params: UseTargetsParams = {}) {
           params.errorBuckets && params.errorBuckets.length > 0
             ? params.errorBuckets
             : undefined,
+        source:
+          params.sources && params.sources.length > 0
+            ? params.sources
+            : undefined,
         geographic_id: params.geographicId,
         state_fips: params.stateFips,
         domain_variable: params.domainVariable,
@@ -58,9 +63,27 @@ export interface FacetValue {
   total_loss?: number;
 }
 
+export interface SourceSummaryRow {
+  source: string;
+  n_targets: number;
+  mean_abs_rel_error: number | null;
+  median_abs_rel_error: number | null;
+  total_loss: number | null;
+  pct_within_10pct: number | null;
+}
+
+export function useSourceSummary() {
+  return useQuery({
+    queryKey: ["targets", "source-summary"],
+    queryFn: () =>
+      apiGet<{ sources: SourceSummaryRow[] }>("/targets/source-summary"),
+  });
+}
+
 export interface FacetsResponse {
   by_variable: FacetValue[];
   by_geo_level: FacetValue[];
+  by_source?: FacetValue[];
   by_error_bucket: FacetValue[];
   by_status: FacetValue[];
   buckets_definition: Record<string, { min: number; max: number | null }>;

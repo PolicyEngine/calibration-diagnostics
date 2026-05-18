@@ -112,6 +112,7 @@ def _apply_target_filters(
     variables: list[str] | None = None,
     geo_levels: list[str] | None = None,
     error_buckets: list[str] | None = None,
+    sources: list[str] | None = None,
     geographic_id: str | None = None,
     state_fips: list[int] | None = None,
     domain_variable: str | None = None,
@@ -141,6 +142,8 @@ def _apply_target_filters(
             for m in masks[1:]:
                 combined = combined | m
             df = df[combined]
+    if sources and "source" in df.columns:
+        df = df[df["source"].isin(sources)]
     if geographic_id:
         df = df[df["geographic_id"].astype(str) == str(geographic_id)]
     if state_fips:
@@ -184,6 +187,7 @@ def list_targets(
     variable: Annotated[list[str] | None, Query()] = None,
     geo_level: Annotated[list[str] | None, Query()] = None,
     error_bucket: Annotated[list[str] | None, Query()] = None,
+    source: Annotated[list[str] | None, Query()] = None,
     geographic_id: str | None = None,
     state_fips: Annotated[list[int] | None, Query(alias="state_fips")] = None,
     domain_variable: str | None = None,
@@ -199,6 +203,7 @@ def list_targets(
         variables=variable,
         geo_levels=geo_level,
         error_buckets=error_bucket,
+        sources=source,
         geographic_id=geographic_id,
         state_fips=state_fips,
         domain_variable=domain_variable,
@@ -226,6 +231,7 @@ def get_facets(
     variable: Annotated[list[str] | None, Query()] = None,
     geo_level: Annotated[list[str] | None, Query()] = None,
     error_bucket: Annotated[list[str] | None, Query()] = None,
+    source: Annotated[list[str] | None, Query()] = None,
     included_only: bool | None = None,
     state_fips: Annotated[list[int] | None, Query(alias="state_fips")] = None,
     state: AppState = Depends(get_state),
@@ -240,6 +246,7 @@ def get_facets(
             variables=variable if exclude != "variable" else None,
             geo_levels=geo_level if exclude != "geo_level" else None,
             error_buckets=error_bucket if exclude != "error_bucket" else None,
+            sources=source if exclude != "source" else None,
             included_only=included_only,
             state_fips=state_fips,
         )
@@ -264,6 +271,7 @@ def get_facets(
 
     by_variable = _value_counts_with_loss(_filtered("variable"), "variable")
     by_geo_level = _value_counts_with_loss(_filtered("geo_level"), "geo_level")
+    by_source = _value_counts_with_loss(_filtered("source"), "source")
 
     # Error buckets — count distribution within the current selection-aware df.
     df_for_buckets = _filtered("error_bucket")
@@ -297,6 +305,7 @@ def get_facets(
     return {
         "by_variable": by_variable,
         "by_geo_level": by_geo_level,
+        "by_source": by_source,
         "by_error_bucket": by_error_bucket,
         "by_status": by_status,
         "buckets_definition": {
@@ -304,6 +313,50 @@ def get_facets(
             for k, v in ERROR_BUCKETS.items()
         },
     }
+
+
+@router.get("/source-summary")
+def get_source_summary(
+    included_only: bool | None = True,
+    state: AppState = Depends(get_state),
+):
+    """Per-source stats: count, mean/median |rel_error|, % within ±10%.
+    Useful for spotting upstream sources the calibration fits well vs poorly.
+    """
+    df = state.targets_enriched
+    if df.empty or "source" not in df.columns:
+        return {"sources": []}
+    if included_only and "included" in df.columns:
+        df = df[df["included"].astype(bool)]
+
+    grouped = (
+        df.dropna(subset=["source"])
+        .groupby("source", dropna=False)
+        .agg(
+            n_targets=("source", "size"),
+            mean_abs_rel_error=("abs_rel_error", "mean"),
+            median_abs_rel_error=("abs_rel_error", "median"),
+            total_loss=("loss_contribution", "sum"),
+        )
+        .reset_index()
+        .sort_values("n_targets", ascending=False)
+    )
+    out = []
+    for _, r in grouped.iterrows():
+        # Pct within 10%
+        sub = df[df["source"] == r["source"]]
+        abs_err = sub["abs_rel_error"].to_numpy()
+        finite = abs_err[np.isfinite(abs_err)]
+        within_10 = float((finite <= 0.10).mean()) if len(finite) else None
+        out.append({
+            "source": str(r["source"]),
+            "n_targets": int(r["n_targets"]),
+            "mean_abs_rel_error": _safe_float(r["mean_abs_rel_error"]),
+            "median_abs_rel_error": _safe_float(r["median_abs_rel_error"]),
+            "total_loss": _safe_float(r["total_loss"]),
+            "pct_within_10pct": within_10,
+        })
+    return {"sources": out}
 
 
 # --- Parametric routes ---
@@ -580,7 +633,19 @@ def _nan_to_none(val):
 def _safe_int(val) -> int | None:
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return None
-    return int(val)
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_float(val) -> float | None:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_constraints_from_name(target_name: str) -> list[str]:
@@ -617,4 +682,8 @@ def _target_row(df, idx: int) -> TargetRow:
         abs_error=abs(float(r.get("estimate", 0)) - float(r["value"])),
         loss_contribution=float(r.get("loss_contribution", 0)),
         included=bool(r.get("included", True)),
+        source=_nan_to_none(r.get("source")),
+        period=_safe_int(r.get("period")),
+        tolerance=_safe_float(r.get("tolerance")),
+        notes=_nan_to_none(r.get("notes")),
     )

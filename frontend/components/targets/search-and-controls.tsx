@@ -13,6 +13,7 @@ import {
 import { STATE_FIPS_TO_NAME } from "@/lib/geo-names";
 import { MultiSelectDropdown } from "@/components/shared/multi-select-dropdown";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
+import { useTargetFacets } from "@/lib/api/hooks/use-targets";
 
 const STATUS_OPTIONS: StatusFilter[] = ["included", "all", "skipped"];
 
@@ -21,8 +22,26 @@ const STATE_OPTIONS = Object.entries(STATE_FIPS_TO_NAME)
   .sort((a, b) => a.label.localeCompare(b.label));
 
 export function TargetSearchAndControls() {
-  const { filters, setFilters, toggleErrorBucket, toggleGeoLevel, toggleStateFips } =
-    useTargetFilters();
+  const {
+    filters,
+    setFilters,
+    toggleErrorBucket,
+    toggleGeoLevel,
+    toggleStateFips,
+    toggleSource,
+  } = useTargetFilters();
+  const facets = useTargetFacets({
+    search: filters.search,
+    variables: filters.variables,
+    geoLevels: filters.geoLevels,
+    errorBuckets: filters.errorBuckets,
+    sources: filters.sources,
+  });
+  const sourceOptions = (facets.data?.by_source ?? []).map((s) => ({
+    value: s.value,
+    label: s.value,
+    count: s.count,
+  }));
 
   // The state filter only makes sense when state-/district-level targets
   // are in play; for national-only it's a no-op so we dim it.
@@ -79,6 +98,14 @@ export function TargetSearchAndControls() {
         selected={filters.errorBuckets}
         onToggle={(v) => toggleErrorBucket(v as never)}
         onClear={() => setFilters({ errorBuckets: [] })}
+      />
+
+      <MultiSelectDropdown
+        label="Source"
+        options={sourceOptions}
+        selected={filters.sources}
+        onToggle={(v) => toggleSource(v)}
+        onClear={() => setFilters({ sources: [] })}
       />
 
       <ToolbarSelect

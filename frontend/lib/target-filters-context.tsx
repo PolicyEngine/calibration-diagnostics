@@ -46,6 +46,7 @@ export interface TargetFilters {
   geoLevels: GeoLevel[];
   errorBuckets: ErrorBucket[];
   stateFipsList: number[];        // narrow state-/district-level targets to one or more states
+  sources: string[];              // upstream source filter (IRS SOI, Census ACS, etc.)
   status: StatusFilter;
   sortBy: SortKey;
   sortOrder: SortOrder;
@@ -59,6 +60,7 @@ export const DEFAULT_FILTERS: TargetFilters = {
   geoLevels: [],
   errorBuckets: [],
   stateFipsList: [],
+  sources: [],
   status: "all",
   sortBy: "abs_rel_error",
   sortOrder: "desc",
@@ -80,6 +82,7 @@ interface CtxValue {
   toggleGeoLevel: (g: string) => void;
   toggleErrorBucket: (b: ErrorBucket) => void;
   toggleStateFips: (fips: number) => void;
+  toggleSource: (s: string) => void;
   clearAll: () => void;
   hasActiveFilters: boolean;
 }
@@ -104,6 +107,7 @@ function parseFiltersFromUrl(sp: URLSearchParams): TargetFilters {
       (x): x is ErrorBucket => (ERROR_BUCKETS as string[]).includes(x),
     ),
     stateFipsList,
+    sources: arr("source"),
     status,
     sortBy: (sp.get("sort_by") as SortKey) ?? "loss_contribution",
     sortOrder: (sp.get("sort_order") as SortOrder) ?? "desc",
@@ -119,7 +123,7 @@ function writeFiltersToUrl(
   const next = new URLSearchParams(base.toString());
   // Clear our own keys, keep others (dataset/run/etc.)
   ["search", "variable", "geo_level", "error_bucket", "status", "state_fips",
-   "included_only", "sort_by", "sort_order", "page", "page_size"]
+   "source", "included_only", "sort_by", "sort_order", "page", "page_size"]
     .forEach((k) => next.delete(k));
 
   if (f.search) next.set("search", f.search);
@@ -127,6 +131,7 @@ function writeFiltersToUrl(
   f.geoLevels.forEach((g) => next.append("geo_level", g));
   f.errorBuckets.forEach((b) => next.append("error_bucket", b));
   f.stateFipsList.forEach((fips) => next.append("state_fips", String(fips)));
+  f.sources.forEach((s) => next.append("source", s));
   if (f.status !== "all") next.set("status", f.status);
   if (f.sortBy !== "loss_contribution") next.set("sort_by", f.sortBy);
   if (f.sortOrder !== "desc") next.set("sort_order", f.sortOrder);
@@ -169,7 +174,10 @@ export function TargetFiltersProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggle = useCallback(
-    <K extends "variables" | "geoLevels" | "errorBuckets">(key: K, value: string) =>
+    <K extends "variables" | "geoLevels" | "errorBuckets" | "sources">(
+      key: K,
+      value: string,
+    ) =>
       setFiltersState((prev) => {
         const arr = prev[key] as string[];
         const exists = arr.includes(value);
@@ -199,6 +207,7 @@ export function TargetFiltersProvider({ children }: { children: ReactNode }) {
       toggleGeoLevel: (g) => toggle("geoLevels", g),
       toggleErrorBucket: (b) => toggle("errorBuckets", b),
       toggleStateFips,
+      toggleSource: (s) => toggle("sources", s),
       clearAll: () =>
         setFiltersState({ ...DEFAULT_FILTERS, pageSize: filters.pageSize }),
       hasActiveFilters:
@@ -207,6 +216,7 @@ export function TargetFiltersProvider({ children }: { children: ReactNode }) {
         filters.geoLevels.length > 0 ||
         filters.errorBuckets.length > 0 ||
         filters.stateFipsList.length > 0 ||
+        filters.sources.length > 0 ||
         filters.status !== "all",
     }),
     [filters, setFilters, toggle, toggleStateFips],

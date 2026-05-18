@@ -82,6 +82,15 @@ export function TargetChipBar() {
           }
         />
       ))}
+      {filters.sources.map((s) => (
+        <Chip
+          key={`src-${s}`}
+          label={`source: ${s}`}
+          onRemove={() =>
+            setFilters({ sources: filters.sources.filter((x) => x !== s) })
+          }
+        />
+      ))}
       {filters.errorBuckets.map((b) => (
         <Chip
           key={`bucket-${b}`}
