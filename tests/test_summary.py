@@ -84,6 +84,35 @@ def test_summary_respects_included_flag():
     assert h["median_abs_rel_error"] == pytest.approx(0.01)
 
 
+def test_n_targets_with_estimate_counts_over_full_bundle():
+    """n_targets_with_estimate is *computability* coverage, not inclusion.
+    Even skipped targets contribute if they have a non-NaN estimate, since
+    in sandbox mode X · weights produces a number regardless of whether the
+    calibration opted that row into its loss function."""
+    state = _make_state(
+        rel_errors=[0.01, 0.05, 0.20],
+        included=[True, False, False],
+    )
+    h = get_summary(state=state)["headline"]
+    assert h["n_targets"] == 3
+    assert h["n_targets_included"] == 1
+    assert h["n_targets_with_estimate"] == 3  # all have real estimates
+
+
+def test_n_targets_with_estimate_excludes_nans():
+    """Dataset mode: when the MVP evaluator can't compute, the row has NaN
+    abs_rel_error. Those don't count toward computability coverage."""
+    import numpy as np
+    state = _make_state(rel_errors=[0.01, 0.05])
+    # Surgically NaN out one row's estimate, as dataset_loader would for an
+    # uncomputable target.
+    state.targets_enriched.loc[0, "abs_rel_error"] = np.nan
+    state.targets_enriched.loc[0, "estimate"] = np.nan
+    h = get_summary(state=state)["headline"]
+    assert h["n_targets"] == 2
+    assert h["n_targets_with_estimate"] == 1
+
+
 def test_summary_worst_by_variable_orders_by_loss():
     """Variable with largest summed loss_contribution should rank first."""
     state = _make_state(
