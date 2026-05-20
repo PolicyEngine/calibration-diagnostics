@@ -63,7 +63,9 @@ export const DEFAULT_FILTERS: TargetFilters = {
   sources: [],
   status: "all",
   sortBy: "abs_rel_error",
-  sortOrder: "desc",
+  // Best-fit first: surface the well-calibrated rows on initial load. Worst
+  // miscalibrations are reachable by clicking the header to flip to desc.
+  sortOrder: "asc",
   page: 0,
   pageSize: 50,
 };
@@ -110,7 +112,7 @@ function parseFiltersFromUrl(sp: URLSearchParams): TargetFilters {
     sources: arr("source"),
     status,
     sortBy: (sp.get("sort_by") as SortKey) ?? "loss_contribution",
-    sortOrder: (sp.get("sort_order") as SortOrder) ?? "desc",
+    sortOrder: (sp.get("sort_order") as SortOrder) ?? "asc",
     page: Number(sp.get("page") ?? 0),
     pageSize: Number(sp.get("page_size") ?? 50),
   };
@@ -134,7 +136,7 @@ function writeFiltersToUrl(
   f.sources.forEach((s) => next.append("source", s));
   if (f.status !== "all") next.set("status", f.status);
   if (f.sortBy !== "loss_contribution") next.set("sort_by", f.sortBy);
-  if (f.sortOrder !== "desc") next.set("sort_order", f.sortOrder);
+  if (f.sortOrder !== "asc") next.set("sort_order", f.sortOrder);
   if (f.page > 0) next.set("page", String(f.page));
   if (f.pageSize !== 50) next.set("page_size", String(f.pageSize));
   return next;
