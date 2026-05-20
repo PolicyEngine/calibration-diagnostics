@@ -31,23 +31,51 @@ def _load_nodes() -> dict:
     return json.loads(path.read_text())
 
 
+# Canonical 5-stage taxonomy from
+# policyengine_us_data.stage_contracts.stages. Label is the human form.
+STAGE_LABELS = {
+    "1_build_datasets":                 "1. Build datasets",
+    "2_build_calibration_package":      "2. Build calibration package",
+    "3_fit_weights":                    "3. Fit weights",
+    "4_build_outputs":                  "4. Build outputs",
+    "5_validate_and_promote_release":   "5. Validate & promote release",
+}
+
+
 @router.get("/pipeline")
 def get_pipeline():
-    """Full DAG: nodes, edges, stats. Grouped by pathway for convenience."""
+    """Full DAG: nodes, edges, stats. Grouped by both stage (canonical) and
+    pathway (legacy) for the frontend."""
     payload = _load_nodes()
     nodes = payload["nodes"]
-    # Group by pathway (a node can belong to multiple, but we list once per).
+
+    # Group by stage (canonical 5-stage taxonomy)
+    stages: dict[str, list[str]] = {}
+    for n in nodes:
+        sid = n.get("stage_id") or "(unknown)"
+        stages.setdefault(sid, []).append(n["id"])
+
+    # Group by pathway (legacy; kept so existing pathway docs still surface)
     pathways: dict[str, list[str]] = {}
     for n in nodes:
         for p in (n.get("pathways") or ["(none)"]):
             pathways.setdefault(p, []).append(n["id"])
-    # Which stages have a deep-dive doc on disk?
+
     stages_dir = DATA_ROOT / "stages"
     has_doc: dict[str, bool] = {}
     if stages_dir.exists():
         for path in stages_dir.glob("*.md"):
             has_doc[path.stem] = True
 
+    stage_summary = [
+        {
+            "id": sid,
+            "label": STAGE_LABELS.get(sid, sid),
+            "node_count": len(ids),
+            "has_doc": has_doc.get(sid, False),
+        }
+        for sid, ids in sorted(stages.items())
+    ]
     pathway_summary = [
         {
             "id": p,
@@ -62,6 +90,7 @@ def get_pipeline():
         "edges": payload.get("edges", []),
         "unproduced_artifacts": payload.get("unproduced_artifacts", []),
         "stats": payload.get("stats", {}),
+        "stages": stage_summary,
         "pathways": pathway_summary,
     }
 

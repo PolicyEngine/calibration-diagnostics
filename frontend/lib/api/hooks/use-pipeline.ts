@@ -14,6 +14,7 @@ export interface PipelineNode {
   artifacts_in?: string[];
   artifacts_out?: string[];
   pathways?: string[];
+  stage_id?: string;
   validation_commands?: string[];
 }
 
@@ -31,6 +32,13 @@ export interface PipelinePathway {
   has_doc: boolean;
 }
 
+export interface PipelineStage {
+  id: string;
+  label: string;
+  node_count: number;
+  has_doc: boolean;
+}
+
 export interface PipelineResponse {
   nodes: PipelineNode[];
   edges: PipelineEdge[];
@@ -41,15 +49,22 @@ export interface PipelineResponse {
     by_type: Record<string, number>;
     by_status: Record<string, number>;
     by_pathway: Record<string, number>;
+    by_stage?: Record<string, number>;
   };
+  stages: PipelineStage[];
   pathways: PipelinePathway[];
 }
 
 export function usePipeline() {
   return useQuery({
     queryKey: ["pipeline"],
-    queryFn: () => apiGet<PipelineResponse>("/pipeline"),
-    staleTime: 60 * 60 * 1000, // 1 hour; the DAG is committed, not run-specific
+    queryFn: async () => {
+      const r = await apiGet<PipelineResponse>("/pipeline");
+      // Backwards-compat: if the backend predates stages, derive from pathways.
+      if (!r.stages) r.stages = r.pathways.map((p) => ({ ...p }));
+      return r;
+    },
+    staleTime: 60 * 60 * 1000,
   });
 }
 

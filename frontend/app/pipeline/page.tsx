@@ -19,7 +19,7 @@ import {
   usePipeline,
   useStageDoc,
   type PipelineNode,
-  type PipelinePathway,
+  type PipelineStage,
 } from "@/lib/api/hooks/use-pipeline";
 import { PipelineGraph } from "@/components/pipeline/pipeline-graph";
 
@@ -31,12 +31,12 @@ const STATUS_VARIANT: Record<string, "success" | "secondary" | "warning" | "erro
   unknown: "secondary",
 };
 
-function PathwayCard({
-  pathway,
+function StageCard({
+  stage,
   active,
   onClick,
 }: {
-  pathway: PipelinePathway;
+  stage: PipelineStage;
   active: boolean;
   onClick: () => void;
 }) {
@@ -51,12 +51,10 @@ function PathwayCard({
       }`}
     >
       <span className="text-xs uppercase tracking-wide text-muted-foreground">
-        {pathway.id}
+        {stage.label}
       </span>
-      <span className="text-2xl font-bold">{pathway.node_count}</span>
-      <span className="text-xs text-muted-foreground">
-        nodes · {pathway.has_doc ? "deep-dive ready" : "no doc"}
-      </span>
+      <span className="text-2xl font-bold">{stage.node_count}</span>
+      <span className="text-xs text-muted-foreground">nodes</span>
     </button>
   );
 }
@@ -125,7 +123,7 @@ function StageDoc({ stageId }: { stageId: string }) {
 
 export default function PipelinePage() {
   const pipeline = usePipeline();
-  const [activePathway, setActivePathway] = useState<string | null>(null);
+  const [activeStage, setActiveStage] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showIsolated, setShowIsolated] = useState(false);
 
@@ -164,14 +162,14 @@ export default function PipelinePage() {
 
         {pipeline.data && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {pipeline.data.pathways.map((p) => (
-                <PathwayCard
-                  key={p.id}
-                  pathway={p}
-                  active={activePathway === p.id}
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {pipeline.data.stages.map((s) => (
+                <StageCard
+                  key={s.id}
+                  stage={s}
+                  active={activeStage === s.id}
                   onClick={() => {
-                    setActivePathway(activePathway === p.id ? null : p.id);
+                    setActiveStage(activeStage === s.id ? null : s.id);
                     setSelectedNodeId(null);
                   }}
                 />
@@ -183,9 +181,9 @@ export default function PipelinePage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle>
                     Graph
-                    {activePathway && (
+                    {activeStage && (
                       <span className="ml-2 text-sm font-normal text-muted-foreground">
-                        filtered to <code>{activePathway}</code>
+                        filtered to <code>{activeStage}</code>
                       </span>
                     )}
                   </CardTitle>
@@ -204,7 +202,7 @@ export default function PipelinePage() {
                   nodes={pipeline.data.nodes}
                   edges={pipeline.data.edges}
                   unproducedArtifacts={pipeline.data.unproduced_artifacts}
-                  activePathway={activePathway}
+                  activeStage={activeStage}
                   onNodeSelect={setSelectedNodeId}
                   selectedId={selectedNodeId}
                   showIsolated={showIsolated}
@@ -240,13 +238,13 @@ export default function PipelinePage() {
               </Card>
             )}
 
-            {activePathway && (
+            {activeStage && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Deep dive: {activePathway}</CardTitle>
+                  <CardTitle>Deep dive: {activeStage}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <StageDoc stageId={activePathway} />
+                  <StageDoc stageId={activeStage} />
                 </CardContent>
               </Card>
             )}

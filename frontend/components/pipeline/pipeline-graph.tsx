@@ -31,7 +31,7 @@ interface Props {
   nodes: PipelineNode[];
   edges: PipelineEdge[];
   unproducedArtifacts: string[];
-  activePathway: string | null;
+  activeStage: string | null;
   onNodeSelect: (id: string | null) => void;
   selectedId: string | null;
   /** When true, show every node. Otherwise hide isolated nodes (no edges). */
@@ -150,15 +150,15 @@ export function PipelineGraph({
   nodes,
   edges,
   unproducedArtifacts,
-  activePathway,
+  activeStage,
   onNodeSelect,
   selectedId,
   showIsolated,
 }: Props) {
   const { laidOutNodes, laidOutEdges } = useMemo(() => {
     // 1. Pathway filter
-    const byPathway = activePathway
-      ? nodes.filter((n) => (n.pathways ?? []).includes(activePathway))
+    const byPathway = activeStage
+      ? nodes.filter((n) => (n as { stage_id?: string }).stage_id === activeStage)
       : nodes;
     const idSet = new Set(byPathway.map((n) => n.id));
 
@@ -285,7 +285,7 @@ export function PipelineGraph({
 
     const laid = layoutWithDagre(rfNodes, rfEdges);
     return { laidOutNodes: laid.nodes, laidOutEdges: laid.edges };
-  }, [nodes, edges, unproducedArtifacts, activePathway, selectedId, showIsolated]);
+  }, [nodes, edges, unproducedArtifacts, activeStage, selectedId, showIsolated]);
 
   const handleNodeClick = useCallback(
     (_evt: React.MouseEvent, node: Node) => {

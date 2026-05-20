@@ -163,6 +163,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/area_catalog.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "USAreaCatalog",
       "validation_commands": [
@@ -190,6 +191,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/bootstrap.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "WorkerBootstrapBundle",
       "validation_commands": [
@@ -211,6 +213,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/bootstrap.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "WorkerBootstrapStore",
       "validation_commands": [
@@ -238,6 +241,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/bootstrap.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "WorkerBootstrapBuilder",
       "validation_commands": [
@@ -255,6 +259,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/builder.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "LocalAreaBuildResult",
       "validation_commands": [
@@ -272,6 +277,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/builder.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "LocalAreaDatasetBuilder",
       "validation_commands": [
@@ -289,6 +295,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/fingerprinting.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "PublishingInputBundle"
     },
@@ -303,6 +310,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/fingerprinting.py",
       "stability": "stable",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "ArtifactIdentity",
       "validation_commands": [
@@ -320,6 +328,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/fingerprinting.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "TraceabilityBundle",
       "validation_commands": [
@@ -337,6 +346,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/fingerprinting.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "FingerprintingService",
       "validation_commands": [
@@ -354,6 +364,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/geography_loader.py",
       "stability": "stable",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "ResolvedGeographySource",
       "validation_commands": [
@@ -371,6 +382,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/geography_loader.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "CalibrationGeographyLoader",
       "validation_commands": [
@@ -388,6 +400,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/partitioning.py",
       "stability": "stable",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "partition_weighted_work_items",
       "validation_commands": [
@@ -405,6 +418,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/payload.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "H5Payload",
       "validation_commands": [
@@ -422,6 +436,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/payload.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "PayloadBuildContext",
       "validation_commands": [
@@ -439,6 +454,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/reindexing.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "EntityReindexer",
       "validation_commands": [
@@ -456,6 +472,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/reindexing.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "ReindexedEntities",
       "validation_commands": [
@@ -473,6 +490,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/requests.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "AreaFilter",
       "validation_commands": [
@@ -490,6 +508,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/requests.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "AreaBuildRequest",
       "validation_commands": [
@@ -507,6 +526,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/selection.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "AreaSelector",
       "validation_commands": [
@@ -524,6 +544,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/selection.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "CloneSelection",
       "validation_commands": [
@@ -541,6 +562,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/source_dataset.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "EntityGraph",
       "validation_commands": [
@@ -558,6 +580,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/source_dataset.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "MicrosimulationVariableProvider",
       "validation_commands": [
@@ -575,6 +598,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/source_dataset.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "SourceDatasetSnapshot",
       "validation_commands": [
@@ -592,6 +616,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/source_dataset.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "PolicyEngineDatasetReader",
       "validation_commands": [
@@ -609,6 +634,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "USEntityPostProcessorResult",
       "validation_commands": [
@@ -626,6 +652,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "USGeographyPostProcessorResult",
       "validation_commands": [
@@ -643,6 +670,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "USTakeupPostProcessorResult",
       "validation_commands": [
@@ -660,6 +688,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "USEntityPostProcessor",
       "validation_commands": [
@@ -677,6 +706,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "USGeographyPostProcessor",
       "validation_commands": [
@@ -694,6 +724,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/us_augmentations.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "USTakeupPostProcessor",
       "validation_commands": [
@@ -711,6 +742,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/validation.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "ValidationPolicy",
       "validation_commands": [
@@ -728,6 +760,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/validation.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "ValidationContext",
       "validation_commands": [
@@ -750,6 +783,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/validation.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "AreaValidationService",
       "validation_commands": [
@@ -767,6 +801,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/variables.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "VariableCloner",
       "validation_commands": [
@@ -784,6 +819,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/variables.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "VariableClonePayload",
       "validation_commands": [
@@ -805,6 +841,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/weights.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "CloneWeightMatrix",
       "validation_commands": [
@@ -822,6 +859,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/worker_inputs.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "WorkerCalibrationInputs",
       "validation_commands": [
@@ -846,6 +884,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/worker_session.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "WorkerSession",
       "validation_commands": [
@@ -871,6 +910,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/worker_session.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "WorkerSessionFactory",
       "validation_commands": [
@@ -889,6 +929,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/writer.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "H5WriteResult",
       "validation_commands": [
@@ -906,6 +947,7 @@
       ],
       "source_file": "policyengine_us_data/build_outputs/writer.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "H5Writer",
       "validation_commands": [
@@ -924,6 +966,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/block_assignment.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "derive_geography_from_blocks",
       "validation_commands": [
@@ -945,6 +988,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/clone_and_assign.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "assign_random_geography",
       "validation_commands": [
@@ -968,6 +1012,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/create_stratified_cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "create_stratified_cps_dataset",
       "validation_commands": [
@@ -988,6 +1033,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/promote_local_h5s.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "stage",
       "validation_commands": [
@@ -1009,6 +1055,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/promote_local_h5s.py",
       "stability": "moving",
+      "stage_id": "5_validate_and_promote_release",
       "status": "current",
       "target_symbol": "promote",
       "validation_commands": [
@@ -1029,6 +1076,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/publish_local_area.py",
       "stability": "moving",
+      "stage_id": "5_validate_and_promote_release",
       "status": "legacy",
       "target_symbol": "compute_input_fingerprint",
       "validation_commands": [
@@ -1054,6 +1102,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/publish_local_area.py",
       "stability": "moving",
+      "stage_id": "5_validate_and_promote_release",
       "status": "legacy",
       "target_symbol": "load_calibration_geography",
       "validation_commands": [
@@ -1082,6 +1131,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/publish_local_area.py",
       "stability": "moving",
+      "stage_id": "5_validate_and_promote_release",
       "status": "transitional",
       "target_symbol": "build_h5",
       "validation_commands": [
@@ -1103,6 +1153,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/publish_local_area.py",
       "stability": "moving",
+      "stage_id": "5_validate_and_promote_release",
       "status": "current",
       "target_symbol": "build_states"
     },
@@ -1120,6 +1171,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/publish_local_area.py",
       "stability": "moving",
+      "stage_id": "5_validate_and_promote_release",
       "status": "current",
       "target_symbol": "build_districts"
     },
@@ -1137,6 +1189,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/publish_local_area.py",
       "stability": "moving",
+      "stage_id": "5_validate_and_promote_release",
       "status": "current",
       "target_symbol": "build_cities"
     },
@@ -1151,6 +1204,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/puf_impute.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "reconcile_ss_subcomponents",
       "validation_commands": [
@@ -1171,6 +1225,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/puf_impute.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "puf_clone_dataset",
       "validation_commands": [
@@ -1188,6 +1243,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/puf_impute.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "_impute_weeks_unemployed",
       "validation_commands": [
@@ -1205,6 +1261,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/puf_impute.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "_impute_retirement_contributions",
       "validation_commands": [
@@ -1222,6 +1279,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/puf_impute.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "_run_qrf_imputation",
       "validation_commands": [
@@ -1239,6 +1297,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/sanity_checks.py",
       "stability": "moving",
+      "stage_id": "4_build_outputs",
       "status": "current",
       "target_symbol": "run_sanity_checks",
       "validation_commands": [
@@ -1262,6 +1321,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/source_impute.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "impute_source_variables",
       "validation_commands": [
@@ -1279,6 +1339,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/source_impute.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "_impute_acs",
       "validation_commands": [
@@ -1296,6 +1357,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/source_impute.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "_impute_sipp",
       "validation_commands": [
@@ -1313,6 +1375,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/source_impute.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "_impute_scf",
       "validation_commands": [
@@ -1333,6 +1396,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/unified_calibration.py",
       "stability": "moving",
+      "stage_id": "3_fit_weights",
       "status": "current",
       "target_symbol": "compute_initial_weights",
       "validation_commands": [
@@ -1357,6 +1421,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/unified_calibration.py",
       "stability": "moving",
+      "stage_id": "3_fit_weights",
       "status": "current",
       "target_symbol": "fit_l0_weights",
       "validation_commands": [
@@ -1377,6 +1442,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/unified_calibration.py",
       "stability": "moving",
+      "stage_id": "3_fit_weights",
       "status": "current",
       "target_symbol": "compute_diagnostics",
       "validation_commands": [
@@ -1406,6 +1472,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/unified_calibration.py",
       "stability": "moving",
+      "stage_id": "2_build_calibration_package",
       "status": "transitional",
       "target_symbol": "run_calibration",
       "validation_commands": [
@@ -1423,6 +1490,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/unified_matrix_builder.py",
       "stability": "moving",
+      "stage_id": "2_build_calibration_package",
       "status": "current",
       "target_symbol": "_compute_single_state",
       "validation_commands": [
@@ -1443,6 +1511,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/unified_matrix_builder.py",
       "stability": "moving",
+      "stage_id": "2_build_calibration_package",
       "status": "current",
       "target_symbol": "_assemble_clone_values_standalone",
       "validation_commands": [
@@ -1461,6 +1530,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/unified_matrix_builder.py",
       "stability": "moving",
+      "stage_id": "2_build_calibration_package",
       "status": "current",
       "target_symbol": "UnifiedMatrixBuilder",
       "validation_commands": [
@@ -1483,6 +1553,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/unified_matrix_builder.py",
       "stability": "moving",
+      "stage_id": "2_build_calibration_package",
       "status": "current",
       "target_symbol": "build_matrix",
       "validation_commands": [
@@ -1504,6 +1575,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/unified_matrix_builder.py",
       "stability": "experimental",
+      "stage_id": "2_build_calibration_package",
       "status": "current",
       "target_symbol": "build_matrix_chunked",
       "validation_commands": [
@@ -1521,6 +1593,7 @@
       ],
       "source_file": "policyengine_us_data/calibration/validate_staging.py",
       "stability": "moving",
+      "stage_id": "5_validate_and_promote_release",
       "status": "current",
       "target_symbol": "validate_area",
       "validation_commands": [
@@ -1538,6 +1611,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "legacy",
       "target_symbol": "add_rent",
       "validation_commands": [
@@ -1555,6 +1629,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "add_takeup",
       "validation_commands": [
@@ -1572,6 +1647,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "stable",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "add_id_variables",
       "validation_commands": [
@@ -1589,6 +1665,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "add_personal_variables",
       "validation_commands": [
@@ -1606,6 +1683,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "add_personal_income_variables",
       "validation_commands": [
@@ -1623,6 +1701,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "add_spm_variables",
       "validation_commands": [
@@ -1640,6 +1719,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "stable",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "add_household_variables",
       "validation_commands": [
@@ -1657,6 +1737,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "add_previous_year_income",
       "validation_commands": [
@@ -1674,6 +1755,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "add_ssn_card_type",
       "validation_commands": [
@@ -1691,6 +1773,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "legacy",
       "target_symbol": "add_tips",
       "validation_commands": [
@@ -1708,6 +1791,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "add_org_labor_market_inputs",
       "validation_commands": [
@@ -1725,6 +1809,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "legacy",
       "target_symbol": "add_auto_loan_interest_and_net_worth",
       "validation_commands": [
@@ -1742,6 +1827,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/cps/cps.py",
       "stability": "stable",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "downsample",
       "validation_commands": [
@@ -1766,6 +1852,7 @@
       "pydoc": true,
       "source_file": "policyengine_us_data/datasets/cps/enhanced_cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "transitional",
       "target_symbol": "create_aca_2025_takeup_override"
     },
@@ -1788,6 +1875,7 @@
       "pydoc": true,
       "source_file": "policyengine_us_data/datasets/cps/enhanced_cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "transitional",
       "target_symbol": "reweight"
     },
@@ -1810,6 +1898,7 @@
       "pydoc": true,
       "source_file": "policyengine_us_data/datasets/cps/extended_cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "transitional",
       "target_symbol": "_splice_clone_feature_predictions"
     },
@@ -1832,6 +1921,7 @@
       "pydoc": true,
       "source_file": "policyengine_us_data/datasets/cps/extended_cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "transitional",
       "target_symbol": "_impute_cps_only_variables"
     },
@@ -1853,6 +1943,7 @@
       "pydoc": true,
       "source_file": "policyengine_us_data/datasets/cps/extended_cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "transitional",
       "target_symbol": "_splice_cps_only_predictions"
     },
@@ -1874,6 +1965,7 @@
       "pydoc": true,
       "source_file": "policyengine_us_data/datasets/cps/extended_cps.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "transitional",
       "target_symbol": "_drop_formula_variables"
     },
@@ -1888,6 +1980,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/puf/puf.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "simulate_w2_and_ubia_from_puf",
       "validation_commands": [
@@ -1905,6 +1998,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/puf/puf.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "impute_pension_contributions_to_puf",
       "validation_commands": [
@@ -1922,6 +2016,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/puf/puf.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "impute_missing_demographics",
       "validation_commands": [
@@ -1939,6 +2034,7 @@
       ],
       "source_file": "policyengine_us_data/datasets/puf/puf.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "preprocess_puf",
       "validation_commands": [
@@ -1956,6 +2052,7 @@
       ],
       "source_file": "policyengine_us_data/utils/mortgage_interest.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "impute_tax_unit_mortgage_balance_hints",
       "validation_commands": [
@@ -1973,6 +2070,7 @@
       ],
       "source_file": "policyengine_us_data/utils/mortgage_interest.py",
       "stability": "moving",
+      "stage_id": "1_build_datasets",
       "status": "current",
       "target_symbol": "convert_mortgage_interest_to_structural_inputs",
       "validation_commands": [
@@ -1986,6 +2084,13 @@
       "data_build": 36,
       "local_h5": 53,
       "weight_fit": 4
+    },
+    "by_stage": {
+      "1_build_datasets": 36,
+      "2_build_calibration_package": 6,
+      "3_fit_weights": 3,
+      "4_build_outputs": 45,
+      "5_validate_and_promote_release": 8
     },
     "by_status": {
       "current": 85,
