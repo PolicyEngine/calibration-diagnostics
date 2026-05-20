@@ -158,6 +158,19 @@ def list_targets(
     # those stay '—' here (the audit page already shows the gap).
     estimate_lookup = _build_estimate_lookup(state)
 
+    # MVP evaluator cache (lazy: only built if there's a non-DB row that
+    # needs computation).
+    eval_cache_box: list = [None]
+
+    def _get_eval_cache():
+        if eval_cache_box[0] is not None:
+            return eval_cache_box[0]
+        if state.sim_service is None:
+            return None
+        from backend.services.stratum_evaluator import EvalCache
+        eval_cache_box[0] = EvalCache(state)
+        return eval_cache_box[0]
+
     def annotate(r):
         sig = _freeze(r["signature"])
         # DB rows trivially have in_db=True; otherwise check membership.
@@ -166,14 +179,41 @@ def list_targets(
         r["estimate"] = None
         r["rel_error"] = None
         r["target_idx"] = None
-        # Join PE aggregates onto DB-tier rows via target_id.
+        r["eval_note"] = ""
+
         if r.get("storage_tier") == "db":
+            # Cheap path: pull the loaded run's estimate by target_id.
             tid = _target_id_from_source_row(r.get("source_row") or "")
             if tid is not None and tid in estimate_lookup:
                 hit = estimate_lookup[tid]
                 r["estimate"] = hit["estimate"]
                 r["rel_error"] = hit["rel_error"]
                 r["target_idx"] = hit["target_idx"]
+                r["eval_note"] = "from loaded calibration X·w"
+        else:
+            # Authored-only row: try the MVP evaluator. Geographic-only and
+            # simple-constraint cases will return a real number.
+            cache = _get_eval_cache()
+            if cache is not None:
+                from backend.services.stratum_evaluator import evaluate_signature
+                cons = r.get("constraints") or []
+                try:
+                    est, note = evaluate_signature(
+                        variable=r["variable"],
+                        geo_level=r.get("geo_level"),
+                        geographic_id=r.get("geographic_id"),
+                        constraints=[tuple(c) for c in cons],
+                        is_count=bool(r.get("is_count")),
+                        cache=cache,
+                        period=r.get("period"),
+                    )
+                    r["estimate"] = est
+                    r["eval_note"] = note
+                    target = r.get("value")
+                    if est is not None and target not in (None, 0):
+                        r["rel_error"] = (est - target) / abs(target)
+                except Exception as exc:
+                    r["eval_note"] = f"evaluator error: {exc}"
         return r
 
     rows = [annotate(r) for r in union]
