@@ -21,5 +21,8 @@ frontend/tsconfig.tsbuildinfo
 .artifacts/
 frontend/.artifacts/
 
+# Target-index full per-record dump (regenerable; committed summary suffices)
+backend/data/target_index.json.union.jsonl
+
 # OS
 .DS_Store

@@ -1,0 +1,380 @@
+{
+  "db_total": 37812,
+  "tiers": [
+    {
+      "tier": "csv/snap_state.csv",
+      "total_records": 102,
+      "unique_signatures": 102,
+      "matched_to_db": 51,
+      "unmatched": 51,
+      "match_rate": 0.5,
+      "unmatched_examples": [
+        {
+          "variable": "snap",
+          "geo_level": "state",
+          "geographic_id": "01",
+          "period": 2024,
+          "constraints": [],
+          "value": 1733693703.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/snap_state.csv",
+          "source_row": "row-2",
+          "notes": "USDA FNS SNAP \u2014 dollar cost",
+          "signature": [
+            "snap",
+            "state",
+            "1",
+            2024,
+            []
+          ]
+        },
+        {
+          "variable": "snap",
+          "geo_level": "state",
+          "geographic_id": "02",
+          "period": 2024,
+          "constraints": [],
+          "value": 249618195.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/snap_state.csv",
+          "source_row": "row-3",
+          "notes": "USDA FNS SNAP \u2014 dollar cost",
+          "signature": [
+            "snap",
+            "state",
+            "2",
+            2024,
+            []
+          ]
+        },
+        {
+          "variable": "snap",
+          "geo_level": "state",
+          "geographic_id": "04",
+          "period": 2024,
+          "constraints": [],
+          "value": 2015194104.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/snap_state.csv",
+          "source_row": "row-4",
+          "notes": "USDA FNS SNAP \u2014 dollar cost",
+          "signature": [
+            "snap",
+            "state",
+            "4",
+            2024,
+            []
+          ]
+        },
+        {
+          "variable": "snap",
+          "geo_level": "state",
+          "geographic_id": "05",
+          "period": 2024,
+          "constraints": [],
+          "value": 549666027.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/snap_state.csv",
+          "source_row": "row-5",
+          "notes": "USDA FNS SNAP \u2014 dollar cost",
+          "signature": [
+            "snap",
+            "state",
+            "5",
+            2024,
+            []
+          ]
+        },
+        {
+          "variable": "snap",
+          "geo_level": "state",
+          "geographic_id": "06",
+          "period": 2024,
+          "constraints": [],
+          "value": 12377175489.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/snap_state.csv",
+          "source_row": "row-6",
+          "notes": "USDA FNS SNAP \u2014 dollar cost",
+          "signature": [
+            "snap",
+            "state",
+            "6",
+            2024,
+            []
+          ]
+        }
+      ]
+    },
+    {
+      "tier": "csv/soi_targets.csv",
+      "total_records": 11929,
+      "unique_signatures": 6748,
+      "matched_to_db": 0,
+      "unmatched": 11929,
+      "match_rate": 0.0,
+      "unmatched_examples": [
+        {
+          "variable": "adjusted_gross_income",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2015,
+          "constraints": [
+            [
+              "tax_unit_is_filer",
+              "==",
+              "1"
+            ],
+            [
+              "adjusted_gross_income",
+              "<",
+              "0.0"
+            ]
+          ],
+          "value": -203775058000.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/soi_targets.csv",
+          "source_row": "Table 1.1/11/D",
+          "notes": "IRS SOI Table 1.1 \u00b7 filing=All",
+          "signature": [
+            "adjusted_gross_income",
+            "national",
+            "",
+            2015,
+            [
+              [
+                "adjusted_gross_income",
+                "<",
+                "0"
+              ],
+              [
+                "tax_unit_is_filer",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "adjusted_gross_income",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2015,
+          "constraints": [
+            [
+              "tax_unit_is_filer",
+              "==",
+              "1"
+            ],
+            [
+              "adjusted_gross_income",
+              "<",
+              "0.0"
+            ],
+            [
+              "tax_unit_is_taxable",
+              "==",
+              "1"
+            ]
+          ],
+          "value": -11205340000.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/soi_targets.csv",
+          "source_row": "Table 1.1/11/I",
+          "notes": "IRS SOI Table 1.1 \u00b7 filing=All",
+          "signature": [
+            "adjusted_gross_income",
+            "national",
+            "",
+            2015,
+            [
+              [
+                "adjusted_gross_income",
+                "<",
+                "0"
+              ],
+              [
+                "tax_unit_is_filer",
+                "==",
+                "1"
+              ],
+              [
+                "tax_unit_is_taxable",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "adjusted_gross_income",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2015,
+          "constraints": [
+            [
+              "tax_unit_is_filer",
+              "==",
+              "1"
+            ],
+            [
+              "full_population",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 10210310102000.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/soi_targets.csv",
+          "source_row": "Table 1.1/10/D",
+          "notes": "IRS SOI Table 1.1 \u00b7 filing=All",
+          "signature": [
+            "adjusted_gross_income",
+            "national",
+            "",
+            2015,
+            [
+              [
+                "full_population",
+                "==",
+                "1"
+              ],
+              [
+                "tax_unit_is_filer",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "adjusted_gross_income",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2015,
+          "constraints": [
+            [
+              "tax_unit_is_filer",
+              "==",
+              "1"
+            ],
+            [
+              "tax_unit_is_taxable",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 9550843480000.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/soi_targets.csv",
+          "source_row": "Table 1.1/10/I",
+          "notes": "IRS SOI Table 1.1 \u00b7 filing=All",
+          "signature": [
+            "adjusted_gross_income",
+            "national",
+            "",
+            2015,
+            [
+              [
+                "tax_unit_is_filer",
+                "==",
+                "1"
+              ],
+              [
+                "tax_unit_is_taxable",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "adjusted_gross_income",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2015,
+          "constraints": [
+            [
+              "tax_unit_is_filer",
+              "==",
+              "1"
+            ],
+            [
+              "adjusted_gross_income",
+              ">=",
+              "1.0"
+            ],
+            [
+              "adjusted_gross_income",
+              "<",
+              "5000.0"
+            ]
+          ],
+          "value": 26240797000.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/soi_targets.csv",
+          "source_row": "Table 1.2/11/C",
+          "notes": "IRS SOI Table 1.2 \u00b7 filing=All",
+          "signature": [
+            "adjusted_gross_income",
+            "national",
+            "",
+            2015,
+            [
+              [
+                "adjusted_gross_income",
+                "<",
+                "5000"
+              ],
+              [
+                "adjusted_gross_income",
+                ">=",
+                "1"
+              ],
+              [
+                "tax_unit_is_filer",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "parsers_covered": [
+    "snap_state.csv",
+    "soi_targets.csv"
+  ],
+  "parsers_missing": [
+    "aca_marketplace_state_metal_selection_2024.csv",
+    "aca_ptc_state.csv",
+    "aca_spending_and_enrollment_2024.csv",
+    "aca_spending_and_enrollment_2025.csv",
+    "aca_spending_and_enrollment_2026.csv",
+    "acs_housing_costs_2024.csv",
+    "age_state.csv",
+    "agi_state.csv",
+    "eitc_by_agi_and_children.csv",
+    "eitc_claim_controls.csv",
+    "eitc_state.csv",
+    "healthcare_spending.csv",
+    "medicaid_enrollment_2024.csv",
+    "medicaid_enrollment_2025.csv",
+    "medicaid_enrollment_2026.csv",
+    "np2023_d5_mid.csv",
+    "population_by_state.csv",
+    "real_estate_taxes_by_state_acs.csv",
+    "spm_threshold_agi.csv"
+  ]
+}
