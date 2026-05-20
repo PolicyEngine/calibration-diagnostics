@@ -27,6 +27,27 @@ function mergeRunParams(
   };
 }
 
+// Endpoints that don't depend on a loaded run — safe to call before the
+// run picker has settled.
+const RUN_AGNOSTIC_PATHS = [
+  "/datasets",
+  "/runs",
+  "/health",
+  "/pipeline",         // covers /pipeline and /pipeline/stages/*
+  "/target-inventory", // committed JSON, run-independent
+];
+
+function pathRequiresRun(path: string): boolean {
+  return !RUN_AGNOSTIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+}
+
+class SelectionNotReadyError extends Error {
+  constructor() {
+    super("Run not yet selected; skipping request.");
+    this.name = "SelectionNotReadyError";
+  }
+}
+
 function appendParams(url: URL, params: Record<string, ParamValue>): void {
   Object.entries(params).forEach(([k, v]) => {
     if (v === undefined || v === null) return;
@@ -49,6 +70,13 @@ export async function apiGet<T>(
   if (process.env.NEXT_PUBLIC_USE_FIXTURES === "true") {
     const { getFixture } = await import("@/fixtures");
     return getFixture<T>(path, params as never);
+  }
+
+  // If the path needs a loaded run but the picker hasn't settled yet,
+  // throw instead of firing a doomed request. React Query will surface
+  // this as a transient error and retry once the run resolves.
+  if (pathRequiresRun(path) && !(_currentRun.dataset && _currentRun.run)) {
+    throw new SelectionNotReadyError();
   }
 
   const url = new URL(path, API_BASE);
