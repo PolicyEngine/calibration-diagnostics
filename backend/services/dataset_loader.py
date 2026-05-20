@@ -13,6 +13,7 @@ but the universe view (Summary + All targets) works.
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -27,6 +28,93 @@ if TYPE_CHECKING:
     from huggingface_hub import HfApi  # noqa: F401
 
 logger = logging.getLogger(__name__)
+
+
+_CONSTRAINT_RE = re.compile(r"([A-Za-z_][\w]*)(==|!=|>=|<=|>|<)(.+)$")
+
+
+def _parse_constraint(s: str) -> tuple[str, str, str] | None:
+    """Parse 'var op value' (with or without spaces) into a tuple."""
+    s = s.strip().replace(" ", "")
+    m = _CONSTRAINT_RE.match(s)
+    if not m:
+        return None
+    var, op, val = m.group(1), m.group(2), m.group(3).strip()
+    return (var, op, _norm_constraint_value(val))
+
+
+def _norm_constraint_value(v: str) -> str:
+    """Normalise numeric constraint values: '1.0' → '1', '-inf' stays '-inf'."""
+    s = str(v).strip()
+    if s in ("inf", "-inf", "Infinity", "-Infinity"):
+        return s.replace("Infinity", "inf")
+    try:
+        f = float(s)
+        if f != f or f in (float("inf"), float("-inf")):
+            return s
+        if f == int(f):
+            return str(int(f))
+        return str(f)
+    except (TypeError, ValueError):
+        return s
+
+
+def _parse_diagnostics_key(key: str) -> tuple | None:
+    """Convert a diagnostics CSV target key into an order-independent signature.
+
+    Examples:
+      national/medicaid                                    → ('national', '', 'medicaid', ())
+      national/adj.../[tax_unit_is_filer==1]               → ('national', '', 'adj...', (('tax_unit_is_filer','==','1'),))
+      cd_1000/person_count/[age<5,age>-1]                  → ('district', '1000', 'person_count', (('age','<','5'),('age','>','-1')))
+    """
+    if not isinstance(key, str) or "/" not in key:
+        return None
+    head, _, rest = key.partition("/")
+    if head == "national":
+        geo_level, geo_id = "national", ""
+    elif head.startswith("cd_"):
+        geo_level, geo_id = "district", head[3:]
+    else:
+        geo_level, geo_id = head, ""
+    if "/" in rest:
+        variable, _, constraint_part = rest.partition("/")
+    else:
+        variable, constraint_part = rest, ""
+    constraints: list[tuple[str, str, str]] = []
+    if constraint_part.startswith("[") and constraint_part.endswith("]"):
+        body = constraint_part[1:-1].strip()
+        if body:
+            for c in body.split(","):
+                parsed = _parse_constraint(c)
+                if parsed is not None:
+                    constraints.append(parsed)
+    return (geo_level, geo_id, variable, tuple(sorted(constraints)))
+
+
+def _row_to_diagnostics_signature(row) -> tuple:
+    """Same signature shape as _parse_diagnostics_key but built from a
+    targets_enriched row. Order-independent."""
+    variable = str(row.get("variable") or "")
+    geo_level = row.get("geo_level") or "national"
+    gid = row.get("geographic_id")
+    if gid is None or (isinstance(gid, float) and pd.isna(gid)):
+        geo_id_norm = ""
+    else:
+        try:
+            geo_id_norm = str(int(float(str(gid))))
+        except (TypeError, ValueError):
+            geo_id_norm = str(gid)
+    cons = row.get("constraints") or []
+    parsed_cons = []
+    for c in cons:
+        if isinstance(c, (list, tuple)) and len(c) >= 3:
+            parsed_cons.append((str(c[0]), str(c[1]),
+                               _norm_constraint_value(str(c[2]))))
+        elif isinstance(c, str):
+            p = _parse_constraint(c)
+            if p is not None:
+                parsed_cons.append(p)
+    return (geo_level, geo_id_norm, variable, tuple(sorted(parsed_cons)))
 
 
 def _target_to_diagnostics_key(row) -> str:
@@ -338,9 +426,18 @@ def load_run_from_dataset(
             "Joining %d rows from unified_diagnostics.csv onto %d targets...",
             len(diag_df), len(targets_df),
         )
-        diag_by_name = dict(zip(diag_df["target"], diag_df["estimate"]))
-        diag_keys = targets_df.apply(_target_to_diagnostics_key, axis=1)
-        targets_df["estimate"] = diag_keys.map(diag_by_name)
+        # Parse each diag key into a constraint-order-independent signature
+        # and build sig → estimate.
+        diag_sig_to_estimate: dict[tuple, float] = {}
+        for diag_target, est in zip(diag_df["target"], diag_df["estimate"]):
+            sig = _parse_diagnostics_key(diag_target)
+            if sig is not None:
+                diag_sig_to_estimate[sig] = est
+        # Compute the same signature on each of our rows and join.
+        targets_df["estimate"] = targets_df.apply(
+            lambda r: diag_sig_to_estimate.get(_row_to_diagnostics_signature(r)),
+            axis=1,
+        )
         n_from_diag = int(targets_df["estimate"].notna().sum())
         logger.info(
             "  → %d/%d targets got estimates from diagnostics CSV",
