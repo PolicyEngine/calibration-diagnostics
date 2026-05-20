@@ -2362,6 +2362,736 @@
       ]
     },
     {
+      "tier": "csv/healthcare_spending.csv",
+      "total_records": 36,
+      "unique_signatures": 36,
+      "matched_to_db": 0,
+      "unmatched": 36,
+      "match_rate": 0.0,
+      "unmatched_examples": [
+        {
+          "variable": "health_insurance_premiums_without_medicare_part_b",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "age",
+              ">=",
+              "0"
+            ],
+            [
+              "age",
+              "<",
+              "10"
+            ]
+          ],
+          "value": 0.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/healthcare_spending.csv",
+          "source_row": "row-2/band-0",
+          "notes": "Healthcare spending 2024 \u00b7 age band 0+",
+          "signature": [
+            "health_insurance_premiums_without_medicare_part_b",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "age",
+                "<",
+                "10"
+              ],
+              [
+                "age",
+                ">=",
+                "0"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "over_the_counter_health_expenses",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "age",
+              ">=",
+              "0"
+            ],
+            [
+              "age",
+              "<",
+              "10"
+            ]
+          ],
+          "value": 3139958418.4186344,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/healthcare_spending.csv",
+          "source_row": "row-2/band-0",
+          "notes": "Healthcare spending 2024 \u00b7 age band 0+",
+          "signature": [
+            "over_the_counter_health_expenses",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "age",
+                "<",
+                "10"
+              ],
+              [
+                "age",
+                ">=",
+                "0"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "other_medical_expenses",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "age",
+              ">=",
+              "0"
+            ],
+            [
+              "age",
+              "<",
+              "10"
+            ]
+          ],
+          "value": 10581757838.419937,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/healthcare_spending.csv",
+          "source_row": "row-2/band-0",
+          "notes": "Healthcare spending 2024 \u00b7 age band 0+",
+          "signature": [
+            "other_medical_expenses",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "age",
+                "<",
+                "10"
+              ],
+              [
+                "age",
+                ">=",
+                "0"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "medicare_part_b_premiums",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "age",
+              ">=",
+              "0"
+            ],
+            [
+              "age",
+              "<",
+              "10"
+            ]
+          ],
+          "value": 0.0,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/healthcare_spending.csv",
+          "source_row": "row-2/band-0",
+          "notes": "Healthcare spending 2024 \u00b7 age band 0+",
+          "signature": [
+            "medicare_part_b_premiums",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "age",
+                "<",
+                "10"
+              ],
+              [
+                "age",
+                ">=",
+                "0"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "health_insurance_premiums_without_medicare_part_b",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "age",
+              ">=",
+              "10"
+            ],
+            [
+              "age",
+              "<",
+              "20"
+            ]
+          ],
+          "value": 1331908850.7960727,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/healthcare_spending.csv",
+          "source_row": "row-3/band-10",
+          "notes": "Healthcare spending 2024 \u00b7 age band 10+",
+          "signature": [
+            "health_insurance_premiums_without_medicare_part_b",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "age",
+                "<",
+                "20"
+              ],
+              [
+                "age",
+                ">=",
+                "10"
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "tier": "csv/medicaid_enrollment_2024.csv",
+      "total_records": 51,
+      "unique_signatures": 51,
+      "matched_to_db": 0,
+      "unmatched": 51,
+      "match_rate": 0.0,
+      "unmatched_examples": [
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "2",
+          "period": 2024,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 231577.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2024.csv",
+          "source_row": "row-2",
+          "notes": "Medicaid enrollment 2024 \u2014 AK (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "2",
+            2024,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "1",
+          "period": 2024,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 766009.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2024.csv",
+          "source_row": "row-3",
+          "notes": "Medicaid enrollment 2024 \u2014 AL (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "1",
+            2024,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "5",
+          "period": 2024,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 733561.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2024.csv",
+          "source_row": "row-4",
+          "notes": "Medicaid enrollment 2024 \u2014 AR (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "5",
+            2024,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "4",
+          "period": 2024,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 1778734.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2024.csv",
+          "source_row": "row-5",
+          "notes": "Medicaid enrollment 2024 \u2014 AZ (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "4",
+            2024,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "6",
+          "period": 2024,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 12172695.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2024.csv",
+          "source_row": "row-6",
+          "notes": "Medicaid enrollment 2024 \u2014 CA (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "6",
+            2024,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "tier": "csv/medicaid_enrollment_2025.csv",
+      "total_records": 51,
+      "unique_signatures": 51,
+      "matched_to_db": 0,
+      "unmatched": 51,
+      "match_rate": 0.0,
+      "unmatched_examples": [
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "2",
+          "period": 2025,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 199460.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2025.csv",
+          "source_row": "row-2",
+          "notes": "Medicaid enrollment 2025 \u2014 AK (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "2",
+            2025,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "1",
+          "period": 2025,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 752535.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2025.csv",
+          "source_row": "row-3",
+          "notes": "Medicaid enrollment 2025 \u2014 AL (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "1",
+            2025,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "5",
+          "period": 2025,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 723536.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2025.csv",
+          "source_row": "row-4",
+          "notes": "Medicaid enrollment 2025 \u2014 AR (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "5",
+            2025,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "4",
+          "period": 2025,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 1579905.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2025.csv",
+          "source_row": "row-5",
+          "notes": "Medicaid enrollment 2025 \u2014 AZ (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "4",
+            2025,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "6",
+          "period": 2025,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 11554412.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2025.csv",
+          "source_row": "row-6",
+          "notes": "Medicaid enrollment 2025 \u2014 CA (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "6",
+            2025,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "tier": "csv/medicaid_enrollment_2026.csv",
+      "total_records": 51,
+      "unique_signatures": 51,
+      "matched_to_db": 0,
+      "unmatched": 51,
+      "match_rate": 0.0,
+      "unmatched_examples": [
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "2",
+          "period": 2026,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 197303.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2026.csv",
+          "source_row": "row-2",
+          "notes": "Medicaid enrollment 2026 \u2014 AK (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "2",
+            2026,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "1",
+          "period": 2026,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 741054.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2026.csv",
+          "source_row": "row-3",
+          "notes": "Medicaid enrollment 2026 \u2014 AL (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "1",
+            2026,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "5",
+          "period": 2026,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 717460.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2026.csv",
+          "source_row": "row-4",
+          "notes": "Medicaid enrollment 2026 \u2014 AR (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "5",
+            2026,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "4",
+          "period": 2026,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 1550145.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2026.csv",
+          "source_row": "row-5",
+          "notes": "Medicaid enrollment 2026 \u2014 AZ (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "4",
+            2026,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "person_count",
+          "geo_level": "state",
+          "geographic_id": "6",
+          "period": 2026,
+          "constraints": [
+            [
+              "medicaid_enrolled",
+              "==",
+              "1"
+            ]
+          ],
+          "value": 11317458.0,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/medicaid_enrollment_2026.csv",
+          "source_row": "row-6",
+          "notes": "Medicaid enrollment 2026 \u2014 CA (persons with medicaid_enrolled==1)",
+          "signature": [
+            "person_count",
+            "state",
+            "6",
+            2026,
+            [
+              [
+                "medicaid_enrolled",
+                "==",
+                "1"
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
       "tier": "csv/np2023_d5_mid.csv",
       "total_records": 6873,
       "unique_signatures": 6873,
@@ -3114,6 +3844,226 @@
       ]
     },
     {
+      "tier": "csv/spm_threshold_agi.csv",
+      "total_records": 20,
+      "unique_signatures": 20,
+      "matched_to_db": 0,
+      "unmatched": 20,
+      "match_rate": 0.0,
+      "unmatched_examples": [
+        {
+          "variable": "adjusted_gross_income",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "spm_unit_spm_threshold",
+              ">=",
+              "13232.297"
+            ],
+            [
+              "spm_unit_spm_threshold",
+              "<",
+              "16084.154296875"
+            ]
+          ],
+          "value": 601395945534.2526,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/spm_threshold_agi.csv",
+          "source_row": "row-2/decile-1",
+          "notes": "SPM-threshold decile 1 \u00b7 AGI dollar amount",
+          "signature": [
+            "adjusted_gross_income",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "spm_unit_spm_threshold",
+                "<",
+                "16084"
+              ],
+              [
+                "spm_unit_spm_threshold",
+                ">=",
+                "13232"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "tax_unit_count",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "spm_unit_spm_threshold",
+              ">=",
+              "13232.297"
+            ],
+            [
+              "spm_unit_spm_threshold",
+              "<",
+              "16084.154296875"
+            ]
+          ],
+          "value": 14067622.329864502,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/spm_threshold_agi.csv",
+          "source_row": "row-2/decile-1",
+          "notes": "SPM-threshold decile 1 \u00b7 tax-unit count",
+          "signature": [
+            "tax_unit_count",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "spm_unit_spm_threshold",
+                "<",
+                "16084"
+              ],
+              [
+                "spm_unit_spm_threshold",
+                ">=",
+                "13232"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "adjusted_gross_income",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "spm_unit_spm_threshold",
+              ">=",
+              "16084.154"
+            ],
+            [
+              "spm_unit_spm_threshold",
+              "<",
+              "18203.76171875"
+            ]
+          ],
+          "value": 699173775752.6232,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/spm_threshold_agi.csv",
+          "source_row": "row-3/decile-2",
+          "notes": "SPM-threshold decile 2 \u00b7 AGI dollar amount",
+          "signature": [
+            "adjusted_gross_income",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "spm_unit_spm_threshold",
+                "<",
+                "18203"
+              ],
+              [
+                "spm_unit_spm_threshold",
+                ">=",
+                "16084"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "tax_unit_count",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "spm_unit_spm_threshold",
+              ">=",
+              "16084.154"
+            ],
+            [
+              "spm_unit_spm_threshold",
+              "<",
+              "18203.76171875"
+            ]
+          ],
+          "value": 14069629.232849121,
+          "is_count": true,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/spm_threshold_agi.csv",
+          "source_row": "row-3/decile-2",
+          "notes": "SPM-threshold decile 2 \u00b7 tax-unit count",
+          "signature": [
+            "tax_unit_count",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "spm_unit_spm_threshold",
+                "<",
+                "18203"
+              ],
+              [
+                "spm_unit_spm_threshold",
+                ">=",
+                "16084"
+              ]
+            ]
+          ]
+        },
+        {
+          "variable": "adjusted_gross_income",
+          "geo_level": "national",
+          "geographic_id": null,
+          "period": 2024,
+          "constraints": [
+            [
+              "spm_unit_spm_threshold",
+              ">=",
+              "18203.762"
+            ],
+            [
+              "spm_unit_spm_threshold",
+              "<",
+              "19966.45703125"
+            ]
+          ],
+          "value": 1038943520151.5376,
+          "is_count": false,
+          "storage_tier": "csv",
+          "source_path": "storage/calibration_targets/spm_threshold_agi.csv",
+          "source_row": "row-4/decile-3",
+          "notes": "SPM-threshold decile 3 \u00b7 AGI dollar amount",
+          "signature": [
+            "adjusted_gross_income",
+            "national",
+            "",
+            2024,
+            [
+              [
+                "spm_unit_spm_threshold",
+                "<",
+                "19966"
+              ],
+              [
+                "spm_unit_spm_threshold",
+                ">=",
+                "18203"
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
       "tier": "python/cms_medicare+takeup",
       "total_records": 5,
       "unique_signatures": 5,
@@ -3252,17 +4202,16 @@
     "eitc_by_agi_and_children.csv",
     "eitc_claim_controls.csv",
     "eitc_state.csv",
-    "np2023_d5_mid.csv",
-    "population_by_state.csv",
-    "real_estate_taxes_by_state_acs.csv",
-    "snap_state.csv",
-    "soi_targets.csv"
-  ],
-  "parsers_missing": [
     "healthcare_spending.csv",
     "medicaid_enrollment_2024.csv",
     "medicaid_enrollment_2025.csv",
     "medicaid_enrollment_2026.csv",
+    "np2023_d5_mid.csv",
+    "population_by_state.csv",
+    "real_estate_taxes_by_state_acs.csv",
+    "snap_state.csv",
+    "soi_targets.csv",
     "spm_threshold_agi.csv"
-  ]
+  ],
+  "parsers_missing": []
 }

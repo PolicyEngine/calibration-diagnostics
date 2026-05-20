@@ -29,11 +29,16 @@ from . import (
     eitc_by_agi_and_children,
     eitc_claim_controls,
     eitc_state,
+    healthcare_spending,
+    medicaid_enrollment_2024,
+    medicaid_enrollment_2025,
+    medicaid_enrollment_2026,
     np2023_d5_mid,
     population_by_state,
     real_estate_taxes_by_state_acs,
     snap_state,
     soi_targets,
+    spm_threshold_agi,
 )
 
 PARSER_REGISTRY: dict[str, Callable[[Path], list[TargetRecord]]] = {
@@ -48,12 +53,14 @@ PARSER_REGISTRY: dict[str, Callable[[Path], list[TargetRecord]]] = {
     "eitc_by_agi_and_children.csv": eitc_by_agi_and_children.parse,
     "eitc_claim_controls.csv": eitc_claim_controls.parse,
     "eitc_state.csv": eitc_state.parse,
+    "healthcare_spending.csv": healthcare_spending.parse,
+    "medicaid_enrollment_2024.csv": medicaid_enrollment_2024.parse,
+    "medicaid_enrollment_2025.csv": medicaid_enrollment_2025.parse,
+    "medicaid_enrollment_2026.csv": medicaid_enrollment_2026.parse,
     "np2023_d5_mid.csv": np2023_d5_mid.parse,
     "population_by_state.csv": population_by_state.parse,
     "real_estate_taxes_by_state_acs.csv": real_estate_taxes_by_state_acs.parse,
     "snap_state.csv": snap_state.parse,
     "soi_targets.csv": soi_targets.parse,
-    # Remaining CSVs (programs batch agent still running):
-    # healthcare_spending.csv, spm_threshold_agi.csv,
-    # medicaid_enrollment_{2024,2025,2026}.csv
+    "spm_threshold_agi.csv": spm_threshold_agi.parse,
 }
