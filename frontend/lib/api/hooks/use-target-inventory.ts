@@ -14,6 +14,9 @@ export interface InventoryRow {
   source_row: string;
   notes: string;
   in_db: boolean;
+  estimate: number | null;
+  rel_error: number | null;
+  target_idx: number | null;
 }
 
 export interface InventoryListResponse {

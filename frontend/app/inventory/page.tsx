@@ -100,10 +100,38 @@ function InventoryTable() {
     },
     {
       key: "value",
-      header: "Value",
+      header: "Target",
       align: "right" as const,
       format: (val: unknown) =>
         val == null ? <span className="text-muted-foreground">—</span> : formatNumber(Number(val)),
+    },
+    {
+      key: "estimate",
+      header: "PE aggregate",
+      align: "right" as const,
+      format: (val: unknown) =>
+        val == null ? <span className="text-muted-foreground">—</span> : formatNumber(Number(val)),
+    },
+    {
+      key: "rel_error",
+      header: "Rel. err",
+      align: "right" as const,
+      format: (val: unknown) => {
+        if (val == null) return <span className="text-muted-foreground">—</span>;
+        const v = Number(val);
+        const abs = Math.abs(v);
+        const variant =
+          abs > 0.5
+            ? "error"
+            : abs > 0.2
+              ? "warning"
+              : abs > 0.05
+                ? "secondary"
+                : "success";
+        const display =
+          abs >= 1 ? `${(v * 100).toFixed(0)}%` : `${(v * 100).toFixed(1)}%`;
+        return <Badge variant={variant}>{display}</Badge>;
+      },
     },
     {
       key: "source_path",
