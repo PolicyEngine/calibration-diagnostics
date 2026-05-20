@@ -76,6 +76,13 @@ def run_audit(csv_dir: Path, db_path: Path, out_path: Path) -> dict:
         parsed_total += len(records)
         logger.info("  ✓ %s → %d records", fname, len(records))
 
+    # 2b. Tier 3 — Python constants
+    from backend.scripts.target_index import python_constants
+    py_records = python_constants.collect()
+    if py_records:
+        tier_records["python/cms_medicare+takeup"] = py_records
+        logger.info("  ✓ python constants → %d records", len(py_records))
+
     # 3. Load the DB tier
     logger.info("Loading policy_data.db: %s", db_path)
     db_records = load_db_targets(db_path)

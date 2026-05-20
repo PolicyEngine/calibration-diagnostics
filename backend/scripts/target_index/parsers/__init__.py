@@ -17,12 +17,43 @@ from typing import Callable
 
 from backend.scripts.target_index.schema import TargetRecord
 
-from . import snap_state, soi_targets
+from . import (
+    aca_marketplace_state_metal_selection_2024,
+    aca_ptc_state,
+    aca_spending_and_enrollment_2024,
+    aca_spending_and_enrollment_2025,
+    aca_spending_and_enrollment_2026,
+    acs_housing_costs_2024,
+    age_state,
+    agi_state,
+    eitc_by_agi_and_children,
+    eitc_claim_controls,
+    eitc_state,
+    np2023_d5_mid,
+    population_by_state,
+    real_estate_taxes_by_state_acs,
+    snap_state,
+    soi_targets,
+)
 
-# Filename → parser callable. Keep alphabetical for reviewability.
 PARSER_REGISTRY: dict[str, Callable[[Path], list[TargetRecord]]] = {
+    "aca_marketplace_state_metal_selection_2024.csv": aca_marketplace_state_metal_selection_2024.parse,
+    "aca_ptc_state.csv": aca_ptc_state.parse,
+    "aca_spending_and_enrollment_2024.csv": aca_spending_and_enrollment_2024.parse,
+    "aca_spending_and_enrollment_2025.csv": aca_spending_and_enrollment_2025.parse,
+    "aca_spending_and_enrollment_2026.csv": aca_spending_and_enrollment_2026.parse,
+    "acs_housing_costs_2024.csv": acs_housing_costs_2024.parse,
+    "age_state.csv": age_state.parse,
+    "agi_state.csv": agi_state.parse,
+    "eitc_by_agi_and_children.csv": eitc_by_agi_and_children.parse,
+    "eitc_claim_controls.csv": eitc_claim_controls.parse,
+    "eitc_state.csv": eitc_state.parse,
+    "np2023_d5_mid.csv": np2023_d5_mid.parse,
+    "population_by_state.csv": population_by_state.parse,
+    "real_estate_taxes_by_state_acs.csv": real_estate_taxes_by_state_acs.parse,
     "snap_state.csv": snap_state.parse,
     "soi_targets.csv": soi_targets.parse,
-    # TODO: 17 more CSVs to register. The audit script's coverage flag will
-    # show which ones still need adapters.
+    # Remaining CSVs (programs batch agent still running):
+    # healthcare_spending.csv, spm_threshold_agi.csv,
+    # medicaid_enrollment_{2024,2025,2026}.csv
 }
