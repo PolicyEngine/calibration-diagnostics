@@ -57,12 +57,10 @@ class DatasetConfig:
 
 
 DEFAULT_DATASETS: list[DatasetConfig] = [
-    DatasetConfig(
-        id="us-cps",
-        label="US ECPS (sandbox)",
-        repo_id="PolicyEngine/policyengine-us-data-pipeline",
-        layout="flat",
-    ),
+    # us-cps (sandbox / pkl mode) was retired once the canonical us-data
+    # publication started shipping unified_diagnostics.csv with full target
+    # coverage. Re-add it here if you need to compare against a pkl-snapshot
+    # run; the flat-layout loader is still wired up.
     DatasetConfig(
         id="us-data",
         label="US Data (canonical)",
