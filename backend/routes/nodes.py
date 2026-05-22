@@ -1,11 +1,12 @@
 """Node-variable inventory.
 
-A "node variable" is a leaf in the policyengine_us variable tree: no formula,
-no `adds`, no `subtracts`, no `uprating`. These are the pure inputs the
-microsim cannot derive on its own — they have to come from the dataset or
-calibration. This view lets users see, for the loaded run, which of those
-leaves actually carry a calibration target and which are left to whatever
-upstream data provides.
+A "node variable" is a leaf in the policyengine_us variable tree: it has no
+formula and is not built up from other variables via `adds`/`subtracts`.
+Uprating is allowed — that's just CPI/wage projection of a data value, not
+derivation. These are the variables the microsim cannot compute on its own;
+their values have to come from the underlying dataset or a calibration target.
+This view lets users see, for the loaded run, which leaves actually carry a
+calibration target and which are left to whatever upstream data provides.
 """
 
 from __future__ import annotations
@@ -28,14 +29,20 @@ def _tax_benefit_system(state: AppState):
 
 
 def _is_leaf(var) -> bool:
-    """No way to compute this variable from others — it must come from data."""
+    """No way to compute this variable from others — it must come from data.
+
+    Uprating is permitted: a parameter-driven yearly projection of a stored
+    value isn't derivation, just inflation/wage indexing. Many calibration
+    targets (e.g. unemployment_compensation, dividend_income,
+    social_security_*) have no formula and no adds/subtracts — only uprating.
+    Treating them as non-leaves would hide the bulk of what the loss actually
+    pins down at the input layer.
+    """
     if getattr(var, "formulas", None):
         return False
     if getattr(var, "adds", None):
         return False
     if getattr(var, "subtracts", None):
-        return False
-    if getattr(var, "uprating", None):
         return False
     return True
 

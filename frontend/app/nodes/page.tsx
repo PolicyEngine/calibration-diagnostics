@@ -162,11 +162,13 @@ export default function NodesPage() {
           <Title order={2}>Node variables</Title>
           <Text c="dimmed" size="sm">
             Leaf inputs in the <code>policyengine_us</code> variable tree —
-            variables with no formula, no <code>adds</code>/
-            <code>subtracts</code>, and no <code>uprating</code>. These can&apos;t
-            be derived; they must come from the underlying dataset or from a
-            calibration target. Use this view to see which leaves carry a
-            target in the loaded run and which don&apos;t.
+            variables with no formula and no <code>adds</code>/
+            <code>subtracts</code>. (Uprating is allowed; it&apos;s just
+            CPI/wage projection of a stored value, not derivation.) These
+            can&apos;t be computed by the microsim and must come from the
+            underlying dataset or from a calibration target. Use this view to
+            see which leaves carry a target in the loaded run and which
+            don&apos;t.
           </Text>
         </div>
 
