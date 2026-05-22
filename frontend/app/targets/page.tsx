@@ -41,6 +41,7 @@ import {
 import { TargetChipBar } from "@/components/targets/chip-bar";
 import { TargetSearchAndControls } from "@/components/targets/search-and-controls";
 import { TargetPagination } from "@/components/targets/pagination";
+import { RunSelectorCard } from "@/components/targets/run-selector-card";
 import { STATE_FIPS_TO_CODE } from "@/lib/geo-names";
 
 /**
@@ -531,6 +532,8 @@ function TargetExplorerContent() {
             bundle the pipeline builds it into.
           </Text>
         </div>
+
+        <RunSelectorCard />
 
         <CoverageBanner />
 
