@@ -451,7 +451,11 @@ def evaluate_targets(
 
     for i, (_, row) in enumerate(out.iterrows()):
         variable = row["variable"]
-        period = int(row.get("period") or default_period)
+        # Ignore row["period"] — that's metadata about the source year of
+        # target_value (e.g. SOI 2022). The PE estimate must be at the
+        # dataset's period (2024 for the current h5); asking PE for any
+        # other year silently returns zeros instead of erroring.
+        period = default_period
         geo_level = row.get("geo_level")
         gid = row.get("geographic_id")
         raw_constraints = row.get("constraints") or []
