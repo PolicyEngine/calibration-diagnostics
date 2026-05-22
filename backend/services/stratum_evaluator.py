@@ -36,9 +36,37 @@ _OPS = {
     "<": op_module.lt, "<=": op_module.le,
 }
 
+
+def _apply_op(op_str: str, arr, cval):
+    """Apply a comparison operator, handling the multi-value `in` case.
+
+    SOI-style constraints encode multi-value filters as
+    ``filing_status in JOINT|SURVIVING_SPOUSE`` (pipe-delimited). Our
+    standard _OPS dict only covers scalar comparisons, so handle `in`
+    explicitly here.
+    """
+    if op_str == "in":
+        choices = [c.strip() for c in str(cval).split("|") if c.strip()]
+        # Try numeric coercion of choices; fall back to string compare.
+        try:
+            numeric = [float(c) for c in choices]
+            return np.isin(arr, numeric)
+        except (TypeError, ValueError):
+            return np.isin(np.asarray(arr).astype(str), choices)
+    op = _OPS.get(op_str)
+    if op is None:
+        raise ValueError(f"unknown operator {op_str!r}")
+    try:
+        target_val = float(cval)
+    except (TypeError, ValueError):
+        target_val = cval
+    return op(arr, target_val)
+
 # Constraint variables whose household-mapping makes the mask meaningless
-# (person-level continuous values like age). The evaluator refuses to handle
-# constraints on these so we don't quietly produce wrong numbers.
+# (person-level continuous values like age). evaluate_signature() refuses
+# these only in the household-level path; the entity-aware path
+# (_evaluate_at_entity) handles them correctly by working at the variable's
+# native entity.
 _ENTITY_ONLY_VARS = {
     "age",
     "person_id",
@@ -46,6 +74,39 @@ _ENTITY_ONLY_VARS = {
     "tax_unit_id",
     "family_id",
 }
+
+
+_NON_HOUSEHOLD_ENTITIES = ("person", "tax_unit", "spm_unit", "family", "marital_unit")
+
+
+def _tbs_from(sim) -> "object | None":
+    """Return the TBS from either a SimService wrapper or a raw Microsim."""
+    if sim is None:
+        return None
+    return getattr(sim, "_sim", sim).tax_benefit_system
+
+
+def _variable_entity(sim, variable: str) -> str | None:
+    tbs = _tbs_from(sim)
+    if tbs is None:
+        return None
+    v = tbs.variables.get(variable)
+    return v.entity.key if v is not None else None
+
+
+def _calculate_at(sim, variable: str, entity: str, period: int):
+    """Compute a variable mapped to a specific entity and return the
+    MicroSeries (carries both ``.values`` and ``.weights`` at that entity).
+
+    Supports both the SimService wrapper (pkl mode) and raw Microsim
+    (dataset mode). Returns None on failure.
+    """
+    target_sim = getattr(sim, "_sim", sim)
+    try:
+        return target_sim.calculate(variable, map_to=entity, period=period)
+    except Exception as exc:
+        logger.debug("calculate(%s, map_to=%s) failed: %s", variable, entity, exc)
+        return None
 
 
 def _is_geographic_only(constraints: list[str]) -> bool:
@@ -128,6 +189,88 @@ class EvalCache:
         return self.raw("congressional_district_geoid")
 
 
+def _evaluate_at_entity(
+    variable: str,
+    geo_level: str | None,
+    geographic_id: str | None,
+    constraints,
+    is_count: bool,
+    sim,
+    entity: str,
+    period: int,
+) -> tuple[float | None, str]:
+    """Entity-aware evaluation: works at the target variable's native
+    entity (person / tax_unit / spm_unit / family) rather than household.
+
+    Required for targets like population counts with age-range constraints,
+    or SOI tax-unit aggregates with filing_status / AGI bracket constraints
+    — household-level evaluation gets these wrong because the constraint
+    can't be meaningfully aggregated to household.
+    """
+    # Per-entity MicroSeries cache: name → MicroSeries
+    series_cache: dict[str, object] = {}
+
+    def calc(v: str):
+        if v not in series_cache:
+            series_cache[v] = _calculate_at(sim, v, entity, period)
+        return series_cache[v]
+
+    target_series = calc(variable)
+    if target_series is None:
+        return None, f"target {variable!r} not evaluable at entity={entity}"
+    target_vals = np.asarray(target_series.values)
+    target_weights = np.asarray(target_series.weights)
+    n = len(target_vals)
+
+    # Geo mask at this entity. PE projects state_fips / cd_geoid from
+    # household down to person / tax_unit / spm_unit automatically.
+    if geo_level in (None, "national"):
+        mask = np.ones(n, dtype=bool)
+    elif geo_level == "state":
+        sf_s = calc("state_fips")
+        if sf_s is None:
+            return None, f"state_fips not evaluable at {entity}"
+        sf = np.asarray(sf_s.values)
+        try:
+            mask = sf == int(geographic_id)
+        except (TypeError, ValueError):
+            mask = sf.astype(str) == str(geographic_id)
+    elif geo_level == "district":
+        cd_s = calc("congressional_district_geoid")
+        if cd_s is None:
+            return None, f"cd_geoid not evaluable at {entity}"
+        cd = np.asarray(cd_s.values)
+        try:
+            mask = cd.astype(int) == int(geographic_id)
+        except (TypeError, ValueError):
+            mask = cd.astype(str) == str(geographic_id)
+    else:
+        return None, f"geo_level={geo_level!r} not supported"
+
+    # Constraint masks at this entity
+    for cvar, op_str, cval in constraints or ():
+        c_s = calc(cvar)
+        if c_s is None:
+            return None, f"constraint {cvar!r} not evaluable at {entity}"
+        arr = np.asarray(c_s.values)
+        try:
+            m = _apply_op(op_str, arr, cval)
+        except Exception as exc:
+            return None, f"could not evaluate {cvar} {op_str} {cval}: {exc}"
+        mask = mask & m
+
+    # Aggregate
+    if is_count:
+        return (
+            float(target_weights[mask].sum()),
+            f"count at entity={entity}",
+        )
+    return (
+        float((target_vals[mask] * target_weights[mask]).sum()),
+        f"dollar at entity={entity}",
+    )
+
+
 def evaluate_signature(
     variable: str,
     geo_level: str | None,
@@ -139,13 +282,31 @@ def evaluate_signature(
 ) -> tuple[float | None, str]:
     """Single-target evaluator. Returns (estimate, eval_note).
 
-    `cache` carries the sim + per-variable caches across many invocations.
-    Constraint variables whose meaning breaks under household aggregation
-    (see _ENTITY_ONLY_VARS) cause the function to return None with an
-    explanatory note.
+    Routes to the entity-aware path automatically when the target
+    variable's native entity is not household, or when any constraint is
+    on a variable whose household-mapping would be wrong (age, etc.).
     """
     period = period or cache.period
 
+    # Decide working entity: target variable's entity, unless a constraint
+    # forces a more-granular entity. Default to household when TBS lookup
+    # is unavailable so behavior matches the legacy path.
+    sim = cache.state.sim_service
+    target_entity = _variable_entity(sim, variable) or "household"
+    forced_person = any(
+        (c[0] if isinstance(c, (list, tuple)) else "") in _ENTITY_ONLY_VARS
+        for c in (constraints or ())
+    )
+    if forced_person and target_entity == "household":
+        target_entity = "person"
+
+    if target_entity in _NON_HOUSEHOLD_ENTITIES:
+        return _evaluate_at_entity(
+            variable, geo_level, geographic_id, constraints,
+            is_count, sim, target_entity, period,
+        )
+
+    # --- Household-level path (legacy / fast) ---
     # --- Geographic mask ---
     if geo_level == "national" or geo_level is None:
         geo_mask = None  # full set
@@ -173,19 +334,11 @@ def evaluate_signature(
     for cvar, op_str, cval in constraints or ():
         if cvar in _ENTITY_ONLY_VARS:
             return None, f"constraint on {cvar} requires entity-level evaluation"
-        op = _OPS.get(op_str)
-        if op is None:
-            return None, f"unknown operator {op_str!r}"
         arr = cache.raw(cvar, period)
         if arr is None:
             return None, f"constraint variable {cvar!r} not evaluable"
-        # Cast cval to numeric where possible; fall back to string compare
         try:
-            target_val: Any = float(cval)
-        except (TypeError, ValueError):
-            target_val = cval
-        try:
-            m = op(arr, target_val)
+            m = _apply_op(op_str, arr, cval)
         except Exception as exc:
             return None, f"could not evaluate {cvar} {op_str} {cval}: {exc}"
         constraint_mask = m if constraint_mask is None else (constraint_mask & m)
@@ -228,14 +381,25 @@ def _parse_constraint(c) -> tuple[str, str, str] | None:
     if isinstance(c, (list, tuple)) and len(c) >= 3:
         return str(c[0]), str(c[1]), str(c[2])
     s = str(c).strip()
-    for op in ("==", "!=", ">=", "<=", ">", "<"):
-        idx = s.find(f" {op} ")
-        if idx == -1:
+    # Order matters: longer operators first so "==" beats "=", " in " stays
+    # word-bounded so it doesn't match substrings inside a variable name.
+    for op, sep in (
+        ("==", "=="), ("!=", "!="), (">=", ">="), ("<=", "<="),
+        (">", ">"), ("<", "<"),
+        ("in", " in "),
+    ):
+        idx = s.find(f" {sep.strip()} ") if op != "in" else s.find(sep)
+        if idx == -1 and op != "in":
+            # Allow no-space form for scalar ops (e.g. "x>=5")
             idx = s.find(op)
             if idx <= 0:
                 continue
+        if idx == -1:
+            continue
         left = s[:idx].strip()
-        right = s[idx + len(op):].strip().lstrip(" ").lstrip(op).strip()
+        # For 'in', sep includes the surrounding spaces.
+        skip = len(sep) if op == "in" else len(op)
+        right = s[idx + skip:].strip().lstrip(" ").lstrip(op).strip()
         if left:
             return left, op, right
     return None
