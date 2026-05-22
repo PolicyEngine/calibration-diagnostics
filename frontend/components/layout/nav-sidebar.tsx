@@ -11,7 +11,6 @@ const navItems = [
   { href: "/nodes", label: "Node variables" },
   { href: "/weights", label: "Weight landscape" },
   { href: "/pipeline", label: "Data pipeline" },
-  { href: "/run-config", label: "Run config" },
 ];
 
 export function NavSidebar() {

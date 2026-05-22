@@ -167,47 +167,6 @@ def _target_to_diagnostics_key(row) -> str:
     return f"{prefix}/{variable}/[{','.join(parts)}]"
 
 
-def _try_fetch_run_config(
-    dataset,
-    run_id: str,
-    scope: str,
-    cache_root: str = ".artifacts",
-) -> "dict | None":
-    """Fetch the published `unified_run_config.json` for a staging run.
-
-    Scope picks the regional/national filename pair. We look first in the
-    per-run artifacts dir, then the canonical `calibration/logs/` snapshot.
-    """
-    if dataset.layout != "staging":
-        return None
-    import json as _json
-    from huggingface_hub import hf_hub_download
-    from backend.services.fit_artifacts import artifacts_for_scope
-
-    filename = artifacts_for_scope(scope).run_config
-    repo_slug = dataset.repo_id.replace("/", "__")
-    cache = Path(cache_root) / repo_slug
-    cache.mkdir(parents=True, exist_ok=True)
-
-    for path in [
-        f"calibration/runs/{run_id}/artifacts/{filename}",
-        f"calibration/logs/{filename}",
-    ]:
-        try:
-            local = hf_hub_download(
-                repo_id=dataset.repo_id,
-                filename=path,
-                repo_type=dataset.repo_type,
-                local_dir=str(cache),
-            )
-            with open(local) as fh:
-                return _json.load(fh)
-        except Exception as exc:
-            logger.debug("run_config fetch failed at %s: %s", path, exc)
-            continue
-    return None
-
-
 def _try_fetch_unified_diagnostics(
     dataset,
     run_id: str,
@@ -523,9 +482,9 @@ def load_run_from_dataset(
         n_evaluated, len(targets_df), 100 * n_evaluated / max(1, len(targets_df)),
     )
 
-    # Stash the detected fit scope so downstream endpoints (e.g. /run-config)
-    # know which set of artifact filenames to look up. Falls back to regional
-    # when we couldn't fetch diagnostics at all (best guess for legacy runs).
+    # Stash the detected fit scope so other artifact lookups can pick the
+    # right regional/national filenames. Falls back to regional when we
+    # couldn't fetch diagnostics at all (best guess for legacy runs).
     detected_scope = diag_scope or "regional"
 
     # Compute rel_error / abs_rel_error now that estimates are filled.
