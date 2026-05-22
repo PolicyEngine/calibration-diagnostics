@@ -41,7 +41,6 @@ import {
 import { TargetChipBar } from "@/components/targets/chip-bar";
 import { TargetSearchAndControls } from "@/components/targets/search-and-controls";
 import { TargetPagination } from "@/components/targets/pagination";
-import { SourceSummary } from "@/components/targets/source-summary";
 import { STATE_FIPS_TO_CODE } from "@/lib/geo-names";
 
 /**
@@ -277,7 +276,7 @@ const constraintColumns = [
 ];
 
 function TargetTable() {
-  const { filters } = useTargetFilters();
+  const { filters, setFilters } = useTargetFilters();
   const searchParams = useSearchParams();
   const selectedIdx = searchParams.get("selected")
     ? Number(searchParams.get("selected"))
@@ -304,6 +303,15 @@ function TargetTable() {
         <DataTable
           columns={targetColumns}
           sortable
+          sort={{ key: filters.sortBy, direction: filters.sortOrder }}
+          onSortChange={(s) => {
+            if (s) {
+              setFilters({
+                sortBy: s.key as typeof filters.sortBy,
+                sortOrder: s.direction,
+              });
+            }
+          }}
           data={targets.data.items.map((t) => ({
             ...t,
             _selected: t.target_idx === selectedIdx,
@@ -525,8 +533,6 @@ function TargetExplorerContent() {
         </div>
 
         <CoverageBanner />
-
-        <SourceSummary />
 
         <div className="flex flex-col gap-3 min-w-0">
           <TargetSearchAndControls />

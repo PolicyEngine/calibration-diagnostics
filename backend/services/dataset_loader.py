@@ -13,6 +13,7 @@ but the universe view (Summary + All targets) works.
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -27,6 +28,188 @@ if TYPE_CHECKING:
     from huggingface_hub import HfApi  # noqa: F401
 
 logger = logging.getLogger(__name__)
+
+
+_CONSTRAINT_RE = re.compile(r"([A-Za-z_][\w]*)(==|!=|>=|<=|>|<)(.+)$")
+
+
+def _parse_constraint(s: str) -> tuple[str, str, str] | None:
+    """Parse 'var op value' (with or without spaces) into a tuple."""
+    s = s.strip().replace(" ", "")
+    m = _CONSTRAINT_RE.match(s)
+    if not m:
+        return None
+    var, op, val = m.group(1), m.group(2), m.group(3).strip()
+    return (var, op, _norm_constraint_value(val))
+
+
+def _norm_constraint_value(v: str) -> str:
+    """Normalise numeric constraint values: '1.0' → '1', '-inf' stays '-inf'."""
+    s = str(v).strip()
+    if s in ("inf", "-inf", "Infinity", "-Infinity"):
+        return s.replace("Infinity", "inf")
+    try:
+        f = float(s)
+        if f != f or f in (float("inf"), float("-inf")):
+            return s
+        if f == int(f):
+            return str(int(f))
+        return str(f)
+    except (TypeError, ValueError):
+        return s
+
+
+def _parse_diagnostics_key(key: str) -> tuple | None:
+    """Convert a diagnostics CSV target key into an order-independent signature.
+
+    Examples:
+      national/medicaid                                    → ('national', '', 'medicaid', ())
+      national/adj.../[tax_unit_is_filer==1]               → ('national', '', 'adj...', (('tax_unit_is_filer','==','1'),))
+      cd_1000/person_count/[age<5,age>-1]                  → ('district', '1000', 'person_count', (('age','<','5'),('age','>','-1')))
+    """
+    if not isinstance(key, str) or "/" not in key:
+        return None
+    head, _, rest = key.partition("/")
+    if head == "national":
+        geo_level, geo_id = "national", ""
+    elif head.startswith("cd_"):
+        geo_level, geo_id = "district", head[3:]
+    else:
+        geo_level, geo_id = head, ""
+    if "/" in rest:
+        variable, _, constraint_part = rest.partition("/")
+    else:
+        variable, constraint_part = rest, ""
+    constraints: list[tuple[str, str, str]] = []
+    if constraint_part.startswith("[") and constraint_part.endswith("]"):
+        body = constraint_part[1:-1].strip()
+        if body:
+            for c in body.split(","):
+                parsed = _parse_constraint(c)
+                if parsed is not None:
+                    constraints.append(parsed)
+    return (geo_level, geo_id, variable, tuple(sorted(constraints)))
+
+
+def _row_to_diagnostics_signature(row) -> tuple:
+    """Same signature shape as _parse_diagnostics_key but built from a
+    targets_enriched row. Order-independent."""
+    variable = str(row.get("variable") or "")
+    geo_level = row.get("geo_level") or "national"
+    gid = row.get("geographic_id")
+    if gid is None or (isinstance(gid, float) and pd.isna(gid)):
+        geo_id_norm = ""
+    else:
+        try:
+            geo_id_norm = str(int(float(str(gid))))
+        except (TypeError, ValueError):
+            geo_id_norm = str(gid)
+    cons = row.get("constraints") or []
+    parsed_cons = []
+    for c in cons:
+        if isinstance(c, (list, tuple)) and len(c) >= 3:
+            parsed_cons.append((str(c[0]), str(c[1]),
+                               _norm_constraint_value(str(c[2]))))
+        elif isinstance(c, str):
+            p = _parse_constraint(c)
+            if p is not None:
+                parsed_cons.append(p)
+    return (geo_level, geo_id_norm, variable, tuple(sorted(parsed_cons)))
+
+
+def _target_to_diagnostics_key(row) -> str:
+    """Build the target key used in unified_diagnostics.csv from a
+    targets_enriched row.
+
+    Diag format observed empirically:
+      <geo_prefix>/<variable>                      (no constraints)
+      <geo_prefix>/<variable>/[<c1>,<c2>,...]      (with constraints, no spaces)
+
+    Where geo_prefix is:
+      "national"      — when no geographic constraint
+      "cd_<gid>"      — when geographic_id is a district id (no leading zeros)
+
+    State-level rows aren't represented in the diagnostics file (the
+    calibration trains national + district only). We return a key anyway;
+    those will simply miss the join.
+    """
+    variable = str(row.get("variable") or "")
+    geo_level = row.get("geo_level") or ""
+    gid = row.get("geographic_id")
+    if geo_level == "national" or geo_level == "" or gid is None or (isinstance(gid, float) and pd.isna(gid)):
+        prefix = "national"
+    elif geo_level == "district":
+        try:
+            prefix = f"cd_{int(float(str(gid)))}"
+        except (TypeError, ValueError):
+            prefix = f"cd_{gid}"
+    elif geo_level == "state":
+        # No state rows in diag — return a key that won't match.
+        try:
+            prefix = f"state_{int(float(str(gid)))}"
+        except (TypeError, ValueError):
+            prefix = f"state_{gid}"
+    else:
+        prefix = geo_level
+
+    cons = row.get("constraints") or []
+    if not cons:
+        return f"{prefix}/{variable}"
+    # Strip spaces from each "var op value" → "varopvalue"; join with ",".
+    parts = []
+    for c in cons:
+        # `c` may be either a string "var op value" (from DB rebuild) or a
+        # (var, op, value) tuple.
+        if isinstance(c, (list, tuple)) and len(c) >= 3:
+            parts.append(f"{c[0]}{c[1]}{c[2]}")
+        else:
+            parts.append(str(c).replace(" ", ""))
+    return f"{prefix}/{variable}/[{','.join(parts)}]"
+
+
+def _try_fetch_unified_diagnostics(
+    dataset,
+    run_id: str,
+    cache_root: str = ".artifacts",
+) -> "pd.DataFrame | None":
+    """For staging-layout datasets, try to fetch the canonical post-
+    calibration diagnostics CSV from the repo.
+
+    Lookup order:
+    1. `calibration/runs/<run_id>/diagnostics/unified_diagnostics.csv` —
+       per-run diagnostics, ideal when the run id matches a published one.
+    2. `calibration/logs/unified_diagnostics.csv` — the "current" canonical
+       snapshot. Used as fallback when the per-run path doesn't exist.
+
+    Returns None on any failure (network, missing file, parse error).
+    """
+    if dataset.layout != "staging":
+        return None
+    from huggingface_hub import hf_hub_download
+    repo_slug = dataset.repo_id.replace("/", "__")
+    cache = Path(cache_root) / repo_slug
+    cache.mkdir(parents=True, exist_ok=True)
+
+    candidate_paths = [
+        f"calibration/runs/{run_id}/diagnostics/unified_diagnostics.csv",
+        "calibration/logs/unified_diagnostics.csv",
+    ]
+    for path in candidate_paths:
+        try:
+            local = hf_hub_download(
+                repo_id=dataset.repo_id,
+                filename=path,
+                repo_type=dataset.repo_type,
+                local_dir=str(cache),
+            )
+            df = pd.read_csv(local)
+            if "target" in df.columns and "estimate" in df.columns:
+                logger.info("Loaded diagnostics from %s (%d rows)", path, len(df))
+                return df
+        except Exception as exc:
+            logger.debug("diagnostics fetch failed at %s: %s", path, exc)
+            continue
+    return None
 
 
 def _ensure_staging_artifacts(
@@ -228,23 +411,69 @@ def load_run_from_dataset(
         "final_weight": household_weight.astype(np.float32),
     })
 
-    # Dataset mode: the canonical us-data repo doesn't publish the X matrix
-    # the calibration pipeline builds internally. Rebuilding it inline takes
-    # ~1h+ per run with the current single-threaded path, which makes the
-    # dashboard unusable. So we use the MVP evaluator (handles ~2% of
-    # targets — the ones with only geographic constraints) and rely on the
-    # data team to publish X_sparse.npz alongside the existing artifacts.
-    # See ARTIFACTS.md for the publishing spec.
-    logger.info("Evaluating targets via MVP evaluator (geographic-only)...")
-    from backend.services.stratum_evaluator import evaluate_targets
-    targets_df = evaluate_targets(
-        targets_df, sim, default_period=time_period,
-    )
+    # Dataset mode: the canonical us-data repo publishes a per-run
+    # `unified_diagnostics.csv` (under calibration/runs/<run>/diagnostics/)
+    # that already contains post-calibration estimates for every target the
+    # pipeline trained against. We use those directly — no need to rebuild
+    # the X matrix.
+    #
+    # Targets the diagnostics file doesn't cover (typically the ones excluded
+    # by target_config.yaml during this calibration) fall back to the MVP
+    # evaluator, which handles the simple geographic-only cases.
+    diag_df = _try_fetch_unified_diagnostics(dataset, run_id, cache_root)
+    if diag_df is not None:
+        logger.info(
+            "Joining %d rows from unified_diagnostics.csv onto %d targets...",
+            len(diag_df), len(targets_df),
+        )
+        # Parse each diag key into a constraint-order-independent signature
+        # and build sig → estimate.
+        diag_sig_to_estimate: dict[tuple, float] = {}
+        for diag_target, est in zip(diag_df["target"], diag_df["estimate"]):
+            sig = _parse_diagnostics_key(diag_target)
+            if sig is not None:
+                diag_sig_to_estimate[sig] = est
+        # Compute the same signature on each of our rows and join.
+        targets_df["estimate"] = targets_df.apply(
+            lambda r: diag_sig_to_estimate.get(_row_to_diagnostics_signature(r)),
+            axis=1,
+        )
+        n_from_diag = int(targets_df["estimate"].notna().sum())
+        logger.info(
+            "  → %d/%d targets got estimates from diagnostics CSV",
+            n_from_diag, len(targets_df),
+        )
+    else:
+        logger.info("No unified_diagnostics.csv found; falling back to MVP evaluator only.")
+
+    # Fill any remaining NaN estimates via the MVP evaluator (geographic-only).
+    if targets_df["estimate"].isna().any():
+        from backend.services.stratum_evaluator import evaluate_targets
+        unfilled = targets_df["estimate"].isna()
+        logger.info(
+            "Running MVP evaluator on %d remaining targets...", int(unfilled.sum()),
+        )
+        filled = evaluate_targets(
+            targets_df[unfilled].copy(), sim, default_period=time_period,
+        )
+        targets_df.loc[unfilled, "estimate"] = filled["estimate"].values
     n_evaluated = int(np.sum(~targets_df["estimate"].isna()))
     logger.info(
-        "MVP evaluator done: %d/%d targets have estimates",
-        n_evaluated, len(targets_df),
+        "Total estimates available: %d/%d (%.1f%%)",
+        n_evaluated, len(targets_df), 100 * n_evaluated / max(1, len(targets_df)),
     )
+
+    # Compute rel_error / abs_rel_error now that estimates are filled.
+    target_values = targets_df["value"].to_numpy(dtype=np.float64)
+    estimates_arr = targets_df["estimate"].to_numpy(dtype=np.float64)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rel = np.where(
+            np.abs(target_values) > 0,
+            (estimates_arr - target_values) / np.abs(target_values),
+            np.nan,
+        )
+    targets_df["rel_error"] = rel
+    targets_df["abs_rel_error"] = np.abs(rel)
 
     # Empty sparse matrices since dataset mode doesn't have the pipeline's
     # X matrix yet (waiting on data-team publish).

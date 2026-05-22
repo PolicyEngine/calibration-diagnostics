@@ -18,6 +18,7 @@ from backend.routes import (
     runs as runs_route,
     strata,
     summary,
+    target_inventory,
     targets,
     weights,
 )
@@ -70,6 +71,7 @@ app.add_middleware(
 app.include_router(runs_route.router, tags=["runs"])
 app.include_router(summary.router, tags=["summary"])
 app.include_router(pipeline.router, tags=["pipeline"])
+app.include_router(target_inventory.router, tags=["target-inventory"])
 app.include_router(geography.router, prefix="/geography", tags=["geography"])
 app.include_router(targets.router, prefix="/targets", tags=["targets"])
 app.include_router(strata.router, prefix="/strata", tags=["strata"])

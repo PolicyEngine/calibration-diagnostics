@@ -84,6 +84,48 @@ def _decorator_target_name(func_or_class: ast.AST) -> str:
     return "<unknown>"
 
 
+# --- 5-stage canonical taxonomy ---------------------------------------------
+#
+# The team uses 5 stages declared in policyengine_us_data.stage_contracts.stages:
+#   STAGE_1_BUILD_DATASETS, STAGE_2_BUILD_CALIBRATION_PACKAGE,
+#   STAGE_3_FIT_WEIGHTS, STAGE_4_BUILD_OUTPUTS, STAGE_5_VALIDATE_AND_PROMOTE_RELEASE.
+#
+# Pipeline nodes don't carry stage_id directly, so we map via pathway + a
+# heuristic that splits local_h5 into Stage 4 (build) vs Stage 5 (validate/
+# promote/release).
+
+STAGE_BY_PATHWAY = {
+    "data_build":          "1_build_datasets",
+    "calibration_package": "2_build_calibration_package",
+    "weight_fit":          "3_fit_weights",
+    "local_h5":            "4_build_outputs",
+}
+
+STAGE_5_KEYWORDS = (
+    "validate_", "atomic_promote", "publish_", "_promote",
+    "release", "_sanity", "version_manifest",
+)
+
+
+def _stage_for_node(node: dict) -> str:
+    """Best-effort mapping from a node's pathway + id to one of the 5
+    canonical stages. Local_h5 nodes that look like validate/promote work
+    are reclassified to Stage 5."""
+    pathways = node.get("pathways") or []
+    primary = pathways[0] if pathways else ""
+    base_stage = STAGE_BY_PATHWAY.get(primary, "")
+
+    # Promote local_h5 validate/release nodes to Stage 5.
+    if base_stage == "4_build_outputs":
+        nid = node.get("id") or ""
+        src = node.get("source_file") or ""
+        if any(kw in nid for kw in STAGE_5_KEYWORDS) or any(
+            kw in src for kw in STAGE_5_KEYWORDS
+        ):
+            return "5_validate_and_promote_release"
+    return base_stage
+
+
 def extract_nodes(package_root: Path) -> list[dict[str, Any]]:
     nodes: list[dict[str, Any]] = []
     seen_ids: list[str] = []
@@ -111,6 +153,7 @@ def extract_nodes(package_root: Path) -> list[dict[str, Any]]:
                 node.setdefault("source_file", rel_source)
                 node["target_symbol"] = _decorator_target_name(top)
                 node["decorator_line"] = deco.lineno
+                node["stage_id"] = _stage_for_node(node)
                 seen_ids.append(node["id"])
                 nodes.append(node)
     return nodes
@@ -167,11 +210,13 @@ def main():
     for n in nodes:
         for p in (n.get("pathways") or []):
             by_pathway[p] += 1
+    by_stage = Counter(n.get("stage_id") or "(unknown)" for n in nodes)
 
     logger.info("Found %d nodes", len(nodes))
     logger.info("  by type: %s", dict(by_type))
     logger.info("  by status: %s", dict(by_status))
     logger.info("  by pathway: %s", dict(by_pathway))
+    logger.info("  by stage:   %s", dict(by_stage))
     logger.info("Built %d edges (data-flow). Unproduced artifacts: %d",
                 len(edges), len(unproduced))
 
@@ -187,6 +232,7 @@ def main():
             "by_type": dict(by_type),
             "by_status": dict(by_status),
             "by_pathway": dict(by_pathway),
+            "by_stage": dict(by_stage),
         },
     }
     out_path = out_dir / "nodes.json"
