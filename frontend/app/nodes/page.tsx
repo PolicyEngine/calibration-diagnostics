@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
   Input,
-  Skeleton,
   Stack,
   Text,
   Title,
@@ -17,6 +16,7 @@ import { useMemo, useState } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { DataTable } from "@/components/shared/InteractiveDataTable";
+import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { useNodes, type NodeVariable } from "@/lib/api/hooks/use-nodes";
 
 type CalFilter = "all" | "calibrated" | "uncalibrated";
@@ -86,14 +86,14 @@ function NodesTable() {
     });
   }, [data, search, calFilter, entityFilter]);
 
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  if (isLoading) return <LoadingBlock label="Loading variable tree…" />;
   if (error)
     return (
       <Text size="sm" c="red">
         Failed to load node variables: {String(error)}
       </Text>
     );
-  if (!data) return null;
+  if (!data) return <LoadingBlock label="Waiting for run selection…" />;
 
   return (
     <Stack gap="md">

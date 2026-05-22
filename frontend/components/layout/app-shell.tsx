@@ -1,12 +1,14 @@
 "use client";
 
 import { DashboardShell, Header } from "@policyengine/ui-kit";
+import { GlobalLoader } from "./global-loader";
 import { NavSidebar } from "./nav-sidebar";
 import { RunPicker } from "./run-picker";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <DashboardShell>
+      <GlobalLoader />
       <Header navItems={[]} logoHref="/" />
       <div className="flex items-center gap-4 border-b border-border bg-background px-6 py-2">
         <RunPicker />
