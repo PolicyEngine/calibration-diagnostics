@@ -217,82 +217,103 @@ def evaluate_signature(
         return float(weighted[combined].sum()), "dollar: weighted sum where mask"
 
 
+def _parse_constraint(c) -> tuple[str, str, str] | None:
+    """Coerce one constraint into a (var, op, value) tuple.
+
+    Loader rows store constraints as either pre-parsed tuples or strings of
+    the form ``"var op value"`` (e.g. ``"filing_status == JOINT"``). We need
+    both forms because the diagnostics-CSV join and the DB load take
+    different paths into the same dataframe.
+    """
+    if isinstance(c, (list, tuple)) and len(c) >= 3:
+        return str(c[0]), str(c[1]), str(c[2])
+    s = str(c).strip()
+    for op in ("==", "!=", ">=", "<=", ">", "<"):
+        idx = s.find(f" {op} ")
+        if idx == -1:
+            idx = s.find(op)
+            if idx <= 0:
+                continue
+        left = s[:idx].strip()
+        right = s[idx + len(op):].strip().lstrip(" ").lstrip(op).strip()
+        if left:
+            return left, op, right
+    return None
+
+
+def _looks_like_count_target(variable: str) -> bool:
+    """Detect count-style targets by naming convention.
+
+    PE doesn't expose a "is this a population count" flag we can read off
+    the variable, so we fall back to the convention that population counts
+    end in ``_count`` (e.g. ``household_count``, ``tax_unit_count``). For
+    these, we want a weighted sum of the boolean mask, not of the variable
+    itself.
+    """
+    return variable.endswith("_count")
+
+
 def evaluate_targets(
     targets_df: pd.DataFrame,
     sim,
     default_period: int = 2024,
 ) -> pd.DataFrame:
-    """Fill estimate / rel_error / abs_rel_error for targets we can compute.
+    """Fill estimate / rel_error / abs_rel_error for as many rows as we can.
 
-    Mutates a copy and returns it. Targets we don't know how to handle keep
-    NaN estimates and gain an `eval_note` column explaining why.
+    Uses ``evaluate_signature`` so constraint targets (filing_status,
+    income brackets, has_children, etc.) get evaluated against the loaded
+    Microsimulation, not just geographic aggregates. Anything that's still
+    unevaluable (person-level continuous constraints, missing variables)
+    keeps a NaN estimate and an explanatory ``eval_note``.
     """
+    from types import SimpleNamespace
+
     out = targets_df.copy()
     out["eval_note"] = ""
 
-    # Pre-calculate per-household geography once.
-    try:
-        state_fips_hh = sim.calculate(
-            "state_fips", map_to="household", period=default_period,
-        ).values
-    except Exception:
-        state_fips_hh = None
-    try:
-        cd_geoid_hh = sim.calculate(
-            "congressional_district_geoid",
-            map_to="household", period=default_period,
-        ).values
-    except Exception:
-        cd_geoid_hh = None
-
-    # Cache evaluated variables across rows (same var → only call sim once)
-    var_cache: dict[tuple[str, int], np.ndarray | None] = {}
+    # EvalCache expects a state-like object exposing sim_service +
+    # final_weights + time_period. The pkl-mode loader passes its real
+    # AppState; the dataset-mode loader passes a raw Microsimulation, so we
+    # synthesize a minimal one here.
+    state_like = SimpleNamespace(
+        sim_service=sim,
+        final_weights=np.array([]),
+        time_period=default_period,
+    )
+    cache = EvalCache(state_like)
 
     estimates = np.full(len(out), np.nan, dtype=np.float64)
+    notes = np.array([""] * len(out), dtype=object)
 
     for i, (_, row) in enumerate(out.iterrows()):
-        constraints = row.get("constraints") or []
-        if not _is_geographic_only(constraints):
-            out.iloc[i, out.columns.get_loc("eval_note")] = (
-                "requires entity-mapped constraint evaluation (not in MVP)"
-            )
-            continue
-
         variable = row["variable"]
         period = int(row.get("period") or default_period)
-        cache_key = (variable, period)
-        if cache_key not in var_cache:
-            var_cache[cache_key] = _evaluate_variable(sim, variable, period)
-        weighted = var_cache[cache_key]
-        if weighted is None:
-            out.iloc[i, out.columns.get_loc("eval_note")] = (
-                f"variable '{variable}' not available in dataset"
-            )
-            continue
-
         geo_level = row.get("geo_level")
         gid = row.get("geographic_id")
-        if geo_level == "national":
-            mask = np.ones_like(weighted, dtype=bool)
-        elif geo_level == "state" and gid and state_fips_hh is not None:
-            try:
-                mask = state_fips_hh == int(gid)
-            except (TypeError, ValueError):
-                mask = state_fips_hh.astype(str) == str(gid)
-        elif geo_level == "district" and gid and cd_geoid_hh is not None:
-            try:
-                mask = cd_geoid_hh.astype(int) == int(gid)
-            except (TypeError, ValueError):
-                mask = cd_geoid_hh.astype(str) == str(gid)
-        else:
-            out.iloc[i, out.columns.get_loc("eval_note")] = (
-                f"geo_level={geo_level!r} not supported in MVP"
-            )
+        raw_constraints = row.get("constraints") or []
+        parsed = [_parse_constraint(c) for c in raw_constraints]
+        if any(p is None for p in parsed):
+            notes[i] = f"unparseable constraint in {raw_constraints!r}"
             continue
+        constraints = [c for c in parsed if c is not None]
+        is_count = _looks_like_count_target(variable)
 
-        estimates[i] = float(weighted[mask].sum())
+        est, note = evaluate_signature(
+            variable=variable,
+            geo_level=geo_level,
+            geographic_id=gid,
+            constraints=constraints,
+            is_count=is_count,
+            cache=cache,
+            period=period,
+        )
+        if est is None:
+            notes[i] = note
+            continue
+        estimates[i] = est
 
     out["estimate"] = estimates
+    out["eval_note"] = notes
     target_values = out["value"].to_numpy(dtype=np.float64)
     with np.errstate(divide="ignore", invalid="ignore"):
         rel = np.where(
