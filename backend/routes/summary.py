@@ -33,12 +33,19 @@ def get_summary(
     abs_err = included["abs_rel_error"].to_numpy()
     rel_err = included["rel_error"].to_numpy()
 
+    # n_targets_with_estimate is computability coverage — counted across the
+    # WHOLE bundle, not just the included subset. In sandbox mode every X row
+    # produces an estimate (so this equals n_targets); in dataset mode only
+    # the MVP-evaluable subset does.
+    full_abs = df["abs_rel_error"].to_numpy()
+    n_with_estimate = int(np.sum(~np.isnan(full_abs)))
+
     headline = {
         "dataset_id": state.dataset_id,
         "run_id": state.run_id,
         "n_targets": int(len(df)),
         "n_targets_included": int(len(included)),
-        "n_targets_with_estimate": int(np.sum(~np.isnan(abs_err))),
+        "n_targets_with_estimate": n_with_estimate,
         "median_abs_rel_error": _safe_float(np.median(abs_err)),
         "mean_abs_rel_error": _safe_float(np.mean(abs_err)),
         "p95_abs_rel_error": _safe_float(np.percentile(abs_err, 95)) if len(abs_err) else None,
