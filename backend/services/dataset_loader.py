@@ -167,34 +167,32 @@ def _target_to_diagnostics_key(row) -> str:
     return f"{prefix}/{variable}/[{','.join(parts)}]"
 
 
-def _try_fetch_unified_diagnostics(
+def _try_fetch_run_config(
     dataset,
     run_id: str,
+    scope: str,
     cache_root: str = ".artifacts",
-) -> "pd.DataFrame | None":
-    """For staging-layout datasets, try to fetch the canonical post-
-    calibration diagnostics CSV from the repo.
+) -> "dict | None":
+    """Fetch the published `unified_run_config.json` for a staging run.
 
-    Lookup order:
-    1. `calibration/runs/<run_id>/diagnostics/unified_diagnostics.csv` —
-       per-run diagnostics, ideal when the run id matches a published one.
-    2. `calibration/logs/unified_diagnostics.csv` — the "current" canonical
-       snapshot. Used as fallback when the per-run path doesn't exist.
-
-    Returns None on any failure (network, missing file, parse error).
+    Scope picks the regional/national filename pair. We look first in the
+    per-run artifacts dir, then the canonical `calibration/logs/` snapshot.
     """
     if dataset.layout != "staging":
         return None
+    import json as _json
     from huggingface_hub import hf_hub_download
+    from backend.services.fit_artifacts import artifacts_for_scope
+
+    filename = artifacts_for_scope(scope).run_config
     repo_slug = dataset.repo_id.replace("/", "__")
     cache = Path(cache_root) / repo_slug
     cache.mkdir(parents=True, exist_ok=True)
 
-    candidate_paths = [
-        f"calibration/runs/{run_id}/diagnostics/unified_diagnostics.csv",
-        "calibration/logs/unified_diagnostics.csv",
-    ]
-    for path in candidate_paths:
+    for path in [
+        f"calibration/runs/{run_id}/artifacts/{filename}",
+        f"calibration/logs/{filename}",
+    ]:
         try:
             local = hf_hub_download(
                 repo_id=dataset.repo_id,
@@ -202,13 +200,73 @@ def _try_fetch_unified_diagnostics(
                 repo_type=dataset.repo_type,
                 local_dir=str(cache),
             )
-            df = pd.read_csv(local)
-            if "target" in df.columns and "estimate" in df.columns:
-                logger.info("Loaded diagnostics from %s (%d rows)", path, len(df))
-                return df
+            with open(local) as fh:
+                return _json.load(fh)
         except Exception as exc:
-            logger.debug("diagnostics fetch failed at %s: %s", path, exc)
+            logger.debug("run_config fetch failed at %s: %s", path, exc)
             continue
+    return None
+
+
+def _try_fetch_unified_diagnostics(
+    dataset,
+    run_id: str,
+    cache_root: str = ".artifacts",
+) -> "tuple[pd.DataFrame, str] | None":
+    """For staging-layout datasets, try to fetch the canonical post-
+    calibration diagnostics CSV from the repo.
+
+    Uses the Stage 3 artifact catalog (mirrored locally as
+    ``backend.services.fit_artifacts`` until us-data ships a release that
+    exports ``policyengine_us_data.fit_weights.artifacts``). Tries both
+    regional (`unified_diagnostics.csv`) and national
+    (`national_unified_diagnostics.csv`) filenames so we don't silently
+    miss national-scope runs.
+
+    For each scope we look in two locations:
+    1. `calibration/runs/<run_id>/diagnostics/<file>` — per-run.
+    2. `calibration/logs/<file>` — "current" canonical snapshot.
+
+    Returns ``(df, scope)`` on success — knowing the scope lets later code
+    pick the matching weights / run_config files. Returns ``None`` if
+    nothing was found.
+    """
+    if dataset.layout != "staging":
+        return None
+    from huggingface_hub import hf_hub_download
+    from backend.services.fit_artifacts import (
+        artifacts_for_scope,
+        SCOPES,
+    )
+
+    repo_slug = dataset.repo_id.replace("/", "__")
+    cache = Path(cache_root) / repo_slug
+    cache.mkdir(parents=True, exist_ok=True)
+
+    for scope in SCOPES:
+        filename = artifacts_for_scope(scope).diagnostics
+        candidate_paths = [
+            f"calibration/runs/{run_id}/diagnostics/{filename}",
+            f"calibration/logs/{filename}",
+        ]
+        for path in candidate_paths:
+            try:
+                local = hf_hub_download(
+                    repo_id=dataset.repo_id,
+                    filename=path,
+                    repo_type=dataset.repo_type,
+                    local_dir=str(cache),
+                )
+                df = pd.read_csv(local)
+                if "target" in df.columns and "estimate" in df.columns:
+                    logger.info(
+                        "Loaded %s-scope diagnostics from %s (%d rows)",
+                        scope, path, len(df),
+                    )
+                    return df, scope
+            except Exception as exc:
+                logger.debug("diagnostics fetch failed at %s: %s", path, exc)
+                continue
     return None
 
 
@@ -420,11 +478,13 @@ def load_run_from_dataset(
     # Targets the diagnostics file doesn't cover (typically the ones excluded
     # by target_config.yaml during this calibration) fall back to the MVP
     # evaluator, which handles the simple geographic-only cases.
-    diag_df = _try_fetch_unified_diagnostics(dataset, run_id, cache_root)
-    if diag_df is not None:
+    diag_result = _try_fetch_unified_diagnostics(dataset, run_id, cache_root)
+    diag_scope: str | None = None
+    if diag_result is not None:
+        diag_df, diag_scope = diag_result
         logger.info(
-            "Joining %d rows from unified_diagnostics.csv onto %d targets...",
-            len(diag_df), len(targets_df),
+            "Joining %d rows from %s-scope diagnostics onto %d targets...",
+            len(diag_df), diag_scope, len(targets_df),
         )
         # Parse each diag key into a constraint-order-independent signature
         # and build sig → estimate.
@@ -462,6 +522,11 @@ def load_run_from_dataset(
         "Total estimates available: %d/%d (%.1f%%)",
         n_evaluated, len(targets_df), 100 * n_evaluated / max(1, len(targets_df)),
     )
+
+    # Stash the detected fit scope so downstream endpoints (e.g. /run-config)
+    # know which set of artifact filenames to look up. Falls back to regional
+    # when we couldn't fetch diagnostics at all (best guess for legacy runs).
+    detected_scope = diag_scope or "regional"
 
     # Compute rel_error / abs_rel_error now that estimates are filled.
     target_values = targets_df["value"].to_numpy(dtype=np.float64)
@@ -501,6 +566,7 @@ def load_run_from_dataset(
         initial_weights=household_weight,
         final_weights=household_weight,
         g_weights=np.ones(n_households),
+        metadata={"fit_scope": detected_scope},
     )
 
     # Cache the sim on the state so the evaluator can reuse it later.
