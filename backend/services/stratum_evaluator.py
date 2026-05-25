@@ -259,7 +259,14 @@ def _evaluate_at_entity(
             return None, f"could not evaluate {cvar} {op_str} {cval}: {exc}"
         mask = mask & m
 
-    # Aggregate
+    # Empty-mask: the PE dataset has zero records matching this slice
+    # (common at district × multi-filter combinations). Return None instead
+    # of 0 so the UI can distinguish "no data to estimate" from "PE estimate
+    # is genuinely zero." A spurious 0 here looks like a -100% error vs the
+    # target and pollutes the ranked views.
+    if not mask.any():
+        return None, f"no records match constraints at entity={entity}"
+
     if is_count:
         return (
             float(target_weights[mask].sum()),
@@ -352,6 +359,11 @@ def evaluate_signature(
         combined = geo_mask
     else:
         combined = geo_mask & constraint_mask
+
+    # Empty-mask: see notes in _evaluate_at_entity — return None, not 0, so
+    # "no records match" reads as missing rather than a real estimate.
+    if combined is not None and not combined.any():
+        return None, "no records match constraints at entity=household"
 
     # --- Aggregate ---
     if is_count:
