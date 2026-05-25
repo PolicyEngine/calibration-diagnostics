@@ -18,6 +18,7 @@ interface UseTargetsParams {
   domainVariable?: string;
   minAbsRelError?: number;
   includedOnly?: boolean;
+  compareRun?: string | null;
   limit?: number;
   offset?: number;
 }
@@ -51,6 +52,7 @@ export function useTargets(params: UseTargetsParams = {}) {
         domain_variable: params.domainVariable,
         min_abs_rel_error: params.minAbsRelError,
         included_only: params.includedOnly,
+        compare_run: params.compareRun || undefined,
         limit: params.limit ?? 50,
         offset: params.offset ?? 0,
       }),
