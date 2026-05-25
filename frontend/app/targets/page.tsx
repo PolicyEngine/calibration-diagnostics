@@ -42,6 +42,8 @@ import { TargetChipBar } from "@/components/targets/chip-bar";
 import { TargetSearchAndControls } from "@/components/targets/search-and-controls";
 import { TargetPagination } from "@/components/targets/pagination";
 import { RunSelectorCard } from "@/components/targets/run-selector-card";
+import { ComparePanel, CompareModeToggle } from "@/components/targets/compare-panel";
+import { useState } from "react";
 import { STATE_FIPS_TO_CODE } from "@/lib/geo-names";
 
 /**
@@ -502,19 +504,27 @@ function DetailPanel() {
 }
 
 function TargetExplorerContent() {
+  const [compareOn, setCompareOn] = useState(false);
+  const [runB, setRunB] = useState<string | null>(null);
+
   return (
     <AppShell>
       <Stack gap="lg">
-        <div>
-          <Title order={2}>All targets</Title>
-          <Text c="dimmed" size="sm">
-            Every target known to <code>policy_data.db</code>. Status shows
-            whether the active calibration uses it; Dataset shows which output
-            bundle the pipeline builds it into.
-          </Text>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Title order={2}>All targets</Title>
+            <Text c="dimmed" size="sm">
+              Every target known to <code>policy_data.db</code>. Status shows
+              whether the active calibration uses it; Dataset shows which output
+              bundle the pipeline builds it into.
+            </Text>
+          </div>
+          <CompareModeToggle enabled={compareOn} onToggle={setCompareOn} />
         </div>
 
         <RunSelectorCard />
+
+        {compareOn && <ComparePanel runB={runB} setRunB={setRunB} />}
 
         <div className="flex flex-col gap-3 min-w-0">
           <TargetSearchAndControls />
