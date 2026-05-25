@@ -41,6 +41,7 @@ import {
 import { TargetChipBar } from "@/components/targets/chip-bar";
 import { TargetSearchAndControls } from "@/components/targets/search-and-controls";
 import { TargetPagination } from "@/components/targets/pagination";
+import { RunSelectorCard } from "@/components/targets/run-selector-card";
 import { STATE_FIPS_TO_CODE } from "@/lib/geo-names";
 
 /**
@@ -500,25 +501,6 @@ function DetailPanel() {
   );
 }
 
-function CoverageBanner() {
-  const summary = useSummary();
-  if (!summary.data) return null;
-  const h = summary.data.headline;
-  const total = h.n_targets;
-  const withEst = h.n_targets_with_estimate ?? total;
-  if (withEst === total) return null;
-  const pct = total > 0 ? (withEst / total) * 100 : 0;
-  return (
-    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
-      <strong>{withEst.toLocaleString()}</strong> of{" "}
-      <strong>{total.toLocaleString()}</strong> targets have a PE aggregate
-      computed ({pct.toFixed(1)}%). The remainder need pipeline-level
-      evaluation (uprating + entity mapping) that this dashboard doesn't yet
-      perform; those rows show <span className="font-mono">—</span> for now.
-    </div>
-  );
-}
-
 function TargetExplorerContent() {
   return (
     <AppShell>
@@ -532,7 +514,7 @@ function TargetExplorerContent() {
           </Text>
         </div>
 
-        <CoverageBanner />
+        <RunSelectorCard />
 
         <div className="flex flex-col gap-3 min-w-0">
           <TargetSearchAndControls />
