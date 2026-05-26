@@ -42,7 +42,6 @@ import { TargetChipBar } from "@/components/targets/chip-bar";
 import { TargetSearchAndControls } from "@/components/targets/search-and-controls";
 import { TargetPagination } from "@/components/targets/pagination";
 import { RunSelectorCard } from "@/components/targets/run-selector-card";
-import { CompareBar } from "@/components/targets/compare-bar";
 import { CompareProvider, useCompareMode } from "@/lib/compare-context";
 import { STATE_FIPS_TO_CODE } from "@/lib/geo-names";
 
@@ -574,7 +573,6 @@ function TargetExplorerContent() {
         </div>
 
         <RunSelectorCard />
-        <CompareBar />
 
         <div className="flex flex-col gap-3 min-w-0">
           <TargetSearchAndControls />
