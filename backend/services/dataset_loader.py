@@ -365,7 +365,11 @@ def _load_targets_from_db(db_engine) -> tuple[pd.DataFrame, list[str]]:
 
     # Convenience aliased columns matching the pkl-mode shape
     targets["target_idx"] = np.arange(len(targets))
-    targets["included"] = True  # No target_config in this layout; all active
+    # `included` is set to True later only for rows that match a published
+    # entry in unified_diagnostics.csv — the only honest signal we have for
+    # "this target was actually evaluated by the calibration loss this run."
+    # The DB's `active` flag is always 1 and so isn't useful here.
+    targets["included"] = False
     targets["estimate"] = np.nan
     targets["rel_error"] = np.nan
     targets["abs_rel_error"] = np.nan
@@ -457,9 +461,13 @@ def load_run_from_dataset(
             lambda r: diag_sig_to_estimate.get(_row_to_diagnostics_signature(r)),
             axis=1,
         )
+        # A CSV match means the pipeline evaluated this target in its loss.
+        # That's our "included" signal — it correctly distinguishes in-loss
+        # rows (~14k) from authored-but-not-evaluated rows (~27k).
+        targets_df["included"] = targets_df["estimate"].notna()
         n_from_diag = int(targets_df["estimate"].notna().sum())
         logger.info(
-            "  → %d/%d targets got estimates from diagnostics CSV",
+            "  → %d/%d targets got estimates from diagnostics CSV (marked included=True)",
             n_from_diag, len(targets_df),
         )
     else:

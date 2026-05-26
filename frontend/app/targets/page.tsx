@@ -242,9 +242,9 @@ const baseTargetColumns = [
     header: "Status",
     format: (val: unknown) =>
       val ? (
-        <Badge variant="success">Used</Badge>
+        <Badge variant="success">In loss</Badge>
       ) : (
-        <Badge variant="secondary">Unused</Badge>
+        <Badge variant="secondary">Not in loss</Badge>
       ),
   },
 ];

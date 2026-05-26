@@ -26,9 +26,9 @@ export type SortOrder = "asc" | "desc";
 export type StatusFilter = "included" | "all" | "skipped";
 
 export const STATUS_LABELS: Record<StatusFilter, string> = {
-  included: "Used",
+  included: "In loss",
   all: "All",
-  skipped: "Unused",
+  skipped: "Not in loss",
 };
 
 export const GEO_LEVELS = ["national", "state", "district"] as const;
