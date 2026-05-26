@@ -23,6 +23,7 @@ import {
   MetricCard,
 } from "@policyengine/ui-kit";
 import { DataTable } from "@/components/shared/InteractiveDataTable";
+import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { AppShell } from "@/components/layout/app-shell";
 import { useTargets } from "@/lib/api/hooks/use-targets";
 import { useSummary } from "@/lib/api/hooks/use-summary";
@@ -376,8 +377,18 @@ function TargetTable() {
             _selected: t.target_idx === selectedIdx,
           }))}
         />
+      ) : targets.error ? (
+        <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm">
+          Failed to load targets: {String(targets.error)}
+        </div>
       ) : (
-        <Skeleton className="h-64 w-full" />
+        <LoadingBlock
+          label={
+            compareRun
+              ? "Loading targets + compare run… (first-time loads can take ~1–2 min)"
+              : "Loading targets… (first-time loads can take ~30–90s)"
+          }
+        />
       )}
       <TargetPagination total={targets.data?.total ?? 0} />
     </Stack>
