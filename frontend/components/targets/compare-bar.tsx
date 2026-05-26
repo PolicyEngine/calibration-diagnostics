@@ -9,6 +9,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
   Text,
 } from "@policyengine/ui-kit";
 
@@ -115,9 +116,13 @@ export function CompareBar() {
               </div>
 
               {runB && cmp.isLoading && (
-                <Text size="xs" c="dimmed">
-                  Loading run B… (first load can take ~2 min)
-                </Text>
+                <div className="flex items-center gap-2">
+                  <Spinner size="sm" />
+                  <Text size="xs" c="dimmed">
+                    Loading run B… (first load can take ~2 min; subsequent
+                    loads of the same run are instant)
+                  </Text>
+                </div>
               )}
               {runB && cmp.data && (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">

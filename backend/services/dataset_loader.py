@@ -420,6 +420,36 @@ def load_run_from_dataset(
     sim = Microsimulation(dataset=files[dataset.primary_h5])
     time_period = _detect_time_period(sim)
 
+    # If we've previously computed estimates for this run, the parquet
+    # cache is good for the lifetime of the run (run_id is immutable per
+    # publish). Skip the CSV join + entity-aware evaluator entirely.
+    # Pickle keeps pandas types (object cols with lists, etc.) and needs no
+    # extra deps. Cache key is the immutable run_id, so no staleness risk
+    # within a run; bump SCHEMA_VERSION below to invalidate on shape change.
+    enriched_cache_path = (
+        Path(cache_root) / dataset.repo_id.replace("/", "__")
+        / "staging" / run_id / "targets_enriched.pkl"
+    )
+    SCHEMA_VERSION = 1
+    cached_enriched: pd.DataFrame | None = None
+    detected_scope_cached: str | None = None
+    if enriched_cache_path.exists():
+        try:
+            meta_path = enriched_cache_path.with_suffix(".meta.json")
+            if meta_path.exists():
+                import json as _json
+                meta = _json.loads(meta_path.read_text())
+                if meta.get("version") == SCHEMA_VERSION:
+                    cached_enriched = pd.read_pickle(enriched_cache_path)
+                    detected_scope_cached = meta.get("fit_scope")
+                    logger.info(
+                        "Loaded cached targets_enriched (%d rows) from %s",
+                        len(cached_enriched), enriched_cache_path,
+                    )
+        except Exception as exc:
+            logger.warning("Failed to read enriched cache (%s); recomputing.", exc)
+            cached_enriched = None
+
     # Household-level scaffolding so weights/geo lookups work
     household_weight = sim.calculate(
         "household_weight", map_to="household", period=time_period,
@@ -441,8 +471,16 @@ def load_run_from_dataset(
     # Targets the diagnostics file doesn't cover (typically the ones excluded
     # by target_config.yaml during this calibration) fall back to the MVP
     # evaluator, which handles the simple geographic-only cases.
-    diag_result = _try_fetch_unified_diagnostics(dataset, run_id, cache_root)
-    diag_scope: str | None = None
+    # Skip CSV join + evaluator entirely if the parquet cache was already
+    # warmed for this run. targets_df becomes the cached frame; we still
+    # need to compute downstream stuff (households_df, sparse mats).
+    if cached_enriched is not None:
+        targets_df = cached_enriched
+        diag_result = None
+        diag_scope = detected_scope_cached
+    else:
+        diag_result = _try_fetch_unified_diagnostics(dataset, run_id, cache_root)
+        diag_scope: str | None = None
     if diag_result is not None:
         diag_df, diag_scope = diag_result
         logger.info(
@@ -494,6 +532,21 @@ def load_run_from_dataset(
     # right regional/national filenames. Falls back to regional when we
     # couldn't fetch diagnostics at all (best guess for legacy runs).
     detected_scope = diag_scope or "regional"
+
+    # Write the enriched parquet cache so subsequent loads can skip the
+    # CSV join + evaluator entirely. Only write if we actually did the
+    # work (cached_enriched is None means we recomputed this load).
+    if cached_enriched is None:
+        try:
+            enriched_cache_path.parent.mkdir(parents=True, exist_ok=True)
+            targets_df.to_pickle(enriched_cache_path)
+            import json as _json
+            enriched_cache_path.with_suffix(".meta.json").write_text(
+                _json.dumps({"fit_scope": detected_scope, "version": SCHEMA_VERSION})
+            )
+            logger.info("Cached targets_enriched → %s", enriched_cache_path)
+        except Exception as exc:
+            logger.warning("Failed to cache enriched targets (%s); continuing.", exc)
 
     # Compute rel_error / abs_rel_error now that estimates are filled.
     target_values = targets_df["value"].to_numpy(dtype=np.float64)
