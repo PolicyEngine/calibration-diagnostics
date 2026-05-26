@@ -74,6 +74,44 @@ def state_abbrev(fips: int) -> str:
     return STATE_FIPS_TO_ABBREV.get(fips, f"?{fips}")
 
 
+def dataset_bundle_for(geo_level: str | None, geographic_id) -> str:
+    """Map a target's geography to the calibrated dataset file that holds
+    its calibrated weights, mirroring the per-state / per-district pipeline
+    builds in policyengine-us-data.
+
+    Examples:
+        national, US   → 'national/US.h5'
+        state, '6'     → 'states/CA.h5'
+        district, 612  → 'districts/CA-12.h5'
+
+    Used both for display (the existing 'Dataset' column on /targets) and
+    for the dataset_file filter — different bundles include different
+    target subsets, and the per-state h5 builds are calibrated against
+    their own slice of the targets table.
+    """
+    if not geo_level or geo_level == "national":
+        return "national/US.h5"
+    gid_str = "" if geographic_id is None else str(geographic_id)
+    if not gid_str or gid_str == "nan":
+        return "—"
+    try:
+        n = int(float(gid_str))
+    except (TypeError, ValueError):
+        n = None
+    if geo_level == "state":
+        if n is not None and n in STATE_FIPS_TO_ABBREV:
+            return f"states/{STATE_FIPS_TO_ABBREV[n]}.h5"
+        return f"states/{gid_str}.h5"
+    if geo_level == "district":
+        if n is not None:
+            state_fips = n // 100
+            dist = n % 100
+            code = STATE_FIPS_TO_ABBREV.get(state_fips, str(state_fips))
+            return f"districts/{code}-{dist:02d}.h5"
+        return f"districts/{gid_str}.h5"
+    return str(geo_level)
+
+
 def _ordinal(n: int) -> str:
     """Return ordinal string for an integer (1 -> '1st', 2 -> '2nd', etc.)."""
     if 11 <= n % 100 <= 13:

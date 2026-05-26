@@ -118,6 +118,7 @@ def _apply_target_filters(
     domain_variable: str | None = None,
     min_abs_rel_error: float | None = None,
     included_only: bool | None = None,
+    dataset_files: list[str] | None = None,
 ):
     """Apply the standard filter set used by list_targets and facets."""
     if included_only is not None:
@@ -144,6 +145,17 @@ def _apply_target_filters(
             df = df[combined]
     if sources and "source" in df.columns:
         df = df[df["source"].isin(sources)]
+    if dataset_files:
+        # Each target maps to exactly one calibrated h5 in us-data's pipeline
+        # (the per-state / per-district bundle that holds its weights).
+        from backend.services.geo_utils import dataset_bundle_for
+        wanted = set(dataset_files)
+        df = df[df.apply(
+            lambda r: dataset_bundle_for(
+                r.get("geo_level"), r.get("geographic_id")
+            ) in wanted,
+            axis=1,
+        )]
     if geographic_id:
         df = df[df["geographic_id"].astype(str) == str(geographic_id)]
     if state_fips:
@@ -197,6 +209,7 @@ def list_targets(
     compare_run: str | None = Query(
         None, description="Second run id (same dataset) to join for compare mode."
     ),
+    dataset_file: Annotated[list[str] | None, Query()] = None,
     limit: int = 50,
     offset: int = 0,
     state: AppState = Depends(get_state),
@@ -213,6 +226,7 @@ def list_targets(
         domain_variable=domain_variable,
         min_abs_rel_error=min_abs_rel_error,
         included_only=included_only,
+        dataset_files=dataset_file,
     )
 
     # Compare-run join: enriches each row with estimate_b / rel_error_b /
@@ -300,6 +314,28 @@ def get_facets(
     by_geo_level = _value_counts_with_loss(_filtered("geo_level"), "geo_level")
     by_source = _value_counts_with_loss(_filtered("source"), "source")
 
+    # Per-h5-bundle counts: which calibrated dataset each target rolls up
+    # into. The pipeline builds separate per-state and per-district h5s,
+    # each calibrated against its own slice of targets, so this is the
+    # facet that lets users scope to "what does CA.h5 actually target?"
+    from backend.services.geo_utils import dataset_bundle_for
+    df_bundles = _filtered("dataset_file")
+    df_bundles = df_bundles.assign(
+        _bundle=df_bundles.apply(
+            lambda r: dataset_bundle_for(r.get("geo_level"), r.get("geographic_id")),
+            axis=1,
+        )
+    )
+    bundle_counts = (
+        df_bundles.groupby("_bundle", dropna=False)
+        .size()
+        .sort_values(ascending=False)
+        .head(200)
+    )
+    by_dataset_file = [
+        {"value": str(k), "count": int(v)} for k, v in bundle_counts.items()
+    ]
+
     # Error buckets — count distribution within the current selection-aware df.
     df_for_buckets = _filtered("error_bucket")
     abs_err = df_for_buckets["abs_rel_error"].to_numpy() if "abs_rel_error" in df_for_buckets.columns else []
@@ -335,6 +371,7 @@ def get_facets(
         "by_source": by_source,
         "by_error_bucket": by_error_bucket,
         "by_status": by_status,
+        "by_dataset_file": by_dataset_file,
         "buckets_definition": {
             k: {"min": v[0], "max": None if v[1] == float("inf") else v[1]}
             for k, v in ERROR_BUCKETS.items()

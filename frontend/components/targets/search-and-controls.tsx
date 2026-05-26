@@ -29,6 +29,7 @@ export function TargetSearchAndControls() {
     toggleGeoLevel,
     toggleStateFips,
     toggleSource,
+    toggleDatasetFile,
   } = useTargetFilters();
   const facets = useTargetFacets({
     search: filters.search,
@@ -41,6 +42,11 @@ export function TargetSearchAndControls() {
     value: s.value,
     label: s.value,
     count: s.count,
+  }));
+  const datasetFileOptions = (facets.data?.by_dataset_file ?? []).map((d) => ({
+    value: d.value,
+    label: d.value,
+    count: d.count,
   }));
 
   // The state filter only makes sense when state-/district-level targets
@@ -106,6 +112,14 @@ export function TargetSearchAndControls() {
         selected={filters.sources}
         onToggle={(v) => toggleSource(v)}
         onClear={() => setFilters({ sources: [] })}
+      />
+
+      <MultiSelectDropdown
+        label="Dataset"
+        options={datasetFileOptions}
+        selected={filters.datasetFiles}
+        onToggle={(v) => toggleDatasetFile(v)}
+        onClear={() => setFilters({ datasetFiles: [] })}
       />
 
       <ToolbarSelect

@@ -47,6 +47,7 @@ export interface TargetFilters {
   errorBuckets: ErrorBucket[];
   stateFipsList: number[];        // narrow state-/district-level targets to one or more states
   sources: string[];              // upstream source filter (IRS SOI, Census ACS, etc.)
+  datasetFiles: string[];         // calibrated h5 bundle(s): national/US.h5, states/CA.h5, …
   status: StatusFilter;
   sortBy: SortKey;
   sortOrder: SortOrder;
@@ -61,6 +62,7 @@ export const DEFAULT_FILTERS: TargetFilters = {
   errorBuckets: [],
   stateFipsList: [],
   sources: [],
+  datasetFiles: [],
   status: "all",
   sortBy: "abs_rel_error",
   // Best-fit first: surface the well-calibrated rows on initial load. Worst
@@ -85,6 +87,7 @@ interface CtxValue {
   toggleErrorBucket: (b: ErrorBucket) => void;
   toggleStateFips: (fips: number) => void;
   toggleSource: (s: string) => void;
+  toggleDatasetFile: (d: string) => void;
   clearAll: () => void;
   hasActiveFilters: boolean;
 }
@@ -110,6 +113,7 @@ function parseFiltersFromUrl(sp: URLSearchParams): TargetFilters {
     ),
     stateFipsList,
     sources: arr("source"),
+    datasetFiles: arr("dataset_file"),
     status,
     sortBy: (sp.get("sort_by") as SortKey) ?? "abs_rel_error",
     sortOrder: (sp.get("sort_order") as SortOrder) ?? "asc",
@@ -125,7 +129,8 @@ function writeFiltersToUrl(
   const next = new URLSearchParams(base.toString());
   // Clear our own keys, keep others (dataset/run/etc.)
   ["search", "variable", "geo_level", "error_bucket", "status", "state_fips",
-   "source", "included_only", "sort_by", "sort_order", "page", "page_size"]
+   "source", "dataset_file", "included_only", "sort_by", "sort_order",
+   "page", "page_size"]
     .forEach((k) => next.delete(k));
 
   if (f.search) next.set("search", f.search);
@@ -134,6 +139,7 @@ function writeFiltersToUrl(
   f.errorBuckets.forEach((b) => next.append("error_bucket", b));
   f.stateFipsList.forEach((fips) => next.append("state_fips", String(fips)));
   f.sources.forEach((s) => next.append("source", s));
+  f.datasetFiles.forEach((d) => next.append("dataset_file", d));
   if (f.status !== "all") next.set("status", f.status);
   if (f.sortBy !== "abs_rel_error") next.set("sort_by", f.sortBy);
   if (f.sortOrder !== "asc") next.set("sort_order", f.sortOrder);
@@ -176,7 +182,7 @@ export function TargetFiltersProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggle = useCallback(
-    <K extends "variables" | "geoLevels" | "errorBuckets" | "sources">(
+    <K extends "variables" | "geoLevels" | "errorBuckets" | "sources" | "datasetFiles">(
       key: K,
       value: string,
     ) =>
@@ -210,6 +216,7 @@ export function TargetFiltersProvider({ children }: { children: ReactNode }) {
       toggleErrorBucket: (b) => toggle("errorBuckets", b),
       toggleStateFips,
       toggleSource: (s) => toggle("sources", s),
+      toggleDatasetFile: (d) => toggle("datasetFiles", d),
       clearAll: () =>
         setFiltersState({ ...DEFAULT_FILTERS, pageSize: filters.pageSize }),
       hasActiveFilters:
@@ -219,6 +226,7 @@ export function TargetFiltersProvider({ children }: { children: ReactNode }) {
         filters.errorBuckets.length > 0 ||
         filters.stateFipsList.length > 0 ||
         filters.sources.length > 0 ||
+        filters.datasetFiles.length > 0 ||
         filters.status !== "all",
     }),
     [filters, setFilters, toggle, toggleStateFips],

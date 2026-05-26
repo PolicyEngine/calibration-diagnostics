@@ -19,6 +19,7 @@ interface UseTargetsParams {
   minAbsRelError?: number;
   includedOnly?: boolean;
   compareRun?: string | null;
+  datasetFiles?: string[];
   limit?: number;
   offset?: number;
 }
@@ -53,6 +54,10 @@ export function useTargets(params: UseTargetsParams = {}) {
         min_abs_rel_error: params.minAbsRelError,
         included_only: params.includedOnly,
         compare_run: params.compareRun || undefined,
+        dataset_file:
+          params.datasetFiles && params.datasetFiles.length > 0
+            ? params.datasetFiles
+            : undefined,
         limit: params.limit ?? 50,
         offset: params.offset ?? 0,
       }),
@@ -86,6 +91,7 @@ export interface FacetsResponse {
   by_variable: FacetValue[];
   by_geo_level: FacetValue[];
   by_source?: FacetValue[];
+  by_dataset_file?: FacetValue[];
   by_error_bucket: FacetValue[];
   by_status: FacetValue[];
   buckets_definition: Record<string, { min: number; max: number | null }>;

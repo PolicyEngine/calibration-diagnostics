@@ -349,6 +349,8 @@ function TargetTable() {
     stateFips:
       filters.stateFipsList.length > 0 ? filters.stateFipsList : undefined,
     sources: filters.sources.length > 0 ? filters.sources : undefined,
+    datasetFiles:
+      filters.datasetFiles.length > 0 ? filters.datasetFiles : undefined,
     includedOnly: statusToIncludedOnly(filters.status),
     compareRun,
     limit: filters.pageSize,
