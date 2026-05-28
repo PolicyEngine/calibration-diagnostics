@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from backend.routes import (
     compare,
     geography,
+    microplex,
     nodes,
     pipeline,
     runs as runs_route,
@@ -76,6 +77,7 @@ app.include_router(pipeline.router, tags=["pipeline"])
 app.include_router(target_inventory.router, tags=["target-inventory"])
 app.include_router(nodes.router, tags=["nodes"])
 app.include_router(compare.router, tags=["compare"])
+app.include_router(microplex.router, tags=["microplex"])
 app.include_router(geography.router, prefix="/geography", tags=["geography"])
 app.include_router(targets.router, prefix="/targets", tags=["targets"])
 app.include_router(strata.router, prefix="/strata", tags=["strata"])

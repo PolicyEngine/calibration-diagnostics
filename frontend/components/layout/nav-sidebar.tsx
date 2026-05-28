@@ -9,6 +9,7 @@ const navItems = [
   { href: "/targets", label: "All targets" },
   { href: "/inventory", label: "Target inventory" },
   { href: "/nodes", label: "Node variables" },
+  { href: "/microplex", label: "microplex vs us-data" },
   { href: "/weights", label: "Weight landscape" },
   { href: "/pipeline", label: "Data pipeline" },
 ];
