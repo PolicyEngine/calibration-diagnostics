@@ -5,7 +5,7 @@ from typing import Annotated
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session
 
 from backend.services.geo_utils import geo_display_name
@@ -118,6 +118,7 @@ def _apply_target_filters(
     domain_variable: str | None = None,
     min_abs_rel_error: float | None = None,
     included_only: bool | None = None,
+    dataset_files: list[str] | None = None,
 ):
     """Apply the standard filter set used by list_targets and facets."""
     if included_only is not None:
@@ -144,6 +145,17 @@ def _apply_target_filters(
             df = df[combined]
     if sources and "source" in df.columns:
         df = df[df["source"].isin(sources)]
+    if dataset_files:
+        # Each target maps to exactly one calibrated h5 in us-data's pipeline
+        # (the per-state / per-district bundle that holds its weights).
+        from backend.services.geo_utils import dataset_bundle_for
+        wanted = set(dataset_files)
+        df = df[df.apply(
+            lambda r: dataset_bundle_for(
+                r.get("geo_level"), r.get("geographic_id")
+            ) in wanted,
+            axis=1,
+        )]
     if geographic_id:
         df = df[df["geographic_id"].astype(str) == str(geographic_id)]
     if state_fips:
@@ -181,6 +193,7 @@ def _apply_target_filters(
 
 @router.get("")
 def list_targets(
+    request: Request,
     sort_by: str = "loss_contribution",
     sort_order: str = "desc",
     search: str | None = None,
@@ -193,6 +206,10 @@ def list_targets(
     domain_variable: str | None = None,
     min_abs_rel_error: float | None = None,
     included_only: bool | None = None,
+    compare_run: str | None = Query(
+        None, description="Second run id (same dataset) to join for compare mode."
+    ),
+    dataset_file: Annotated[list[str] | None, Query()] = None,
     limit: int = 50,
     offset: int = 0,
     state: AppState = Depends(get_state),
@@ -209,7 +226,30 @@ def list_targets(
         domain_variable=domain_variable,
         min_abs_rel_error=min_abs_rel_error,
         included_only=included_only,
+        dataset_files=dataset_file,
     )
+
+    # Compare-run join: enriches each row with estimate_b / rel_error_b /
+    # abs_rel_error_b / delta from the second run, joined on target_id.
+    # Loaded through the registry so a cold compare-run picks up the same
+    # entity-aware evaluator pass.
+    df_b = None
+    if compare_run and compare_run != state.run_id:
+        try:
+            state_b = request.app.state.registry.get(state.dataset_id, compare_run)
+            df_b = state_b.targets_enriched
+        except Exception:
+            df_b = None
+    if df_b is not None and not df_b.empty:
+        b_cols = df_b[["target_id", "estimate", "rel_error", "abs_rel_error"]].rename(
+            columns={
+                "estimate": "estimate_b",
+                "rel_error": "rel_error_b",
+                "abs_rel_error": "abs_rel_error_b",
+            }
+        )
+        df = df.merge(b_cols, on="target_id", how="left")
+        df["delta"] = df["abs_rel_error_b"] - df["abs_rel_error"]
 
     total = len(df)
     ascending = sort_order == "asc"
@@ -217,8 +257,9 @@ def list_targets(
         df = df.sort_values(sort_by, ascending=ascending)
     df = df.iloc[offset : offset + limit]
 
+    has_compare = df_b is not None and not df_b.empty
     return TargetListResponse(
-        items=[_target_row(df, idx) for idx in df.index],
+        items=[_target_row(df, idx, with_compare=has_compare) for idx in df.index],
         total=total,
         offset=offset,
         limit=limit,
@@ -273,6 +314,28 @@ def get_facets(
     by_geo_level = _value_counts_with_loss(_filtered("geo_level"), "geo_level")
     by_source = _value_counts_with_loss(_filtered("source"), "source")
 
+    # Per-h5-bundle counts: which calibrated dataset each target rolls up
+    # into. The pipeline builds separate per-state and per-district h5s,
+    # each calibrated against its own slice of targets, so this is the
+    # facet that lets users scope to "what does CA.h5 actually target?"
+    from backend.services.geo_utils import dataset_bundle_for
+    df_bundles = _filtered("dataset_file")
+    df_bundles = df_bundles.assign(
+        _bundle=df_bundles.apply(
+            lambda r: dataset_bundle_for(r.get("geo_level"), r.get("geographic_id")),
+            axis=1,
+        )
+    )
+    bundle_counts = (
+        df_bundles.groupby("_bundle", dropna=False)
+        .size()
+        .sort_values(ascending=False)
+        .head(200)
+    )
+    by_dataset_file = [
+        {"value": str(k), "count": int(v)} for k, v in bundle_counts.items()
+    ]
+
     # Error buckets — count distribution within the current selection-aware df.
     df_for_buckets = _filtered("error_bucket")
     abs_err = df_for_buckets["abs_rel_error"].to_numpy() if "abs_rel_error" in df_for_buckets.columns else []
@@ -308,6 +371,7 @@ def get_facets(
         "by_source": by_source,
         "by_error_bucket": by_error_bucket,
         "by_status": by_status,
+        "by_dataset_file": by_dataset_file,
         "buckets_definition": {
             k: {"min": v[0], "max": None if v[1] == float("inf") else v[1]}
             for k, v in ERROR_BUCKETS.items()
@@ -663,7 +727,7 @@ def _parse_constraints_from_name(target_name: str) -> list[str]:
     return [c.strip() for c in bracket.split(",") if c.strip()]
 
 
-def _target_row(df, idx: int) -> TargetRow:
+def _target_row(df, idx: int, with_compare: bool = False) -> TargetRow:
     r = df.loc[idx]
     gl = _nan_to_none(r.get("geo_level")) or "national"
     gid = str(_nan_to_none(r.get("geographic_id")) or "US")
@@ -686,4 +750,8 @@ def _target_row(df, idx: int) -> TargetRow:
         period=_safe_int(r.get("period")),
         tolerance=_safe_float(r.get("tolerance")),
         notes=_nan_to_none(r.get("notes")),
+        estimate_b=_safe_float(r.get("estimate_b")) if with_compare else None,
+        rel_error_b=_safe_float(r.get("rel_error_b")) if with_compare else None,
+        abs_rel_error_b=_safe_float(r.get("abs_rel_error_b")) if with_compare else None,
+        delta=_safe_float(r.get("delta")) if with_compare else None,
     )

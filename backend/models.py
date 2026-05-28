@@ -24,6 +24,14 @@ class TargetRow(BaseModel):
     tolerance: float | None = None
     notes: str | None = None
 
+    # When the caller passes ?compare_run=<other run id>, the joined run's
+    # per-row stats land here. delta = abs_rel_error_b - abs_rel_error_a
+    # (negative ⇒ B is closer to the target).
+    estimate_b: float | None = None
+    rel_error_b: float | None = None
+    abs_rel_error_b: float | None = None
+    delta: float | None = None
+
 
 class TargetListResponse(BaseModel):
     items: list[TargetRow]

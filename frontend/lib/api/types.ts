@@ -19,6 +19,11 @@ export interface Target extends Record<string, unknown> {
   abs_error: number;
   loss_contribution: number;
   included: boolean;
+  // Populated when /targets is called with ?compare_run=…
+  estimate_b: number | null;
+  rel_error_b: number | null;
+  abs_rel_error_b: number | null;
+  delta: number | null;
 }
 
 export interface PaginatedResponse<T> {

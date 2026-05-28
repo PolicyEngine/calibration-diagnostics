@@ -23,6 +23,7 @@ import {
   MetricCard,
 } from "@policyengine/ui-kit";
 import { DataTable } from "@/components/shared/InteractiveDataTable";
+import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { AppShell } from "@/components/layout/app-shell";
 import { useTargets } from "@/lib/api/hooks/use-targets";
 import { useSummary } from "@/lib/api/hooks/use-summary";
@@ -42,6 +43,7 @@ import { TargetChipBar } from "@/components/targets/chip-bar";
 import { TargetSearchAndControls } from "@/components/targets/search-and-controls";
 import { TargetPagination } from "@/components/targets/pagination";
 import { RunSelectorCard } from "@/components/targets/run-selector-card";
+import { CompareProvider, useCompareMode } from "@/lib/compare-context";
 import { STATE_FIPS_TO_CODE } from "@/lib/geo-names";
 
 /**
@@ -100,7 +102,59 @@ function NotesWithLinks({ notes }: { notes: string }) {
   );
 }
 
-const targetColumns = [
+function buildTargetColumns(compareOn: boolean) {
+  const base = baseTargetColumns;
+  if (!compareOn) return base;
+  // Splice compare-only columns immediately after the rel_error column so
+  // the user reads A → B → Δ left-to-right next to the existing PE
+  // aggregate / Rel. error pair.
+  const relIdx = base.findIndex((c) => c.key === "rel_error");
+  return [
+    ...base.slice(0, relIdx + 1),
+    {
+      key: "estimate_b",
+      header: "PE agg (B)",
+      align: "right" as const,
+      format: (val: unknown) =>
+        val == null
+          ? <span className="text-muted-foreground">—</span>
+          : formatNumber(Number(val)),
+    },
+    {
+      key: "rel_error_b",
+      header: "Rel. error (B)",
+      align: "right" as const,
+      format: (val: unknown) => {
+        if (val == null) return <span className="text-muted-foreground">—</span>;
+        const v = Number(val);
+        const abs = Math.abs(v);
+        const variant =
+          abs > 0.5 ? "error" : abs > 0.2 ? "warning" : abs > 0.05 ? "secondary" : "success";
+        const display = abs >= 1 ? `${(v * 100).toFixed(0)}%` : `${(v * 100).toFixed(1)}%`;
+        return <Badge variant={variant}>{display}</Badge>;
+      },
+    },
+    {
+      key: "delta",
+      header: "Δ |err|",
+      align: "right" as const,
+      format: (val: unknown) => {
+        if (val == null || !Number.isFinite(Number(val))) {
+          return <span className="text-muted-foreground">—</span>;
+        }
+        const v = Number(val);
+        // Negative delta = B improved (lower |err|); positive = regressed.
+        const variant: "success" | "error" | "secondary" =
+          Math.abs(v) < 1e-6 ? "secondary" : v < 0 ? "success" : "error";
+        const sign = v > 0 ? "+" : "";
+        return <Badge variant={variant}>{sign}{(v * 100).toFixed(1)}pp</Badge>;
+      },
+    },
+    ...base.slice(relIdx + 1),
+  ];
+}
+
+const baseTargetColumns = [
   {
     key: "target_id",
     header: "ID",
@@ -188,9 +242,9 @@ const targetColumns = [
     header: "Status",
     format: (val: unknown) =>
       val ? (
-        <Badge variant="success">Used</Badge>
+        <Badge variant="success">In loss</Badge>
       ) : (
-        <Badge variant="secondary">Unused</Badge>
+        <Badge variant="secondary">Not in loss</Badge>
       ),
   },
 ];
@@ -278,11 +332,13 @@ const constraintColumns = [
 
 function TargetTable() {
   const { filters, setFilters } = useTargetFilters();
+  const { enabled: compareOn, runB } = useCompareMode();
   const searchParams = useSearchParams();
   const selectedIdx = searchParams.get("selected")
     ? Number(searchParams.get("selected"))
     : null;
 
+  const compareRun = compareOn ? runB : null;
   const targets = useTargets({
     sortBy: filters.sortBy,
     sortOrder: filters.sortOrder,
@@ -293,16 +349,21 @@ function TargetTable() {
     stateFips:
       filters.stateFipsList.length > 0 ? filters.stateFipsList : undefined,
     sources: filters.sources.length > 0 ? filters.sources : undefined,
+    datasetFiles:
+      filters.datasetFiles.length > 0 ? filters.datasetFiles : undefined,
     includedOnly: statusToIncludedOnly(filters.status),
+    compareRun,
     limit: filters.pageSize,
     offset: filters.page * filters.pageSize,
   });
+
+  const columns = buildTargetColumns(!!compareRun);
 
   return (
     <Stack gap="md">
       {targets.data ? (
         <DataTable
-          columns={targetColumns}
+          columns={columns}
           sortable
           sort={{ key: filters.sortBy, direction: filters.sortOrder }}
           onSortChange={(s) => {
@@ -318,8 +379,18 @@ function TargetTable() {
             _selected: t.target_idx === selectedIdx,
           }))}
         />
+      ) : targets.error ? (
+        <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm">
+          Failed to load targets: {String(targets.error)}
+        </div>
       ) : (
-        <Skeleton className="h-64 w-full" />
+        <LoadingBlock
+          label={
+            compareRun
+              ? "Loading targets + compare run… (first-time loads can take ~1–2 min)"
+              : "Loading targets… (first-time loads can take ~30–90s)"
+          }
+        />
       )}
       <TargetPagination total={targets.data?.total ?? 0} />
     </Stack>
@@ -531,7 +602,9 @@ export default function TargetExplorerPage() {
   return (
     <Suspense>
       <TargetFiltersProvider>
-        <TargetExplorerContent />
+        <CompareProvider>
+          <TargetExplorerContent />
+        </CompareProvider>
       </TargetFiltersProvider>
     </Suspense>
   );
