@@ -43,11 +43,16 @@ export function TargetSearchAndControls() {
     label: s.value,
     count: s.count,
   }));
+  // Only list bundles the loaded run actually publishes. For a federal-
+  // only GHA run, this collapses to a single entry — that's intentional;
+  // the dashboard should never offer to filter to a bundle that doesn't
+  // exist for the run.
   const datasetFileOptions = (facets.data?.by_dataset_file ?? []).map((d) => ({
     value: d.value,
     label: d.value,
     count: d.count,
   }));
+  const onlyOneBundle = datasetFileOptions.length === 1;
 
   // The state filter only makes sense when state-/district-level targets
   // are in play; for national-only it's a no-op so we dim it.
@@ -114,13 +119,23 @@ export function TargetSearchAndControls() {
         onClear={() => setFilters({ sources: [] })}
       />
 
-      <MultiSelectDropdown
-        label="Dataset"
-        options={datasetFileOptions}
-        selected={filters.datasetFiles}
-        onToggle={(v) => toggleDatasetFile(v)}
-        onClear={() => setFilters({ datasetFiles: [] })}
-      />
+      <div className="flex items-center gap-2">
+        <MultiSelectDropdown
+          label="Dataset"
+          options={datasetFileOptions}
+          selected={filters.datasetFiles}
+          onToggle={(v) => toggleDatasetFile(v)}
+          onClear={() => setFilters({ datasetFiles: [] })}
+        />
+        {onlyOneBundle && (
+          <span
+            className="text-[11px] text-muted-foreground"
+            title="This run only publishes one calibrated h5; all targets are evaluated against it."
+          >
+            (1 bundle in this run)
+          </span>
+        )}
+      </div>
 
       <ToolbarSelect
         label="Status"

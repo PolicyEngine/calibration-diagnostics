@@ -105,6 +105,24 @@ ERROR_BUCKETS = {
 }
 
 
+def _available_bundles_for_state(state) -> "frozenset[str] | None":
+    """Look up which bundle h5s the loaded run actually publishes on HF.
+
+    Returns ``None`` for runs without a resolvable HF repo (pkl-mode
+    sandbox); callers that get ``None`` should treat the canonical
+    bundle mapping as a best-effort label rather than a verified fact.
+    """
+    try:
+        from backend.services.runs import get_dataset
+        from backend.services.bundle_availability import published_bundles
+        ds = get_dataset(state.dataset_id)
+    except Exception:
+        return None
+    if ds is None or getattr(ds, "layout", None) != "staging":
+        return None
+    return published_bundles(ds.repo_id, state.run_id)
+
+
 def _apply_target_filters(
     df,
     *,
@@ -119,6 +137,7 @@ def _apply_target_filters(
     min_abs_rel_error: float | None = None,
     included_only: bool | None = None,
     dataset_files: list[str] | None = None,
+    available_bundles: "frozenset[str] | None" = None,
 ):
     """Apply the standard filter set used by list_targets and facets."""
     if included_only is not None:
@@ -146,13 +165,15 @@ def _apply_target_filters(
     if sources and "source" in df.columns:
         df = df[df["source"].isin(sources)]
     if dataset_files:
-        # Each target maps to exactly one calibrated h5 in us-data's pipeline
-        # (the per-state / per-district bundle that holds its weights).
-        from backend.services.geo_utils import dataset_bundle_for
+        # Each target maps to one calibrated h5 in us-data's pipeline. If
+        # `available_bundles` is set, fall back to the federal bundle when
+        # the conventional per-bundle h5 doesn't exist for this run.
+        from backend.services.geo_utils import runtime_dataset_bundle_for
         wanted = set(dataset_files)
         df = df[df.apply(
-            lambda r: dataset_bundle_for(
-                r.get("geo_level"), r.get("geographic_id")
+            lambda r: runtime_dataset_bundle_for(
+                r.get("geo_level"), r.get("geographic_id"),
+                available=available_bundles,
             ) in wanted,
             axis=1,
         )]
@@ -214,6 +235,7 @@ def list_targets(
     offset: int = 0,
     state: AppState = Depends(get_state),
 ) -> TargetListResponse:
+    available_bundles = _available_bundles_for_state(state)
     df = _apply_target_filters(
         state.targets_enriched,
         search=search,
@@ -227,6 +249,7 @@ def list_targets(
         min_abs_rel_error=min_abs_rel_error,
         included_only=included_only,
         dataset_files=dataset_file,
+        available_bundles=available_bundles,
     )
 
     # Compare-run join: enriches each row with estimate_b / rel_error_b /
@@ -314,15 +337,19 @@ def get_facets(
     by_geo_level = _value_counts_with_loss(_filtered("geo_level"), "geo_level")
     by_source = _value_counts_with_loss(_filtered("source"), "source")
 
-    # Per-h5-bundle counts: which calibrated dataset each target rolls up
-    # into. The pipeline builds separate per-state and per-district h5s,
-    # each calibrated against its own slice of targets, so this is the
-    # facet that lets users scope to "what does CA.h5 actually target?"
-    from backend.services.geo_utils import dataset_bundle_for
+    # Per-h5-bundle counts: which calibrated dataset each target rolls
+    # up into. Runtime-aware so we only list bundles the run actually
+    # publishes — for a federal-only GHA run that means a single entry
+    # holding all 40k targets, not the theoretical 200 names.
+    from backend.services.geo_utils import runtime_dataset_bundle_for
+    available_bundles = _available_bundles_for_state(state)
     df_bundles = _filtered("dataset_file")
     df_bundles = df_bundles.assign(
         _bundle=df_bundles.apply(
-            lambda r: dataset_bundle_for(r.get("geo_level"), r.get("geographic_id")),
+            lambda r: runtime_dataset_bundle_for(
+                r.get("geo_level"), r.get("geographic_id"),
+                available=available_bundles,
+            ),
             axis=1,
         )
     )

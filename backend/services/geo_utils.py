@@ -74,6 +74,32 @@ def state_abbrev(fips: int) -> str:
     return STATE_FIPS_TO_ABBREV.get(fips, f"?{fips}")
 
 
+def runtime_dataset_bundle_for(
+    geo_level: str | None,
+    geographic_id,
+    *,
+    available: "frozenset[str] | None" = None,
+    federal_fallback: str = "enhanced_cps_2024.h5",
+) -> str:
+    """Like ``dataset_bundle_for`` but aware of what the run actually
+    publishes. If the conventional bundle (e.g. ``states/CA.h5``) isn't
+    in ``available``, fall back to the federal bundle so the dashboard
+    label matches the file that actually holds this target's weights.
+
+    When ``available`` is None the function behaves like the raw
+    canonical mapping; pass a set from ``published_bundles`` to make it
+    run-aware.
+    """
+    proposed = dataset_bundle_for(geo_level, geographic_id)
+    if not available:
+        return proposed
+    if proposed in available:
+        return proposed
+    if federal_fallback in available:
+        return federal_fallback
+    return proposed
+
+
 def dataset_bundle_for(geo_level: str | None, geographic_id) -> str:
     """Map a target's geography to the calibrated dataset file that holds
     its calibrated weights, mirroring the per-state / per-district pipeline
