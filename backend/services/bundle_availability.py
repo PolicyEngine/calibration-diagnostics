@@ -39,12 +39,26 @@ def _bundle_paths_for_run(repo_id: str, run_id: str) -> frozenset[str]:
         logger.warning("HF list_repo_files failed for %s: %s", repo_id, exc)
         return frozenset()
     root_run = run_id == "main"
-    prefix = "" if root_run else f"staging/{run_id}/"
+    current_staging = run_id == "staging"
+    if root_run:
+        prefix = ""
+    elif current_staging:
+        prefix = "staging/"
+    else:
+        prefix = f"staging/{run_id}/"
     bundles: set[str] = set()
     for f in files:
         if not f.startswith(prefix) or not f.endswith(".h5"):
             continue
         rel = f[len(prefix):]
+        if current_staging:
+            if rel == "calibration/source_imputed_stratified_extended_cps.h5":
+                bundles.add("source_imputed_stratified_extended_cps.h5")
+                continue
+            if "/" not in rel or rel.split("/", 1)[0] not in {
+                "cities", "districts", "national", "states",
+            }:
+                continue
         if root_run and "/" in rel and rel.split("/", 1)[0] not in {
             "cities", "districts", "national", "states",
         }:

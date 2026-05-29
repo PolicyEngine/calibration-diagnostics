@@ -39,7 +39,7 @@ class RunRegistry:
                 dataset_id, run_id, dataset.layout,
                 len(self._cache), self.max_size,
             )
-            if dataset.layout in {"staging", "root"}:
+            if dataset.layout in {"staging", "root", "staging-root"}:
                 from backend.services.dataset_loader import (
                     load_run_from_dataset,
                 )

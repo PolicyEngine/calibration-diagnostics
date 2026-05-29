@@ -6,6 +6,7 @@ import pytest
 
 from backend.services import runs as runs_module
 from backend.services.runs import (
+    CURRENT_STAGING_RUN_ID,
     DEFAULT_REQUIRED_FILES,
     DatasetConfig,
     RunInfo,
@@ -29,6 +30,7 @@ def test_list_datasets_returns_defaults():
     assert len(datasets) >= 1
     assert all(isinstance(d, DatasetConfig) for d in datasets)
     assert any(d.id == "us-data" for d in datasets)
+    assert any(d.id == "us-data-current-staging" for d in datasets)
 
 
 def test_get_dataset_known():
@@ -88,6 +90,36 @@ def test_list_runs_handles_nested_files(monkeypatch):
         result = list_runs(FLAT_DATASET.id)
 
     assert [r.run_id for r in result] == ["real-run"]
+
+
+def test_list_runs_exposes_current_staging_snapshot(monkeypatch):
+    dataset = DatasetConfig(
+        id="current-staging-test",
+        label="Current staging test",
+        repo_id="PolicyEngine/test",
+        layout="staging-root",
+        primary_h5="source_imputed_stratified_extended_cps.h5",
+    )
+    files = [
+        "staging/calibration/policy_data.db",
+        "staging/calibration/source_imputed_stratified_extended_cps.h5",
+        "staging/states/WY.h5",
+        "staging/1.115.5-patch-usdata-gha26360067320-a1/policy_data.db",
+    ]
+
+    list_runs.cache_clear()
+    monkeypatch.setattr(runs_module, "DEFAULT_DATASETS", [dataset])
+    with patch.object(runs_module, "HfApi") as MockApi:
+        MockApi.return_value.list_repo_files.return_value = files
+        result = list_runs(dataset.id)
+
+    assert result == (
+        RunInfo(
+            dataset_id=dataset.id,
+            run_id=CURRENT_STAGING_RUN_ID,
+            label="Current staging",
+        ),
+    )
 
 
 def test_list_runs_empty_on_api_failure(monkeypatch):

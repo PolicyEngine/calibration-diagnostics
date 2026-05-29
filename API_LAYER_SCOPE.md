@@ -242,6 +242,11 @@ This branch implements the Phase 1 read-only API plus a synchronous evaluation w
 - `POST /api/v1/evaluate`
 - `POST /api/v1/compare`
 
+It also exposes the current top-level us-data staging snapshot as
+`us-data-current-staging` / run `staging`, backed by
+`staging/calibration/policy_data.db`, `staging/calibration/source_imputed_stratified_extended_cps.h5`,
+and top-level `staging/{states,districts,national,cities}` H5 bundles.
+
 Not yet implemented:
 
 - async evaluation jobs
@@ -299,6 +304,7 @@ API smoke examples:
 curl 'http://localhost:8000/api/v1/datasets'
 curl 'http://localhost:8000/api/v1/datasets/us-data-production/runs/main/bundles?kind=state'
 curl 'http://localhost:8000/api/v1/datasets/us-data-production/runs/main/targets?bundle=states/CA.h5&geo_level=state&included=false'
+curl 'http://localhost:8000/api/v1/datasets/us-data-current-staging/runs/staging/bundles?kind=state'
 ```
 
 ## Open Questions

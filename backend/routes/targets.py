@@ -130,7 +130,9 @@ def _available_bundles_for_state(state) -> "frozenset[str] | None":
         ds = get_dataset(state.dataset_id)
     except Exception:
         return None
-    if ds is None or getattr(ds, "layout", None) not in {"staging", "root"}:
+    if ds is None or getattr(ds, "layout", None) not in {
+        "staging", "root", "staging-root",
+    }:
         return None
     return published_bundles(ds.repo_id, state.run_id)
 
