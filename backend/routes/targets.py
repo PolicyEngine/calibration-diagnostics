@@ -252,6 +252,38 @@ def list_targets(
         available_bundles=available_bundles,
     )
 
+    # Per-bundle re-evaluation. Kicks in when the caller filtered to
+    # exactly one published bundle other than the federal one we
+    # already loaded — then estimates come from that bundle's own h5.
+    bundle_evaluated: str | None = None
+    if (
+        dataset_file
+        and len(dataset_file) == 1
+        and available_bundles
+        and dataset_file[0] in available_bundles
+        and dataset_file[0] != "enhanced_cps_2024.h5"
+        and not df.empty
+    ):
+        only = dataset_file[0]
+        try:
+            from backend.services.runs import get_dataset
+            from backend.services.bundle_eval import evaluate_bundle
+            ds = get_dataset(state.dataset_id)
+            df = evaluate_bundle(
+                df,
+                repo_id=ds.repo_id,
+                run_id=state.run_id,
+                bundle=only,
+                time_period=state.time_period,
+            )
+            bundle_evaluated = only
+        except Exception as exc:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "Per-bundle eval for %s failed (%s); using federal-fit numbers.",
+                only, exc,
+            )
+
     # Compare-run join: enriches each row with estimate_b / rel_error_b /
     # abs_rel_error_b / delta from the second run, joined on target_id.
     # Loaded through the registry so a cold compare-run picks up the same
@@ -286,6 +318,7 @@ def list_targets(
         total=total,
         offset=offset,
         limit=limit,
+        bundle_evaluated=bundle_evaluated,
     )
 
 

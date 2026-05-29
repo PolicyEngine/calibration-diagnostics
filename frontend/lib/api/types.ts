@@ -31,6 +31,9 @@ export interface PaginatedResponse<T> {
   total: number;
   offset: number;
   limit: number;
+  // Set when /targets re-evaluated estimates against a single bundle's
+  // h5 (e.g. "states/CA.h5") instead of the federal load.
+  bundle_evaluated?: string | null;
 }
 
 export interface ErrorDecomposition extends Record<string, unknown> {

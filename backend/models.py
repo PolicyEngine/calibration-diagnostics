@@ -36,6 +36,11 @@ class TargetRow(BaseModel):
 class TargetListResponse(BaseModel):
     items: list[TargetRow]
     total: int
+    # Populated when the request filtered to exactly one bundle that
+    # exists for the run and we re-evaluated estimates against that
+    # bundle's own h5 instead of the federal load. None means estimates
+    # came from the standard federal-fit pass.
+    bundle_evaluated: str | None = None
     offset: int
     limit: int
 
