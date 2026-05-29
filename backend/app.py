@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from backend.api.v1.router import router as api_v1_router
 from backend.routes import (
     compare,
     geography,
@@ -71,6 +72,7 @@ app.add_middleware(
 )
 
 app.include_router(runs_route.router, tags=["runs"])
+app.include_router(api_v1_router)
 app.include_router(summary.router, tags=["summary"])
 app.include_router(pipeline.router, tags=["pipeline"])
 app.include_router(target_inventory.router, tags=["target-inventory"])
