@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../client";
+import { useRunQueryState } from "./use-runs";
 
 export interface NodeVariable {
   name: string;
@@ -18,9 +19,11 @@ export interface NodesResponse {
 }
 
 export function useNodes() {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: ["nodes"],
+    queryKey: ["nodes", dataset, run],
     queryFn: () => apiGet<NodesResponse>("/nodes"),
+    enabled: ready,
     staleTime: 60 * 60 * 1000,
   });
 }

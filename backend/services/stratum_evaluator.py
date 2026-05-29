@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import logging
 import operator as op_module
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -83,7 +82,7 @@ def _tbs_from(sim) -> "object | None":
     """Return the TBS from either a SimService wrapper or a raw Microsim."""
     if sim is None:
         return None
-    return getattr(sim, "_sim", sim).tax_benefit_system
+    return getattr(getattr(sim, "_sim", sim), "tax_benefit_system", None)
 
 
 def _variable_entity(sim, variable: str) -> str | None:
@@ -142,6 +141,7 @@ class EvalCache:
         self.state = state
         self.period = int(state.time_period)
         self._raw: dict[tuple[str, int], np.ndarray | None] = {}
+        self._weights: np.ndarray | None = None
 
     # --- Internal: source of truth for one variable, evaluated to a 1-D
     # per-household array aligned with `weights()` below.
@@ -154,6 +154,8 @@ class EvalCache:
                 return np.asarray(svc.calculate(variable, map_to="household"))
             # Otherwise treat as raw Microsimulation
             series = svc.calculate(variable, map_to="household", period=self.period)
+            if self._weights is None and hasattr(series, "weights"):
+                self._weights = np.asarray(series.weights)
             return np.asarray(series.values)
         except Exception as exc:
             logger.debug("calculate(%s) failed: %s", variable, exc)
@@ -180,6 +182,8 @@ class EvalCache:
         w = getattr(self.state, "final_weights", None)
         if w is not None and len(w) > 0:
             return np.asarray(w)
+        if self._weights is not None:
+            return self._weights
         return self.raw("household_weight")
 
     def state_fips(self) -> np.ndarray | None:
@@ -343,7 +347,7 @@ def evaluate_signature(
             return None, f"constraint on {cvar} requires entity-level evaluation"
         arr = cache.raw(cvar, period)
         if arr is None:
-            return None, f"constraint variable {cvar!r} not evaluable"
+            return None, f"constraint variable {cvar!r} not available"
         try:
             m = _apply_op(op_str, arr, cval)
         except Exception as exc:
@@ -376,7 +380,7 @@ def evaluate_signature(
     else:
         weighted = cache.weighted(variable, period)
         if weighted is None:
-            return None, f"target variable {variable!r} not evaluable"
+            return None, f"target variable {variable!r} not available"
         if combined is None:
             return float(weighted.sum()), "dollar: full population"
         return float(weighted[combined].sum()), "dollar: weighted sum where mask"
