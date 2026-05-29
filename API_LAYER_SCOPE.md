@@ -229,6 +229,24 @@ The response should include target matching keys and only compare rows with comp
 
 ## Implementation Plan
 
+## Implemented In This Branch
+
+This branch implements the Phase 1 read-only API plus a synchronous evaluation wrapper:
+
+- `GET /api/v1/datasets`
+- `GET /api/v1/datasets/{dataset_id}/runs`
+- `GET /api/v1/datasets/{dataset_id}/runs/{run_id}/bundles`
+- `GET /api/v1/datasets/{dataset_id}/runs/{run_id}/summary`
+- `GET /api/v1/datasets/{dataset_id}/runs/{run_id}/targets`
+- `GET /api/v1/datasets/{dataset_id}/runs/{run_id}/targets/{target_id}`
+- `POST /api/v1/evaluate`
+
+Not yet implemented:
+
+- `POST /api/v1/compare`
+- async evaluation jobs
+- generated notebook/CI client
+
 ### Phase 1: Contract And Read-Only Wrappers
 
 - Add Pydantic response models under `backend/api/v1/models.py`.
