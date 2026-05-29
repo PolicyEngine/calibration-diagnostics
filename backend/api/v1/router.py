@@ -13,6 +13,12 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from backend.api.v1.models import (
     BundleItem,
     BundleListResponse,
+    CompareRequest,
+    CompareResponse,
+    CompareSideMetadata,
+    CompareTargetRow,
+    CompareVariableRow,
+    ComparisonSide,
     DatasetItem,
     DatasetListResponse,
     EvaluationRequest,
@@ -273,6 +279,66 @@ def evaluate_v1(
     )
 
 
+@router.post("/compare")
+def compare_v1(
+    request: Request,
+    payload: CompareRequest,
+) -> CompareResponse:
+    side_a = _comparison_side(request, payload.a)
+    side_b = _comparison_side(request, payload.b)
+    merged = _merge_comparison_targets(side_a["df"], side_b["df"])
+    if merged.empty:
+        raise HTTPException(
+            status_code=400,
+            detail="No compatible targets matched between comparison sides.",
+        )
+
+    valid = merged.dropna(subset=["abs_rel_error_a", "abs_rel_error_b"]).copy()
+    if valid.empty:
+        computed_pair_count = 0
+        improved_rows: list[CompareTargetRow] = []
+        regressed_rows: list[CompareTargetRow] = []
+        by_variable: list[CompareVariableRow] = []
+        improved_count = 0
+        regressed_count = 0
+    else:
+        valid["delta_abs_rel_error"] = (
+            valid["abs_rel_error_b"] - valid["abs_rel_error_a"]
+        )
+        computed_pair_count = int(len(valid))
+        improved = valid[valid["delta_abs_rel_error"] < 0]
+        regressed = valid[valid["delta_abs_rel_error"] > 0]
+        improved_count = int(len(improved))
+        regressed_count = int(len(regressed))
+        improved_rows = [
+            _compare_target_row(row, side_a["bundle"], side_b["bundle"])
+            for _, row in improved.nsmallest(
+                payload.top_n,
+                "delta_abs_rel_error",
+            ).iterrows()
+        ]
+        regressed_rows = [
+            _compare_target_row(row, side_a["bundle"], side_b["bundle"])
+            for _, row in regressed.nlargest(
+                payload.top_n,
+                "delta_abs_rel_error",
+            ).iterrows()
+        ]
+        by_variable = _compare_by_variable(valid, payload.top_n)
+
+    return CompareResponse(
+        a=_compare_side_metadata(side_a),
+        b=_compare_side_metadata(side_b),
+        matched_target_count=int(len(merged)),
+        computed_pair_count=computed_pair_count,
+        improved_count=improved_count,
+        regressed_count=regressed_count,
+        improved=improved_rows,
+        regressed=regressed_rows,
+        by_variable=by_variable,
+    )
+
+
 def _get_dataset_or_404(dataset_id: str):
     try:
         return runs_service.get_dataset(dataset_id)
@@ -343,6 +409,149 @@ def _prepare_targets(
             time_period=state.time_period,
         )
     return df
+
+
+def _comparison_side(request: Request, side: ComparisonSide) -> dict:
+    dataset = _get_dataset_or_404(side.dataset_id)
+    state = _load_state(request, side.dataset_id, side.run_id)
+    active_bundle = side.bundle or dataset.primary_h5
+    filters = side.filters
+    df = _prepare_targets(
+        state,
+        dataset,
+        side.run_id,
+        bundle=active_bundle if side.bundle else None,
+        geo_level=filters.geo_level,
+        state_fips=filters.state_fips,
+        geographic_id=filters.geographic_id,
+        variable=filters.variable,
+        source=filters.source,
+        included=filters.included,
+        min_abs_rel_error=filters.min_abs_rel_error,
+    )
+    return {
+        "dataset": dataset,
+        "state": state,
+        "run_id": side.run_id,
+        "bundle": active_bundle,
+        "df": df,
+    }
+
+
+def _merge_comparison_targets(df_a: pd.DataFrame, df_b: pd.DataFrame) -> pd.DataFrame:
+    keep = [
+        "target_id",
+        "target_name",
+        "variable",
+        "geo_level",
+        "geographic_id",
+        "value",
+        "estimate",
+        "rel_error",
+        "abs_rel_error",
+        "included",
+    ]
+    a = df_a[[col for col in keep if col in df_a.columns]].dropna(
+        subset=["target_id"],
+    )
+    b = df_b[[col for col in keep if col in df_b.columns]].dropna(
+        subset=["target_id"],
+    )
+    a = a.rename(columns={col: f"{col}_a" for col in keep if col != "target_id"})
+    b = b.rename(columns={col: f"{col}_b" for col in keep if col != "target_id"})
+    merged = a.merge(b, on="target_id", how="inner")
+    if merged.empty:
+        return merged
+
+    compatible = pd.Series(True, index=merged.index)
+    for field in ("target_name", "variable", "geo_level", "geographic_id"):
+        left = f"{field}_a"
+        right = f"{field}_b"
+        if left in merged.columns and right in merged.columns:
+            compatible &= (
+                merged[left].astype("string").fillna("")
+                == merged[right].astype("string").fillna("")
+            )
+    return merged[compatible].copy()
+
+
+def _compare_side_metadata(side: dict) -> CompareSideMetadata:
+    summary = _summary_response(
+        side["state"],
+        side["dataset"],
+        side["run_id"],
+        side["bundle"],
+        side["df"],
+    )
+    return CompareSideMetadata(
+        dataset_id=summary.dataset_id,
+        run_id=summary.run_id,
+        bundle=summary.bundle,
+        target_count=summary.target_universe_count,
+        computed_target_count=summary.computed_target_count,
+        metrics=summary.metrics,
+        provenance=summary.provenance,
+    )
+
+
+def _compare_target_row(
+    row: pd.Series,
+    bundle_a: str,
+    bundle_b: str,
+) -> CompareTargetRow:
+    estimate_a = _safe_float(row.get("estimate_a"))
+    estimate_b = _safe_float(row.get("estimate_b"))
+    return CompareTargetRow(
+        target_id=_safe_int(row.get("target_id")),
+        target_name=str(row.get("target_name_a", "")),
+        variable=str(row.get("variable_a", "")),
+        geo_level=_none_if_nan(row.get("geo_level_a")),
+        geographic_id=(
+            None if _none_if_nan(row.get("geographic_id_a")) is None
+            else str(_none_if_nan(row.get("geographic_id_a")))
+        ),
+        target_value_a=_safe_float(row.get("value_a")),
+        target_value_b=_safe_float(row.get("value_b")),
+        pe_aggregate_a=estimate_a,
+        pe_aggregate_b=estimate_b,
+        rel_error_a=_safe_float(row.get("rel_error_a")),
+        rel_error_b=_safe_float(row.get("rel_error_b")),
+        abs_rel_error_a=_safe_float(row.get("abs_rel_error_a")),
+        abs_rel_error_b=_safe_float(row.get("abs_rel_error_b")),
+        delta_abs_rel_error=_safe_float(row.get("delta_abs_rel_error")),
+        included_in_loss_a=bool(row.get("included_a", False)),
+        included_in_loss_b=bool(row.get("included_b", False)),
+        computed_from_bundle_a=bundle_a if estimate_a is not None else None,
+        computed_from_bundle_b=bundle_b if estimate_b is not None else None,
+    )
+
+
+def _compare_by_variable(
+    valid: pd.DataFrame,
+    top_n: int,
+) -> list[CompareVariableRow]:
+    if valid.empty:
+        return []
+    rows: list[CompareVariableRow] = []
+    grouped = valid.groupby("variable_a", dropna=False)
+    for variable, df in grouped:
+        deltas = df["delta_abs_rel_error"]
+        rows.append(
+            CompareVariableRow(
+                variable=str(variable),
+                target_count=int(len(df)),
+                mean_abs_rel_error_a=_safe_float(df["abs_rel_error_a"].mean()),
+                mean_abs_rel_error_b=_safe_float(df["abs_rel_error_b"].mean()),
+                mean_delta_abs_rel_error=_safe_float(deltas.mean()),
+                improved_count=int((deltas < 0).sum()),
+                regressed_count=int((deltas > 0).sum()),
+            )
+        )
+    return sorted(
+        rows,
+        key=lambda row: abs(row.mean_delta_abs_rel_error or 0),
+        reverse=True,
+    )[:top_n]
 
 
 def _bundle_target_counts(

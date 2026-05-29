@@ -240,10 +240,10 @@ This branch implements the Phase 1 read-only API plus a synchronous evaluation w
 - `GET /api/v1/datasets/{dataset_id}/runs/{run_id}/targets`
 - `GET /api/v1/datasets/{dataset_id}/runs/{run_id}/targets/{target_id}`
 - `POST /api/v1/evaluate`
+- `POST /api/v1/compare`
 
 Not yet implemented:
 
-- `POST /api/v1/compare`
 - async evaluation jobs
 - generated notebook/CI client
 

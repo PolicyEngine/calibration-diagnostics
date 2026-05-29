@@ -24,16 +24,24 @@ DATASET = DatasetConfig(
 
 
 class _Registry:
-    def __init__(self, state: AppState):
+    def __init__(self, state: AppState | dict[tuple[str, str], AppState]):
         self.state = state
 
     def get(self, dataset_id: str, run_id: str) -> AppState:
-        self.state.dataset_id = dataset_id
-        self.state.run_id = run_id
-        return self.state
+        if isinstance(self.state, dict):
+            state = self.state[(dataset_id, run_id)]
+        else:
+            state = self.state
+        state.dataset_id = dataset_id
+        state.run_id = run_id
+        return state
 
 
-def _state() -> AppState:
+def _state(
+    *,
+    national_estimate: float = 110.0,
+    national_rel_error: float = 0.10,
+) -> AppState:
     rows = [
         {
             "target_id": 1,
@@ -42,9 +50,9 @@ def _state() -> AppState:
             "geo_level": "national",
             "geographic_id": None,
             "value": 100.0,
-            "estimate": 110.0,
-            "rel_error": 0.10,
-            "abs_rel_error": 0.10,
+            "estimate": national_estimate,
+            "rel_error": national_rel_error,
+            "abs_rel_error": abs(national_rel_error),
             "loss_contribution": 0.01,
             "included": True,
             "source": "PolicyEngine",
@@ -80,7 +88,10 @@ def _state() -> AppState:
     )
 
 
-def _client(monkeypatch) -> TestClient:
+def _client(
+    monkeypatch,
+    state: AppState | dict[tuple[str, str], AppState] | None = None,
+) -> TestClient:
     monkeypatch.setattr(
         api_router_module.runs_service,
         "DEFAULT_DATASETS",
@@ -116,7 +127,7 @@ def _client(monkeypatch) -> TestClient:
 
     app = FastAPI()
     app.include_router(router)
-    app.state.registry = _Registry(_state())
+    app.state.registry = _Registry(state or _state())
     return TestClient(app)
 
 
@@ -221,3 +232,62 @@ def test_evaluate_endpoint_returns_items_url(monkeypatch):
     assert data["result"]["target_count"] == 1
     assert data["result"]["computed_target_count"] == 1
     assert "bundle=states/CA.h5" in data["result"]["items_url"]
+
+
+def test_compare_endpoint_ranks_run_improvement(monkeypatch):
+    client = _client(
+        monkeypatch,
+        {
+            ("test-root", "run-a"): _state(
+                national_estimate=110.0,
+                national_rel_error=0.10,
+            ),
+            ("test-root", "run-b"): _state(
+                national_estimate=105.0,
+                national_rel_error=0.05,
+            ),
+        },
+    )
+    data = client.post(
+        "/api/v1/compare",
+        json={
+            "a": {"dataset_id": "test-root", "run_id": "run-a"},
+            "b": {"dataset_id": "test-root", "run_id": "run-b"},
+            "top_n": 5,
+        },
+    ).json()
+    assert data["a"]["run_id"] == "run-a"
+    assert data["b"]["run_id"] == "run-b"
+    assert data["matched_target_count"] == 2
+    assert data["computed_pair_count"] == 1
+    assert data["improved_count"] == 1
+    assert data["regressed_count"] == 0
+    assert data["improved"][0]["target_id"] == 1
+    assert data["improved"][0]["delta_abs_rel_error"] == -0.05
+    assert data["improved"][0]["computed_from_bundle_a"] == "enhanced_cps_2024.h5"
+    assert data["improved"][0]["computed_from_bundle_b"] == "enhanced_cps_2024.h5"
+    assert data["by_variable"][0]["variable"] == "medicaid"
+
+
+def test_compare_endpoint_rejects_incompatible_targets(monkeypatch):
+    incompatible = _state()
+    incompatible.targets_enriched.loc[0, "target_name"] = "national/snap/US/[]"
+    incompatible.targets_enriched.loc[1, "target_name"] = "state/snap/CA/[]"
+    client = _client(
+        monkeypatch,
+        {
+            ("test-root", "run-a"): _state(),
+            ("test-root", "run-b"): incompatible,
+        },
+    )
+    response = client.post(
+        "/api/v1/compare",
+        json={
+            "a": {"dataset_id": "test-root", "run_id": "run-a"},
+            "b": {"dataset_id": "test-root", "run_id": "run-b"},
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "No compatible targets matched between comparison sides."
+    )
