@@ -11,9 +11,9 @@ import { useRunContext } from "@/lib/run-context";
  * used to live on RunPicker, so the app still has a sensible default after
  * the global picker UI was removed.
  *
- * Prefers `us-data` (canonical) over `us-cps` (sandbox) when both are
- * available — the canonical dataset is what users actually want to see by
- * default.
+ * Prefers the current staging snapshot because it exposes the latest
+ * state/district/city H5 bundle tree. Falls back to the versioned enhanced
+ * CPS staging dataset when the snapshot is unavailable.
  */
 export function RunBootstrap() {
   const { dataset, run, setSelection } = useRunContext();
@@ -25,7 +25,9 @@ export function RunBootstrap() {
   useEffect(() => {
     if (datasetsQ.data && datasetsQ.data.length > 0 && !datasetIsValid) {
       const preferred =
-        datasetsQ.data.find((d) => d.id === "us-data") ?? datasetsQ.data[0];
+        datasetsQ.data.find((d) => d.id === "us-data-current-staging") ??
+        datasetsQ.data.find((d) => d.id === "us-data") ??
+        datasetsQ.data[0];
       setSelection({ dataset: preferred.id, run: null });
     }
   }, [datasetIsValid, datasetsQ.data, setSelection]);
