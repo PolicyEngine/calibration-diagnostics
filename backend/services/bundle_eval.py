@@ -50,14 +50,18 @@ def _h5_local_path(
 ) -> Path:
     """Lazily fetch the bundle's h5 from HF and return its local path."""
     repo_slug = repo_id.replace("/", "__")
-    cache = Path(cache_root) / repo_slug / "staging" / run_id
+    cache = (
+        Path(cache_root) / repo_slug / "root" / run_id
+        if run_id == "main"
+        else Path(cache_root) / repo_slug / "staging" / run_id
+    )
     cache.mkdir(parents=True, exist_ok=True)
     local = cache / bundle  # nested in cache, e.g. states/CA.h5
     if local.exists():
         return local
 
     from huggingface_hub import hf_hub_download
-    hf_path = f"staging/{run_id}/{bundle}"
+    hf_path = bundle if run_id == "main" else f"staging/{run_id}/{bundle}"
     logger.info("Downloading bundle h5 %s/%s", repo_id, hf_path)
     downloaded = hf_hub_download(
         repo_id=repo_id,
@@ -103,7 +107,11 @@ def _estimate_cache_path(
     cache_root: str = ".artifacts",
 ) -> Path:
     repo_slug = repo_id.replace("/", "__")
-    cache = Path(cache_root) / repo_slug / "staging" / run_id
+    cache = (
+        Path(cache_root) / repo_slug / "root" / run_id
+        if run_id == "main"
+        else Path(cache_root) / repo_slug / "staging" / run_id
+    )
     cache.mkdir(parents=True, exist_ok=True)
     safe = bundle.replace("/", "__")
     return cache / f"{safe}.bundle_estimates.pkl"

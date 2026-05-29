@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../client";
 import { targetKeys } from "../query-keys";
+import { useRunQueryState } from "./use-runs";
 import type {
   ErrorDecomposition,
   Provenance,
@@ -11,20 +12,22 @@ import type {
 } from "../types";
 
 export function useErrorDecomposition(targetIdx: number | null) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: targetKeys.errorDecomposition(targetIdx!),
+    queryKey: targetKeys.errorDecomposition(dataset, run, targetIdx!),
     queryFn: () =>
       apiGet<ErrorDecomposition>(`/targets/${targetIdx}/error-decomposition`),
-    enabled: targetIdx !== null,
+    enabled: ready && targetIdx !== null,
   });
 }
 
 export function useProvenance(targetIdx: number | null) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: targetKeys.provenance(targetIdx!),
+    queryKey: targetKeys.provenance(dataset, run, targetIdx!),
     queryFn: () =>
       apiGet<Provenance>(`/targets/${targetIdx}/provenance`),
-    enabled: targetIdx !== null,
+    enabled: ready && targetIdx !== null,
   });
 }
 
@@ -38,24 +41,26 @@ export function useEligibilityAudit(
   targetIdx: number | null,
   params: EligibilityParams | null,
 ) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: targetKeys.eligibilityAudit(targetIdx!, params ?? {}),
+    queryKey: targetKeys.eligibilityAudit(dataset, run, targetIdx!, params ?? {}),
     queryFn: () =>
       apiGet<EligibilityAudit>(`/targets/${targetIdx}/eligibility-audit`, {
         criterion_variable: params!.criterionVariable,
         criterion_operator: params!.criterionOperator,
         criterion_value: params!.criterionValue,
       }),
-    enabled: targetIdx !== null && params !== null,
+    enabled: ready && targetIdx !== null && params !== null,
   });
 }
 
 export function useConstraintDiff(targetIdx: number | null) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: targetKeys.constraintDiff(targetIdx!),
+    queryKey: targetKeys.constraintDiff(dataset, run, targetIdx!),
     queryFn: () =>
       apiGet<ConstraintDiffResult>(`/targets/${targetIdx}/constraint-diff`),
-    enabled: targetIdx !== null,
+    enabled: ready && targetIdx !== null,
   });
 }
 
@@ -71,8 +76,9 @@ export function useContributors(
   targetIdx: number | null,
   params: ContributorParams = {},
 ) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: targetKeys.contributors(targetIdx!, params),
+    queryKey: targetKeys.contributors(dataset, run, targetIdx!, params),
     queryFn: () =>
       apiGet<Contributor[]>(`/targets/${targetIdx}/contributors`, {
         poverty_only: params.povertyOnly,
@@ -81,15 +87,16 @@ export function useContributors(
         limit: params.limit ?? 50,
         offset: params.offset ?? 0,
       }),
-    enabled: targetIdx !== null,
+    enabled: ready && targetIdx !== null,
   });
 }
 
 export function useTargetConvergence(targetIdx: number | null) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: targetKeys.convergence(targetIdx!),
+    queryKey: targetKeys.convergence(dataset, run, targetIdx!),
     queryFn: () =>
       apiGet<ConvergencePoint[]>(`/targets/${targetIdx}/convergence`),
-    enabled: targetIdx !== null,
+    enabled: ready && targetIdx !== null,
   });
 }

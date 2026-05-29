@@ -128,10 +128,14 @@ function WorstTargets({ rows }: { rows: SummaryResponse["worst_targets"] }) {
             <td className="py-2 text-right">{num(r.value)}</td>
             <td className="py-2 text-right">{num(r.estimate)}</td>
             <td className="py-2 text-right">
-              <Badge variant={r.abs_rel_error > 0.25 ? "destructive" : "secondary"}>
-                {r.rel_error >= 0 ? "+" : ""}
-                {(r.rel_error * 100).toFixed(1)}%
-              </Badge>
+              {r.rel_error == null || r.abs_rel_error == null ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                <Badge variant={r.abs_rel_error > 0.25 ? "destructive" : "secondary"}>
+                  {r.rel_error >= 0 ? "+" : ""}
+                  {(r.rel_error * 100).toFixed(1)}%
+                </Badge>
+              )}
             </td>
           </tr>
         ))}

@@ -63,11 +63,11 @@ export const DEFAULT_FILTERS: TargetFilters = {
   stateFipsList: [],
   sources: [],
   datasetFiles: [],
-  status: "all",
+  status: "included",
   sortBy: "abs_rel_error",
-  // Best-fit first: surface the well-calibrated rows on initial load. Worst
-  // miscalibrations are reachable by clicking the header to flip to desc.
-  sortOrder: "asc",
+  // Calibration diagnostics should open on the in-loss targets with the
+  // largest errors. Skipped/authored targets remain available via Status.
+  sortOrder: "desc",
   page: 0,
   pageSize: 50,
 };
@@ -98,7 +98,7 @@ function parseFiltersFromUrl(sp: URLSearchParams): TargetFilters {
   const arr = (k: string) => sp.getAll(k).filter(Boolean);
   const rawStatus = sp.get("status");
   const status: StatusFilter =
-    rawStatus === "included" || rawStatus === "skipped" ? rawStatus : "all";
+    rawStatus === "all" || rawStatus === "skipped" ? rawStatus : "included";
   const stateFipsList = arr("state_fips")
     .map((x) => Number(x))
     .filter((n) => Number.isFinite(n));
@@ -116,7 +116,7 @@ function parseFiltersFromUrl(sp: URLSearchParams): TargetFilters {
     datasetFiles: arr("dataset_file"),
     status,
     sortBy: (sp.get("sort_by") as SortKey) ?? "abs_rel_error",
-    sortOrder: (sp.get("sort_order") as SortOrder) ?? "asc",
+    sortOrder: (sp.get("sort_order") as SortOrder) ?? "desc",
     page: Number(sp.get("page") ?? 0),
     pageSize: Number(sp.get("page_size") ?? 50),
   };
@@ -140,9 +140,9 @@ function writeFiltersToUrl(
   f.stateFipsList.forEach((fips) => next.append("state_fips", String(fips)));
   f.sources.forEach((s) => next.append("source", s));
   f.datasetFiles.forEach((d) => next.append("dataset_file", d));
-  if (f.status !== "all") next.set("status", f.status);
+  if (f.status !== "included") next.set("status", f.status);
   if (f.sortBy !== "abs_rel_error") next.set("sort_by", f.sortBy);
-  if (f.sortOrder !== "asc") next.set("sort_order", f.sortOrder);
+  if (f.sortOrder !== "desc") next.set("sort_order", f.sortOrder);
   if (f.page > 0) next.set("page", String(f.page));
   if (f.pageSize !== 50) next.set("page_size", String(f.pageSize));
   return next;

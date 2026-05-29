@@ -38,12 +38,17 @@ def _bundle_paths_for_run(repo_id: str, run_id: str) -> frozenset[str]:
     except Exception as exc:
         logger.warning("HF list_repo_files failed for %s: %s", repo_id, exc)
         return frozenset()
-    prefix = f"staging/{run_id}/"
+    root_run = run_id == "main"
+    prefix = "" if root_run else f"staging/{run_id}/"
     bundles: set[str] = set()
     for f in files:
         if not f.startswith(prefix) or not f.endswith(".h5"):
             continue
         rel = f[len(prefix):]
+        if root_run and "/" in rel and rel.split("/", 1)[0] not in {
+            "cities", "districts", "national", "states",
+        }:
+            continue
         # Skip clone-diagnostics-style sidecars that share the .h5 stem.
         if rel.endswith(".clone_diagnostics.json"):
             continue

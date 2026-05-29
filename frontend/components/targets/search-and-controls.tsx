@@ -10,7 +10,7 @@ import {
   useTargetFilters,
   type StatusFilter,
 } from "@/lib/target-filters-context";
-import { STATE_FIPS_TO_NAME } from "@/lib/geo-names";
+import { STATE_FIPS_TO_CODE, STATE_FIPS_TO_NAME } from "@/lib/geo-names";
 import { MultiSelectDropdown } from "@/components/shared/multi-select-dropdown";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { useTargetFacets } from "@/lib/api/hooks/use-targets";
@@ -38,6 +38,9 @@ export function TargetSearchAndControls() {
     errorBuckets: filters.errorBuckets,
     sources: filters.sources,
   });
+  const stateBundleFacets = useTargetFacets({
+    geoLevels: ["state"],
+  });
   const sourceOptions = (facets.data?.by_source ?? []).map((s) => ({
     value: s.value,
     label: s.value,
@@ -52,6 +55,39 @@ export function TargetSearchAndControls() {
     label: d.value,
     count: d.count,
   }));
+  const stateBundleCounts = new Map(
+    (stateBundleFacets.data?.by_dataset_file ?? [])
+      .filter((d) => d.value.startsWith("states/"))
+      .map((d) => [d.value, d.count]),
+  );
+  const availableStateBundles = new Set(
+    (stateBundleFacets.data?.by_dataset_file ?? [])
+      .map((d) => d.value)
+      .filter((v) => v.startsWith("states/")),
+  );
+  const stateBundleOptions = [
+    { value: "", label: "Any" },
+    ...Object.entries(STATE_FIPS_TO_NAME)
+      .map(([fipsRaw, name]) => {
+        const fips = Number(fipsRaw);
+        const code = STATE_FIPS_TO_CODE[fips];
+        const bundle = `states/${code}.h5`;
+        const count = stateBundleCounts.get(bundle);
+        return {
+          value: bundle,
+          label: count == null ? name : `${name} (${count})`,
+          disabled: !availableStateBundles.has(bundle),
+          fips,
+        };
+      })
+      .filter((o) => !o.disabled)
+      .sort((a, b) => a.label.localeCompare(b.label)),
+  ];
+  const selectedStateBundle =
+    filters.datasetFiles.length === 1 &&
+    filters.datasetFiles[0].startsWith("states/")
+      ? filters.datasetFiles[0]
+      : "";
   const onlyOneBundle = datasetFileOptions.length === 1;
 
   // The state filter only makes sense when state-/district-level targets
@@ -103,6 +139,29 @@ export function TargetSearchAndControls() {
         disabled={!stateApplicable}
       />
 
+      <ToolbarSelect
+        label="State H5"
+        value={selectedStateBundle}
+        options={stateBundleOptions}
+        disabled={stateBundleOptions.length <= 1}
+        onChange={(bundle) => {
+          if (!bundle) {
+            setFilters({ datasetFiles: [] });
+            return;
+          }
+          const code = bundle.match(/^states\/([A-Z]{2})\.h5$/)?.[1];
+          const fips = Object.entries(STATE_FIPS_TO_CODE).find(
+            ([, abbrev]) => abbrev === code,
+          )?.[0];
+          setFilters({
+            datasetFiles: [bundle],
+            geoLevels: ["state"],
+            stateFipsList: fips ? [Number(fips)] : [],
+            status: "all",
+          });
+        }}
+      />
+
       <MultiSelectDropdown
         label="Error"
         options={errorOptions}
@@ -121,7 +180,7 @@ export function TargetSearchAndControls() {
 
       <div className="flex items-center gap-2">
         <MultiSelectDropdown
-          label="Dataset"
+          label="H5 Bundle"
           options={datasetFileOptions}
           selected={filters.datasetFiles}
           onToggle={(v) => toggleDatasetFile(v)}

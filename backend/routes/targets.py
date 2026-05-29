@@ -44,6 +44,18 @@ def _validate_target_idx(state: AppState, target_idx: int) -> None:
         )
 
 
+def _require_matrix_artifacts(state: AppState) -> None:
+    if state.X_csr.shape[0] == 0 or state.X_csr.shape[1] == 0 or state.X_csr.nnz == 0:
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "This run does not publish the calibration sparse matrix. "
+                "Target detail tabs that need household-level contributors "
+                "are unavailable for dataset-mode runs."
+            ),
+        )
+
+
 # --- Literal-segment routes BEFORE parametric routes ---
 
 
@@ -118,7 +130,7 @@ def _available_bundles_for_state(state) -> "frozenset[str] | None":
         ds = get_dataset(state.dataset_id)
     except Exception:
         return None
-    if ds is None or getattr(ds, "layout", None) != "staging":
+    if ds is None or getattr(ds, "layout", None) not in {"staging", "root"}:
         return None
     return published_bundles(ds.repo_id, state.run_id)
 
@@ -289,7 +301,7 @@ def list_targets(
     # Loaded through the registry so a cold compare-run picks up the same
     # entity-aware evaluator pass.
     df_b = None
-    if compare_run and compare_run != state.run_id:
+    if request is not None and compare_run and compare_run != state.run_id:
         try:
             state_b = request.app.state.registry.get(state.dataset_id, compare_run)
             df_b = state_b.targets_enriched
@@ -309,7 +321,12 @@ def list_targets(
     total = len(df)
     ascending = sort_order == "asc"
     if sort_by in df.columns:
-        df = df.sort_values(sort_by, ascending=ascending)
+        effective_sort = sort_by
+        if sort_by == "loss_contribution":
+            losses = df["loss_contribution"].to_numpy(dtype=float)
+            if len(losses) == 0 or not np.any(np.nan_to_num(losses) != 0):
+                effective_sort = "abs_rel_error"
+        df = df.sort_values(effective_sort, ascending=ascending)
     df = df.iloc[offset : offset + limit]
 
     has_compare = df_b is not None and not df_b.empty
@@ -492,6 +509,7 @@ def error_decomposition(
     state: AppState = Depends(get_state),
 ) -> ErrorDecomposition:
     _validate_target_idx(state, target_idx)
+    _require_matrix_artifacts(state)
     target_value = float(state.targets_enriched.iloc[target_idx]["value"])
     decomp = matrix_ops.compute_error_decomposition(
         state.X_csr, target_idx, target_value,
@@ -547,6 +565,7 @@ def eligibility_audit(
     state: AppState = Depends(get_state),
 ) -> EligibilityAuditResponse:
     _validate_target_idx(state, target_idx)
+    _require_matrix_artifacts(state)
     if criterion_operator not in _OPS:
         raise HTTPException(status_code=400, detail=f"Invalid operator: {criterion_operator}")
     if not state.sim_service.variable_exists(criterion_variable):
@@ -601,6 +620,7 @@ def constraint_diff(
     state: AppState = Depends(get_state),
 ) -> ConstraintDiffResponse:
     _validate_target_idx(state, target_idx)
+    _require_matrix_artifacts(state)
     if state.db_engine is None:
         raise HTTPException(status_code=503, detail="No database connected")
 
@@ -689,6 +709,7 @@ def contributors(
     state: AppState = Depends(get_state),
 ) -> list[ContributorRow]:
     _validate_target_idx(state, target_idx)
+    _require_matrix_artifacts(state)
     contribs = matrix_ops.get_target_contributions(
         state.X_csr, target_idx, state.final_weights,
     )
@@ -764,12 +785,22 @@ def _safe_int(val) -> int | None:
 
 
 def _safe_float(val) -> float | None:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
+    if val is None or pd.isna(val):
         return None
+    try:
+        out = float(val)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(out):
+        return None
+    return out
+
+
+def _parse_value(val):
     try:
         return float(val)
     except (TypeError, ValueError):
-        return None
+        return val
 
 
 def _parse_constraints_from_name(target_name: str) -> list[str]:
@@ -792,6 +823,13 @@ def _target_row(df, idx: int, with_compare: bool = False) -> TargetRow:
     gl = _nan_to_none(r.get("geo_level")) or "national"
     gid = str(_nan_to_none(r.get("geographic_id")) or "US")
     constraints = _parse_constraints_from_name(str(r.get("target_name", "")))
+    target_value = _safe_float(r.get("value"))
+    estimate = _safe_float(r.get("estimate"))
+    abs_error = (
+        abs(estimate - target_value)
+        if estimate is not None and target_value is not None
+        else None
+    )
     return TargetRow(
         target_idx=idx,
         target_id=_safe_int(r.get("target_id")),
@@ -800,11 +838,11 @@ def _target_row(df, idx: int, with_compare: bool = False) -> TargetRow:
         geographic_id=gid,
         geo_display_name=geo_display_name(gl, gid),
         constraints=constraints,
-        target_value=float(r["value"]),
-        estimate=float(r.get("estimate", 0)),
-        rel_error=float(r.get("rel_error", 0)),
-        abs_error=abs(float(r.get("estimate", 0)) - float(r["value"])),
-        loss_contribution=float(r.get("loss_contribution", 0)),
+        target_value=target_value,
+        estimate=estimate,
+        rel_error=_safe_float(r.get("rel_error")),
+        abs_error=abs_error,
+        loss_contribution=_safe_float(r.get("loss_contribution")),
         included=bool(r.get("included", True)),
         source=_nan_to_none(r.get("source")),
         period=_safe_int(r.get("period")),

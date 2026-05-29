@@ -14,10 +14,10 @@ export interface Target extends Record<string, unknown> {
   geo_display_name: string | null;
   constraints: string[];
   target_value: number;
-  estimate: number;
-  rel_error: number;
-  abs_error: number;
-  loss_contribution: number;
+  estimate: number | null;
+  rel_error: number | null;
+  abs_error: number | null;
+  loss_contribution: number | null;
   included: boolean;
   // Populated when /targets is called with ?compare_run=…
   estimate_b: number | null;

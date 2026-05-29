@@ -2,12 +2,14 @@
 
 import sys
 import types
-from unittest.mock import MagicMock
 
 import pytest
 
 from backend.services.registry import RunRegistry
+from backend.services.runs import DatasetConfig
 from backend.state import AppState
+
+DATASET_ID = "flat-test"
 
 
 def _fake_state(dataset_id: str, run_id: str) -> AppState:
@@ -30,6 +32,20 @@ def _fake_state(dataset_id: str, run_id: str) -> AppState:
 @pytest.fixture
 def mock_loader(monkeypatch):
     """Replace the lazy-imported load_run with an instrumented mock."""
+    from backend.services import runs as runs_module
+
+    monkeypatch.setattr(
+        runs_module,
+        "DEFAULT_DATASETS",
+        [
+            DatasetConfig(
+                id=DATASET_ID,
+                label="Flat test",
+                repo_id="PolicyEngine/test",
+                layout="flat",
+            ),
+        ],
+    )
     fake_loader = types.ModuleType("backend.services.loader")
     calls: list[tuple[str, str, str]] = []
 
@@ -44,37 +60,37 @@ def mock_loader(monkeypatch):
 
 def test_get_loads_on_miss(mock_loader):
     reg = RunRegistry(max_size=3)
-    state = reg.get("us-cps", "run-a")
-    assert state.dataset_id == "us-cps"
+    state = reg.get(DATASET_ID, "run-a")
+    assert state.dataset_id == DATASET_ID
     assert state.run_id == "run-a"
     assert len(mock_loader) == 1
 
 
 def test_get_hits_cache_on_second_call(mock_loader):
     reg = RunRegistry(max_size=3)
-    reg.get("us-cps", "run-a")
-    reg.get("us-cps", "run-a")
+    reg.get(DATASET_ID, "run-a")
+    reg.get(DATASET_ID, "run-a")
     assert len(mock_loader) == 1, "second call should hit cache"
 
 
 def test_lru_eviction(mock_loader):
     reg = RunRegistry(max_size=2)
-    reg.get("us-cps", "a")
-    reg.get("us-cps", "b")
-    reg.get("us-cps", "c")  # evicts "a"
+    reg.get(DATASET_ID, "a")
+    reg.get(DATASET_ID, "b")
+    reg.get(DATASET_ID, "c")  # evicts "a"
     keys = reg.loaded_keys()
-    assert keys == [("us-cps", "b"), ("us-cps", "c")]
+    assert keys == [(DATASET_ID, "b"), (DATASET_ID, "c")]
 
 
 def test_lru_promotes_on_access(mock_loader):
     reg = RunRegistry(max_size=2)
-    reg.get("us-cps", "a")
-    reg.get("us-cps", "b")
-    reg.get("us-cps", "a")  # promote a to MRU
-    reg.get("us-cps", "c")  # should evict b, not a
+    reg.get(DATASET_ID, "a")
+    reg.get(DATASET_ID, "b")
+    reg.get(DATASET_ID, "a")  # promote a to MRU
+    reg.get(DATASET_ID, "c")  # should evict b, not a
     keys = reg.loaded_keys()
-    assert ("us-cps", "a") in keys
-    assert ("us-cps", "b") not in keys
+    assert (DATASET_ID, "a") in keys
+    assert (DATASET_ID, "b") not in keys
 
 
 def test_get_unknown_dataset_raises(mock_loader):

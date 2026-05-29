@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../client";
 import { weightKeys } from "../query-keys";
 import type { WeightDistribution, HistogramBin } from "../types";
+import { useRunQueryState } from "./use-runs";
 
 interface WeightDistributionParams {
   sliceBy?: string;
@@ -11,8 +12,9 @@ interface WeightDistributionParams {
 }
 
 export function useWeightDistribution(params: WeightDistributionParams = {}) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: weightKeys.distribution(params),
+    queryKey: weightKeys.distribution(dataset, run, params),
     queryFn: () =>
       apiGet<WeightDistribution>("/weights/distribution", {
         slice_by: params.sliceBy ?? "none",
@@ -20,6 +22,7 @@ export function useWeightDistribution(params: WeightDistributionParams = {}) {
         state_fips: params.stateFips,
         cd_geoid: params.cdGeoid,
       }),
+    enabled: ready,
   });
 }
 
@@ -35,8 +38,9 @@ interface HistogramParams {
 }
 
 export function useWeightHistogram(params: HistogramParams = {}) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: weightKeys.histogram(params),
+    queryKey: weightKeys.histogram(dataset, run, params),
     queryFn: () =>
       apiGet<HistogramBin[]>("/weights/histogram", {
         metric: params.metric ?? "g_weight",
@@ -48,5 +52,6 @@ export function useWeightHistogram(params: HistogramParams = {}) {
         state_fips: params.stateFips,
         cd_geoid: params.cdGeoid,
       }),
+    enabled: ready,
   });
 }
