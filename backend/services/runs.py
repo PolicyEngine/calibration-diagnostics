@@ -104,7 +104,20 @@ def _group_flat(files: list[str]) -> dict[str, set[str]]:
 
 
 def _group_staging(files: list[str]) -> dict[str, set[str]]:
-    """For staging layout: prefix = "staging/<run_id>", files = direct children."""
+    """For staging layout, group files by run.
+
+    Supports two artifact shapes the us-data team uses interchangeably:
+
+    1. **GHA / flat staging**: ``staging/<run_id>/policy_data.db``,
+       ``staging/<run_id>/enhanced_cps_2024.h5`` at the run root.
+    2. **Versioned-release nested**: ``staging/<run_id>/calibration/policy_data.db``
+       and ``staging/<run_id>/datasets/enhanced_cps_2024.h5``.
+
+    Both layouts get the *same* set of logical filenames so the
+    discovery + required-files check in :func:`list_runs` works
+    uniformly. The actual on-disk download location is resolved later
+    by :func:`_resolve_staging_file_paths`.
+    """
     by_prefix: dict[str, set[str]] = {}
     for path in files:
         if not path.startswith("staging/"):
@@ -114,10 +127,46 @@ def _group_staging(files: list[str]) -> dict[str, set[str]]:
             continue
         run_id = parts[1]
         rest = parts[2]
-        if "/" in rest:
+        if "/" not in rest:
+            # Flat staging — file sits at the run root.
+            by_prefix.setdefault(run_id, set()).add(rest)
             continue
-        by_prefix.setdefault(run_id, set()).add(rest)
+        # Nested staging — recognise the locations the pipeline uses.
+        head, _, tail = rest.partition("/")
+        if head == "calibration" and tail == "policy_data.db":
+            by_prefix.setdefault(run_id, set()).add("policy_data.db")
+        elif head == "datasets" and tail.endswith(".h5") and "/" not in tail:
+            by_prefix.setdefault(run_id, set()).add(tail)
     return by_prefix
+
+
+def _resolve_staging_file_paths(
+    repo_id: str,
+    run_id: str,
+    logical_names: list[str],
+) -> dict[str, str]:
+    """Map each logical filename (e.g. ``policy_data.db``, ``enhanced_cps_2024.h5``)
+    to its actual path on HF, probing both flat and nested layouts.
+
+    Returns only entries that were found; callers should treat a missing
+    key as 'this run doesn't publish that file'.
+    """
+    api = HfApi()
+    files = set(api.list_repo_files(repo_id, repo_type="model"))
+    prefix = f"staging/{run_id}"
+    resolved: dict[str, str] = {}
+    candidates: dict[str, list[str]] = {
+        "policy_data.db": [
+            f"{prefix}/policy_data.db",
+            f"{prefix}/calibration/policy_data.db",
+        ],
+    }
+    for ln in logical_names:
+        for cand in candidates.get(ln, [f"{prefix}/{ln}", f"{prefix}/datasets/{ln}"]):
+            if cand in files:
+                resolved[ln] = cand
+                break
+    return resolved
 
 
 @lru_cache(maxsize=8)

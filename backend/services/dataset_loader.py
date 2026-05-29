@@ -234,28 +234,43 @@ def _ensure_staging_artifacts(
     run_id: str,
     cache_root: str = ".artifacts",
 ) -> dict[str, str]:
-    """Download a staging run's required files; return a {filename: path} map."""
+    """Download a staging run's required files; return a {logical_name: path} map.
+
+    Logical names are the flat filenames (``policy_data.db``,
+    ``enhanced_cps_2024.h5``); on HF they may live at the run root OR
+    nested under ``calibration/`` / ``datasets/``. We probe both so
+    versioned releases and GHA staging both load through the same code
+    path, and store everything flat in the local cache.
+    """
     from huggingface_hub import hf_hub_download
+    from backend.services.runs import _resolve_staging_file_paths
+    import shutil
 
     prefix = storage_prefix(dataset, run_id)
     repo_slug = dataset.repo_id.replace("/", "__")
-    # Cache under e.g. .artifacts/PolicyEngine__policyengine-us-data/staging/<run>/
     cache = Path(cache_root) / repo_slug / prefix
     cache.mkdir(parents=True, exist_ok=True)
 
-    filenames = dataset.effective_required_files()
+    logical_names = list(dataset.effective_required_files())
+    actual_paths = _resolve_staging_file_paths(
+        dataset.repo_id, run_id, logical_names,
+    )
+
     resolved: dict[str, str] = {}
-    for fn in filenames:
-        dest = cache / fn
+    for fn in logical_names:
+        dest = cache / fn  # flat in our cache
         if dest.exists():
             logger.info("Found cached %s: %s", fn, dest)
             resolved[fn] = str(dest)
             continue
 
-        hf_path = f"{prefix}/{fn}"
+        hf_path = actual_paths.get(fn)
+        if hf_path is None:
+            logger.warning("Run %s does not publish %s; skipping.", run_id, fn)
+            continue
         logger.info("Downloading %s from %s/%s ...", fn, dataset.repo_id, hf_path)
         try:
-            hf_hub_download(
+            downloaded = hf_hub_download(
                 repo_id=dataset.repo_id,
                 filename=hf_path,
                 repo_type=dataset.repo_type,
@@ -265,14 +280,13 @@ def _ensure_staging_artifacts(
             logger.warning("Could not download %s: %s", hf_path, exc)
             continue
 
-        # hf_hub_download may nest the file under the prefix path.
-        nested = cache / prefix / fn
-        if nested.exists() and not dest.exists():
-            nested.rename(dest)
-            try:
-                (cache / prefix).rmdir()
-            except OSError:
-                pass
+        # hf_hub_download honors the repo path under local_dir, so the
+        # file lands at cache/<hf_path>. Move it to the flat dest so the
+        # rest of the loader doesn't need to know about the layout.
+        src = Path(downloaded)
+        if src != dest:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dest))
         if dest.exists():
             resolved[fn] = str(dest)
             size_mb = dest.stat().st_size / 1e6
