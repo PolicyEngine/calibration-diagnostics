@@ -26,6 +26,7 @@ no-filter calls keep the federal-fit numbers.
 from __future__ import annotations
 
 import logging
+import shutil
 import threading
 from collections import OrderedDict
 from pathlib import Path
@@ -61,7 +62,12 @@ def _h5_local_path(
         return local
 
     from huggingface_hub import hf_hub_download
-    hf_path = bundle if run_id == "main" else f"staging/{run_id}/{bundle}"
+    if run_id == "main":
+        hf_path = bundle
+    elif run_id == "staging":
+        hf_path = f"staging/{bundle}"
+    else:
+        hf_path = f"staging/{run_id}/{bundle}"
     logger.info("Downloading bundle h5 %s/%s", repo_id, hf_path)
     downloaded = hf_hub_download(
         repo_id=repo_id,
@@ -69,7 +75,11 @@ def _h5_local_path(
         repo_type="model",
         local_dir=str(cache),
     )
-    return Path(downloaded)
+    src = Path(downloaded)
+    if src != local:
+        local.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(local))
+    return local
 
 
 def _get_sim(

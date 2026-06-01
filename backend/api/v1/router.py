@@ -359,7 +359,7 @@ def _load_state(request: Request, dataset_id: str, run_id: str) -> AppState:
 
 
 def _available_bundles(dataset, run_id: str) -> frozenset[str]:
-    if dataset.layout not in {"staging", "root"}:
+    if dataset.layout not in {"staging", "root", "staging-root"}:
         return frozenset()
     return published_bundles(dataset.repo_id, run_id)
 
@@ -687,11 +687,12 @@ def _target_item(row: pd.Series, bundle: str) -> TargetItem:
 
 
 def _provenance(dataset, bundle: str) -> ProvenanceInfo:
-    diagnostics = (
-        "calibration/logs/unified_diagnostics.csv"
-        if dataset.layout == "root"
-        else "calibration/runs/<run_id>/diagnostics/unified_diagnostics.csv"
-    )
+    if dataset.layout == "root":
+        diagnostics = "calibration/logs/unified_diagnostics.csv"
+    elif dataset.layout == "staging-root":
+        diagnostics = None
+    else:
+        diagnostics = "calibration/runs/<run_id>/diagnostics/unified_diagnostics.csv"
     return ProvenanceInfo(
         target_db="policy_data.db",
         diagnostics=diagnostics,

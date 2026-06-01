@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 
-from backend.services.runs import DatasetConfig, storage_prefix
+from backend.services.runs import DatasetConfig
 from backend.state import AppState
 
 if TYPE_CHECKING:
@@ -354,24 +354,33 @@ def _ensure_staging_artifacts(
     path, and store everything flat in the local cache.
     """
     from huggingface_hub import hf_hub_download
-    from backend.services.runs import _resolve_staging_file_paths
+    from backend.services.runs import (
+        _resolve_staging_file_paths,
+        _resolve_staging_root_file_paths,
+    )
     import shutil
 
     repo_slug = dataset.repo_id.replace("/", "__")
-    prefix = storage_prefix(dataset, run_id)
-    cache = (
-        Path(cache_root) / repo_slug / "root" / run_id
-        if dataset.layout == "root"
-        else Path(cache_root) / repo_slug / prefix
-    )
+    if dataset.layout == "root":
+        cache = Path(cache_root) / repo_slug / "root" / run_id
+    else:
+        cache = Path(cache_root) / repo_slug / "staging" / run_id
     cache.mkdir(parents=True, exist_ok=True)
 
     logical_names = list(dataset.effective_required_files())
-    actual_paths = (
-        {name: name for name in logical_names}
-        if dataset.layout == "root"
-        else _resolve_staging_file_paths(dataset.repo_id, run_id, logical_names)
-    )
+    if dataset.layout == "root":
+        actual_paths = {name: name for name in logical_names}
+    elif dataset.layout == "staging-root":
+        actual_paths = _resolve_staging_root_file_paths(
+            dataset.repo_id,
+            logical_names,
+        )
+    else:
+        actual_paths = _resolve_staging_file_paths(
+            dataset.repo_id,
+            run_id,
+            logical_names,
+        )
 
     resolved: dict[str, str] = {}
     for fn in logical_names:
@@ -720,7 +729,7 @@ def load_run_from_dataset(
         "1", "true", "yes",
     }
     should_eval_remaining = cached_enriched is None and (
-        diag_result is None or eval_skipped
+        (diag_result is None and dataset.layout != "staging-root") or eval_skipped
     )
     if targets_df["estimate"].isna().any() and should_eval_remaining:
         from backend.services.stratum_evaluator import evaluate_targets

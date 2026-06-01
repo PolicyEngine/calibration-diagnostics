@@ -2,11 +2,12 @@
 
 A "dataset" is a HuggingFace repository plus a layout convention. A "run" is
 one published calibration build whose artifacts live under some prefix in the
-repo. Three layouts are supported today:
+repo. Four layouts are supported today:
 
 - **flat**:    repo/<run_id>/<artifact>           (the legacy sandbox repo)
 - **staging**: repo/staging/<run_id>/<artifact>   (the canonical us-data repo)
 - **root**:    repo/<artifact>                    (current production files)
+- **staging-root**: repo/staging/<artifact>       (current staging snapshot)
 
 Each layout declares which artifact filenames must be present for a candidate
 prefix to count as a real run, since the two repos publish different files.
@@ -29,7 +30,10 @@ DEFAULT_REQUIRED_FILES = {
     "flat":    ("calibration_package.pkl", "calibration_weights.npy"),
     "staging": ("policy_data.db",),  # at least the targets DB; an .h5 picked at load time
     "root":    ("policy_data.db",),
+    "staging-root": ("policy_data.db",),
 }
+
+CURRENT_STAGING_RUN_ID = "staging"
 
 
 @dataclass(frozen=True)
@@ -40,7 +44,7 @@ class DatasetConfig:
     label: str
     repo_id: str
     repo_type: str = "model"
-    layout: str = "flat"                       # "flat", "staging", or "root"
+    layout: str = "flat"                       # flat, staging, root, staging-root
     # Files that must exist under a prefix for it to be considered a run.
     required_files: tuple[str, ...] = ()
     # For the staging layout: which h5 dataset to load when this dataset is
@@ -51,8 +55,8 @@ class DatasetConfig:
         if self.required_files:
             return self.required_files
         defaults = DEFAULT_REQUIRED_FILES.get(self.layout, ())
-        # Staging/root layouts also require the configured primary h5 to be present.
-        if self.layout in {"staging", "root"} and self.primary_h5:
+        # Dataset layouts also require the configured primary h5 to be present.
+        if self.layout in {"staging", "root", "staging-root"} and self.primary_h5:
             return defaults + (self.primary_h5,)
         return defaults
 
@@ -75,6 +79,13 @@ DEFAULT_DATASETS: list[DatasetConfig] = [
         repo_id="PolicyEngine/policyengine-us-data",
         layout="root",
         primary_h5="enhanced_cps_2024.h5",
+    ),
+    DatasetConfig(
+        id="us-data-current-staging",
+        label="US Data - Current Staging",
+        repo_id="PolicyEngine/policyengine-us-data",
+        layout="staging-root",
+        primary_h5="source_imputed_stratified_extended_cps.h5",
     ),
     DatasetConfig(
         id="us-data-cps",
@@ -162,6 +173,22 @@ def _group_staging(files: list[str]) -> dict[str, set[str]]:
     return by_prefix
 
 
+def _group_staging_root(files: list[str]) -> dict[str, set[str]]:
+    """Expose the top-level ``staging/`` snapshot as one synthetic run."""
+    names: set[str] = set()
+    for path in files:
+        if path == "staging/calibration/policy_data.db":
+            names.add("policy_data.db")
+            continue
+        if (
+            path.startswith("staging/calibration/")
+            and path.endswith(".h5")
+            and path.count("/") == 2
+        ):
+            names.add(path.rsplit("/", 1)[-1])
+    return {CURRENT_STAGING_RUN_ID: names} if names else {}
+
+
 def _resolve_staging_file_paths(
     repo_id: str,
     run_id: str,
@@ -191,6 +218,25 @@ def _resolve_staging_file_paths(
     return resolved
 
 
+def _resolve_staging_root_file_paths(
+    repo_id: str,
+    logical_names: list[str],
+) -> dict[str, str]:
+    """Resolve logical artifact names in the current top-level staging snapshot."""
+    api = HfApi()
+    files = set(api.list_repo_files(repo_id, repo_type="model"))
+    resolved: dict[str, str] = {}
+    candidates: dict[str, list[str]] = {
+        "policy_data.db": ["staging/calibration/policy_data.db"],
+    }
+    for name in logical_names:
+        for candidate in candidates.get(name, [f"staging/calibration/{name}"]):
+            if candidate in files:
+                resolved[name] = candidate
+                break
+    return resolved
+
+
 @lru_cache(maxsize=8)
 def list_runs(dataset_id: str) -> tuple[RunInfo, ...]:
     """Discover runs for a dataset. Cached; restart to refresh from HF."""
@@ -210,6 +256,8 @@ def list_runs(dataset_id: str) -> tuple[RunInfo, ...]:
         by_prefix = _group_staging(files)
     elif dataset.layout == "root":
         by_prefix = {"main": {path for path in files if "/" not in path}}
+    elif dataset.layout == "staging-root":
+        by_prefix = _group_staging_root(files)
     else:
         logger.error("Unknown layout %r for dataset %s", dataset.layout, dataset_id)
         return ()
@@ -223,7 +271,7 @@ def list_runs(dataset_id: str) -> tuple[RunInfo, ...]:
             RunInfo(
                 dataset_id=dataset_id,
                 run_id=prefix,
-                label=prefix,
+                label="Current staging" if dataset.layout == "staging-root" else prefix,
                 last_modified=None,  # cheap; populate lazily if needed
             )
         )
@@ -234,6 +282,8 @@ def storage_prefix(dataset: DatasetConfig, run_id: str) -> str:
     """The path prefix within the repo where this run's files live."""
     if dataset.layout == "staging":
         return f"staging/{run_id}"
+    if dataset.layout == "staging-root":
+        return "staging"
     if dataset.layout == "root":
         return ""
     return run_id
