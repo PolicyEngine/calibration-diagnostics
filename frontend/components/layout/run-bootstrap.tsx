@@ -11,28 +11,34 @@ import { useRunContext } from "@/lib/run-context";
  * used to live on RunPicker, so the app still has a sensible default after
  * the global picker UI was removed.
  *
- * Prefers `us-data` (canonical) over `us-cps` (sandbox) when both are
- * available — the canonical dataset is what users actually want to see by
- * default.
+ * Prefers the current staging snapshot because it exposes the latest
+ * state/district/city H5 bundle tree. Falls back to the versioned enhanced
+ * CPS staging dataset when the snapshot is unavailable.
  */
 export function RunBootstrap() {
   const { dataset, run, setSelection } = useRunContext();
   const datasetsQ = useDatasets();
-  const runsQ = useRuns(dataset);
+  const datasetIsValid =
+    !!dataset && !!datasetsQ.data?.some((d) => d.id === dataset);
+  const runsQ = useRuns(datasetIsValid ? dataset : null);
 
   useEffect(() => {
-    if (!dataset && datasetsQ.data && datasetsQ.data.length > 0) {
+    if (datasetsQ.data && datasetsQ.data.length > 0 && !datasetIsValid) {
       const preferred =
-        datasetsQ.data.find((d) => d.id === "us-data") ?? datasetsQ.data[0];
+        datasetsQ.data.find((d) => d.id === "us-data-current-staging") ??
+        datasetsQ.data.find((d) => d.id === "us-data") ??
+        datasetsQ.data[0];
       setSelection({ dataset: preferred.id, run: null });
     }
-  }, [dataset, datasetsQ.data, setSelection]);
+  }, [datasetIsValid, datasetsQ.data, setSelection]);
 
   useEffect(() => {
-    if (dataset && !run && runsQ.data && runsQ.data.length > 0) {
-      setSelection({ dataset, run: runsQ.data[0].run_id });
+    if (!datasetIsValid || !dataset || !runsQ.data) return;
+    const runIsValid = !!run && runsQ.data.some((r) => r.run_id === run);
+    if (!runIsValid) {
+      setSelection({ dataset, run: runsQ.data[0]?.run_id ?? null });
     }
-  }, [dataset, run, runsQ.data, setSelection]);
+  }, [dataset, datasetIsValid, run, runsQ.data, setSelection]);
 
   return null;
 }

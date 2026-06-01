@@ -19,6 +19,9 @@ import {
   useMicroplex,
   type MicroplexRunSummary,
   type MicroplexFamilyCount,
+  type MicroplexTargetCount,
+  type MicroplexFilingStatusGap,
+  type MicroplexAgiGap,
 } from "@/lib/api/hooks/use-microplex";
 
 function fmt(v: number | null | undefined, opts: { pct?: boolean } = {}) {
@@ -122,6 +125,108 @@ const leadColumns = [
   },
 ];
 
+const targetCountColumns = [
+  {
+    key: "target",
+    header: "Target",
+    format: (v: unknown) => (
+      <span className="font-mono text-xs">{String(v)}</span>
+    ),
+  },
+  {
+    key: "count",
+    header: "Count",
+    align: "right" as const,
+    format: (v: unknown) => formatNumber(Number(v)),
+  },
+  {
+    key: "weightedTermDeltaMean",
+    header: "Mean weighted Δ",
+    align: "right" as const,
+    format: (v: unknown) =>
+      v == null ? "—" : Number(v).toFixed(2),
+  },
+  {
+    key: "weightedTermDeltaSum",
+    header: "Σ weighted Δ",
+    align: "right" as const,
+    format: (v: unknown) =>
+      v == null ? "—" : Number(v).toFixed(2),
+  },
+];
+
+const filingStatusGapColumns = [
+  {
+    key: "filingStatus",
+    header: "Filing status",
+    format: (v: unknown) => (
+      <span className="font-mono text-xs">{String(v)}</span>
+    ),
+  },
+  {
+    key: "meanAbsWeightedCountDelta",
+    header: "Mean |count Δ|",
+    align: "right" as const,
+    format: (v: unknown) =>
+      v == null ? "—" : formatNumber(Number(v)),
+  },
+  {
+    key: "weightedCountDeltaSum",
+    header: "Σ count Δ",
+    align: "right" as const,
+    format: (v: unknown) =>
+      v == null ? "—" : formatNumber(Number(v)),
+  },
+  {
+    key: "positiveCount",
+    header: "+ audits",
+    align: "right" as const,
+    format: (v: unknown) => formatNumber(Number(v)),
+  },
+  {
+    key: "negativeCount",
+    header: "- audits",
+    align: "right" as const,
+    format: (v: unknown) => formatNumber(Number(v)),
+  },
+];
+
+const agiGapColumns = [
+  {
+    key: "agiBin",
+    header: "AGI bin",
+    format: (v: unknown) => (
+      <span className="font-mono text-xs">{String(v)}</span>
+    ),
+  },
+  {
+    key: "meanAbsWeightedCountDelta",
+    header: "Mean |count Δ|",
+    align: "right" as const,
+    format: (v: unknown) =>
+      v == null ? "—" : formatNumber(Number(v)),
+  },
+  {
+    key: "weightedCountDeltaSum",
+    header: "Σ count Δ",
+    align: "right" as const,
+    format: (v: unknown) =>
+      v == null ? "—" : formatNumber(Number(v)),
+  },
+  {
+    key: "positiveCount",
+    header: "+ audits",
+    align: "right" as const,
+    format: (v: unknown) => formatNumber(Number(v)),
+  },
+  {
+    key: "negativeCount",
+    header: "- audits",
+    align: "right" as const,
+    format: (v: unknown) => formatNumber(Number(v)),
+  },
+];
+
 export default function MicroplexPage() {
   const { data, isLoading, error } = useMicroplex();
 
@@ -196,6 +301,7 @@ export default function MicroplexPage() {
                   Coverage
                 </div>
                 <div>slice win rate <strong>{fmt(h.slice_win_rate, { pct: true })}</strong></div>
+                <div>target win rate <strong>{fmt(h.target_win_rate, { pct: true })}</strong></div>
                 <div>supported target rate <strong>{fmt(h.supported_target_rate, { pct: true })}</strong></div>
                 <div>n synthetic <strong>{fmt(h.n_synthetic)}</strong></div>
                 <div>profile <span className="font-mono text-xs">{h.calibration_target_profile}</span></div>
@@ -213,6 +319,24 @@ export default function MicroplexPage() {
             <Text size="xs" c="dimmed" className="mt-3">
               artifact_id <code className="font-mono">{data.artifact_id}</code>
             </Text>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {data.source_artifacts.map((artifact) => (
+                <a
+                  key={artifact.name}
+                  href={artifact.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-primary hover:underline"
+                >
+                  {artifact.name}
+                </a>
+              ))}
+            </div>
+            <ul className="mt-3 list-disc pl-5 text-xs text-muted-foreground">
+              {data.limitations.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
 
@@ -264,6 +388,23 @@ export default function MicroplexPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Targets most often appearing in audited regressions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              columns={targetCountColumns}
+              data={
+                data.regression_summary.target_counts_from_audits.slice(0, 25) as unknown as Record<
+                  string,
+                  unknown
+                >[]
+              }
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>
               IRS drilldown — {data.irs_drilldown.family} (leads{" "}
               {data.irs_drilldown.audits_where_family_leads} audits)
@@ -281,6 +422,41 @@ export default function MicroplexPage() {
             />
           </CardContent>
         </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Filing-status gaps in IRS lead audits</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={filingStatusGapColumns}
+                data={
+                  data.irs_drilldown.lead_filing_status_gap_summary as unknown as Record<
+                    string,
+                    unknown
+                  >[]
+                }
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>MFS AGI-bin gaps in IRS lead audits</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={agiGapColumns}
+                data={
+                  data.irs_drilldown.lead_mfs_agi_gap_summary as unknown as Record<
+                    string,
+                    unknown
+                  >[]
+                }
+              />
+            </CardContent>
+          </Card>
+        </div>
       </Stack>
     </AppShell>
   );

@@ -13,6 +13,7 @@ but the universe view (Summary + All targets) works.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -21,7 +22,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 
-from backend.services.runs import DatasetConfig, storage_prefix
+from backend.services.runs import DatasetConfig
 from backend.state import AppState
 
 if TYPE_CHECKING:
@@ -182,14 +183,43 @@ def _try_fetch_unified_diagnostics(
     (`national_unified_diagnostics.csv`) filenames so we don't silently
     miss national-scope runs.
 
-    For each scope we look in two locations:
+    For each scope we look in:
     1. `calibration/runs/<run_id>/diagnostics/<file>` — per-run.
-    2. `calibration/logs/<file>` — "current" canonical snapshot.
+    2. `calibration/logs/<file>` — "current" canonical snapshot, but only
+       for the latest discovered run. Reusing current logs for older staging
+       runs silently reports the wrong calibration fit.
 
     Returns ``(df, scope)`` on success — knowing the scope lets later code
     pick the matching weights / run_config files. Returns ``None`` if
     nothing was found.
     """
+    if dataset.layout == "root":
+        from huggingface_hub import hf_hub_download
+        from backend.services.fit_artifacts import artifacts_for_scope
+
+        filename = artifacts_for_scope("regional").diagnostics
+        path = f"calibration/logs/{filename}"
+        repo_slug = dataset.repo_id.replace("/", "__")
+        cache = Path(cache_root) / repo_slug
+        cache.mkdir(parents=True, exist_ok=True)
+        try:
+            local = hf_hub_download(
+                repo_id=dataset.repo_id,
+                filename=path,
+                repo_type=dataset.repo_type,
+                local_dir=str(cache),
+            )
+            df = pd.read_csv(local)
+            if "target" in df.columns and "estimate" in df.columns:
+                logger.info(
+                    "Loaded root production diagnostics from %s (%d rows)",
+                    path, len(df),
+                )
+                return df, "regional"
+        except Exception as exc:
+            logger.debug("diagnostics fetch failed at %s: %s", path, exc)
+        return None
+
     if dataset.layout != "staging":
         return None
     from huggingface_hub import hf_hub_download
@@ -206,8 +236,14 @@ def _try_fetch_unified_diagnostics(
         filename = artifacts_for_scope(scope).diagnostics
         candidate_paths = [
             f"calibration/runs/{run_id}/diagnostics/{filename}",
-            f"calibration/logs/{filename}",
         ]
+        try:
+            from backend.services import runs as runs_service
+            latest = next(iter(runs_service.list_runs(dataset.id)), None)
+            if latest is not None and latest.run_id == run_id:
+                candidate_paths.append(f"calibration/logs/{filename}")
+        except Exception as exc:
+            logger.debug("Could not determine latest run for diagnostics fallback: %s", exc)
         for path in candidate_paths:
             try:
                 local = hf_hub_download(
@@ -229,33 +265,138 @@ def _try_fetch_unified_diagnostics(
     return None
 
 
+def _join_diagnostics(
+    targets_df: pd.DataFrame,
+    diag_df: pd.DataFrame,
+) -> int:
+    """Attach published calibration diagnostics to DB targets.
+
+    Diagnostics keys do not carry target_id or period, and the DB can contain
+    multiple active rows with the same variable/geography/constraint signature.
+    Join one diagnostics row to at most one DB row, picking the closest target
+    value when duplicates exist. For joined rows, the diagnostics true_value is
+    the calibrated target value, so use that value for package-derived error
+    calculations instead of the raw DB source value.
+    """
+    sig_to_indices: dict[tuple, list[int]] = {}
+    for idx, row in targets_df.iterrows():
+        sig_to_indices.setdefault(_row_to_diagnostics_signature(row), []).append(idx)
+
+    matched_indices: set[int] = set()
+    n_joined = 0
+    has_true = "true_value" in diag_df.columns
+    has_rel = "rel_error" in diag_df.columns
+    has_abs = "abs_rel_error" in diag_df.columns
+
+    for _, diag_row in diag_df.iterrows():
+        sig = _parse_diagnostics_key(diag_row.get("target"))
+        if sig is None:
+            continue
+        candidates = [
+            idx for idx in sig_to_indices.get(sig, [])
+            if idx not in matched_indices
+        ]
+        if not candidates:
+            continue
+
+        true_value = diag_row.get("true_value") if has_true else np.nan
+        if pd.notna(true_value):
+            def distance(idx: int) -> float:
+                raw_value = targets_df.at[idx, "value"]
+                try:
+                    return abs(float(raw_value) - float(true_value)) / max(
+                        1.0, abs(float(raw_value))
+                    )
+                except (TypeError, ValueError):
+                    return float("inf")
+            chosen = min(candidates, key=distance)
+        else:
+            chosen = candidates[0]
+
+        matched_indices.add(chosen)
+        if pd.notna(true_value):
+            targets_df.at[chosen, "value"] = float(true_value)
+        targets_df.at[chosen, "estimate"] = diag_row.get("estimate")
+        if has_rel and pd.notna(diag_row.get("rel_error")):
+            targets_df.at[chosen, "rel_error"] = float(diag_row["rel_error"])
+        if has_abs and pd.notna(diag_row.get("abs_rel_error")):
+            targets_df.at[chosen, "abs_rel_error"] = float(diag_row["abs_rel_error"])
+        targets_df.at[chosen, "included"] = True
+        if has_rel and pd.notna(diag_row.get("rel_error")):
+            targets_df.at[chosen, "loss_contribution"] = float(diag_row["rel_error"]) ** 2
+        n_joined += 1
+
+    return n_joined
+
+
+def _household_series(sim, variable: str, period: int, default=None) -> np.ndarray:
+    try:
+        return np.asarray(
+            sim.calculate(variable, map_to="household", period=period).values
+        )
+    except Exception:
+        if default is None:
+            raise
+        return np.asarray(default)
+
+
 def _ensure_staging_artifacts(
     dataset: DatasetConfig,
     run_id: str,
     cache_root: str = ".artifacts",
 ) -> dict[str, str]:
-    """Download a staging run's required files; return a {filename: path} map."""
-    from huggingface_hub import hf_hub_download
+    """Download a staging run's required files; return a {logical_name: path} map.
 
-    prefix = storage_prefix(dataset, run_id)
+    Logical names are the flat filenames (``policy_data.db``,
+    ``enhanced_cps_2024.h5``); on HF they may live at the run root OR
+    nested under ``calibration/`` / ``datasets/``. We probe both so
+    versioned releases and GHA staging both load through the same code
+    path, and store everything flat in the local cache.
+    """
+    from huggingface_hub import hf_hub_download
+    from backend.services.runs import (
+        _resolve_staging_file_paths,
+        _resolve_staging_root_file_paths,
+    )
+    import shutil
+
     repo_slug = dataset.repo_id.replace("/", "__")
-    # Cache under e.g. .artifacts/PolicyEngine__policyengine-us-data/staging/<run>/
-    cache = Path(cache_root) / repo_slug / prefix
+    if dataset.layout == "root":
+        cache = Path(cache_root) / repo_slug / "root" / run_id
+    else:
+        cache = Path(cache_root) / repo_slug / "staging" / run_id
     cache.mkdir(parents=True, exist_ok=True)
 
-    filenames = dataset.effective_required_files()
+    logical_names = list(dataset.effective_required_files())
+    if dataset.layout == "root":
+        actual_paths = {name: name for name in logical_names}
+    elif dataset.layout == "staging-root":
+        actual_paths = _resolve_staging_root_file_paths(
+            dataset.repo_id,
+            logical_names,
+        )
+    else:
+        actual_paths = _resolve_staging_file_paths(
+            dataset.repo_id,
+            run_id,
+            logical_names,
+        )
+
     resolved: dict[str, str] = {}
-    for fn in filenames:
-        dest = cache / fn
+    for fn in logical_names:
+        dest = cache / fn  # flat in our cache
         if dest.exists():
             logger.info("Found cached %s: %s", fn, dest)
             resolved[fn] = str(dest)
             continue
 
-        hf_path = f"{prefix}/{fn}"
+        hf_path = actual_paths.get(fn)
+        if hf_path is None:
+            logger.warning("Run %s does not publish %s; skipping.", run_id, fn)
+            continue
         logger.info("Downloading %s from %s/%s ...", fn, dataset.repo_id, hf_path)
         try:
-            hf_hub_download(
+            downloaded = hf_hub_download(
                 repo_id=dataset.repo_id,
                 filename=hf_path,
                 repo_type=dataset.repo_type,
@@ -265,14 +406,13 @@ def _ensure_staging_artifacts(
             logger.warning("Could not download %s: %s", hf_path, exc)
             continue
 
-        # hf_hub_download may nest the file under the prefix path.
-        nested = cache / prefix / fn
-        if nested.exists() and not dest.exists():
-            nested.rename(dest)
-            try:
-                (cache / prefix).rmdir()
-            except OSError:
-                pass
+        # hf_hub_download honors the repo path under local_dir, so the
+        # file lands at cache/<hf_path>. Move it to the flat dest so the
+        # rest of the loader doesn't need to know about the layout.
+        src = Path(downloaded)
+        if src != dest:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dest))
         if dest.exists():
             resolved[fn] = str(dest)
             size_mb = dest.stat().st_size / 1e6
@@ -421,16 +561,19 @@ def load_run_from_dataset(
     time_period = _detect_time_period(sim)
 
     # If we've previously computed estimates for this run, the parquet
-    # cache is good for the lifetime of the run (run_id is immutable per
-    # publish). Skip the CSV join + entity-aware evaluator entirely.
+    # cache is good for the lifetime of the run + selected h5 (run_id is
+    # immutable per publish). Skip the CSV join + entity-aware evaluator
+    # entirely.
     # Pickle keeps pandas types (object cols with lists, etc.) and needs no
     # extra deps. Cache key is the immutable run_id, so no staleness risk
     # within a run; bump SCHEMA_VERSION below to invalidate on shape change.
+    cache_stem = Path(dataset.primary_h5).stem.replace("/", "_")
+    layout_cache_dir = "root" if dataset.layout == "root" else "staging"
     enriched_cache_path = (
         Path(cache_root) / dataset.repo_id.replace("/", "__")
-        / "staging" / run_id / "targets_enriched.pkl"
+        / layout_cache_dir / run_id / f"targets_enriched.{cache_stem}.pkl"
     )
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 4
     cached_enriched: pd.DataFrame | None = None
     detected_scope_cached: str | None = None
     if enriched_cache_path.exists():
@@ -456,21 +599,65 @@ def load_run_from_dataset(
     ).values
     n_households = len(household_weight)
 
+    compute_household_fields = os.environ.get(
+        "COMPUTE_HOUSEHOLD_FIELDS", "",
+    ).lower() in {"1", "true", "yes"}
+    if compute_household_fields:
+        state_fips = _household_series(
+            sim, "state_fips", time_period, default=np.zeros(n_households)
+        ).astype(int)
+        cd_geoid = _household_series(
+            sim, "congressional_district_geoid", time_period,
+            default=np.zeros(n_households),
+        ).astype(int)
+        hh_income = _household_series(
+            sim, "spm_unit_net_income", time_period, default=np.zeros(n_households)
+        )
+        hh_threshold = _household_series(
+            sim, "spm_unit_spm_threshold", time_period, default=np.zeros(n_households)
+        )
+        in_poverty = hh_income < hh_threshold
+        try:
+            income_decile = pd.qcut(hh_income, 10, labels=False, duplicates="drop")
+            income_decile = np.asarray(income_decile).astype(np.int8)
+        except Exception:
+            income_decile = np.zeros(n_households, dtype=np.int8)
+    else:
+        logger.info(
+            "Skipping household income/geography fields "
+            "(set COMPUTE_HOUSEHOLD_FIELDS=true to compute them)."
+        )
+        state_fips = np.zeros(n_households, dtype=int)
+        cd_geoid = np.zeros(n_households, dtype=int)
+        hh_income = np.zeros(n_households, dtype=np.float32)
+        hh_threshold = np.zeros(n_households, dtype=np.float32)
+        in_poverty = np.zeros(n_households, dtype=bool)
+        income_decile = np.zeros(n_households, dtype=np.int8)
+
     households_df = pd.DataFrame({
         "household_idx": np.arange(n_households),
+        "income": hh_income.astype(np.float32),
+        "spm_threshold": hh_threshold.astype(np.float32),
+        "in_poverty": in_poverty,
         "initial_weight": household_weight.astype(np.float32),
         "final_weight": household_weight.astype(np.float32),
+        "g_weight": np.ones(n_households, dtype=np.float32),
+        "state": state_fips,
+        "cd_geoid": cd_geoid,
+        "income_decile": income_decile,
     })
 
     # Dataset mode: the canonical us-data repo publishes a per-run
-    # `unified_diagnostics.csv` (under calibration/runs/<run>/diagnostics/)
-    # that already contains post-calibration estimates for every target the
-    # pipeline trained against. We use those directly — no need to rebuild
-    # the X matrix.
+    # `unified_diagnostics.csv` (under calibration/runs/<run>/diagnostics/).
+    # We use it to identify targets that were actually in the calibration loss
+    # and to pick the published true_value, then recompute PE aggregates from
+    # the h5 with policyengine_us so the dashboard's "PE aggregate" column is
+    # sourced from the same package API users would call manually.
     #
-    # Targets the diagnostics file doesn't cover (typically the ones excluded
-    # by target_config.yaml during this calibration) fall back to the MVP
-    # evaluator, which handles the simple geographic-only cases.
+    # Targets the diagnostics file doesn't cover (typically excluded by
+    # target_config.yaml during this calibration) are left unestimated unless
+    # explicitly requested; evaluating all authored targets is slow and
+    # misleading for "included targets" diagnostics.
     # Skip CSV join + evaluator entirely if the parquet cache was already
     # warmed for this run. targets_df becomes the cached frame; we still
     # need to compute downstream stuff (households_df, sparse mats).
@@ -487,32 +674,64 @@ def load_run_from_dataset(
             "Joining %d rows from %s-scope diagnostics onto %d targets...",
             len(diag_df), diag_scope, len(targets_df),
         )
-        # Parse each diag key into a constraint-order-independent signature
-        # and build sig → estimate.
-        diag_sig_to_estimate: dict[tuple, float] = {}
-        for diag_target, est in zip(diag_df["target"], diag_df["estimate"]):
-            sig = _parse_diagnostics_key(diag_target)
-            if sig is not None:
-                diag_sig_to_estimate[sig] = est
-        # Compute the same signature on each of our rows and join.
-        targets_df["estimate"] = targets_df.apply(
-            lambda r: diag_sig_to_estimate.get(_row_to_diagnostics_signature(r)),
-            axis=1,
-        )
         # A CSV match means the pipeline evaluated this target in its loss.
-        # That's our "included" signal — it correctly distinguishes in-loss
-        # rows (~14k) from authored-but-not-evaluated rows (~27k).
-        targets_df["included"] = targets_df["estimate"].notna()
-        n_from_diag = int(targets_df["estimate"].notna().sum())
+        # Join one-to-one: target_id is absent from diagnostics and signatures
+        # can repeat across source periods in policy_data.db.
+        n_from_diag = _join_diagnostics(targets_df, diag_df)
         logger.info(
             "  → %d/%d targets got estimates from diagnostics CSV (marked included=True)",
             n_from_diag, len(targets_df),
         )
-    else:
+    elif cached_enriched is None:
         logger.info("No unified_diagnostics.csv found; falling back to MVP evaluator only.")
 
-    # Fill any remaining NaN estimates via the MVP evaluator (geographic-only).
-    if targets_df["estimate"].isna().any():
+    compute_pe_aggregates = os.environ.get(
+        "COMPUTE_PE_AGGREGATES", "true",
+    ).lower() not in {"0", "false", "no"}
+    if (
+        cached_enriched is None
+        and diag_result is not None
+        and compute_pe_aggregates
+        and targets_df["included"].any()
+    ):
+        from backend.services.stratum_evaluator import evaluate_targets
+
+        included_mask = targets_df["included"].astype(bool)
+        logger.info(
+            "Computing PE aggregates from published h5 for %d in-loss targets...",
+            int(included_mask.sum()),
+        )
+        evaluated = evaluate_targets(
+            targets_df[included_mask].copy(),
+            sim,
+            default_period=time_period,
+        )
+        idx = evaluated.index
+        targets_df.loc[idx, "estimate"] = evaluated["estimate"].values
+        targets_df.loc[idx, "rel_error"] = evaluated["rel_error"].values
+        targets_df.loc[idx, "abs_rel_error"] = evaluated["abs_rel_error"].values
+        if "eval_note" in evaluated.columns:
+            targets_df.loc[idx, "eval_note"] = evaluated["eval_note"].values
+        with np.errstate(invalid="ignore"):
+            targets_df.loc[idx, "loss_contribution"] = (
+                targets_df.loc[idx, "rel_error"].astype(float) ** 2
+            )
+        logger.info(
+            "Computed PE aggregates for %d/%d in-loss targets.",
+            int(targets_df.loc[idx, "estimate"].notna().sum()),
+            int(included_mask.sum()),
+        )
+
+    # Fill remaining NaN estimates only when diagnostics were unavailable, or
+    # explicitly requested. Evaluating tens of thousands of skipped/authored
+    # targets through Microsimulation makes normal dashboard loads look hung.
+    eval_skipped = os.environ.get("EVALUATE_SKIPPED_TARGETS", "").lower() in {
+        "1", "true", "yes",
+    }
+    should_eval_remaining = cached_enriched is None and (
+        (diag_result is None and dataset.layout != "staging-root") or eval_skipped
+    )
+    if targets_df["estimate"].isna().any() and should_eval_remaining:
         from backend.services.stratum_evaluator import evaluate_targets
         unfilled = targets_df["estimate"].isna()
         logger.info(
@@ -522,10 +741,34 @@ def load_run_from_dataset(
             targets_df[unfilled].copy(), sim, default_period=time_period,
         )
         targets_df.loc[unfilled, "estimate"] = filled["estimate"].values
+    elif targets_df["estimate"].isna().any():
+        logger.info(
+            "Skipping MVP evaluator for %d non-diagnostics targets "
+            "(set EVALUATE_SKIPPED_TARGETS=true to compute them).",
+            int(targets_df["estimate"].isna().sum()),
+        )
     n_evaluated = int(np.sum(~targets_df["estimate"].isna()))
     logger.info(
         "Total estimates available: %d/%d (%.1f%%)",
         n_evaluated, len(targets_df), 100 * n_evaluated / max(1, len(targets_df)),
+    )
+
+    # Compute rel_error / abs_rel_error for rows not populated by diagnostics.
+    target_values = targets_df["value"].to_numpy(dtype=np.float64)
+    estimates_arr = targets_df["estimate"].to_numpy(dtype=np.float64)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rel = np.where(
+            np.abs(target_values) > 0,
+            (estimates_arr - target_values) / np.abs(target_values),
+            np.nan,
+        )
+    targets_df["rel_error"] = np.where(
+        targets_df["rel_error"].notna(), targets_df["rel_error"], rel,
+    )
+    targets_df["abs_rel_error"] = np.where(
+        targets_df["abs_rel_error"].notna(),
+        targets_df["abs_rel_error"],
+        np.abs(rel),
     )
 
     # Stash the detected fit scope so other artifact lookups can pick the
@@ -547,18 +790,6 @@ def load_run_from_dataset(
             logger.info("Cached targets_enriched → %s", enriched_cache_path)
         except Exception as exc:
             logger.warning("Failed to cache enriched targets (%s); continuing.", exc)
-
-    # Compute rel_error / abs_rel_error now that estimates are filled.
-    target_values = targets_df["value"].to_numpy(dtype=np.float64)
-    estimates_arr = targets_df["estimate"].to_numpy(dtype=np.float64)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        rel = np.where(
-            np.abs(target_values) > 0,
-            (estimates_arr - target_values) / np.abs(target_values),
-            np.nan,
-        )
-    targets_df["rel_error"] = rel
-    targets_df["abs_rel_error"] = np.abs(rel)
 
     # Empty sparse matrices since dataset mode doesn't have the pipeline's
     # X matrix yet (waiting on data-team publish).

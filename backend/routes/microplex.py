@@ -43,6 +43,12 @@ _IRS_DRILLDOWN_PATH = (
 
 _GITHUB_RAW = "https://raw.githubusercontent.com/PolicyEngine/microplex-us/main"
 
+_ARTIFACTS = {
+    "parity": _PARITY_PATH,
+    "regression_summary": _REGRESSION_SUMMARY_PATH,
+    "irs_drilldown": _IRS_DRILLDOWN_PATH,
+}
+
 # In-process cache: the JSONs change only when microplex-us commits, so a
 # few minutes of TTL is plenty.
 _CACHE: dict[str, tuple[float, Any]] = {}
@@ -117,11 +123,29 @@ def microplex_overview() -> dict:
             "mean_abs_relative_error_delta": ph.get("mean_abs_relative_error_delta"),
             "slice_win_rate": ph.get("slice_win_rate"),
             "supported_target_rate": ph.get("supported_target_rate"),
+            "target_win_rate": (
+                ph.get("tag_summaries", {})
+                .get("all_targets", {})
+                .get("target_win_rate")
+            ),
             "tag_summaries": ph.get("tag_summaries", {}),
         }
 
     return _scrub({
         "source_repo": "PolicyEngine/microplex-us",
+        "source_artifacts": [
+            {
+                "name": name,
+                "path": path,
+                "url": f"{_GITHUB_RAW}/{path}",
+            }
+            for name, path in _ARTIFACTS.items()
+        ],
+        "limitations": [
+            "Only committed microplex-us JSON artifacts are public.",
+            "Microplex h5 output and per-target diagnostics are not published to HuggingFace yet.",
+            "This is aggregate parity/regression reporting, not a target-by-target dataset-file comparison.",
+        ],
         "artifact_id": parity.get("artifactId"),
         "verdict": parity.get("verdict"),
         "headline": headline,

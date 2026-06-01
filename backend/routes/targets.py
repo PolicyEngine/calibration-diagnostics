@@ -44,6 +44,18 @@ def _validate_target_idx(state: AppState, target_idx: int) -> None:
         )
 
 
+def _require_matrix_artifacts(state: AppState) -> None:
+    if state.X_csr.shape[0] == 0 or state.X_csr.shape[1] == 0 or state.X_csr.nnz == 0:
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "This run does not publish the calibration sparse matrix. "
+                "Target detail tabs that need household-level contributors "
+                "are unavailable for dataset-mode runs."
+            ),
+        )
+
+
 # --- Literal-segment routes BEFORE parametric routes ---
 
 
@@ -105,6 +117,26 @@ ERROR_BUCKETS = {
 }
 
 
+def _available_bundles_for_state(state) -> "frozenset[str] | None":
+    """Look up which bundle h5s the loaded run actually publishes on HF.
+
+    Returns ``None`` for runs without a resolvable HF repo (pkl-mode
+    sandbox); callers that get ``None`` should treat the canonical
+    bundle mapping as a best-effort label rather than a verified fact.
+    """
+    try:
+        from backend.services.runs import get_dataset
+        from backend.services.bundle_availability import published_bundles
+        ds = get_dataset(state.dataset_id)
+    except Exception:
+        return None
+    if ds is None or getattr(ds, "layout", None) not in {
+        "staging", "root", "staging-root",
+    }:
+        return None
+    return published_bundles(ds.repo_id, state.run_id)
+
+
 def _apply_target_filters(
     df,
     *,
@@ -119,6 +151,7 @@ def _apply_target_filters(
     min_abs_rel_error: float | None = None,
     included_only: bool | None = None,
     dataset_files: list[str] | None = None,
+    available_bundles: "frozenset[str] | None" = None,
 ):
     """Apply the standard filter set used by list_targets and facets."""
     if included_only is not None:
@@ -146,13 +179,15 @@ def _apply_target_filters(
     if sources and "source" in df.columns:
         df = df[df["source"].isin(sources)]
     if dataset_files:
-        # Each target maps to exactly one calibrated h5 in us-data's pipeline
-        # (the per-state / per-district bundle that holds its weights).
-        from backend.services.geo_utils import dataset_bundle_for
+        # Each target maps to one calibrated h5 in us-data's pipeline. If
+        # `available_bundles` is set, fall back to the federal bundle when
+        # the conventional per-bundle h5 doesn't exist for this run.
+        from backend.services.geo_utils import runtime_dataset_bundle_for
         wanted = set(dataset_files)
         df = df[df.apply(
-            lambda r: dataset_bundle_for(
-                r.get("geo_level"), r.get("geographic_id")
+            lambda r: runtime_dataset_bundle_for(
+                r.get("geo_level"), r.get("geographic_id"),
+                available=available_bundles,
             ) in wanted,
             axis=1,
         )]
@@ -214,6 +249,7 @@ def list_targets(
     offset: int = 0,
     state: AppState = Depends(get_state),
 ) -> TargetListResponse:
+    available_bundles = _available_bundles_for_state(state)
     df = _apply_target_filters(
         state.targets_enriched,
         search=search,
@@ -227,14 +263,47 @@ def list_targets(
         min_abs_rel_error=min_abs_rel_error,
         included_only=included_only,
         dataset_files=dataset_file,
+        available_bundles=available_bundles,
     )
+
+    # Per-bundle re-evaluation. Kicks in when the caller filtered to
+    # exactly one published bundle other than the federal one we
+    # already loaded — then estimates come from that bundle's own h5.
+    bundle_evaluated: str | None = None
+    if (
+        dataset_file
+        and len(dataset_file) == 1
+        and available_bundles
+        and dataset_file[0] in available_bundles
+        and dataset_file[0] != "enhanced_cps_2024.h5"
+        and not df.empty
+    ):
+        only = dataset_file[0]
+        try:
+            from backend.services.runs import get_dataset
+            from backend.services.bundle_eval import evaluate_bundle
+            ds = get_dataset(state.dataset_id)
+            df = evaluate_bundle(
+                df,
+                repo_id=ds.repo_id,
+                run_id=state.run_id,
+                bundle=only,
+                time_period=state.time_period,
+            )
+            bundle_evaluated = only
+        except Exception as exc:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "Per-bundle eval for %s failed (%s); using federal-fit numbers.",
+                only, exc,
+            )
 
     # Compare-run join: enriches each row with estimate_b / rel_error_b /
     # abs_rel_error_b / delta from the second run, joined on target_id.
     # Loaded through the registry so a cold compare-run picks up the same
     # entity-aware evaluator pass.
     df_b = None
-    if compare_run and compare_run != state.run_id:
+    if request is not None and compare_run and compare_run != state.run_id:
         try:
             state_b = request.app.state.registry.get(state.dataset_id, compare_run)
             df_b = state_b.targets_enriched
@@ -254,7 +323,12 @@ def list_targets(
     total = len(df)
     ascending = sort_order == "asc"
     if sort_by in df.columns:
-        df = df.sort_values(sort_by, ascending=ascending)
+        effective_sort = sort_by
+        if sort_by == "loss_contribution":
+            losses = df["loss_contribution"].to_numpy(dtype=float)
+            if len(losses) == 0 or not np.any(np.nan_to_num(losses) != 0):
+                effective_sort = "abs_rel_error"
+        df = df.sort_values(effective_sort, ascending=ascending)
     df = df.iloc[offset : offset + limit]
 
     has_compare = df_b is not None and not df_b.empty
@@ -263,6 +337,7 @@ def list_targets(
         total=total,
         offset=offset,
         limit=limit,
+        bundle_evaluated=bundle_evaluated,
     )
 
 
@@ -314,15 +389,19 @@ def get_facets(
     by_geo_level = _value_counts_with_loss(_filtered("geo_level"), "geo_level")
     by_source = _value_counts_with_loss(_filtered("source"), "source")
 
-    # Per-h5-bundle counts: which calibrated dataset each target rolls up
-    # into. The pipeline builds separate per-state and per-district h5s,
-    # each calibrated against its own slice of targets, so this is the
-    # facet that lets users scope to "what does CA.h5 actually target?"
-    from backend.services.geo_utils import dataset_bundle_for
+    # Per-h5-bundle counts: which calibrated dataset each target rolls
+    # up into. Runtime-aware so we only list bundles the run actually
+    # publishes — for a federal-only GHA run that means a single entry
+    # holding all 40k targets, not the theoretical 200 names.
+    from backend.services.geo_utils import runtime_dataset_bundle_for
+    available_bundles = _available_bundles_for_state(state)
     df_bundles = _filtered("dataset_file")
     df_bundles = df_bundles.assign(
         _bundle=df_bundles.apply(
-            lambda r: dataset_bundle_for(r.get("geo_level"), r.get("geographic_id")),
+            lambda r: runtime_dataset_bundle_for(
+                r.get("geo_level"), r.get("geographic_id"),
+                available=available_bundles,
+            ),
             axis=1,
         )
     )
@@ -432,6 +511,7 @@ def error_decomposition(
     state: AppState = Depends(get_state),
 ) -> ErrorDecomposition:
     _validate_target_idx(state, target_idx)
+    _require_matrix_artifacts(state)
     target_value = float(state.targets_enriched.iloc[target_idx]["value"])
     decomp = matrix_ops.compute_error_decomposition(
         state.X_csr, target_idx, target_value,
@@ -487,6 +567,7 @@ def eligibility_audit(
     state: AppState = Depends(get_state),
 ) -> EligibilityAuditResponse:
     _validate_target_idx(state, target_idx)
+    _require_matrix_artifacts(state)
     if criterion_operator not in _OPS:
         raise HTTPException(status_code=400, detail=f"Invalid operator: {criterion_operator}")
     if not state.sim_service.variable_exists(criterion_variable):
@@ -541,6 +622,7 @@ def constraint_diff(
     state: AppState = Depends(get_state),
 ) -> ConstraintDiffResponse:
     _validate_target_idx(state, target_idx)
+    _require_matrix_artifacts(state)
     if state.db_engine is None:
         raise HTTPException(status_code=503, detail="No database connected")
 
@@ -629,6 +711,7 @@ def contributors(
     state: AppState = Depends(get_state),
 ) -> list[ContributorRow]:
     _validate_target_idx(state, target_idx)
+    _require_matrix_artifacts(state)
     contribs = matrix_ops.get_target_contributions(
         state.X_csr, target_idx, state.final_weights,
     )
@@ -704,12 +787,22 @@ def _safe_int(val) -> int | None:
 
 
 def _safe_float(val) -> float | None:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
+    if val is None or pd.isna(val):
         return None
+    try:
+        out = float(val)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(out):
+        return None
+    return out
+
+
+def _parse_value(val):
     try:
         return float(val)
     except (TypeError, ValueError):
-        return None
+        return val
 
 
 def _parse_constraints_from_name(target_name: str) -> list[str]:
@@ -732,6 +825,13 @@ def _target_row(df, idx: int, with_compare: bool = False) -> TargetRow:
     gl = _nan_to_none(r.get("geo_level")) or "national"
     gid = str(_nan_to_none(r.get("geographic_id")) or "US")
     constraints = _parse_constraints_from_name(str(r.get("target_name", "")))
+    target_value = _safe_float(r.get("value"))
+    estimate = _safe_float(r.get("estimate"))
+    abs_error = (
+        abs(estimate - target_value)
+        if estimate is not None and target_value is not None
+        else None
+    )
     return TargetRow(
         target_idx=idx,
         target_id=_safe_int(r.get("target_id")),
@@ -740,11 +840,11 @@ def _target_row(df, idx: int, with_compare: bool = False) -> TargetRow:
         geographic_id=gid,
         geo_display_name=geo_display_name(gl, gid),
         constraints=constraints,
-        target_value=float(r["value"]),
-        estimate=float(r.get("estimate", 0)),
-        rel_error=float(r.get("rel_error", 0)),
-        abs_error=abs(float(r.get("estimate", 0)) - float(r["value"])),
-        loss_contribution=float(r.get("loss_contribution", 0)),
+        target_value=target_value,
+        estimate=estimate,
+        rel_error=_safe_float(r.get("rel_error")),
+        abs_error=abs_error,
+        loss_contribution=_safe_float(r.get("loss_contribution")),
         included=bool(r.get("included", True)),
         source=_nan_to_none(r.get("source")),
         period=_safe_int(r.get("period")),

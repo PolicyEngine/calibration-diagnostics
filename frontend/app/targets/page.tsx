@@ -359,8 +359,19 @@ function TargetTable() {
 
   const columns = buildTargetColumns(!!compareRun);
 
+  const bundleEvaluated = targets.data?.bundle_evaluated;
+
   return (
     <Stack gap="md">
+      {bundleEvaluated && (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm">
+          <strong>Bundle-fit numbers.</strong> PE aggregates below were
+          evaluated against{" "}
+          <code className="font-mono text-xs">{bundleEvaluated}</code>{" "}
+          — the calibrated h5 the pipeline builds for this bundle — not
+          the federal <code className="font-mono text-xs">enhanced_cps_2024.h5</code>.
+        </div>
+      )}
       {targets.data ? (
         <DataTable
           columns={columns}

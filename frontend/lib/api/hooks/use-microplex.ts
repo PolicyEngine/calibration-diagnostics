@@ -19,6 +19,7 @@ export interface MicroplexHeadline {
   mean_abs_relative_error_delta: number | null;
   slice_win_rate: number | null;
   supported_target_rate: number | null;
+  target_win_rate: number | null;
   tag_summaries: Record<string, MicroplexTagSummary>;
 }
 
@@ -42,6 +43,31 @@ export interface MicroplexFamilyCount {
   top3Count: number;
 }
 
+export interface MicroplexTargetCount {
+  count: number;
+  target: string;
+  weightedTermDeltaMean?: number | null;
+  weightedTermDeltaSum?: number | null;
+}
+
+export interface MicroplexFilingStatusGap {
+  filingStatus: string;
+  count: number;
+  meanAbsWeightedCountDelta: number | null;
+  negativeCount: number;
+  positiveCount: number;
+  weightedCountDeltaSum: number | null;
+}
+
+export interface MicroplexAgiGap {
+  agiBin: string;
+  count: number;
+  meanAbsWeightedCountDelta: number | null;
+  negativeCount: number;
+  positiveCount: number;
+  weightedCountDeltaSum: number | null;
+}
+
 export interface MicroplexLeadAudit {
   artifactPath: string;
   artifactRoot: string;
@@ -52,6 +78,8 @@ export interface MicroplexLeadAudit {
 
 export interface MicroplexResponse {
   source_repo: string;
+  source_artifacts: { name: string; path: string; url: string }[];
+  limitations: string[];
   artifact_id: string | null;
   verdict: Record<string, boolean> | null;
   headline: MicroplexHeadline;
@@ -62,16 +90,16 @@ export interface MicroplexResponse {
     worst_runs: MicroplexRunSummary[];
     largest_family_counts: Record<string, unknown>;
     top3_family_counts: MicroplexFamilyCount[];
-    target_counts_from_audits: Record<string, unknown>;
+    target_counts_from_audits: MicroplexTargetCount[];
   };
   irs_drilldown: {
     family: string | null;
     audits_where_family_leads: number | null;
     audits_with_matching_targets: number | null;
     lead_audits: MicroplexLeadAudit[];
-    lead_target_counts: Record<string, unknown>;
-    lead_filing_status_gap_summary: unknown;
-    lead_mfs_agi_gap_summary: unknown;
+    lead_target_counts: MicroplexTargetCount[];
+    lead_filing_status_gap_summary: MicroplexFilingStatusGap[];
+    lead_mfs_agi_gap_summary: MicroplexAgiGap[];
   };
 }
 

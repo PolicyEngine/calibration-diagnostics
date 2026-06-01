@@ -14,10 +14,10 @@ export interface Target extends Record<string, unknown> {
   geo_display_name: string | null;
   constraints: string[];
   target_value: number;
-  estimate: number;
-  rel_error: number;
-  abs_error: number;
-  loss_contribution: number;
+  estimate: number | null;
+  rel_error: number | null;
+  abs_error: number | null;
+  loss_contribution: number | null;
   included: boolean;
   // Populated when /targets is called with ?compare_run=…
   estimate_b: number | null;
@@ -31,6 +31,9 @@ export interface PaginatedResponse<T> {
   total: number;
   offset: number;
   limit: number;
+  // Set when /targets re-evaluated estimates against a single bundle's
+  // h5 (e.g. "states/CA.h5") instead of the federal load.
+  bundle_evaluated?: string | null;
 }
 
 export interface ErrorDecomposition extends Record<string, unknown> {

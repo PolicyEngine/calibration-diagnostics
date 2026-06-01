@@ -36,6 +36,7 @@ const RUN_AGNOSTIC_PATHS = [
   "/pipeline",         // covers /pipeline and /pipeline/stages/*
   "/target-inventory", // committed JSON, run-independent
   "/microplex",        // pulls parity JSONs from PolicyEngine/microplex-us
+  "/analysis/case-studies",
 ];
 
 function pathRequiresRun(path: string): boolean {

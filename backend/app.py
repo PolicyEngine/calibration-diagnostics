@@ -12,7 +12,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from backend.api.v1.router import router as api_v1_router
 from backend.routes import (
+    analysis,
     compare,
     geography,
     microplex,
@@ -72,10 +74,12 @@ app.add_middleware(
 )
 
 app.include_router(runs_route.router, tags=["runs"])
+app.include_router(api_v1_router)
 app.include_router(summary.router, tags=["summary"])
 app.include_router(pipeline.router, tags=["pipeline"])
 app.include_router(target_inventory.router, tags=["target-inventory"])
 app.include_router(nodes.router, tags=["nodes"])
+app.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
 app.include_router(compare.router, tags=["compare"])
 app.include_router(microplex.router, tags=["microplex"])
 app.include_router(geography.router, prefix="/geography", tags=["geography"])

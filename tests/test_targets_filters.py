@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 import scipy.sparse as sp
 
 from backend.routes.targets import (
@@ -179,15 +178,15 @@ def test_filter_state_fips_empty_list_is_no_op():
 
 def test_list_targets_no_filters_returns_total():
     s = _state(_make_rows())
-    resp = list_targets(state=s)
+    resp = list_targets(request=None, state=s)
     assert resp.total == 6
     assert len(resp.items) == 6
 
 
 def test_list_targets_paging():
     s = _state(_make_rows())
-    resp1 = list_targets(limit=2, offset=0, state=s)
-    resp2 = list_targets(limit=2, offset=2, state=s)
+    resp1 = list_targets(request=None, limit=2, offset=0, state=s)
+    resp2 = list_targets(request=None, limit=2, offset=2, state=s)
     assert resp1.total == 6
     assert len(resp1.items) == 2
     assert len(resp2.items) == 2
@@ -199,14 +198,18 @@ def test_list_targets_paging():
 
 def test_list_targets_sort_by_loss_desc():
     s = _state(_make_rows())
-    resp = list_targets(sort_by="loss_contribution", sort_order="desc", state=s)
+    resp = list_targets(
+        request=None, sort_by="loss_contribution", sort_order="desc", state=s,
+    )
     losses = [i.loss_contribution for i in resp.items]
     assert losses == sorted(losses, reverse=True)
 
 
 def test_list_targets_variable_multi():
     s = _state(_make_rows())
-    resp = list_targets(variable=["snap_enrollment", "agi"], state=s)
+    resp = list_targets(
+        request=None, variable=["snap_enrollment", "agi"], state=s,
+    )
     assert resp.total == 5  # 3 snap (national/state/district CA) + 1 TX + 1 agi
 
 

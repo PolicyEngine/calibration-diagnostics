@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../client";
 import { targetKeys } from "../query-keys";
 import type { Target, PaginatedResponse } from "../types";
+import { useRunQueryState } from "./use-runs";
 
 interface UseTargetsParams {
   sortBy?: string;
@@ -25,8 +26,9 @@ interface UseTargetsParams {
 }
 
 export function useTargets(params: UseTargetsParams = {}) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: targetKeys.list(params),
+    queryKey: targetKeys.list(dataset, run, params),
     queryFn: () =>
       apiGet<PaginatedResponse<Target>>("/targets", {
         sort_by: params.sortBy ?? "loss_contribution",
@@ -61,6 +63,7 @@ export function useTargets(params: UseTargetsParams = {}) {
         limit: params.limit ?? 50,
         offset: params.offset ?? 0,
       }),
+    enabled: ready,
   });
 }
 
@@ -80,10 +83,12 @@ export interface SourceSummaryRow {
 }
 
 export function useSourceSummary() {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: ["targets", "source-summary"],
+    queryKey: ["targets", dataset, run, "source-summary"],
     queryFn: () =>
       apiGet<{ sources: SourceSummaryRow[] }>("/targets/source-summary"),
+    enabled: ready,
   });
 }
 
@@ -98,8 +103,9 @@ export interface FacetsResponse {
 }
 
 export function useTargetFacets(params: UseTargetsParams = {}) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: ["targets", "facets", params],
+    queryKey: ["targets", dataset, run, "facets", params],
     queryFn: () =>
       apiGet<FacetsResponse>("/targets/facets", {
         search: params.search || undefined,
@@ -109,22 +115,26 @@ export function useTargetFacets(params: UseTargetsParams = {}) {
         included_only: params.includedOnly,
         state_fips: params.stateFips,
       }),
+    enabled: ready,
   });
 }
 
 export function useTargetSearch(variable: string, enabled = true) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: targetKeys.search(variable),
+    queryKey: targetKeys.search(dataset, run, variable),
     queryFn: () =>
       apiGet<Target[]>("/targets/search", { variable }),
-    enabled: enabled && variable.length >= 2,
+    enabled: ready && enabled && variable.length >= 2,
   });
 }
 
 export function useWorstFitTargets(limit = 20) {
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
-    queryKey: targetKeys.worstFit(),
+    queryKey: targetKeys.worstFit(dataset, run),
     queryFn: () =>
       apiGet<Target[]>("/targets/worst-fit", { limit }),
+    enabled: ready,
   });
 }

@@ -30,15 +30,18 @@ def get_summary(
     else:
         included = df
 
-    abs_err = included["abs_rel_error"].to_numpy()
-    rel_err = included["rel_error"].to_numpy()
+    abs_err_all = included["abs_rel_error"].to_numpy(dtype=float)
+    rel_err_all = included["rel_error"].to_numpy(dtype=float)
+    finite_mask = np.isfinite(abs_err_all) & np.isfinite(rel_err_all)
+    abs_err = abs_err_all[finite_mask]
+    rel_err = rel_err_all[finite_mask]
 
     # n_targets_with_estimate is computability coverage — counted across the
     # WHOLE bundle, not just the included subset. In sandbox mode every X row
     # produces an estimate (so this equals n_targets); in dataset mode only
     # the MVP-evaluable subset does.
-    full_abs = df["abs_rel_error"].to_numpy()
-    n_with_estimate = int(np.sum(~np.isnan(full_abs)))
+    full_abs = df["abs_rel_error"].to_numpy(dtype=float)
+    n_with_estimate = int(np.sum(np.isfinite(full_abs)))
 
     headline = {
         "dataset_id": state.dataset_id,
@@ -46,8 +49,8 @@ def get_summary(
         "n_targets": int(len(df)),
         "n_targets_included": int(len(included)),
         "n_targets_with_estimate": n_with_estimate,
-        "median_abs_rel_error": _safe_float(np.median(abs_err)),
-        "mean_abs_rel_error": _safe_float(np.mean(abs_err)),
+        "median_abs_rel_error": _safe_float(np.median(abs_err)) if len(abs_err) else None,
+        "mean_abs_rel_error": _safe_float(np.mean(abs_err)) if len(abs_err) else None,
         "p95_abs_rel_error": _safe_float(np.percentile(abs_err, 95)) if len(abs_err) else None,
         "pct_within_5pct": _pct(abs_err, 0.05),
         "pct_within_10pct": _pct(abs_err, 0.10),
@@ -66,7 +69,7 @@ def get_summary(
     # otherwise fall back to abs_rel_error so we still show meaningful rows
     # in dataset mode where loss_contribution is uniformly 0.
     rank_col = "loss_contribution"
-    if included[rank_col].max() == 0:
+    if included[rank_col].fillna(0).max() == 0:
         rank_col = "abs_rel_error"
     worst_targets = (
         included.nlargest(worst_n, rank_col)[
@@ -177,7 +180,10 @@ def _group_summary(df, by: str, top: int) -> list[dict]:
         median_abs_rel_error=("abs_rel_error", "median"),
         total_loss=("loss_contribution", "sum"),
     )
-    grouped = grouped.sort_values("total_loss", ascending=False).head(top)
+    sort_col = "total_loss"
+    if grouped["total_loss"].fillna(0).eq(0).all():
+        sort_col = "mean_abs_rel_error"
+    grouped = grouped.sort_values(sort_col, ascending=False).head(top)
     out = []
     for key, row in grouped.iterrows():
         out.append({
@@ -193,7 +199,6 @@ def _group_summary(df, by: str, top: int) -> list[dict]:
 def _weight_health(state: AppState) -> dict:
     g = state.g_weights
     finals = state.final_weights
-    n = len(g) if len(g) else 1
     return {
         "n_households": int(len(g)),
         "pct_zero_g": float(np.mean(g == 0)) if len(g) else None,

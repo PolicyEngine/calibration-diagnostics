@@ -98,7 +98,7 @@ def test_constrained_target_left_unevaluated_with_note():
     }])
     out = evaluate_targets(targets, sim)
     assert pd.isna(out["estimate"].iloc[0])
-    assert "entity-mapped" in out["eval_note"].iloc[0]
+    assert "constraint variable" in out["eval_note"].iloc[0]
 
 
 def test_unknown_variable_gets_note():

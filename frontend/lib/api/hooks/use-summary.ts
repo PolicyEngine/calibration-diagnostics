@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../client";
-import { useRunContext } from "@/lib/run-context";
+import { useRunQueryState } from "./use-runs";
 
 export interface SummaryHeadline {
   dataset_id: string;
@@ -40,10 +40,10 @@ export interface WorstTargetRow {
   variable: string;
   geo_level: string | null;
   value: number;
-  estimate: number;
-  rel_error: number;
-  abs_rel_error: number;
-  loss_contribution: number;
+  estimate: number | null;
+  rel_error: number | null;
+  abs_rel_error: number | null;
+  loss_contribution: number | null;
 }
 
 export interface WeightHealth {
@@ -67,10 +67,10 @@ export interface SummaryResponse {
 }
 
 export function useSummary() {
-  const { dataset, run } = useRunContext();
+  const { dataset, run, ready } = useRunQueryState();
   return useQuery({
     queryKey: ["summary", dataset, run],
     queryFn: () => apiGet<SummaryResponse>("/summary"),
-    enabled: !!dataset && !!run,
+    enabled: ready,
   });
 }

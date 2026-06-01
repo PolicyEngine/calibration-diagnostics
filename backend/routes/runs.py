@@ -10,7 +10,12 @@ router = APIRouter()
 @router.get("/datasets")
 def list_datasets():
     return [
-        {"id": d.id, "label": d.label, "repo_id": d.repo_id}
+        {
+            "id": d.id,
+            "label": d.label,
+            "repo_id": d.repo_id,
+            "primary_h5": d.primary_h5,
+        }
         for d in runs_service.list_datasets()
     ]
 

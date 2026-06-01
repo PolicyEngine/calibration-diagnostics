@@ -1,11 +1,12 @@
 """Tests for run discovery (backend/services/runs.py)."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from backend.services import runs as runs_module
 from backend.services.runs import (
+    CURRENT_STAGING_RUN_ID,
     DEFAULT_REQUIRED_FILES,
     DatasetConfig,
     RunInfo,
@@ -16,19 +17,27 @@ from backend.services.runs import (
 )
 
 REQUIRED_ARTIFACTS = DEFAULT_REQUIRED_FILES["flat"]
+FLAT_DATASET = DatasetConfig(
+    id="flat-test",
+    label="Flat test",
+    repo_id="PolicyEngine/test-flat",
+    layout="flat",
+)
 
 
 def test_list_datasets_returns_defaults():
     datasets = list_datasets()
     assert len(datasets) >= 1
     assert all(isinstance(d, DatasetConfig) for d in datasets)
-    assert any(d.id == "us-cps" for d in datasets)
+    assert any(d.id == "us-data" for d in datasets)
+    assert any(d.id == "us-data-current-staging" for d in datasets)
 
 
 def test_get_dataset_known():
-    d = get_dataset("us-cps")
-    assert d.id == "us-cps"
-    assert "policyengine-us-data-pipeline" in d.repo_id
+    d = get_dataset("us-data")
+    assert d.id == "us-data"
+    assert "policyengine-us-data" in d.repo_id
+    assert d.layout == "staging"
 
 
 def test_get_dataset_unknown_raises():
@@ -45,7 +54,7 @@ def _fake_files(prefixes_with_files: dict[str, list[str]]) -> list[str]:
     return out
 
 
-def test_list_runs_filters_incomplete_prefixes():
+def test_list_runs_filters_incomplete_prefixes(monkeypatch):
     """Prefixes missing required artifacts must not be reported as runs."""
     files = _fake_files({
         "good-run": list(REQUIRED_ARTIFACTS) + ["extra.txt"],
@@ -55,37 +64,70 @@ def test_list_runs_filters_incomplete_prefixes():
     })
 
     list_runs.cache_clear()
+    monkeypatch.setattr(runs_module, "DEFAULT_DATASETS", [FLAT_DATASET])
     with patch.object(runs_module, "HfApi") as MockApi:
         api = MockApi.return_value
         api.list_repo_files.return_value = files
         api.repo_info.side_effect = Exception("no metadata")
-        result = list_runs("us-cps")
+        result = list_runs(FLAT_DATASET.id)
 
     run_ids = [r.run_id for r in result]
     assert run_ids == ["good-run"]
 
 
-def test_list_runs_handles_nested_files():
+def test_list_runs_handles_nested_files(monkeypatch):
     """Files more than one level deep should not be mistaken for prefixes."""
     files = _fake_files({
         "real-run": list(REQUIRED_ARTIFACTS),
     }) + ["real-run/subdir/extra.txt"]
 
     list_runs.cache_clear()
+    monkeypatch.setattr(runs_module, "DEFAULT_DATASETS", [FLAT_DATASET])
     with patch.object(runs_module, "HfApi") as MockApi:
         api = MockApi.return_value
         api.list_repo_files.return_value = files
         api.repo_info.side_effect = Exception("no metadata")
-        result = list_runs("us-cps")
+        result = list_runs(FLAT_DATASET.id)
 
     assert [r.run_id for r in result] == ["real-run"]
 
 
-def test_list_runs_empty_on_api_failure():
+def test_list_runs_exposes_current_staging_snapshot(monkeypatch):
+    dataset = DatasetConfig(
+        id="current-staging-test",
+        label="Current staging test",
+        repo_id="PolicyEngine/test",
+        layout="staging-root",
+        primary_h5="source_imputed_stratified_extended_cps.h5",
+    )
+    files = [
+        "staging/calibration/policy_data.db",
+        "staging/calibration/source_imputed_stratified_extended_cps.h5",
+        "staging/states/WY.h5",
+        "staging/1.115.5-patch-usdata-gha26360067320-a1/policy_data.db",
+    ]
+
     list_runs.cache_clear()
+    monkeypatch.setattr(runs_module, "DEFAULT_DATASETS", [dataset])
+    with patch.object(runs_module, "HfApi") as MockApi:
+        MockApi.return_value.list_repo_files.return_value = files
+        result = list_runs(dataset.id)
+
+    assert result == (
+        RunInfo(
+            dataset_id=dataset.id,
+            run_id=CURRENT_STAGING_RUN_ID,
+            label="Current staging",
+        ),
+    )
+
+
+def test_list_runs_empty_on_api_failure(monkeypatch):
+    list_runs.cache_clear()
+    monkeypatch.setattr(runs_module, "DEFAULT_DATASETS", [FLAT_DATASET])
     with patch.object(runs_module, "HfApi") as MockApi:
         MockApi.return_value.list_repo_files.side_effect = RuntimeError("offline")
-        result = list_runs("us-cps")
+        result = list_runs(FLAT_DATASET.id)
     assert result == ()
 
 
@@ -96,9 +138,9 @@ def test_list_runs_unknown_dataset_raises():
 
 
 def test_default_selection_env(monkeypatch):
-    monkeypatch.setenv("DEFAULT_DATASET", "us-cps")
+    monkeypatch.setenv("DEFAULT_DATASET", "us-data")
     monkeypatch.setenv("DEFAULT_RUN", "test")
-    assert default_selection() == ("us-cps", "test")
+    assert default_selection() == ("us-data", "test")
 
 
 def test_default_selection_missing(monkeypatch):
