@@ -1,5 +1,4 @@
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 // Module-scoped current run, updated by RunProvider. Lets every request
 // automatically carry ?dataset & ?run without each hook re-threading them.
@@ -65,6 +64,19 @@ function appendParams(url: URL, params: Record<string, ParamValue>): void {
   });
 }
 
+function apiUrl(path: string): URL {
+  if (
+    path === "/microplex" &&
+    !process.env.NEXT_PUBLIC_API_URL &&
+    typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1"
+  ) {
+    return new URL(`/api${path}`, window.location.origin);
+  }
+  return new URL(path, API_BASE);
+}
+
 export async function apiGet<T>(
   path: string,
   params?: Record<string, ParamValue>,
@@ -81,7 +93,7 @@ export async function apiGet<T>(
     throw new SelectionNotReadyError();
   }
 
-  const url = new URL(path, API_BASE);
+  const url = apiUrl(path);
   appendParams(url, mergeRunParams(params));
 
   const res = await fetch(url.toString());
@@ -100,7 +112,7 @@ export async function apiPost<T>(
     return getFixture<T>(path);
   }
 
-  const url = new URL(path, API_BASE);
+  const url = apiUrl(path);
   appendParams(url, mergeRunParams());
   const res = await fetch(url.toString(), {
     method: "POST",
