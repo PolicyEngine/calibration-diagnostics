@@ -1,3 +1,4 @@
 .next
+.artifacts
 node_modules
 tsconfig.tsbuildinfo
