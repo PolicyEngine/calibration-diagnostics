@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import {
   Card,
@@ -16,11 +16,13 @@ import {
 } from "@policyengine/ui-kit";
 import { AppShell } from "@/components/layout/app-shell";
 import {
+  PIPELINE_OPTIONS,
   usePipeline,
   useStageDoc,
   type PipelineNode,
   type PipelineStage,
 } from "@/lib/api/hooks/use-pipeline";
+import { useDashboardMode } from "@/lib/dashboard-mode-context";
 import { PipelineGraph } from "@/components/pipeline/pipeline-graph";
 
 const STATUS_VARIANT: Record<string, "success" | "secondary" | "warning" | "error"> = {
@@ -78,6 +80,11 @@ function NodeDetail({ node }: { node: PipelineNode }) {
       {node.description && (
         <p className="text-sm text-muted-foreground">{node.description}</p>
       )}
+      {node.explanation && (
+        <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
+          {node.explanation}
+        </div>
+      )}
       <div className="text-xs text-muted-foreground">
         <span className="font-mono">
           {node.source_file?.replace("policyengine_us_data/", "")}
@@ -100,12 +107,44 @@ function NodeDetail({ node }: { node: PipelineNode }) {
           </span>
         </div>
       )}
+      {node.implementation_refs && node.implementation_refs.length > 0 && (
+        <div className="text-xs">
+          <span className="font-semibold">implementation:</span>{" "}
+          <span className="font-mono text-muted-foreground">
+            {node.implementation_refs.join(", ")}
+          </span>
+        </div>
+      )}
+      {node.validation_commands && node.validation_commands.length > 0 && (
+        <div className="text-xs">
+          <span className="font-semibold">validation:</span>{" "}
+          <span className="font-mono text-muted-foreground">
+            {node.validation_commands.join(", ")}
+          </span>
+        </div>
+      )}
+      {node.analyst_questions && node.analyst_questions.length > 0 && (
+        <div className="space-y-1 text-xs">
+          <span className="font-semibold">questions to ask:</span>
+          <ul className="list-disc pl-5 text-muted-foreground">
+            {node.analyst_questions.map((question) => (
+              <li key={question}>{question}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
 
-function StageDoc({ stageId }: { stageId: string }) {
-  const q = useStageDoc(stageId);
+function StageDoc({
+  stageId,
+  pipelineId,
+}: {
+  stageId: string;
+  pipelineId: string;
+}) {
+  const q = useStageDoc(stageId, pipelineId);
   if (q.isLoading) return <Skeleton className="h-48 w-full" />;
   if (q.error)
     return (
@@ -122,10 +161,24 @@ function StageDoc({ stageId }: { stageId: string }) {
 }
 
 export default function PipelinePage() {
-  const pipeline = usePipeline();
+  const { mode } = useDashboardMode();
+  const [selectedPipelineId, setSelectedPipelineId] = useState(
+    mode === "us-data" ? "us-data" : "microplex-us",
+  );
+  const pipeline = usePipeline(selectedPipelineId);
   const [activeStage, setActiveStage] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showIsolated, setShowIsolated] = useState(false);
+
+  useEffect(() => {
+    setActiveStage(null);
+    setSelectedNodeId(null);
+    setShowIsolated(false);
+  }, [selectedPipelineId]);
+
+  useEffect(() => {
+    setSelectedPipelineId(mode === "us-data" ? "us-data" : "microplex-us");
+  }, [mode]);
 
   const selectedNode = useMemo(() => {
     if (!pipeline.data || !selectedNodeId) return null;
@@ -138,11 +191,39 @@ export default function PipelinePage() {
         <div>
           <Title order={2}>Data pipeline</Title>
           <Text c="dimmed" size="sm">
-            Every <code>@pipeline_node</code> declared in{" "}
-            <code>policyengine_us_data</code>, laid out as a DAG. Click a
-            pathway to filter; click a node for its details.
+            Compare the extracted <code>policyengine_us_data</code> DAG with a
+            curated Microplex-US flow. Select a pipeline, click a stage to
+            filter, then click a node for its explanation.
           </Text>
         </div>
+
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-sm font-medium" htmlFor="pipeline-select">
+                Pipeline
+              </label>
+              <select
+                id="pipeline-select"
+                value={selectedPipelineId}
+                onChange={(e) => setSelectedPipelineId(e.target.value)}
+                className="h-10 min-w-[260px] rounded-md border border-border bg-background px-3 text-sm"
+              >
+                {PIPELINE_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <Text size="sm" c="dimmed">
+                {
+                  PIPELINE_OPTIONS.find((option) => option.id === selectedPipelineId)
+                    ?.description
+                }
+              </Text>
+            </div>
+          </CardContent>
+        </Card>
 
         {pipeline.isLoading && <Skeleton className="h-64 w-full" />}
         {pipeline.error && (
@@ -162,6 +243,47 @@ export default function PipelinePage() {
 
         {pipeline.data && (
           <>
+            <Card>
+              <CardContent className="py-4">
+                <div className="flex flex-col gap-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary">
+                      {pipeline.data.pipeline_label ?? selectedPipelineId}
+                    </Badge>
+                    <Badge variant="outline">
+                      {formatNumber(pipeline.data.stats.node_count)} nodes
+                    </Badge>
+                    <Badge variant="outline">
+                      {formatNumber(pipeline.data.stats.edge_count)} edges
+                    </Badge>
+                    {pipeline.data.source_repo && (
+                      <Badge variant="outline">{pipeline.data.source_repo}</Badge>
+                    )}
+                  </div>
+                  {pipeline.data.description && (
+                    <Text size="sm" c="dimmed">
+                      {pipeline.data.description}
+                    </Text>
+                  )}
+                  {pipeline.data.source_urls && pipeline.data.source_urls.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {pipeline.data.source_urls.map((url) => (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          {new URL(url).pathname.split("/").slice(-1)[0] || url}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {pipeline.data.stages.map((s) => (
                 <StageCard
@@ -244,7 +366,10 @@ export default function PipelinePage() {
                   <CardTitle>Deep dive: {activeStage}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <StageDoc stageId={activeStage} />
+                  <StageDoc
+                    stageId={activeStage}
+                    pipelineId={selectedPipelineId}
+                  />
                 </CardContent>
               </Card>
             )}
