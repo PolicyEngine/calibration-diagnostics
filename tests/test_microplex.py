@@ -359,3 +359,117 @@ def test_microplex_budget_benchmarks_include_live_and_external_rows(
     assert external_only["live"]["available"] is False
     assert external_only["external_estimates"][0]["source"] == "CBO/JCT"
     assert external_only["external_estimates"][0]["estimate"] == 3_877_600_000_000
+
+
+def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_path):
+    root = tmp_path / "runs"
+    bundle = root / "run-1"
+    bundle.mkdir(parents=True)
+    rows = [
+        {
+            "target_id": "state/CA/agi/count/0_10k",
+            "family": "state_agi_distribution",
+            "state": "CA",
+            "geo_level": "state",
+            "supported_by_microplex": True,
+            "in_loss": True,
+            "target_value": 10.0,
+            "microplex_aggregate": 9.0,
+        },
+        {
+            "target_id": "state/MT/snap/households",
+            "family": "state_snap_households",
+            "state": "MT",
+            "geo_level": "state",
+            "supported_by_microplex": False,
+            "in_loss": True,
+            "target_value": 20.0,
+            "microplex_aggregate": math.inf,
+        },
+        {
+            "target_id": "nation/irs/dividends",
+            "family": "national_irs_other",
+            "state": None,
+            "geo_level": "national",
+            "supported_by_microplex": True,
+            "in_loss": False,
+            "target_value": 30.0,
+            "microplex_aggregate": 31.0,
+        },
+    ]
+    (bundle / "pe_native_target_diagnostics.json").write_text(
+        json.dumps(
+            {
+                "diagnostic_schema_version": 1,
+                "metric": "enhanced_cps_native_loss_target_delta",
+                "period": 2024,
+                "baseline_dataset": "us-data.h5",
+                "candidate_dataset": "microplex.h5",
+                "dataset_labels": {"from": "us-data", "to": "microplex"},
+                "summary": {"n_targets": 3},
+                "targets": rows,
+            }
+        )
+    )
+    (bundle / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_id": "run-1",
+                "artifacts": {
+                    "policyengine_native_target_diagnostics": (
+                        "pe_native_target_diagnostics.json"
+                    ),
+                    "policyengine_dataset": "policyengine_us.h5",
+                },
+            }
+        )
+    )
+    monkeypatch.setenv("MICROPLEX_ARTIFACT_ROOTS", str(root))
+
+    page = microplex.microplex_target_diagnostics(limit=1, offset=1)
+
+    assert page["available"] is True
+    assert page["microplex_bundle"]["artifact_id"] == "run-1"
+    assert page["total_targets"] == 3
+    assert page["filtered_total"] == 3
+    assert page["limit"] == 1
+    assert page["offset"] == 1
+    assert page["has_next"] is True
+    assert page["targets"][0]["target_id"] == "state/MT/snap/households"
+    assert page["targets"][0]["microplex_aggregate"] is None
+
+    filtered = microplex.microplex_target_diagnostics(
+        family="state_agi_distribution",
+        state="ca",
+        supported=True,
+        in_loss=True,
+        search="agi",
+    )
+
+    assert filtered["filtered_total"] == 1
+    assert filtered["has_next"] is False
+    assert filtered["targets"][0]["target_id"] == "state/CA/agi/count/0_10k"
+    assert filtered["filters"]["state"] == "ca"
+
+
+def test_microplex_target_diagnostics_unavailable_without_sidecar(
+    monkeypatch,
+    tmp_path,
+):
+    bundle = tmp_path / "run-1"
+    bundle.mkdir()
+    (bundle / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_id": "run-1",
+                "artifacts": {"policyengine_dataset": "policyengine_us.h5"},
+            }
+        )
+    )
+    monkeypatch.setenv("MICROPLEX_ARTIFACT_ROOTS", str(tmp_path))
+
+    result = microplex.microplex_target_diagnostics()
+
+    assert result["available"] is False
+    assert result["filtered_total"] == 0
+    assert "No readable" in result["reason"]
