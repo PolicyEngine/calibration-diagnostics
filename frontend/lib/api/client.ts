@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const EXPLICIT_API_BASE = process.env.NEXT_PUBLIC_API_URL?.trim();
+const LOCAL_API_BASE = "http://localhost:8000";
+const API_BASE = EXPLICIT_API_BASE || LOCAL_API_BASE;
 
 // Module-scoped current run, updated by RunProvider. Lets every request
 // automatically carry ?dataset & ?run without each hook re-threading them.
@@ -65,16 +67,23 @@ function appendParams(url: URL, params: Record<string, ParamValue>): void {
 }
 
 function apiUrl(path: string): URL {
-  if (
-    (path === "/microplex" || path === "/microplex/budget-benchmarks") &&
-    !process.env.NEXT_PUBLIC_API_URL &&
-    typeof window !== "undefined" &&
-    window.location.hostname !== "localhost" &&
-    window.location.hostname !== "127.0.0.1"
-  ) {
+  if (!EXPLICIT_API_BASE && isPublicBrowserRuntime() && path.startsWith("/microplex")) {
     return new URL(`/api${path}`, window.location.origin);
   }
   return new URL(path, API_BASE);
+}
+
+function isPublicBrowserRuntime(): boolean {
+  if (typeof window === "undefined") return false;
+  return !["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
+function shouldUseDeployedFixture(path: string): boolean {
+  return (
+    !EXPLICIT_API_BASE &&
+    isPublicBrowserRuntime() &&
+    (path === "/datasets" || path === "/runs")
+  );
 }
 
 export async function apiGet<T>(
@@ -82,6 +91,11 @@ export async function apiGet<T>(
   params?: Record<string, ParamValue>,
 ): Promise<T> {
   if (process.env.NEXT_PUBLIC_USE_FIXTURES === "true") {
+    const { getFixture } = await import("@/fixtures");
+    return getFixture<T>(path, params as never);
+  }
+
+  if (shouldUseDeployedFixture(path)) {
     const { getFixture } = await import("@/fixtures");
     return getFixture<T>(path, params as never);
   }
