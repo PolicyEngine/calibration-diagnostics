@@ -152,6 +152,7 @@ export interface MicroplexTargetDiagnosticRow {
 
 export interface MicroplexTargetDiagnostics {
   available: boolean;
+  reason?: string | null;
   path: string | null;
   diagnostic_schema_version?: number | null;
   metric?: string | null;
@@ -162,6 +163,11 @@ export interface MicroplexTargetDiagnostics {
   summary: Record<string, unknown>;
   total_targets: number;
   display_limit: number;
+  returned?: number;
+  limit?: number;
+  offset?: number;
+  has_next?: boolean;
+  unfiltered_total_targets?: number;
   targets: MicroplexTargetDiagnosticRow[];
 }
 
@@ -361,6 +367,23 @@ export function useMicroplex() {
     queryKey: ["microplex"],
     queryFn: () => apiGet<MicroplexResponse>("/microplex"),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useMicroplexTargetDiagnostics(params: {
+  limit?: number;
+  offset?: number;
+  family?: string;
+  state?: string;
+  supported?: string;
+  in_loss?: string;
+  search?: string;
+}) {
+  return useQuery({
+    queryKey: ["microplex", "target-diagnostics", params],
+    queryFn: () =>
+      apiGet<MicroplexTargetDiagnostics>("/microplex/target-diagnostics", params),
+    staleTime: 15 * 60 * 1000,
   });
 }
 

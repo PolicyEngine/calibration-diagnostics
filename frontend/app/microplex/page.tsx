@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import {
   Badge,
@@ -20,7 +20,86 @@ import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import {
   useMicroplex,
   useMicroplexReformComparison,
+  useMicroplexTargetDiagnostics,
 } from "@/lib/api/hooks/use-microplex";
+
+const TARGET_DIAGNOSTICS_LIMIT = 100;
+
+const TARGET_FAMILY_OPTIONS = [
+  "national_census_other",
+  "national_infants",
+  "national_irs_other",
+  "national_net_worth",
+  "national_population_by_age",
+  "national_spm_threshold_agi",
+  "national_spm_threshold_count",
+  "national_ssa",
+  "national_tax_expenditures",
+  "other",
+  "state_aca_enrollment",
+  "state_aca_spending",
+  "state_age_distribution",
+  "state_agi_distribution",
+  "state_population",
+  "state_population_under_5",
+  "state_real_estate_taxes",
+  "state_snap_cost",
+  "state_snap_households",
+];
+
+const STATE_OPTIONS = [
+  "AL",
+  "AK",
+  "AZ",
+  "AR",
+  "CA",
+  "CO",
+  "CT",
+  "DE",
+  "DC",
+  "FL",
+  "GA",
+  "HI",
+  "ID",
+  "IL",
+  "IN",
+  "IA",
+  "KS",
+  "KY",
+  "LA",
+  "ME",
+  "MD",
+  "MA",
+  "MI",
+  "MN",
+  "MS",
+  "MO",
+  "MT",
+  "NE",
+  "NV",
+  "NH",
+  "NJ",
+  "NM",
+  "NY",
+  "NC",
+  "ND",
+  "OH",
+  "OK",
+  "OR",
+  "PA",
+  "RI",
+  "SC",
+  "SD",
+  "TN",
+  "TX",
+  "UT",
+  "VT",
+  "VA",
+  "WA",
+  "WV",
+  "WI",
+  "WY",
+];
 
 function fmt(v: number | null | undefined, opts: { pct?: boolean } = {}) {
   if (v == null || !Number.isFinite(v)) return "—";
@@ -572,7 +651,26 @@ export default function MicroplexPage() {
   const [selectedReformId, setSelectedReformId] = useState(
     "american_family_act_2025",
   );
+  const [targetSearch, setTargetSearch] = useState("");
+  const [targetFamily, setTargetFamily] = useState("");
+  const [targetState, setTargetState] = useState("");
+  const [targetSupported, setTargetSupported] = useState("");
+  const [targetInLoss, setTargetInLoss] = useState("");
+  const [targetOffset, setTargetOffset] = useState(0);
   const reformComparison = useMicroplexReformComparison(selectedReformId);
+  const targetDiagnosticsQuery = useMicroplexTargetDiagnostics({
+    limit: TARGET_DIAGNOSTICS_LIMIT,
+    offset: targetOffset,
+    search: targetSearch || undefined,
+    family: targetFamily || undefined,
+    state: targetState || undefined,
+    supported: targetSupported || undefined,
+    in_loss: targetInLoss || undefined,
+  });
+
+  useEffect(() => {
+    setTargetOffset(0);
+  }, [targetSearch, targetFamily, targetState, targetSupported, targetInLoss]);
 
   if (isLoading)
     return (
@@ -601,7 +699,13 @@ export default function MicroplexPage() {
   );
   const topFamilies = data.regression_summary.top3_family_counts.slice(0, 5);
   const topTargets = data.regression_summary.target_counts_from_audits.slice(0, 8);
-  const targetDiagnostics = data.target_diagnostics;
+  const targetDiagnostics =
+    targetDiagnosticsQuery.data ?? data.target_diagnostics;
+  const targetDiagnosticsLoading =
+    targetDiagnosticsQuery.isLoading || targetDiagnosticsQuery.isFetching;
+  const filteredTargetTotal = targetDiagnostics.total_targets ?? 0;
+  const unfilteredTargetTotal =
+    targetDiagnostics.unfiltered_total_targets ?? data.target_diagnostics.total_targets;
 
   return (
     <AppShell>
@@ -766,8 +870,138 @@ export default function MicroplexPage() {
                   {targetDiagnostics.path ?? native.full_target_diagnostics_path}
                 </span>
                 . Showing {fmt(targetDiagnostics.targets.length)} of{" "}
-                {fmt(targetDiagnostics.total_targets)} rows.
+                {fmt(filteredTargetTotal)} matching rows
+                {filteredTargetTotal !== unfilteredTargetTotal
+                  ? ` from ${fmt(unfilteredTargetTotal)} total`
+                  : ""}
+                .
               </Text>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_120px_150px_130px_auto]">
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Search
+                  </span>
+                  <input
+                    type="search"
+                    value={targetSearch}
+                    onChange={(event) => setTargetSearch(event.target.value)}
+                    placeholder="Target, variable, family, state..."
+                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Family
+                  </span>
+                  <select
+                    value={targetFamily}
+                    onChange={(event) => setTargetFamily(event.target.value)}
+                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
+                  >
+                    <option value="">All families</option>
+                    {TARGET_FAMILY_OPTIONS.map((family) => (
+                      <option key={family} value={family}>
+                        {family}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    State
+                  </span>
+                  <select
+                    value={targetState}
+                    onChange={(event) => setTargetState(event.target.value)}
+                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
+                  >
+                    <option value="">All</option>
+                    {STATE_OPTIONS.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Supported
+                  </span>
+                  <select
+                    value={targetSupported}
+                    onChange={(event) => setTargetSupported(event.target.value)}
+                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
+                  >
+                    <option value="">All</option>
+                    <option value="true">Supported</option>
+                    <option value="false">Unsupported</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    In loss
+                  </span>
+                  <select
+                    value={targetInLoss}
+                    onChange={(event) => setTargetInLoss(event.target.value)}
+                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
+                  >
+                    <option value="">All</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </label>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetSearch("");
+                      setTargetFamily("");
+                      setTargetState("");
+                      setTargetSupported("");
+                      setTargetInLoss("");
+                    }}
+                    className="h-10 rounded-md border border-border bg-white px-3 text-sm font-medium hover:bg-muted/40"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Text size="xs" c="dimmed">
+                  {targetDiagnosticsLoading
+                    ? "Loading filtered rows..."
+                    : `Rows ${fmt(targetOffset + 1)}-${fmt(
+                        targetOffset + targetDiagnostics.targets.length,
+                      )} of ${fmt(filteredTargetTotal)}`}
+                </Text>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={targetOffset === 0 || targetDiagnosticsLoading}
+                    onClick={() =>
+                      setTargetOffset(
+                        Math.max(0, targetOffset - TARGET_DIAGNOSTICS_LIMIT),
+                      )
+                    }
+                    className="h-9 rounded-md border border-border bg-white px-3 text-sm font-medium hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      !targetDiagnostics.has_next || targetDiagnosticsLoading
+                    }
+                    onClick={() =>
+                      setTargetOffset(targetOffset + TARGET_DIAGNOSTICS_LIMIT)
+                    }
+                    className="h-9 rounded-md border border-border bg-white px-3 text-sm font-medium hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
               <DataTable
                 columns={targetDiagnosticsColumns}
                 data={
@@ -776,6 +1010,7 @@ export default function MicroplexPage() {
                     unknown
                   >[]
                 }
+                sortable
               />
             </Stack>
           </CardContent>
