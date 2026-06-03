@@ -398,6 +398,8 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
             "target_value": 30.0,
             "us_data_aggregate": 29.0,
             "microplex_aggregate": 31.0,
+            "us_data_relative_error": -0.0001,
+            "microplex_relative_error": 0.0001,
         },
     ]
     (bundle / "pe_native_target_diagnostics.json").write_text(
@@ -465,6 +467,9 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
     ]
     assert sorted_desc["targets"][0]["microplex_vs_target_relative"] == (
         1.0 / 30.0
+    )
+    assert sorted_desc["targets"][0]["us_data_vs_target_relative"] == (
+        -1.0 / 30.0
     )
     assert sorted_desc["targets"][-1]["microplex_vs_target_relative"] is None
 

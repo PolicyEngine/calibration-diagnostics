@@ -67,10 +67,8 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     us_data_vs_target: usDataVsTarget,
     microplex_vs_us_data: microplexVsUsData,
     microplex_vs_target_relative:
-      estimate(row.microplex_relative_error) ??
       relativeDifference(microplexVsTarget, target),
     us_data_vs_target_relative:
-      estimate(row.us_data_relative_error) ??
       relativeDifference(usDataVsTarget, target),
     microplex_vs_us_data_relative:
       relativeDifference(microplexVsUsData, usData),

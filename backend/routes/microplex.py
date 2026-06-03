@@ -1142,14 +1142,6 @@ def _relative_difference(
     return numerator / abs(denominator)
 
 
-def _first_estimate(*values: Any) -> float | None:
-    for value in values:
-        estimate = _estimate(value)
-        if estimate is not None:
-            return estimate
-    return None
-
-
 def _enrich_target_diagnostic_row(row: dict[str, Any]) -> dict[str, Any]:
     target = _estimate(row.get("target_value"))
     us_data = _estimate(row.get("us_data_aggregate", row.get("from_estimate")))
@@ -1171,13 +1163,13 @@ def _enrich_target_diagnostic_row(row: dict[str, Any]) -> dict[str, Any]:
         "microplex_vs_target": microplex_vs_target,
         "us_data_vs_target": us_data_vs_target,
         "microplex_vs_us_data": microplex_vs_us_data,
-        "microplex_vs_target_relative": _first_estimate(
-            row.get("microplex_relative_error"),
-            _relative_difference(microplex_vs_target, target),
+        "microplex_vs_target_relative": _relative_difference(
+            microplex_vs_target,
+            target,
         ),
-        "us_data_vs_target_relative": _first_estimate(
-            row.get("us_data_relative_error"),
-            _relative_difference(us_data_vs_target, target),
+        "us_data_vs_target_relative": _relative_difference(
+            us_data_vs_target,
+            target,
         ),
         "microplex_vs_us_data_relative": _relative_difference(
             microplex_vs_us_data,
