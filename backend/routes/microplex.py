@@ -1099,6 +1099,144 @@ def _load_target_diagnostics(latest_bundle: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _load_target_diagnostics_payload(
+    latest_bundle: dict[str, Any],
+) -> tuple[Path | None, dict[str, Any] | None]:
+    path_text = latest_bundle.get("target_diagnostics_path")
+    if not path_text:
+        return None, None
+    path = Path(str(path_text))
+    payload = _read_json_file(path)
+    return path, payload if isinstance(payload, dict) else None
+
+
+def _row_matches_text(row: dict[str, Any], search: str) -> bool:
+    needle = search.lower()
+    fields = [
+        "target_id",
+        "target_name",
+        "family",
+        "target_family",
+        "geography",
+        "state",
+        "variable",
+        "entity",
+    ]
+    return any(needle in str(row.get(field, "")).lower() for field in fields)
+
+
+@router.get("/microplex/target-diagnostics")
+def microplex_target_diagnostics(
+    limit: int = 100,
+    offset: int = 0,
+    family: str | None = None,
+    state: str | None = None,
+    geo_level: str | None = None,
+    supported: bool | None = None,
+    in_loss: bool | None = None,
+    search: str | None = None,
+):
+    """Return paginated full Microplex target diagnostics rows."""
+    limit = max(1, min(int(limit), 500))
+    offset = max(0, int(offset))
+    latest = _discover_configured_run_bundles().get("latest_run_bundle")
+    if not isinstance(latest, dict):
+        return {
+            "available": False,
+            "reason": (
+                "No configured Microplex run bundle was found. Set "
+                "MICROPLEX_ARTIFACT_ROOTS or MICROPLEX_ARTIFACT_ROOT."
+            ),
+            "targets": [],
+            "total_targets": 0,
+            "filtered_total": 0,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    path, payload = _load_target_diagnostics_payload(latest)
+    if payload is None:
+        return {
+            "available": False,
+            "reason": "No readable pe_native_target_diagnostics.json was found.",
+            "path": str(path) if path is not None else None,
+            "microplex_bundle": {
+                "artifact_id": latest.get("artifact_id"),
+                "artifact_dir": latest.get("artifact_dir"),
+            },
+            "targets": [],
+            "total_targets": 0,
+            "filtered_total": 0,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    rows = payload.get("targets")
+    all_rows = [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+    filtered = all_rows
+    if family:
+        filtered = [
+            row
+            for row in filtered
+            if str(row.get("family") or row.get("target_family") or "") == family
+        ]
+    if state:
+        state_upper = state.upper()
+        filtered = [
+            row
+            for row in filtered
+            if str(row.get("state") or "").upper() == state_upper
+        ]
+    if geo_level:
+        filtered = [
+            row
+            for row in filtered
+            if str(row.get("geo_level") or "") == geo_level
+        ]
+    if supported is not None:
+        filtered = [
+            row for row in filtered if row.get("supported_by_microplex") is supported
+        ]
+    if in_loss is not None:
+        filtered = [row for row in filtered if row.get("in_loss") is in_loss]
+    if search:
+        filtered = [row for row in filtered if _row_matches_text(row, search)]
+
+    page = filtered[offset : offset + limit]
+    summary = payload.get("summary")
+    return _scrub(
+        {
+            "available": True,
+            "path": str(path) if path is not None else None,
+            "microplex_bundle": {
+                "artifact_id": latest.get("artifact_id"),
+                "artifact_dir": latest.get("artifact_dir"),
+            },
+            "diagnostic_schema_version": payload.get("diagnostic_schema_version"),
+            "metric": payload.get("metric"),
+            "period": payload.get("period"),
+            "baseline_dataset": payload.get("baseline_dataset"),
+            "candidate_dataset": payload.get("candidate_dataset"),
+            "dataset_labels": payload.get("dataset_labels", {}),
+            "summary": summary if isinstance(summary, dict) else {},
+            "total_targets": len(all_rows),
+            "filtered_total": len(filtered),
+            "limit": limit,
+            "offset": offset,
+            "has_next": offset + limit < len(filtered),
+            "filters": {
+                "family": family,
+                "state": state,
+                "geo_level": geo_level,
+                "supported": supported,
+                "in_loss": in_loss,
+                "search": search,
+            },
+            "targets": page,
+        }
+    )
+
+
 def _load_bundle_native_scores(latest_bundle: dict[str, Any]) -> dict[str, Any] | None:
     path_text = latest_bundle.get("native_scores_path")
     if not path_text:
