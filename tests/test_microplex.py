@@ -374,6 +374,7 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
             "supported_by_microplex": True,
             "in_loss": True,
             "target_value": 10.0,
+            "us_data_aggregate": 8.0,
             "microplex_aggregate": 9.0,
         },
         {
@@ -384,6 +385,7 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
             "supported_by_microplex": False,
             "in_loss": True,
             "target_value": 20.0,
+            "us_data_aggregate": 19.0,
             "microplex_aggregate": math.inf,
         },
         {
@@ -394,6 +396,7 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
             "supported_by_microplex": True,
             "in_loss": False,
             "target_value": 30.0,
+            "us_data_aggregate": 29.0,
             "microplex_aggregate": 31.0,
         },
     ]
@@ -450,6 +453,44 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
     assert filtered["has_next"] is False
     assert filtered["targets"][0]["target_id"] == "state/CA/agi/count/0_10k"
     assert filtered["filters"]["state"] == "ca"
+
+    sorted_desc = microplex.microplex_target_diagnostics(
+        sort_by="microplex_vs_target_relative",
+        sort_dir="desc",
+    )
+    assert [row["target_id"] for row in sorted_desc["targets"]] == [
+        "nation/irs/dividends",
+        "state/CA/agi/count/0_10k",
+        "state/MT/snap/households",
+    ]
+    assert sorted_desc["targets"][0]["microplex_vs_target_relative"] == (
+        1.0 / 30.0
+    )
+    assert sorted_desc["targets"][-1]["microplex_vs_target_relative"] is None
+
+    sorted_asc = microplex.microplex_target_diagnostics(
+        sort_by="target_value",
+        sort_dir="asc",
+    )
+    assert [row["target_id"] for row in sorted_asc["targets"]] == [
+        "state/CA/agi/count/0_10k",
+        "state/MT/snap/households",
+        "nation/irs/dividends",
+    ]
+
+    above_target = microplex.microplex_target_diagnostics(
+        microplex_target_direction="above"
+    )
+    assert [row["target_id"] for row in above_target["targets"]] == [
+        "nation/irs/dividends"
+    ]
+
+    below_target = microplex.microplex_target_diagnostics(
+        microplex_target_direction="below"
+    )
+    assert [row["target_id"] for row in below_target["targets"]] == [
+        "state/CA/agi/count/0_10k"
+    ]
 
 
 def test_microplex_target_diagnostics_unavailable_without_sidecar(

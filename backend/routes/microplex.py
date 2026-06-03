@@ -1125,6 +1125,103 @@ def _row_matches_text(row: dict[str, Any], search: str) -> bool:
     return any(needle in str(row.get(field, "")).lower() for field in fields)
 
 
+def _estimate(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float) and np.isfinite(value):
+        return float(value)
+    return None
+
+
+def _relative_difference(
+    numerator: float | None,
+    denominator: float | None,
+) -> float | None:
+    if numerator is None or denominator in (None, 0):
+        return None
+    return numerator / abs(denominator)
+
+
+def _first_estimate(*values: Any) -> float | None:
+    for value in values:
+        estimate = _estimate(value)
+        if estimate is not None:
+            return estimate
+    return None
+
+
+def _enrich_target_diagnostic_row(row: dict[str, Any]) -> dict[str, Any]:
+    target = _estimate(row.get("target_value"))
+    us_data = _estimate(row.get("us_data_aggregate", row.get("from_estimate")))
+    microplex = _estimate(row.get("microplex_aggregate", row.get("to_estimate")))
+    delta_abs_error = _estimate(row.get("delta_absolute_error"))
+    microplex_vs_target = (
+        microplex - target if microplex is not None and target is not None else None
+    )
+    us_data_vs_target = (
+        us_data - target if us_data is not None and target is not None else None
+    )
+    microplex_vs_us_data = (
+        microplex - us_data
+        if microplex is not None and us_data is not None
+        else None
+    )
+    return {
+        **row,
+        "microplex_vs_target": microplex_vs_target,
+        "us_data_vs_target": us_data_vs_target,
+        "microplex_vs_us_data": microplex_vs_us_data,
+        "microplex_vs_target_relative": _first_estimate(
+            row.get("microplex_relative_error"),
+            _relative_difference(microplex_vs_target, target),
+        ),
+        "us_data_vs_target_relative": _first_estimate(
+            row.get("us_data_relative_error"),
+            _relative_difference(us_data_vs_target, target),
+        ),
+        "microplex_vs_us_data_relative": _relative_difference(
+            microplex_vs_us_data,
+            us_data,
+        ),
+        "closer_dataset": (
+            None
+            if delta_abs_error is None
+            else "microplex"
+            if delta_abs_error < 0
+            else "us-data"
+            if delta_abs_error > 0
+            else "tie"
+        ),
+    }
+
+
+def _sort_target_diagnostic_rows(
+    rows: list[dict[str, Any]],
+    *,
+    sort_by: str | None,
+    sort_dir: str | None,
+) -> list[dict[str, Any]]:
+    if not sort_by:
+        return rows
+    descending = sort_dir == "desc"
+
+    def sort_key(row: dict[str, Any]) -> tuple[int, Any]:
+        value = row.get(sort_by)
+        if value is None:
+            return (1, "")
+        numeric_value = _estimate(value)
+        if numeric_value is not None:
+            return (0, -numeric_value if descending else numeric_value)
+        text_value = str(value).lower()
+        return (0, _reverse_text_key(text_value) if descending else text_value)
+
+    return sorted(rows, key=sort_key)
+
+
+def _reverse_text_key(value: str) -> tuple[int, ...]:
+    return tuple(-ord(char) for char in value)
+
+
 @router.get("/microplex/target-diagnostics")
 def microplex_target_diagnostics(
     limit: int = 100,
@@ -1132,9 +1229,12 @@ def microplex_target_diagnostics(
     family: str | None = None,
     state: str | None = None,
     geo_level: str | None = None,
+    microplex_target_direction: str | None = None,
     supported: bool | None = None,
     in_loss: bool | None = None,
     search: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
 ):
     """Return paginated full Microplex target diagnostics rows."""
     limit = max(1, min(int(limit), 500))
@@ -1172,7 +1272,11 @@ def microplex_target_diagnostics(
         }
 
     rows = payload.get("targets")
-    all_rows = [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+    all_rows = (
+        [_enrich_target_diagnostic_row(row) for row in rows if isinstance(row, dict)]
+        if isinstance(rows, list)
+        else []
+    )
     filtered = all_rows
     if family:
         filtered = [
@@ -1193,6 +1297,31 @@ def microplex_target_diagnostics(
             for row in filtered
             if str(row.get("geo_level") or "") == geo_level
         ]
+    if microplex_target_direction:
+        filtered = [
+            row
+            for row in filtered
+            if (
+                (relative := _estimate(row.get("microplex_vs_target_relative")))
+                is not None
+                and (
+                    (
+                        microplex_target_direction == "above"
+                        and relative > 0
+                    )
+                    or (
+                        microplex_target_direction == "below"
+                        and relative < 0
+                    )
+                    or (
+                        microplex_target_direction == "near"
+                        and abs(relative) <= 0.05
+                    )
+                    or microplex_target_direction
+                    not in {"above", "below", "near"}
+                )
+            )
+        ]
     if supported is not None:
         filtered = [
             row for row in filtered if row.get("supported_by_microplex") is supported
@@ -1201,6 +1330,11 @@ def microplex_target_diagnostics(
         filtered = [row for row in filtered if row.get("in_loss") is in_loss]
     if search:
         filtered = [row for row in filtered if _row_matches_text(row, search)]
+    filtered = _sort_target_diagnostic_rows(
+        filtered,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+    )
 
     page = filtered[offset : offset + limit]
     summary = payload.get("summary")
@@ -1228,9 +1362,12 @@ def microplex_target_diagnostics(
                 "family": family,
                 "state": state,
                 "geo_level": geo_level,
+                "microplex_target_direction": microplex_target_direction,
                 "supported": supported,
                 "in_loss": in_loss,
                 "search": search,
+                "sort_by": sort_by,
+                "sort_dir": sort_dir,
             },
             "targets": page,
         }
