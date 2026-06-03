@@ -147,6 +147,9 @@ export interface MicroplexTargetDiagnosticRow {
   microplex_vs_target?: number | null;
   us_data_vs_target?: number | null;
   microplex_vs_us_data?: number | null;
+  microplex_vs_target_relative?: number | null;
+  us_data_vs_target_relative?: number | null;
+  microplex_vs_us_data_relative?: number | null;
   closer_dataset?: "microplex" | "us-data" | "tie" | null;
   loss_contribution?: number | null;
   in_loss?: boolean | null;
@@ -380,6 +383,7 @@ export function useMicroplexTargetDiagnostics(params: {
   family?: string;
   state?: string;
   geo_level?: string;
+  microplex_target_direction?: string;
   supported?: string;
   in_loss?: string;
   search?: string;

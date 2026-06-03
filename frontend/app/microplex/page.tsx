@@ -22,6 +22,7 @@ import {
   useMicroplexReformComparison,
   useMicroplexTargetDiagnostics,
 } from "@/lib/api/hooks/use-microplex";
+import { usePathname } from "next/navigation";
 
 const TARGET_DIAGNOSTICS_LIMIT = 100;
 
@@ -131,6 +132,17 @@ function signedFmt(v: number | null | undefined) {
     <span className="font-mono text-xs">
       {sign}
       {fmt(v)}
+    </span>
+  );
+}
+
+function signedPct(v: number | null | undefined) {
+  if (v == null || !Number.isFinite(v)) return "—";
+  const sign = v > 0 ? "+" : "";
+  return (
+    <span className="font-mono text-xs">
+      {sign}
+      {(v * 100).toFixed(2)}%
     </span>
   );
 }
@@ -556,9 +568,9 @@ function targetDiagnosticsColumns(compareWithUsData: boolean) {
     },
   },
   {
-    key: "microplex_vs_target",
+    key: "microplex_vs_target_relative",
     header: (
-      <HelpText title="Microplex aggregate minus target value. Positive means Microplex is above the target; negative means below the target.">
+      <HelpText title="Microplex aggregate relative to the target: (Microplex - target) / |target|. Positive means Microplex is above the target; negative means below.">
         Microplex vs target
       </HelpText>
     ),
@@ -568,17 +580,17 @@ function targetDiagnosticsColumns(compareWithUsData: boolean) {
       if (value == null) {
         const target = Number(row.target_value);
         const microplex = Number(row.to_estimate ?? row.microplex_aggregate);
-        if (Number.isFinite(target) && Number.isFinite(microplex)) {
-          value = microplex - target;
+        if (Number.isFinite(target) && target !== 0 && Number.isFinite(microplex)) {
+          value = (microplex - target) / Math.abs(target);
         }
       }
-      return signedFmt(value == null ? null : Number(value));
+      return signedPct(value == null ? null : Number(value));
     },
   },
   {
-    key: "microplex_vs_us_data",
+    key: "microplex_vs_us_data_relative",
     header: (
-      <HelpText title="Microplex aggregate minus us-data aggregate. Positive means Microplex is higher than us-data; negative means lower.">
+      <HelpText title="Microplex relative to the us-data aggregate: (Microplex - us-data) / |us-data|. Positive means Microplex is higher than us-data; negative means lower.">
         Microplex vs us-data
       </HelpText>
     ),
@@ -588,11 +600,11 @@ function targetDiagnosticsColumns(compareWithUsData: boolean) {
       if (value == null) {
         const usData = Number(row.from_estimate ?? row.us_data_aggregate);
         const microplex = Number(row.to_estimate ?? row.microplex_aggregate);
-        if (Number.isFinite(usData) && Number.isFinite(microplex)) {
-          value = microplex - usData;
+        if (Number.isFinite(usData) && usData !== 0 && Number.isFinite(microplex)) {
+          value = (microplex - usData) / Math.abs(usData);
         }
       }
-      return signedFmt(value == null ? null : Number(value));
+      return signedPct(value == null ? null : Number(value));
     },
   },
   {
@@ -655,7 +667,7 @@ function targetDiagnosticsColumns(compareWithUsData: boolean) {
       compareWithUsData ||
       ![
         "us_data_aggregate",
-        "microplex_vs_us_data",
+        "microplex_vs_us_data_relative",
         "closer_dataset",
         "delta_absolute_error",
       ].includes(column.key),
@@ -809,17 +821,17 @@ function ReformComparisonCard({
 }
 
 export default function MicroplexPage() {
+  const pathname = usePathname();
+  const isDiagnosticsView = pathname.startsWith("/microplex/diagnostics");
   const { data, isLoading, error } = useMicroplex();
   const [selectedReformId, setSelectedReformId] = useState(
     "american_family_act_2025",
-  );
-  const [microplexTab, setMicroplexTab] = useState<"overview" | "diagnostics">(
-    "overview",
   );
   const [compareWithUsData, setCompareWithUsData] = useState(true);
   const [targetSearch, setTargetSearch] = useState("");
   const [targetFamily, setTargetFamily] = useState("");
   const [targetGeoLevel, setTargetGeoLevel] = useState("");
+  const [targetDirection, setTargetDirection] = useState("");
   const [targetState, setTargetState] = useState("");
   const [targetSupported, setTargetSupported] = useState("");
   const [targetInLoss, setTargetInLoss] = useState("");
@@ -831,16 +843,11 @@ export default function MicroplexPage() {
     search: targetSearch || undefined,
     family: targetFamily || undefined,
     geo_level: targetGeoLevel || undefined,
+    microplex_target_direction: targetDirection || undefined,
     state: targetState || undefined,
     supported: targetSupported || undefined,
     in_loss: targetInLoss || undefined,
   });
-
-  useEffect(() => {
-    if (window.location.hash === "#diagnostics") {
-      setMicroplexTab("diagnostics");
-    }
-  }, []);
 
   useEffect(() => {
     setTargetOffset(0);
@@ -848,6 +855,7 @@ export default function MicroplexPage() {
     targetSearch,
     targetFamily,
     targetGeoLevel,
+    targetDirection,
     targetState,
     targetSupported,
     targetInLoss,
@@ -919,40 +927,7 @@ export default function MicroplexPage() {
           </Text>
         </div>
 
-        <div className="flex w-fit rounded-md border border-border bg-white p-1 shadow-sm">
-          {[
-            { id: "overview", label: "Overview" },
-            { id: "diagnostics", label: "Target diagnostics" },
-          ].map((tab) => {
-            const active = microplexTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  const nextTab = tab.id as "overview" | "diagnostics";
-                  setMicroplexTab(nextTab);
-                  window.history.replaceState(
-                    null,
-                    "",
-                    nextTab === "diagnostics"
-                      ? "#diagnostics"
-                      : window.location.pathname + window.location.search,
-                  );
-                }}
-                className={`h-9 rounded px-3 text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-primary text-white shadow-sm"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {microplexTab === "overview" && (
+        {!isDiagnosticsView && (
           <>
         <Card>
           <CardContent className="py-4">
@@ -1077,7 +1052,7 @@ export default function MicroplexPage() {
           </>
         )}
 
-        {microplexTab === "diagnostics" && (
+        {isDiagnosticsView && (
         <Card>
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1120,7 +1095,7 @@ export default function MicroplexPage() {
                 .
               </Text>
               <div className="w-full overflow-x-auto rounded-md border border-border bg-muted/20 p-2">
-                <div className="flex min-w-[1240px] items-center gap-2">
+                <div className="flex min-w-[1410px] items-center gap-2">
                   <CompactSearchInput
                     label="Search"
                     value={targetSearch}
@@ -1148,6 +1123,18 @@ export default function MicroplexPage() {
                       { value: "", label: "All" },
                       { value: "national", label: "Federal only" },
                       { value: "state", label: "State only" },
+                    ]}
+                    className="w-[180px]"
+                  />
+                  <CompactSelect
+                    label="Target fit"
+                    value={targetDirection}
+                    onChange={setTargetDirection}
+                    options={[
+                      { value: "", label: "All" },
+                      { value: "above", label: "Above target" },
+                      { value: "below", label: "Below target" },
+                      { value: "near", label: "Near target" },
                     ]}
                     className="w-[180px]"
                   />
@@ -1193,6 +1180,7 @@ export default function MicroplexPage() {
                       setTargetSearch("");
                       setTargetFamily("");
                       setTargetGeoLevel("");
+                      setTargetDirection("");
                       setTargetState("");
                       setTargetSupported("");
                       setTargetInLoss("");
@@ -1267,7 +1255,7 @@ export default function MicroplexPage() {
         </Card>
         )}
 
-        {microplexTab === "overview" && (
+        {!isDiagnosticsView && (
           <>
         <Card>
           <CardHeader>

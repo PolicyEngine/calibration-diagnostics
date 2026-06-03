@@ -18,6 +18,7 @@ const usDataNavItems = [
 
 const microplexNavItems = [
   { href: "/microplex", label: "Overview" },
+  { href: "/microplex/diagnostics", label: "Target diagnostics" },
   { href: "/budget-impact", label: "Budget impact" },
   { href: "/pipeline", label: "Pipeline" },
 ];
@@ -48,7 +49,9 @@ export function NavSidebar() {
           const isActive =
             item.href === "/"
               ? pathname === "/"
-              : pathname.startsWith(item.href);
+              : item.href === "/microplex"
+                ? pathname === "/microplex"
+                : pathname.startsWith(item.href);
           return (
             <SidebarNavItem
               key={item.href}
