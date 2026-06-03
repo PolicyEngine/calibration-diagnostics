@@ -1,0 +1,451 @@
+{
+  "pipeline_id": "microplex-us",
+  "pipeline_label": "Microplex-US",
+  "description": "US-specific Microplex runtime: source fusion, donor integration, synthesis, PolicyEngine-compatible export, calibration, and oracle evaluation.",
+  "source_repo": "PolicyEngine/microplex-us",
+  "source_urls": [
+    "https://github.com/PolicyEngine/microplex-us",
+    "https://github.com/PolicyEngine/microplex-us/blob/main/docs/architecture.md",
+    "https://github.com/PolicyEngine/microplex-us/blob/main/docs/pipeline-stages.md",
+    "https://github.com/PolicyEngine/microplex-us/blob/main/docs/stage-contracts.md",
+    "https://github.com/PolicyEngine/microplex-us/blob/main/docs/benchmarking.md",
+    "https://github.com/PolicyEngine/microplex-us/blob/main/docs/policyengine-oracle-compatibility.md"
+  ],
+  "nodes": [
+    {
+      "id": "run_profile",
+      "label": "Resolve run profile",
+      "description": "Resolve the Microplex runtime profile, target period, source bundle, calibration backend, random seed, and artifact root.",
+      "node_type": "entrypoint",
+      "status": "current",
+      "stage_id": "01_run_profile",
+      "pathways": ["microplex_us"],
+      "source_file": "microplex_us/pipelines/us.py",
+      "artifacts_in": ["runtime_overrides", "profile_defaults"],
+      "artifacts_out": ["resolved_config", "provider_query_plan", "manifest"],
+      "implementation_refs": [
+        "USMicroplexPipeline",
+        "default_policyengine_us_data_rebuild_config",
+        "run manifest"
+      ],
+      "explanation": "This fixes the build contract before data is loaded: sources, period, target profile, calibration mode, artifact location, and reproducibility settings.",
+      "analyst_questions": [
+        "Which profile is this run using?",
+        "Which sources and target period are in scope?",
+        "Is this an incumbent-compatibility run or a challenger mode?"
+      ]
+    },
+    {
+      "id": "source_providers",
+      "label": "Load US source providers",
+      "description": "Load CPS, PUF, and donor-source adapters into canonical source descriptors and observation frames.",
+      "node_type": "source",
+      "status": "current",
+      "stage_id": "02_source_loading",
+      "pathways": ["microplex_us"],
+      "source_file": "microplex_us/pipelines/us.py",
+      "artifacts_in": ["resolved_config", "provider_query_plan", "raw_cps", "raw_puf", "donor_sources", "source_metadata"],
+      "artifacts_out": ["observation_frames", "source_descriptors"],
+      "implementation_refs": [
+        "microplex_us.pipelines.USMicroplexPipeline",
+        "microplex_us.data_sources.*"
+      ],
+      "explanation": "This is the boundary where survey-specific files become Microplex-owned tables with explicit variable, entity, and source capability metadata.",
+      "analyst_questions": [
+        "Which source owns each variable?",
+        "Which variables are native to the scaffold vs donor-only?",
+        "Are source units and entity IDs preserved?"
+      ]
+    },
+    {
+      "id": "fusion_plan",
+      "label": "Build fusion plan",
+      "description": "Construct a plan for combining scaffold and donor sources based on variable capability metadata and declared entity semantics.",
+      "node_type": "planner",
+      "status": "current",
+      "stage_id": "03_source_planning",
+      "pathways": ["microplex_us"],
+      "source_file": "microplex_us/pipelines/us.py",
+      "artifacts_in": ["observation_frames", "source_descriptors"],
+      "artifacts_out": ["fusion_plan"],
+      "implementation_refs": [
+        "FusionPlan",
+        "source capability registry",
+        "variable semantic registry"
+      ],
+      "explanation": "The fusion plan decides what can be copied, modeled, projected across entities, or deferred. It is the attribution layer for later data differences.",
+      "analyst_questions": [
+        "Which variables are directly observed in the scaffold?",
+        "Which variables require donor modeling?",
+        "What entity projection is needed?"
+      ]
+    },
+    {
+      "id": "scaffold_seed",
+      "label": "Choose scaffold and seed population",
+      "description": "Select a public structured scaffold source and prepare canonical seed rows for the synthetic population.",
+      "node_type": "process",
+      "status": "current",
+      "stage_id": "04_seed_scaffold",
+      "pathways": ["microplex_us"],
+      "source_file": "microplex_us/pipelines/us.py",
+      "artifacts_in": ["fusion_plan", "observation_frames"],
+      "artifacts_out": ["seed_population"],
+      "implementation_refs": [
+        "USMicroplexPipeline",
+        "canonical seed data preparation"
+      ],
+      "explanation": "The scaffold gives the synthetic dataset its initial row structure, entity IDs, and observed baseline features.",
+      "analyst_questions": [
+        "Is the scaffold representative for the target geography and period?",
+        "Which later variables depend on scaffold entity IDs?"
+      ]
+    },
+    {
+      "id": "donor_blocks",
+      "label": "Integrate donor-only variables",
+      "description": "Fit and generate donor-source variable blocks using declared match strategies, condition surfaces, and entity projection rules.",
+      "node_type": "model",
+      "status": "current",
+      "stage_id": "05_donor_integration_synthesis",
+      "pathways": ["microplex_us"],
+      "source_file": "microplex_us/pe_source_impute_engine.py",
+      "artifacts_in": ["seed_population", "fusion_plan", "donor_sources"],
+      "artifacts_out": ["imputed_variable_blocks", "imputation_sidecars"],
+      "implementation_refs": [
+        "pe_source_impute_blocks.json",
+        "pe_source_impute_engine.py",
+        "donor_surveys.py"
+      ],
+      "explanation": "This is where CPS/PUF scaffold rows get variables that only exist in donor sources. It is one of the highest-risk points for downstream tax and benefit aggregates.",
+      "analyst_questions": [
+        "Which donor block supplied a variable?",
+        "What conditions were used for matching?",
+        "Did projection from person/tax-unit/household change totals?"
+      ]
+    },
+    {
+      "id": "synthesize_population",
+      "label": "Synthesize population",
+      "description": "Materialize a complete synthetic population after scaffold and donor integration.",
+      "node_type": "model",
+      "status": "current",
+      "stage_id": "05_donor_integration_synthesis",
+      "pathways": ["microplex_us"],
+      "source_file": "microplex_us/pipelines/us.py",
+      "artifacts_in": ["seed_population", "imputed_variable_blocks"],
+      "artifacts_out": ["synthetic_population"],
+      "implementation_refs": [
+        "generic microplex synthesis engine",
+        "USMicroplexPipeline"
+      ],
+      "explanation": "This produces the candidate microdata before PolicyEngine-specific shaping, calibration, and evaluation.",
+      "analyst_questions": [
+        "How many synthetic records were produced?",
+        "Do donor variables preserve valid combinations?",
+        "Are missingness and support flags auditable?"
+      ]
+    },
+    {
+      "id": "pe_entity_tables",
+      "label": "Build PolicyEngine entity tables",
+      "description": "Convert the synthetic population into PolicyEngine-style person, tax-unit, spm-unit, household, and marital-unit tables.",
+      "node_type": "export",
+      "status": "current",
+      "stage_id": "06_policyengine_entities",
+      "pathways": ["policyengine_compatibility"],
+      "source_file": "microplex_us/policyengine/us.py",
+      "artifacts_in": ["synthetic_population"],
+      "artifacts_out": ["pe_entity_tables"],
+      "implementation_refs": [
+        "microplex_us.policyengine.us",
+        "PE-US-compatible export"
+      ],
+      "explanation": "PolicyEngine can only evaluate aggregates correctly if the entity graph and variable placement match its expected H5 schema.",
+      "analyst_questions": [
+        "Are entity IDs and joins valid?",
+        "Are variables stored on the correct entity?",
+        "Which values are native vs derived?"
+      ]
+    },
+    {
+      "id": "pe_derived_features",
+      "label": "Materialize PE-derived features",
+      "description": "Run PolicyEngine-compatible materialization for derived features required by calibration targets and diagnostics.",
+      "node_type": "policyengine",
+      "status": "current",
+      "stage_id": "06_policyengine_entities",
+      "pathways": ["policyengine_compatibility"],
+      "source_file": "microplex_us/policyengine/us.py",
+      "artifacts_in": ["pe_entity_tables", "policyengine_us"],
+      "artifacts_out": ["pe_feature_tables"],
+      "implementation_refs": [
+        "policyengine-us",
+        "microplex_us.policyengine.us"
+      ],
+      "explanation": "This turns raw modeled inputs into the same measured variables used by the target oracle.",
+      "analyst_questions": [
+        "Which variables are stored inputs vs PE formulas?",
+        "Did a missing node prevent a target from being evaluated?",
+        "Are formula-period assumptions aligned?"
+      ]
+    },
+    {
+      "id": "target_provider",
+      "label": "Load active PE target DB",
+      "description": "Load the active PolicyEngine-US target database and compile canonical target rows for evaluation and calibration planning.",
+      "node_type": "target",
+      "status": "current",
+      "stage_id": "07_calibration",
+      "pathways": ["policyengine_oracle"],
+      "source_file": "microplex_us/policyengine/harness.py",
+      "artifacts_in": ["policy_data_db"],
+      "artifacts_out": ["active_target_set", "compiled_target_specs"],
+      "implementation_refs": [
+        "PolicyEngineUSDBTargetProvider",
+        "policyengine-us-data targets DB"
+      ],
+      "explanation": "In Microplex benchmarking, the target DB is treated as truth. The incumbent us-data dataset is a comparator, not the oracle.",
+      "analyst_questions": [
+        "Which targets are active?",
+        "Which targets are supported by the candidate dataset?",
+        "Which targets are calibration constraints vs audit-only?"
+      ]
+    },
+    {
+      "id": "calibration_planner",
+      "label": "Plan calibration constraints",
+      "description": "Classify target rows into solve-now, solve-later, and audit-only groups instead of flattening the entire DB into one solve.",
+      "node_type": "planner",
+      "status": "current",
+      "stage_id": "07_calibration",
+      "pathways": ["policyengine_oracle"],
+      "source_file": "microplex_us/policyengine/harness.py",
+      "artifacts_in": ["compiled_target_specs", "pe_feature_tables"],
+      "artifacts_out": ["calibration_plan"],
+      "implementation_refs": [
+        "full-oracle loss with unsupported-target penalty",
+        "solve_now / solve_later / audit_only classification"
+      ],
+      "explanation": "This keeps every target visible while avoiding the claim that every target row is simultaneously solvable in one numerical step.",
+      "analyst_questions": [
+        "Which relevant targets are unsupported?",
+        "Which targets are optimized now?",
+        "Which targets only inform diagnostics?"
+      ]
+    },
+    {
+      "id": "calibrate_weights",
+      "label": "Calibrate / reweight",
+      "description": "Adjust synthetic population weights against the planned PE-US targets, including narrow deferred passes when they improve full-oracle score.",
+      "node_type": "optimizer",
+      "status": "current",
+      "stage_id": "07_calibration",
+      "pathways": ["policyengine_oracle"],
+      "source_file": "microplex_us/pipelines/us.py",
+      "artifacts_in": ["pe_feature_tables", "calibration_plan"],
+      "artifacts_out": ["calibrated_population", "calibration_sidecars"],
+      "implementation_refs": [
+        "Microplex calibration planner",
+        "full active PE-US target estate"
+      ],
+      "explanation": "This is the main calibration step: it changes weights or fitted outputs so candidate aggregates get closer to target DB values.",
+      "analyst_questions": [
+        "Which targets drove the largest weight changes?",
+        "Did calibration improve broad loss or only a narrow family?",
+        "Are unsupported targets penalized in the final score?"
+      ]
+    },
+    {
+      "id": "export_h5",
+      "label": "Export PE-ingestable H5",
+      "description": "Write the calibrated candidate dataset in the H5 shape that PolicyEngine-US can load.",
+      "node_type": "export",
+      "status": "current",
+      "stage_id": "08_dataset_assembly",
+      "pathways": ["policyengine_compatibility"],
+      "source_file": "microplex_us/pipelines/artifacts.py",
+      "artifacts_in": ["calibrated_population", "pe_entity_tables"],
+      "artifacts_out": ["microplex_h5"],
+      "implementation_refs": [
+        "artifact bundle",
+        "PE-ingestable H5 export"
+      ],
+      "explanation": "The exported H5 is the thing that can be compared with us-data in a shared PolicyEngine measurement harness.",
+      "analyst_questions": [
+        "Can PolicyEngine load the H5 without schema repairs?",
+        "Are all expected entity arrays present?",
+        "Is the exported artifact published or private?"
+      ]
+    },
+    {
+      "id": "baseline_us_data",
+      "label": "Load incumbent us-data baseline",
+      "description": "Load the comparable policyengine-us-data dataset slice used as the incumbent baseline.",
+      "node_type": "baseline",
+      "status": "current",
+      "stage_id": "09_validation_benchmarking",
+      "pathways": ["policyengine_oracle"],
+      "source_file": "microplex_us/policyengine/comparison.py",
+      "artifacts_in": ["policyengine_us_data_h5"],
+      "artifacts_out": ["baseline_dataset"],
+      "implementation_refs": [
+        "policyengine-us-data incumbent comparator",
+        "baselineSlice"
+      ],
+      "explanation": "This is not truth; it is the incumbent comparator run through the same target oracle as Microplex.",
+      "analyst_questions": [
+        "Which us-data artifact is the baseline?",
+        "Does it use the same target period and profile?",
+        "Are both datasets evaluated through the same PE version?"
+      ]
+    },
+    {
+      "id": "oracle_evaluation",
+      "label": "Evaluate through PE target oracle",
+      "description": "Run Microplex and us-data through PolicyEngine-US and compare implied aggregates to the same active target DB.",
+      "node_type": "evaluation",
+      "status": "current",
+      "stage_id": "09_validation_benchmarking",
+      "pathways": ["policyengine_oracle"],
+      "source_file": "microplex_us/policyengine/comparison.py",
+      "artifacts_in": ["microplex_h5", "baseline_dataset", "active_target_set"],
+      "artifacts_out": ["policyengine_harness", "target_diagnostics"],
+      "implementation_refs": [
+        "microplex_us.policyengine.harness",
+        "microplex_us.policyengine.comparison"
+      ],
+      "explanation": "This produces composite parity loss, mean absolute relative error, supported target rate, target win rate, and per-target deltas when diagnostics are available.",
+      "analyst_questions": [
+        "Which target families improved?",
+        "Which target families regressed?",
+        "Is the gain broad or concentrated in a few target weights?"
+      ]
+    },
+    {
+      "id": "artifact_bundle",
+      "label": "Save artifacts and run index",
+      "description": "Persist the versioned artifact bundle, harness JSON, registry rows, DuckDB index, and diagnostic sidecars.",
+      "node_type": "artifact",
+      "status": "current",
+      "stage_id": "09_validation_benchmarking",
+      "pathways": ["frontier_tracking"],
+      "source_file": "microplex_us/pipelines/artifacts.py",
+      "artifacts_in": ["policyengine_harness", "target_diagnostics", "microplex_h5"],
+      "artifacts_out": ["artifact_bundle", "run_registry_jsonl", "run_index_duckdb"],
+      "implementation_refs": [
+        "policyengine_harness.json",
+        "policyengine_native_scores.json",
+        "pe_us_data_rebuild_native_audit.json",
+        "run_registry.jsonl",
+        "run_index.duckdb",
+        "manifest.artifacts.policyengine_native_target_diagnostics",
+        "pe_native_target_diagnostics.json"
+      ],
+      "explanation": "This is the reproducibility and frontier-analysis layer. Newer Microplex runs record full target diagnostics as manifest.artifacts.policyengine_native_target_diagnostics pointing to pe_native_target_diagnostics.json. The current calibration-diagnostics app only reads public committed JSON summaries unless a generated artifact root or artifact service is supplied.",
+      "analyst_questions": [
+        "Which artifacts are public?",
+        "Which artifacts are generated but not committed?",
+        "Can this app ingest full per-target diagnostics yet?"
+      ]
+    },
+    {
+      "id": "dashboard_public_json",
+      "label": "Publish dashboard JSON summaries",
+      "description": "Commit aggregate parity, regression, and IRS drilldown JSONs that this dashboard can read without credentials.",
+      "node_type": "publication",
+      "status": "current",
+      "stage_id": "09_validation_benchmarking",
+      "pathways": ["frontier_tracking"],
+      "source_file": "artifacts/",
+      "artifacts_in": ["artifact_bundle", "policyengine_harness", "target_diagnostics"],
+      "artifacts_out": ["parity_json", "regression_summary_json", "irs_drilldown_json"],
+      "implementation_refs": [
+        "pe_us_data_rebuild_parity.json",
+        "live_pe_us_data_rebuild_checkpoint_modelpass_regression_summary_20260410.json",
+        "live_pe_us_data_rebuild_checkpoint_national_irs_other_drilldown_20260410.json"
+      ],
+      "explanation": "This is the narrow public surface currently shown on the Microplex dashboard page.",
+      "analyst_questions": [
+        "Do these summaries contain enough detail for a target-level diagnosis?",
+        "Which run produced the public headline?",
+        "When should the dashboard switch to full diagnostics?"
+      ]
+    }
+  ],
+  "edges": [
+    {"from": "run_profile", "to": "source_providers", "artifact": "provider_query_plan", "kind": "config"},
+    {"from": "run_profile", "to": "target_provider", "artifact": "resolved_config", "kind": "config"},
+    {"from": "source_providers", "to": "fusion_plan", "artifact": "observation_frames", "kind": "data"},
+    {"from": "fusion_plan", "to": "scaffold_seed", "artifact": "fusion_plan", "kind": "plan"},
+    {"from": "scaffold_seed", "to": "donor_blocks", "artifact": "seed_population", "kind": "data"},
+    {"from": "fusion_plan", "to": "donor_blocks", "artifact": "fusion_plan", "kind": "plan"},
+    {"from": "donor_blocks", "to": "synthesize_population", "artifact": "imputed_variable_blocks", "kind": "data"},
+    {"from": "scaffold_seed", "to": "synthesize_population", "artifact": "seed_population", "kind": "data"},
+    {"from": "synthesize_population", "to": "pe_entity_tables", "artifact": "synthetic_population", "kind": "data"},
+    {"from": "pe_entity_tables", "to": "pe_derived_features", "artifact": "pe_entity_tables", "kind": "data"},
+    {"from": "target_provider", "to": "calibration_planner", "artifact": "compiled_target_specs", "kind": "target"},
+    {"from": "pe_derived_features", "to": "calibration_planner", "artifact": "pe_feature_tables", "kind": "data"},
+    {"from": "calibration_planner", "to": "calibrate_weights", "artifact": "calibration_plan", "kind": "plan"},
+    {"from": "pe_derived_features", "to": "calibrate_weights", "artifact": "pe_feature_tables", "kind": "data"},
+    {"from": "calibrate_weights", "to": "export_h5", "artifact": "calibrated_population", "kind": "data"},
+    {"from": "pe_entity_tables", "to": "export_h5", "artifact": "pe_entity_tables", "kind": "data"},
+    {"from": "export_h5", "to": "oracle_evaluation", "artifact": "microplex_h5", "kind": "dataset"},
+    {"from": "baseline_us_data", "to": "oracle_evaluation", "artifact": "baseline_dataset", "kind": "dataset"},
+    {"from": "target_provider", "to": "oracle_evaluation", "artifact": "active_target_set", "kind": "target"},
+    {"from": "oracle_evaluation", "to": "artifact_bundle", "artifact": "policyengine_harness", "kind": "diagnostic"},
+    {"from": "export_h5", "to": "artifact_bundle", "artifact": "microplex_h5", "kind": "dataset"},
+    {"from": "artifact_bundle", "to": "dashboard_public_json", "artifact": "artifact_bundle", "kind": "publication"},
+    {"from": "oracle_evaluation", "to": "dashboard_public_json", "artifact": "target_diagnostics", "kind": "diagnostic"}
+  ],
+  "unproduced_artifacts": [
+    "runtime_overrides",
+    "profile_defaults",
+    "raw_cps",
+    "raw_puf",
+    "donor_sources",
+    "source_metadata",
+    "policyengine_us",
+    "policy_data_db",
+    "policyengine_us_data_h5"
+  ],
+    "stats": {
+    "node_count": 16,
+    "edge_count": 23,
+    "by_type": {
+      "entrypoint": 1,
+      "source": 1,
+      "planner": 2,
+      "process": 1,
+      "model": 2,
+      "export": 2,
+      "policyengine": 1,
+      "target": 1,
+      "optimizer": 1,
+      "baseline": 1,
+      "evaluation": 1,
+      "artifact": 1,
+      "publication": 1
+    },
+    "by_status": {
+      "current": 16
+    },
+    "by_pathway": {
+      "microplex_us": 6,
+      "policyengine_compatibility": 3,
+      "policyengine_oracle": 5,
+      "frontier_tracking": 2
+    },
+    "by_stage": {
+      "01_run_profile": 1,
+      "02_source_loading": 1,
+      "03_source_planning": 1,
+      "04_seed_scaffold": 1,
+      "05_donor_integration_synthesis": 2,
+      "06_policyengine_entities": 2,
+      "07_calibration": 3,
+      "08_dataset_assembly": 1,
+      "09_validation_benchmarking": 4
+    }
+  }
+}

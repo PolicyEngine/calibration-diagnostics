@@ -229,7 +229,7 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div
       className={cn(
-        'bg-card border border-border rounded-lg overflow-hidden',
+        'bg-card border border-border rounded-lg overflow-visible',
         className,
       )}
       style={styles?.root}
@@ -246,7 +246,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 <th
                   key={col.key}
                   className={cn(
-                    'px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground',
+                    'px-4 py-3 text-xs font-semibold tracking-normal text-muted-foreground',
                     col.align === 'right' && 'text-right',
                     col.align === 'center' && 'text-center',
                     isSortable && 'cursor-pointer select-none hover:text-foreground transition-colors',
