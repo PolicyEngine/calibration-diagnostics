@@ -592,7 +592,9 @@ export default function MicroplexPage() {
 
   const h = data.headline;
   const native = data.native_scores;
-  const hasConfiguredBundleScore = native.source === "configured_run_bundle";
+  const hasCurrentArtifactScore =
+    native.source === "configured_run_bundle" ||
+    native.source === "deployed_static_artifact";
   const verdictEntries = data.verdict ? Object.entries(data.verdict) : [];
   const leadAuditTargets = data.irs_drilldown.lead_audits.flatMap((a) =>
     (a.matchingTargets ?? []).map((t) => ({ ...t, audit: a.artifactPath })),
@@ -607,8 +609,8 @@ export default function MicroplexPage() {
         <div>
           <Title order={2}>Microplex target performance</Title>
           <Text c="dimmed" size="sm">
-            Read-only aggregate view of the Microplex summary artifacts
-            committed in{" "}
+            Read-only aggregate view of the latest deployed Microplex artifact
+            snapshot, with historical run summaries from{" "}
             <a
               href="https://github.com/PolicyEngine/microplex-us/tree/main/artifacts"
               className="text-primary hover:underline"
@@ -649,8 +651,8 @@ export default function MicroplexPage() {
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <CardTitle>
-                {hasConfiguredBundleScore
-                  ? "Run bundle broad target score"
+                {hasCurrentArtifactScore
+                  ? "Latest artifact broad target score"
                   : "Historical broad target score"}
               </CardTitle>
               <Badge variant={metricTone(native.enhanced_cps_native_loss_delta)}>
@@ -667,12 +669,12 @@ export default function MicroplexPage() {
                   label={
                     <HelpText
                       title={
-                        hasConfiguredBundleScore
-                          ? "Native loss is the PolicyEngine-us-data broad target loss computed by running dataset aggregates against the active target set. This value is read from the configured Microplex run bundle. Lower is better."
+                        hasCurrentArtifactScore
+                          ? "Native loss is the PolicyEngine-us-data broad target loss computed by running dataset aggregates against the active target set. This value is read from the latest deployed Microplex artifact snapshot. Lower is better."
                           : "Native loss is the PolicyEngine-us-data broad target loss computed by running dataset aggregates against the active target set. This value is read from the committed public Microplex parity artifact, not recomputed live. Lower is better."
                       }
                     >
-                      {hasConfiguredBundleScore
+                      {hasCurrentArtifactScore
                         ? "Microplex native loss"
                         : "Historical Microplex native loss"}
                     </HelpText>
@@ -707,9 +709,9 @@ export default function MicroplexPage() {
               </div>
               <Text size="sm" c="dimmed">
                 Lower loss is better.{" "}
-                {hasConfiguredBundleScore ? (
+                {hasCurrentArtifactScore ? (
                   <>
-                    These values come from configured run bundle{" "}
+                    These values come from latest deployed artifact{" "}
                     <span className="font-mono">
                       {native.artifact_id ?? data.artifact_id ?? "unknown"}
                     </span>
@@ -733,8 +735,7 @@ export default function MicroplexPage() {
                     and should not be read as a current live Microplex score.
                   </>
                 )}{" "}
-                The full row-level aggregate table is generated in each newer
-                run bundle as{" "}
+                The full row-level aggregate table is read from{" "}
                 <span className="font-mono">
                   {native.full_target_diagnostics_path}
                 </span>
@@ -742,7 +743,7 @@ export default function MicroplexPage() {
                 <span className="font-mono">
                   {native.full_target_diagnostics_manifest_key}
                 </span>
-                , but those generated bundles are not committed publicly yet.
+                .
               </Text>
             </Stack>
           </CardContent>

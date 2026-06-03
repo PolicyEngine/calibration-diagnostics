@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
 
+import {
+  LATEST_MICROPLEX_ARTIFACT_ID,
+  LATEST_MICROPLEX_NATIVE_SCORES_PATH,
+  LATEST_MICROPLEX_TARGET_DIAGNOSTICS_PATH,
+  latestHeadlinePatch,
+  latestNativeScores,
+  latestTargetDiagnosticsSummary,
+} from "@/lib/microplex/latest-artifact";
+
 const GITHUB_RAW = "https://raw.githubusercontent.com/PolicyEngine/microplex-us/main";
 
 const PARITY_PATH =
@@ -137,19 +146,16 @@ export async function GET() {
 
     const comparison = asObject(parity.comparison);
     const policyengineHarness = asObject(comparison.policyengineHarness);
-    const policyengineNativeScores = asObject(
-      comparison.policyengineNativeScores,
-    );
     const baselineSlice = asObject(parity.baselineSlice);
     const comparisonMetadata = asObject(baselineSlice.comparisonMetadata);
     const tagSummaries = asObject(policyengineHarness.tag_summaries);
     const allTargets = asObject(tagSummaries.all_targets);
     const configuredRuns = discoverConfiguredRunBundles();
-    const latestBundle = asObject(configuredRuns.latest_run_bundle);
-    const targetRowsAvailable =
-      latestBundle.target_diagnostics_exists === true;
+    const targetRowsAvailable = true;
+    const latestScores = latestNativeScores();
+    const latestTargetDiagnostics = latestTargetDiagnosticsSummary(100);
 
-    const headline = policyengineHarness.isPolicyEngineComparison
+    const historicalHeadline = policyengineHarness.isPolicyEngineComparison
       ? {
           baseline_label: baselineSlice.baselineLabel ?? null,
           candidate_label: baselineSlice.candidateLabel ?? null,
@@ -176,6 +182,10 @@ export async function GET() {
           tag_summaries: tagSummaries,
         }
       : {};
+    const headline = {
+      ...historicalHeadline,
+      ...latestHeadlinePatch(),
+    };
 
     return NextResponse.json(
       scrub({
@@ -184,27 +194,39 @@ export async function GET() {
           name,
           path,
           url: `${GITHUB_RAW}/${path}`,
-        })),
+        })).concat([
+          {
+            name: "latest_native_scores",
+            path: LATEST_MICROPLEX_NATIVE_SCORES_PATH,
+            url: "deployed-static-snapshot",
+          },
+          {
+            name: "latest_target_diagnostics",
+            path: LATEST_MICROPLEX_TARGET_DIAGNOSTICS_PATH,
+            url: "deployed-static-snapshot",
+          },
+        ]),
         limitations: [
-          "Only committed microplex-us summary JSON artifacts are public.",
-          "Newer Microplex run bundles write pe_native_target_diagnostics.json, but those bundles are generated artifacts, not committed public JSONs.",
-          "This is aggregate Microplex target-oracle reporting, not the full row-level target performance table.",
+          "The headline native loss and target rows use the latest deployed static Microplex artifact snapshot.",
+          "The best/worst run history and IRS drilldown still come from older public summary JSONs committed in PolicyEngine/microplex-us.",
+          "Live microsim reform comparisons still require a hosted Python backend and configured Microplex H5 artifact root.",
         ],
         newer_runs: {
-          current_reader: "public_github_committed_summary_jsons",
+          current_reader: "deployed_static_latest_artifact_snapshot",
           public_branch: "PolicyEngine/microplex-us main",
           run_bundle_manifest_key: RUN_LEVEL_TARGET_DIAGNOSTICS_MANIFEST_KEY,
           run_bundle_path_hint: RUN_LEVEL_TARGET_DIAGNOSTICS_PATH,
           legacy_static_dashboard_path: LEGACY_STATIC_TARGET_DIAGNOSTICS_PATH,
           required_to_load_newer_runs:
-            "Point the dashboard at a generated Microplex artifact root, publish the run-bundle JSONs, or expose the run index/artifacts through an authenticated artifact service.",
+            "Update the deployed static artifact snapshot, point the dashboard at a generated Microplex artifact root, publish the run-bundle JSONs, or expose the run index/artifacts through an authenticated artifact service.",
           not_loaded_reason:
-            "The committed public repo only contains summary JSONs; this process can only see newer runs when MICROPLEX_ARTIFACT_ROOTS or MICROPLEX_ARTIFACT_ROOT points at generated run bundles, or when an artifact store is wired in.",
+            "This Vercel deployment is reading the latest checked-in static artifact snapshot, not discovering private/generated run bundles at runtime.",
           configured_run_discovery: configuredRuns,
         },
         repo_structure: {
           canonical_stage_count: 9,
-          current_commit_public_artifact_count: Object.keys(ARTIFACTS).length,
+          current_commit_public_artifact_count:
+            Object.keys(ARTIFACTS).length + 2,
           analysis_modes: [
             "microplex_vs_target_oracle",
             "microplex_vs_us_data_comparator",
@@ -212,13 +234,13 @@ export async function GET() {
           ],
           generated_artifacts: GENERATED_ARTIFACT_CONTRACT,
           full_target_diagnostics: {
-            available_in_committed_repo: false,
+            available_in_committed_repo: true,
             expected_path: RUN_LEVEL_TARGET_DIAGNOSTICS_PATH,
             run_level_path: RUN_LEVEL_TARGET_DIAGNOSTICS_PATH,
             manifest_key: RUN_LEVEL_TARGET_DIAGNOSTICS_MANIFEST_KEY,
             legacy_static_dashboard_path: LEGACY_STATIC_TARGET_DIAGNOSTICS_PATH,
             static_dashboard_default_url:
-              `../${LEGACY_STATIC_TARGET_DIAGNOSTICS_PATH}`,
+              LATEST_MICROPLEX_TARGET_DIAGNOSTICS_PATH,
             producer_command:
               `Run the Microplex PE-US-data rebuild/native audit pipeline; newer runs record manifest.artifacts.${RUN_LEVEL_TARGET_DIAGNOSTICS_MANIFEST_KEY} = ${RUN_LEVEL_TARGET_DIAGNOSTICS_PATH}.`,
             row_fields: TARGET_DIAGNOSTIC_ROW_FIELDS,
@@ -234,51 +256,16 @@ export async function GET() {
             ],
           },
         },
-        artifact_id: parity.artifactId ?? null,
+        artifact_id: LATEST_MICROPLEX_ARTIFACT_ID,
         verdict: parity.verdict ?? null,
         headline,
         native_scores: {
-          available: policyengineNativeScores.available ?? null,
-          metric: policyengineNativeScores.metric ?? null,
-          period: policyengineNativeScores.period ?? null,
-          baseline_enhanced_cps_native_loss:
-            policyengineNativeScores.baseline_enhanced_cps_native_loss ?? null,
-          candidate_enhanced_cps_native_loss:
-            policyengineNativeScores.candidate_enhanced_cps_native_loss ?? null,
-          enhanced_cps_native_loss_delta:
-            policyengineNativeScores.enhanced_cps_native_loss_delta ?? null,
-          baseline_unweighted_msre:
-            policyengineNativeScores.baseline_unweighted_msre ?? null,
-          candidate_unweighted_msre:
-            policyengineNativeScores.candidate_unweighted_msre ?? null,
-          unweighted_msre_delta:
-            policyengineNativeScores.unweighted_msre_delta ?? null,
-          candidate_beats_baseline:
-            policyengineNativeScores.candidate_beats_baseline ?? null,
-          n_targets_total: policyengineNativeScores.n_targets_total ?? null,
-          n_targets_kept: policyengineNativeScores.n_targets_kept ?? null,
-          n_national_targets:
-            policyengineNativeScores.n_national_targets ?? null,
-          n_state_targets: policyengineNativeScores.n_state_targets ?? null,
-          n_targets_bad_dropped:
-            policyengineNativeScores.n_targets_bad_dropped ?? null,
-          n_targets_zero_dropped:
-            policyengineNativeScores.n_targets_zero_dropped ?? null,
+          ...latestScores,
           target_rows_available: targetRowsAvailable,
-          full_target_diagnostics_path:
-            latestBundle.target_diagnostics_path ??
-            RUN_LEVEL_TARGET_DIAGNOSTICS_PATH,
           full_target_diagnostics_manifest_key:
             RUN_LEVEL_TARGET_DIAGNOSTICS_MANIFEST_KEY,
         },
-        target_diagnostics: {
-          available: false,
-          path: latestBundle.target_diagnostics_path ?? null,
-          summary: {},
-          total_targets: 0,
-          display_limit: 100,
-          targets: [],
-        },
+        target_diagnostics: latestTargetDiagnostics,
         regression_summary: {
           total_scored_runs: regression.totalScoredRuns ?? null,
           total_audited_runs: regression.totalAuditedRuns ?? null,
