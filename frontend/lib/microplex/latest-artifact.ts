@@ -183,6 +183,9 @@ export function latestTargetDiagnosticsPage(requestUrl: string) {
   const family = stringParam(url.searchParams.get("family"));
   const state = stringParam(url.searchParams.get("state"));
   const geoLevel = stringParam(url.searchParams.get("geo_level"));
+  const sortBy = stringParam(url.searchParams.get("sort_by"));
+  const sortDir =
+    stringParam(url.searchParams.get("sort_dir")) === "desc" ? "desc" : "asc";
   const microplexTargetDirection = stringParam(
     url.searchParams.get("microplex_target_direction"),
   );
@@ -220,6 +223,20 @@ export function latestTargetDiagnosticsPage(requestUrl: string) {
   }
   if (search) {
     filtered = filtered.filter((row) => matchesSearch(row, search));
+  }
+  if (sortBy) {
+    filtered = [...filtered].sort((a, b) => {
+      const aVal = a[sortBy];
+      const bVal = b[sortBy];
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      const cmp =
+        typeof aVal === "number" && typeof bVal === "number"
+          ? aVal - bVal
+          : String(aVal).localeCompare(String(bVal));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
   }
 
   return {

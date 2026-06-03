@@ -387,6 +387,8 @@ export function useMicroplexTargetDiagnostics(params: {
   supported?: string;
   in_loss?: string;
   search?: string;
+  sort_by?: string;
+  sort_dir?: string;
 }) {
   return useQuery({
     queryKey: ["microplex", "target-diagnostics", params],

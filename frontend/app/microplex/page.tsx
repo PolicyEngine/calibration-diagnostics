@@ -15,7 +15,10 @@ import {
 } from "@policyengine/ui-kit";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { DataTable } from "@/components/shared/InteractiveDataTable";
+import {
+  DataTable,
+  type SortState,
+} from "@/components/shared/InteractiveDataTable";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import {
   useMicroplex,
@@ -836,6 +839,10 @@ export default function MicroplexPage() {
   const [targetSupported, setTargetSupported] = useState("");
   const [targetInLoss, setTargetInLoss] = useState("");
   const [targetOffset, setTargetOffset] = useState(0);
+  const [targetSort, setTargetSort] = useState<SortState | null>({
+    key: "microplex_vs_target_relative",
+    direction: "desc",
+  });
   const reformComparison = useMicroplexReformComparison(selectedReformId);
   const targetDiagnosticsQuery = useMicroplexTargetDiagnostics({
     limit: TARGET_DIAGNOSTICS_LIMIT,
@@ -847,6 +854,8 @@ export default function MicroplexPage() {
     state: targetState || undefined,
     supported: targetSupported || undefined,
     in_loss: targetInLoss || undefined,
+    sort_by: targetSort?.key,
+    sort_dir: targetSort?.direction,
   });
 
   useEffect(() => {
@@ -859,6 +868,7 @@ export default function MicroplexPage() {
     targetState,
     targetSupported,
     targetInLoss,
+    targetSort,
   ]);
 
   useEffect(() => {
@@ -1235,6 +1245,20 @@ export default function MicroplexPage() {
                   >[]
                 }
                 sortable
+                sort={targetSort}
+                onSortChange={(sort) => {
+                  const nextSort =
+                    sort ??
+                    (targetSort
+                      ? {
+                          key: targetSort.key,
+                          direction:
+                            targetSort.direction === "desc" ? "asc" : "desc",
+                        }
+                      : null);
+                  setTargetSort(nextSort);
+                  setTargetOffset(0);
+                }}
                 styles={{
                   table: { minWidth: compareWithUsData ? 1680 : 1080 },
                   header: {
