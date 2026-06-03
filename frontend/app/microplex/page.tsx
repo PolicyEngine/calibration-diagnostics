@@ -533,7 +533,12 @@ function targetDiagnosticsColumns(compareWithUsData: boolean) {
     header: "Target",
     format: (v: unknown, row: Record<string, unknown>) => (
       <span className="block w-[300px] whitespace-normal break-words font-mono text-xs leading-snug">
-        {String(v ?? row.target_name ?? "—")}
+        {String(row.target_name ?? v ?? "—")}
+        {row.target_name != null && v != null && String(row.target_name) !== String(v) ? (
+          <span className="mt-1 block font-sans text-[11px] text-muted-foreground">
+            ID {String(v)}
+          </span>
+        ) : null}
       </span>
     ),
   },
