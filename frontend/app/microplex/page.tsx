@@ -511,7 +511,8 @@ const agiGapColumns = [
   },
 ];
 
-const targetDiagnosticsColumns = [
+function targetDiagnosticsColumns(compareWithUsData: boolean) {
+  return [
   {
     key: "target_id",
     header: "Target",
@@ -649,7 +650,17 @@ const targetDiagnosticsColumns = [
         "—"
       ),
   },
-];
+  ].filter(
+    (column) =>
+      compareWithUsData ||
+      ![
+        "us_data_aggregate",
+        "microplex_vs_us_data",
+        "closer_dataset",
+        "delta_absolute_error",
+      ].includes(column.key),
+  );
+}
 
 function ReformComparisonCard({
   comparison,
@@ -802,6 +813,10 @@ export default function MicroplexPage() {
   const [selectedReformId, setSelectedReformId] = useState(
     "american_family_act_2025",
   );
+  const [microplexTab, setMicroplexTab] = useState<"overview" | "diagnostics">(
+    "overview",
+  );
+  const [compareWithUsData, setCompareWithUsData] = useState(true);
   const [targetSearch, setTargetSearch] = useState("");
   const [targetFamily, setTargetFamily] = useState("");
   const [targetGeoLevel, setTargetGeoLevel] = useState("");
@@ -820,6 +835,12 @@ export default function MicroplexPage() {
     supported: targetSupported || undefined,
     in_loss: targetInLoss || undefined,
   });
+
+  useEffect(() => {
+    if (window.location.hash === "#diagnostics") {
+      setMicroplexTab("diagnostics");
+    }
+  }, []);
 
   useEffect(() => {
     setTargetOffset(0);
@@ -898,6 +919,41 @@ export default function MicroplexPage() {
           </Text>
         </div>
 
+        <div className="flex w-fit rounded-md border border-border bg-white p-1 shadow-sm">
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "diagnostics", label: "Target diagnostics" },
+          ].map((tab) => {
+            const active = microplexTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  const nextTab = tab.id as "overview" | "diagnostics";
+                  setMicroplexTab(nextTab);
+                  window.history.replaceState(
+                    null,
+                    "",
+                    nextTab === "diagnostics"
+                      ? "#diagnostics"
+                      : window.location.pathname + window.location.search,
+                  );
+                }}
+                className={`h-9 rounded px-3 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {microplexTab === "overview" && (
+          <>
         <Card>
           <CardContent className="py-4">
             <Text size="sm" c="dimmed">
@@ -1018,14 +1074,35 @@ export default function MicroplexPage() {
             </Stack>
           </CardContent>
         </Card>
+          </>
+        )}
 
+        {microplexTab === "diagnostics" && (
         <Card>
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Target diagnostics rows</CardTitle>
-              <Badge variant={targetDiagnostics.available ? "success" : "secondary"}>
-                {targetDiagnostics.available ? "loaded" : "not loaded"}
-              </Badge>
+              <div>
+                <CardTitle>Target diagnostics rows</CardTitle>
+                <Text size="xs" c="dimmed" className="mt-1">
+                  Microplex aggregate fit against each calibration target.
+                </Text>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm shadow-sm">
+                  <input
+                    type="checkbox"
+                    checked={compareWithUsData}
+                    onChange={(event) =>
+                      setCompareWithUsData(event.target.checked)
+                    }
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <span className="font-medium">Compare with us-data</span>
+                </label>
+                <Badge variant={targetDiagnostics.available ? "success" : "secondary"}>
+                  {targetDiagnostics.available ? "loaded" : "not loaded"}
+                </Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -1162,7 +1239,7 @@ export default function MicroplexPage() {
                 </div>
               </div>
               <DataTable
-                columns={targetDiagnosticsColumns}
+                columns={targetDiagnosticsColumns(compareWithUsData)}
                 data={
                   targetDiagnostics.targets as unknown as Record<
                     string,
@@ -1171,7 +1248,7 @@ export default function MicroplexPage() {
                 }
                 sortable
                 styles={{
-                  table: { minWidth: 1680 },
+                  table: { minWidth: compareWithUsData ? 1680 : 1080 },
                   header: {
                     paddingLeft: 10,
                     paddingRight: 10,
@@ -1188,7 +1265,10 @@ export default function MicroplexPage() {
             </Stack>
           </CardContent>
         </Card>
+        )}
 
+        {microplexTab === "overview" && (
+          <>
         <Card>
           <CardHeader>
             <CardTitle>What needs attention</CardTitle>
@@ -1439,6 +1519,8 @@ export default function MicroplexPage() {
             </Stack>
           </CardContent>
         </Card>
+          </>
+        )}
       </Stack>
     </AppShell>
   );
