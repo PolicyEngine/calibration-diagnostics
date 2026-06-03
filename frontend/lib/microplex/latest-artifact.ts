@@ -7,7 +7,7 @@ type TargetRow = JsonObject;
 const TARGET_DIAGNOSTICS = targetDiagnosticsData as JsonObject;
 const NATIVE_SCORES = nativeScoresData as JsonObject;
 const TARGET_ROWS = Array.isArray(TARGET_DIAGNOSTICS.targets)
-  ? (TARGET_DIAGNOSTICS.targets as TargetRow[])
+  ? (TARGET_DIAGNOSTICS.targets as TargetRow[]).map(enrichTargetRow)
   : [];
 const NATIVE_SUMMARY = asObject(NATIVE_SCORES.summary);
 
@@ -38,6 +38,35 @@ export function scrub(value: unknown): unknown {
 
 function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function estimate(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function enrichTargetRow(row: TargetRow): TargetRow {
+  const target = estimate(row.target_value);
+  const usData = estimate(row.us_data_aggregate ?? row.from_estimate);
+  const microplex = estimate(row.microplex_aggregate ?? row.to_estimate);
+  const deltaAbsError = estimate(row.delta_absolute_error);
+
+  return {
+    ...row,
+    microplex_vs_target:
+      microplex != null && target != null ? microplex - target : null,
+    us_data_vs_target:
+      usData != null && target != null ? usData - target : null,
+    microplex_vs_us_data:
+      microplex != null && usData != null ? microplex - usData : null,
+    closer_dataset:
+      deltaAbsError == null
+        ? null
+        : deltaAbsError < 0
+          ? "microplex"
+          : deltaAbsError > 0
+            ? "us-data"
+            : "tie",
+  };
 }
 
 function stringParam(value: string | null): string | null {

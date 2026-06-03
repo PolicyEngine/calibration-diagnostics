@@ -124,6 +124,17 @@ function deltaBadge(v: number | null | undefined, improveIsLower = true) {
   );
 }
 
+function signedFmt(v: number | null | undefined) {
+  if (v == null || !Number.isFinite(v)) return "—";
+  const sign = v > 0 ? "+" : "";
+  return (
+    <span className="font-mono text-xs">
+      {sign}
+      {fmt(v)}
+    </span>
+  );
+}
+
 const bestWorstColumns = [
   { key: "artifactPath", header: "Run", format: (v: unknown) => (
     <span className="block max-w-[360px] whitespace-normal break-words font-mono text-xs">
@@ -462,10 +473,68 @@ const targetDiagnosticsColumns = [
     },
   },
   {
+    key: "microplex_vs_target",
+    header: (
+      <HelpText title="Microplex aggregate minus target value. Positive means Microplex is above the target; negative means below the target.">
+        Microplex vs target
+      </HelpText>
+    ),
+    align: "right" as const,
+    format: (v: unknown, row: Record<string, unknown>) => {
+      let value = v;
+      if (value == null) {
+        const target = Number(row.target_value);
+        const microplex = Number(row.to_estimate ?? row.microplex_aggregate);
+        if (Number.isFinite(target) && Number.isFinite(microplex)) {
+          value = microplex - target;
+        }
+      }
+      return signedFmt(value == null ? null : Number(value));
+    },
+  },
+  {
+    key: "microplex_vs_us_data",
+    header: (
+      <HelpText title="Microplex aggregate minus us-data aggregate. Positive means Microplex is higher than us-data; negative means lower.">
+        Microplex vs us-data
+      </HelpText>
+    ),
+    align: "right" as const,
+    format: (v: unknown, row: Record<string, unknown>) => {
+      let value = v;
+      if (value == null) {
+        const usData = Number(row.from_estimate ?? row.us_data_aggregate);
+        const microplex = Number(row.to_estimate ?? row.microplex_aggregate);
+        if (Number.isFinite(usData) && Number.isFinite(microplex)) {
+          value = microplex - usData;
+        }
+      }
+      return signedFmt(value == null ? null : Number(value));
+    },
+  },
+  {
+    key: "closer_dataset",
+    header: (
+      <HelpText title="Which dataset has lower absolute error against the target on this row.">
+        Closer
+      </HelpText>
+    ),
+    format: (v: unknown) =>
+      v === "microplex" ? (
+        <Badge variant="success">Microplex</Badge>
+      ) : v === "us-data" ? (
+        <Badge variant="secondary">us-data</Badge>
+      ) : v === "tie" ? (
+        <Badge variant="secondary">tie</Badge>
+      ) : (
+        "—"
+      ),
+  },
+  {
     key: "delta_absolute_error",
     header: (
       <HelpText title="Microplex absolute error minus us-data absolute error. Negative means Microplex is closer to the target.">
-        Error delta
+        Abs error delta
       </HelpText>
     ),
     align: "right" as const,

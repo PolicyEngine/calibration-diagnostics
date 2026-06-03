@@ -144,6 +144,10 @@ export interface MicroplexTargetDiagnosticRow {
   microplex_relative_error?: number | null;
   delta_absolute_error?: number | null;
   delta_relative_error?: number | null;
+  microplex_vs_target?: number | null;
+  us_data_vs_target?: number | null;
+  microplex_vs_us_data?: number | null;
+  closer_dataset?: "microplex" | "us-data" | "tie" | null;
   loss_contribution?: number | null;
   in_loss?: boolean | null;
   supported_by_microplex?: boolean | null;
