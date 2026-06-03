@@ -544,7 +544,11 @@ function targetDiagnosticsColumns(compareWithUsData: boolean) {
   },
   {
     key: "family",
-    header: "Family",
+    header: (
+      <HelpText title="Target group from the diagnostics sidecar. Families are used to scan related calibration rows and may differ from the raw PolicyEngine target source label.">
+        Family
+      </HelpText>
+    ),
     format: (v: unknown, row: Record<string, unknown>) => (
       <span className="block w-[150px] whitespace-normal break-words font-mono text-xs leading-snug">
         {String(v ?? row.target_family ?? "—")}
@@ -553,13 +557,21 @@ function targetDiagnosticsColumns(compareWithUsData: boolean) {
   },
   {
     key: "target_value",
-    header: "Target value",
+    header: (
+      <HelpText title="Calibration oracle value used in this Microplex target diagnostics sidecar. This is the value the displayed aggregates are compared against.">
+        Target value
+      </HelpText>
+    ),
     align: "right" as const,
     format: (v: unknown) => (v == null ? "—" : fmt(Number(v))),
   },
   {
     key: "us_data_aggregate",
-    header: "us-data aggregate",
+    header: (
+      <HelpText title="Aggregate computed from the baseline PolicyEngine us-data H5 for this target row.">
+        us-data aggregate
+      </HelpText>
+    ),
     align: "right" as const,
     format: (v: unknown, row: Record<string, unknown>) => {
       const value = v ?? row.from_estimate;
@@ -568,7 +580,11 @@ function targetDiagnosticsColumns(compareWithUsData: boolean) {
   },
   {
     key: "microplex_aggregate",
-    header: "Microplex aggregate",
+    header: (
+      <HelpText title="Aggregate computed from the Microplex candidate H5 for this target row.">
+        Microplex aggregate
+      </HelpText>
+    ),
     align: "right" as const,
     format: (v: unknown, row: Record<string, unknown>) => {
       const value = v ?? row.to_estimate;
@@ -660,7 +676,11 @@ function targetDiagnosticsColumns(compareWithUsData: boolean) {
   },
   {
     key: "supported_by_microplex",
-    header: "Supported",
+    header: (
+      <HelpText title="Whether Microplex could evaluate this target with the available candidate variables and entity structure.">
+        Supported
+      </HelpText>
+    ),
     format: (v: unknown) =>
       v === true ? (
         <Badge variant="success">yes</Badge>

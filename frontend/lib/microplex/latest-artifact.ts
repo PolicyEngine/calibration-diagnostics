@@ -243,9 +243,21 @@ export function latestTargetDiagnosticsPage(requestUrl: string) {
     limit,
     offset,
     has_next: offset + limit < filtered.length,
-    total_targets: filtered.length,
+    total_targets: TARGET_ROWS.length,
+    filtered_total: filtered.length,
     targets: filtered.slice(offset, offset + limit),
     unfiltered_total_targets: TARGET_ROWS.length,
+    filters: {
+      family,
+      state,
+      geo_level: geoLevel,
+      microplex_target_direction: microplexTargetDirection,
+      supported,
+      in_loss: inLoss,
+      search,
+      sort_by: sortBy,
+      sort_dir: sortBy ? sortDir : null,
+    },
     microplex_bundle: {
       artifact_id: LATEST_MICROPLEX_ARTIFACT_ID,
       artifact_dir:

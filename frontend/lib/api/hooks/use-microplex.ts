@@ -169,7 +169,8 @@ export interface MicroplexTargetDiagnostics {
   dataset_labels?: Record<string, unknown>;
   summary: Record<string, unknown>;
   total_targets: number;
-  display_limit: number;
+  display_limit?: number;
+  filtered_total?: number;
   returned?: number;
   limit?: number;
   offset?: number;

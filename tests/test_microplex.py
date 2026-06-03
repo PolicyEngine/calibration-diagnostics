@@ -483,6 +483,26 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
         "nation/irs/dividends",
     ]
 
+    family_desc = microplex.microplex_target_diagnostics(
+        sort_by="family",
+        sort_dir="desc",
+    )
+    assert [row["target_id"] for row in family_desc["targets"]] == [
+        "state/MT/snap/households",
+        "state/CA/agi/count/0_10k",
+        "nation/irs/dividends",
+    ]
+
+    aggregate_desc = microplex.microplex_target_diagnostics(
+        sort_by="microplex_aggregate",
+        sort_dir="desc",
+    )
+    assert [row["target_id"] for row in aggregate_desc["targets"]] == [
+        "nation/irs/dividends",
+        "state/CA/agi/count/0_10k",
+        "state/MT/snap/households",
+    ]
+
     above_target = microplex.microplex_target_diagnostics(
         microplex_target_direction="above"
     )

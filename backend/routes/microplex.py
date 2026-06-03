@@ -21,7 +21,7 @@ import json
 import logging
 import os
 import time
-from functools import lru_cache
+from functools import cmp_to_key, lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -1197,21 +1197,35 @@ def _sort_target_diagnostic_rows(
         return rows
     descending = sort_dir == "desc"
 
-    def sort_key(row: dict[str, Any]) -> tuple[int, Any]:
-        value = row.get(sort_by)
-        if value is None:
-            return (1, "")
-        numeric_value = _estimate(value)
-        if numeric_value is not None:
-            return (0, -numeric_value if descending else numeric_value)
-        text_value = str(value).lower()
-        return (0, _reverse_text_key(text_value) if descending else text_value)
+    def compare(left: dict[str, Any], right: dict[str, Any]) -> int:
+        left_value = _row_sort_value(left.get(sort_by))
+        right_value = _row_sort_value(right.get(sort_by))
+        if left_value is None and right_value is None:
+            return 0
+        if left_value is None:
+            return 1
+        if right_value is None:
+            return -1
+        if isinstance(left_value, float) and isinstance(right_value, float):
+            result = (left_value > right_value) - (left_value < right_value)
+        else:
+            result = (str(left_value) > str(right_value)) - (
+                str(left_value) < str(right_value)
+            )
+        return -result if descending else result
 
-    return sorted(rows, key=sort_key)
+    return sorted(rows, key=cmp_to_key(compare))
 
 
-def _reverse_text_key(value: str) -> tuple[int, ...]:
-    return tuple(-ord(char) for char in value)
+def _row_sort_value(value: Any) -> float | str | None:
+    if value is None:
+        return None
+    numeric_value = _estimate(value)
+    if numeric_value is not None:
+        return numeric_value
+    if isinstance(value, int | float):
+        return None
+    return str(value).lower()
 
 
 @router.get("/microplex/target-diagnostics")
@@ -1347,6 +1361,8 @@ def microplex_target_diagnostics(
             "summary": summary if isinstance(summary, dict) else {},
             "total_targets": len(all_rows),
             "filtered_total": len(filtered),
+            "unfiltered_total_targets": len(all_rows),
+            "returned": len(page),
             "limit": limit,
             "offset": offset,
             "has_next": offset + limit < len(filtered),
