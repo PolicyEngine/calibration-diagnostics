@@ -379,6 +379,7 @@ export function useMicroplexTargetDiagnostics(params: {
   offset?: number;
   family?: string;
   state?: string;
+  geo_level?: string;
   supported?: string;
   in_loss?: string;
   search?: string;

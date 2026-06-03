@@ -229,13 +229,13 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div
       className={cn(
-        'bg-card border border-border rounded-lg overflow-visible',
+        'w-full max-w-full overflow-x-auto overflow-y-visible bg-card border border-border rounded-lg',
         className,
       )}
       style={styles?.root}
       {...props}
     >
-      <table className="w-full" style={styles?.table}>
+      <table className="w-full min-w-max" style={styles?.table}>
         <thead>
           <tr className="border-b border-border bg-gray-50">
             {columns.map((col) => {

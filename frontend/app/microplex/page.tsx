@@ -434,7 +434,7 @@ const targetDiagnosticsColumns = [
     key: "target_id",
     header: "Target",
     format: (v: unknown, row: Record<string, unknown>) => (
-      <span className="block max-w-[420px] whitespace-normal break-words font-mono text-xs">
+      <span className="block w-[300px] whitespace-normal break-words font-mono text-xs leading-snug">
         {String(v ?? row.target_name ?? "—")}
       </span>
     ),
@@ -443,7 +443,7 @@ const targetDiagnosticsColumns = [
     key: "family",
     header: "Family",
     format: (v: unknown, row: Record<string, unknown>) => (
-      <span className="font-mono text-xs">
+      <span className="block w-[150px] whitespace-normal break-words font-mono text-xs leading-snug">
         {String(v ?? row.target_family ?? "—")}
       </span>
     ),
@@ -722,6 +722,7 @@ export default function MicroplexPage() {
   );
   const [targetSearch, setTargetSearch] = useState("");
   const [targetFamily, setTargetFamily] = useState("");
+  const [targetGeoLevel, setTargetGeoLevel] = useState("");
   const [targetState, setTargetState] = useState("");
   const [targetSupported, setTargetSupported] = useState("");
   const [targetInLoss, setTargetInLoss] = useState("");
@@ -732,6 +733,7 @@ export default function MicroplexPage() {
     offset: targetOffset,
     search: targetSearch || undefined,
     family: targetFamily || undefined,
+    geo_level: targetGeoLevel || undefined,
     state: targetState || undefined,
     supported: targetSupported || undefined,
     in_loss: targetInLoss || undefined,
@@ -739,7 +741,20 @@ export default function MicroplexPage() {
 
   useEffect(() => {
     setTargetOffset(0);
-  }, [targetSearch, targetFamily, targetState, targetSupported, targetInLoss]);
+  }, [
+    targetSearch,
+    targetFamily,
+    targetGeoLevel,
+    targetState,
+    targetSupported,
+    targetInLoss,
+  ]);
+
+  useEffect(() => {
+    if (targetGeoLevel === "national" && targetState) {
+      setTargetState("");
+    }
+  }, [targetGeoLevel, targetState]);
 
   if (isLoading)
     return (
@@ -945,7 +960,7 @@ export default function MicroplexPage() {
                   : ""}
                 .
               </Text>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_120px_150px_130px_auto]">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_210px_170px_120px_145px_125px_auto]">
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="text-xs font-medium text-muted-foreground">
                     Search
@@ -977,12 +992,27 @@ export default function MicroplexPage() {
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="text-xs font-medium text-muted-foreground">
+                    Geography
+                  </span>
+                  <select
+                    value={targetGeoLevel}
+                    onChange={(event) => setTargetGeoLevel(event.target.value)}
+                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
+                  >
+                    <option value="">All geographies</option>
+                    <option value="national">Federal/national only</option>
+                    <option value="state">State only</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs font-medium text-muted-foreground">
                     State
                   </span>
                   <select
                     value={targetState}
+                    disabled={targetGeoLevel === "national"}
                     onChange={(event) => setTargetState(event.target.value)}
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
+                    className="h-10 rounded-md border border-border bg-white px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="">All</option>
                     {STATE_OPTIONS.map((state) => (
@@ -1026,6 +1056,7 @@ export default function MicroplexPage() {
                     onClick={() => {
                       setTargetSearch("");
                       setTargetFamily("");
+                      setTargetGeoLevel("");
                       setTargetState("");
                       setTargetSupported("");
                       setTargetInLoss("");
@@ -1080,6 +1111,20 @@ export default function MicroplexPage() {
                   >[]
                 }
                 sortable
+                styles={{
+                  table: { minWidth: 1680 },
+                  header: {
+                    paddingLeft: 10,
+                    paddingRight: 10,
+                    whiteSpace: "nowrap",
+                  },
+                  cell: {
+                    paddingLeft: 10,
+                    paddingRight: 10,
+                    verticalAlign: "top",
+                    whiteSpace: "nowrap",
+                  },
+                }}
               />
             </Stack>
           </CardContent>
