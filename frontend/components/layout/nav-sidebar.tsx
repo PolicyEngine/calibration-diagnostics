@@ -19,14 +19,14 @@ const usDataNavItems = [
 const microplexNavItems = [
   { href: "/microplex", label: "Overview" },
   { href: "/microplex/diagnostics", label: "Target diagnostics" },
-  { href: "/budget-impact", label: "Budget impact" },
+  { href: "/microplex/reforms", label: "Reform benchmarks" },
   { href: "/pipeline", label: "Pipeline" },
 ];
 
 const comparisonNavItems = [
   { href: "/comparison", label: "Comparison" },
   { href: "/microplex", label: "Microplex target performance" },
-  { href: "/budget-impact", label: "Budget impact" },
+  { href: "/microplex/reforms", label: "Reform benchmarks" },
   { href: "/summary", label: "us-data summary" },
   { href: "/pipeline", label: "Pipeline DAG" },
 ];
