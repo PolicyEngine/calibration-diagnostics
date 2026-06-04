@@ -108,6 +108,10 @@ function primaryExternalEstimate(row: MicroplexBudgetBenchmarkRow) {
   );
 }
 
+function hasNumericExternalEstimate(row: MicroplexBudgetBenchmarkRow) {
+  return row.external_estimates.some((estimate) => estimate.estimate != null);
+}
+
 function sourceBadge(sourceType: string | undefined) {
   if (!sourceType) return null;
   return <Badge variant="secondary">{sourceType.replaceAll("_", " ")}</Badge>;
@@ -362,15 +366,24 @@ export default function ReformBenchmarksPage() {
 
   if (!data) return null;
 
-  const liveRows = data.rows.filter((row) => row.live.available).length;
-  const numericExternalRows = data.rows.filter((row) =>
-    row.external_estimates.some((estimate) => estimate.estimate != null),
-  ).length;
-  const comparableRows = data.rows.filter(
-    (row) =>
-      row.live.available &&
-      row.external_estimates.some((estimate) => estimate.estimate != null),
-  ).length;
+  const scoredRows = data.rows.filter(
+    (row) => row.live.available && hasNumericExternalEstimate(row),
+  );
+  const modelOnlyRows = data.rows.filter(
+    (row) => row.live.available && !hasNumericExternalEstimate(row),
+  );
+  const externalOnlyRows = data.rows.filter(
+    (row) => !row.live.available && hasNumericExternalEstimate(row),
+  );
+  const otherRows = data.rows.filter(
+    (row) => !row.live.available && !hasNumericExternalEstimate(row),
+  );
+  const detailRows = [
+    ...scoredRows,
+    ...externalOnlyRows,
+    ...modelOnlyRows,
+    ...otherRows,
+  ];
 
   return (
     <AppShell>
@@ -378,21 +391,27 @@ export default function ReformBenchmarksPage() {
         <div>
           <Title order={2}>Reform benchmarks</Title>
           <Text c="dimmed" size="sm" className="max-w-5xl">
-            Cached comparisons for the same PolicyEngine reform run over
-            us-data and the configured Microplex H5, with third-party or
-            official estimates shown where available. {data.sign_convention}
+            Cached comparisons for reforms with a live us-data/Microplex run
+            and a numeric third-party or official benchmark. Model-only reform
+            rows are kept separate below. {data.sign_convention}
           </Text>
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <Metric label="Computed reform rows" value={formatNumber(liveRows)} />
           <Metric
-            label="Rows with numeric external estimate"
-            value={formatNumber(numericExternalRows)}
+            label="Scored benchmark rows"
+            value={formatNumber(scoredRows.length)}
+            detail="live model + numeric external"
           />
           <Metric
-            label="Computed + external"
-            value={formatNumber(comparableRows)}
+            label="Model-only rows"
+            value={formatNumber(modelOnlyRows.length)}
+            detail="computed, no score"
+          />
+          <Metric
+            label="External scores to wire"
+            value={formatNumber(externalOnlyRows.length)}
+            detail="score exists, no live reform"
           />
           <Metric
             label="Generated"
@@ -432,10 +451,65 @@ export default function ReformBenchmarksPage() {
           </Card>
         ) : null}
 
-        <ReformBenchmarkTable rows={data.rows} />
+        <div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <Title order={3}>Scored reform benchmarks</Title>
+            <Badge variant="success">
+              {formatNumber(scoredRows.length)} comparable
+            </Badge>
+          </div>
+          {scoredRows.length ? (
+            <ReformBenchmarkTable rows={scoredRows} />
+          ) : (
+            <Card>
+              <CardContent className="py-4">
+                <Text size="sm" c="dimmed">
+                  No reform currently has both a live us-data/Microplex run and
+                  a numeric third-party estimate.
+                </Text>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {externalOnlyRows.length ? (
+          <div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <Title order={3}>Scores needing live reform wiring</Title>
+              <Badge variant="secondary">
+                {formatNumber(externalOnlyRows.length)} to wire
+              </Badge>
+            </div>
+            <ReformBenchmarkTable rows={externalOnlyRows} />
+          </div>
+        ) : null}
+
+        {modelOnlyRows.length ? (
+          <div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <Title order={3}>Model-only smoke tests</Title>
+              <Badge variant="secondary">
+                {formatNumber(modelOnlyRows.length)} unscored
+              </Badge>
+            </div>
+            <ReformBenchmarkTable rows={modelOnlyRows} />
+          </div>
+        ) : null}
+
+        {otherRows.length ? (
+          <div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <Title order={3}>Other rows</Title>
+              <Badge variant="secondary">
+                {formatNumber(otherRows.length)} rows
+              </Badge>
+            </div>
+            <ReformBenchmarkTable rows={otherRows} />
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-1 gap-4">
-          {data.rows.map((row) => (
+          {detailRows.map((row) => (
             <BenchmarkDetail key={row.id} row={row} />
           ))}
         </div>
