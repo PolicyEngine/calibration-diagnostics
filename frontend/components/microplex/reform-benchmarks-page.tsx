@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import {
   Badge,
@@ -112,9 +112,30 @@ function hasNumericExternalEstimate(row: MicroplexBudgetBenchmarkRow) {
   return row.external_estimates.some((estimate) => estimate.estimate != null);
 }
 
+function hasComparableExternalEstimate(row: MicroplexBudgetBenchmarkRow) {
+  return row.external_estimates.some(
+    (estimate) =>
+      estimate.estimate != null &&
+      estimate.comparable_to_live_annual_result === true,
+  );
+}
+
 function sourceBadge(sourceType: string | undefined) {
   if (!sourceType) return null;
-  return <Badge variant="secondary">{sourceType.replaceAll("_", " ")}</Badge>;
+  const labels: Record<string, string> = {
+    cbo_jct: "CBO/JCT",
+    jct: "JCT",
+    pwbm: "PWBM",
+    official_score: "official",
+    published_model_result: "model result",
+    third_party_context: "third-party context",
+    third_party_score: "third-party score",
+  };
+  return (
+    <Badge variant="secondary">
+      {labels[sourceType] ?? sourceType.replaceAll("_", " ")}
+    </Badge>
+  );
 }
 
 function ReformBenchmarkTable({
@@ -344,7 +365,9 @@ function BenchmarkDetail({ row }: { row: MicroplexBudgetBenchmarkRow }) {
 }
 
 export default function ReformBenchmarksPage() {
-  const { data, isLoading, error } = useMicroplexBudgetBenchmarks();
+  const [computeLive, setComputeLive] = useState(false);
+  const { data, isLoading, isFetching, error } =
+    useMicroplexBudgetBenchmarks(computeLive);
 
   if (isLoading) {
     return (
@@ -367,19 +390,24 @@ export default function ReformBenchmarksPage() {
   if (!data) return null;
 
   const scoredRows = data.rows.filter(
-    (row) => row.live.available && hasNumericExternalEstimate(row),
+    (row) => row.live.available && hasComparableExternalEstimate(row),
   );
   const modelOnlyRows = data.rows.filter(
     (row) => row.live.available && !hasNumericExternalEstimate(row),
   );
+  const waterfallRows = data.rows.filter(
+    (row) =>
+      hasNumericExternalEstimate(row) && !hasComparableExternalEstimate(row),
+  );
   const externalOnlyRows = data.rows.filter(
-    (row) => !row.live.available && hasNumericExternalEstimate(row),
+    (row) => !row.live.available && hasComparableExternalEstimate(row),
   );
   const otherRows = data.rows.filter(
     (row) => !row.live.available && !hasNumericExternalEstimate(row),
   );
   const detailRows = [
     ...scoredRows,
+    ...waterfallRows,
     ...externalOnlyRows,
     ...modelOnlyRows,
     ...otherRows,
@@ -389,12 +417,29 @@ export default function ReformBenchmarksPage() {
     <AppShell>
       <Stack gap="lg">
         <div>
-          <Title order={2}>Reform benchmarks</Title>
-          <Text c="dimmed" size="sm" className="max-w-5xl">
-            Cached comparisons for reforms with a live us-data/Microplex run
-            and a numeric third-party or official benchmark. Model-only reform
-            rows are kept separate below. {data.sign_convention}
-          </Text>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <Title order={2}>Reform benchmarks</Title>
+              <Text c="dimmed" size="sm" className="max-w-5xl">
+                Third-party and official benchmark catalog for clean,
+                provision-level reform comparisons. Live us-data/Microplex
+                microsims are deferred because full income_tax calculations
+                are expensive on page load. {data.sign_convention}
+              </Text>
+            </div>
+            <button
+              type="button"
+              onClick={() => setComputeLive(true)}
+              disabled={computeLive || isFetching}
+              className="rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {computeLive
+                ? isFetching
+                  ? "Computing..."
+                  : "Live results loaded"
+                : "Compute live results"}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
@@ -411,7 +456,7 @@ export default function ReformBenchmarksPage() {
           <Metric
             label="External scores to wire"
             value={formatNumber(externalOnlyRows.length)}
-            detail="score exists, no live reform"
+            detail="clean score, no live reform"
           />
           <Metric
             label="Generated"
@@ -475,12 +520,24 @@ export default function ReformBenchmarksPage() {
         {externalOnlyRows.length ? (
           <div>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <Title order={3}>Scores needing live reform wiring</Title>
+              <Title order={3}>Scores awaiting live compute</Title>
               <Badge variant="secondary">
-                {formatNumber(externalOnlyRows.length)} to wire
+                {formatNumber(externalOnlyRows.length)} pending
               </Badge>
             </div>
             <ReformBenchmarkTable rows={externalOnlyRows} />
+          </div>
+        ) : null}
+
+        {waterfallRows.length ? (
+          <div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <Title order={3}>Waterfall score context</Title>
+              <Badge variant="secondary">
+                {formatNumber(waterfallRows.length)} contextual
+              </Badge>
+            </div>
+            <ReformBenchmarkTable rows={waterfallRows} />
           </div>
         ) : null}
 

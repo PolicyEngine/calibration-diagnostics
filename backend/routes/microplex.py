@@ -138,7 +138,7 @@ _REFORM_COMPARISON_CACHE: dict[
 ] = {}
 _REFORM_COMPARISON_TTL_SECONDS = 900
 _BUDGET_BENCHMARK_CACHE: dict[
-    tuple[str, str, int],
+    tuple[str, str, int, int],
     tuple[float, dict[str, Any]],
 ] = {}
 _BUDGET_BENCHMARK_TTL_SECONDS = 900
@@ -197,6 +197,76 @@ _REFORM_PRESETS: dict[str, dict[str, Any]] = {
         "unit": "USD",
         "source_url": "https://www.policyengine.org/us/research/trafwa-ctc",
     },
+    "kypa_ctc_2026": {
+        "id": "kypa_ctc_2026",
+        "label": "Keep Your Pay Act expanded CTC",
+        "description": (
+            "Uses the PolicyEngine-US American Family Act-style CTC "
+            "implementation to approximate KYPA's expanded, fully refundable "
+            "CTC in 2026."
+        ),
+        "variable": "ctc",
+        "entity": "tax_unit",
+        "period": 2026,
+        "unit": "USD",
+        "source_url": "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+    },
+    "kypa_childless_eitc_2026": {
+        "id": "kypa_childless_eitc_2026",
+        "label": "Keep Your Pay Act childless EITC expansion",
+        "description": (
+            "Applies KYPA's childless-worker EITC parameters: lower minimum "
+            "age, no maximum age, doubled phase-in and phase-out rates, and "
+            "a higher maximum credit."
+        ),
+        "variable": "eitc",
+        "entity": "tax_unit",
+        "period": 2026,
+        "unit": "USD",
+        "source_url": "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+    },
+    "obbba_no_tax_on_tips_repeal_2026": {
+        "id": "obbba_no_tax_on_tips_repeal_2026",
+        "label": "OBBBA no tax on tips provision",
+        "description": (
+            "Counterfactual removal of the current-law tip income deduction. "
+            "The tax increase from removal is interpreted as the standalone "
+            "modeled cost of keeping the provision."
+        ),
+        "variable": "income_tax",
+        "entity": "tax_unit",
+        "period": 2026,
+        "unit": "USD",
+        "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    },
+    "obbba_no_tax_on_overtime_repeal_2026": {
+        "id": "obbba_no_tax_on_overtime_repeal_2026",
+        "label": "OBBBA no tax on overtime provision",
+        "description": (
+            "Counterfactual removal of the current-law overtime income "
+            "deduction. The tax increase from removal is interpreted as the "
+            "standalone modeled cost of keeping the provision."
+        ),
+        "variable": "income_tax",
+        "entity": "tax_unit",
+        "period": 2026,
+        "unit": "USD",
+        "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    },
+    "obbba_senior_deduction_repeal_2026": {
+        "id": "obbba_senior_deduction_repeal_2026",
+        "label": "OBBBA senior deduction provision",
+        "description": (
+            "Counterfactual removal of the current-law additional senior "
+            "deduction. The tax increase from removal is interpreted as the "
+            "standalone modeled cost of keeping the provision."
+        ),
+        "variable": "income_tax",
+        "entity": "tax_unit",
+        "period": 2026,
+        "unit": "USD",
+        "source_url": "https://www.jct.gov/publications/2025/jcx-26-25r/",
+    },
 }
 
 _BUDGET_BENCHMARKS: list[dict[str, Any]] = [
@@ -204,10 +274,10 @@ _BUDGET_BENCHMARKS: list[dict[str, Any]] = [
         "id": "american_family_act_2025",
         "title": "American Family Act 2025 CTC expansion",
         "policy_area": "Child Tax Credit",
-        "live_reform_id": "american_family_act_2025",
+        "live_reform_id": None,
         "budget_effect_rule": "credit_delta_is_cost",
         "benchmark_period": "2026 annual",
-        "comparison_status": "live_model_no_third_party_score",
+        "comparison_status": "model_context_no_third_party_score",
         "external_estimates": [
             {
                 "source": "CBO/JCT",
@@ -229,10 +299,10 @@ _BUDGET_BENCHMARKS: list[dict[str, Any]] = [
         "id": "working_parents_tax_relief_act_2026",
         "title": "Working Parents Tax Relief Act EITC enhancement",
         "policy_area": "Earned Income Tax Credit",
-        "live_reform_id": "working_parents_tax_relief_act_2026",
+        "live_reform_id": None,
         "budget_effect_rule": "credit_delta_is_cost",
         "benchmark_period": "2026 annual",
-        "comparison_status": "live_model_partial_external_context",
+        "comparison_status": "model_context_partial_external_context",
         "external_estimates": [
             {
                 "source": "Thomson Reuters coverage",
@@ -278,6 +348,7 @@ _BUDGET_BENCHMARKS: list[dict[str, Any]] = [
                     "reported in PolicyEngine's JCT comparison table."
                 ),
                 "period": "2024",
+                "comparable_to_live_annual_result": True,
             },
             {
                 "source": "Joint Committee on Taxation",
@@ -289,6 +360,7 @@ _BUDGET_BENCHMARKS: list[dict[str, Any]] = [
                     "Working Families line in JCX-3-24."
                 ),
                 "period": "2024-2033",
+                "comparable_to_live_annual_result": False,
             },
         ],
         "notes": (
@@ -298,6 +370,258 @@ _BUDGET_BENCHMARKS: list[dict[str, Any]] = [
             "table for the 2024 CTC provisions; the decade score is included "
             "as context but is not directly comparable to the single-year live "
             "run."
+        ),
+    },
+    {
+        "id": "kypa_ctc_2026",
+        "title": "Keep Your Pay Act expanded CTC",
+        "policy_area": "Child Tax Credit",
+        "live_reform_id": "kypa_ctc_2026",
+        "budget_effect_rule": "credit_delta_is_cost",
+        "benchmark_period": "2026 annual",
+        "comparison_status": "live_model_with_third_party_score",
+        "external_estimates": [
+            {
+                "source": "Penn Wharton Budget Model",
+                "source_type": "pwbm",
+                "url": "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+                "estimate": 140_500_000_000,
+                "estimate_label": (
+                    "$140.5B FY2027 revenue loss for KYPA's expanded Child "
+                    "Tax Credit provision. This is the closest full-year "
+                    "fiscal proxy for a calendar-year 2026 microsim."
+                ),
+                "period": "FY2027 proxy for TY2026",
+                "comparable_to_live_annual_result": True,
+            },
+            {
+                "source": "Penn Wharton Budget Model",
+                "source_type": "pwbm",
+                "url": "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+                "estimate": 2_500_000_000,
+                "estimate_label": (
+                    "$2.5B FY2026 revenue loss. Included as timing context; "
+                    "not comparable to a full calendar-year 2026 tax microsim."
+                ),
+                "period": "FY2026 timing context",
+                "comparable_to_live_annual_result": False,
+            },
+            {
+                "source": "Penn Wharton Budget Model",
+                "source_type": "pwbm",
+                "url": "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+                "estimate": 1_261_600_000_000,
+                "estimate_label": (
+                    "$1.2616T FY2026-2035 revenue loss for KYPA's expanded "
+                    "Child Tax Credit provision."
+                ),
+                "period": "FY2026-2035",
+                "comparable_to_live_annual_result": False,
+            },
+        ],
+        "notes": (
+            "PWBM provides separable KYPA CTC estimates. The live dashboard "
+            "comparison uses the 2026 annual CTC delta against PWBM's FY2027 "
+            "line as a full-year fiscal proxy. PWBM's FY2026 line is much "
+            "smaller because refundable credit timing shifts most TY2026 "
+            "cost into FY2027. The PolicyEngine-US reform is an AFA-style "
+            "approximation: it matches the main child amounts, refundability, "
+            "and phaseout structure, but its newborn-bonus formula is not "
+            "guaranteed to match PWBM exactly."
+        ),
+    },
+    {
+        "id": "kypa_childless_eitc_2026",
+        "title": "Keep Your Pay Act childless-worker EITC",
+        "policy_area": "Earned Income Tax Credit",
+        "live_reform_id": "kypa_childless_eitc_2026",
+        "budget_effect_rule": "credit_delta_is_cost",
+        "benchmark_period": "2026 annual",
+        "comparison_status": "live_model_with_third_party_score",
+        "external_estimates": [
+            {
+                "source": "Penn Wharton Budget Model",
+                "source_type": "pwbm",
+                "url": "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+                "estimate": 7_200_000_000,
+                "estimate_label": (
+                    "$7.2B FY2027 revenue loss for KYPA's childless-worker "
+                    "EITC expansion. This is the closest full-year fiscal "
+                    "proxy for a calendar-year 2026 microsim."
+                ),
+                "period": "FY2027 proxy for TY2026",
+                "comparable_to_live_annual_result": True,
+            },
+            {
+                "source": "Penn Wharton Budget Model",
+                "source_type": "pwbm",
+                "url": "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+                "estimate": 800_000_000,
+                "estimate_label": (
+                    "$0.8B FY2026 revenue loss. Included as timing context; "
+                    "not comparable to a full calendar-year 2026 tax microsim."
+                ),
+                "period": "FY2026 timing context",
+                "comparable_to_live_annual_result": False,
+            },
+            {
+                "source": "Penn Wharton Budget Model",
+                "source_type": "pwbm",
+                "url": "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+                "estimate": 63_800_000_000,
+                "estimate_label": (
+                    "$63.8B FY2026-2035 revenue loss for KYPA's childless-"
+                    "worker EITC expansion."
+                ),
+                "period": "FY2026-2035",
+                "comparable_to_live_annual_result": False,
+            },
+        ],
+        "notes": (
+            "PWBM provides a separable childless-worker EITC estimate. The "
+            "live comparison applies the same 2026 parameters described by "
+            "PWBM and compares to the FY2027 line as a full-year fiscal "
+            "proxy: minimum age 19, no maximum age, 15.3% phase-in and "
+            "phase-out rates, about a $1,502 maximum credit, and about an "
+            "$11,610 phase-out start."
+        ),
+    },
+    {
+        "id": "obbba_no_tax_on_tips_repeal_2026",
+        "title": "OBBBA no tax on tips",
+        "policy_area": "Federal individual income tax",
+        "live_reform_id": "obbba_no_tax_on_tips_repeal_2026",
+        "budget_effect_rule": "repeal_tax_delta_is_provision_cost",
+        "benchmark_period": "2026 annual",
+        "comparison_status": "waterfall_external_score_context",
+        "external_estimates": [
+            {
+                "source": "Joint Committee on Taxation JCX-35-25",
+                "source_type": "jct",
+                "url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+                "estimate": 10_121_000_000,
+                "estimate_label": (
+                    "$10.121B FY2026 revenue loss for the no-tax-on-tips "
+                    "line item in JCT's OBBBA table. Treat as package-order "
+                    "context, not a standalone oracle."
+                ),
+                "period": "FY2026",
+                "comparable_to_live_annual_result": False,
+            },
+            {
+                "source": "Joint Committee on Taxation JCX-35-25",
+                "source_type": "jct",
+                "url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+                "estimate": 31_664_000_000,
+                "estimate_label": (
+                    "$31.664B 2025-2034 revenue loss for the no-tax-on-tips "
+                    "line item in JCT's OBBBA table. Treat as package-order "
+                    "context, not a standalone oracle."
+                ),
+                "period": "2025-2034",
+            },
+        ],
+        "notes": (
+            "This is modeled as a one-provision counterfactual because the "
+            "installed PolicyEngine-US baseline already includes the OBBBA "
+            "tip deduction. The dashboard removes only that deduction and "
+            "uses the resulting income-tax increase as the provision cost. "
+            "JCT's OBBBA table is not a clean standalone target for this "
+            "counterfactual because it uses a specified OBBBA baseline and "
+            "package-order interactions. The live model is calendar-year 2026; "
+            "the JCT annual entry is fiscal-year 2026."
+        ),
+    },
+    {
+        "id": "obbba_no_tax_on_overtime_repeal_2026",
+        "title": "OBBBA no tax on overtime",
+        "policy_area": "Federal individual income tax",
+        "live_reform_id": "obbba_no_tax_on_overtime_repeal_2026",
+        "budget_effect_rule": "repeal_tax_delta_is_provision_cost",
+        "benchmark_period": "2026 annual",
+        "comparison_status": "waterfall_external_score_context",
+        "external_estimates": [
+            {
+                "source": "Joint Committee on Taxation JCX-35-25",
+                "source_type": "jct",
+                "url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+                "estimate": 32_806_000_000,
+                "estimate_label": (
+                    "$32.806B FY2026 revenue loss for the no-tax-on-overtime "
+                    "line item in JCT's OBBBA table. Treat as package-order "
+                    "context, not a standalone oracle."
+                ),
+                "period": "FY2026",
+                "comparable_to_live_annual_result": False,
+            },
+            {
+                "source": "Joint Committee on Taxation JCX-35-25",
+                "source_type": "jct",
+                "url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+                "estimate": 89_573_000_000,
+                "estimate_label": (
+                    "$89.573B 2025-2034 revenue loss for the no-tax-on-"
+                    "overtime line item in JCT's OBBBA table. Treat as "
+                    "package-order context, not a standalone oracle."
+                ),
+                "period": "2025-2034",
+            },
+        ],
+        "notes": (
+            "This is modeled as a one-provision counterfactual because the "
+            "installed PolicyEngine-US baseline already includes the OBBBA "
+            "overtime deduction. The dashboard removes only that deduction "
+            "and uses the resulting income-tax increase as the provision cost. "
+            "JCT's OBBBA table is not a clean standalone target for this "
+            "counterfactual because it uses a specified OBBBA baseline and "
+            "package-order interactions. The live model is calendar-year 2026; "
+            "the JCT annual entry is fiscal-year 2026."
+        ),
+    },
+    {
+        "id": "obbba_senior_deduction_repeal_2026",
+        "title": "OBBBA senior deduction",
+        "policy_area": "Federal individual income tax",
+        "live_reform_id": "obbba_senior_deduction_repeal_2026",
+        "budget_effect_rule": "repeal_tax_delta_is_provision_cost",
+        "benchmark_period": "2026 annual",
+        "comparison_status": "waterfall_external_score_context",
+        "external_estimates": [
+            {
+                "source": "Joint Committee on Taxation JCX-26-25R",
+                "source_type": "jct",
+                "url": "https://www.jct.gov/publications/2025/jcx-26-25r/",
+                "estimate": 16_464_000_000,
+                "estimate_label": (
+                    "$16.464B FY2026 revenue loss for the enhanced senior "
+                    "deduction line item in JCT's OBBBA table. Treat as "
+                    "package-order context, not a standalone oracle."
+                ),
+                "period": "FY2026",
+                "comparable_to_live_annual_result": False,
+            },
+            {
+                "source": "Joint Committee on Taxation JCX-26-25R",
+                "source_type": "jct",
+                "url": "https://www.jct.gov/publications/2025/jcx-26-25r/",
+                "estimate": 66_263_000_000,
+                "estimate_label": (
+                    "$66.263B 2025-2034 revenue loss for the enhanced senior "
+                    "deduction line item in JCT's OBBBA table. Treat as "
+                    "package-order context, not a standalone oracle."
+                ),
+                "period": "2025-2034",
+            },
+        ],
+        "notes": (
+            "This is modeled as a one-provision counterfactual because the "
+            "installed PolicyEngine-US baseline already includes the OBBBA "
+            "senior deduction. The dashboard removes only that deduction and "
+            "uses the resulting income-tax increase as the provision cost. "
+            "JCT's OBBBA table is not a clean standalone target for this "
+            "counterfactual because it uses a specified OBBBA baseline and "
+            "package-order interactions. The live model is calendar-year 2026; "
+            "the JCT annual entry is fiscal-year 2026."
         ),
     },
     {
@@ -608,6 +932,116 @@ def _wyden_smith_ctc_2024_parameter_reform():
     return wyden_smith_ctc_2024_parameter_reform
 
 
+def _obbba_no_tax_on_tips_repeal_parameter_reform():
+    from policyengine_core.periods import instant
+    from policyengine_us.model_api import Reform
+
+    class obbba_no_tax_on_tips_repeal_parameter_reform(Reform):
+        def apply(self):
+            def modify_parameters(parameters):
+                parameters.gov.irs.deductions.tip_income.cap.update(
+                    start=instant("2026-01-01"),
+                    stop=instant("2026-12-31"),
+                    value=0,
+                )
+                return parameters
+
+            self.modify_parameters(modify_parameters)
+
+    return obbba_no_tax_on_tips_repeal_parameter_reform
+
+
+def _obbba_no_tax_on_overtime_repeal_parameter_reform():
+    from policyengine_core.periods import instant
+    from policyengine_us.model_api import Reform
+
+    class obbba_no_tax_on_overtime_repeal_parameter_reform(Reform):
+        def apply(self):
+            def modify_parameters(parameters):
+                caps = parameters.gov.irs.deductions.overtime_income.cap
+                for filing_status in (
+                    "JOINT",
+                    "HEAD_OF_HOUSEHOLD",
+                    "SURVIVING_SPOUSE",
+                    "SINGLE",
+                    "SEPARATE",
+                ):
+                    getattr(caps, filing_status).update(
+                        start=instant("2026-01-01"),
+                        stop=instant("2026-12-31"),
+                        value=0,
+                    )
+                return parameters
+
+            self.modify_parameters(modify_parameters)
+
+    return obbba_no_tax_on_overtime_repeal_parameter_reform
+
+
+def _obbba_senior_deduction_repeal_parameter_reform():
+    from policyengine_core.periods import instant
+    from policyengine_us.model_api import Reform
+
+    class obbba_senior_deduction_repeal_parameter_reform(Reform):
+        def apply(self):
+            def modify_parameters(parameters):
+                parameters.gov.irs.deductions.senior_deduction.amount.update(
+                    start=instant("2026-01-01"),
+                    stop=instant("2026-12-31"),
+                    value=0,
+                )
+                return parameters
+
+            self.modify_parameters(modify_parameters)
+
+    return obbba_senior_deduction_repeal_parameter_reform
+
+
+def _kypa_childless_eitc_parameter_reform():
+    from policyengine_core.periods import instant
+    from policyengine_us.model_api import Reform
+
+    class kypa_childless_eitc_parameter_reform(Reform):
+        def apply(self):
+            def modify_parameters(parameters):
+                eitc = parameters.gov.irs.credits.eitc
+                start = instant("2026-01-01")
+                stop = instant("2035-12-31")
+
+                eitc.max[0].amount.update(start=start, stop=stop, value=1_502)
+                eitc.phase_in_rate[0].amount.update(
+                    start=start,
+                    stop=stop,
+                    value=0.153,
+                )
+                eitc.phase_out.rate[0].amount.update(
+                    start=start,
+                    stop=stop,
+                    value=0.153,
+                )
+                eitc.phase_out.start[0].amount.update(
+                    start=start,
+                    stop=stop,
+                    value=11_610,
+                )
+                eitc.eligibility.age.min.update(start=start, stop=stop, value=19)
+                eitc.eligibility.age.min_student.update(
+                    start=start,
+                    stop=stop,
+                    value=19,
+                )
+                eitc.eligibility.age.max.update(
+                    start=start,
+                    stop=stop,
+                    value=float("inf"),
+                )
+                return parameters
+
+            self.modify_parameters(modify_parameters)
+
+    return kypa_childless_eitc_parameter_reform
+
+
 def _reform_object(reform_id: str):
     if reform_id == "halve_joint_eitc_phase_out_rate":
         from policyengine_us.reforms.eitc.halve_joint_eitc_phase_out_rate import (
@@ -639,10 +1073,24 @@ def _reform_object(reform_id: str):
             ctc_expansion,
             _wyden_smith_ctc_2024_parameter_reform(),
         )
+    if reform_id == "kypa_ctc_2026":
+        from policyengine_us.reforms.congress.afa.afa_other_dependent_credit import (
+            afa_other_dependent_credit,
+        )
+
+        return afa_other_dependent_credit
+    if reform_id == "kypa_childless_eitc_2026":
+        return _kypa_childless_eitc_parameter_reform()
+    if reform_id == "obbba_no_tax_on_tips_repeal_2026":
+        return _obbba_no_tax_on_tips_repeal_parameter_reform()
+    if reform_id == "obbba_no_tax_on_overtime_repeal_2026":
+        return _obbba_no_tax_on_overtime_repeal_parameter_reform()
+    if reform_id == "obbba_senior_deduction_repeal_2026":
+        return _obbba_senior_deduction_repeal_parameter_reform()
     raise ValueError(f"Unknown reform_id: {reform_id}")
 
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=64)
 def _microsimulation(dataset: str, reform_id: str | None):
     from policyengine_us import Microsimulation
 
@@ -727,6 +1175,8 @@ def _budget_effect_from_delta(
         return _finite_float(delta)
     if rule == "tax_revenue_delta_is_negative_cost":
         return _finite_float(-delta)
+    if rule == "repeal_tax_delta_is_provision_cost":
+        return _finite_float(delta)
     return _finite_float(delta)
 
 
@@ -863,7 +1313,7 @@ def microplex_reform_comparison(
 
 
 @router.get("/microplex/budget-benchmarks")
-def microplex_budget_benchmarks() -> dict[str, Any]:
+def microplex_budget_benchmarks(compute_live: bool = False) -> dict[str, Any]:
     """Return budget-score benchmark rows for us-data and Microplex.
 
     This endpoint intentionally distinguishes exact live comparisons from
@@ -885,6 +1335,7 @@ def microplex_budget_benchmarks() -> dict[str, Any]:
         microplex_dataset or "no-microplex-h5",
         us_data_dataset,
         len(_BUDGET_BENCHMARKS),
+        int(compute_live),
     )
     cached = _BUDGET_BENCHMARK_CACHE.get(cache_key)
     if cached and time.time() - cached[0] < _BUDGET_BENCHMARK_TTL_SECONDS:
@@ -926,6 +1377,13 @@ def microplex_budget_benchmarks() -> dict[str, Any]:
         )
         if preset is None:
             row["live"]["reason"] = "No matching live reform preset is wired yet."
+            rows.append(row)
+            continue
+        if not compute_live:
+            row["live"]["reason"] = (
+                "Live microsim compute is deferred. Set compute_live=true to "
+                "run this benchmark over us-data and Microplex."
+            )
             rows.append(row)
             continue
         if not microplex_dataset:
@@ -990,7 +1448,9 @@ def microplex_budget_benchmarks() -> dict[str, Any]:
             external_estimates.append(
                 {
                     **estimate,
-                    "comparable_to_live_annual_result": False,
+                    "comparable_to_live_annual_result": bool(
+                        estimate.get("comparable_to_live_annual_result")
+                    ),
                     "us_data_gap": us_gap["gap"],
                     "us_data_ratio": us_gap["ratio"],
                     "microplex_gap": microplex_gap["gap"],
@@ -1034,14 +1494,20 @@ def microplex_budget_benchmarks() -> dict[str, Any]:
             "generated_at_unix": time.time(),
             "sign_convention": (
                 "Positive budget effect means higher federal cost or lower "
-                "federal revenue. For current live CTC/EITC rows, this equals "
-                "the aggregate credit increase."
+                "federal revenue. For counterfactual repeal rows, the model "
+                "uses the tax increase from removing one current-law provision "
+                "as the cost of keeping that provision."
             ),
             "comparison_caveat": (
-                "External decade scores are shown as references until a "
-                "matching live reform preset is wired. Live rows currently "
-                "show annual modeled outcome deltas."
+                "Clean scored rows compare one modeled provision at a time. "
+                "External decade scores are context unless the row explicitly "
+                "marks the annual estimate as comparable to the live result. "
+                "OBBBA JCT line items are shown as context because they are "
+                "baseline- and package-order-sensitive. "
+                "Live income-tax microsims are expensive on the full dataset, "
+                "so this endpoint only computes them when compute_live=true."
             ),
+            "compute_live": compute_live,
             "us_data_dataset": us_data_dataset,
             "microplex_bundle": {
                 "available": bool(microplex_dataset),

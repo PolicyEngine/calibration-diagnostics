@@ -68,6 +68,7 @@ const ROWS = [
         estimate_label:
           "$10.7B 2024 cost for the combined CTC provisions, as reported in PolicyEngine's JCT comparison table.",
         period: "2024",
+        comparable_to_live_annual_result: true,
       },
       {
         source: "Joint Committee on Taxation",
@@ -77,6 +78,91 @@ const ROWS = [
         estimate_label:
           "$33.493B 2024-2033 revenue effect for the Tax Relief for Working Families line in JCX-3-24.",
         period: "2024-2033",
+        comparable_to_live_annual_result: false,
+      },
+    ],
+  },
+  {
+    id: "kypa_ctc_2026",
+    title: "Keep Your Pay Act expanded CTC",
+    policy_area: "Child Tax Credit",
+    benchmark_period: "2026 annual",
+    comparison_status: "live_model_with_third_party_score",
+    budget_effect_rule: "credit_delta_is_cost",
+    notes:
+      "PWBM provides separable KYPA CTC estimates. Live dashboard comparison uses the 2026 annual CTC delta against PWBM's FY2027 line as a full-year fiscal proxy. PWBM's FY2026 line is much smaller because refundable credit timing shifts most TY2026 cost into FY2027. The PolicyEngine-US reform is an AFA-style approximation, so the newborn-bonus mechanics may not match PWBM exactly.",
+    external_estimates: [
+      {
+        source: "Penn Wharton Budget Model",
+        source_type: "pwbm",
+        url: "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+        estimate: 140_500_000_000,
+        estimate_label:
+          "$140.5B FY2027 revenue loss for KYPA's expanded Child Tax Credit provision. This is the closest full-year fiscal proxy for a calendar-year 2026 microsim.",
+        period: "FY2027 proxy for TY2026",
+        comparable_to_live_annual_result: true,
+      },
+      {
+        source: "Penn Wharton Budget Model",
+        source_type: "pwbm",
+        url: "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+        estimate: 2_500_000_000,
+        estimate_label:
+          "$2.5B FY2026 revenue loss. Included as timing context; not comparable to a full calendar-year 2026 tax microsim.",
+        period: "FY2026 timing context",
+        comparable_to_live_annual_result: false,
+      },
+      {
+        source: "Penn Wharton Budget Model",
+        source_type: "pwbm",
+        url: "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+        estimate: 1_261_600_000_000,
+        estimate_label:
+          "$1.2616T FY2026-2035 revenue loss for KYPA's expanded Child Tax Credit provision.",
+        period: "FY2026-2035",
+        comparable_to_live_annual_result: false,
+      },
+    ],
+  },
+  {
+    id: "kypa_childless_eitc_2026",
+    title: "Keep Your Pay Act childless-worker EITC",
+    policy_area: "Earned Income Tax Credit",
+    benchmark_period: "2026 annual",
+    comparison_status: "live_model_with_third_party_score",
+    budget_effect_rule: "credit_delta_is_cost",
+    notes:
+      "PWBM provides a separable childless-worker EITC estimate. The live comparison applies the same 2026 parameters described by PWBM and compares to the FY2027 line as a full-year fiscal proxy: minimum age 19, no maximum age, 15.3% phase-in and phase-out rates, about a $1,502 maximum credit, and about an $11,610 phase-out start.",
+    external_estimates: [
+      {
+        source: "Penn Wharton Budget Model",
+        source_type: "pwbm",
+        url: "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+        estimate: 7_200_000_000,
+        estimate_label:
+          "$7.2B FY2027 revenue loss for KYPA's childless-worker EITC expansion. This is the closest full-year fiscal proxy for a calendar-year 2026 microsim.",
+        period: "FY2027 proxy for TY2026",
+        comparable_to_live_annual_result: true,
+      },
+      {
+        source: "Penn Wharton Budget Model",
+        source_type: "pwbm",
+        url: "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+        estimate: 800_000_000,
+        estimate_label:
+          "$0.8B FY2026 revenue loss. Included as timing context; not comparable to a full calendar-year 2026 tax microsim.",
+        period: "FY2026 timing context",
+        comparable_to_live_annual_result: false,
+      },
+      {
+        source: "Penn Wharton Budget Model",
+        source_type: "pwbm",
+        url: "https://budgetmodel.wharton.upenn.edu/p/2026-03-11-the-keep-your-pay-act-budgetary-and-distributional-effects/",
+        estimate: 63_800_000_000,
+        estimate_label:
+          "$63.8B FY2026-2035 revenue loss for KYPA's childless-worker EITC expansion.",
+        period: "FY2026-2035",
+        comparable_to_live_annual_result: false,
       },
     ],
   },

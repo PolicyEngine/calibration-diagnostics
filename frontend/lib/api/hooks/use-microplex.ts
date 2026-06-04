@@ -357,6 +357,7 @@ export interface MicroplexBudgetBenchmarks {
   available: boolean;
   runtime_seconds?: number | null;
   generated_at_unix?: number | null;
+  compute_live?: boolean;
   sign_convention: string;
   comparison_caveat: string;
   us_data_dataset: string;
@@ -410,11 +411,13 @@ export function useMicroplexReformComparison(reformId?: string) {
   });
 }
 
-export function useMicroplexBudgetBenchmarks() {
+export function useMicroplexBudgetBenchmarks(computeLive = false) {
   return useQuery({
-    queryKey: ["microplex", "budget-benchmarks"],
+    queryKey: ["microplex", "budget-benchmarks", computeLive],
     queryFn: () =>
-      apiGet<MicroplexBudgetBenchmarks>("/microplex/budget-benchmarks"),
+      apiGet<MicroplexBudgetBenchmarks>(
+        `/microplex/budget-benchmarks?compute_live=${computeLive ? "true" : "false"}`,
+      ),
     staleTime: 15 * 60 * 1000,
   });
 }
