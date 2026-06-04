@@ -15,13 +15,17 @@ import {
 } from "@policyengine/ui-kit";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { DataTable } from "@/components/shared/InteractiveDataTable";
+import {
+  DataTable,
+  type SortState,
+} from "@/components/shared/InteractiveDataTable";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import {
   useMicroplex,
   useMicroplexReformComparison,
   useMicroplexTargetDiagnostics,
 } from "@/lib/api/hooks/use-microplex";
+import { usePathname } from "next/navigation";
 
 const TARGET_DIAGNOSTICS_LIMIT = 100;
 
@@ -131,6 +135,17 @@ function signedFmt(v: number | null | undefined) {
     <span className="font-mono text-xs">
       {sign}
       {fmt(v)}
+    </span>
+  );
+}
+
+function signedPct(v: number | null | undefined) {
+  if (v == null || !Number.isFinite(v)) return "—";
+  const sign = v > 0 ? "+" : "";
+  return (
+    <span className="font-mono text-xs">
+      {sign}
+      {(v * 100).toFixed(2)}%
     </span>
   );
 }
@@ -303,6 +318,88 @@ function HelpText({ children, title }: { children: ReactNode; title: string }) {
   );
 }
 
+function CompactSearchInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="flex h-9 min-w-[320px] flex-1 items-center rounded-md border border-border bg-white text-sm shadow-sm focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/20">
+      <span className="shrink-0 border-r border-border px-2.5 text-xs font-medium text-muted-foreground">
+        {label}
+      </span>
+      <input
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground/60"
+      />
+    </label>
+  );
+}
+
+function CompactSelect({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <label
+      className={`relative flex h-9 items-center rounded-md border border-border bg-white text-sm shadow-sm focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/20 ${
+        disabled ? "opacity-50" : ""
+      } ${className}`}
+    >
+      <span className="shrink-0 border-r border-border px-2.5 text-xs font-medium text-muted-foreground">
+        {label}
+      </span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-full min-w-0 flex-1 appearance-none bg-transparent px-2.5 pr-7 text-sm outline-none disabled:cursor-not-allowed"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <svg
+        width="10"
+        height="6"
+        viewBox="0 0 10 6"
+        fill="none"
+        className="pointer-events-none absolute right-2.5 text-muted-foreground"
+      >
+        <path
+          d="M1 1l4 4 4-4"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+        />
+      </svg>
+    </label>
+  );
+}
+
 const targetCountColumns = [
   {
     key: "target",
@@ -429,34 +526,52 @@ const agiGapColumns = [
   },
 ];
 
-const targetDiagnosticsColumns = [
+function targetDiagnosticsColumns(compareWithUsData: boolean) {
+  return [
   {
     key: "target_id",
     header: "Target",
     format: (v: unknown, row: Record<string, unknown>) => (
-      <span className="block max-w-[420px] whitespace-normal break-words font-mono text-xs">
-        {String(v ?? row.target_name ?? "—")}
+      <span className="block w-[300px] whitespace-normal break-words font-mono text-xs leading-snug">
+        {String(row.target_name ?? v ?? "—")}
+        {row.target_name != null && v != null && String(row.target_name) !== String(v) ? (
+          <span className="mt-1 block font-sans text-[11px] text-muted-foreground">
+            ID {String(v)}
+          </span>
+        ) : null}
       </span>
     ),
   },
   {
     key: "family",
-    header: "Family",
+    header: (
+      <HelpText title="Target group from the diagnostics sidecar. Families are used to scan related calibration rows and may differ from the raw PolicyEngine target source label.">
+        Family
+      </HelpText>
+    ),
     format: (v: unknown, row: Record<string, unknown>) => (
-      <span className="font-mono text-xs">
+      <span className="block w-[150px] whitespace-normal break-words font-mono text-xs leading-snug">
         {String(v ?? row.target_family ?? "—")}
       </span>
     ),
   },
   {
     key: "target_value",
-    header: "Target value",
+    header: (
+      <HelpText title="Calibration oracle value used in this Microplex target diagnostics sidecar. This is the value the displayed aggregates are compared against.">
+        Target value
+      </HelpText>
+    ),
     align: "right" as const,
     format: (v: unknown) => (v == null ? "—" : fmt(Number(v))),
   },
   {
     key: "us_data_aggregate",
-    header: "us-data aggregate",
+    header: (
+      <HelpText title="Aggregate computed from the baseline PolicyEngine us-data H5 for this target row.">
+        us-data aggregate
+      </HelpText>
+    ),
     align: "right" as const,
     format: (v: unknown, row: Record<string, unknown>) => {
       const value = v ?? row.from_estimate;
@@ -465,7 +580,11 @@ const targetDiagnosticsColumns = [
   },
   {
     key: "microplex_aggregate",
-    header: "Microplex aggregate",
+    header: (
+      <HelpText title="Aggregate computed from the Microplex candidate H5 for this target row.">
+        Microplex aggregate
+      </HelpText>
+    ),
     align: "right" as const,
     format: (v: unknown, row: Record<string, unknown>) => {
       const value = v ?? row.to_estimate;
@@ -473,9 +592,9 @@ const targetDiagnosticsColumns = [
     },
   },
   {
-    key: "microplex_vs_target",
+    key: "microplex_vs_target_relative",
     header: (
-      <HelpText title="Microplex aggregate minus target value. Positive means Microplex is above the target; negative means below the target.">
+      <HelpText title="Microplex aggregate relative to the target: (Microplex - target) / |target|. Positive means Microplex is above the target; negative means below.">
         Microplex vs target
       </HelpText>
     ),
@@ -485,17 +604,17 @@ const targetDiagnosticsColumns = [
       if (value == null) {
         const target = Number(row.target_value);
         const microplex = Number(row.to_estimate ?? row.microplex_aggregate);
-        if (Number.isFinite(target) && Number.isFinite(microplex)) {
-          value = microplex - target;
+        if (Number.isFinite(target) && target !== 0 && Number.isFinite(microplex)) {
+          value = (microplex - target) / Math.abs(target);
         }
       }
-      return signedFmt(value == null ? null : Number(value));
+      return signedPct(value == null ? null : Number(value));
     },
   },
   {
-    key: "microplex_vs_us_data",
+    key: "microplex_vs_us_data_relative",
     header: (
-      <HelpText title="Microplex aggregate minus us-data aggregate. Positive means Microplex is higher than us-data; negative means lower.">
+      <HelpText title="Microplex relative to the us-data aggregate: (Microplex - us-data) / |us-data|. Positive means Microplex is higher than us-data; negative means lower.">
         Microplex vs us-data
       </HelpText>
     ),
@@ -505,11 +624,11 @@ const targetDiagnosticsColumns = [
       if (value == null) {
         const usData = Number(row.from_estimate ?? row.us_data_aggregate);
         const microplex = Number(row.to_estimate ?? row.microplex_aggregate);
-        if (Number.isFinite(usData) && Number.isFinite(microplex)) {
-          value = microplex - usData;
+        if (Number.isFinite(usData) && usData !== 0 && Number.isFinite(microplex)) {
+          value = (microplex - usData) / Math.abs(usData);
         }
       }
-      return signedFmt(value == null ? null : Number(value));
+      return signedPct(value == null ? null : Number(value));
     },
   },
   {
@@ -557,7 +676,11 @@ const targetDiagnosticsColumns = [
   },
   {
     key: "supported_by_microplex",
-    header: "Supported",
+    header: (
+      <HelpText title="Whether Microplex could evaluate this target with the available candidate variables and entity structure.">
+        Supported
+      </HelpText>
+    ),
     format: (v: unknown) =>
       v === true ? (
         <Badge variant="success">yes</Badge>
@@ -567,7 +690,17 @@ const targetDiagnosticsColumns = [
         "—"
       ),
   },
-];
+  ].filter(
+    (column) =>
+      compareWithUsData ||
+      ![
+        "us_data_aggregate",
+        "microplex_vs_us_data_relative",
+        "closer_dataset",
+        "delta_absolute_error",
+      ].includes(column.key),
+  );
+}
 
 function ReformComparisonCard({
   comparison,
@@ -716,30 +849,58 @@ function ReformComparisonCard({
 }
 
 export default function MicroplexPage() {
+  const pathname = usePathname();
+  const isDiagnosticsView = pathname.startsWith("/microplex/diagnostics");
   const { data, isLoading, error } = useMicroplex();
   const [selectedReformId, setSelectedReformId] = useState(
     "american_family_act_2025",
   );
+  const [compareWithUsData, setCompareWithUsData] = useState(true);
   const [targetSearch, setTargetSearch] = useState("");
   const [targetFamily, setTargetFamily] = useState("");
+  const [targetGeoLevel, setTargetGeoLevel] = useState("");
+  const [targetDirection, setTargetDirection] = useState("");
   const [targetState, setTargetState] = useState("");
   const [targetSupported, setTargetSupported] = useState("");
   const [targetInLoss, setTargetInLoss] = useState("");
   const [targetOffset, setTargetOffset] = useState(0);
+  const [targetSort, setTargetSort] = useState<SortState | null>({
+    key: "microplex_vs_target_relative",
+    direction: "desc",
+  });
   const reformComparison = useMicroplexReformComparison(selectedReformId);
   const targetDiagnosticsQuery = useMicroplexTargetDiagnostics({
     limit: TARGET_DIAGNOSTICS_LIMIT,
     offset: targetOffset,
     search: targetSearch || undefined,
     family: targetFamily || undefined,
+    geo_level: targetGeoLevel || undefined,
+    microplex_target_direction: targetDirection || undefined,
     state: targetState || undefined,
     supported: targetSupported || undefined,
     in_loss: targetInLoss || undefined,
+    sort_by: targetSort?.key,
+    sort_dir: targetSort?.direction,
   });
 
   useEffect(() => {
     setTargetOffset(0);
-  }, [targetSearch, targetFamily, targetState, targetSupported, targetInLoss]);
+  }, [
+    targetSearch,
+    targetFamily,
+    targetGeoLevel,
+    targetDirection,
+    targetState,
+    targetSupported,
+    targetInLoss,
+    targetSort,
+  ]);
+
+  useEffect(() => {
+    if (targetGeoLevel === "national" && targetState) {
+      setTargetState("");
+    }
+  }, [targetGeoLevel, targetState]);
 
   if (isLoading)
     return (
@@ -801,6 +962,8 @@ export default function MicroplexPage() {
           </Text>
         </div>
 
+        {!isDiagnosticsView && (
+          <>
         <Card>
           <CardContent className="py-4">
             <Text size="sm" c="dimmed">
@@ -921,14 +1084,35 @@ export default function MicroplexPage() {
             </Stack>
           </CardContent>
         </Card>
+          </>
+        )}
 
+        {isDiagnosticsView && (
         <Card>
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Target diagnostics rows</CardTitle>
-              <Badge variant={targetDiagnostics.available ? "success" : "secondary"}>
-                {targetDiagnostics.available ? "loaded" : "not loaded"}
-              </Badge>
+              <div>
+                <CardTitle>Target diagnostics rows</CardTitle>
+                <Text size="xs" c="dimmed" className="mt-1">
+                  Microplex aggregate fit against each calibration target.
+                </Text>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm shadow-sm">
+                  <input
+                    type="checkbox"
+                    checked={compareWithUsData}
+                    onChange={(event) =>
+                      setCompareWithUsData(event.target.checked)
+                    }
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <span className="font-medium">Compare with us-data</span>
+                </label>
+                <Badge variant={targetDiagnostics.available ? "success" : "secondary"}>
+                  {targetDiagnostics.available ? "loaded" : "not loaded"}
+                </Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -945,92 +1129,98 @@ export default function MicroplexPage() {
                   : ""}
                 .
               </Text>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_120px_150px_130px_auto]">
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Search
-                  </span>
-                  <input
-                    type="search"
+              <div className="w-full overflow-x-auto rounded-md border border-border bg-muted/20 p-2">
+                <div className="flex min-w-[1410px] items-center gap-2">
+                  <CompactSearchInput
+                    label="Search"
                     value={targetSearch}
-                    onChange={(event) => setTargetSearch(event.target.value)}
+                    onChange={setTargetSearch}
                     placeholder="Target, variable, family, state..."
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
                   />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Family
-                  </span>
-                  <select
+                  <CompactSelect
+                    label="Family"
                     value={targetFamily}
-                    onChange={(event) => setTargetFamily(event.target.value)}
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
-                  >
-                    <option value="">All families</option>
-                    {TARGET_FAMILY_OPTIONS.map((family) => (
-                      <option key={family} value={family}>
-                        {family}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    State
-                  </span>
-                  <select
+                    onChange={setTargetFamily}
+                    options={[
+                      { value: "", label: "All families" },
+                      ...TARGET_FAMILY_OPTIONS.map((family) => ({
+                        value: family,
+                        label: family,
+                      })),
+                    ]}
+                    className="w-[250px]"
+                  />
+                  <CompactSelect
+                    label="Geo"
+                    value={targetGeoLevel}
+                    onChange={setTargetGeoLevel}
+                    options={[
+                      { value: "", label: "All" },
+                      { value: "national", label: "Federal only" },
+                      { value: "state", label: "State only" },
+                    ]}
+                    className="w-[180px]"
+                  />
+                  <CompactSelect
+                    label="Target fit"
+                    value={targetDirection}
+                    onChange={setTargetDirection}
+                    options={[
+                      { value: "", label: "All" },
+                      { value: "above", label: "Above target" },
+                      { value: "below", label: "Below target" },
+                      { value: "near", label: "Near target" },
+                    ]}
+                    className="w-[180px]"
+                  />
+                  <CompactSelect
+                    label="State"
                     value={targetState}
-                    onChange={(event) => setTargetState(event.target.value)}
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
-                  >
-                    <option value="">All</option>
-                    {STATE_OPTIONS.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Supported
-                  </span>
-                  <select
+                    disabled={targetGeoLevel === "national"}
+                    onChange={setTargetState}
+                    options={[
+                      { value: "", label: "All" },
+                      ...STATE_OPTIONS.map((state) => ({
+                        value: state,
+                        label: state,
+                      })),
+                    ]}
+                    className="w-[125px]"
+                  />
+                  <CompactSelect
+                    label="Support"
                     value={targetSupported}
-                    onChange={(event) => setTargetSupported(event.target.value)}
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
-                  >
-                    <option value="">All</option>
-                    <option value="true">Supported</option>
-                    <option value="false">Unsupported</option>
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    In loss
-                  </span>
-                  <select
+                    onChange={setTargetSupported}
+                    options={[
+                      { value: "", label: "All" },
+                      { value: "true", label: "Supported" },
+                      { value: "false", label: "Unsupported" },
+                    ]}
+                    className="w-[170px]"
+                  />
+                  <CompactSelect
+                    label="Loss"
                     value={targetInLoss}
-                    onChange={(event) => setTargetInLoss(event.target.value)}
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm"
-                  >
-                    <option value="">All</option>
-                    <option value="true">Yes</option>
-                    <option value="false">No</option>
-                  </select>
-                </label>
-                <div className="flex items-end">
+                    onChange={setTargetInLoss}
+                    options={[
+                      { value: "", label: "All" },
+                      { value: "true", label: "Yes" },
+                      { value: "false", label: "No" },
+                    ]}
+                    className="w-[125px]"
+                  />
                   <button
                     type="button"
                     onClick={() => {
                       setTargetSearch("");
                       setTargetFamily("");
+                      setTargetGeoLevel("");
+                      setTargetDirection("");
                       setTargetState("");
                       setTargetSupported("");
                       setTargetInLoss("");
                     }}
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm font-medium hover:bg-muted/40"
+                    className="h-9 shrink-0 rounded-md border border-border bg-white px-3 text-sm font-medium shadow-sm hover:bg-muted/40"
                   >
                     Reset
                   </button>
@@ -1072,7 +1262,7 @@ export default function MicroplexPage() {
                 </div>
               </div>
               <DataTable
-                columns={targetDiagnosticsColumns}
+                columns={targetDiagnosticsColumns(compareWithUsData)}
                 data={
                   targetDiagnostics.targets as unknown as Record<
                     string,
@@ -1080,11 +1270,42 @@ export default function MicroplexPage() {
                   >[]
                 }
                 sortable
+                sort={targetSort}
+                onSortChange={(sort) => {
+                  const nextSort =
+                    sort ??
+                    (targetSort
+                      ? {
+                          key: targetSort.key,
+                          direction:
+                            targetSort.direction === "desc" ? "asc" : "desc",
+                        }
+                      : null);
+                  setTargetSort(nextSort);
+                  setTargetOffset(0);
+                }}
+                styles={{
+                  table: { minWidth: compareWithUsData ? 1680 : 1080 },
+                  header: {
+                    paddingLeft: 10,
+                    paddingRight: 10,
+                    whiteSpace: "nowrap",
+                  },
+                  cell: {
+                    paddingLeft: 10,
+                    paddingRight: 10,
+                    verticalAlign: "top",
+                    whiteSpace: "nowrap",
+                  },
+                }}
               />
             </Stack>
           </CardContent>
         </Card>
+        )}
 
+        {!isDiagnosticsView && (
+          <>
         <Card>
           <CardHeader>
             <CardTitle>What needs attention</CardTitle>
@@ -1335,6 +1556,8 @@ export default function MicroplexPage() {
             </Stack>
           </CardContent>
         </Card>
+          </>
+        )}
       </Stack>
     </AppShell>
   );

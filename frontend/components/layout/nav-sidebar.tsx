@@ -18,14 +18,15 @@ const usDataNavItems = [
 
 const microplexNavItems = [
   { href: "/microplex", label: "Overview" },
-  { href: "/budget-impact", label: "Budget impact" },
+  { href: "/microplex/diagnostics", label: "Target diagnostics" },
+  { href: "/microplex/reforms", label: "Reform benchmarks" },
   { href: "/pipeline", label: "Pipeline" },
 ];
 
 const comparisonNavItems = [
   { href: "/comparison", label: "Comparison" },
   { href: "/microplex", label: "Microplex target performance" },
-  { href: "/budget-impact", label: "Budget impact" },
+  { href: "/microplex/reforms", label: "Reform benchmarks" },
   { href: "/summary", label: "us-data summary" },
   { href: "/pipeline", label: "Pipeline DAG" },
 ];
@@ -48,7 +49,9 @@ export function NavSidebar() {
           const isActive =
             item.href === "/"
               ? pathname === "/"
-              : pathname.startsWith(item.href);
+              : item.href === "/microplex"
+                ? pathname === "/microplex"
+                : pathname.startsWith(item.href);
           return (
             <SidebarNavItem
               key={item.href}

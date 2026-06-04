@@ -147,6 +147,9 @@ export interface MicroplexTargetDiagnosticRow {
   microplex_vs_target?: number | null;
   us_data_vs_target?: number | null;
   microplex_vs_us_data?: number | null;
+  microplex_vs_target_relative?: number | null;
+  us_data_vs_target_relative?: number | null;
+  microplex_vs_us_data_relative?: number | null;
   closer_dataset?: "microplex" | "us-data" | "tie" | null;
   loss_contribution?: number | null;
   in_loss?: boolean | null;
@@ -166,7 +169,8 @@ export interface MicroplexTargetDiagnostics {
   dataset_labels?: Record<string, unknown>;
   summary: Record<string, unknown>;
   total_targets: number;
-  display_limit: number;
+  display_limit?: number;
+  filtered_total?: number;
   returned?: number;
   limit?: number;
   offset?: number;
@@ -353,6 +357,7 @@ export interface MicroplexBudgetBenchmarks {
   available: boolean;
   runtime_seconds?: number | null;
   generated_at_unix?: number | null;
+  compute_live?: boolean;
   sign_convention: string;
   comparison_caveat: string;
   us_data_dataset: string;
@@ -379,9 +384,13 @@ export function useMicroplexTargetDiagnostics(params: {
   offset?: number;
   family?: string;
   state?: string;
+  geo_level?: string;
+  microplex_target_direction?: string;
   supported?: string;
   in_loss?: string;
   search?: string;
+  sort_by?: string;
+  sort_dir?: string;
 }) {
   return useQuery({
     queryKey: ["microplex", "target-diagnostics", params],
@@ -402,11 +411,13 @@ export function useMicroplexReformComparison(reformId?: string) {
   });
 }
 
-export function useMicroplexBudgetBenchmarks() {
+export function useMicroplexBudgetBenchmarks(computeLive = false) {
   return useQuery({
-    queryKey: ["microplex", "budget-benchmarks"],
+    queryKey: ["microplex", "budget-benchmarks", computeLive],
     queryFn: () =>
-      apiGet<MicroplexBudgetBenchmarks>("/microplex/budget-benchmarks"),
+      apiGet<MicroplexBudgetBenchmarks>(
+        `/microplex/budget-benchmarks?compute_live=${computeLive ? "true" : "false"}`,
+      ),
     staleTime: 15 * 60 * 1000,
   });
 }

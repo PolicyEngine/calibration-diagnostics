@@ -299,14 +299,24 @@ def test_microplex_budget_benchmarks_include_live_and_external_rows(
     def fake_run(*, dataset, reform_id, variable, period, entity):
         assert entity == "tax_unit"
         assert reform_id in {
-            "american_family_act_2025",
-            "working_parents_tax_relief_act_2026",
             "wyden_smith_ctc_2024",
+            "kypa_ctc_2026",
+            "kypa_childless_eitc_2026",
+            "obbba_no_tax_on_tips_repeal_2026",
+            "obbba_no_tax_on_overtime_repeal_2026",
+            "obbba_senior_deduction_repeal_2026",
         }
         if reform_id == "wyden_smith_ctc_2024":
             assert variable == "ctc"
             assert period == 2024
+        elif reform_id == "kypa_ctc_2026":
+            assert variable == "ctc"
+            assert period == 2026
+        elif reform_id == "kypa_childless_eitc_2026":
+            assert variable == "eitc"
+            assert period == 2026
         else:
+            assert variable == "income_tax"
             assert period == 2026
         delta = 120.0 if dataset == "/tmp/us-data.h5" else 60.0
         return {
@@ -328,22 +338,15 @@ def test_microplex_budget_benchmarks_include_live_and_external_rows(
 
     monkeypatch.setattr(microplex, "_run_dataset_reform_comparison", fake_run)
 
-    result = microplex.microplex_budget_benchmarks()
+    result = microplex.microplex_budget_benchmarks(compute_live=True)
 
     assert result["available"] is True
     assert result["microplex_bundle"]["artifact_id"] == "run-1"
     live_rows = [row for row in result["rows"] if row["live"]["available"]]
-    assert len(live_rows) == 3
-    afa = next(row for row in live_rows if row["id"] == "american_family_act_2025")
-    assert afa["live"]["outcome_variable"] == "ctc"
-    assert afa["live"]["us_data"]["budget_effect"] == 120.0
-    assert afa["live"]["microplex"]["budget_effect"] == 60.0
-    assert afa["live"]["budget_effect_gap"] == -60.0
-    assert afa["live"]["microplex_budget_effect_as_share_of_us_data"] == 0.5
-    assert afa["comparison_status"] == "live_model_no_third_party_score"
-    assert afa["external_estimates"][0]["source"] == "CBO/JCT"
-    assert afa["external_estimates"][0]["estimate"] is None
-    assert afa["external_estimates"][0]["us_data_gap"] is None
+    assert len(live_rows) == 6
+    afa = next(row for row in result["rows"] if row["id"] == "american_family_act_2025")
+    assert afa["live"]["available"] is False
+    assert afa["comparison_status"] == "model_context_no_third_party_score"
 
     wyden_smith = next(row for row in live_rows if row["id"] == "wyden_smith_ctc_2024")
     assert wyden_smith["comparison_status"] == "live_model_with_third_party_score"
@@ -352,6 +355,44 @@ def test_microplex_budget_benchmarks_include_live_and_external_rows(
     )
     assert wyden_smith["external_estimates"][0]["estimate"] == 10_700_000_000
     assert wyden_smith["external_estimates"][0]["us_data_gap"] == -10_699_999_880.0
+    assert wyden_smith["external_estimates"][0]["comparable_to_live_annual_result"] is True
+
+    kypa_ctc = next(row for row in live_rows if row["id"] == "kypa_ctc_2026")
+    assert kypa_ctc["comparison_status"] == "live_model_with_third_party_score"
+    assert kypa_ctc["external_estimates"][0]["source"] == (
+        "Penn Wharton Budget Model"
+    )
+    assert kypa_ctc["external_estimates"][0]["estimate"] == 140_500_000_000
+    assert kypa_ctc["external_estimates"][0]["comparable_to_live_annual_result"] is True
+    assert kypa_ctc["external_estimates"][1]["estimate"] == 2_500_000_000
+    assert kypa_ctc["external_estimates"][1]["comparable_to_live_annual_result"] is False
+    assert kypa_ctc["external_estimates"][2]["estimate"] == 1_261_600_000_000
+
+    kypa_eitc = next(
+        row for row in live_rows if row["id"] == "kypa_childless_eitc_2026"
+    )
+    assert kypa_eitc["live"]["outcome_variable"] == "eitc"
+    assert kypa_eitc["external_estimates"][0]["source"] == (
+        "Penn Wharton Budget Model"
+    )
+    assert kypa_eitc["external_estimates"][0]["estimate"] == 7_200_000_000
+    assert kypa_eitc["external_estimates"][1]["estimate"] == 800_000_000
+    assert kypa_eitc["external_estimates"][2]["estimate"] == 63_800_000_000
+
+    tips = next(
+        row for row in live_rows if row["id"] == "obbba_no_tax_on_tips_repeal_2026"
+    )
+    assert tips["live"]["outcome_variable"] == "income_tax"
+    assert tips["live"]["us_data"]["budget_effect"] == 120.0
+    assert tips["live"]["microplex"]["budget_effect"] == 60.0
+    assert tips["live"]["budget_effect_gap"] == -60.0
+    assert tips["live"]["microplex_budget_effect_as_share_of_us_data"] == 0.5
+    assert tips["external_estimates"][0]["source"] == (
+        "Joint Committee on Taxation JCX-35-25"
+    )
+    assert tips["external_estimates"][0]["estimate"] == 10_121_000_000
+    assert tips["comparison_status"] == "waterfall_external_score_context"
+    assert tips["external_estimates"][0]["comparable_to_live_annual_result"] is False
 
     external_only = next(
         row for row in result["rows"] if row["id"] == "tcja_extension_2026_2035"
@@ -374,6 +415,7 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
             "supported_by_microplex": True,
             "in_loss": True,
             "target_value": 10.0,
+            "us_data_aggregate": 8.0,
             "microplex_aggregate": 9.0,
         },
         {
@@ -384,6 +426,7 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
             "supported_by_microplex": False,
             "in_loss": True,
             "target_value": 20.0,
+            "us_data_aggregate": 19.0,
             "microplex_aggregate": math.inf,
         },
         {
@@ -394,7 +437,10 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
             "supported_by_microplex": True,
             "in_loss": False,
             "target_value": 30.0,
+            "us_data_aggregate": 29.0,
             "microplex_aggregate": 31.0,
+            "us_data_relative_error": -0.0001,
+            "microplex_relative_error": 0.0001,
         },
     ]
     (bundle / "pe_native_target_diagnostics.json").write_text(
@@ -450,6 +496,67 @@ def test_microplex_target_diagnostics_paginates_and_filters(monkeypatch, tmp_pat
     assert filtered["has_next"] is False
     assert filtered["targets"][0]["target_id"] == "state/CA/agi/count/0_10k"
     assert filtered["filters"]["state"] == "ca"
+
+    sorted_desc = microplex.microplex_target_diagnostics(
+        sort_by="microplex_vs_target_relative",
+        sort_dir="desc",
+    )
+    assert [row["target_id"] for row in sorted_desc["targets"]] == [
+        "nation/irs/dividends",
+        "state/CA/agi/count/0_10k",
+        "state/MT/snap/households",
+    ]
+    assert sorted_desc["targets"][0]["microplex_vs_target_relative"] == (
+        1.0 / 30.0
+    )
+    assert sorted_desc["targets"][0]["us_data_vs_target_relative"] == (
+        -1.0 / 30.0
+    )
+    assert sorted_desc["targets"][-1]["microplex_vs_target_relative"] is None
+
+    sorted_asc = microplex.microplex_target_diagnostics(
+        sort_by="target_value",
+        sort_dir="asc",
+    )
+    assert [row["target_id"] for row in sorted_asc["targets"]] == [
+        "state/CA/agi/count/0_10k",
+        "state/MT/snap/households",
+        "nation/irs/dividends",
+    ]
+
+    family_desc = microplex.microplex_target_diagnostics(
+        sort_by="family",
+        sort_dir="desc",
+    )
+    assert [row["target_id"] for row in family_desc["targets"]] == [
+        "state/MT/snap/households",
+        "state/CA/agi/count/0_10k",
+        "nation/irs/dividends",
+    ]
+
+    aggregate_desc = microplex.microplex_target_diagnostics(
+        sort_by="microplex_aggregate",
+        sort_dir="desc",
+    )
+    assert [row["target_id"] for row in aggregate_desc["targets"]] == [
+        "nation/irs/dividends",
+        "state/CA/agi/count/0_10k",
+        "state/MT/snap/households",
+    ]
+
+    above_target = microplex.microplex_target_diagnostics(
+        microplex_target_direction="above"
+    )
+    assert [row["target_id"] for row in above_target["targets"]] == [
+        "nation/irs/dividends"
+    ]
+
+    below_target = microplex.microplex_target_diagnostics(
+        microplex_target_direction="below"
+    )
+    assert [row["target_id"] for row in below_target["targets"]] == [
+        "state/CA/agi/count/0_10k"
+    ]
 
 
 def test_microplex_target_diagnostics_unavailable_without_sidecar(
