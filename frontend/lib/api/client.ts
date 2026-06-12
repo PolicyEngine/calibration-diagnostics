@@ -37,6 +37,7 @@ const RUN_AGNOSTIC_PATHS = [
   "/pipeline",         // covers /pipeline and /pipeline/stages/*
   "/target-inventory", // committed JSON, run-independent
   "/microplex",        // pulls parity JSONs from PolicyEngine/microplex-us
+  "/populace",         // pulls release artifacts from policyengine/populace-us
   "/analysis/case-studies",
 ];
 
@@ -67,7 +68,11 @@ function appendParams(url: URL, params: Record<string, ParamValue>): void {
 }
 
 function apiUrl(path: string): URL {
-  if (!EXPLICIT_API_BASE && isPublicBrowserRuntime() && path.startsWith("/microplex")) {
+  if (
+    !EXPLICIT_API_BASE &&
+    isPublicBrowserRuntime() &&
+    (path.startsWith("/microplex") || path.startsWith("/populace"))
+  ) {
     return new URL(`/api${path}`, window.location.origin);
   }
   return new URL(path, API_BASE);

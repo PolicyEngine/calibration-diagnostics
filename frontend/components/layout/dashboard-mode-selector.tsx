@@ -9,6 +9,11 @@ const OPTIONS: { id: DashboardMode; label: string; hint: string }[] = [
     hint: "Synthetic pipeline and parity artifacts",
   },
   {
+    id: "populace",
+    label: "Populace",
+    hint: "Published populace-US releases",
+  },
+  {
     id: "us-data",
     label: "us-data",
     hint: "Current calibration diagnostics",

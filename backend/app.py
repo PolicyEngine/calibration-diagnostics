@@ -20,6 +20,7 @@ from backend.routes import (
     microplex,
     nodes,
     pipeline,
+    populace,
     runs as runs_route,
     strata,
     summary,
@@ -82,6 +83,7 @@ app.include_router(nodes.router, tags=["nodes"])
 app.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
 app.include_router(compare.router, tags=["compare"])
 app.include_router(microplex.router, tags=["microplex"])
+app.include_router(populace.router, tags=["populace"])
 app.include_router(geography.router, prefix="/geography", tags=["geography"])
 app.include_router(targets.router, prefix="/targets", tags=["targets"])
 app.include_router(strata.router, prefix="/strata", tags=["strata"])

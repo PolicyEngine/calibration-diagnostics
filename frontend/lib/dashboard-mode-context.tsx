@@ -11,7 +11,7 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-export type DashboardMode = "us-data" | "microplex" | "comparison";
+export type DashboardMode = "us-data" | "microplex" | "populace" | "comparison";
 
 interface DashboardModeValue {
   mode: DashboardMode;
@@ -23,6 +23,7 @@ const DEFAULT_MODE: DashboardMode = "microplex";
 const MODE_HOME: Record<DashboardMode, string> = {
   "us-data": "/summary",
   microplex: "/microplex",
+  populace: "/populace",
   comparison: "/comparison",
 };
 
@@ -34,6 +35,7 @@ const DashboardModeContext = createContext<DashboardModeValue>({
 function modeFromPath(pathname: string): DashboardMode | null {
   if (pathname.startsWith("/comparison")) return "comparison";
   if (pathname.startsWith("/microplex")) return "microplex";
+  if (pathname.startsWith("/populace")) return "populace";
   if (
     pathname.startsWith("/summary") ||
     pathname.startsWith("/analysis") ||
@@ -55,7 +57,10 @@ export function DashboardModeProvider({ children }: { children: ReactNode }) {
     if (pathMode) return pathMode;
     if (typeof window === "undefined") return DEFAULT_MODE;
     const stored = window.localStorage.getItem("dashboard-mode");
-    return stored === "us-data" || stored === "microplex" || stored === "comparison"
+    return stored === "us-data" ||
+      stored === "microplex" ||
+      stored === "populace" ||
+      stored === "comparison"
       ? stored
       : DEFAULT_MODE;
   });

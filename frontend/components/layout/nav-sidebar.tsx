@@ -23,6 +23,11 @@ const microplexNavItems = [
   { href: "/pipeline", label: "Pipeline" },
 ];
 
+const populaceNavItems = [
+  { href: "/populace", label: "Release summary" },
+  { href: "/populace/targets", label: "Target diagnostics" },
+];
+
 const comparisonNavItems = [
   { href: "/comparison", label: "Comparison" },
   { href: "/microplex", label: "Microplex target performance" },
@@ -37,9 +42,11 @@ export function NavSidebar() {
   const navItems =
     mode === "microplex"
       ? microplexNavItems
-      : mode === "comparison"
-        ? comparisonNavItems
-        : usDataNavItems;
+      : mode === "populace"
+        ? populaceNavItems
+        : mode === "comparison"
+          ? comparisonNavItems
+          : usDataNavItems;
 
   return (
     <div className="py-4 flex flex-col gap-4">
@@ -51,7 +58,9 @@ export function NavSidebar() {
               ? pathname === "/"
               : item.href === "/microplex"
                 ? pathname === "/microplex"
-                : pathname.startsWith(item.href);
+                : item.href === "/populace"
+                  ? pathname === "/populace"
+                  : pathname.startsWith(item.href);
           return (
             <SidebarNavItem
               key={item.href}
