@@ -24,38 +24,46 @@ function numberOrNull(value: unknown): number | null {
 export function normalizeComparisonScorecard(raw: JsonObject): JsonObject {
   const summary = asObject(raw.summary);
   const tdSummary = asObject(raw.target_diagnostics_summary);
+  // First key wins, searching the per-target win/loss block before the
+  // refit/loss scalars — so the flat benchmarks scorecard (everything in
+  // ``summary``) and the archived ``sound_ecps_replacement_comparison`` (split
+  // across ``summary`` and ``target_diagnostics_summary``) both normalize.
+  const pick = (...keys: string[]): number | null => {
+    for (const key of keys) {
+      for (const source of [tdSummary, summary]) {
+        const value = numberOrNull(source[key]);
+        if (value != null) return value;
+      }
+    }
+    return null;
+  };
   const flat = {
-    candidate_loss: numberOrNull(
-      tdSummary.candidate_loss ?? summary.candidate_enhanced_cps_native_loss,
-    ),
-    baseline_loss: numberOrNull(
-      tdSummary.baseline_loss ?? summary.baseline_enhanced_cps_native_loss,
-    ),
-    loss_delta: numberOrNull(
-      tdSummary.loss_delta ?? summary.enhanced_cps_native_loss_delta,
-    ),
-    candidate_holdout_loss: numberOrNull(summary.candidate_holdout_loss),
-    baseline_holdout_loss: numberOrNull(summary.baseline_holdout_loss),
-    candidate_train_loss: numberOrNull(summary.candidate_train_loss),
-    baseline_train_loss: numberOrNull(summary.baseline_train_loss),
-    candidate_unweighted_msre: numberOrNull(summary.candidate_unweighted_msre),
-    baseline_unweighted_msre: numberOrNull(summary.baseline_unweighted_msre),
-    candidate_wins: numberOrNull(tdSummary.candidate_wins ?? summary.candidate_wins),
-    baseline_wins: numberOrNull(tdSummary.baseline_wins ?? summary.baseline_wins),
-    ties: numberOrNull(tdSummary.ties ?? summary.ties),
-    n_targets: numberOrNull(tdSummary.n_targets ?? summary.n_targets_total),
-    holdout_targets: numberOrNull(tdSummary.holdout_targets ?? summary.holdout_targets),
-    train_targets: numberOrNull(tdSummary.train_targets),
+    candidate_loss: pick("candidate_loss", "candidate_enhanced_cps_native_loss"),
+    baseline_loss: pick("baseline_loss", "baseline_enhanced_cps_native_loss"),
+    loss_delta: pick("loss_delta", "enhanced_cps_native_loss_delta"),
+    candidate_holdout_loss: pick("candidate_holdout_loss"),
+    baseline_holdout_loss: pick("baseline_holdout_loss"),
+    candidate_train_loss: pick("candidate_train_loss"),
+    baseline_train_loss: pick("baseline_train_loss"),
+    candidate_unweighted_msre: pick("candidate_unweighted_msre"),
+    baseline_unweighted_msre: pick("baseline_unweighted_msre"),
+    candidate_wins: pick("candidate_wins"),
+    baseline_wins: pick("baseline_wins"),
+    ties: pick("ties"),
+    n_targets: pick("n_targets", "n_targets_total"),
+    holdout_targets: pick("holdout_targets"),
+    train_targets: pick("train_targets"),
     candidate_beats_baseline:
       typeof summary.candidate_beats_baseline === "boolean"
         ? summary.candidate_beats_baseline
         : null,
     // The archived summary's matched_household_count is a stray bool; the real
     // matched count is the per-dataset household count.
-    matched_household_count:
-      numberOrNull(summary.matched_household_count) ??
-      numberOrNull(summary.candidate_household_count) ??
-      numberOrNull(summary.baseline_household_count),
+    matched_household_count: pick(
+      "matched_household_count",
+      "candidate_household_count",
+      "baseline_household_count",
+    ),
   };
   return {
     release_id: raw.candidate_release_id ?? raw.release_id ?? null,

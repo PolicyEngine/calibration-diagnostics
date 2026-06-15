@@ -52,9 +52,21 @@ _COMPARISON_SCORECARD_PUBLIC_PATH = (
     "frontend/data/populace/latest/comparison_scorecard.json"
 )
 
-# The live incumbent-comparison scorecard is not published yet
-# (PolicyEngine/populace-benchmarks#3). Set this to the artifact URL to serve it
-# live; otherwise the route serves the archived 9f1260b snapshot.
+# The incumbent comparison lives in PolicyEngine/populace-benchmarks
+# (PolicyEngine/populace#37). By default the route resolves that repo's
+# latest.json pointer (PolicyEngine/populace-benchmarks#3) and serves the
+# scorecard it names, falling back to the committed archived snapshot until the
+# artifact is reachable. POPULACE_BENCHMARKS_POINTER_URL overrides the pointer;
+# POPULACE_BENCHMARKS_SCORECARD_URL points straight at a scorecard.
+_BENCHMARKS_RAW_BASE = (
+    "https://raw.githubusercontent.com/PolicyEngine/populace-benchmarks/main"
+)
+_DEFAULT_POINTER_URL = (
+    f"{_BENCHMARKS_RAW_BASE}/benchmarks/us/incumbent-comparison/latest.json"
+)
+_BENCHMARKS_POINTER_URL = (
+    os.environ.get("POPULACE_BENCHMARKS_POINTER_URL") or _DEFAULT_POINTER_URL
+)
 _BENCHMARKS_SCORECARD_URL = os.environ.get("POPULACE_BENCHMARKS_SCORECARD_URL")
 
 _CACHE: dict[str, tuple[float, Any]] = {}
@@ -537,45 +549,85 @@ def _normalize_comparison_scorecard(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _scorecard_url_from_pointer(pointer_url: str, scorecard_path: str) -> str:
+    if scorecard_path.startswith(("http://", "https://")):
+        return scorecard_path
+    suffix = "/benchmarks/us/incumbent-comparison/latest.json"
+    base = pointer_url[: -len(suffix)] if pointer_url.endswith(suffix) else pointer_url
+    return f"{base}/{scorecard_path.lstrip('/')}"
+
+
+def _load_live_scorecard() -> dict[str, Any]:
+    """Resolve the benchmarks scorecard, raising on any failure.
+
+    A direct ``POPULACE_BENCHMARKS_SCORECARD_URL`` skips the pointer; otherwise
+    the ``latest.json`` pointer names the scorecard to fetch.
+    """
+    if _BENCHMARKS_SCORECARD_URL:
+        raw = _fetch_json(_BENCHMARKS_SCORECARD_URL)
+        status = raw.get("status") if isinstance(raw, dict) else None
+        return {
+            "source": "populace_benchmarks_live",
+            "path": _BENCHMARKS_SCORECARD_URL,
+            "pointer_url": None,
+            "scorecard_status": status if isinstance(status, str) else None,
+            **_normalize_comparison_scorecard(raw),
+        }
+    pointer = _fetch_json(_BENCHMARKS_POINTER_URL)
+    scorecard_path = pointer.get("scorecard_path") if isinstance(pointer, dict) else None
+    if not isinstance(scorecard_path, str) or not scorecard_path:
+        raise ValueError(f"Pointer {_BENCHMARKS_POINTER_URL} has no scorecard_path.")
+    scorecard_url = _scorecard_url_from_pointer(_BENCHMARKS_POINTER_URL, scorecard_path)
+    raw = _fetch_json(scorecard_url)
+    status = pointer.get("status")
+    if not isinstance(status, str):
+        status = raw.get("status") if isinstance(raw, dict) else None
+    return {
+        "source": "populace_benchmarks_live",
+        "path": scorecard_url,
+        "pointer_url": _BENCHMARKS_POINTER_URL,
+        "scorecard_status": status if isinstance(status, str) else None,
+        **_normalize_comparison_scorecard(raw),
+    }
+
+
 @router.get("/populace/comparison")
 def populace_comparison() -> dict[str, Any]:
-    snapshot = _normalize_comparison_scorecard(_load_static(_STATIC_COMPARISON_SCORECARD))
-    source = "deployed_static_snapshot"
-    path = _COMPARISON_SCORECARD_PUBLIC_PATH
+    payload: dict[str, Any] = {
+        "source": "deployed_static_snapshot",
+        "path": _COMPARISON_SCORECARD_PUBLIC_PATH,
+        "pointer_url": _BENCHMARKS_POINTER_URL,
+        "scorecard_status": None,
+        **_normalize_comparison_scorecard(_load_static(_STATIC_COMPARISON_SCORECARD)),
+    }
     live_error = None
+    try:
+        payload = _load_live_scorecard()
+    except Exception as exc:
+        live_error = str(exc)
 
-    if _BENCHMARKS_SCORECARD_URL:
-        try:
-            live = _normalize_comparison_scorecard(_fetch_json(_BENCHMARKS_SCORECARD_URL))
-            snapshot = live
-            source = "populace_benchmarks_live"
-            path = _BENCHMARKS_SCORECARD_URL
-        except Exception as exc:
-            live_error = str(exc)
-
-    archived = source != "populace_benchmarks_live"
+    live = payload["source"] == "populace_benchmarks_live"
+    scorecard_status = payload.get("scorecard_status") or "archived"
     return _scrub(
         {
+            **payload,
             "available": True,
-            "source": source,
-            "path": path,
-            "archived": archived,
-            "live_scorecard_configured": bool(_BENCHMARKS_SCORECARD_URL),
+            "archived": not live,
+            "scorecard_status": scorecard_status,
+            "source_pointer": payload.get("pointer_url") or _BENCHMARKS_POINTER_URL,
             "live_scorecard_error": live_error,
-            **snapshot,
             "notes": [
                 "Populace (candidate) is scored against the enhanced CPS "
                 "(incumbent) with a matched-household, symmetric-refit, "
                 "held-out-target protocol.",
                 (
-                    "This is the archived scorecard for release "
-                    "populace-us-2024-9f1260b-20260611. The live incumbent "
-                    "comparison is not published as a machine-readable artifact "
-                    "yet (PolicyEngine/populace-benchmarks#3); set "
-                    "POPULACE_BENCHMARKS_SCORECARD_URL to serve it live."
-                    if archived
-                    else "Served live from the configured populace-benchmarks "
-                    "scorecard."
+                    f"Served live from populace-benchmarks "
+                    f"({scorecard_status} scorecard)."
+                    if live
+                    else "The benchmarks scorecard was not reachable, so this is "
+                    "the committed archived snapshot for release "
+                    "populace-us-2024-9f1260b-20260611 "
+                    "(PolicyEngine/populace-benchmarks#3 / #4 publish it)."
                 ),
                 "The eCPS comparison is benchmark-harness material and "
                 "intentionally lives outside live populace "

@@ -207,7 +207,8 @@ export interface PopulaceComparison {
   source: string;
   path: string | null;
   archived: boolean;
-  live_scorecard_configured: boolean;
+  scorecard_status: string;
+  source_pointer: string | null;
   live_scorecard_error: string | null;
   release_id: string | null;
   incumbent_manifest: string | null;
