@@ -159,3 +159,74 @@ export function usePopulaceTargetDiagnostics(params: {
     staleTime: 15 * 60 * 1000,
   });
 }
+
+export interface PopulaceComparisonSummary {
+  candidate_loss: number | null;
+  baseline_loss: number | null;
+  loss_delta: number | null;
+  candidate_holdout_loss: number | null;
+  baseline_holdout_loss: number | null;
+  candidate_train_loss: number | null;
+  baseline_train_loss: number | null;
+  candidate_unweighted_msre: number | null;
+  baseline_unweighted_msre: number | null;
+  candidate_wins: number | null;
+  baseline_wins: number | null;
+  ties: number | null;
+  n_targets: number | null;
+  holdout_targets: number | null;
+  train_targets: number | null;
+  candidate_beats_baseline: boolean | null;
+  matched_household_count: number | null;
+}
+
+export interface PopulaceComparisonFamilyRow {
+  family: string;
+  n_targets: number | null;
+  candidate_wins: number | null;
+  baseline_wins: number | null;
+  ties: number | null;
+  candidate_loss_contribution: number | null;
+  baseline_loss_contribution: number | null;
+  loss_delta: number | null;
+  [key: string]: unknown;
+}
+
+export interface PopulaceComparisonMover {
+  target_name?: string | null;
+  family?: string | null;
+  split?: string | null;
+  candidate_relative_error?: number | null;
+  baseline_relative_error?: number | null;
+  loss_delta?: number | null;
+  [key: string]: unknown;
+}
+
+export interface PopulaceComparison {
+  available: boolean;
+  source: string;
+  path: string | null;
+  archived: boolean;
+  live_scorecard_configured: boolean;
+  live_scorecard_error: string | null;
+  release_id: string | null;
+  incumbent_manifest: string | null;
+  period: number | null;
+  baseline_label: string;
+  candidate_label: string;
+  protocol: string | null;
+  summary: PopulaceComparisonSummary;
+  family_breakdown: PopulaceComparisonFamilyRow[];
+  top_improvements: PopulaceComparisonMover[];
+  top_regressions: PopulaceComparisonMover[];
+  gates: Record<string, unknown>;
+  notes: string[];
+}
+
+export function usePopulaceComparison() {
+  return useQuery({
+    queryKey: ["populace", "comparison"],
+    queryFn: () => apiGet<PopulaceComparison>("/populace/comparison"),
+    staleTime: 15 * 60 * 1000,
+  });
+}

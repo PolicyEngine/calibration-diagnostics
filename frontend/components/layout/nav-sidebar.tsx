@@ -26,6 +26,7 @@ const microplexNavItems = [
 const populaceNavItems = [
   { href: "/populace", label: "Release summary" },
   { href: "/populace/targets", label: "Target diagnostics" },
+  { href: "/populace/comparison", label: "Incumbent comparison" },
 ];
 
 const comparisonNavItems = [

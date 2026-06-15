@@ -43,10 +43,19 @@ _STATIC_ROOT = Path(__file__).resolve().parents[2] / "frontend/data/populace/lat
 _STATIC_BUILD_MANIFEST = _STATIC_ROOT / "build_manifest.json"
 _STATIC_RELEASE_MANIFEST = _STATIC_ROOT / "release_manifest.json"
 _STATIC_CALIBRATION_DIAGNOSTICS = _STATIC_ROOT / "calibration_diagnostics.json"
+_STATIC_COMPARISON_SCORECARD = _STATIC_ROOT / "comparison_scorecard.json"
 
 _CALIBRATION_DIAGNOSTICS_PUBLIC_PATH = (
     "frontend/data/populace/latest/calibration_diagnostics.json"
 )
+_COMPARISON_SCORECARD_PUBLIC_PATH = (
+    "frontend/data/populace/latest/comparison_scorecard.json"
+)
+
+# The live incumbent-comparison scorecard is not published yet
+# (PolicyEngine/populace-benchmarks#3). Set this to the artifact URL to serve it
+# live; otherwise the route serves the archived 9f1260b snapshot.
+_BENCHMARKS_SCORECARD_URL = os.environ.get("POPULACE_BENCHMARKS_SCORECARD_URL")
 
 _CACHE: dict[str, tuple[float, Any]] = {}
 _TTL_SECONDS = 300
@@ -442,5 +451,136 @@ def populace_target_diagnostics(
                 "sort_dir": sort_dir,
             },
             "targets": page,
+        }
+    )
+
+
+def _num(value: Any) -> float | None:
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _normalize_comparison_scorecard(raw: dict[str, Any]) -> dict[str, Any]:
+    """Flatten an incumbent-comparison scorecard to the shared shape.
+
+    The archived ``sound_ecps_replacement_comparison.json`` splits the clean
+    win/loss block (``target_diagnostics_summary``) from the refit/loss scalars
+    (``summary``); the proposed benchmarks scorecard
+    (PolicyEngine/populace-benchmarks#3) is a single flat ``summary``. Read both.
+    """
+    summary = raw.get("summary") if isinstance(raw.get("summary"), dict) else {}
+    td = (
+        raw.get("target_diagnostics_summary")
+        if isinstance(raw.get("target_diagnostics_summary"), dict)
+        else {}
+    )
+
+    def pick(*keys: str) -> float | None:
+        # First key wins, across both sources: the kept-target ``n_targets``
+        # (target_diagnostics_summary) takes precedence over the pre-drop
+        # ``n_targets_total`` (summary), so it matches the win/loss/tie counts.
+        for key in keys:
+            for source in (td, summary):
+                if key in source:
+                    value = _num(source[key])
+                    if value is not None:
+                        return value
+        return None
+
+    flat = {
+        "candidate_loss": pick("candidate_loss", "candidate_enhanced_cps_native_loss"),
+        "baseline_loss": pick("baseline_loss", "baseline_enhanced_cps_native_loss"),
+        "loss_delta": pick("loss_delta", "enhanced_cps_native_loss_delta"),
+        "candidate_holdout_loss": pick("candidate_holdout_loss"),
+        "baseline_holdout_loss": pick("baseline_holdout_loss"),
+        "candidate_train_loss": pick("candidate_train_loss"),
+        "baseline_train_loss": pick("baseline_train_loss"),
+        "candidate_unweighted_msre": pick("candidate_unweighted_msre"),
+        "baseline_unweighted_msre": pick("baseline_unweighted_msre"),
+        "candidate_wins": pick("candidate_wins"),
+        "baseline_wins": pick("baseline_wins"),
+        "ties": pick("ties"),
+        "n_targets": pick("n_targets", "n_targets_total"),
+        "holdout_targets": pick("holdout_targets"),
+        "train_targets": pick("train_targets"),
+        "candidate_beats_baseline": (
+            summary.get("candidate_beats_baseline")
+            if isinstance(summary.get("candidate_beats_baseline"), bool)
+            else None
+        ),
+        # The archived summary's ``matched_household_count`` is a stray bool;
+        # the real matched count is the per-dataset household count. ``pick``
+        # skips non-numeric values, so the count keys are the real source.
+        "matched_household_count": pick(
+            "matched_household_count",
+            "candidate_household_count",
+            "baseline_household_count",
+        ),
+    }
+    protocol = raw.get("protocol")
+    if not isinstance(protocol, str) and flat["matched_household_count"] is not None:
+        protocol = (
+            f"Matched {int(flat['matched_household_count']):,} households, "
+            f"symmetric refit, {flat['holdout_targets']}-target holdout."
+        )
+    return {
+        "release_id": raw.get("candidate_release_id") or raw.get("release_id"),
+        "incumbent_manifest": raw.get("incumbent_manifest", "pinned-production-ecps-2024"),
+        "period": _num(raw.get("period")),
+        "baseline_label": raw.get("baseline_label", "enhanced_cps"),
+        "candidate_label": raw.get("candidate_label", "populace"),
+        "protocol": protocol if isinstance(protocol, str) else None,
+        "summary": flat,
+        "family_breakdown": raw.get("family_breakdown") or [],
+        "top_improvements": raw.get("top_improvements") or [],
+        "top_regressions": raw.get("top_regressions") or [],
+        "gates": raw.get("gates") or {},
+    }
+
+
+@router.get("/populace/comparison")
+def populace_comparison() -> dict[str, Any]:
+    snapshot = _normalize_comparison_scorecard(_load_static(_STATIC_COMPARISON_SCORECARD))
+    source = "deployed_static_snapshot"
+    path = _COMPARISON_SCORECARD_PUBLIC_PATH
+    live_error = None
+
+    if _BENCHMARKS_SCORECARD_URL:
+        try:
+            live = _normalize_comparison_scorecard(_fetch_json(_BENCHMARKS_SCORECARD_URL))
+            snapshot = live
+            source = "populace_benchmarks_live"
+            path = _BENCHMARKS_SCORECARD_URL
+        except Exception as exc:
+            live_error = str(exc)
+
+    archived = source != "populace_benchmarks_live"
+    return _scrub(
+        {
+            "available": True,
+            "source": source,
+            "path": path,
+            "archived": archived,
+            "live_scorecard_configured": bool(_BENCHMARKS_SCORECARD_URL),
+            "live_scorecard_error": live_error,
+            **snapshot,
+            "notes": [
+                "Populace (candidate) is scored against the enhanced CPS "
+                "(incumbent) with a matched-household, symmetric-refit, "
+                "held-out-target protocol.",
+                (
+                    "This is the archived scorecard for release "
+                    "populace-us-2024-9f1260b-20260611. The live incumbent "
+                    "comparison is not published as a machine-readable artifact "
+                    "yet (PolicyEngine/populace-benchmarks#3); set "
+                    "POPULACE_BENCHMARKS_SCORECARD_URL to serve it live."
+                    if archived
+                    else "Served live from the configured populace-benchmarks "
+                    "scorecard."
+                ),
+                "The eCPS comparison is benchmark-harness material and "
+                "intentionally lives outside live populace "
+                "(PolicyEngine/populace#37); the live calibration-fit view is "
+                "the populace release summary.",
+            ],
         }
     )

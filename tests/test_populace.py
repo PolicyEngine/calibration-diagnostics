@@ -185,3 +185,89 @@ def test_enrich_derives_state_distribution_family():
     # Calibration moved the estimate closer to the target → positive improvement.
     assert row["improvement"] > 0
     assert row["direction"] == "under"
+
+
+def test_enrich_collapses_state_fips_snap_family():
+    row = populace._enrich(
+        {
+            "name": "US06/snap-cost",
+            "target": 100.0,
+            "initial_estimate": 90.0,
+            "final_estimate": 99.0,
+            "relative_error": -0.01,
+            "within_tolerance": True,
+        }
+    )
+    assert row["family"] == "snap-cost"
+    assert row["state"] is None
+
+
+def test_populace_comparison_serves_archived_snapshot(monkeypatch):
+    monkeypatch.setattr(populace, "_BENCHMARKS_SCORECARD_URL", None)
+    payload = populace.populace_comparison()
+
+    assert payload["available"] is True
+    assert payload["archived"] is True
+    assert payload["source"] == "deployed_static_snapshot"
+    assert payload["live_scorecard_configured"] is False
+    assert payload["candidate_label"] == "populace"
+    assert payload["baseline_label"] == "enhanced_cps"
+
+    s = payload["summary"]
+    # The 9f1260b scorecard: populace beats eCPS on loss but loses the win count.
+    assert s["candidate_loss"] < s["baseline_loss"]
+    assert s["candidate_beats_baseline"] is True
+    assert s["candidate_wins"] + s["baseline_wins"] + s["ties"] == s["n_targets"]
+    assert s["matched_household_count"] > 0
+
+    assert payload["family_breakdown"]
+    assert payload["top_regressions"]
+    assert payload["top_improvements"]
+    assert any("populace-benchmarks#3" in note for note in payload["notes"])
+
+
+def test_populace_comparison_prefers_live_scorecard(monkeypatch):
+    flat = {
+        "candidate_release_id": "populace-us-2024-f32c2e5-20260614",
+        "period": 2024,
+        "summary": {
+            "candidate_loss": 0.2,
+            "baseline_loss": 1.4,
+            "loss_delta": -1.2,
+            "candidate_wins": 1100,
+            "baseline_wins": 2550,
+            "ties": 54,
+            "n_targets": 3704,
+            "candidate_beats_baseline": True,
+            "matched_household_count": 41314,
+        },
+        "family_breakdown": [{"family": "x", "n_targets": 1}],
+        "top_improvements": [],
+        "top_regressions": [],
+    }
+    monkeypatch.setattr(
+        populace, "_BENCHMARKS_SCORECARD_URL", "https://example.test/scorecard.json"
+    )
+    monkeypatch.setattr(populace, "_fetch_json", lambda url: flat)
+    payload = populace.populace_comparison()
+
+    assert payload["archived"] is False
+    assert payload["source"] == "populace_benchmarks_live"
+    assert payload["live_scorecard_configured"] is True
+    assert payload["release_id"] == "populace-us-2024-f32c2e5-20260614"
+    assert payload["summary"]["candidate_wins"] == 1100
+
+
+def test_populace_comparison_falls_back_when_live_fetch_fails(monkeypatch):
+    def _boom(url):
+        raise RuntimeError("benchmarks unreachable")
+
+    monkeypatch.setattr(
+        populace, "_BENCHMARKS_SCORECARD_URL", "https://example.test/scorecard.json"
+    )
+    monkeypatch.setattr(populace, "_fetch_json", _boom)
+    payload = populace.populace_comparison()
+
+    assert payload["archived"] is True
+    assert payload["source"] == "deployed_static_snapshot"
+    assert payload["live_scorecard_error"] == "benchmarks unreachable"
