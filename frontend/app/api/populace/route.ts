@@ -2,20 +2,19 @@ import { NextResponse } from "next/server";
 
 import {
   LATEST_POPULACE_BUILD_MANIFEST_PATH,
-  LATEST_POPULACE_COMPARISON_SUMMARY_PATH,
+  LATEST_POPULACE_CALIBRATION_DIAGNOSTICS_PATH,
   LATEST_POPULACE_RELEASE_ID,
   LATEST_POPULACE_RELEASE_MANIFEST_PATH,
-  LATEST_POPULACE_TARGET_DIAGNOSTICS_PATH,
   latestPopulaceBuildManifest,
-  latestPopulaceComparisonSummary,
+  latestPopulaceCalibrationHighlights,
+  latestPopulaceCalibrationSummary,
   latestPopulaceReleaseManifest,
-  latestPopulaceTargetDiagnosticsSummary,
   scrub,
 } from "@/lib/populace/latest-artifact";
 
 const HF_REPO = process.env.POPULACE_HF_REPO ?? "policyengine/populace-us";
 const HF_REVISION = process.env.POPULACE_HF_REVISION ?? "main";
-const HF_API = "https://huggingface.co/api/datasets";
+const LATEST_POINTER_PATH = "latest.json";
 
 type JsonObject = Record<string, unknown>;
 
@@ -39,71 +38,49 @@ async function fetchJson(url: string): Promise<unknown> {
   return response.json();
 }
 
-interface ReleaseEntry {
-  release_id: string;
-  files: string[];
-}
-
-async function listReleases(): Promise<ReleaseEntry[]> {
-  const tree = await fetchJson(
-    `${HF_API}/${HF_REPO}/tree/${HF_REVISION}/releases?recursive=true`,
-  );
-  if (!Array.isArray(tree)) return [];
-  const releases = new Map<string, string[]>();
-  for (const entry of tree) {
-    const item = asObject(entry);
-    if (item.type !== "file" || typeof item.path !== "string") continue;
-    const match = item.path.match(/^releases\/([^/]+)\/(.+)$/);
-    if (!match) continue;
-    const files = releases.get(match[1]) ?? [];
-    files.push(match[2]);
-    releases.set(match[1], files);
-  }
-  return [...releases.entries()]
-    .map(([release_id, files]) => ({ release_id, files }))
-    .sort((a, b) => a.release_id.localeCompare(b.release_id));
-}
-
+// Resolve the current release through latest.json — the published pointer
+// (PolicyEngine/populace#9). Its `paths` name the build/release manifests for
+// the release it points at; we read those small files live and leave the large
+// per-target diagnostics to the deployed snapshot.
 async function loadLiveRelease(): Promise<JsonObject> {
   try {
-    const releases = await listReleases();
-    // Prefer the snapshot's release when it is published; otherwise the
-    // lexicographically-latest complete release. Build ids end in a date,
-    // but same-day builds have no published ordering — a latest.json
-    // pointer in the repo would make this resolution exact.
-    const complete = releases.filter((release) =>
-      release.files.includes("build_manifest.json"),
-    );
-    const live =
-      complete.find((r) => r.release_id === LATEST_POPULACE_RELEASE_ID) ??
-      complete[complete.length - 1] ??
-      null;
-    if (!live) {
-      return {
-        available: false,
-        reason: "No release with a build_manifest.json found on Hugging Face.",
-        releases,
-      };
+    const pointer = asObject(await fetchJson(hfResolveUrl(LATEST_POINTER_PATH)));
+    const releaseId = pointer.release_id;
+    const paths = asObject(pointer.paths);
+    if (typeof releaseId !== "string" || !releaseId) {
+      return { available: false, reason: "latest.json has no release_id." };
     }
-    const prefix = `releases/${live.release_id}`;
-    const buildManifest = asObject(
-      await fetchJson(hfResolveUrl(`${prefix}/build_manifest.json`)),
-    );
-    const releaseManifest = live.files.includes("release_manifest.json")
-      ? asObject(await fetchJson(hfResolveUrl(`${prefix}/release_manifest.json`)))
-      : {};
+    const buildManifestPath =
+      typeof paths.build_manifest === "string"
+        ? paths.build_manifest
+        : `releases/${releaseId}/build_manifest.json`;
+    const releaseManifestPath =
+      typeof paths.release_manifest === "string"
+        ? paths.release_manifest
+        : `releases/${releaseId}/release_manifest.json`;
+    const buildManifest = asObject(await fetchJson(hfResolveUrl(buildManifestPath)));
+    let releaseManifest: JsonObject = {};
+    try {
+      releaseManifest = asObject(await fetchJson(hfResolveUrl(releaseManifestPath)));
+    } catch {
+      releaseManifest = {};
+    }
     return {
       available: true,
       source: "huggingface_live",
       repo_id: HF_REPO,
       revision: HF_REVISION,
-      release_id: live.release_id,
-      releases,
+      release_id: releaseId,
+      updated_at: pointer.updated_at ?? null,
+      pointer,
       build_manifest: buildManifest,
       release_manifest: releaseManifest,
-      comparison_url: live.files.includes("sound_ecps_replacement_comparison.json")
-        ? hfResolveUrl(`${prefix}/sound_ecps_replacement_comparison.json`)
-        : null,
+      build_manifest_path: buildManifestPath,
+      release_manifest_path: releaseManifestPath,
+      calibration_diagnostics_path:
+        typeof paths.calibration_diagnostics === "string"
+          ? paths.calibration_diagnostics
+          : null,
     };
   } catch (error) {
     return {
@@ -127,10 +104,10 @@ export async function GET() {
     const releaseId = liveAvailable
       ? String(live.release_id)
       : LATEST_POPULACE_RELEASE_ID;
-    const releases = Array.isArray(live.releases) ? live.releases : [];
-    const comparison = latestPopulaceComparisonSummary();
-    const comparisonIsStale =
-      releaseId !== String(comparison.release_id ?? LATEST_POPULACE_RELEASE_ID);
+    const calibration = latestPopulaceCalibrationSummary();
+    const highlights = latestPopulaceCalibrationHighlights(15);
+    const calibrationSnapshotStale =
+      releaseId !== String(calibration.release_id ?? LATEST_POPULACE_RELEASE_ID);
 
     return NextResponse.json(
       scrub({
@@ -141,52 +118,53 @@ export async function GET() {
         live_unavailable_reason: liveAvailable ? null : live.reason ?? null,
         release_id: releaseId,
         snapshot_release_id: LATEST_POPULACE_RELEASE_ID,
-        releases,
+        updated_at: liveAvailable ? live.updated_at ?? null : null,
         source_artifacts: [
+          {
+            name: "latest_pointer",
+            path: LATEST_POINTER_PATH,
+            url: liveAvailable
+              ? hfResolveUrl(LATEST_POINTER_PATH)
+              : "deployed-static-snapshot",
+          },
           {
             name: "build_manifest",
             path: liveAvailable
-              ? `releases/${releaseId}/build_manifest.json`
+              ? String(live.build_manifest_path)
               : LATEST_POPULACE_BUILD_MANIFEST_PATH,
             url: liveAvailable
-              ? hfResolveUrl(`releases/${releaseId}/build_manifest.json`)
+              ? hfResolveUrl(String(live.build_manifest_path))
               : "deployed-static-snapshot",
           },
           {
             name: "release_manifest",
             path: liveAvailable
-              ? `releases/${releaseId}/release_manifest.json`
+              ? String(live.release_manifest_path)
               : LATEST_POPULACE_RELEASE_MANIFEST_PATH,
             url: liveAvailable
-              ? hfResolveUrl(`releases/${releaseId}/release_manifest.json`)
+              ? hfResolveUrl(String(live.release_manifest_path))
               : "deployed-static-snapshot",
           },
           {
-            name: "sound_ecps_replacement_comparison",
-            path: LATEST_POPULACE_COMPARISON_SUMMARY_PATH,
+            name: "calibration_diagnostics",
+            path: LATEST_POPULACE_CALIBRATION_DIAGNOSTICS_PATH,
             url:
-              typeof live.comparison_url === "string"
-                ? live.comparison_url
+              liveAvailable && typeof live.calibration_diagnostics_path === "string"
+                ? hfResolveUrl(live.calibration_diagnostics_path)
                 : "deployed-static-snapshot",
-          },
-          {
-            name: "target_diagnostics",
-            path: LATEST_POPULACE_TARGET_DIAGNOSTICS_PATH,
-            url: "deployed-static-snapshot",
           },
         ],
         limitations: [
-          "Build and release manifests are read live from the policyengine/populace-us Hugging Face dataset when reachable; per-target diagnostics come from a deployed static snapshot of sound_ecps_replacement_comparison.json.",
-          "populace does not yet publish a latest.json pointer, so the live release is resolved by listing the releases/ tree and picking the lexicographically latest complete release (PolicyEngine/populace#9).",
-          "Calibration internals (loss trajectory, skipped targets, per-record L0 gates) are computed by populace-calibrate but not published, so the dashboard cannot show convergence or skip reasons yet (PolicyEngine/populace#10).",
+          "Build and release manifests are read live from the policyengine/populace-us Hugging Face dataset via latest.json; per-target calibration diagnostics come from a deployed static snapshot of calibration_diagnostics.json.",
+          "The eCPS head-to-head comparison moved out of live populace into PolicyEngine/populace-benchmarks, so this view reports populace's calibration fit against its own target surface, not a populace-vs-enhanced-CPS score.",
+          "The published loss trajectory for this release was reconstructed from saved scalars (the historical build did not store the full epoch trace), so the convergence curve is coarse — see the solver provenance note.",
         ],
-        comparison_snapshot_stale: comparisonIsStale,
+        calibration_snapshot_stale: calibrationSnapshotStale,
         build_manifest: buildManifest,
         release_manifest: releaseManifest,
         gates: asObject(buildManifest.gates),
-        score_vs_enhanced_cps: asObject(buildManifest.score_vs_enhanced_cps),
-        comparison,
-        target_diagnostics: latestPopulaceTargetDiagnosticsSummary(100),
+        calibration,
+        highlights,
       }),
     );
   } catch (error) {

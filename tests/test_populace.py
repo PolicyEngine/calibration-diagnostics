@@ -29,55 +29,54 @@ def test_populace_overview_serves_snapshot_when_offline(monkeypatch):
     assert gates["calibration"]["within_10pct_share"] is not None
     assert "smoke" in gates
 
-    score = payload["score_vs_enhanced_cps"]
-    assert set(score["per_target_wins"]) == {"populace", "enhanced_cps", "ties"}
-    assert score["full_loss"]["populace"] < score["full_loss"]["enhanced_cps"]
+    cal = payload["calibration"]
+    assert cal["available"] is True
+    assert cal["total_targets"] > 3000
+    assert cal["final_loss"] < cal["initial_loss"]
+    assert cal["n_nonzero"] is not None and cal["n_records"] is not None
+    assert cal["family_fit"]
+    # Family fit rows are consistent: within-10% never exceeds the count.
+    for row in cal["family_fit"]:
+        assert 0 <= row["within_10pct"] <= row["n_targets"]
+        assert 0 <= row["within_tolerance"] <= row["n_targets"]
 
-    comparison = payload["comparison"]
-    assert comparison["available"] is True
-    assert comparison["family_breakdown"]
-    assert comparison["top_regressions"]
-    assert comparison["top_improvements"]
-
-    diagnostics = payload["target_diagnostics"]
-    assert diagnostics["available"] is True
-    assert diagnostics["total_targets"] > 3000
-    assert len(diagnostics["targets"]) == 100
-    assert diagnostics["baseline_label"] == "enhanced_cps"
-    assert diagnostics["candidate_label"] == "populace"
+    highlights = payload["highlights"]
+    assert len(highlights["worst_fit"]) == 15
+    assert len(highlights["biggest_improvements"]) == 15
+    # Worst-fit is sorted by descending absolute relative error.
+    worst = [r["abs_relative_error"] for r in highlights["worst_fit"]]
+    assert worst == sorted(worst, reverse=True)
 
 
 def test_populace_overview_prefers_live_release(monkeypatch):
     live_build = {
         "build_id": "populace-us-2024-fffffff-20990101",
         "builder": "populace",
-        "gates": {"parity_gaps": 0},
-        "score_vs_enhanced_cps": {"per_target_wins": {}},
+        "dataset": {"filename": "populace_us_2024.h5"},
+        "gates": {"parity_gaps": 0, "smoke": {}},
     }
     live_release = {"schema_version": 1, "build": {"build_id": live_build["build_id"]}}
 
     def _fake_fetch(url):
-        if "/tree/" in url:
-            return [
-                {
-                    "type": "file",
-                    "path": "releases/populace-us-2024-ffffffff-20990101/x",
-                },
-                {
-                    "type": "file",
-                    "path": (
-                        "releases/populace-us-2024-fffffff-20990101/"
-                        "build_manifest.json"
+        if url.endswith("latest.json"):
+            return {
+                "schema_version": 1,
+                "release_id": "populace-us-2024-fffffff-20990101",
+                "updated_at": "2099-01-01T00:00:00+00:00",
+                "paths": {
+                    "build_manifest": (
+                        "releases/populace-us-2024-fffffff-20990101/build_manifest.json"
                     ),
-                },
-                {
-                    "type": "file",
-                    "path": (
+                    "release_manifest": (
                         "releases/populace-us-2024-fffffff-20990101/"
                         "release_manifest.json"
                     ),
+                    "calibration_diagnostics": (
+                        "releases/populace-us-2024-fffffff-20990101/"
+                        "calibration_diagnostics.json"
+                    ),
                 },
-            ]
+            }
         if url.endswith("build_manifest.json"):
             return live_build
         if url.endswith("release_manifest.json"):
@@ -89,9 +88,10 @@ def test_populace_overview_prefers_live_release(monkeypatch):
 
     assert payload["source"] == "huggingface_live"
     assert payload["release_id"] == "populace-us-2024-fffffff-20990101"
+    assert payload["updated_at"] == "2099-01-01T00:00:00+00:00"
     assert payload["build_manifest"]["build_id"] == live_build["build_id"]
     # The committed per-target snapshot is from an older release.
-    assert payload["comparison_snapshot_stale"] is True
+    assert payload["calibration_snapshot_stale"] is True
 
 
 def test_populace_target_diagnostics_filters_and_sorts():
@@ -99,10 +99,11 @@ def test_populace_target_diagnostics_filters_and_sorts():
         limit=10,
         offset=0,
         family=None,
-        split="holdout",
-        winner="candidate",
+        state=None,
+        direction="over",
+        within_tolerance="false",
         search=None,
-        sort_by="candidate_loss_term",
+        sort_by="abs_relative_error",
         sort_dir="desc",
     )
 
@@ -111,40 +112,76 @@ def test_populace_target_diagnostics_filters_and_sorts():
     assert payload["filtered_total"] <= payload["total_targets"]
     assert payload["families"]
     for row in payload["targets"]:
-        assert row["split"] == "holdout"
-        assert row["winner"] == "candidate"
-    loss_terms = [
-        row["candidate_loss_term"]
-        for row in payload["targets"]
-        if row.get("candidate_loss_term") is not None
+        assert row["direction"] == "over"
+        assert row["within_tolerance"] is False
+    errors = [
+        r["abs_relative_error"]
+        for r in payload["targets"]
+        if r.get("abs_relative_error") is not None
     ]
-    assert loss_terms == sorted(loss_terms, reverse=True)
+    assert errors == sorted(errors, reverse=True)
+
+
+def test_populace_target_diagnostics_default_sort_is_worst_fit():
+    payload = populace.populace_target_diagnostics(
+        limit=20, offset=0, family=None, state=None, direction=None,
+        within_tolerance=None, search=None, sort_by=None, sort_dir="desc",
+    )
+    errors = [r["abs_relative_error"] for r in payload["targets"]]
+    assert errors == sorted(errors, reverse=True)
 
 
 def test_populace_target_diagnostics_pagination():
     first = populace.populace_target_diagnostics(
-        limit=5, offset=0, family=None, split=None, winner=None,
-        search=None, sort_by="target_index", sort_dir="asc",
+        limit=5, offset=0, family=None, state=None, direction=None,
+        within_tolerance=None, search=None, sort_by="name", sort_dir="asc",
     )
     second = populace.populace_target_diagnostics(
-        limit=5, offset=5, family=None, split=None, winner=None,
-        search=None, sort_by="target_index", sort_dir="asc",
+        limit=5, offset=5, family=None, state=None, direction=None,
+        within_tolerance=None, search=None, sort_by="name", sort_dir="asc",
     )
     assert first["has_next"] is True
-    first_ids = {row["target_index"] for row in first["targets"]}
-    second_ids = {row["target_index"] for row in second["targets"]}
-    assert not first_ids & second_ids
+    first_names = {r["name"] for r in first["targets"]}
+    second_names = {r["name"] for r in second["targets"]}
+    assert not first_names & second_names
+
+
+def test_populace_target_diagnostics_family_filter():
+    payload = populace.populace_target_diagnostics(
+        limit=50, offset=0, family="nation/irs", state=None, direction=None,
+        within_tolerance=None, search=None, sort_by=None, sort_dir="desc",
+    )
+    assert payload["filtered_total"] >= 1
+    for row in payload["targets"]:
+        assert row["family"] == "nation/irs"
 
 
 def test_populace_target_diagnostics_search():
     payload = populace.populace_target_diagnostics(
-        limit=50, offset=0, family=None, split=None, winner=None,
-        search="snap", sort_by=None, sort_dir="asc",
+        limit=50, offset=0, family=None, state=None, direction=None,
+        within_tolerance=None, search="snap", sort_by=None, sort_dir="desc",
     )
     assert payload["filtered_total"] >= 1
     for row in payload["targets"]:
         haystack = " ".join(
-            str(row.get(key, ""))
-            for key in ("target_name", "family", "split", "winner")
+            str(row.get(key, "")) for key in ("name", "family", "state")
         ).lower()
         assert "snap" in haystack
+
+
+def test_enrich_derives_state_distribution_family():
+    row = populace._enrich(
+        {
+            "name": "state/AL/adjusted_gross_income/count/1_1",
+            "target": 100.0,
+            "initial_estimate": 80.0,
+            "final_estimate": 95.0,
+            "relative_error": -0.05,
+            "within_tolerance": True,
+        }
+    )
+    assert row["family"] == "state_distribution"
+    assert row["state"] == "AL"
+    # Calibration moved the estimate closer to the target → positive improvement.
+    assert row["improvement"] > 0
+    assert row["direction"] == "under"

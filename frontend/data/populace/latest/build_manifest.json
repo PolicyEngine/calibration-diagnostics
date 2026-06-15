@@ -1,17 +1,19 @@
 {
- "build_id": "populace-us-2024-9f1260b-20260611",
+ "build_id": "populace-us-2024-f32c2e5-20260614",
  "builder": "populace",
- "build_sha": "9f1260b",
- "build_date": "2026-06-11",
+ "build_sha": "f32c2e5",
+ "build_date": "2026-06-14",
  "dataset": {
   "filename": "populace_us_2024.h5",
-  "sha256": "dc75c0d4fdedd57946db84a8d838dbc5b61a284365c3ce6eb6508b8e81111a4b"
+  "sha256": "f32c2e5e9098bc6540724fdd5debf963af495da4c29b3a7a63fb53c2a4bb5a34",
+  "size_bytes": 355658426
  },
  "calibration": {
   "filename": "populace_us_2024_calibration.npz",
-  "sha256": "a3da2f59085c45f0e16b06337818e3513c2635911dc0d16fa7deb5006263c12a"
+  "sha256": "9c5fd7397267b01212658d82f4e96d4d41e38efbd666671274a0f060565e60fa",
+  "size_bytes": 326592
  },
- "construction": "eCPS-free: every layer from primary sources (CPS ASEC, IRS PUF 2015 uprated, Fed SCF 2022, Census SIPP, CPS-ORG, MEPS-IC parameters, Census ACS 2022); enhanced CPS used only as the scoring benchmark",
+ "construction": "Primary-source Populace build: CPS ASEC household/person spine; IRS PUF tax detail; Fed SCF wealth; Census SIPP vehicles and tipped income; CPS-ORG hourly/union signals; MEPS-IC employer-sponsored insurance premiums; Census ACS rent. No incumbent microdata is used as a build input.",
  "gates": {
   "parity_gaps": 0,
   "exported_nonzero": {
@@ -19,40 +21,21 @@
    "stored_columns": 309
   },
   "calibration": {
-   "within_10pct_share": 0.9509,
-   "loss": 0.022,
-   "max_weight": 297651,
+   "targets": 3704,
+   "within_10pct_share": 0.9465442764578834,
+   "initial_loss": 1.8307578877880506,
+   "loss": 0.021951236237680125,
+   "max_weight": 379622.78125,
    "weights_above_500k": 0,
-   "max_weight_ratio": 50
+   "max_weight_ratio": 50.0
   },
   "smoke": {
-   "people_m": 332.3,
-   "snap_b": 97.8,
-   "net_worth_t": 176.5,
-   "net_stcg_b": -77.5,
-   "tips_b": 52.9,
-   "pre_subsidy_rent_b": 757.5,
-   "investment_interest_expense_b": 5.1
-  }
- },
- "score_vs_enhanced_cps": {
-  "protocol": "matched 41,314 households, symmetric refit, 739-target holdout (seed 20260529)",
-  "train_loss": {
-   "populace": 0.18957,
-   "enhanced_cps": 1.08879
-  },
-  "holdout_loss": {
-   "populace": 0.03837,
-   "enhanced_cps": 0.3167
-  },
-  "full_loss": {
-   "populace": 0.22794,
-   "enhanced_cps": 1.40549
-  },
-  "per_target_wins": {
-   "populace": 1040,
-   "enhanced_cps": 2613,
-   "ties": 51
+   "people_m": 332.8,
+   "snap_b": 98.0,
+   "net_worth_t": 175.5,
+   "net_stcg_b": -77.4,
+   "tips_b": 53.1,
+   "pre_subsidy_rent_b": 759.7
   }
  }
 }

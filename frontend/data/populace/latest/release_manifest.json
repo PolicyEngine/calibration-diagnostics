@@ -28,8 +28,8 @@
   }
  ],
  "build": {
-  "build_id": "populace-us-2024-9f1260b-20260611",
-  "built_at": "2026-06-11T13:53:15.217836Z",
+  "build_id": "populace-us-2024-f32c2e5-20260614",
+  "built_at": "2026-06-14T20:30:40+00:00",
   "built_with_core_package": {
    "name": "policyengine-core",
    "version": "3.27.0"
@@ -44,8 +44,9 @@
   },
   "metadata": {
    "builder": "populace",
-   "build_sha": "9f1260b",
-   "construction": "eCPS-free: every layer from primary sources (CPS ASEC, IRS PUF 2015 uprated, Fed SCF 2022, Census SIPP, CPS-ORG, MEPS-IC parameters, Census ACS 2022); the enhanced CPS is the scoring benchmark only"
+   "build_sha": "f32c2e5",
+   "construction": "Primary-source Populace build: CPS ASEC household/person spine; IRS PUF tax detail; Fed SCF wealth; Census SIPP vehicles and tipped income; CPS-ORG hourly/union signals; MEPS-IC employer-sponsored insurance premiums; Census ACS rent. No incumbent microdata is used as a build input.",
+   "republished_at": "2026-06-14T16:04:57+00:00"
   }
  },
  "artifacts": {
@@ -53,33 +54,33 @@
    "kind": "microdata",
    "path": "populace_us_2024.h5",
    "repo_id": "policyengine/populace-us",
-   "revision": "populace-us-2024-9f1260b-20260611",
-   "sha256": "dc75c0d4fdedd57946db84a8d838dbc5b61a284365c3ce6eb6508b8e81111a4b",
-   "size_bytes": 357079693
+   "revision": "populace-us-2024-f32c2e5-20260614",
+   "sha256": "f32c2e5e9098bc6540724fdd5debf963af495da4c29b3a7a63fb53c2a4bb5a34",
+   "size_bytes": 355658426
   },
   "populace_us_2024_calibration": {
    "kind": "auxiliary",
    "path": "populace_us_2024_calibration.npz",
    "repo_id": "policyengine/populace-us",
-   "revision": "populace-us-2024-9f1260b-20260611",
-   "sha256": "a3da2f59085c45f0e16b06337818e3513c2635911dc0d16fa7deb5006263c12a",
-   "size_bytes": 326556
+   "revision": "populace-us-2024-f32c2e5-20260614",
+   "sha256": "9c5fd7397267b01212658d82f4e96d4d41e38efbd666671274a0f060565e60fa",
+   "size_bytes": 326592
   },
-  "releases/populace-us-2024-9f1260b-20260611/build_manifest": {
+  "build_manifest": {
    "kind": "auxiliary",
-   "path": "releases/populace-us-2024-9f1260b-20260611/build_manifest.json",
+   "path": "releases/populace-us-2024-f32c2e5-20260614/build_manifest.json",
    "repo_id": "policyengine/populace-us",
-   "revision": "populace-us-2024-9f1260b-20260611",
-   "sha256": "df02c9d263d7640e457164cf122466f37d94201385636e7eaf78f9bbbb867b15",
-   "size_bytes": 1654
+   "revision": "populace-us-2024-f32c2e5-20260614",
+   "sha256": "94f1a1b809b8f260c7f9143acf3d171c8eb42a18fb5f231de1f07274f6579466",
+   "size_bytes": 1365
   },
-  "releases/populace-us-2024-9f1260b-20260611/sound_ecps_replacement_comparison": {
+  "calibration_diagnostics": {
    "kind": "auxiliary",
-   "path": "releases/populace-us-2024-9f1260b-20260611/sound_ecps_replacement_comparison.json",
+   "path": "releases/populace-us-2024-f32c2e5-20260614/calibration_diagnostics.json",
    "repo_id": "policyengine/populace-us",
-   "revision": "populace-us-2024-9f1260b-20260611",
-   "sha256": "d6f9ea002804aafcfe65dcb9f5b93fd8881c5e846ad7364f611bfb6b5683ce8f",
-   "size_bytes": 3721672
+   "revision": "populace-us-2024-f32c2e5-20260614",
+   "sha256": "c01fdba68053785ffc2079440d8b98a9bb70f1ddfdbb75f442c7ddc8bd745b6b",
+   "size_bytes": 908864
   }
  }
 }

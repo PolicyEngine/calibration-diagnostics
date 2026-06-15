@@ -1,17 +1,23 @@
 """Populace release diagnostics.
 
 Serves the populace-US build published on the Hugging Face dataset
-``policyengine/populace-us``. Each release under ``releases/<build_id>/``
-ships a ``build_manifest.json`` (gate verdicts + score vs the enhanced
-CPS), a ``release_manifest.json`` (artifact registry + compatibility
-matrix), and a ``sound_ecps_replacement_comparison.json`` with full
-per-target diagnostics.
+``policyengine/populace-us``. The current release is resolved through the
+``latest.json`` pointer at the repo root (PolicyEngine/populace#9); its
+``paths`` name the ``build_manifest.json`` (gate verdicts) and
+``release_manifest.json`` (artifact registry) for that release, which this
+route reads live with a TTL cache.
 
-The small manifests are fetched live with a TTL cache. The per-target
-comparison artifact is ~3.7 MB, so the deployed static snapshot committed
-under ``frontend/data/populace/latest/`` is the default source for target
-rows; the live artifact is fetched only when the snapshot's release does
-not match the live release and ``POPULACE_FETCH_LIVE_COMPARISON`` is set.
+Per-target calibration diagnostics come from ``calibration_diagnostics.json``
+(PolicyEngine/populace#10) — populace's own calibration fit against its target
+surface: per target the declared value, the aggregate under the design weights
+(initial) and the calibrated weights (final), the relative error, and the
+tolerance verdict. That artifact is large, so the deployed static snapshot
+committed under ``frontend/data/populace/latest/`` is the source for target
+rows; only the small manifests are fetched live.
+
+The eCPS head-to-head comparison moved out of live populace into
+``PolicyEngine/populace-benchmarks``; this view reports calibration fit, not a
+populace-vs-enhanced-CPS score.
 """
 
 from __future__ import annotations
@@ -31,16 +37,22 @@ router = APIRouter()
 
 _HF_REPO = os.environ.get("POPULACE_HF_REPO", "policyengine/populace-us")
 _HF_REVISION = os.environ.get("POPULACE_HF_REVISION", "main")
-_HF_API = "https://huggingface.co/api/datasets"
+_LATEST_POINTER_PATH = "latest.json"
 
 _STATIC_ROOT = Path(__file__).resolve().parents[2] / "frontend/data/populace/latest"
 _STATIC_BUILD_MANIFEST = _STATIC_ROOT / "build_manifest.json"
 _STATIC_RELEASE_MANIFEST = _STATIC_ROOT / "release_manifest.json"
-_STATIC_COMPARISON_SUMMARY = _STATIC_ROOT / "comparison_summary.json"
-_STATIC_TARGET_DIAGNOSTICS = _STATIC_ROOT / "target_diagnostics.json"
+_STATIC_CALIBRATION_DIAGNOSTICS = _STATIC_ROOT / "calibration_diagnostics.json"
+
+_CALIBRATION_DIAGNOSTICS_PUBLIC_PATH = (
+    "frontend/data/populace/latest/calibration_diagnostics.json"
+)
 
 _CACHE: dict[str, tuple[float, Any]] = {}
 _TTL_SECONDS = 300
+
+_STATE_CODE = re.compile(r"^[A-Z]{2}$")
+_STATE_FIPS = re.compile(r"^US\d{2}$")
 
 
 def _scrub(value: Any) -> Any:
@@ -48,7 +60,9 @@ def _scrub(value: Any) -> Any:
         return {key: _scrub(item) for key, item in value.items()}
     if isinstance(value, list):
         return [_scrub(item) for item in value]
-    if isinstance(value, float) and (value != value or value in (float("inf"), float("-inf"))):
+    if isinstance(value, float) and (
+        value != value or value in (float("inf"), float("-inf"))
+    ):
         return None
     return value
 
@@ -81,69 +95,161 @@ def _load_static(path: Path) -> dict[str, Any]:
         )
 
 
-def _list_releases() -> list[dict[str, Any]]:
-    tree = _fetch_json(f"{_HF_API}/{_HF_REPO}/tree/{_HF_REVISION}/releases?recursive=true")
-    releases: dict[str, list[str]] = {}
-    if not isinstance(tree, list):
-        return []
-    for entry in tree:
-        if not isinstance(entry, dict) or entry.get("type") != "file":
-            continue
-        match = re.match(r"^releases/([^/]+)/(.+)$", str(entry.get("path", "")))
-        if not match:
-            continue
-        releases.setdefault(match.group(1), []).append(match.group(2))
-    return [
-        {"release_id": release_id, "files": sorted(files)}
-        for release_id, files in sorted(releases.items())
-    ]
-
-
 def _load_live_release(snapshot_release_id: str) -> dict[str, Any]:
     try:
-        releases = _list_releases()
-        complete = [r for r in releases if "build_manifest.json" in r["files"]]
-        live = next(
-            (r for r in complete if r["release_id"] == snapshot_release_id),
-            complete[-1] if complete else None,
+        pointer = _fetch_json(_hf_resolve_url(_LATEST_POINTER_PATH))
+        if not isinstance(pointer, dict) or not pointer.get("release_id"):
+            return {"available": False, "reason": "latest.json has no release_id."}
+        release_id = str(pointer["release_id"])
+        paths = pointer.get("paths") if isinstance(pointer.get("paths"), dict) else {}
+        build_path = paths.get(
+            "build_manifest", f"releases/{release_id}/build_manifest.json"
         )
-        if live is None:
-            return {
-                "available": False,
-                "reason": "No release with a build_manifest.json found on Hugging Face.",
-                "releases": releases,
-            }
-        prefix = f"releases/{live['release_id']}"
-        build_manifest = _fetch_json(_hf_resolve_url(f"{prefix}/build_manifest.json"))
-        release_manifest = (
-            _fetch_json(_hf_resolve_url(f"{prefix}/release_manifest.json"))
-            if "release_manifest.json" in live["files"]
-            else {}
+        release_path = paths.get(
+            "release_manifest", f"releases/{release_id}/release_manifest.json"
         )
+        build_manifest = _fetch_json(_hf_resolve_url(build_path))
+        try:
+            release_manifest = _fetch_json(_hf_resolve_url(release_path))
+        except Exception:
+            release_manifest = {}
         return {
             "available": True,
             "source": "huggingface_live",
             "repo_id": _HF_REPO,
             "revision": _HF_REVISION,
-            "release_id": live["release_id"],
-            "releases": releases,
+            "release_id": release_id,
+            "updated_at": pointer.get("updated_at"),
             "build_manifest": build_manifest,
             "release_manifest": release_manifest,
-            "comparison_url": (
-                _hf_resolve_url(f"{prefix}/sound_ecps_replacement_comparison.json")
-                if "sound_ecps_replacement_comparison.json" in live["files"]
-                else None
-            ),
+            "build_manifest_path": build_path,
+            "release_manifest_path": release_path,
+            "calibration_diagnostics_path": paths.get("calibration_diagnostics"),
         }
     except Exception as exc:
         return {"available": False, "reason": str(exc)}
+
+
+def _relative_error(estimate: float | None, target: float | None) -> float | None:
+    if estimate is None or target is None:
+        return None
+    return estimate - target if target == 0 else (estimate - target) / abs(target)
+
+
+def _derive_family(name: str) -> str:
+    parts = name.split("/")
+    if len(parts) < 2:
+        return name
+    geo, second = parts[0], parts[1]
+    # Per-state distribution targets ("state/AL/...") collapse to one family.
+    if _STATE_CODE.match(second):
+        return "state_distribution"
+    # Per-state-FIPS program targets ("US01/snap-cost") collapse to the measure.
+    if _STATE_FIPS.match(geo):
+        return second
+    return f"{geo}/{second}"
+
+
+def _derive_state(name: str) -> str | None:
+    parts = name.split("/")
+    if len(parts) >= 2 and _STATE_CODE.match(parts[1]):
+        return parts[1]
+    return None
+
+
+def _enrich(row: dict[str, Any]) -> dict[str, Any]:
+    name = str(row.get("name", ""))
+    target = row.get("target")
+    initial = row.get("initial_estimate")
+    final = row.get("final_estimate")
+    final_rel = row.get("relative_error")
+    if final_rel is None:
+        final_rel = _relative_error(final, target)
+    initial_rel = _relative_error(initial, target)
+    abs_rel = abs(final_rel) if isinstance(final_rel, (int, float)) else None
+    improvement = (
+        abs(initial_rel) - abs(final_rel)
+        if isinstance(initial_rel, (int, float)) and isinstance(final_rel, (int, float))
+        else None
+    )
+    direction = None
+    if isinstance(final_rel, (int, float)):
+        direction = "over" if final_rel > 0 else "under" if final_rel < 0 else "exact"
+    return {
+        **row,
+        "family": _derive_family(name),
+        "state": _derive_state(name),
+        "initial_relative_error": initial_rel,
+        "abs_relative_error": abs_rel,
+        "improvement": improvement,
+        "direction": direction,
+    }
+
+
+def _family_fit(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault(str(row.get("family", "")), []).append(row)
+    out = []
+    for family, members in groups.items():
+        abs_errors = [
+            r["abs_relative_error"]
+            for r in members
+            if isinstance(r.get("abs_relative_error"), (int, float))
+        ]
+        out.append(
+            {
+                "family": family,
+                "n_targets": len(members),
+                "within_tolerance": sum(
+                    1 for r in members if r.get("within_tolerance") is True
+                ),
+                "within_10pct": sum(
+                    1
+                    for r in members
+                    if isinstance(r.get("abs_relative_error"), (int, float))
+                    and r["abs_relative_error"] <= 0.1
+                ),
+                "mean_abs_relative_error": (
+                    sum(abs_errors) / len(abs_errors) if abs_errors else None
+                ),
+            }
+        )
+    return sorted(out, key=lambda f: f["n_targets"], reverse=True)
+
+
+def _calibration_summary(
+    payload: dict[str, Any], rows: list[dict[str, Any]]
+) -> dict[str, Any]:
+    return {
+        "available": True,
+        "path": _CALIBRATION_DIAGNOSTICS_PUBLIC_PATH,
+        "release_id": payload.get("release_id"),
+        "schema_version": payload.get("schema_version"),
+        "weight_entity": payload.get("weight_entity"),
+        "options": payload.get("options") or {},
+        "l0_lambda": payload.get("l0_lambda"),
+        "n_nonzero": payload.get("n_nonzero"),
+        "n_records": payload.get("n_records"),
+        "initial_loss": payload.get("initial_loss"),
+        "final_loss": payload.get("final_loss"),
+        "fraction_within_10pct": payload.get("fraction_within_10pct"),
+        "loss_trajectory": payload.get("loss_trajectory") or [],
+        "skipped": payload.get("skipped") or [],
+        "total_targets": len(rows),
+        "within_tolerance_count": sum(
+            1 for r in rows if r.get("within_tolerance") is True
+        ),
+        "family_fit": _family_fit(rows),
+    }
 
 
 @router.get("/populace")
 def populace_overview() -> dict[str, Any]:
     static_build = _load_static(_STATIC_BUILD_MANIFEST)
     static_release = _load_static(_STATIC_RELEASE_MANIFEST)
-    comparison = _load_static(_STATIC_COMPARISON_SUMMARY)
+    payload = _load_static(_STATIC_CALIBRATION_DIAGNOSTICS)
+    rows = [_enrich(row) for row in (payload.get("targets") or [])]
     snapshot_release_id = str(static_build.get("build_id", ""))
 
     live = _load_live_release(snapshot_release_id)
@@ -155,88 +261,95 @@ def populace_overview() -> dict[str, Any]:
         else static_release
     )
     release_id = str(live["release_id"]) if live_available else snapshot_release_id
-    releases = live.get("releases") or []
 
-    target_diagnostics = _load_static(_STATIC_TARGET_DIAGNOSTICS)
-    targets = target_diagnostics.get("targets") or []
+    calibration = _calibration_summary(payload, rows)
 
-    gates = build_manifest.get("gates") or {}
-    score = build_manifest.get("score_vs_enhanced_cps") or {}
+    def with_abs(row: dict[str, Any]) -> bool:
+        return isinstance(row.get("abs_relative_error"), (int, float))
+
+    worst_fit = sorted(
+        (r for r in rows if with_abs(r)),
+        key=lambda r: r["abs_relative_error"],
+        reverse=True,
+    )[:15]
+    biggest_improvements = sorted(
+        (r for r in rows if isinstance(r.get("improvement"), (int, float))),
+        key=lambda r: r["improvement"],
+        reverse=True,
+    )[:15]
+
+    def artifact(name: str, live_path_key: str, static_path: str):
+        live_path = live.get(live_path_key)
+        return {
+            "name": name,
+            "path": str(live_path) if live_available and live_path else static_path,
+            "url": (
+                _hf_resolve_url(str(live_path))
+                if live_available and live_path
+                else "deployed-static-snapshot"
+            ),
+        }
 
     return _scrub(
         {
             "source_repo": _HF_REPO,
             "repo_type": "dataset",
             "revision": _HF_REVISION,
-            "source": "huggingface_live" if live_available else "deployed_static_snapshot",
+            "source": "huggingface_live"
+            if live_available
+            else "deployed_static_snapshot",
             "live_unavailable_reason": None if live_available else live.get("reason"),
             "release_id": release_id,
             "snapshot_release_id": snapshot_release_id,
-            "releases": releases,
+            "updated_at": live.get("updated_at") if live_available else None,
             "source_artifacts": [
                 {
-                    "name": "build_manifest",
-                    "path": f"releases/{release_id}/build_manifest.json",
+                    "name": "latest_pointer",
+                    "path": _LATEST_POINTER_PATH,
                     "url": (
-                        _hf_resolve_url(f"releases/{release_id}/build_manifest.json")
+                        _hf_resolve_url(_LATEST_POINTER_PATH)
                         if live_available
                         else "deployed-static-snapshot"
                     ),
                 },
-                {
-                    "name": "release_manifest",
-                    "path": f"releases/{release_id}/release_manifest.json",
-                    "url": (
-                        _hf_resolve_url(f"releases/{release_id}/release_manifest.json")
-                        if live_available
-                        else "deployed-static-snapshot"
-                    ),
-                },
-                {
-                    "name": "sound_ecps_replacement_comparison",
-                    "path": "frontend/data/populace/latest/comparison_summary.json",
-                    "url": live.get("comparison_url") or "deployed-static-snapshot",
-                },
-                {
-                    "name": "target_diagnostics",
-                    "path": "frontend/data/populace/latest/target_diagnostics.json",
-                    "url": "deployed-static-snapshot",
-                },
+                artifact(
+                    "build_manifest",
+                    "build_manifest_path",
+                    "frontend/data/populace/latest/build_manifest.json",
+                ),
+                artifact(
+                    "release_manifest",
+                    "release_manifest_path",
+                    "frontend/data/populace/latest/release_manifest.json",
+                ),
+                artifact(
+                    "calibration_diagnostics",
+                    "calibration_diagnostics_path",
+                    _CALIBRATION_DIAGNOSTICS_PUBLIC_PATH,
+                ),
             ],
             "limitations": [
                 "Build and release manifests are read live from the "
-                "policyengine/populace-us Hugging Face dataset when reachable; "
-                "per-target diagnostics come from a deployed static snapshot of "
-                "sound_ecps_replacement_comparison.json.",
-                "populace does not yet publish a latest.json pointer, so the live "
-                "release is resolved by listing the releases/ tree and picking the "
-                "lexicographically latest complete release "
-                "(PolicyEngine/populace#9).",
-                "Calibration internals (loss trajectory, skipped targets, "
-                "per-record L0 gates) are computed by populace-calibrate but not "
-                "published, so the dashboard cannot show convergence or skip "
-                "reasons yet (PolicyEngine/populace#10).",
+                "policyengine/populace-us Hugging Face dataset via latest.json; "
+                "per-target calibration diagnostics come from a deployed static "
+                "snapshot of calibration_diagnostics.json.",
+                "The eCPS head-to-head comparison moved out of live populace into "
+                "PolicyEngine/populace-benchmarks, so this view reports populace's "
+                "calibration fit against its own target surface, not a "
+                "populace-vs-enhanced-CPS score.",
+                "The published loss trajectory for this release was reconstructed "
+                "from saved scalars (the historical build did not store the full "
+                "epoch trace), so the convergence curve is coarse.",
             ],
-            "comparison_snapshot_stale": release_id
-            != str(comparison.get("release_id", snapshot_release_id)),
+            "calibration_snapshot_stale": release_id
+            != str(payload.get("release_id", snapshot_release_id)),
             "build_manifest": build_manifest,
             "release_manifest": release_manifest,
-            "gates": gates,
-            "score_vs_enhanced_cps": score,
-            "comparison": {"available": True, **comparison},
-            "target_diagnostics": {
-                "available": True,
-                "path": "frontend/data/populace/latest/target_diagnostics.json",
-                "release_id": target_diagnostics.get("release_id"),
-                "schema_version": target_diagnostics.get("schema_version"),
-                "metric": target_diagnostics.get("metric"),
-                "period": target_diagnostics.get("period"),
-                "baseline_label": "enhanced_cps",
-                "candidate_label": "populace",
-                "summary": target_diagnostics.get("summary") or {},
-                "total_targets": len(targets),
-                "display_limit": 100,
-                "targets": targets[:100],
+            "gates": build_manifest.get("gates") or {},
+            "calibration": calibration,
+            "highlights": {
+                "worst_fit": worst_fit,
+                "biggest_improvements": biggest_improvements,
             },
         }
     )
@@ -245,7 +358,7 @@ def populace_overview() -> dict[str, Any]:
 def _matches_search(row: dict[str, Any], search: str) -> bool:
     haystack = " ".join(
         str(row.get(key))
-        for key in ("target_name", "family", "split", "winner")
+        for key in ("name", "family", "state")
         if row.get(key) is not None
     ).lower()
     return search.lower() in haystack
@@ -256,65 +369,77 @@ def populace_target_diagnostics(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     family: str | None = None,
-    split: str | None = None,
-    winner: str | None = None,
+    state: str | None = None,
+    direction: str | None = None,
+    within_tolerance: str | None = None,
     search: str | None = None,
     sort_by: str | None = None,
-    sort_dir: str = "asc",
+    sort_dir: str = "desc",
 ) -> dict[str, Any]:
-    payload = _load_static(_STATIC_TARGET_DIAGNOSTICS)
-    rows: list[dict[str, Any]] = list(payload.get("targets") or [])
+    payload = _load_static(_STATIC_CALIBRATION_DIAGNOSTICS)
+    rows = [_enrich(row) for row in (payload.get("targets") or [])]
     families = sorted({str(row.get("family", "")) for row in rows})
+
+    within: bool | None = None
+    if within_tolerance is not None and within_tolerance != "":
+        within = within_tolerance.lower() in ("1", "true", "yes")
 
     filtered = rows
     if family:
-        filtered = [row for row in filtered if row.get("family") == family]
-    if split:
-        filtered = [row for row in filtered if row.get("split") == split]
-    if winner:
-        filtered = [row for row in filtered if row.get("winner") == winner]
+        filtered = [r for r in filtered if r.get("family") == family]
+    if state:
+        filtered = [r for r in filtered if r.get("state") == state]
+    if direction:
+        filtered = [r for r in filtered if r.get("direction") == direction]
+    if within is not None:
+        filtered = [r for r in filtered if r.get("within_tolerance") is within]
     if search and search.strip():
-        filtered = [row for row in filtered if _matches_search(row, search.strip())]
-    if sort_by:
-        descending = sort_dir == "desc"
-        present = [row for row in filtered if row.get(sort_by) is not None]
-        missing = [row for row in filtered if row.get(sort_by) is None]
+        filtered = [r for r in filtered if _matches_search(r, search.strip())]
 
-        def sort_key(row: dict[str, Any]):
-            value = row.get(sort_by)
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                return (1, 0.0, str(value))
-            return (0, float(value), "")
+    sort_key = sort_by or "abs_relative_error"
+    descending = sort_dir != "asc"
+    present = [r for r in filtered if r.get(sort_key) is not None]
+    missing = [r for r in filtered if r.get(sort_key) is None]
 
-        # None values sort last regardless of direction.
-        filtered = sorted(present, key=sort_key, reverse=descending) + missing
+    def key_fn(row: dict[str, Any]):
+        value = row.get(sort_key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return (1, 0.0, str(value))
+        return (0, float(value), "")
+
+    filtered = sorted(present, key=key_fn, reverse=descending) + missing
 
     page = filtered[offset : offset + limit]
     return _scrub(
         {
             "available": True,
-            "path": "frontend/data/populace/latest/target_diagnostics.json",
+            "path": _CALIBRATION_DIAGNOSTICS_PUBLIC_PATH,
             "release_id": payload.get("release_id"),
             "schema_version": payload.get("schema_version"),
-            "metric": payload.get("metric"),
-            "period": payload.get("period"),
-            "baseline_label": "enhanced_cps",
-            "candidate_label": "populace",
-            "summary": payload.get("summary") or {},
-            "total_targets": len(rows),
+            "metric": "relative_error",
             "families": families,
+            "summary": {
+                "total_targets": len(rows),
+                "within_tolerance_count": sum(
+                    1 for r in rows if r.get("within_tolerance") is True
+                ),
+                "fraction_within_10pct": payload.get("fraction_within_10pct"),
+            },
+            "total_targets": len(rows),
             "filtered_total": len(filtered),
             "returned": len(page),
             "limit": limit,
             "offset": offset,
             "has_next": offset + limit < len(filtered),
+            "display_limit": limit,
             "filters": {
                 "family": family,
-                "split": split,
-                "winner": winner,
+                "state": state,
+                "direction": direction,
+                "within_tolerance": within,
                 "search": search,
-                "sort_by": sort_by,
-                "sort_dir": sort_dir if sort_by else None,
+                "sort_by": sort_key,
+                "sort_dir": sort_dir,
             },
             "targets": page,
         }

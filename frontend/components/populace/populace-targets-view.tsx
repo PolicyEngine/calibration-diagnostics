@@ -11,7 +11,7 @@ import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import {
   usePopulaceTargetDiagnostics,
-  type PopulaceTargetDiagnosticRow,
+  type PopulaceTargetRow,
 } from "@/lib/api/hooks/use-populace";
 
 const PAGE_SIZE = 50;
@@ -25,14 +25,14 @@ const COLUMNS: {
   key: string;
   label: string;
   numeric?: boolean;
-  render: (row: PopulaceTargetDiagnosticRow) => React.ReactNode;
+  render: (row: PopulaceTargetRow) => React.ReactNode;
 }[] = [
   {
-    key: "target_name",
+    key: "name",
     label: "Target",
     render: (row) => (
-      <span className="block max-w-md truncate" title={String(row.target_name ?? "")}>
-        {row.target_name}
+      <span className="block max-w-md truncate" title={String(row.name ?? "")}>
+        {row.name}
       </span>
     ),
   },
@@ -42,62 +42,53 @@ const COLUMNS: {
     render: (row) => <span className="whitespace-nowrap">{row.family}</span>,
   },
   {
-    key: "split",
-    label: "Split",
-    render: (row) => row.split,
-  },
-  {
-    key: "target_value",
-    label: "Target value",
+    key: "target",
+    label: "Target",
     numeric: true,
-    render: (row) => fmtCompact(row.target_value),
+    render: (row) => fmtCompact(row.target),
   },
   {
-    key: "candidate_estimate",
-    label: "Populace est.",
+    key: "initial_estimate",
+    label: "Initial est.",
     numeric: true,
-    render: (row) => fmtCompact(row.candidate_estimate),
+    render: (row) => fmtCompact(row.initial_estimate),
   },
   {
-    key: "candidate_relative_error",
-    label: "Populace rel. err",
+    key: "final_estimate",
+    label: "Final est.",
     numeric: true,
-    render: (row) => fmt(row.candidate_relative_error, { pct: true, digits: 1 }),
+    render: (row) => fmtCompact(row.final_estimate),
   },
   {
-    key: "baseline_relative_error",
-    label: "eCPS rel. err",
+    key: "relative_error",
+    label: "Rel. error",
     numeric: true,
-    render: (row) => fmt(row.baseline_relative_error, { pct: true, digits: 1 }),
+    render: (row) => fmt(row.relative_error, { pct: true, digits: 1 }),
   },
   {
-    key: "loss_delta",
-    label: "Loss delta",
+    key: "improvement",
+    label: "Improvement",
     numeric: true,
     render: (row) => (
-      <span className={(row.loss_delta ?? 0) < 0 ? "text-emerald-700" : "text-rose-700"}>
-        {row.loss_delta == null ? "—" : row.loss_delta.toExponential(2)}
+      <span className={(row.improvement ?? 0) > 0 ? "text-emerald-700" : "text-rose-700"}>
+        {row.improvement == null ? "—" : fmt(row.improvement, { pct: true, digits: 1 })}
       </span>
     ),
   },
   {
-    key: "winner",
-    label: "Closer",
+    key: "within_tolerance",
+    label: "In tol.",
     render: (row) => (
       <StatusPill
         tone={
-          row.winner === "candidate"
-            ? "success"
-            : row.winner === "baseline"
-              ? "danger"
-              : "neutral"
+          row.within_tolerance == null
+            ? "neutral"
+            : row.within_tolerance
+              ? "success"
+              : "danger"
         }
       >
-        {row.winner === "candidate"
-          ? "populace"
-          : row.winner === "baseline"
-            ? "eCPS"
-            : "tie"}
+        {row.within_tolerance == null ? "—" : row.within_tolerance ? "yes" : "no"}
       </StatusPill>
     ),
   },
@@ -105,27 +96,24 @@ const COLUMNS: {
 
 export function PopulaceTargetsView() {
   const [family, setFamily] = useState("");
-  const [split, setSplit] = useState("");
-  const [winner, setWinner] = useState("");
+  const [within, setWithin] = useState("");
+  const [direction, setDirection] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [sort, setSort] = useState<SortState>({
-    by: "candidate_loss_term",
-    dir: "desc",
-  });
+  const [sort, setSort] = useState<SortState>({ by: "abs_relative_error", dir: "desc" });
 
   const params = useMemo(
     () => ({
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
       family: family || undefined,
-      split: split || undefined,
-      winner: winner || undefined,
+      within_tolerance: within || undefined,
+      direction: direction || undefined,
       search: search || undefined,
       sort_by: sort.by,
       sort_dir: sort.dir,
     }),
-    [family, split, winner, search, page, sort],
+    [family, within, direction, search, page, sort],
   );
 
   const { data, isLoading, error } = usePopulaceTargetDiagnostics(params);
@@ -148,7 +136,7 @@ export function PopulaceTargetsView() {
       <PageHeader
         eyebrow="Populace"
         title="Target diagnostics"
-        description="Per-target fit for the populace-US release versus the enhanced CPS, from the published sound_ecps_replacement_comparison artifact. Candidate is populace; baseline is the enhanced CPS."
+        description="Per-target calibration fit for the populace-US release: each target's value, the aggregate under the design weights (initial) and the calibrated weights (final), and whether the calibrated estimate lands within tolerance."
         status={
           data?.release_id ? (
             <StatusPill tone="info">{String(data.release_id)}</StatusPill>
@@ -161,7 +149,7 @@ export function PopulaceTargetsView() {
           data?.total_targets ?? null,
           { digits: 0 },
         )})`}
-        description="Click a column header to sort. Loss terms use the calibrator's relative-error loss; negative loss delta means populace fits the target better."
+        description="Click a column header to sort. Relative error is the calibrated estimate's miss against the target; improvement is how much calibration reduced the absolute relative error from the design weights."
         padded={false}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -188,30 +176,29 @@ export function PopulaceTargetsView() {
               ]}
             />
             <ToolbarSelect
-              label="Split"
-              value={split}
+              label="In tolerance"
+              value={within}
               onChange={(value) => {
-                setSplit(value);
+                setWithin(value);
                 setPage(0);
               }}
               options={[
                 { value: "", label: "All" },
-                { value: "train", label: "Train" },
-                { value: "holdout", label: "Holdout" },
+                { value: "true", label: "Within" },
+                { value: "false", label: "Outside" },
               ]}
             />
             <ToolbarSelect
-              label="Closer"
-              value={winner}
+              label="Direction"
+              value={direction}
               onChange={(value) => {
-                setWinner(value);
+                setDirection(value);
                 setPage(0);
               }}
               options={[
                 { value: "", label: "All" },
-                { value: "candidate", label: "Populace" },
-                { value: "baseline", label: "Enhanced CPS" },
-                { value: "tie", label: "Tie" },
+                { value: "over", label: "Over target" },
+                { value: "under", label: "Under target" },
               ]}
             />
           </div>
@@ -276,7 +263,7 @@ export function PopulaceTargetsView() {
               <tbody>
                 {data.targets.map((row) => (
                   <tr
-                    key={`${row.target_name}-${row.target_index}`}
+                    key={row.name}
                     className="border-b border-border/60 last:border-b-0 hover:bg-muted/30"
                   >
                     {COLUMNS.map((column) => (

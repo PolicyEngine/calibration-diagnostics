@@ -1,11 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../client";
 
-export interface PopulaceReleaseEntry {
-  release_id: string;
-  files: string[];
-}
-
 export interface PopulaceGates {
   parity_gaps?: number | null;
   exported_nonzero?: {
@@ -23,96 +18,54 @@ export interface PopulaceGates {
   [key: string]: unknown;
 }
 
-export interface PopulaceScoreVsEnhancedCps {
-  protocol?: string | null;
-  train_loss?: Record<string, number | null>;
-  holdout_loss?: Record<string, number | null>;
-  full_loss?: Record<string, number | null>;
-  per_target_wins?: Record<string, number | null>;
+export interface PopulaceSkippedTarget {
+  name: string;
+  reason: string;
 }
 
-export interface PopulaceFamilyBreakdownRow {
-  family: string;
-  n_targets: number | null;
-  train_targets?: number | null;
-  holdout_targets?: number | null;
-  baseline_wins?: number | null;
-  candidate_wins?: number | null;
-  ties?: number | null;
-  baseline_loss_contribution?: number | null;
-  candidate_loss_contribution?: number | null;
-  loss_delta?: number | null;
-  [key: string]: unknown;
-}
-
-export interface PopulaceTargetDiagnosticRow {
-  target_name?: string | null;
-  target_index?: number | null;
-  target_value?: number | null;
+export interface PopulaceTargetRow {
+  name?: string | null;
+  target?: number | null;
+  initial_estimate?: number | null;
+  final_estimate?: number | null;
+  relative_error?: number | null;
+  within_tolerance?: boolean | null;
+  // Derived at read time.
   family?: string | null;
-  split?: "train" | "holdout" | string | null;
-  winner?: "candidate" | "baseline" | "tie" | string | null;
-  value_scale?: string | null;
-  baseline_estimate?: number | null;
-  baseline_error?: number | null;
-  baseline_relative_error?: number | null;
-  baseline_loss_term?: number | null;
-  baseline_abs_scaled_error?: number | null;
-  candidate_estimate?: number | null;
-  candidate_error?: number | null;
-  candidate_relative_error?: number | null;
-  candidate_loss_term?: number | null;
-  candidate_abs_scaled_error?: number | null;
-  loss_delta?: number | null;
+  state?: string | null;
+  initial_relative_error?: number | null;
+  abs_relative_error?: number | null;
+  improvement?: number | null;
+  direction?: "over" | "under" | "exact" | null;
   [key: string]: unknown;
 }
 
-export interface PopulaceComparisonSummary {
-  available: boolean;
-  path?: string | null;
-  release_id?: string | null;
-  schema_version?: number | null;
-  period?: number | null;
-  metric?: string | null;
-  elapsed_seconds?: number | null;
-  summary?: Record<string, unknown>;
-  matched_datasets?: Record<string, unknown>;
-  refit_config?: Record<string, unknown>;
-  comparison_contract?: Record<string, unknown>;
-  target_split?: {
-    holdout_target_fraction?: number | null;
-    holdout_target_seed?: number | null;
-    holdout_targets?: number | null;
-    train_targets?: number | null;
-  };
-  score_broad_loss?: Record<string, unknown>;
-  score_family_breakdown?: Record<string, unknown>[];
-  target_diagnostics_summary?: Record<string, unknown>;
-  family_breakdown?: PopulaceFamilyBreakdownRow[];
-  top_improvements?: PopulaceTargetDiagnosticRow[];
-  top_regressions?: PopulaceTargetDiagnosticRow[];
+export interface PopulaceFamilyFitRow {
+  family: string;
+  n_targets: number;
+  within_tolerance: number;
+  within_10pct: number;
+  mean_abs_relative_error: number | null;
 }
 
-export interface PopulaceTargetDiagnostics {
+export interface PopulaceCalibration {
   available: boolean;
   path?: string | null;
   release_id?: string | null;
   schema_version?: number | null;
-  metric?: string | null;
-  period?: number | null;
-  baseline_label?: string | null;
-  candidate_label?: string | null;
-  summary: Record<string, unknown>;
-  total_targets: number;
-  display_limit?: number;
-  families?: string[];
-  filtered_total?: number;
-  returned?: number;
-  limit?: number;
-  offset?: number;
-  has_next?: boolean;
-  filters?: Record<string, unknown>;
-  targets: PopulaceTargetDiagnosticRow[];
+  weight_entity?: string | null;
+  options?: Record<string, unknown>;
+  l0_lambda?: number | null;
+  n_nonzero?: number | null;
+  n_records?: number | null;
+  initial_loss?: number | null;
+  final_loss?: number | null;
+  fraction_within_10pct?: number | null;
+  loss_trajectory?: number[];
+  skipped?: PopulaceSkippedTarget[];
+  total_targets?: number;
+  within_tolerance_count?: number;
+  family_fit?: PopulaceFamilyFitRow[];
 }
 
 export interface PopulaceResponse {
@@ -123,10 +76,10 @@ export interface PopulaceResponse {
   live_unavailable_reason: string | null;
   release_id: string;
   snapshot_release_id: string;
-  releases: PopulaceReleaseEntry[];
+  updated_at: string | null;
   source_artifacts: { name: string; path: string; url: string }[];
   limitations: string[];
-  comparison_snapshot_stale: boolean;
+  calibration_snapshot_stale: boolean;
   build_manifest: {
     build_id?: string | null;
     builder?: string | null;
@@ -136,7 +89,6 @@ export interface PopulaceResponse {
     calibration?: { filename?: string | null; sha256?: string | null };
     construction?: string | null;
     gates?: PopulaceGates;
-    score_vs_enhanced_cps?: PopulaceScoreVsEnhancedCps;
     [key: string]: unknown;
   };
   release_manifest: {
@@ -150,9 +102,35 @@ export interface PopulaceResponse {
     [key: string]: unknown;
   };
   gates: PopulaceGates;
-  score_vs_enhanced_cps: PopulaceScoreVsEnhancedCps;
-  comparison: PopulaceComparisonSummary;
-  target_diagnostics: PopulaceTargetDiagnostics;
+  calibration: PopulaceCalibration;
+  highlights: {
+    worst_fit: PopulaceTargetRow[];
+    biggest_improvements: PopulaceTargetRow[];
+  };
+}
+
+export interface PopulaceTargetDiagnostics {
+  available: boolean;
+  path?: string | null;
+  release_id?: string | null;
+  schema_version?: number | null;
+  metric?: string | null;
+  families?: string[];
+  summary: {
+    total_targets?: number | null;
+    within_tolerance_count?: number | null;
+    fraction_within_10pct?: number | null;
+    [key: string]: unknown;
+  };
+  total_targets: number;
+  filtered_total?: number;
+  returned?: number;
+  limit?: number;
+  offset?: number;
+  has_next?: boolean;
+  display_limit?: number;
+  filters?: Record<string, unknown>;
+  targets: PopulaceTargetRow[];
 }
 
 export function usePopulace() {
@@ -167,8 +145,9 @@ export function usePopulaceTargetDiagnostics(params: {
   limit?: number;
   offset?: number;
   family?: string;
-  split?: string;
-  winner?: string;
+  state?: string;
+  direction?: string;
+  within_tolerance?: string;
   search?: string;
   sort_by?: string;
   sort_dir?: string;
