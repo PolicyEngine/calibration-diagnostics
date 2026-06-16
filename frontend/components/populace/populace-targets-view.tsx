@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact } from "@/components/shared/format";
+import { fmt, fmtCompact, humanizeName } from "@/components/shared/format";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
@@ -90,7 +90,9 @@ const OVERVIEW_COLUMNS: Column[] = [
     sortable: true,
     render: (row) => (
       <div className="max-w-md" title={String(row.name ?? "")}>
-        <div className="font-medium text-foreground">{row.variable || row.name}</div>
+        <div className="font-medium text-foreground">
+          {humanizeName(row.variable as string) || row.name}
+        </div>
         {row.breakdown ? (
           <div className="truncate text-xs text-muted-foreground">{row.breakdown}</div>
         ) : null}
@@ -162,9 +164,9 @@ function VariableBrowser({
         onChange={(event) => setQuery(event.target.value)}
         className="h-8 w-full rounded-md border border-border bg-white px-3 text-xs focus:border-primary/60 focus:outline-none"
       />
-      <div className="max-h-72 overflow-y-auto rounded-md border border-border">
+      <div className="rounded-md border border-border">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 bg-muted/40 backdrop-blur">
+          <thead className="bg-muted/40">
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-3 py-2 font-semibold">Variable</th>
               <th className="px-3 py-2 text-right font-semibold">Targets</th>
@@ -182,16 +184,23 @@ function VariableBrowser({
                     isActive ? "bg-primary/10" : "hover:bg-muted/40"
                   }`}
                 >
-                  <td className="px-3 py-1.5">
-                    <span className={isActive ? "font-medium text-primary" : ""}>
-                      {v.variable || v.variable_key}
-                    </span>
-                    <span className="ml-1 text-xs text-muted-foreground">{v.source}</span>
+                  <td className="px-3 py-1.5 align-top">
+                    <div className={`leading-snug ${isActive ? "font-medium text-primary" : ""}`}>
+                      {humanizeName(v.variable) || v.variable_key}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <span>{v.source}</span>
+                      {v.measure && (
+                        <span className="rounded bg-muted px-1 py-px text-[10px] normal-case text-foreground/70">
+                          {v.measure === "total" ? "amount" : v.measure}
+                        </span>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">
+                  <td className="px-3 py-1.5 text-right align-top tabular-nums">
                     {fmt(v.n_targets, { digits: 0 })}
                   </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">
+                  <td className="px-3 py-1.5 text-right align-top tabular-nums">
                     {v.n_targets
                       ? fmt(v.within_10pct / v.n_targets, { pct: true, digits: 0 })
                       : "—"}
@@ -368,7 +377,14 @@ export function PopulaceTargetsView() {
           title={
             activeVariable ? (
               <span className="flex flex-wrap items-center gap-2">
-                <span>{activeVariable.variable_key}</span>
+                <span>
+                  {activeVariable.source} / {humanizeName(activeVariable.variable)}
+                  {activeVariable.measure ? (
+                    <span className="ml-1 text-sm font-normal text-muted-foreground">
+                      ({activeVariable.measure === "total" ? "amount" : activeVariable.measure})
+                    </span>
+                  ) : null}
+                </span>
                 <button
                   type="button"
                   onClick={() => pickVariable("")}

@@ -43,7 +43,7 @@ function page(url: string, cal = SAMPLE) {
 
 test("v2 metadata and parsing survive enrichment", () => {
   const row = SAMPLE.rows[0];
-  expect(row.variable_key).toBe("irs / adjusted gross income");
+  expect(row.variable_key).toBe("irs / adjusted gross income · total");
   expect(row.variable).toBe("adjusted gross income"); // @2024 stripped via target_name
   expect(row.geography).toBe("United States");
   expect(row.entity).toBe("household");
@@ -60,13 +60,13 @@ test("FIPS admin target collapses to a measure family", () => {
 });
 
 test("variable filter isolates a variable's breakdowns", () => {
-  const result = page("?variable=irs%20%2F%20adjusted%20gross%20income");
+  const result = page("?variable=irs%20%2F%20adjusted%20gross%20income%20%C2%B7%20total");
   expect(result.filtered_total).toBe(3);
-  for (const row of result.targets) expect(row.variable_key).toBe("irs / adjusted gross income");
+  for (const row of result.targets) expect(row.variable_key).toBe("irs / adjusted gross income · total");
 });
 
 test("dimensions are the axes that vary; constants drop", () => {
-  const result = page("?variable=irs%20%2F%20adjusted%20gross%20income");
+  const result = page("?variable=irs%20%2F%20adjusted%20gross%20income%20%C2%B7%20total");
   const labels = result.dimensions.map((d) => d.label);
   expect(labels).toContain("Income band");
   expect(labels).toContain("Filing status");
@@ -74,11 +74,11 @@ test("dimensions are the axes that vary; constants drop", () => {
 });
 
 test("facet filter narrows to a single breakdown", () => {
-  const income = page("?variable=irs%20%2F%20adjusted%20gross%20income").dimensions.find(
+  const income = page("?variable=irs%20%2F%20adjusted%20gross%20income%20%C2%B7%20total").dimensions.find(
     (d) => d.label === "Income band",
   )!;
   const result = page(
-    `?variable=irs%20%2F%20adjusted%20gross%20income&facet=${income.key}:AGI in 30k-40k`,
+    `?variable=irs%20%2F%20adjusted%20gross%20income%20%C2%B7%20total&facet=${income.key}:AGI in 30k-40k`,
   );
   expect(result.filtered_total).toBe(1);
   expect(result.targets[0].dims).toContain("AGI in 30k-40k");
@@ -107,4 +107,16 @@ test("comparison matches on base_name across the @period boundary", () => {
   expect(cmp.summary.added).toBe(1); // cbo income tax, only in B
   expect(cmp.summary.removed).toBe(2); // the MFJ AGI row and snap-cost, only in A
   expect(cmp.summary.losses_comparable).toBe(false);
+});
+
+test("count and total measures split into distinct variables", () => {
+  const cal = calibration([
+    { name: "nation/irs/capital gains gross/total/AGI in 1m-inf/taxable/All@2024", target_name: "nation/irs/capital gains gross/total/AGI in 1m-inf/taxable/All", target: 100, initial_estimate: 90, final_estimate: 100, relative_error: 0, within_tolerance: true },
+    { name: "nation/irs/capital gains gross/count/AGI in 1m-inf/taxable/All@2024", target_name: "nation/irs/capital gains gross/count/AGI in 1m-inf/taxable/All", target: 10, initial_estimate: 9, final_estimate: 10, relative_error: 0, within_tolerance: true },
+  ]);
+  const keys = new Set(cal.rows.map((r) => r.variable_key));
+  expect(keys.has("irs / capital gains gross · total")).toBe(true);
+  expect(keys.has("irs / capital gains gross · count")).toBe(true);
+  expect(cal.rows.find((r) => r.measure === "count")).toBeTruthy();
+  expect(cal.rows.find((r) => r.measure === "total")).toBeTruthy();
 });

@@ -244,7 +244,15 @@ function enrichTargetRow(row: TargetRow): TargetRow {
   const improvement =
     initialRel == null || finalRel == null ? null : Math.abs(initialRel) - Math.abs(finalRel);
   const parsed = parseTarget(baseName);
-  const measure = asObject(row.measure);
+  const measureCol = asObject(row.measure);
+  const dims = splitBreakdown(parsed.breakdown);
+  // The first breakdown token is the measure (total / count / mean / …). Many
+  // IRS variables publish both a total (dollar amount) and a count (number of
+  // returns), so the measure is part of the variable's identity, not a
+  // breakdown within it — fold it into variable_key so they're distinct things.
+  const measure = dims[0] && MEASURES.has(dims[0]) ? dims[0] : null;
+  const variableKey =
+    variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
   return {
     ...row,
     name: fullName,
@@ -255,14 +263,15 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     level: parsed.level,
     source: parsed.source,
     variable: parsed.variable,
+    measure,
     breakdown: parsed.breakdown,
-    dims: splitBreakdown(parsed.breakdown),
-    variable_key: variableKeyOf(parsed),
+    dims,
+    variable_key: variableKey,
     // v2 published metadata (null on v1).
     source_citation: typeof row.source === "string" ? (row.source as string) : null,
     entity: typeof row.entity === "string" ? (row.entity as string) : null,
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
-    measure_name: typeof measure.name === "string" ? (measure.name as string) : null,
+    measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
     period: numberOrNull(row.period),
     initial_relative_error: initialRel,
     abs_relative_error: absFinalRel,
@@ -323,6 +332,7 @@ export function populaceVariableSummary(rows: TargetRow[]) {
         variable_key,
         source: String(first.source ?? ""),
         variable: String(first.variable ?? ""),
+        measure: first.measure ? String(first.measure) : null,
         level: String(first.level ?? ""),
         n_targets: group.length,
         within_10pct: group.filter((r) => (numberOrNull(r.abs_relative_error) ?? Infinity) <= 0.1).length,

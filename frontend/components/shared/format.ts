@@ -1,5 +1,22 @@
 import { formatNumber } from "@policyengine/ui-kit";
 
+// Tax/benefit acronyms shown uppercase rather than as words.
+const ACRONYMS = new Set([
+  "salt", "agi", "eitc", "ctc", "actc", "qbi", "ira", "aca", "ptc", "snap",
+  "tanf", "ssi", "oasdi", "fica", "ui", "hsa", "fsa", "amt", "se", "magi",
+]);
+
+// Humanize a snake_case identifier (e.g. "salt_deduction_expenditure") into
+// readable words ("SALT deduction expenditure"). Names that already use spaces
+// (e.g. "adjusted gross income") pass through unchanged.
+export function humanizeName(value: string | null | undefined): string {
+  if (!value) return "";
+  return value
+    .split("_")
+    .map((word) => (ACRONYMS.has(word.toLowerCase()) ? word.toUpperCase() : word))
+    .join(" ");
+}
+
 export function fmt(
   value: number | null | undefined,
   opts: { pct?: boolean; digits?: number } = {},

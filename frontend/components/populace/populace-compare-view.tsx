@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtSigned } from "@/components/shared/format";
+import { fmt, fmtSigned, humanizeName } from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -46,7 +46,7 @@ function MoversTable({ rows }: { rows: PopulaceComparisonRow[] }) {
                 {row.breakdown || row.name}
               </td>
               <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">
-                {row.variable_key}
+                {row.variable ? humanizeName(row.variable as string) : row.variable_key}
               </td>
               <td className="px-3 py-1.5 text-right tabular-nums">{relErr(row.a_relative_error)}</td>
               <td className="px-3 py-1.5 text-right tabular-nums">{relErr(row.b_relative_error)}</td>

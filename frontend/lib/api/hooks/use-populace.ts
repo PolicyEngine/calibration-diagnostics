@@ -38,6 +38,7 @@ export interface PopulaceTargetRow {
   level?: string | null;
   source?: string | null;
   variable?: string | null;
+  measure?: string | null;
   breakdown?: string | null;
   dims?: string[] | null;
   variable_key?: string | null;
@@ -58,6 +59,7 @@ export interface PopulaceVariableRow {
   variable_key: string;
   source: string;
   variable: string;
+  measure: string | null;
   level: string;
   n_targets: number;
   within_10pct: number;

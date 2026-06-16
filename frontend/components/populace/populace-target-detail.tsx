@@ -1,6 +1,6 @@
 "use client";
 
-import { fmt, fmtCompact, fmtSigned } from "@/components/shared/format";
+import { fmt, fmtCompact, fmtSigned, humanizeName } from "@/components/shared/format";
 import { StatusPill } from "@/components/shared/status-pill";
 import {
   type PopulaceTargetDimension,
@@ -106,7 +106,7 @@ export function PopulaceTargetDetail({
             Canonical target
           </div>
           <div className="text-base font-semibold leading-tight text-foreground">
-            {row.variable || row.name}
+            {humanizeName(row.variable as string) || row.name}
           </div>
           <code className="mt-1 block break-all text-xs text-muted-foreground">
             {row.name}
@@ -127,7 +127,7 @@ export function PopulaceTargetDetail({
             <Field label="Geography" value={row.geography} />
             <Field label="Level" value={row.level} />
             <Field label="Source" value={row.source} />
-            <Field label="Variable" value={row.variable} />
+            <Field label="Variable" value={humanizeName(row.variable as string)} />
           </div>
           {shownDims.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
