@@ -83,3 +83,26 @@ make backend    # starts backend on port 8000
 **Backend:** FastAPI, uvicorn, policyengine-us-data, policyengine-us, scipy, numpy, pandas, sqlalchemy, sqlmodel
 
 **Frontend:** Next.js 15, React 19, @policyengine/ui-kit, TanStack React Query v5, Tailwind CSS v4, Recharts
+
+## Deployment
+
+Live:
+
+- **Frontend (Vercel):** https://calibration-diagnostics.vercel.app — project `policy-engine/calibration-diagnostics`, root dir `frontend/`.
+- **Backend (Modal):** https://policyengine--calibration-diagnostics-api.modal.run — Modal app `calibration-diagnostics`, defined in `modal_app.py`.
+
+The frontend reaches the backend via the `NEXT_PUBLIC_API_URL` Vercel env var
+(set to the Modal URL). The backend is self-contained — it downloads every
+calibration run artifact from HuggingFace at request time.
+
+Redeploy the backend:
+
+```bash
+modal deploy modal_app.py
+```
+
+Redeploy the frontend (from `frontend/`):
+
+```bash
+vercel --prod --scope policy-engine
+```
