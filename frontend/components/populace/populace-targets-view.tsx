@@ -327,9 +327,6 @@ export function PopulaceTargetsView() {
         eyebrow="Populace"
         title="Target diagnostics"
         description="Browse the calibration target surface by the thing each constraint measures — e.g. adjusted gross income, then its by-income-bracket and by-filing-status breakdowns — and see how well the calibrated weights reproduce each."
-        actions={
-          <ToolbarSelect label="Release" value={release} onChange={pickRelease} options={releaseOptions} />
-        }
         status={
           data?.release_id ? (
             <StatusPill tone="info">
@@ -342,8 +339,20 @@ export function PopulaceTargetsView() {
       <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <SectionCard
           title="Browse by variable"
-          description={`${fmt(variables.length, { digits: 0 })} measured quantities across the surface. Click one to filter the table.`}
+          description={`${fmt(variables.length, { digits: 0 })} measured quantities in this release. Click one to filter the table.`}
         >
+          <div className="mb-3 flex flex-col gap-1">
+            <ToolbarSelect
+              label="Release"
+              value={release}
+              onChange={pickRelease}
+              options={releaseOptions}
+              className="w-full"
+            />
+            <span className="text-[11px] text-muted-foreground">
+              The newest build can be a small surface; switch release to see others.
+            </span>
+          </div>
           <VariableBrowser variables={variables} active={variable} onPick={pickVariable} />
         </SectionCard>
 
