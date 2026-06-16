@@ -1,78 +1,47 @@
 "use client";
 
-import { SidebarSection, SidebarNavItem } from "@policyengine/ui-kit";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useDashboardMode } from "@/lib/dashboard-mode-context";
-import { DashboardModeSelector } from "./dashboard-mode-selector";
 
-const usDataNavItems = [
-  { href: "/summary", label: "Summary" },
-  { href: "/analysis", label: "Analyst readiness" },
-  { href: "/targets", label: "All targets" },
-  { href: "/inventory", label: "Target inventory" },
-  { href: "/nodes", label: "Node variables" },
-  { href: "/weights", label: "Weight landscape" },
-  { href: "/pipeline", label: "Data pipeline" },
-];
-
-const microplexNavItems = [
-  { href: "/microplex", label: "Overview" },
-  { href: "/microplex/diagnostics", label: "Target diagnostics" },
-  { href: "/microplex/reforms", label: "Reform benchmarks" },
-  { href: "/pipeline", label: "Pipeline" },
-];
-
-const populaceNavItems = [
+const navItems = [
   { href: "/populace", label: "Release summary" },
   { href: "/populace/targets", label: "Target diagnostics" },
-  { href: "/populace/comparison", label: "Incumbent comparison" },
+  { href: "/populace/compare", label: "Compare versions" },
 ];
 
-const comparisonNavItems = [
-  { href: "/comparison", label: "Comparison" },
-  { href: "/microplex", label: "Microplex target performance" },
-  { href: "/microplex/reforms", label: "Reform benchmarks" },
-  { href: "/summary", label: "us-data summary" },
-  { href: "/pipeline", label: "Pipeline DAG" },
-];
+function isActive(pathname: string, href: string): boolean {
+  if (href === "/populace") return pathname === "/populace";
+  return pathname.startsWith(href);
+}
 
 export function NavSidebar() {
   const pathname = usePathname();
-  const { mode } = useDashboardMode();
-  const navItems =
-    mode === "microplex"
-      ? microplexNavItems
-      : mode === "populace"
-        ? populaceNavItems
-        : mode === "comparison"
-          ? comparisonNavItems
-          : usDataNavItems;
-
   return (
-    <div className="py-4 flex flex-col gap-4">
-      <DashboardModeSelector />
-      <SidebarSection>
+    <div className="flex flex-col gap-5 py-5">
+      <div className="px-3">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Dataset
+        </div>
+        <div className="text-sm font-semibold text-foreground">populace-US</div>
+      </div>
+      <nav className="flex flex-col gap-0.5 px-3">
         {navItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : item.href === "/microplex"
-                ? pathname === "/microplex"
-                : item.href === "/populace"
-                  ? pathname === "/populace"
-                  : pathname.startsWith(item.href);
+          const active = isActive(pathname, item.href);
           return (
-            <SidebarNavItem
+            <Link
               key={item.href}
-              label={item.label}
               href={item.href}
-              isActive={isActive}
-              linkComponent={Link}
-            />
+              className={`block rounded-md px-3 py-1.5 text-sm leading-tight transition-colors ${
+                active
+                  ? "bg-primary/10 font-medium text-primary"
+                  : "text-foreground/80 hover:bg-muted/60 hover:text-foreground"
+              }`}
+            >
+              {item.label}
+            </Link>
           );
         })}
-      </SidebarSection>
+      </nav>
     </div>
   );
 }

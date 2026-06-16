@@ -14,10 +14,6 @@ surface: per target the declared value, the aggregate under the design weights
 tolerance verdict. That artifact is large, so the deployed static snapshot
 committed under ``frontend/data/populace/latest/`` is the source for target
 rows; only the small manifests are fetched live.
-
-The eCPS head-to-head comparison moved out of live populace into
-``PolicyEngine/populace-benchmarks``; this view reports calibration fit, not a
-populace-vs-enhanced-CPS score.
 """
 
 from __future__ import annotations
@@ -43,31 +39,10 @@ _STATIC_ROOT = Path(__file__).resolve().parents[2] / "frontend/data/populace/lat
 _STATIC_BUILD_MANIFEST = _STATIC_ROOT / "build_manifest.json"
 _STATIC_RELEASE_MANIFEST = _STATIC_ROOT / "release_manifest.json"
 _STATIC_CALIBRATION_DIAGNOSTICS = _STATIC_ROOT / "calibration_diagnostics.json"
-_STATIC_COMPARISON_SCORECARD = _STATIC_ROOT / "comparison_scorecard.json"
 
 _CALIBRATION_DIAGNOSTICS_PUBLIC_PATH = (
     "frontend/data/populace/latest/calibration_diagnostics.json"
 )
-_COMPARISON_SCORECARD_PUBLIC_PATH = (
-    "frontend/data/populace/latest/comparison_scorecard.json"
-)
-
-# The incumbent comparison lives in PolicyEngine/populace-benchmarks
-# (PolicyEngine/populace#37). By default the route resolves that repo's
-# latest.json pointer (PolicyEngine/populace-benchmarks#3) and serves the
-# scorecard it names, falling back to the committed archived snapshot until the
-# artifact is reachable. POPULACE_BENCHMARKS_POINTER_URL overrides the pointer;
-# POPULACE_BENCHMARKS_SCORECARD_URL points straight at a scorecard.
-_BENCHMARKS_RAW_BASE = (
-    "https://raw.githubusercontent.com/PolicyEngine/populace-benchmarks/main"
-)
-_DEFAULT_POINTER_URL = (
-    f"{_BENCHMARKS_RAW_BASE}/benchmarks/us/incumbent-comparison/latest.json"
-)
-_BENCHMARKS_POINTER_URL = (
-    os.environ.get("POPULACE_BENCHMARKS_POINTER_URL") or _DEFAULT_POINTER_URL
-)
-_BENCHMARKS_SCORECARD_URL = os.environ.get("POPULACE_BENCHMARKS_SCORECARD_URL")
 
 _CACHE: dict[str, tuple[float, Any]] = {}
 _TTL_SECONDS = 300
@@ -766,172 +741,3 @@ def populace_target_diagnostics(
     )
 
 
-def _num(value: Any) -> float | None:
-    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
-
-
-def _normalize_comparison_scorecard(raw: dict[str, Any]) -> dict[str, Any]:
-    """Flatten an incumbent-comparison scorecard to the shared shape.
-
-    The archived ``sound_ecps_replacement_comparison.json`` splits the clean
-    win/loss block (``target_diagnostics_summary``) from the refit/loss scalars
-    (``summary``); the proposed benchmarks scorecard
-    (PolicyEngine/populace-benchmarks#3) is a single flat ``summary``. Read both.
-    """
-    summary = raw.get("summary") if isinstance(raw.get("summary"), dict) else {}
-    td = (
-        raw.get("target_diagnostics_summary")
-        if isinstance(raw.get("target_diagnostics_summary"), dict)
-        else {}
-    )
-
-    def pick(*keys: str) -> float | None:
-        # First key wins, across both sources: the kept-target ``n_targets``
-        # (target_diagnostics_summary) takes precedence over the pre-drop
-        # ``n_targets_total`` (summary), so it matches the win/loss/tie counts.
-        for key in keys:
-            for source in (td, summary):
-                if key in source:
-                    value = _num(source[key])
-                    if value is not None:
-                        return value
-        return None
-
-    flat = {
-        "candidate_loss": pick("candidate_loss", "candidate_enhanced_cps_native_loss"),
-        "baseline_loss": pick("baseline_loss", "baseline_enhanced_cps_native_loss"),
-        "loss_delta": pick("loss_delta", "enhanced_cps_native_loss_delta"),
-        "candidate_holdout_loss": pick("candidate_holdout_loss"),
-        "baseline_holdout_loss": pick("baseline_holdout_loss"),
-        "candidate_train_loss": pick("candidate_train_loss"),
-        "baseline_train_loss": pick("baseline_train_loss"),
-        "candidate_unweighted_msre": pick("candidate_unweighted_msre"),
-        "baseline_unweighted_msre": pick("baseline_unweighted_msre"),
-        "candidate_wins": pick("candidate_wins"),
-        "baseline_wins": pick("baseline_wins"),
-        "ties": pick("ties"),
-        "n_targets": pick("n_targets", "n_targets_total"),
-        "holdout_targets": pick("holdout_targets"),
-        "train_targets": pick("train_targets"),
-        "candidate_beats_baseline": (
-            summary.get("candidate_beats_baseline")
-            if isinstance(summary.get("candidate_beats_baseline"), bool)
-            else None
-        ),
-        # The archived summary's ``matched_household_count`` is a stray bool;
-        # the real matched count is the per-dataset household count. ``pick``
-        # skips non-numeric values, so the count keys are the real source.
-        "matched_household_count": pick(
-            "matched_household_count",
-            "candidate_household_count",
-            "baseline_household_count",
-        ),
-    }
-    protocol = raw.get("protocol")
-    if not isinstance(protocol, str) and flat["matched_household_count"] is not None:
-        protocol = (
-            f"Matched {int(flat['matched_household_count']):,} households, "
-            f"symmetric refit, {flat['holdout_targets']}-target holdout."
-        )
-    return {
-        "release_id": raw.get("candidate_release_id") or raw.get("release_id"),
-        "incumbent_manifest": raw.get("incumbent_manifest", "pinned-production-ecps-2024"),
-        "period": _num(raw.get("period")),
-        "baseline_label": raw.get("baseline_label", "enhanced_cps"),
-        "candidate_label": raw.get("candidate_label", "populace"),
-        "protocol": protocol if isinstance(protocol, str) else None,
-        "summary": flat,
-        "family_breakdown": raw.get("family_breakdown") or [],
-        "top_improvements": raw.get("top_improvements") or [],
-        "top_regressions": raw.get("top_regressions") or [],
-        "gates": raw.get("gates") or {},
-    }
-
-
-def _scorecard_url_from_pointer(pointer_url: str, scorecard_path: str) -> str:
-    if scorecard_path.startswith(("http://", "https://")):
-        return scorecard_path
-    suffix = "/benchmarks/us/incumbent-comparison/latest.json"
-    base = pointer_url[: -len(suffix)] if pointer_url.endswith(suffix) else pointer_url
-    return f"{base}/{scorecard_path.lstrip('/')}"
-
-
-def _load_live_scorecard() -> dict[str, Any]:
-    """Resolve the benchmarks scorecard, raising on any failure.
-
-    A direct ``POPULACE_BENCHMARKS_SCORECARD_URL`` skips the pointer; otherwise
-    the ``latest.json`` pointer names the scorecard to fetch.
-    """
-    if _BENCHMARKS_SCORECARD_URL:
-        raw = _fetch_json(_BENCHMARKS_SCORECARD_URL)
-        status = raw.get("status") if isinstance(raw, dict) else None
-        return {
-            "source": "populace_benchmarks_live",
-            "path": _BENCHMARKS_SCORECARD_URL,
-            "pointer_url": None,
-            "scorecard_status": status if isinstance(status, str) else None,
-            **_normalize_comparison_scorecard(raw),
-        }
-    pointer = _fetch_json(_BENCHMARKS_POINTER_URL)
-    scorecard_path = pointer.get("scorecard_path") if isinstance(pointer, dict) else None
-    if not isinstance(scorecard_path, str) or not scorecard_path:
-        raise ValueError(f"Pointer {_BENCHMARKS_POINTER_URL} has no scorecard_path.")
-    scorecard_url = _scorecard_url_from_pointer(_BENCHMARKS_POINTER_URL, scorecard_path)
-    raw = _fetch_json(scorecard_url)
-    status = pointer.get("status")
-    if not isinstance(status, str):
-        status = raw.get("status") if isinstance(raw, dict) else None
-    return {
-        "source": "populace_benchmarks_live",
-        "path": scorecard_url,
-        "pointer_url": _BENCHMARKS_POINTER_URL,
-        "scorecard_status": status if isinstance(status, str) else None,
-        **_normalize_comparison_scorecard(raw),
-    }
-
-
-@router.get("/populace/comparison")
-def populace_comparison() -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "source": "deployed_static_snapshot",
-        "path": _COMPARISON_SCORECARD_PUBLIC_PATH,
-        "pointer_url": _BENCHMARKS_POINTER_URL,
-        "scorecard_status": None,
-        **_normalize_comparison_scorecard(_load_static(_STATIC_COMPARISON_SCORECARD)),
-    }
-    live_error = None
-    try:
-        payload = _load_live_scorecard()
-    except Exception as exc:
-        live_error = str(exc)
-
-    live = payload["source"] == "populace_benchmarks_live"
-    scorecard_status = payload.get("scorecard_status") or "archived"
-    return _scrub(
-        {
-            **payload,
-            "available": True,
-            "archived": not live,
-            "scorecard_status": scorecard_status,
-            "source_pointer": payload.get("pointer_url") or _BENCHMARKS_POINTER_URL,
-            "live_scorecard_error": live_error,
-            "notes": [
-                "Populace (candidate) is scored against the enhanced CPS "
-                "(incumbent) with a matched-household, symmetric-refit, "
-                "held-out-target protocol.",
-                (
-                    f"Served live from populace-benchmarks "
-                    f"({scorecard_status} scorecard)."
-                    if live
-                    else "The benchmarks scorecard was not reachable, so this is "
-                    "the committed archived snapshot for release "
-                    "populace-us-2024-9f1260b-20260611 "
-                    "(PolicyEngine/populace-benchmarks#3 / #4 publish it)."
-                ),
-                "The eCPS comparison is benchmark-harness material and "
-                "intentionally lives outside live populace "
-                "(PolicyEngine/populace#37); the live calibration-fit view is "
-                "the populace release summary.",
-            ],
-        }
-    )
