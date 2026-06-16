@@ -101,6 +101,11 @@ export interface PopulaceCalibration {
   total_targets?: number;
   within_tolerance_count?: number;
   family_fit?: PopulaceFamilyFitRow[];
+  // Loss decomposition: the raw loss is dominated by $0-reference targets.
+  n_zero_target?: number | null;
+  loss_excl_zero_target?: number | null;
+  zero_target_loss_share?: number | null;
+  median_abs_rel_error?: number | null;
 }
 
 export interface PopulaceReleaseEntry {
