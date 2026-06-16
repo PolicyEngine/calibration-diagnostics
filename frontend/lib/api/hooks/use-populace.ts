@@ -434,6 +434,91 @@ export function usePopulaceVariableValue(params: {
   });
 }
 
+export interface ReformValidationRow {
+  id: string;
+  name: string;
+  category?: string | null;
+  description?: string | null;
+  jct_score?: number | null;
+  jct_score_type?: string | null;
+  jct_window?: string | null;
+  jct_source?: string | null;
+  jct_source_url?: string | null;
+  jct_published?: string | null;
+  populace_estimate?: number | null;
+  populace_window?: string | null;
+  populace_annual?: Record<string, number> | null;
+  abs_error?: number | null;
+  relative_error?: number | null;
+  abs_relative_error?: number | null;
+  within_10pct?: boolean | null;
+  direction?: "over" | "under" | "exact" | null;
+  in_sample?: boolean | null;
+}
+
+export interface ReformValidationResponse {
+  available: boolean;
+  release_id: string;
+  // present when available === false
+  reason?: string;
+  expected_path?: string;
+  // present when available === true
+  updated_at?: string | null;
+  schema_version?: number | null;
+  baseline_period?: number | null;
+  scoring_window?: string | null;
+  rows?: ReformValidationRow[];
+  summary?: {
+    n_reforms: number;
+    n_scored: number;
+    within_10pct: number;
+    mean_abs_relative_error: number | null;
+    median_abs_relative_error: number | null;
+  };
+  source_artifact?: { name: string; path: string; url: string };
+}
+
+export interface ReformHistoryPoint {
+  release_id: string;
+  date: string;
+  populace_estimate: number | null;
+  relative_error: number | null;
+  abs_relative_error: number | null;
+}
+
+export interface ReformHistorySeries {
+  id: string;
+  name: string;
+  category?: string | null;
+  jct_score?: number | null;
+  jct_source?: string | null;
+  points: ReformHistoryPoint[];
+  latest_abs_relative_error: number | null;
+  delta: number | null;
+}
+
+export interface ReformHistoryResponse {
+  releases: { release_id: string; date: string }[];
+  reforms: ReformHistorySeries[];
+}
+
+export function usePopulaceReforms(release?: string) {
+  return useQuery({
+    queryKey: ["populace", "reforms", release ?? "latest"],
+    queryFn: () =>
+      apiGet<ReformValidationResponse>("/populace/reforms", release ? { release } : undefined),
+    staleTime: 15 * 60 * 1000,
+  });
+}
+
+export function usePopulaceReformHistory() {
+  return useQuery({
+    queryKey: ["populace", "reforms", "history"],
+    queryFn: () => apiGet<ReformHistoryResponse>("/populace/reforms/history"),
+    staleTime: 15 * 60 * 1000,
+  });
+}
+
 export function usePopulaceCompare(a?: string, b?: string, enabled = true) {
   return useQuery({
     queryKey: ["populace", "compare", "variables-v2", a, b],
