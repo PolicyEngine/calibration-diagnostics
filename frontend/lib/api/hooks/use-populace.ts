@@ -33,11 +33,35 @@ export interface PopulaceTargetRow {
   // Derived at read time.
   family?: string | null;
   state?: string | null;
+  geography?: string | null;
+  level?: string | null;
+  source?: string | null;
+  variable?: string | null;
+  breakdown?: string | null;
+  dims?: string[] | null;
+  variable_key?: string | null;
   initial_relative_error?: number | null;
   abs_relative_error?: number | null;
   improvement?: number | null;
   direction?: "over" | "under" | "exact" | null;
   [key: string]: unknown;
+}
+
+export interface PopulaceVariableRow {
+  variable_key: string;
+  source: string;
+  variable: string;
+  level: string;
+  n_targets: number;
+  within_10pct: number;
+  within_tolerance: number;
+  mean_abs_relative_error: number | null;
+}
+
+export interface PopulaceTargetDimension {
+  key: string;
+  label: string;
+  values: string[];
 }
 
 export interface PopulaceFamilyFitRow {
@@ -116,6 +140,9 @@ export interface PopulaceTargetDiagnostics {
   schema_version?: number | null;
   metric?: string | null;
   families?: string[];
+  sources?: string[];
+  variables?: PopulaceVariableRow[];
+  dimensions?: PopulaceTargetDimension[];
   summary: {
     total_targets?: number | null;
     within_tolerance_count?: number | null;
@@ -145,10 +172,14 @@ export function usePopulaceTargetDiagnostics(params: {
   limit?: number;
   offset?: number;
   family?: string;
+  variable?: string;
+  source?: string;
+  level?: string;
   state?: string;
   direction?: string;
   within_tolerance?: string;
   search?: string;
+  facet?: string[];
   sort_by?: string;
   sort_dir?: string;
 }) {

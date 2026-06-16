@@ -9,7 +9,9 @@ import {
   latestPopulaceCalibrationHighlights,
   latestPopulaceCalibrationSummary,
   latestPopulaceReleaseManifest,
+  loadLiveCalibration,
   scrub,
+  snapshotCalibration,
 } from "@/lib/populace/latest-artifact";
 
 const HF_REPO = process.env.POPULACE_HF_REPO ?? "policyengine/populace-us";
@@ -104,8 +106,13 @@ export async function GET() {
     const releaseId = liveAvailable
       ? String(live.release_id)
       : LATEST_POPULACE_RELEASE_ID;
-    const calibration = latestPopulaceCalibrationSummary();
-    const highlights = latestPopulaceCalibrationHighlights(15);
+    // The per-target diagnostics also resolve live via latest.json (the
+    // latest.json fetch dedupes with loadLiveRelease above), with the committed
+    // snapshot as fallback.
+    const liveCalibration = await loadLiveCalibration(revalidate);
+    const calibrationSource = liveCalibration?.calibration ?? snapshotCalibration();
+    const calibration = latestPopulaceCalibrationSummary(calibrationSource);
+    const highlights = latestPopulaceCalibrationHighlights(calibrationSource, 15);
     const calibrationSnapshotStale =
       releaseId !== String(calibration.release_id ?? LATEST_POPULACE_RELEASE_ID);
 

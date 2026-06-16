@@ -1,6 +1,20 @@
 from __future__ import annotations
 
+import pytest
+
 from backend.routes import populace
+
+
+@pytest.fixture(autouse=True)
+def _offline_by_default(monkeypatch):
+    """Default every test to the committed snapshot: any live HF fetch raises
+    unless a test installs its own ``_fetch_json``. Keeps the suite network-free
+    and deterministic against the pinned snapshot."""
+
+    def _raise(url):
+        raise RuntimeError("offline (no _fetch_json override in this test)")
+
+    monkeypatch.setattr(populace, "_fetch_json", _raise)
 
 
 def _offline(monkeypatch):
@@ -321,3 +335,147 @@ def test_populace_comparison_falls_back_when_pointer_unreachable(monkeypatch):
     assert payload["archived"] is True
     assert payload["source"] == "deployed_static_snapshot"
     assert payload["live_scorecard_error"] == "benchmarks unreachable"
+
+
+def test_parse_target_decomposes_conventions():
+    # National IRS AGI bracket.
+    p = populace._parse_target(
+        "nation/irs/adjusted gross income/total/AGI in 50k-75k/taxable/All"
+    )
+    assert p["level"] == "national"
+    assert p["geography"] == "United States"
+    assert p["source"] == "irs"
+    assert p["variable"] == "adjusted gross income"
+    assert "AGI in 50k-75k" in p["breakdown"]
+
+    # Source-keyed state target with trailing state code.
+    p = populace._parse_target("state/census/acs/rent/AK")
+    assert p["geography"] == "AK"
+    assert p["source"] == "census"
+    assert p["variable"] == "acs"
+
+    # State-keyed distribution: slot 2 is the state, grouped under "state".
+    p = populace._parse_target("state/AL/adjusted_gross_income/count/1_1")
+    assert p["geography"] == "AL"
+    assert p["source"] == "state"
+    assert p["variable"] == "adjusted_gross_income"
+
+    # Per-state-FIPS admin metric.
+    p = populace._parse_target("US06/snap-cost")
+    assert p["geography"] == "CA"
+    assert p["source"] == "admin"
+    assert p["variable"] == "snap-cost"
+
+
+def test_target_diagnostics_exposes_variables_and_sources():
+    payload = populace.populace_target_diagnostics(
+        limit=1, offset=0, family=None, variable=None, source=None, level=None,
+        state=None, direction=None, within_tolerance=None, search=None,
+        sort_by=None, sort_dir="desc",
+    )
+    variables = payload["variables"]
+    assert len(variables) > 50
+    # The state-keyed AGI distribution collapses to ONE variable, not 50.
+    keys = {v["variable_key"] for v in variables}
+    assert "irs / adjusted gross income" in keys
+    assert "state / adjusted_gross_income" in keys
+    assert not any(v["source"] in {"AL", "AK", "CA"} for v in variables)
+    # variables are sorted by target count descending.
+    counts = [v["n_targets"] for v in variables]
+    assert counts == sorted(counts, reverse=True)
+    # sources are the real source families, not state codes.
+    assert "irs" in payload["sources"] and "census" in payload["sources"]
+    assert "CA" not in payload["sources"]
+
+
+def test_target_diagnostics_variable_filter_isolates_breakdowns():
+    payload = populace.populace_target_diagnostics(
+        limit=200, offset=0, family=None, variable="irs / adjusted gross income",
+        source=None, level=None, state=None, direction=None, within_tolerance=None,
+        search=None, sort_by=None, sort_dir="desc",
+    )
+    assert payload["filtered_total"] == 70
+    for row in payload["targets"]:
+        assert row["variable_key"] == "irs / adjusted gross income"
+        assert row["variable"] == "adjusted gross income"
+        assert row["breakdown"]  # each row is a distinct breakdown
+
+
+def test_target_diagnostics_source_and_level_filters():
+    payload = populace.populace_target_diagnostics(
+        limit=10, offset=0, family=None, variable=None, source="irs", level="national",
+        state=None, direction=None, within_tolerance=None, search=None,
+        sort_by=None, sort_dir="desc",
+    )
+    assert payload["filtered_total"] >= 1
+    for row in payload["targets"]:
+        assert row["source"] == "irs"
+        assert row["level"] == "national"
+
+
+def test_target_diagnostics_dimensions_and_facet_filter():
+    # Selecting AGI yields typed facets; the constant measure drops, and
+    # geography/level are constant here (all national, US) so they drop too.
+    payload = populace.populace_target_diagnostics(
+        limit=200, offset=0, family=None, variable="irs / adjusted gross income",
+        source=None, level=None, state=None, direction=None, within_tolerance=None,
+        search=None, facet=None, sort_by=None, sort_dir="desc",
+    )
+    labels = {d["label"] for d in payload["dimensions"]}
+    assert "Income band" in labels
+    assert "Return type" in labels
+    assert "Filing status" in labels
+    assert "Measure" not in labels  # "total" is constant -> dropped
+    assert "Geography" not in labels  # all United States -> dropped
+    income = next(d for d in payload["dimensions"] if d["label"] == "Income band")
+    assert "key" in income and income["key"].startswith("dim")
+    # Income bands sorted by lower bound (negatives first, not lexically).
+    assert income["values"][0].startswith("AGI in -inf")
+
+    # Filtering by two facets narrows to the matching breakdown.
+    filing = next(d for d in payload["dimensions"] if d["label"] == "Filing status")
+    filtered = populace.populace_target_diagnostics(
+        limit=10, offset=0, family=None, variable="irs / adjusted gross income",
+        source=None, level=None, state=None, direction=None, within_tolerance=None,
+        search=None,
+        facet=[f"{income['key']}:AGI in 200k-500k", f"{filing['key']}:All"],
+        sort_by=None, sort_dir="desc",
+    )
+    assert filtered["filtered_total"] == 1
+    row = filtered["targets"][0]
+    assert "AGI in 200k-500k" in row["dims"]
+    assert "All" in row["dims"]
+
+
+def test_state_conditioned_variable_exposes_geography_facet():
+    # real_estate_taxes is conditioned on state, not AGI: geography + level vary.
+    payload = populace.populace_target_diagnostics(
+        limit=5, offset=0, family=None, variable="irs / real_estate_taxes",
+        source=None, level=None, state=None, direction=None, within_tolerance=None,
+        search=None, facet=None, sort_by=None, sort_dir="desc",
+    )
+    by_key = {d["key"]: d for d in payload["dimensions"]}
+    assert "geography" in by_key
+    geo = by_key["geography"]
+    assert "United States" in geo["values"]
+    assert geo["values"][0] == "United States"  # national first
+    assert len(geo["values"]) > 10  # the states
+
+    # Facet by a state narrows to that geography.
+    one = populace.populace_target_diagnostics(
+        limit=5, offset=0, family=None, variable="irs / real_estate_taxes",
+        source=None, level=None, state=None, direction=None, within_tolerance=None,
+        search=None, facet=["geography:CA"], sort_by=None, sort_dir="desc",
+    )
+    assert one["filtered_total"] >= 1
+    for row in one["targets"]:
+        assert row["geography"] == "CA"
+
+
+def test_dimensions_absent_without_variable():
+    payload = populace.populace_target_diagnostics(
+        limit=1, offset=0, family=None, variable=None, source=None, level=None,
+        state=None, direction=None, within_tolerance=None, search=None, facet=None,
+        sort_by=None, sort_dir="desc",
+    )
+    assert payload["dimensions"] == []

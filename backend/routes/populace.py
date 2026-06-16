@@ -75,6 +75,200 @@ _TTL_SECONDS = 300
 _STATE_CODE = re.compile(r"^[A-Z]{2}$")
 _STATE_FIPS = re.compile(r"^US\d{2}$")
 
+# Canonical name decomposition, matching populace.dev's parse_target so both
+# consumers agree. The constraint registry knows these fields; the published
+# surface only carries the slash-joined name, so we reconstruct them.
+_FIPS_TO_ABBR = {
+    "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO",
+    "09": "CT", "10": "DE", "11": "DC", "12": "FL", "13": "GA", "15": "HI",
+    "16": "ID", "17": "IL", "18": "IN", "19": "IA", "20": "KS", "21": "KY",
+    "22": "LA", "23": "ME", "24": "MD", "25": "MA", "26": "MI", "27": "MN",
+    "28": "MS", "29": "MO", "30": "MT", "31": "NE", "32": "NV", "33": "NH",
+    "34": "NJ", "35": "NM", "36": "NY", "37": "NC", "38": "ND", "39": "OH",
+    "40": "OK", "41": "OR", "42": "PA", "44": "RI", "45": "SC", "46": "SD",
+    "47": "TN", "48": "TX", "49": "UT", "50": "VT", "51": "VA", "53": "WA",
+    "54": "WV", "55": "WI", "56": "WY",
+}
+_STATE_ABBRS = {
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID",
+    "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO",
+    "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA",
+    "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "US",
+}
+
+
+def _parse_target(name: str) -> dict[str, str]:
+    parts = name.split("/")
+    p0 = parts[0] if parts else ""
+    fips = re.match(r"^US(\d{2})$", p0)
+    if fips:
+        return {
+            "geography": _FIPS_TO_ABBR.get(fips.group(1), p0),
+            "level": "state",
+            "source": "admin",
+            "variable": parts[1] if len(parts) > 1 else "",
+            "breakdown": " · ".join(parts[2:]),
+        }
+    if p0 == "state":
+        second = parts[1] if len(parts) > 1 else ""
+        # state-keyed ("state/AL/adjusted_gross_income/..."): slot 2 is the
+        # state, not a source. Group all states under one synthetic "state"
+        # source so the 50 state codes don't masquerade as sources/variables.
+        if second in _STATE_ABBRS and second != "US":
+            return {
+                "geography": second,
+                "level": "state",
+                "source": "state",
+                "variable": parts[2] if len(parts) > 2 else "",
+                "breakdown": " · ".join(parts[3:]),
+            }
+        # source-keyed with a trailing state ("state/census/rent/AK").
+        if len(parts) >= 4 and parts[-1] in _STATE_ABBRS:
+            return {
+                "geography": parts[-1],
+                "level": "state",
+                "source": parts[1],
+                "variable": parts[2],
+                "breakdown": " · ".join(parts[3:-1]),
+            }
+        return {
+            "geography": "state",
+            "level": "state",
+            "source": parts[1] if len(parts) > 1 else "",
+            "variable": parts[2] if len(parts) > 2 else "",
+            "breakdown": " · ".join(parts[3:]),
+        }
+    if p0 in ("nation", "national", "us"):
+        return {
+            "geography": "United States",
+            "level": "national",
+            "source": parts[1] if len(parts) > 1 else "",
+            "variable": parts[2] if len(parts) > 2 else "",
+            "breakdown": " · ".join(parts[3:]),
+        }
+    return {
+        "geography": "",
+        "level": "",
+        "source": p0,
+        "variable": parts[1] if len(parts) > 1 else "",
+        "breakdown": " · ".join(parts[2:]),
+    }
+
+
+def _variable_key(parsed: dict[str, str]) -> str:
+    return " / ".join(p for p in (parsed["source"], parsed["variable"]) if p)
+
+
+_FILING_MODIFIERS = {"Surviving Spouse"}
+_FILING_STATUSES = {
+    "All", "Single", "Head of Household", "Married Filing Jointly",
+    "Married Filing Separately", "Surviving Spouse",
+}
+_RETURN_TYPES = {"taxable", "all returns", "nontaxable"}
+_MEASURES = {"total", "count", "mean", "filers", "nonfilers"}
+
+
+def _split_breakdown(breakdown: str) -> list[str]:
+    raw = [t for t in breakdown.split(" · ") if t] if breakdown else []
+    out: list[str] = []
+    for token in raw:
+        if token in _FILING_MODIFIERS and out:
+            out[-1] = f"{out[-1]} · {token}"
+        else:
+            out.append(token)
+    return out
+
+
+def _classify_dimension(values: list[str]) -> str:
+    v = [x for x in values if x]
+    if not v:
+        return "Breakdown"
+
+    def all_match(pred):
+        return all(pred(x) for x in v)
+
+    if all_match(lambda s: s.startswith("AGI in ")):
+        return "Income band"
+    if all_match(lambda s: s in _RETURN_TYPES):
+        return "Return type"
+    if all_match(lambda s: s.split(" · ")[0] in _FILING_STATUSES):
+        return "Filing status"
+    if all_match(lambda s: s.isdigit()):
+        return "Age"
+    if all_match(lambda s: s in _MEASURES):
+        return "Measure"
+    return "Breakdown"
+
+
+def _parse_amount(token: str) -> float:
+    if re.match(r"^-?inf$", token, re.I):
+        return float("-inf") if token.startswith("-") else float("inf")
+    m = re.match(r"^(-?)(\d+(?:\.\d+)?)([km]?)$", token, re.I)
+    if not m:
+        return 0.0
+    mult = {"k": 1e3, "m": 1e6, "": 1}[m.group(3).lower()]
+    return (-1 if m.group(1) else 1) * float(m.group(2)) * mult
+
+
+def _band_lower(label: str) -> float:
+    body = label[len("AGI in "):] if label.startswith("AGI in ") else label
+    m = re.match(r"^(-?inf|-?\d+(?:\.\d+)?[km]?)-(-?inf|-?\d+(?:\.\d+)?[km]?)$", body, re.I)
+    return _parse_amount(m.group(1)) if m else 0.0
+
+
+def _sort_dimension_values(label: str, values: list[str]) -> list[str]:
+    if label == "Income band":
+        return sorted(values, key=_band_lower)
+    if label == "Age":
+        return sorted(values, key=lambda s: int(s) if s.isdigit() else 0)
+    return sorted(values, key=lambda s: (s != "All", s))
+
+
+def _row_facet_value(row: dict[str, Any], key: str) -> str | None:
+    if key == "geography":
+        return row.get("geography") or None
+    if key == "level":
+        return row.get("level") or None
+    m = re.match(r"^dim(\d+)$", key)
+    if m:
+        idx = int(m.group(1))
+        dims = row.get("dims") or []
+        return dims[idx] if len(dims) > idx and dims[idx] else None
+    value = row.get(key)
+    return value if isinstance(value, str) else None
+
+
+def _sort_facet_values(label: str, values: list[str]) -> list[str]:
+    if label == "Geography":
+        return sorted(values, key=lambda s: (s != "United States", s))
+    return _sort_dimension_values(label, values)
+
+
+def _compute_dimensions(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every axis along which the rows vary, as facets: geography, level, and
+    each breakdown position. Constant axes (no variation) are dropped."""
+    max_len = max((len(r.get("dims") or []) for r in rows), default=0)
+    candidates: list[tuple[str, str | None]] = [
+        ("geography", "Geography"),
+        ("level", "Level"),
+    ]
+    candidates += [(f"dim{i}", None) for i in range(max_len)]
+
+    facets = []
+    for key, fixed_label in candidates:
+        values = list(
+            dict.fromkeys(
+                v for v in (_row_facet_value(r, key) for r in rows) if v
+            )
+        )
+        if len(values) <= 1:
+            continue
+        label = fixed_label or _classify_dimension(values)
+        facets.append(
+            {"key": key, "label": label, "values": _sort_facet_values(label, values)}
+        )
+    return facets
+
 
 def _scrub(value: Any) -> Any:
     if isinstance(value, dict):
@@ -196,15 +390,61 @@ def _enrich(row: dict[str, Any]) -> dict[str, Any]:
     direction = None
     if isinstance(final_rel, (int, float)):
         direction = "over" if final_rel > 0 else "under" if final_rel < 0 else "exact"
+    parsed = _parse_target(name)
     return {
         **row,
         "family": _derive_family(name),
         "state": _derive_state(name),
+        "geography": parsed["geography"],
+        "level": parsed["level"],
+        "source": parsed["source"],
+        "variable": parsed["variable"],
+        "breakdown": parsed["breakdown"],
+        "dims": _split_breakdown(parsed["breakdown"]),
+        "variable_key": _variable_key(parsed),
         "initial_relative_error": initial_rel,
         "abs_relative_error": abs_rel,
         "improvement": improvement,
         "direction": direction,
     }
+
+
+def _variable_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        key = str(row.get("variable_key", ""))
+        if key:
+            groups.setdefault(key, []).append(row)
+    out = []
+    for key, members in groups.items():
+        first = members[0]
+        abs_errors = [
+            r["abs_relative_error"]
+            for r in members
+            if isinstance(r.get("abs_relative_error"), (int, float))
+        ]
+        out.append(
+            {
+                "variable_key": key,
+                "source": str(first.get("source", "")),
+                "variable": str(first.get("variable", "")),
+                "level": str(first.get("level", "")),
+                "n_targets": len(members),
+                "within_10pct": sum(
+                    1
+                    for r in members
+                    if isinstance(r.get("abs_relative_error"), (int, float))
+                    and r["abs_relative_error"] <= 0.1
+                ),
+                "within_tolerance": sum(
+                    1 for r in members if r.get("within_tolerance") is True
+                ),
+                "mean_abs_relative_error": (
+                    sum(abs_errors) / len(abs_errors) if abs_errors else None
+                ),
+            }
+        )
+    return sorted(out, key=lambda v: v["n_targets"], reverse=True)
 
 
 def _family_fit(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -239,11 +479,31 @@ def _family_fit(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(out, key=lambda f: f["n_targets"], reverse=True)
 
 
+def _calibration_payload() -> tuple[dict[str, Any], str]:
+    """The calibration_diagnostics payload, live from HF via latest.json when
+    reachable, else the committed snapshot. Returns (payload, source)."""
+    try:
+        pointer = _fetch_json(_hf_resolve_url(_LATEST_POINTER_PATH))
+        paths = pointer.get("paths") if isinstance(pointer, dict) else None
+        diag_path = paths.get("calibration_diagnostics") if isinstance(paths, dict) else None
+        if diag_path:
+            payload = _fetch_json(_hf_resolve_url(diag_path))
+            if isinstance(payload, dict) and payload.get("targets"):
+                # schema v2 carries no top-level release_id — take the pointer's.
+                if not payload.get("release_id") and pointer.get("release_id"):
+                    payload["release_id"] = pointer["release_id"]
+                return payload, "huggingface_live"
+    except Exception as exc:  # noqa: BLE001 - fall back to the snapshot
+        logger.info("Live calibration unavailable, using snapshot: %s", exc)
+    return _load_static(_STATIC_CALIBRATION_DIAGNOSTICS), "deployed_static_snapshot"
+
+
 def _calibration_summary(
-    payload: dict[str, Any], rows: list[dict[str, Any]]
+    payload: dict[str, Any], rows: list[dict[str, Any]], source: str
 ) -> dict[str, Any]:
     return {
         "available": True,
+        "source": source,
         "path": _CALIBRATION_DIAGNOSTICS_PUBLIC_PATH,
         "release_id": payload.get("release_id"),
         "schema_version": payload.get("schema_version"),
@@ -269,7 +529,7 @@ def _calibration_summary(
 def populace_overview() -> dict[str, Any]:
     static_build = _load_static(_STATIC_BUILD_MANIFEST)
     static_release = _load_static(_STATIC_RELEASE_MANIFEST)
-    payload = _load_static(_STATIC_CALIBRATION_DIAGNOSTICS)
+    payload, cal_source = _calibration_payload()
     rows = [_enrich(row) for row in (payload.get("targets") or [])]
     snapshot_release_id = str(static_build.get("build_id", ""))
 
@@ -283,7 +543,7 @@ def populace_overview() -> dict[str, Any]:
     )
     release_id = str(live["release_id"]) if live_available else snapshot_release_id
 
-    calibration = _calibration_summary(payload, rows)
+    calibration = _calibration_summary(payload, rows, cal_source)
 
     def with_abs(row: dict[str, Any]) -> bool:
         return isinstance(row.get("abs_relative_error"), (int, float))
@@ -379,7 +639,7 @@ def populace_overview() -> dict[str, Any]:
 def _matches_search(row: dict[str, Any], search: str) -> bool:
     haystack = " ".join(
         str(row.get(key))
-        for key in ("name", "family", "state")
+        for key in ("name", "variable", "source", "breakdown", "geography", "state")
         if row.get(key) is not None
     ).lower()
     return search.lower() in haystack
@@ -390,26 +650,50 @@ def populace_target_diagnostics(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     family: str | None = None,
+    variable: str | None = None,
+    source: str | None = None,
+    level: str | None = None,
     state: str | None = None,
     direction: str | None = None,
     within_tolerance: str | None = None,
     search: str | None = None,
+    facet: list[str] | None = Query(default=None),
     sort_by: str | None = None,
     sort_dir: str = "desc",
 ) -> dict[str, Any]:
-    payload = _load_static(_STATIC_CALIBRATION_DIAGNOSTICS)
+    payload, _cal_source = _calibration_payload()
     rows = [_enrich(row) for row in (payload.get("targets") or [])]
     families = sorted({str(row.get("family", "")) for row in rows})
+    sources = sorted({str(row.get("source", "")) for row in rows if row.get("source")})
 
     within: bool | None = None
     if within_tolerance is not None and within_tolerance != "":
         within = within_tolerance.lower() in ("1", "true", "yes")
 
+    facet_filters: list[tuple[str, str]] = []
+    # `facet` is the Query sentinel (not a list) when the endpoint is called
+    # directly rather than through FastAPI's request parsing.
+    for entry in facet if isinstance(facet, list) else []:
+        sep = entry.find(":")
+        if sep >= 0:
+            facet_filters.append((entry[:sep], entry[sep + 1 :]))
+
     filtered = rows
     if family:
         filtered = [r for r in filtered if r.get("family") == family]
+    if variable:
+        filtered = [r for r in filtered if r.get("variable_key") == variable]
+    if source:
+        filtered = [r for r in filtered if r.get("source") == source]
+    if level:
+        filtered = [r for r in filtered if r.get("level") == level]
     if state:
         filtered = [r for r in filtered if r.get("state") == state]
+    # Facets derive from the variable's rows before the facet/within/direction/
+    # search filters so every option stays selectable.
+    dimensions = _compute_dimensions(filtered) if variable else []
+    for key, value in facet_filters:
+        filtered = [r for r in filtered if _row_facet_value(r, key) == value]
     if direction:
         filtered = [r for r in filtered if r.get("direction") == direction]
     if within is not None:
@@ -418,12 +702,21 @@ def populace_target_diagnostics(
         filtered = [r for r in filtered if _matches_search(r, search.strip())]
 
     sort_key = sort_by or "abs_relative_error"
+    dim_sort = re.match(r"^dim(\d+)$", sort_key)
+
+    def sort_value(row: dict[str, Any]):
+        if dim_sort:
+            idx = int(dim_sort.group(1))
+            dims = row.get("dims") or []
+            return dims[idx] if len(dims) > idx else None
+        return row.get(sort_key)
+
     descending = sort_dir != "asc"
-    present = [r for r in filtered if r.get(sort_key) is not None]
-    missing = [r for r in filtered if r.get(sort_key) is None]
+    present = [r for r in filtered if sort_value(r) is not None]
+    missing = [r for r in filtered if sort_value(r) is None]
 
     def key_fn(row: dict[str, Any]):
-        value = row.get(sort_key)
+        value = sort_value(row)
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return (1, 0.0, str(value))
         return (0, float(value), "")
@@ -439,6 +732,9 @@ def populace_target_diagnostics(
             "schema_version": payload.get("schema_version"),
             "metric": "relative_error",
             "families": families,
+            "sources": sources,
+            "variables": _variable_summary(rows),
+            "dimensions": dimensions,
             "summary": {
                 "total_targets": len(rows),
                 "within_tolerance_count": sum(
@@ -455,6 +751,9 @@ def populace_target_diagnostics(
             "display_limit": limit,
             "filters": {
                 "family": family,
+                "variable": variable,
+                "source": source,
+                "level": level,
                 "state": state,
                 "direction": direction,
                 "within_tolerance": within,
