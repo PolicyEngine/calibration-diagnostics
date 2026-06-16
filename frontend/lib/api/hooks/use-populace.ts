@@ -50,6 +50,8 @@ export interface PopulaceTargetRow {
   period?: number | null;
   initial_relative_error?: number | null;
   abs_relative_error?: number | null;
+  abs_error?: number | null;
+  target_is_zero?: boolean | null;
   improvement?: number | null;
   direction?: "over" | "under" | "exact" | null;
   [key: string]: unknown;
@@ -208,6 +210,23 @@ export interface PopulaceComparison {
     losses_comparable: boolean;
   };
   rows: PopulaceComparisonRow[];
+  variable_comparison?: PopulaceVariableComparisonRow[];
+}
+
+export interface PopulaceVariableFit {
+  n_targets: number;
+  within_10pct: number;
+  fraction_within_10pct: number | null;
+  mean_abs_relative_error: number | null;
+}
+
+export interface PopulaceVariableComparisonRow {
+  key: string;
+  source: string;
+  variable: string;
+  a: PopulaceVariableFit;
+  b: PopulaceVariableFit;
+  within10_delta: number | null;
 }
 
 export function usePopulaceCompare(a?: string, b?: string, enabled = true) {
