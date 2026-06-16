@@ -439,6 +439,8 @@ export interface ReformValidationRow {
   name: string;
   category?: string | null;
   description?: string | null;
+  in_sample?: boolean;
+  period?: number | null;
   jct_score?: number | null;
   jct_score_type?: string | null;
   jct_window?: string | null;
@@ -474,6 +476,10 @@ export interface ReformValidationResponse {
     within_10pct: number;
     mean_abs_relative_error: number | null;
     median_abs_relative_error: number | null;
+    n_out_of_sample: number;
+    n_out_of_sample_scored: number;
+    out_of_sample_within_10pct: number;
+    out_of_sample_mean_abs_relative_error: number | null;
   };
   source_artifact?: { name: string; path: string; url: string };
 }
@@ -490,6 +496,7 @@ export interface ReformHistorySeries {
   id: string;
   name: string;
   category?: string | null;
+  in_sample?: boolean;
   jct_score?: number | null;
   jct_source?: string | null;
   points: ReformHistoryPoint[];

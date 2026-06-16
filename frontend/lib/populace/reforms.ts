@@ -67,6 +67,11 @@ export interface ReformValidationRow {
   name: string;
   category: string | null;
   description: string | null;
+  // in-sample reforms are JCT tax-expenditure *calibration targets* (the
+  // dataset was tuned to them); out-of-sample reforms (OBBBA provisions) are
+  // the genuine fidelity test.
+  in_sample: boolean;
+  period: number | null;
   // JCT (the authority's official score) and populace's microsim estimate.
   jct_score: number | null;
   jct_score_type: string | null;
@@ -100,6 +105,11 @@ export interface ReformValidation {
     within_10pct: number;
     mean_abs_relative_error: number | null;
     median_abs_relative_error: number | null;
+    // The out-of-sample reforms only — the genuine fidelity test.
+    n_out_of_sample: number;
+    n_out_of_sample_scored: number;
+    out_of_sample_within_10pct: number;
+    out_of_sample_mean_abs_relative_error: number | null;
   };
 }
 
@@ -127,6 +137,8 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
     name: String(raw.name ?? raw.id ?? ""),
     category: stringOrNull(raw.category),
     description: stringOrNull(raw.description),
+    in_sample: raw.in_sample === true,
+    period: numberOrNull(raw.period),
     jct_score: jctScore,
     jct_score_type: stringOrNull(jct.score_type),
     jct_window: stringOrNull(jct.window),
@@ -161,6 +173,9 @@ export function buildReformValidation(
   const rows = reforms.map((r) => enrichReform(asObject(r)));
   const scored = rows.filter((r) => r.abs_relative_error != null);
   const absRels = scored.map((r) => r.abs_relative_error as number);
+  const oos = rows.filter((r) => !r.in_sample);
+  const oosScored = oos.filter((r) => r.abs_relative_error != null);
+  const oosAbsRels = oosScored.map((r) => r.abs_relative_error as number);
   return {
     available: true,
     source: "huggingface_live",
@@ -178,6 +193,12 @@ export function buildReformValidation(
         ? absRels.reduce((s, v) => s + v, 0) / absRels.length
         : null,
       median_abs_relative_error: median(absRels),
+      n_out_of_sample: oos.length,
+      n_out_of_sample_scored: oosScored.length,
+      out_of_sample_within_10pct: oosScored.filter((r) => r.within_10pct === true).length,
+      out_of_sample_mean_abs_relative_error: oosAbsRels.length
+        ? oosAbsRels.reduce((s, v) => s + v, 0) / oosAbsRels.length
+        : null,
     },
   };
 }
@@ -241,6 +262,7 @@ export interface ReformHistorySeries {
   id: string;
   name: string;
   category: string | null;
+  in_sample: boolean;
   jct_score: number | null;
   jct_source: string | null;
   points: ReformHistoryPoint[]; // chronological, oldest → newest
@@ -267,6 +289,7 @@ export function buildReformHistory(
           id: row.id,
           name: row.name,
           category: row.category,
+          in_sample: row.in_sample,
           jct_score: row.jct_score,
           jct_source: row.jct_source,
           points: [],

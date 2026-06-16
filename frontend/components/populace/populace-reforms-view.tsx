@@ -61,6 +61,10 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
   if (!rows.length) {
     return <EmptyState title="No reforms in this release's validation set." variant="compact" />;
   }
+  // Out-of-sample reforms (the genuine test) first, then in-sample targets.
+  const ordered = [...rows].sort(
+    (a, b) => Number(a.in_sample ?? false) - Number(b.in_sample ?? false),
+  );
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -75,10 +79,15 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {ordered.map((row) => (
             <tr key={row.id} className="border-b border-border/60 align-top last:border-b-0">
               <td className="px-3 py-2">
-                <div className="font-medium text-foreground">{row.name}</div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-foreground">{row.name}</span>
+                  <StatusPill tone={row.in_sample ? "neutral" : "info"}>
+                    {row.in_sample ? "in-sample" : "out-of-sample"}
+                  </StatusPill>
+                </div>
                 {row.category && (
                   <div className="text-xs text-muted-foreground">{row.category}</div>
                 )}
@@ -195,32 +204,33 @@ export function PopulaceReformsView() {
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <KpiCard
-              label="Reforms scored"
-              value={fmt(data.summary?.n_scored ?? 0, { digits: 0 })}
-              hint={`of ${fmt(data.summary?.n_reforms ?? 0, { digits: 0 })} in the set`}
+              label="Out-of-sample mean |error|"
+              value={pct(data.summary?.out_of_sample_mean_abs_relative_error)}
+              tone={errorTone(data.summary?.out_of_sample_mean_abs_relative_error)}
+              hint="the genuine fidelity test — reforms calibration never saw"
             />
             <KpiCard
-              label="Mean |error|"
+              label="Out-of-sample within 10%"
+              value={`${fmt(data.summary?.out_of_sample_within_10pct ?? 0, { digits: 0 })} / ${fmt(data.summary?.n_out_of_sample_scored ?? 0, { digits: 0 })}`}
+              tone="positive"
+              hint={`${fmt(data.summary?.n_out_of_sample ?? 0, { digits: 0 })} out-of-sample reforms`}
+            />
+            <KpiCard
+              label="Reforms scored"
+              value={fmt(data.summary?.n_scored ?? 0, { digits: 0 })}
+              hint={`of ${fmt(data.summary?.n_reforms ?? 0, { digits: 0 })} (incl. in-sample targets)`}
+            />
+            <KpiCard
+              label="All-reform mean |error|"
               value={pct(data.summary?.mean_abs_relative_error)}
               tone={errorTone(data.summary?.mean_abs_relative_error)}
               hint={`median ${pct(data.summary?.median_abs_relative_error)}`}
-            />
-            <KpiCard
-              label="Within 10%"
-              value={`${fmt(data.summary?.within_10pct ?? 0, { digits: 0 })} / ${fmt(data.summary?.n_scored ?? 0, { digits: 0 })}`}
-              tone="positive"
-              hint="reforms populace reproduces to ≤10%"
-            />
-            <KpiCard
-              label="Scoring window"
-              value={data.scoring_window ?? "—"}
-              hint={data.baseline_period ? `baseline ${data.baseline_period}` : "vs JCT score"}
             />
           </div>
 
           <SectionCard
             title="populace vs JCT"
-            description="A negative budget effect is a cost (revenue reduction / outlay). Error is populace − JCT; Error % is relative to the JCT score."
+            description="A negative budget effect is a cost (revenue reduction). Error is populace − JCT; Error % is relative to the JCT score. Out-of-sample reforms are the real test; in-sample reforms are JCT tax-expenditure calibration targets the dataset was tuned to, shown for completeness."
             padded={false}
           >
             <ReformTable rows={data.rows ?? []} />

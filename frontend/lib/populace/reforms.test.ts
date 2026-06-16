@@ -10,6 +10,7 @@ const obbba = {
   id: "obbba",
   name: "One Big Beautiful Bill Act",
   category: "OBBBA",
+  in_sample: false,
   jct: { score: -4000, score_type: "conventional", window: "FY2025-2034", source: "JCX-29-25" },
   populace: { budget_effect: -3600, window: "FY2025-2034" },
 };
@@ -17,6 +18,7 @@ const salt = {
   id: "obbba_salt",
   name: "OBBBA — SALT cap to $40k",
   category: "OBBBA",
+  in_sample: false,
   jct: { score: -1000, source: "JCX-30-25" },
   populace: { budget_effect: -1050 },
 };
@@ -32,12 +34,28 @@ test("derives populace-vs-JCT error per reform", () => {
 });
 
 test("summary counts only scored reforms and averages |error|", () => {
-  const unscored = { id: "x", name: "No populace estimate", jct: { score: -500 } };
+  const unscored = { id: "x", name: "No populace estimate", in_sample: false, jct: { score: -500 } };
   const v = buildReformValidation(raw([obbba, salt, unscored]), "rel-a");
   expect(v.summary.n_reforms).toBe(3);
   expect(v.summary.n_scored).toBe(2); // unscored has no populace estimate
   expect(v.summary.within_10pct).toBe(2); // obbba 10%, salt 5%
   expect(v.summary.mean_abs_relative_error).toBeCloseTo((0.1 + 0.05) / 2, 6);
+});
+
+test("summary isolates the out-of-sample reforms from in-sample targets", () => {
+  const inSample = {
+    id: "jct_mortgage",
+    name: "Mortgage interest deduction",
+    in_sample: true,
+    jct: { score: 1000 },
+    populace: { budget_effect: 2000 }, // |error| 100% — but in-sample
+  };
+  const v = buildReformValidation(raw([obbba, salt, inSample]), "rel-a");
+  expect(v.summary.n_out_of_sample).toBe(2); // obbba + salt
+  expect(v.summary.n_out_of_sample_scored).toBe(2);
+  expect(v.summary.out_of_sample_within_10pct).toBe(2);
+  // out-of-sample mean excludes the 100% in-sample miss.
+  expect(v.summary.out_of_sample_mean_abs_relative_error).toBeCloseTo((0.1 + 0.05) / 2, 6);
 });
 
 test("run-over-run series is chronological with an improvement delta", () => {
