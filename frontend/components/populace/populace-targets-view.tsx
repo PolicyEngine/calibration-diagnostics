@@ -11,6 +11,7 @@ import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { PopulaceTargetDetail } from "@/components/populace/populace-target-detail";
 import {
+  usePopulaceReleases,
   usePopulaceTargetDiagnostics,
   type PopulaceTargetDimension,
   type PopulaceTargetRow,
@@ -206,6 +207,7 @@ function VariableBrowser({
 }
 
 export function PopulaceTargetsView() {
+  const [release, setRelease] = useState("");
   const [variable, setVariable] = useState("");
   const [source, setSource] = useState("");
   const [level, setLevel] = useState("");
@@ -217,6 +219,29 @@ export function PopulaceTargetsView() {
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<SortState>({ by: "abs_relative_error", dir: "desc" });
 
+  const { data: releaseData } = usePopulaceReleases();
+  const releaseOptions = useMemo(
+    () => [
+      { value: "", label: "Latest" },
+      ...(releaseData?.releases ?? []).map((r) => ({
+        value: r.release_id,
+        label: r.release_id.replace(/^populace-us-\d{4}-/, "").replace(/-c[0-9a-f]{12}-/, "·"),
+      })),
+    ],
+    [releaseData],
+  );
+
+  function pickRelease(value: string) {
+    // A different release is a different surface — reset everything below it.
+    setRelease(value);
+    setVariable("");
+    setFacetFilters({});
+    setSource("");
+    setLevel("");
+    setSelected(null);
+    setPage(0);
+  }
+
   const facetParam = useMemo(
     () =>
       Object.entries(facetFilters)
@@ -227,6 +252,7 @@ export function PopulaceTargetsView() {
 
   const params = useMemo(
     () => ({
+      release: release || undefined,
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
       variable: variable || undefined,
@@ -239,7 +265,7 @@ export function PopulaceTargetsView() {
       sort_by: sort.by,
       sort_dir: sort.dir,
     }),
-    [variable, source, level, within, direction, search, facetParam, page, sort],
+    [release, variable, source, level, within, direction, search, facetParam, page, sort],
   );
 
   const { data, isLoading, error } = usePopulaceTargetDiagnostics(params);
@@ -301,9 +327,14 @@ export function PopulaceTargetsView() {
         eyebrow="Populace"
         title="Target diagnostics"
         description="Browse the calibration target surface by the thing each constraint measures — e.g. adjusted gross income, then its by-income-bracket and by-filing-status breakdowns — and see how well the calibrated weights reproduce each."
+        actions={
+          <ToolbarSelect label="Release" value={release} onChange={pickRelease} options={releaseOptions} />
+        }
         status={
           data?.release_id ? (
-            <StatusPill tone="info">{String(data.release_id)}</StatusPill>
+            <StatusPill tone="info">
+              {String(data.release_id)} · {fmt(data.total_targets, { digits: 0 })} targets
+            </StatusPill>
           ) : undefined
         }
       />
@@ -370,7 +401,7 @@ export function PopulaceTargetsView() {
                     value={facetFilters[dim.key] ?? ""}
                     onChange={(value) => setFacet(dim.key, value)}
                     options={[
-                      { value: "", label: "All" },
+                      { value: "", label: "Any" },
                       ...dim.values.map((value) => ({
                         value,
                         label: value.replace(/^AGI in /, ""),
@@ -388,7 +419,7 @@ export function PopulaceTargetsView() {
                       setPage(0);
                     }}
                     options={[
-                      { value: "", label: "All" },
+                      { value: "", label: "Any" },
                       ...sources.map((value) => ({ value, label: value })),
                     ]}
                   />
@@ -400,7 +431,7 @@ export function PopulaceTargetsView() {
                       setPage(0);
                     }}
                     options={[
-                      { value: "", label: "All" },
+                      { value: "", label: "Any" },
                       { value: "national", label: "National" },
                       { value: "state", label: "State" },
                     ]}
@@ -415,7 +446,7 @@ export function PopulaceTargetsView() {
                   setPage(0);
                 }}
                 options={[
-                  { value: "", label: "All" },
+                  { value: "", label: "Any" },
                   { value: "true", label: "Within" },
                   { value: "false", label: "Outside" },
                 ]}

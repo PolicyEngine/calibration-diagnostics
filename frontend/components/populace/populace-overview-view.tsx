@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/shared/empty-state";
@@ -10,8 +11,10 @@ import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill } from "@/components/shared/status-pill";
+import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import {
   usePopulace,
+  usePopulaceReleases,
   type PopulaceFamilyFitRow,
   type PopulaceTargetRow,
 } from "@/lib/api/hooks/use-populace";
@@ -118,7 +121,20 @@ function TargetFitTable({
 }
 
 export function PopulaceOverviewView() {
-  const { data, isLoading, error } = usePopulace();
+  const [release, setRelease] = useState("");
+  const { data: releaseData } = usePopulaceReleases();
+  const { data, isLoading, error } = usePopulace(release || undefined);
+
+  const releaseOptions = useMemo(
+    () => [
+      { value: "", label: "Latest" },
+      ...(releaseData?.releases ?? []).map((r) => ({
+        value: r.release_id,
+        label: r.release_id.replace(/^populace-us-\d{4}-/, "").replace(/-c[0-9a-f]{12}-/, "·"),
+      })),
+    ],
+    [releaseData],
+  );
 
   if (isLoading) return <LoadingBlock label="Loading populace release…" />;
   if (error || !data) {
@@ -170,7 +186,14 @@ export function PopulaceOverviewView() {
             surface.
           </>
         }
-        status={<StatusPill tone="success">Live from Hugging Face</StatusPill>}
+        actions={
+          <ToolbarSelect label="Release" value={release} onChange={setRelease} options={releaseOptions} />
+        }
+        status={
+          <StatusPill tone="success">
+            {data.release_id} · {fmt(data.calibration.total_targets ?? null, { digits: 0 })} targets
+          </StatusPill>
+        }
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
