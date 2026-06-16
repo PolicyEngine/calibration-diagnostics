@@ -1,13 +1,16 @@
-.PHONY: frontend backend install-frontend install-backend
+.PHONY: install dev build test typecheck
 
-install-frontend:
+install:
 	cd frontend && bun install
 
-install-backend:
-	pip install -e .
+dev:
+	cd frontend && bun run dev
 
-frontend:
-	cd frontend && NEXT_PUBLIC_USE_FIXTURES=true bun run dev
+build:
+	cd frontend && bun run build
 
-backend:
-	uvicorn backend.app:app --reload --port 8000
+typecheck:
+	cd frontend && bun run lint
+
+test:
+	cd frontend && bun test

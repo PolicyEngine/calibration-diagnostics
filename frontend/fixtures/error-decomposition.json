@@ -1,9 +1,0 @@
-{
-  "target_name": "national/snap/[]",
-  "target_value": 65000000000,
-  "raw_sum": 125000000000,
-  "initial_estimate": 72000000000,
-  "final_estimate": 98500000000,
-  "diagnosis": "raw_sum is 92% above target — variable values or coverage wrong in source data",
-  "concentration": {"top_1pct_share": 12.3, "top_5pct_share": 34.8}
-}
