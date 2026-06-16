@@ -33,7 +33,175 @@ const FILING_STATUSES = new Set([
   "Married Filing Separately", "Surviving Spouse",
 ]);
 const RETURN_TYPES = new Set(["taxable", "all returns", "nontaxable"]);
-const MEASURES = new Set(["total", "count", "mean", "filers", "nonfilers"]);
+const MEASURES = new Set(["total", "count", "mean", "filers", "nonfilers", "amount"]);
+
+// --- dotted registry-name decomposition --------------------------------------
+// A second naming scheme published by the ledger-backed target surface uses
+// dot-separated paths instead of slashes, e.g.
+//   irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_total
+//   jct.tax_expenditures.cy2024.salt_deduction.revenue_loss
+//   usda_snap.fy2024.state_benefits.nero.ct.total_benefits
+// Both schemes must canonicalise to the same {source, variable, measure,
+// geography, breakdown} so the dashboard groups and faceted-browses them alike.
+const DOTTED_SOURCE_LABELS: Record<string, string> = {
+  irs_soi: "IRS SOI",
+  soi: "IRS SOI",
+  census_stc: "Census STC",
+  census: "Census",
+  cms_aca: "CMS ACA",
+  cms_medicaid: "CMS Medicaid",
+  cms_medicare: "CMS Medicare",
+  cms_nhe: "CMS NHE",
+  hhs_acf_tanf: "HHS ACF TANF",
+  ssa_supplement: "SSA",
+  usda_snap: "USDA SNAP",
+  jct: "JCT",
+  bea: "BEA",
+  treasury: "Treasury",
+  cbo: "CBO",
+};
+// Terminal words that denote the measure (and whether it counts units or sums
+// dollars). The word is stripped from the variable; both an "…_amount" and an
+// "…_returns" row collapse to the same variable with measure=amount vs count.
+const COUNT_MEASURE_WORDS = new Set([
+  "returns", "claims", "count", "recipients", "enrollment", "return",
+]);
+const AMOUNT_MEASURE_WORDS = new Set([
+  "amount", "total", "collections", "loss", "funds", "value", "payments",
+]);
+// Leaf words too generic to name a variable on their own — fall back to the
+// preceding path token (the table/category) when the leaf reduces to these.
+const GENERIC_LEAF_WORDS = new Set([
+  "actual", "total", "all", "gross", "net", "payment", "revenue", "basic",
+  "projected", "estimate", "estimated", "",
+]);
+
+function isPeriodToken(token: string): boolean {
+  return (
+    /^(ty|fy|cy|oep|month|tax_year|year|q[1-4])[\d_]*\d/i.test(token) ||
+    /^\d{4}$/.test(token) ||
+    /^month\d{4}_\d{1,2}$/i.test(token)
+  );
+}
+
+const AGI_BAND_RE =
+  /^(under_-?\d+|-?\d+(?:k|m)?_to_-?\d+(?:k|m)?|-?\d+(?:k|m)?_plus|-?\d+(?:k|m)?_or_more)$/i;
+function isAgiBand(token: string): boolean {
+  return AGI_BAND_RE.test(token);
+}
+function moneyLabel(token: string): string {
+  const m = /^(-?\d+)(k|m)?$/i.exec(token);
+  if (!m) return token;
+  return `$${m[1]}${m[2] ? m[2].toLowerCase() : ""}`;
+}
+function humanizeAgiBand(token: string): string {
+  if (/^under_1$/i.test(token)) return "AGI <$1";
+  const range = /^(-?\d+(?:k|m)?)_to_(-?\d+(?:k|m)?)$/i.exec(token);
+  if (range) return `AGI ${moneyLabel(range[1])}–${moneyLabel(range[2])}`;
+  const plus = /^(-?\d+(?:k|m)?)_(?:plus|or_more)$/i.exec(token);
+  if (plus) return `AGI ${moneyLabel(plus[1])}+`;
+  const under = /^under_(-?\d+(?:k|m)?)$/i.exec(token);
+  if (under) return `AGI <${moneyLabel(under[1])}`;
+  return `AGI ${token.replace(/_/g, " ")}`;
+}
+function humanizeChildren(token: string): string | null {
+  if (/no_qualifying_children/i.test(token)) return "0 children";
+  if (/one_qualifying_child/i.test(token)) return "1 child";
+  if (/two_qualifying_children/i.test(token)) return "2 children";
+  if (/three_or_more_qualifying_children/i.test(token)) return "3+ children";
+  return null;
+}
+// Tokens that name the source table/category rather than a breakdown.
+const TABLE_TOKEN_RE =
+  /(table|district|marketplace|enrollment|assistance|collection|expenditure|premium|payment|benefit|tax_expenditure|by_agi|w2|tips|income_by_source|projection|state_)/i;
+
+function parseDottedTarget(name: string): ParsedTarget {
+  const all = name.split(".").filter(Boolean);
+  const family = all[0] ?? "";
+  const source = DOTTED_SOURCE_LABELS[family] ?? family.replace(/_/g, " ");
+  // Drop the family and every period token wherever it appears (the period is
+  // not always in a fixed position across families).
+  const rest = all.slice(1).filter((t) => !isPeriodToken(t));
+  const leaf = rest.length ? rest[rest.length - 1] : "";
+  const path = rest.slice(0, -1);
+
+  // measure + variable core from the leaf.
+  const leafWords = leaf.split("_");
+  const lastWord = leafWords[leafWords.length - 1] ?? "";
+  let measure: string | null = null;
+  let varWords = leafWords;
+  if (COUNT_MEASURE_WORDS.has(lastWord)) {
+    measure = "count";
+    varWords = leafWords.slice(0, -1);
+  } else if (AMOUNT_MEASURE_WORDS.has(lastWord)) {
+    measure = "amount";
+    varWords = leafWords.slice(0, -1);
+  }
+
+  // classify the path: geography / AGI band / children / filing / table.
+  let geography = "";
+  let level = "";
+  let table: string | null = null;
+  const dims: string[] = [];
+  for (const token of path) {
+    const low = token.toLowerCase();
+    if (low === "us" || low === "national" || low === "national_total") {
+      geography = "United States";
+      level = "national";
+      continue;
+    }
+    const stTotal = /^([a-z]{2})_total$/i.exec(token);
+    const st = (stTotal ? stTotal[1] : token).toUpperCase();
+    if (STATE_ABBRS.has(st) && st !== "US") {
+      geography = st;
+      level = "state";
+      continue;
+    }
+    if (isAgiBand(token)) {
+      dims.push(humanizeAgiBand(token));
+      continue;
+    }
+    const kids = humanizeChildren(token);
+    if (kids) {
+      dims.push(kids);
+      continue;
+    }
+    if (low === "all" || low === "all_returns") continue; // constant filing scope
+    if (TABLE_TOKEN_RE.test(token)) {
+      table = token;
+      continue;
+    }
+    dims.push(token.replace(/_/g, " "));
+  }
+
+  // variable: the leaf core, unless it is empty/too generic (a pure-measure leaf
+  // like "revenue_loss" or "projected_amount"), in which case the most specific
+  // descriptive token names the quantity — the last unclassified path token
+  // (e.g. "salt_deduction"), else the table/category.
+  let variable = varWords.join(" ").trim();
+  const allGeneric = varWords.every((w) => GENERIC_LEAF_WORDS.has(w));
+  if (!variable || allGeneric) {
+    // Prefer the last descriptive breakdown token (e.g. "salt_deduction"),
+    // skipping short code-like tokens (e.g. "t40"); else the table/category.
+    const isCode = (s: string) => /^[a-z]{1,3}\d+$/i.test(s.replace(/\s/g, ""));
+    let descriptor: string | undefined;
+    while (dims.length) {
+      const candidate = dims[dims.length - 1];
+      if (isCode(candidate)) {
+        dims.pop();
+        continue;
+      }
+      descriptor = dims.pop();
+      break;
+    }
+    variable = (descriptor ?? table?.replace(/_/g, " ") ?? path[path.length - 1] ?? leaf)
+      .replace(/_/g, " ");
+  }
+  if (variable === "return") variable = "returns";
+
+  const breakdown = [measure, ...dims].filter(Boolean).join(" · ");
+  return { geography, level, source, variable, breakdown };
+}
 
 export function asObject(value: unknown): JsonObject {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -75,6 +243,12 @@ interface ParsedTarget {
 }
 
 function parseTarget(name: string): ParsedTarget {
+  // Two naming schemes coexist; dispatch by shape. Slash names ("nation/irs/…")
+  // fall through to the logic below; dotted ledger names ("irs_soi.ty2022.…")
+  // are decomposed by parseDottedTarget. Both yield the same canonical fields.
+  if (!name.includes("/") && name.includes(".")) {
+    return parseDottedTarget(name);
+  }
   const parts = name.split("/");
   const p0 = parts[0] ?? "";
   const fips = /^US(\d{2})$/.exec(p0);
@@ -141,7 +315,9 @@ function classifyDimension(values: string[]): string {
   if (!v.length) return "Breakdown";
   const all = (pred: (s: string) => boolean) => v.every(pred);
   const firstStatus = (s: string) => s.split(" · ")[0];
-  if (all((s) => s.startsWith("AGI in "))) return "Income band";
+  // "AGI in 30k-40k" (slash) and "AGI <$1" / "AGI $25k–$30k" (dotted) both bands.
+  if (all((s) => s.startsWith("AGI"))) return "Income band";
+  if (all((s) => /\bchild(ren)?$/i.test(s))) return "Children";
   if (all((s) => RETURN_TYPES.has(s))) return "Return type";
   if (all((s) => FILING_STATUSES.has(firstStatus(s)))) return "Filing status";
   if (all((s) => /^\d+$/.test(s))) return "Age";
@@ -159,13 +335,25 @@ function parseAmount(token: string): number {
 }
 
 function bandLowerBound(label: string): number {
-  const body = label.replace(/^AGI in /, "");
-  const match = /^(-?inf|-?\d+(?:\.\d+)?[km]?)-(-?inf|-?\d+(?:\.\d+)?[km]?)$/i.exec(body);
-  return match ? parseAmount(match[1]) : 0;
+  // Handles both "AGI in 30k-40k" (slash) and "AGI <$1" / "AGI $25k–$30k" /
+  // "AGI $50k+" (dotted). Sort by the band's lower edge.
+  const body = label.replace(/^AGI(?: in)?\s*/, "").replace(/\$/g, "");
+  if (/^<\s*/.test(body)) return -Infinity; // "<$1" sorts first
+  const match = /^(-?inf|-?\d+(?:\.\d+)?[km]?)\s*[-–]\s*(-?inf|-?\d+(?:\.\d+)?[km]?)/i.exec(body);
+  if (match) return parseAmount(match[1]);
+  const plus = /^(-?\d+(?:\.\d+)?[km]?)\s*\+/i.exec(body);
+  if (plus) return parseAmount(plus[1]);
+  return 0;
+}
+
+function childrenOrder(label: string): number {
+  const m = /^(\d+)/.exec(label);
+  return m ? Number(m[1]) : 99;
 }
 
 function sortDimensionValues(label: string, values: string[]): string[] {
   if (label === "Income band") return [...values].sort((a, b) => bandLowerBound(a) - bandLowerBound(b));
+  if (label === "Children") return [...values].sort((a, b) => childrenOrder(a) - childrenOrder(b));
   if (label === "Age") return [...values].sort((a, b) => Number(a) - Number(b));
   return [...values].sort((a, b) => (a === "All" ? -1 : b === "All" ? 1 : a.localeCompare(b)));
 }

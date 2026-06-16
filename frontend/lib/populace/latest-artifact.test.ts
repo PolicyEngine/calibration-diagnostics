@@ -123,6 +123,60 @@ test("zero-target rows have null relative error, not a nonsense percentage", () 
   expect(row.direction).toBe("over");
 });
 
+// Dotted ledger names (irs_soi.ty2022.…) must canonicalise like slash names.
+function dotted(name: string) {
+  return { name: `${name}@2024`, target_name: name, target: 100, initial_estimate: 120, final_estimate: 110, relative_error: 0.1, within_tolerance: true };
+}
+
+test("dotted IRS names decompose into source/variable/measure/breakdown", () => {
+  const cal = calibration([
+    dotted("irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_total"),
+  ]);
+  const row = cal.rows[0];
+  expect(row.source).toBe("IRS SOI");
+  expect(row.variable).toBe("eitc");
+  expect(row.measure).toBe("amount"); // "…_total" -> amount
+  expect(row.variable_key).toBe("IRS SOI / eitc · amount");
+  expect(row.dims).toContain("0 children");
+  expect(row.dims).toContain("AGI $25k–$30k");
+});
+
+test("dotted amount/count of the same variable split into two variables", () => {
+  const cal = calibration([
+    dotted("irs_soi.ty2022.historic_table_2.us.under_1.ctc_amount"),
+    dotted("irs_soi.ty2022.historic_table_2.us.under_1.ctc_claims"),
+  ]);
+  const keys = new Set(cal.rows.map((r) => r.variable_key));
+  expect(keys.has("IRS SOI / ctc · amount")).toBe(true);
+  expect(keys.has("IRS SOI / ctc · count")).toBe(true); // claims -> count
+  const ctc = cal.rows[0];
+  expect(ctc.geography).toBe("United States");
+});
+
+test("a pure-measure leaf takes the descriptive token (jct, census)", () => {
+  const cal = calibration([
+    dotted("jct.tax_expenditures.cy2024.salt_deduction.revenue_loss"),
+    dotted("census_stc.fy2024.individual_income_tax_collections.al.t40.collections"),
+  ]);
+  const jct = cal.rows.find((r) => r.source === "JCT")!;
+  expect(jct.variable).toBe("salt deduction"); // not the generic "tax expenditures"
+  const stc = cal.rows.find((r) => r.source === "Census STC")!;
+  expect(stc.variable).toBe("individual income tax collections"); // skips the "t40" code
+  expect(stc.geography).toBe("AL");
+});
+
+test("dotted EITC breakdowns facet by income band and children", () => {
+  const cal = calibration([
+    dotted("irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_total"),
+    dotted("irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.30k_to_35k.eitc_total"),
+    dotted("irs_soi.ty2022.table_2_5.eitc_by_agi_children.one_qualifying_child.25k_to_30k.eitc_total"),
+  ]);
+  const result = page("?variable=IRS%20SOI%20%2F%20eitc%20%C2%B7%20amount", cal);
+  const labels = result.dimensions.map((d) => d.label);
+  expect(labels).toContain("Income band");
+  expect(labels).toContain("Children");
+});
+
 test("count and total measures split into distinct variables", () => {
   const cal = calibration([
     { name: "nation/irs/capital gains gross/total/AGI in 1m-inf/taxable/All@2024", target_name: "nation/irs/capital gains gross/total/AGI in 1m-inf/taxable/All", target: 100, initial_estimate: 90, final_estimate: 100, relative_error: 0, within_tolerance: true },
