@@ -1,175 +1,46 @@
 import { NextResponse } from "next/server";
 
 import {
-  LATEST_POPULACE_BUILD_MANIFEST_PATH,
-  LATEST_POPULACE_CALIBRATION_DIAGNOSTICS_PATH,
-  LATEST_POPULACE_RELEASE_ID,
-  LATEST_POPULACE_RELEASE_MANIFEST_PATH,
-  latestPopulaceBuildManifest,
+  POPULACE_HF_REPO,
+  POPULACE_HF_REVISION,
+  asObject,
+  hfResolveUrl,
   latestPopulaceCalibrationHighlights,
   latestPopulaceCalibrationSummary,
-  latestPopulaceReleaseManifest,
-  loadLiveCalibration,
+  loadRelease,
   scrub,
-  snapshotCalibration,
 } from "@/lib/populace/latest-artifact";
-
-const HF_REPO = process.env.POPULACE_HF_REPO ?? "policyengine/populace-us";
-const HF_REVISION = process.env.POPULACE_HF_REVISION ?? "main";
-const LATEST_POINTER_PATH = "latest.json";
-
-type JsonObject = Record<string, unknown>;
 
 export const revalidate = 300;
 
-function asObject(value: unknown): JsonObject {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonObject)
-    : {};
-}
-
-function hfResolveUrl(path: string): string {
-  return `https://huggingface.co/datasets/${HF_REPO}/resolve/${HF_REVISION}/${path}`;
-}
-
-async function fetchJson(url: string): Promise<unknown> {
-  const response = await fetch(url, { next: { revalidate } });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
-  }
-  return response.json();
-}
-
-// Resolve the current release through latest.json — the published pointer
-// (PolicyEngine/populace#9). Its `paths` name the build/release manifests for
-// the release it points at; we read those small files live and leave the large
-// per-target diagnostics to the deployed snapshot.
-async function loadLiveRelease(): Promise<JsonObject> {
+export async function GET(request: Request) {
+  const release = new URL(request.url).searchParams.get("release") ?? "latest";
   try {
-    const pointer = asObject(await fetchJson(hfResolveUrl(LATEST_POINTER_PATH)));
-    const releaseId = pointer.release_id;
-    const paths = asObject(pointer.paths);
-    if (typeof releaseId !== "string" || !releaseId) {
-      return { available: false, reason: "latest.json has no release_id." };
-    }
-    const buildManifestPath =
-      typeof paths.build_manifest === "string"
-        ? paths.build_manifest
-        : `releases/${releaseId}/build_manifest.json`;
-    const releaseManifestPath =
-      typeof paths.release_manifest === "string"
-        ? paths.release_manifest
-        : `releases/${releaseId}/release_manifest.json`;
-    const buildManifest = asObject(await fetchJson(hfResolveUrl(buildManifestPath)));
-    let releaseManifest: JsonObject = {};
-    try {
-      releaseManifest = asObject(await fetchJson(hfResolveUrl(releaseManifestPath)));
-    } catch {
-      releaseManifest = {};
-    }
-    return {
-      available: true,
-      source: "huggingface_live",
-      repo_id: HF_REPO,
-      revision: HF_REVISION,
-      release_id: releaseId,
-      updated_at: pointer.updated_at ?? null,
-      pointer,
-      build_manifest: buildManifest,
-      release_manifest: releaseManifest,
-      build_manifest_path: buildManifestPath,
-      release_manifest_path: releaseManifestPath,
-      calibration_diagnostics_path:
-        typeof paths.calibration_diagnostics === "string"
-          ? paths.calibration_diagnostics
-          : null,
-    };
-  } catch (error) {
-    return {
-      available: false,
-      reason: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-export async function GET() {
-  try {
-    const live = await loadLiveRelease();
-    const liveAvailable = live.available === true;
-    const buildManifest = liveAvailable
-      ? asObject(live.build_manifest)
-      : latestPopulaceBuildManifest();
-    const releaseManifest =
-      liveAvailable && Object.keys(asObject(live.release_manifest)).length
-        ? asObject(live.release_manifest)
-        : latestPopulaceReleaseManifest();
-    const releaseId = liveAvailable
-      ? String(live.release_id)
-      : LATEST_POPULACE_RELEASE_ID;
-    // The per-target diagnostics also resolve live via latest.json (the
-    // latest.json fetch dedupes with loadLiveRelease above), with the committed
-    // snapshot as fallback.
-    const liveCalibration = await loadLiveCalibration(revalidate);
-    const calibrationSource = liveCalibration?.calibration ?? snapshotCalibration();
-    const calibration = latestPopulaceCalibrationSummary(calibrationSource);
-    const highlights = latestPopulaceCalibrationHighlights(calibrationSource, 15);
-    const calibrationSnapshotStale =
-      releaseId !== String(calibration.release_id ?? LATEST_POPULACE_RELEASE_ID);
-
+    const cal = await loadRelease(release, revalidate);
+    const calibration = latestPopulaceCalibrationSummary(cal);
+    const highlights = latestPopulaceCalibrationHighlights(cal, 15);
+    const prefix = `releases/${cal.release_id}`;
     return NextResponse.json(
       scrub({
-        source_repo: HF_REPO,
+        source_repo: POPULACE_HF_REPO,
         repo_type: "dataset",
-        revision: HF_REVISION,
-        source: liveAvailable ? "huggingface_live" : "deployed_static_snapshot",
-        live_unavailable_reason: liveAvailable ? null : live.reason ?? null,
-        release_id: releaseId,
-        snapshot_release_id: LATEST_POPULACE_RELEASE_ID,
-        updated_at: liveAvailable ? live.updated_at ?? null : null,
+        revision: POPULACE_HF_REVISION,
+        source: "huggingface_live",
+        release_id: cal.release_id,
+        updated_at: cal.updated_at,
         source_artifacts: [
-          {
-            name: "latest_pointer",
-            path: LATEST_POINTER_PATH,
-            url: liveAvailable
-              ? hfResolveUrl(LATEST_POINTER_PATH)
-              : "deployed-static-snapshot",
-          },
-          {
-            name: "build_manifest",
-            path: liveAvailable
-              ? String(live.build_manifest_path)
-              : LATEST_POPULACE_BUILD_MANIFEST_PATH,
-            url: liveAvailable
-              ? hfResolveUrl(String(live.build_manifest_path))
-              : "deployed-static-snapshot",
-          },
-          {
-            name: "release_manifest",
-            path: liveAvailable
-              ? String(live.release_manifest_path)
-              : LATEST_POPULACE_RELEASE_MANIFEST_PATH,
-            url: liveAvailable
-              ? hfResolveUrl(String(live.release_manifest_path))
-              : "deployed-static-snapshot",
-          },
-          {
-            name: "calibration_diagnostics",
-            path: LATEST_POPULACE_CALIBRATION_DIAGNOSTICS_PATH,
-            url:
-              liveAvailable && typeof live.calibration_diagnostics_path === "string"
-                ? hfResolveUrl(live.calibration_diagnostics_path)
-                : "deployed-static-snapshot",
-          },
+          { name: "latest_pointer", path: "latest.json", url: hfResolveUrl("latest.json") },
+          { name: "build_manifest", path: `${prefix}/build_manifest.json`, url: hfResolveUrl(`${prefix}/build_manifest.json`) },
+          { name: "release_manifest", path: `${prefix}/release_manifest.json`, url: hfResolveUrl(`${prefix}/release_manifest.json`) },
+          { name: "calibration_diagnostics", path: `${prefix}/calibration_diagnostics.json`, url: hfResolveUrl(`${prefix}/calibration_diagnostics.json`) },
         ],
         limitations: [
-          "Build and release manifests are read live from the policyengine/populace-us Hugging Face dataset via latest.json; per-target calibration diagnostics come from a deployed static snapshot of calibration_diagnostics.json.",
-          "The eCPS head-to-head comparison moved out of live populace into PolicyEngine/populace-benchmarks, so this view reports populace's calibration fit against its own target surface, not a populace-vs-enhanced-CPS score.",
-          "The published loss trajectory for this release was reconstructed from saved scalars (the historical build did not store the full epoch trace), so the convergence curve is coarse — see the solver provenance note.",
+          "Everything on this page is read live from the policyengine/populace-us Hugging Face dataset; the current release is resolved through latest.json.",
+          "Loss values are the calibrator's own metric for this release; their scale is not comparable across releases that calibrate to different target surfaces.",
         ],
-        calibration_snapshot_stale: calibrationSnapshotStale,
-        build_manifest: buildManifest,
-        release_manifest: releaseManifest,
-        gates: asObject(buildManifest.gates),
+        build_manifest: cal.build_manifest,
+        release_manifest: cal.release_manifest,
+        gates: asObject(cal.build_manifest.gates),
         calibration,
         highlights,
       }),

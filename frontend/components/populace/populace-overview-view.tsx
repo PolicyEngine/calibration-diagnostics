@@ -170,13 +170,7 @@ export function PopulaceOverviewView() {
             surface.
           </>
         }
-        status={
-          <StatusPill tone={data.source === "huggingface_live" ? "success" : "warning"}>
-            {data.source === "huggingface_live"
-              ? "Live from latest.json"
-              : "Static snapshot"}
-          </StatusPill>
-        }
+        status={<StatusPill tone="success">Live from Hugging Face</StatusPill>}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -431,17 +425,10 @@ export function PopulaceOverviewView() {
       <SectionCard
         title="Release artifacts"
         description={
-          data.calibration_snapshot_stale ? (
-            <span className="text-amber-700">
-              The per-target snapshot was built from {data.snapshot_release_id}, which is
-              older than the live release {data.release_id}.
-            </span>
-          ) : (
-            <>
-              Resolved through <code>latest.json</code>
-              {data.updated_at ? ` (published ${data.updated_at})` : ""}.
-            </>
-          )
+          <>
+            Read live from Hugging Face, resolved through <code>latest.json</code>
+            {data.updated_at ? ` (published ${data.updated_at})` : ""}.
+          </>
         }
       >
         <table className="w-full text-left text-sm">
@@ -450,20 +437,14 @@ export function PopulaceOverviewView() {
               <tr key={artifact.name} className="border-b border-border/60 last:border-b-0">
                 <td className="py-1.5 pr-3 font-medium">{artifact.name}</td>
                 <td className="py-1.5 pr-3 text-muted-foreground">
-                  {artifact.url.startsWith("http") ? (
-                    <a
-                      className="underline decoration-dotted underline-offset-2"
-                      href={artifact.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {artifact.path}
-                    </a>
-                  ) : (
-                    <>
-                      {artifact.path} <span className="text-xs">(deployed snapshot)</span>
-                    </>
-                  )}
+                  <a
+                    className="underline decoration-dotted underline-offset-2"
+                    href={artifact.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {artifact.path}
+                  </a>
                 </td>
               </tr>
             ))}

@@ -33,6 +33,7 @@ export interface PopulaceTargetRow {
   // Derived at read time.
   family?: string | null;
   state?: string | null;
+  base_name?: string | null;
   geography?: string | null;
   level?: string | null;
   source?: string | null;
@@ -40,6 +41,12 @@ export interface PopulaceTargetRow {
   breakdown?: string | null;
   dims?: string[] | null;
   variable_key?: string | null;
+  // schema v2 published registry metadata (null on v1).
+  source_citation?: string | null;
+  entity?: string | null;
+  aggregation?: string | null;
+  measure_name?: string | null;
+  period?: number | null;
   initial_relative_error?: number | null;
   abs_relative_error?: number | null;
   improvement?: number | null;
@@ -92,18 +99,29 @@ export interface PopulaceCalibration {
   family_fit?: PopulaceFamilyFitRow[];
 }
 
+export interface PopulaceReleaseEntry {
+  release_id: string;
+  date: string;
+  files: string[];
+  has_calibration: boolean;
+}
+
+export interface PopulaceReleasesResponse {
+  latest_release_id: string;
+  updated_at: string | null;
+  releases: PopulaceReleaseEntry[];
+  all_releases: PopulaceReleaseEntry[];
+}
+
 export interface PopulaceResponse {
   source_repo: string;
   repo_type: string;
   revision: string;
-  source: "huggingface_live" | "deployed_static_snapshot" | string;
-  live_unavailable_reason: string | null;
+  source: "huggingface_live" | string;
   release_id: string;
-  snapshot_release_id: string;
   updated_at: string | null;
   source_artifacts: { name: string; path: string; url: string }[];
   limitations: string[];
-  calibration_snapshot_stale: boolean;
   build_manifest: {
     build_id?: string | null;
     builder?: string | null;
@@ -160,15 +178,24 @@ export interface PopulaceTargetDiagnostics {
   targets: PopulaceTargetRow[];
 }
 
-export function usePopulace() {
+export function usePopulaceReleases() {
   return useQuery({
-    queryKey: ["populace"],
-    queryFn: () => apiGet<PopulaceResponse>("/populace"),
+    queryKey: ["populace", "releases"],
+    queryFn: () => apiGet<PopulaceReleasesResponse>("/populace/releases"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function usePopulace(release?: string) {
+  return useQuery({
+    queryKey: ["populace", release ?? "latest"],
+    queryFn: () => apiGet<PopulaceResponse>("/populace", release ? { release } : undefined),
     staleTime: 5 * 60 * 1000,
   });
 }
 
 export function usePopulaceTargetDiagnostics(params: {
+  release?: string;
   limit?: number;
   offset?: number;
   family?: string;
