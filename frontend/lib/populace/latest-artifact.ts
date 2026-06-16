@@ -378,12 +378,12 @@ export interface Calibration {
   rows: TargetRow[];
 }
 
-function buildCalibration(
+export function buildCalibration(
   diag: JsonObject,
   releaseId: string,
-  updatedAt: string | null,
-  buildManifest: JsonObject,
-  releaseManifest: JsonObject,
+  updatedAt: string | null = null,
+  buildManifest: JsonObject = {},
+  releaseManifest: JsonObject = {},
 ): Calibration {
   const targets = Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : [];
   return {

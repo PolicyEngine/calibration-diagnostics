@@ -1,0 +1,110 @@
+import { expect, test } from "bun:test";
+
+import {
+  buildCalibration,
+  buildComparison,
+  latestPopulaceCalibrationSummary,
+  latestPopulaceTargetDiagnosticsPage,
+  type Calibration,
+} from "./latest-artifact";
+
+// A v2-shaped target: AGI bracket × return type × filing status, with @period.
+function agiTarget(band: string, ret: string, filing: string, rel: number) {
+  return {
+    name: `nation/irs/adjusted gross income/total/${band}/${ret}/${filing}@2024`,
+    target_name: `nation/irs/adjusted gross income/total/${band}/${ret}/${filing}`,
+    period: 2024,
+    entity: "household",
+    aggregation: "sum",
+    measure: { kind: "column", name: "adjusted_gross_income" },
+    source: "IRS SOI Table 1.1",
+    target: 100,
+    initial_estimate: 140,
+    final_estimate: 100 * (1 + rel),
+    relative_error: rel,
+    within_tolerance: Math.abs(rel) <= 0.1,
+  };
+}
+
+function calibration(targets: object[], releaseId = "rel-a"): Calibration {
+  return buildCalibration({ targets, final_loss: 0.02, fraction_within_10pct: 0.9 }, releaseId);
+}
+
+const SAMPLE = calibration([
+  agiTarget("AGI in 200k-500k", "taxable", "All", -0.086),
+  agiTarget("AGI in 200k-500k", "taxable", "Married Filing Jointly", -0.102),
+  agiTarget("AGI in 30k-40k", "taxable", "All", 0.236),
+  { name: "US06/snap-cost", target: 100, initial_estimate: 90, final_estimate: 99, relative_error: -0.01, within_tolerance: true },
+]);
+
+function page(url: string, cal = SAMPLE) {
+  return latestPopulaceTargetDiagnosticsPage(`http://x/api/populace/target-diagnostics${url}`, cal);
+}
+
+test("v2 metadata and parsing survive enrichment", () => {
+  const row = SAMPLE.rows[0];
+  expect(row.variable_key).toBe("irs / adjusted gross income");
+  expect(row.variable).toBe("adjusted gross income"); // @2024 stripped via target_name
+  expect(row.geography).toBe("United States");
+  expect(row.entity).toBe("household");
+  expect(row.aggregation).toBe("sum");
+  expect(row.period).toBe(2024);
+  expect(row.source_citation).toBe("IRS SOI Table 1.1");
+});
+
+test("FIPS admin target collapses to a measure family", () => {
+  const snap = SAMPLE.rows.find((r) => r.variable === "snap-cost")!;
+  expect(snap.geography).toBe("CA");
+  expect(snap.source).toBe("admin");
+  expect(snap.family).toBe("snap-cost");
+});
+
+test("variable filter isolates a variable's breakdowns", () => {
+  const result = page("?variable=irs%20%2F%20adjusted%20gross%20income");
+  expect(result.filtered_total).toBe(3);
+  for (const row of result.targets) expect(row.variable_key).toBe("irs / adjusted gross income");
+});
+
+test("dimensions are the axes that vary; constants drop", () => {
+  const result = page("?variable=irs%20%2F%20adjusted%20gross%20income");
+  const labels = result.dimensions.map((d) => d.label);
+  expect(labels).toContain("Income band");
+  expect(labels).toContain("Filing status");
+  expect(labels).not.toContain("Return type"); // all "taxable" -> constant
+});
+
+test("facet filter narrows to a single breakdown", () => {
+  const income = page("?variable=irs%20%2F%20adjusted%20gross%20income").dimensions.find(
+    (d) => d.label === "Income band",
+  )!;
+  const result = page(
+    `?variable=irs%20%2F%20adjusted%20gross%20income&facet=${income.key}:AGI in 30k-40k`,
+  );
+  expect(result.filtered_total).toBe(1);
+  expect(result.targets[0].dims).toContain("AGI in 30k-40k");
+});
+
+test("calibration summary reports per-family fit", () => {
+  const summary = latestPopulaceCalibrationSummary(SAMPLE);
+  expect(summary.total_targets).toBe(4);
+  expect(summary.family_fit.length).toBeGreaterThan(0);
+});
+
+test("comparison matches on base_name across the @period boundary", () => {
+  // B drops one target, changes one fit, adds a new one.
+  const b = calibration(
+    [
+      agiTarget("AGI in 200k-500k", "taxable", "All", -0.02), // improved (|−0.02| < |−0.086|)
+      agiTarget("AGI in 30k-40k", "taxable", "All", 0.30), // regressed
+      { name: "nation/cbo/individual_income_tax@2024", target_name: "nation/cbo/individual_income_tax", target: 1, initial_estimate: 1, final_estimate: 1, relative_error: 0, within_tolerance: true },
+    ],
+    "rel-b",
+  );
+  const cmp = buildComparison(SAMPLE, b);
+  expect(cmp.summary.common).toBe(2);
+  expect(cmp.summary.improved).toBe(1);
+  expect(cmp.summary.regressed).toBe(1);
+  expect(cmp.summary.added).toBe(1); // cbo income tax, only in B
+  expect(cmp.summary.removed).toBe(2); // the MFJ AGI row and snap-cost, only in A
+  expect(cmp.summary.losses_comparable).toBe(false);
+});
