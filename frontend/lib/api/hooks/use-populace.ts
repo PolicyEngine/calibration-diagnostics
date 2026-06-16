@@ -178,6 +178,45 @@ export interface PopulaceTargetDiagnostics {
   targets: PopulaceTargetRow[];
 }
 
+export interface PopulaceComparisonRow {
+  name: string;
+  variable_key?: string | null;
+  variable?: string | null;
+  breakdown?: string | null;
+  geography?: string | null;
+  a_final_estimate?: number | null;
+  b_final_estimate?: number | null;
+  a_relative_error?: number | null;
+  b_relative_error?: number | null;
+  a_within_tolerance?: boolean | null;
+  b_within_tolerance?: boolean | null;
+  abs_rel_delta?: number | null;
+}
+
+export interface PopulaceComparison {
+  a: { release_id: string; total_targets: number; final_loss: number | null; fraction_within_10pct: number | null };
+  b: { release_id: string; total_targets: number; final_loss: number | null; fraction_within_10pct: number | null };
+  summary: {
+    common: number;
+    added: number;
+    removed: number;
+    improved: number;
+    regressed: number;
+    unchanged: number;
+    losses_comparable: boolean;
+  };
+  rows: PopulaceComparisonRow[];
+}
+
+export function usePopulaceCompare(a?: string, b?: string, enabled = true) {
+  return useQuery({
+    queryKey: ["populace", "compare", a, b],
+    queryFn: () => apiGet<PopulaceComparison>("/populace/compare", { a, b }),
+    enabled: enabled && Boolean(a && b),
+    staleTime: 15 * 60 * 1000,
+  });
+}
+
 export function usePopulaceReleases() {
   return useQuery({
     queryKey: ["populace", "releases"],

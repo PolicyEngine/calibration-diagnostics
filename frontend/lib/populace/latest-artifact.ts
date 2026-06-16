@@ -605,3 +605,86 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     filters: { family, variable, source, level, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
   };
 }
+
+// --- version-over-version comparison ----------------------------------------
+function absRel(row: TargetRow | undefined): number | null {
+  return row ? numberOrNull(row.abs_relative_error) : null;
+}
+
+// Diff two releases' calibration by matching targets on name. Common targets
+// get a fit delta (|b rel err| - |a rel err|; negative = b fits better);
+// targets present in only one release are listed as added/removed. Losses
+// across releases are NOT comparable when the surfaces differ — flagged.
+export function buildComparison(a: Calibration, b: Calibration) {
+  // Match on base_name (the period-stripped name) so v1 and v2 releases align —
+  // v2 appends an @<period> suffix the older convention lacks.
+  const key = (r: TargetRow) => String(r.base_name ?? r.name);
+  const aByName = new Map(a.rows.map((r) => [key(r), r]));
+  const bByName = new Map(b.rows.map((r) => [key(r), r]));
+  const names = new Set([...aByName.keys(), ...bByName.keys()]);
+
+  const common: TargetRow[] = [];
+  let added = 0;
+  let removed = 0;
+  let improved = 0;
+  let regressed = 0;
+  for (const name of names) {
+    const ar = aByName.get(name);
+    const br = bByName.get(name);
+    if (ar && br) {
+      const aAbs = absRel(ar);
+      const bAbs = absRel(br);
+      const delta = aAbs != null && bAbs != null ? bAbs - aAbs : null;
+      if (delta != null && delta < -1e-9) improved += 1;
+      else if (delta != null && delta > 1e-9) regressed += 1;
+      common.push({
+        name,
+        variable_key: br.variable_key ?? ar.variable_key,
+        variable: br.variable ?? ar.variable,
+        breakdown: br.breakdown ?? ar.breakdown,
+        geography: br.geography ?? ar.geography,
+        a_final_estimate: ar.final_estimate ?? null,
+        b_final_estimate: br.final_estimate ?? null,
+        a_relative_error: numberOrNull(ar.relative_error),
+        b_relative_error: numberOrNull(br.relative_error),
+        a_within_tolerance: ar.within_tolerance ?? null,
+        b_within_tolerance: br.within_tolerance ?? null,
+        abs_rel_delta: delta,
+      });
+    } else if (ar) {
+      removed += 1;
+    } else {
+      added += 1;
+    }
+  }
+  common.sort(
+    (x, y) =>
+      Math.abs(numberOrNull(y.abs_rel_delta) ?? 0) -
+      Math.abs(numberOrNull(x.abs_rel_delta) ?? 0),
+  );
+
+  const surfacesDiffer =
+    a.rows.length !== b.rows.length || added > 0 || removed > 0;
+  return {
+    a: { release_id: a.release_id, total_targets: a.rows.length, final_loss: a.final_loss, fraction_within_10pct: a.fraction_within_10pct },
+    b: { release_id: b.release_id, total_targets: b.rows.length, final_loss: b.final_loss, fraction_within_10pct: b.fraction_within_10pct },
+    summary: {
+      common: common.length,
+      added,
+      removed,
+      improved,
+      regressed,
+      unchanged: common.length - improved - regressed,
+      losses_comparable: !surfacesDiffer,
+    },
+    rows: common,
+  };
+}
+
+export async function loadComparison(aId: string, bId: string, revalidate: number) {
+  const [a, b] = await Promise.all([
+    loadRelease(aId, revalidate),
+    loadRelease(bId, revalidate),
+  ]);
+  return buildComparison(a, b);
+}
