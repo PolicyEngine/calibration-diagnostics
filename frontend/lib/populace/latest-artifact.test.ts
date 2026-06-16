@@ -109,6 +109,20 @@ test("comparison matches on base_name across the @period boundary", () => {
   expect(cmp.summary.losses_comparable).toBe(false);
 });
 
+test("zero-target rows have null relative error, not a nonsense percentage", () => {
+  // SOI cells that are genuinely $0 (e.g. the under-$1 AGI band) must not render
+  // a $52B miss as "5191840415890%".
+  const cal = calibration([
+    { name: "nation/irs/real_estate_taxes/total/under 1@2024", target_name: "nation/irs/real_estate_taxes/total/under 1", target: 0, initial_estimate: 51.94e9, final_estimate: 51.92e9, relative_error: 51.92e9, within_tolerance: false },
+  ]);
+  const row = cal.rows[0];
+  expect(row.relative_error).toBeNull(); // not the raw 51.92e9 the producer published
+  expect(row.abs_relative_error).toBeNull();
+  expect(row.target_is_zero).toBe(true);
+  expect(row.abs_error).toBeCloseTo(51.92e9, 0); // the miss is still inspectable
+  expect(row.direction).toBe("over");
+});
+
 test("count and total measures split into distinct variables", () => {
   const cal = calibration([
     { name: "nation/irs/capital gains gross/total/AGI in 1m-inf/taxable/All@2024", target_name: "nation/irs/capital gains gross/total/AGI in 1m-inf/taxable/All", target: 100, initial_estimate: 90, final_estimate: 100, relative_error: 0, within_tolerance: true },

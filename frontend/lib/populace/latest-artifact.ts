@@ -58,7 +58,12 @@ function numberOrNull(value: unknown): number | null {
 
 function relativeError(estimate: number | null, target: number | null): number | null {
   if (estimate == null || target == null) return null;
-  return target === 0 ? estimate - target : (estimate - target) / Math.abs(target);
+  // Relative error is undefined when the target is 0 — dividing the miss by the
+  // target blows up, and rendering the raw dollar miss as a percentage produces
+  // nonsense (e.g. a $52B estimate against a $0 target shows "5191840415890%").
+  // Callers treat a zero-target row as having no relative error.
+  if (target === 0) return null;
+  return (estimate - target) / Math.abs(target);
 }
 
 interface ParsedTarget {
@@ -238,9 +243,14 @@ function enrichTargetRow(row: TargetRow): TargetRow {
   const target = numberOrNull(row.target);
   const initial = numberOrNull(row.initial_estimate);
   const final = numberOrNull(row.final_estimate);
-  const finalRel = numberOrNull(row.relative_error) ?? relativeError(final, target);
-  const initialRel = relativeError(initial, target);
+  // A zero target has no meaningful relative error — null it out regardless of
+  // what the producer published, and expose the absolute miss instead so the
+  // row is still inspectable (these are SOI cells that are genuinely $0).
+  const targetIsZero = target === 0;
+  const finalRel = targetIsZero ? null : (numberOrNull(row.relative_error) ?? relativeError(final, target));
+  const initialRel = targetIsZero ? null : relativeError(initial, target);
   const absFinalRel = finalRel == null ? null : Math.abs(finalRel);
+  const absError = final == null || target == null ? null : final - target;
   const improvement =
     initialRel == null || finalRel == null ? null : Math.abs(initialRel) - Math.abs(finalRel);
   const parsed = parseTarget(baseName);
@@ -273,10 +283,26 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
     period: numberOrNull(row.period),
+    // Override the published relative_error so a zero-target row is null, not
+    // the raw dollar miss that downstream code would render as a percentage.
+    relative_error: finalRel,
     initial_relative_error: initialRel,
     abs_relative_error: absFinalRel,
+    abs_error: absError,
+    target_is_zero: targetIsZero,
     improvement,
-    direction: finalRel == null ? null : finalRel > 0 ? "over" : finalRel < 0 ? "under" : "exact",
+    direction:
+      finalRel == null
+        ? targetIsZero && absError != null && Math.abs(absError) > 1e-9
+          ? absError > 0
+            ? "over"
+            : "under"
+          : null
+        : finalRel > 0
+          ? "over"
+          : finalRel < 0
+            ? "under"
+            : "exact",
   };
 }
 

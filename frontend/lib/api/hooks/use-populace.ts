@@ -50,6 +50,8 @@ export interface PopulaceTargetRow {
   period?: number | null;
   initial_relative_error?: number | null;
   abs_relative_error?: number | null;
+  abs_error?: number | null;
+  target_is_zero?: boolean | null;
   improvement?: number | null;
   direction?: "over" | "under" | "exact" | null;
   [key: string]: unknown;
