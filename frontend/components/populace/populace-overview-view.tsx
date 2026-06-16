@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtCompact, fmtSci, releaseLabel } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -150,9 +150,12 @@ export function PopulaceOverviewView() {
   const calibrationGate = gates.calibration ?? {};
   const cal = data.calibration ?? { available: false };
   const options = cal.options ?? {};
-  const lossDelta =
-    cal.initial_loss != null && cal.final_loss != null
-      ? cal.final_loss - cal.initial_loss
+  // The published loss is the optimizer's raw weighted squared-dollar error
+  // (~1e17), so the meaningful "did it improve" signal is the relative
+  // reduction from the initial loss, not the raw difference.
+  const lossReduction =
+    cal.initial_loss != null && cal.final_loss != null && cal.initial_loss !== 0
+      ? (cal.initial_loss - cal.final_loss) / cal.initial_loss
       : null;
   const recordsKept =
     cal.n_nonzero != null && cal.n_records != null && cal.n_records > 0
@@ -201,13 +204,17 @@ export function PopulaceOverviewView() {
           label={
             <HelpHint
               label="Calibration loss"
-              tooltip="The eCPS relative-error loss mean(((est − target)/(target + 1))²) over all targets under the calibrated weights. Lower is better."
+              tooltip="The optimizer's raw objective: the weighted sum of squared dollar misses across all targets. It runs to ~1e17 and is dominated by the largest aggregates (and a few near-zero targets whose relative error explodes), so it's the quantity calibration minimizes — not an interpretable fit score. Use “Within 10% of target” for fit quality."
             />
           }
-          value={cal.final_loss == null ? "—" : fmt(cal.final_loss, { digits: 4 })}
-          delta={lossDelta == null ? undefined : fmt(lossDelta, { digits: 3 })}
-          tone={lossDelta != null && lossDelta < 0 ? "positive" : "neutral"}
-          hint={`From initial ${fmt(cal.initial_loss, { digits: 3 })}`}
+          value={cal.final_loss == null ? "—" : fmtSci(cal.final_loss)}
+          delta={
+            lossReduction == null
+              ? undefined
+              : `${fmt(Math.abs(lossReduction), { pct: true, digits: 2 })} ${lossReduction >= 0 ? "lower" : "higher"}`
+          }
+          tone={lossReduction != null && lossReduction > 0 ? "positive" : "neutral"}
+          hint={`From initial ${fmtSci(cal.initial_loss)}`}
         />
         <KpiCard
           label={
@@ -307,12 +314,33 @@ export function PopulaceOverviewView() {
                   Initial → final loss
                 </div>
                 <div className="text-lg font-semibold tabular-nums">
-                  {fmt(cal.initial_loss, { digits: 3 })} →{" "}
-                  {fmt(cal.final_loss, { digits: 4 })}
+                  {fmtSci(cal.initial_loss)} → {fmtSci(cal.final_loss)}
                 </div>
               </div>
               <LossSparkline trajectory={cal.loss_trajectory ?? []} />
             </div>
+            {cal.n_zero_target != null && cal.n_zero_target > 0 && (
+              <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3 text-xs leading-relaxed text-amber-900">
+                <span className="font-semibold">Why so large?</span> {cal.n_zero_target} of{" "}
+                {fmt(cal.total_targets ?? null, { digits: 0 })} targets have a $0 reference value
+                (e.g. SOI &ldquo;AGI under $1&rdquo; cells), where the relative-error loss is
+                undefined — populace estimates billions against $0, so the term explodes. Those
+                rows drive {fmt(cal.zero_target_loss_share, { pct: true, digits: 0 })} of the raw
+                loss. Excluding them, the mean squared relative error is{" "}
+                <span className="font-semibold tabular-nums">
+                  {fmtSci(cal.loss_excl_zero_target)}
+                </span>
+                {cal.median_abs_rel_error != null && (
+                  <>
+                    , and the median |relative error| is{" "}
+                    <span className="font-semibold tabular-nums">
+                      {fmt(cal.median_abs_rel_error, { pct: true, digits: 0 })}
+                    </span>
+                  </>
+                )}
+                .
+              </div>
+            )}
             {diagnosticsNote && (
               <p className="text-xs leading-snug text-muted-foreground">{diagnosticsNote}</p>
             )}

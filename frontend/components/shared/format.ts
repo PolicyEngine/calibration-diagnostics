@@ -69,6 +69,14 @@ export function fmtCompact(value: number | null | undefined): string {
   return `${sign}${abs.toFixed(0)}`;
 }
 
+// Scientific notation for magnitudes that blow past human-readable grouping —
+// e.g. the raw calibration loss (~1e17 squared-dollar error). "7.52e17", "-4.39e14".
+export function fmtSci(value: number | null | undefined, digits = 2): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  if (value === 0) return "0";
+  return value.toExponential(digits).replace("e+", "e");
+}
+
 export function fmtMoney(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   const abs = Math.abs(value);

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtSigned, humanizeName, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtSci, fmtSigned, humanizeName, releaseLabel } from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -209,7 +209,7 @@ export function PopulaceCompareView() {
               value={`${fmt(data.a.fraction_within_10pct, { pct: true, digits: 0 })} → ${fmt(data.b.fraction_within_10pct, { pct: true, digits: 0 })}`}
               hint={
                 data.summary.losses_comparable
-                  ? `loss ${fmt(data.a.final_loss, { digits: 3 })} → ${fmt(data.b.final_loss, { digits: 3 })}`
+                  ? `loss ${fmtSci(data.a.final_loss)} → ${fmtSci(data.b.final_loss)}`
                   : "surfaces differ — losses not comparable"
               }
             />
