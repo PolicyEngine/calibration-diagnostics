@@ -71,7 +71,7 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
         <thead>
           <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
             <th className="px-3 py-2 font-semibold">Reform</th>
-            <th className="px-3 py-2 text-right font-semibold">JCT score</th>
+            <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
             <th className="px-3 py-2 text-right font-semibold">populace</th>
             <th className="px-3 py-2 text-right font-semibold">Error</th>
             <th className="px-3 py-2 text-right font-semibold">Error %</th>
@@ -158,7 +158,7 @@ export function PopulaceReformsView() {
       <PageHeader
         eyebrow="Populace"
         title="Reform validation"
-        description="How closely populace-US reproduces the budget effects of reforms that the Joint Committee on Taxation has officially scored. Each reform is simulated on the dataset by the build pipeline; we compare that estimate to the JCT score and track the gap release-over-release."
+        description="How closely populace-US reproduces the budget effects of reforms with an official score — JCT-scored provisions (OBBBA) and JCT/Treasury tax-expenditure values for the big credits and deductions. Each reform is simulated on the dataset by the build pipeline; we compare to the published figure and track the gap release-over-release."
       />
 
       <SectionCard title="Release">
@@ -229,8 +229,8 @@ export function PopulaceReformsView() {
           </div>
 
           <SectionCard
-            title="populace vs JCT"
-            description="A negative budget effect is a cost (revenue reduction). Error is populace − JCT; Error % is relative to the JCT score. Out-of-sample reforms are the real test; in-sample reforms are JCT tax-expenditure calibration targets the dataset was tuned to, shown for completeness."
+            title="populace vs benchmark"
+            description="Error is populace − benchmark; Error % is relative to the benchmark. Some provisions (the standard deduction, all-itemized) have no published figure — both JCT and Treasury treat the standard deduction as baseline — so they show the repeal magnitude only. Out-of-sample reforms are the real test; in-sample reforms are ones the dataset was calibrated to, shown for completeness."
             padded={false}
           >
             <ReformTable rows={data.rows ?? []} />
@@ -238,7 +238,7 @@ export function PopulaceReformsView() {
 
           <SectionCard
             title="Run-over-run"
-            description="How each reform's |error| against its JCT score has moved across releases that published a validation set. Down (and green) is better."
+            description="How each reform's |error| against its benchmark has moved across releases that published a validation set. Down (and green) is better."
             padded={false}
           >
             {trackedReforms.length ? (
