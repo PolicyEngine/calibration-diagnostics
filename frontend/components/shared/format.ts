@@ -17,6 +17,23 @@ export function humanizeName(value: string | null | undefined): string {
     .join(" ");
 }
 
+// Release build ids carry a trailing date ("…-20260614") or timestamp
+// ("…-20260615T201302Z"). Format it for display.
+export function formatReleaseDate(date: string | null | undefined): string {
+  if (!date) return "";
+  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})\d{2}Z)?$/.exec(date);
+  if (!m) return date;
+  const [, y, mo, d, h, mi] = m;
+  return h ? `${y}-${mo}-${d} ${h}:${mi}Z` : `${y}-${mo}-${d}`;
+}
+
+// A readable label for a release: "2026-06-14 · f32c2e5".
+export function releaseLabel(releaseId: string, date?: string | null): string {
+  const sha = releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0];
+  const formatted = formatReleaseDate(date);
+  return formatted ? `${formatted} · ${sha}` : sha;
+}
+
 export function fmt(
   value: number | null | undefined,
   opts: { pct?: boolean; digits?: number } = {},

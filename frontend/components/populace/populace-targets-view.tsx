@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, humanizeName } from "@/components/shared/format";
+import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
@@ -164,9 +164,9 @@ function VariableBrowser({
         onChange={(event) => setQuery(event.target.value)}
         className="h-8 w-full rounded-md border border-border bg-white px-3 text-xs focus:border-primary/60 focus:outline-none"
       />
-      <div className="rounded-md border border-border">
+      <div className="max-h-[65vh] overflow-y-auto rounded-md border border-border">
         <table className="w-full text-left text-sm">
-          <thead className="bg-muted/40">
+          <thead className="sticky top-0 bg-muted/40 backdrop-blur">
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-3 py-2 font-semibold">Variable</th>
               <th className="px-3 py-2 text-right font-semibold">Targets</th>
@@ -234,7 +234,7 @@ export function PopulaceTargetsView() {
       { value: "", label: "Latest" },
       ...(releaseData?.releases ?? []).map((r) => ({
         value: r.release_id,
-        label: r.release_id.replace(/^populace-us-\d{4}-/, "").replace(/-c[0-9a-f]{12}-/, "·"),
+        label: releaseLabel(r.release_id, r.date),
       })),
     ],
     [releaseData],

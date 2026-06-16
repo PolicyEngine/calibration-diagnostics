@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtSigned, humanizeName } from "@/components/shared/format";
+import { fmt, fmtSigned, humanizeName, releaseLabel } from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -15,11 +15,6 @@ import {
   usePopulaceReleases,
   type PopulaceComparisonRow,
 } from "@/lib/api/hooks/use-populace";
-
-// Trim the long build id to something readable in a dropdown.
-function shortRelease(id: string): string {
-  return id.replace(/^populace-us-\d{4}-/, "").replace(/-c[0-9a-f]{12}-/, "·");
-}
 
 function relErr(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
@@ -82,9 +77,13 @@ export function PopulaceCompareView() {
   const { data, isLoading, error } = usePopulaceCompare(a, b);
 
   const options = useMemo(
-    () => releases.map((r) => ({ value: r.release_id, label: shortRelease(r.release_id) })),
+    () => releases.map((r) => ({ value: r.release_id, label: releaseLabel(r.release_id, r.date) })),
     [releases],
   );
+  const dateOf = (id: string) => {
+    const r = releases.find((x) => x.release_id === id);
+    return r ? releaseLabel(r.release_id, r.date) : id;
+  };
 
   const improvements = useMemo(
     () => (data?.rows ?? []).filter((r) => (r.abs_rel_delta ?? 0) < 0).slice(0, 20),
@@ -129,6 +128,11 @@ export function PopulaceCompareView() {
         />
       ) : (
         <>
+          <div className="text-sm text-muted-foreground">
+            A <span className="font-medium text-foreground">{dateOf(a)}</span>
+            {"  →  "}
+            B <span className="font-medium text-foreground">{dateOf(b)}</span>
+          </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <KpiCard
               label="Targets A → B"

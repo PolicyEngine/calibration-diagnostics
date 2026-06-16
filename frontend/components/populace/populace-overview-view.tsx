@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact } from "@/components/shared/format";
+import { fmt, fmtCompact, releaseLabel } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -130,7 +130,7 @@ export function PopulaceOverviewView() {
       { value: "", label: "Latest" },
       ...(releaseData?.releases ?? []).map((r) => ({
         value: r.release_id,
-        label: r.release_id.replace(/^populace-us-\d{4}-/, "").replace(/-c[0-9a-f]{12}-/, "·"),
+        label: releaseLabel(r.release_id, r.date),
       })),
     ],
     [releaseData],
