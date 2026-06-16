@@ -210,6 +210,69 @@ export interface PopulaceComparison {
   rows: PopulaceComparisonRow[];
 }
 
+export interface AgeBandRow {
+  label: string;
+  min_age?: number | null;
+  max_age?: number | null;
+  population?: number | null;
+  share?: number | null;
+  benchmark?: number | null;
+  benchmark_share?: number | null;
+  relative_error?: number | null;
+  abs_relative_error?: number | null;
+}
+
+export interface DemographicsResponse {
+  available: boolean;
+  release_id: string;
+  reason?: string;
+  expected_path?: string;
+  updated_at?: string | null;
+  schema_version?: number | null;
+  period?: number | null;
+  measure?: string | null;
+  total_population?: number | null;
+  benchmark_total_population?: number | null;
+  benchmark_source?: string | null;
+  bands?: AgeBandRow[];
+  summary?: {
+    n_bands: number;
+    n_benchmarked: number;
+    mean_abs_relative_error: number | null;
+    max_abs_relative_error: number | null;
+    total_vs_benchmark: number | null;
+  };
+  source_artifact?: { name: string; path: string; url: string };
+}
+
+export interface DemographicsHistoryResponse {
+  benchmark_total_population: number | null;
+  points: {
+    release_id: string;
+    date: string;
+    total_population: number | null;
+    total_vs_benchmark: number | null;
+    mean_abs_relative_error: number | null;
+  }[];
+}
+
+export function usePopulaceDemographics(release?: string) {
+  return useQuery({
+    queryKey: ["populace", "demographics", release ?? "latest"],
+    queryFn: () =>
+      apiGet<DemographicsResponse>("/populace/demographics", release ? { release } : undefined),
+    staleTime: 15 * 60 * 1000,
+  });
+}
+
+export function usePopulaceDemographicsHistory() {
+  return useQuery({
+    queryKey: ["populace", "demographics", "history"],
+    queryFn: () => apiGet<DemographicsHistoryResponse>("/populace/demographics/history"),
+    staleTime: 15 * 60 * 1000,
+  });
+}
+
 export function usePopulaceCompare(a?: string, b?: string, enabled = true) {
   return useQuery({
     queryKey: ["populace", "compare", a, b],
