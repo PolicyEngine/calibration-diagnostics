@@ -14,10 +14,64 @@ import {
   usePopulaceCompare,
   usePopulaceReleases,
   type PopulaceComparisonRow,
+  type PopulaceVariableComparisonRow,
 } from "@/lib/api/hooks/use-populace";
 
 function relErr(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
+}
+
+function fitPct(f: { fraction_within_10pct: number | null; n_targets: number }) {
+  return `${f.fraction_within_10pct == null ? "—" : fmt(f.fraction_within_10pct, { pct: true, digits: 0 })} (${fmt(f.n_targets, { digits: 0 })})`;
+}
+
+// Variable-level fit, matched on a scheme-independent key — works even when the
+// two releases use different naming conventions (so no individual targets match).
+function VariableComparisonTable({ rows }: { rows: PopulaceVariableComparisonRow[] }) {
+  if (!rows.length) {
+    return <EmptyState title="No variables in common between these releases." variant="compact" />;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+            <th className="px-3 py-2 font-semibold">Variable</th>
+            <th className="px-3 py-2 text-right font-semibold">A within 10% (n)</th>
+            <th className="px-3 py-2 text-right font-semibold">B within 10% (n)</th>
+            <th className="px-3 py-2 text-right font-semibold">Δ within 10%</th>
+            <th className="px-3 py-2 text-right font-semibold">A → B mean |err|</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key} className="border-b border-border/60 last:border-b-0">
+              <td className="px-3 py-1.5">
+                <span className="font-medium text-foreground">{humanizeName(row.variable)}</span>{" "}
+                <span className="text-xs text-muted-foreground">{row.source}</span>
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{fitPct(row.a)}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{fitPct(row.b)}</td>
+              <td
+                className={`px-3 py-1.5 text-right tabular-nums ${
+                  (row.within10_delta ?? 0) > 0
+                    ? "text-emerald-700"
+                    : (row.within10_delta ?? 0) < 0
+                      ? "text-rose-700"
+                      : "text-muted-foreground"
+                }`}
+              >
+                {row.within10_delta == null ? "—" : fmtSigned(row.within10_delta, { pct: true, digits: 0 })}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                {relErr(row.a.mean_abs_relative_error)} → {relErr(row.b.mean_abs_relative_error)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function MoversTable({ rows }: { rows: PopulaceComparisonRow[] }) {
@@ -169,22 +223,32 @@ export function PopulaceCompareView() {
             </StatusPill>
           )}
 
-          <div className="grid gap-5 xl:grid-cols-2">
-            <SectionCard
-              title="Most improved (B vs A)"
-              description="Common targets whose absolute relative error fell the most from A to B."
-              padded={false}
-            >
-              <MoversTable rows={improvements} />
-            </SectionCard>
-            <SectionCard
-              title="Most regressed (B vs A)"
-              description="Common targets whose absolute relative error rose the most from A to B."
-              padded={false}
-            >
-              <MoversTable rows={regressions} />
-            </SectionCard>
-          </div>
+          <SectionCard
+            title="Variable-level fit (A → B)"
+            description="Per-variable fit for the variables present in both releases, matched on a scheme-independent key — so this works even when the two releases use different target-naming conventions and share no individual targets (e.g. the JCT tax expenditures and shared IRS income lines). Δ within 10% positive = B fits the variable better."
+            padded={false}
+          >
+            <VariableComparisonTable rows={data.variable_comparison ?? []} />
+          </SectionCard>
+
+          {data.summary.common > 0 && (
+            <div className="grid gap-5 xl:grid-cols-2">
+              <SectionCard
+                title="Most improved (B vs A)"
+                description="Common targets whose absolute relative error fell the most from A to B."
+                padded={false}
+              >
+                <MoversTable rows={improvements} />
+              </SectionCard>
+              <SectionCard
+                title="Most regressed (B vs A)"
+                description="Common targets whose absolute relative error rose the most from A to B."
+                padded={false}
+              >
+                <MoversTable rows={regressions} />
+              </SectionCard>
+            </div>
+          )}
         </>
       )}
     </div>

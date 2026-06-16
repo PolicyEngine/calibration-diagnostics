@@ -177,6 +177,32 @@ test("dotted EITC breakdowns facet by income band and children", () => {
   expect(labels).toContain("Children");
 });
 
+test("variable comparison aligns the slash and dotted naming schemes", () => {
+  // A uses slash names, B uses dotted names; no individual targets match, but
+  // the shared variables (JCT SALT, IRS AGI) must align at the variable level.
+  const a = calibration(
+    [
+      { name: "nation/jct/salt_deduction_expenditure@2024", target_name: "nation/jct/salt_deduction_expenditure", target: 100, final_estimate: 100, relative_error: 0, within_tolerance: true },
+      { name: "nation/irs/adjusted gross income/total/AGI in 200k-500k/taxable/All@2024", target_name: "nation/irs/adjusted gross income/total/AGI in 200k-500k/taxable/All", target: 100, final_estimate: 95, relative_error: -0.05, within_tolerance: true },
+    ],
+    "rel-a",
+  );
+  const b = calibration(
+    [
+      dotted("jct.tax_expenditures.cy2024.salt_deduction.revenue_loss"),
+      dotted("irs_soi.ty2022.historic_table_2.us.all.adjusted_gross_income"),
+    ],
+    "rel-b",
+  );
+  const cmp = buildComparison(a, b);
+  expect(cmp.summary.common).toBe(0); // raw names share nothing
+  const vc = cmp.variable_comparison ?? [];
+  const salt = vc.find((r) => r.key === "jct/salt deduction");
+  expect(salt?.a.n_targets).toBe(1);
+  expect(salt?.b.n_targets).toBe(1);
+  expect(vc.find((r) => r.key === "irs/adjusted gross income")).toBeTruthy();
+});
+
 test("count and total measures split into distinct variables", () => {
   const cal = calibration([
     { name: "nation/irs/capital gains gross/total/AGI in 1m-inf/taxable/All@2024", target_name: "nation/irs/capital gains gross/total/AGI in 1m-inf/taxable/All", target: 100, initial_estimate: 90, final_estimate: 100, relative_error: 0, within_tolerance: true },

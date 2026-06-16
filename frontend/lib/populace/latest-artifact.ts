@@ -835,6 +835,77 @@ function absRel(row: TargetRow | undefined): number | null {
   return row ? numberOrNull(row.abs_relative_error) : null;
 }
 
+// A scheme-independent variable key so the two naming conventions align: the
+// slash surface's "irs / adjusted gross income" and the dotted surface's
+// "IRS SOI / adjusted gross income" both reduce to "irs/adjusted gross income".
+function canonicalVariableKey(row: TargetRow): string {
+  const src = String(row.source ?? "").toLowerCase().replace(/\s+/g, "_");
+  const srcNorm = src === "irs_soi" ? "irs" : src;
+  const variable = String(row.variable ?? "")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\s+expenditure$/, "")
+    .trim();
+  return srcNorm && variable ? `${srcNorm}/${variable}` : "";
+}
+
+function variableFit(rows: TargetRow[]) {
+  const errs = rows.map(absRel).filter((v): v is number => v != null);
+  return {
+    n_targets: rows.length,
+    within_10pct: errs.filter((e) => e <= 0.1).length,
+    fraction_within_10pct: errs.length ? errs.filter((e) => e <= 0.1).length / errs.length : null,
+    mean_abs_relative_error: errs.length ? errs.reduce((s, v) => s + v, 0) / errs.length : null,
+  };
+}
+
+// Compare the per-variable fit of two releases. Unlike the per-target diff this
+// works across the naming-scheme boundary (and within it): it groups each
+// release's targets by canonical variable and reports the fit of the variables
+// present in both — e.g. the JCT tax expenditures and shared IRS income lines.
+function buildVariableComparison(a: Calibration, b: Calibration) {
+  const group = (rows: TargetRow[]) => {
+    const m = new Map<string, TargetRow[]>();
+    for (const r of rows) {
+      const k = canonicalVariableKey(r);
+      if (!k) continue;
+      (m.get(k) ?? m.set(k, []).get(k)!).push(r);
+    }
+    return m;
+  };
+  const aByVar = group(a.rows);
+  const bByVar = group(b.rows);
+  type VarFit = ReturnType<typeof variableFit>;
+  const common: {
+    key: string;
+    source: string;
+    variable: string;
+    a: VarFit;
+    b: VarFit;
+    within10_delta: number | null;
+  }[] = [];
+  for (const [k, aRows] of aByVar) {
+    const bRows = bByVar.get(k);
+    if (!bRows) continue;
+    const af = variableFit(aRows);
+    const bf = variableFit(bRows);
+    const label = String(aRows[0].variable ?? bRows[0].variable ?? k);
+    common.push({
+      key: k,
+      source: String(aRows[0].source ?? bRows[0].source ?? ""),
+      variable: label,
+      a: af,
+      b: bf,
+      within10_delta:
+        af.fraction_within_10pct != null && bf.fraction_within_10pct != null
+          ? bf.fraction_within_10pct - af.fraction_within_10pct
+          : null,
+    });
+  }
+  common.sort((x, y) => Math.abs(y.within10_delta ?? 0) - Math.abs(x.within10_delta ?? 0));
+  return common;
+}
+
 // Diff two releases' calibration by matching targets on name. Common targets
 // get a fit delta (|b rel err| - |a rel err|; negative = b fits better);
 // targets present in only one release are listed as added/removed. Losses
@@ -902,6 +973,7 @@ export function buildComparison(a: Calibration, b: Calibration) {
       losses_comparable: !surfacesDiffer,
     },
     rows: common,
+    variable_comparison: buildVariableComparison(a, b),
   };
 }
 
