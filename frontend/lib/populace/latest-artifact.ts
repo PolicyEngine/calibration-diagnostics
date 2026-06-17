@@ -80,6 +80,14 @@ interface ParsedTarget {
   breakdown: string;
 }
 
+interface TargetBreakdownDimension {
+  key: string;
+  label: string;
+  value: string;
+  source_key?: string;
+  raw_value?: string;
+}
+
 function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
@@ -93,6 +101,39 @@ function stateFromGeoId(value: string | null): string | null {
 function readableToken(value: string | null): string | null {
   if (!value) return null;
   return value.replace(/_/g, " ");
+}
+
+function titleCase(value: string): string {
+  return value
+    .replace(/[_:./#-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function dimensionKey(label: string): string {
+  return `bd_${label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`;
+}
+
+function addDimension(
+  dimensions: TargetBreakdownDimension[],
+  label: string,
+  value: string | null,
+  sourceKey?: string,
+  rawValue?: string | null,
+) {
+  if (!value) return;
+  const normalized = value.trim();
+  if (!normalized) return;
+  const key = dimensionKey(label);
+  if (dimensions.some((dim) => dim.key === key && dim.value === normalized)) return;
+  dimensions.push({
+    key,
+    label,
+    value: normalized,
+    source_key: sourceKey,
+    raw_value: rawValue ?? undefined,
+  });
 }
 
 function variableFromMeasure(value: string | null): string | null {
@@ -140,11 +181,177 @@ function qualifyingChildrenFromRecordSet(value: string | null): string | null {
   return readableToken(childGroup);
 }
 
+function qualifyingChildrenFromCount(value: string | null): string | null {
+  if (value == null) return null;
+  if (value === "0") return "no qualifying children";
+  if (value === "1") return "one qualifying child";
+  if (value === "2") return "two qualifying children";
+  if (value === "3" || value === "3+" || value === "3plus") {
+    return "three or more qualifying children";
+  }
+  return readableToken(value);
+}
+
+function qualifyingChildrenFromSourceMeasure(variable: string | null, value: string | null): string | null {
+  if (variable !== "eitc" || !value) return null;
+  if (/^eitc_(amount|claims|returns|total)$/.test(value)) return "all qualifying children";
+  if (/^eitc_no_children_/.test(value)) return "no qualifying children";
+  if (/^eitc_one_child_/.test(value)) return "one qualifying child";
+  if (/^eitc_two_children_/.test(value)) return "two qualifying children";
+  if (/^eitc_three_or_more_children_/.test(value)) {
+    return "three or more qualifying children";
+  }
+  return null;
+}
+
 function measureFromName(value: string | null): string | null {
   if (!value) return null;
   if (/_amount$|_total$|_collections$|_projected_amount$/.test(value)) return "total";
   if (/_returns$|_claims$|_count$/.test(value)) return "count";
   return null;
+}
+
+function measureFromMetadata(metadata: JsonObject): string | null {
+  const sourceMeasure = stringValue(metadata.source_measure_id);
+  const namedMeasure = measureFromName(sourceMeasure);
+  if (namedMeasure) return namedMeasure;
+  const unit = stringValue(metadata.ledger_measure_unit);
+  if (stringValue(metadata.count) === "true" || unit === "count") return "count";
+  if (unit === "usd") return "total";
+  return null;
+}
+
+function dimensionLabel(value: string | null): string {
+  if (!value) return "Breakdown";
+  if (value === "us:statutes/26/62#adjusted_gross_income") return "Income band";
+  if (value === "census_stc.item") return "Item";
+  if (value === "hhs_acf_tanf.spending_category") return "Spending category";
+  if (value.startsWith("cms_medicaid.")) return titleCase(value.replace(/^cms_medicaid\./, ""));
+  const hash = value.split("#").at(-1);
+  const last = hash?.split(".").at(-1) ?? value;
+  return titleCase(last);
+}
+
+function filterDimensionLabel(key: string): string {
+  const suffix = key.replace(/^ledger_filter_/, "");
+  if (suffix === "income_range") return "Income band";
+  if (suffix === "filing_status") return "Filing status";
+  if (suffix === "eitc_child_count") return "Qualifying children";
+  return dimensionLabel(suffix);
+}
+
+function isGeographyLayoutDimension(value: string | null): boolean {
+  return [
+    "geography",
+    "state",
+    "cms_medicaid.state_abbreviation",
+  ].includes(value ?? "");
+}
+
+function isRedundantGeographyValue(metadata: JsonObject, value: string | null): boolean {
+  if (!value) return false;
+  const geography = stateFromGeoId(stringValue(metadata.ledger_geography_id));
+  return Boolean(geography && value.toLowerCase() === geography.toLowerCase());
+}
+
+function readableDimensionValue(value: string | null): string | null {
+  if (!value) return null;
+  if (value === "all") return "All";
+  return readableToken(value);
+}
+
+function readableFilterValue(key: string, value: string | null): string | null {
+  if (key === "ledger_filter_eitc_child_count") {
+    return qualifyingChildrenFromCount(value);
+  }
+  return readableDimensionValue(value);
+}
+
+function isDuplicateDimension(
+  dimensions: TargetBreakdownDimension[],
+  label: string,
+  value: string | null,
+): boolean {
+  if (!value) return false;
+  const key = dimensionKey(label);
+  return dimensions.some((dim) => dim.key === key && dim.value === value);
+}
+
+function sourceMeasureDetail(metadata: JsonObject): string | null {
+  const variable = stringValue(metadata.variable);
+  const sourceMeasure = stringValue(metadata.source_measure_id);
+  if (!variable || !sourceMeasure) return null;
+  const variablePrefix = variable.replace(/\s+/g, "_").toLowerCase();
+  const measure = sourceMeasure.toLowerCase();
+  if (!measure.startsWith(`${variablePrefix}_`)) return null;
+  const detail = measure
+    .slice(variablePrefix.length + 1)
+    .replace(/_(amount|returns|claims|count|total|collections|projected_amount)$/, "");
+  if (!detail || MEASURES.has(detail)) return null;
+  if (["amount", "returns", "claims", "count", "total", "collections", "projected_amount"].includes(detail)) {
+    return null;
+  }
+  return readableToken(detail);
+}
+
+function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
+  const metadata = asObject(row.metadata);
+  if (!Object.keys(metadata).length) return null;
+  const dimensions: TargetBreakdownDimension[] = [];
+  const layoutDimension = stringValue(metadata.ledger_layout_groupby_dimension);
+  const layoutValue = stringValue(metadata.ledger_layout_groupby_value_id);
+  if (
+    layoutValue &&
+    !isGeographyLayoutDimension(layoutDimension) &&
+    !isRedundantGeographyValue(metadata, layoutValue)
+  ) {
+    addDimension(
+      dimensions,
+      dimensionLabel(layoutDimension),
+      readableDimensionValue(layoutValue),
+      "ledger_layout_groupby_value_id",
+      layoutValue,
+    );
+  }
+  for (const [key, raw] of Object.entries(metadata)) {
+    if (!key.startsWith("ledger_filter_")) continue;
+    const rawValue = stringValue(raw);
+    if (!rawValue) continue;
+    const label = filterDimensionLabel(key);
+    const value = readableFilterValue(key, rawValue);
+    if (isDuplicateDimension(dimensions, label, value)) continue;
+    addDimension(dimensions, label, value, key, rawValue);
+  }
+  addDimension(
+    dimensions,
+    "Qualifying children",
+    qualifyingChildrenFromCount(stringValue(metadata.ledger_filter_eitc_child_count)) ??
+      qualifyingChildrenFromRecordSet(stringValue(metadata.ledger_layout_record_set_id)) ??
+      qualifyingChildrenFromSourceMeasure(
+        stringValue(metadata.variable),
+        stringValue(metadata.source_measure_id),
+      ),
+    stringValue(metadata.ledger_filter_eitc_child_count)
+      ? "ledger_filter_eitc_child_count"
+      : stringValue(metadata.ledger_layout_record_set_id)
+        ? "ledger_layout_record_set_id"
+        : "source_measure_id",
+    stringValue(metadata.ledger_filter_eitc_child_count) ??
+      stringValue(metadata.ledger_layout_record_set_id) ??
+      stringValue(metadata.source_measure_id),
+  );
+  addDimension(dimensions, "Filing status", stringValue(metadata.filing_status));
+  const sourceDetail = sourceMeasureDetail(metadata);
+  const hasExplicitChildDimension = dimensions.some((dim) => dim.label === "Qualifying children");
+  const sourceDetailIsChildDimension = Boolean(sourceDetail && /child|children/.test(sourceDetail));
+  if (
+    sourceDetail &&
+    !(hasExplicitChildDimension && sourceDetailIsChildDimension) &&
+    !dimensions.some((dim) => dim.value === sourceDetail)
+  ) {
+    addDimension(dimensions, "Source measure detail", sourceDetail, "source_measure_id", stringValue(metadata.source_measure_id));
+  }
+  return dimensions;
 }
 
 function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
@@ -275,12 +482,31 @@ function bandLowerBound(label: string): number {
 function sortDimensionValues(label: string, values: string[]): string[] {
   if (label === "Income band") return [...values].sort((a, b) => bandLowerBound(a) - bandLowerBound(b));
   if (label === "Age") return [...values].sort((a, b) => Number(a) - Number(b));
+  if (label === "Qualifying children") {
+    const rank = (value: string) =>
+      [
+        "all qualifying children",
+        "no qualifying children",
+        "one qualifying child",
+        "two qualifying children",
+        "three or more qualifying children",
+      ].indexOf(value);
+    return [...values].sort((a, b) => {
+      const ar = rank(a);
+      const br = rank(b);
+      if (ar >= 0 || br >= 0) return (ar >= 0 ? ar : 99) - (br >= 0 ? br : 99);
+      return a.localeCompare(b);
+    });
+  }
   return [...values].sort((a, b) => (a === "All" ? -1 : b === "All" ? 1 : a.localeCompare(b)));
 }
 
 function rowFacetValue(row: TargetRow, key: string): string | undefined {
   if (key === "geography") return (row.geography as string) || undefined;
   if (key === "level") return (row.level as string) || undefined;
+  const targetDimensions = row.target_dimensions as TargetBreakdownDimension[] | undefined;
+  const targetDimension = targetDimensions?.find((dim) => dim.key === key);
+  if (targetDimension) return targetDimension.value;
   const dim = /^dim(\d+)$/.exec(key);
   if (dim) return (row.dims as string[] | undefined)?.[Number(dim[1])];
   const value = row[key];
@@ -303,15 +529,18 @@ export interface TargetDimension {
 }
 
 function computeDimensions(rows: TargetRow[]): TargetDimension[] {
-  const maxLen = rows.reduce(
-    (max, row) => Math.max(max, (row.dims as string[] | undefined)?.length ?? 0),
-    0,
-  );
   const candidates: { key: string; label?: string }[] = [
     { key: "geography", label: "Geography" },
-    { key: "level", label: "Level" },
   ];
-  for (let i = 0; i < maxLen; i += 1) candidates.push({ key: `dim${i}` });
+  const seenDimensionKeys = new Set<string>();
+  for (const row of rows) {
+    const targetDimensions = row.target_dimensions as TargetBreakdownDimension[] | undefined;
+    for (const dim of targetDimensions ?? []) {
+      if (seenDimensionKeys.has(dim.key)) continue;
+      seenDimensionKeys.add(dim.key);
+      candidates.push({ key: dim.key, label: dim.label });
+    }
+  }
   const facets: TargetDimension[] = [];
   for (const candidate of candidates) {
     const values = [
@@ -369,8 +598,17 @@ function enrichTargetRow(row: TargetRow): TargetRow {
       : Math.abs(initialError) - Math.abs(finalError);
   const parsed = parseDottedTarget(baseName, row) ?? parseTarget(baseName);
   const measureCol = asObject(row.measure);
-  const dims = splitBreakdown(parsed.breakdown);
   const metadata = asObject(row.metadata);
+  const metadataTargetDimensions = metadataDimensions(row);
+  const targetDimensions =
+    metadataTargetDimensions ??
+    splitBreakdown(parsed.breakdown).map((value, index) => ({
+      key: `dim${index}`,
+      label: classifyDimension([value]),
+      value,
+    }));
+  const dims = targetDimensions.map((dim) => dim.value);
+  const breakdown = metadataTargetDimensions ? dims.join(" · ") : parsed.breakdown;
   const sourceMeasureId = stringValue(metadata.source_measure_id);
   // The first breakdown token is the measure (total / count / mean / …). Many
   // IRS variables publish both a total (dollar amount) and a count (number of
@@ -378,7 +616,7 @@ function enrichTargetRow(row: TargetRow): TargetRow {
   // breakdown within it — fold it into variable_key so they're distinct things.
   const measure = dims[0] && MEASURES.has(dims[0])
     ? dims[0]
-    : measureFromName(sourceMeasureId);
+    : measureFromMetadata(metadata);
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
   return {
@@ -386,7 +624,7 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     name: fullName,
     base_name: baseName,
     family: deriveFamily(baseName),
-    state: deriveState(baseName),
+    state: stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography: parsed.geography,
     level: parsed.level,
     source: parsed.source,
@@ -396,8 +634,9 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     initial_error: initialError,
     final_error: finalError,
     abs_error: absFinalError,
-    breakdown: parsed.breakdown,
+    breakdown,
     dims,
+    target_dimensions: targetDimensions,
     variable_key: variableKey,
     // v2 published metadata (null on v1).
     source_citation: typeof row.source === "string" ? (row.source as string) : null,
@@ -754,6 +993,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     abs_error: row.abs_error,
     breakdown: row.breakdown,
     dims: row.dims,
+    target_dimensions: row.target_dimensions,
     variable_key: row.variable_key,
     source_citation: row.source_citation,
     entity: row.entity,
@@ -850,9 +1090,8 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   if (direction) filtered = filtered.filter((row) => row.direction === direction);
   if (within !== null) filtered = filtered.filter((row) => row.within_tolerance === within);
   if (search) filtered = filtered.filter((row) => matchesSearch(row, search));
-  const dimSort = /^dim(\d+)$/.exec(sortBy);
   const sortValue = (row: TargetRow) =>
-    dimSort ? (row.dims as string[] | undefined)?.[Number(dimSort[1])] : row[sortBy];
+    rowFacetValue(row, sortBy) ?? row[sortBy];
   filtered = [...filtered].sort((a, b) => {
     const aVal = sortValue(a);
     const bVal = sortValue(b);

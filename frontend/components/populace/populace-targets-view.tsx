@@ -74,13 +74,6 @@ const METRIC_COLUMNS: Column[] = [
     render: (row) => fmtCompact(row.target),
   },
   {
-    key: "initial_estimate",
-    label: "Initial est.",
-    numeric: true,
-    sortable: true,
-    render: (row) => fmtCompact(row.initial_estimate),
-  },
-  {
     key: "final_estimate",
     label: "Final est.",
     numeric: true,
@@ -135,6 +128,8 @@ export function rowFacetValue(
 ): string | undefined {
   if (key === "geography") return row.geography ?? undefined;
   if (key === "level") return row.level ?? undefined;
+  const targetDimension = row.target_dimensions?.find((dim) => dim.key === key);
+  if (targetDimension) return targetDimension.value;
   const dim = /^dim(\d+)$/.exec(key);
   if (dim) return row.dims?.[Number(dim[1])] ?? undefined;
   const value = row[key];
@@ -331,7 +326,6 @@ export function PopulaceTargetsView() {
   const [release, setRelease] = useState("");
   const [variable, setVariable] = useState("");
   const [source, setSource] = useState("");
-  const [level, setLevel] = useState("");
   const [direction, setDirection] = useState("");
   const [search, setSearch] = useState("");
   const [facetFilters, setFacetFilters] = useState<Record<string, string>>({});
@@ -357,7 +351,6 @@ export function PopulaceTargetsView() {
     setVariable("");
     setFacetFilters({});
     setSource("");
-    setLevel("");
     setSelected(null);
     setPage(0);
   }
@@ -378,14 +371,13 @@ export function PopulaceTargetsView() {
       offset: page * PAGE_SIZE,
       variable: variable || undefined,
       source: source || undefined,
-      level: level || undefined,
       direction: direction || undefined,
       search: debouncedSearch || undefined,
       facet: facetParam.length ? facetParam : undefined,
       sort_by: sort.by,
       sort_dir: sort.dir,
     }),
-    [release, variable, source, level, direction, debouncedSearch, facetParam, page, sort],
+    [release, variable, source, direction, debouncedSearch, facetParam, page, sort],
   );
 
   const { data, isLoading, isFetching, error } = usePopulaceTargetDiagnostics(params);
@@ -504,7 +496,7 @@ export function PopulaceTargetsView() {
                   activeVariable.within_10pct / Math.max(activeVariable.n_targets, 1),
                   { pct: true, digits: 0 },
                 )} within 10% · mean abs rel. error ${fmt(activeVariable.mean_abs_relative_error, { pct: true, digits: 1 })}`
-              : "Initial estimate is the weighted aggregate before calibration; final estimate is after calibration. Error is relative for non-zero targets and absolute miss for zero-valued targets."
+              : "Final estimate is the weighted aggregate after calibration. Error is relative for non-zero targets and absolute miss for zero-valued targets."
           }
           padded={false}
           actions={
@@ -547,19 +539,6 @@ export function PopulaceTargetsView() {
                     options={[
                       { value: "", label: "Any" },
                       ...sources.map((value) => ({ value, label: value })),
-                    ]}
-                  />
-                  <ToolbarSelect
-                    label="Level"
-                    value={level}
-                    onChange={(value) => {
-                      setLevel(value);
-                      setPage(0);
-                    }}
-                    options={[
-                      { value: "", label: "Any" },
-                      { value: "national", label: "National" },
-                      { value: "state", label: "State" },
                     ]}
                   />
                 </>

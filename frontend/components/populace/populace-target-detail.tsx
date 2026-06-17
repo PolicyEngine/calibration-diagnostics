@@ -8,6 +8,8 @@ import {
 } from "@/lib/api/hooks/use-populace";
 
 function facetValue(row: PopulaceTargetRow, key: string): string {
+  const targetDimension = row.target_dimensions?.find((dim) => dim.key === key);
+  if (targetDimension) return targetDimension.value;
   const dim = /^dim(\d+)$/.exec(key);
   if (dim) return row.dims?.[Number(dim[1])] ?? "";
   const value = row[key];
@@ -133,7 +135,9 @@ export function PopulaceTargetDetail({
     ? dimensions
         .filter((dim) => dim.key !== "geography" && dim.key !== "level")
         .map((dim) => ({ label: dim.label, value: facetValue(row, dim.key) }))
-    : (row.dims ?? []).map((value, index) => ({ label: `Breakdown ${index + 1}`, value }));
+    : row.target_dimensions?.length
+      ? row.target_dimensions.map((dim) => ({ label: dim.label, value: dim.value }))
+      : (row.dims ?? []).map((value, index) => ({ label: `Breakdown ${index + 1}`, value }));
 
   return (
     <div className="rounded-lg border border-primary/30 bg-primary/[0.03] shadow-sm">

@@ -180,15 +180,67 @@ test("source measure details become breakdown dimensions", () => {
   ]);
   expect(cal.rows[0].variable).toBe("eitc");
   expect(cal.rows[0].measure).toBe("total");
-  expect(cal.rows[0].breakdown).toBe("az · all children · All");
-  expect(cal.rows[0].dims).toEqual(["az", "all children", "All"]);
+  expect(cal.rows[0].breakdown).toBe("all qualifying children · All");
+  expect(cal.rows[0].dims).toEqual(["all qualifying children", "All"]);
   expect(cal.rows[0].variable_key).toBe("irs_soi / eitc · total");
-  expect(cal.rows[1].breakdown).toBe("az · no children · All");
+  expect(cal.rows[1].breakdown).toBe("no qualifying children · All");
   const result = latestPopulaceTargetDiagnosticsPage(
     "http://x/api/populace/target-diagnostics?variable=irs_soi%20%2F%20eitc%20%C2%B7%20total",
     cal,
   );
   expect(result.dimensions.map((dim) => dim.label)).toContain("Qualifying children");
+});
+
+test("metadata dimensions skip geography repeated as layout breakdown", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_broad.az.all.ctc_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.state_broad.az.all.ctc_amount",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 90,
+      relative_error: -0.1,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "ctc",
+        source_measure_id: "ctc_amount",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US04",
+        ledger_layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_broad.az",
+        ledger_layout_groupby_dimension: "state",
+        ledger_layout_groupby_value_id: "all",
+        ledger_filter_income_range: "all",
+        filing_status: "All",
+      },
+    },
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_broad.ca.all.ctc_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.state_broad.ca.all.ctc_amount",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 90,
+      relative_error: -0.1,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "ctc",
+        source_measure_id: "ctc_amount",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US06",
+        ledger_layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_broad.ca",
+        ledger_layout_groupby_dimension: "state",
+        ledger_layout_groupby_value_id: "all",
+        ledger_filter_income_range: "all",
+        filing_status: "All",
+      },
+    },
+  ]);
+  expect(cal.rows[0].geography).toBe("AZ");
+  expect(cal.rows[0].breakdown).toBe("All · All");
+  const result = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics?variable=irs_soi%20%2F%20ctc%20%C2%B7%20total",
+    cal,
+  );
+  expect(result.dimensions.map((dim) => dim.label)).toEqual(["Geography"]);
 });
 
 test("EITC table 2.5 child groups come from record set ids", () => {

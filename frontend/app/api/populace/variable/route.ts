@@ -30,6 +30,39 @@ function hostedPythonUnavailableError() {
   );
 }
 
+async function runHostedPythonFunction(
+  request: Request,
+  variables: string[],
+  period: string,
+  release: string,
+) {
+  const incomingUrl = new URL(request.url);
+  const endpoint = new URL("/api/populace_variable", incomingUrl.origin);
+  endpoint.searchParams.set("period", period);
+  endpoint.searchParams.set("release", release);
+  variables.forEach((variable) => endpoint.searchParams.append("variables", variable));
+
+  const response = await fetch(endpoint, { cache: "no-store" });
+  const text = await response.text();
+  let payload: unknown = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = { detail: text || "Hosted variable calculation failed." };
+  }
+  if (!response.ok) {
+    const detail =
+      payload &&
+      typeof payload === "object" &&
+      "detail" in payload &&
+      typeof payload.detail === "string"
+        ? payload.detail
+        : "Hosted variable calculation failed.";
+    return errorResponse(detail, response.status);
+  }
+  return NextResponse.json(scrub(payload));
+}
+
 async function runVariableScript(
   scriptPath: string,
   args: string[],
@@ -89,6 +122,9 @@ export async function GET(request: Request) {
       requestedRelease === "latest"
         ? (await loadPointerReleaseId(300)).release_id
         : requestedRelease;
+    if (process.env.VERCEL === "1" && !process.env.PYTHON) {
+      return runHostedPythonFunction(request, uniqueVariables, period, release);
+    }
     const scriptPath = path.join(process.cwd(), "scripts", "populace_variable_value.py");
     const variableArgs = uniqueVariables.flatMap((variable) => ["--variable", variable]);
     const { stdout } = await runVariableScript(

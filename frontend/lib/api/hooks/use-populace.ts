@@ -45,6 +45,13 @@ export interface PopulaceTargetRow {
   abs_error?: number | null;
   breakdown?: string | null;
   dims?: string[] | null;
+  target_dimensions?: {
+    key: string;
+    label: string;
+    value: string;
+    source_key?: string;
+    raw_value?: string;
+  }[] | null;
   variable_key?: string | null;
   // schema v2 published registry metadata (null on v1).
   source_citation?: string | null;
