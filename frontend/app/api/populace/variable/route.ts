@@ -21,6 +21,32 @@ function errorResponse(detail: string, status: number) {
   return NextResponse.json({ detail }, { status });
 }
 
+async function runVariableScript(
+  scriptPath: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+) {
+  const pythonCandidates = process.env.PYTHON
+    ? [process.env.PYTHON]
+    : ["python", "python3"];
+
+  let lastError: (Error & { code?: string; stderr?: string }) | null = null;
+  for (const python of pythonCandidates) {
+    try {
+      return await execFileAsync(python, [scriptPath, ...args], {
+        timeout: 5 * 60 * 1000,
+        maxBuffer: 1024 * 1024,
+        env,
+      });
+    } catch (error) {
+      const err = error as Error & { code?: string; stderr?: string };
+      lastError = err;
+      if (err.code !== "ENOENT") throw err;
+    }
+  }
+  throw lastError ?? new Error("Python executable was not found.");
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const variables = [
@@ -54,12 +80,10 @@ export async function GET(request: Request) {
         ? (await loadPointerReleaseId(300)).release_id
         : requestedRelease;
     const scriptPath = path.join(process.cwd(), "scripts", "populace_variable_value.py");
-    const python = process.env.PYTHON ?? "python";
     const variableArgs = uniqueVariables.flatMap((variable) => ["--variable", variable]);
-    const { stdout, stderr } = await execFileAsync(
-      python,
+    const { stdout } = await runVariableScript(
+      scriptPath,
       [
-        scriptPath,
         ...variableArgs,
         "--period",
         period,
@@ -69,12 +93,8 @@ export async function GET(request: Request) {
         release,
       ],
       {
-        timeout: 5 * 60 * 1000,
-        maxBuffer: 1024 * 1024,
-        env: {
-          ...process.env,
-          PYTHONUNBUFFERED: "1",
-        },
+        ...process.env,
+        PYTHONUNBUFFERED: "1",
       },
     );
     return NextResponse.json(scrub(JSON.parse(stdout)));
