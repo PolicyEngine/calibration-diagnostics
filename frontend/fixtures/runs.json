@@ -1,5 +1,0 @@
-[
-  { "dataset_id": "us-cps", "run_id": "demo-run", "label": "demo-run", "last_modified": "2026-05-10T14:22:00+00:00" },
-  { "dataset_id": "us-cps", "run_id": "nightly-2026-05-09", "label": "nightly-2026-05-09", "last_modified": "2026-05-09T03:15:00+00:00" },
-  { "dataset_id": "us-cps", "run_id": "test", "label": "test", "last_modified": null }
-]

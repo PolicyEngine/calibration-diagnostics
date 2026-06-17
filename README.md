@@ -1,108 +1,50 @@
-# Calibration Diagnostics
+# Populace calibration diagnostics
 
-Interactive tool for diagnosing calibration quality in PolicyEngine's Enhanced CPS dataset builds. Provides a FastAPI backend and Next.js frontend for exploring calibration artifacts — sparse matrices, target databases, calibration logs, and Microsimulation outputs.
+Interactive dashboard for the **populace-US** synthetic population — PolicyEngine's
+calibrated microdataset published on Hugging Face at
+[`policyengine/populace-us`](https://huggingface.co/datasets/policyengine/populace-us).
 
-## What this does
+Everything is read **live from Hugging Face**: the current release is resolved
+through `latest.json`, and each release's manifests and per-target calibration
+diagnostics are fetched on demand. There is no committed data snapshot and no
+separate service layer — the Next.js API routes are the API layer.
 
-After the PolicyEngine data pipeline calibrates survey weights against ~3,000 demographic and economic targets, this tool helps answer:
+## What it shows
 
-- **Which targets have the worst fit?** Sortable/filterable target table with error metrics and pull scores.
-- **Why is a target badly fit?** Error decomposition (raw data vs initial weights vs final weights), contributor analysis, and automated constraint auditing against the targets database.
-- **Which households are distorted?** Filter by g-weight and any variable to find households whose weights shifted most, inspect their full variable profiles, and see which targets are pulling their weights.
-- **What shifted under calibration?** Decompose any composite variable (e.g., `spm_unit_net_income`) into its formula dependencies and see which components changed most.
-- **How did calibration converge?** Per-target and per-category error traces over training epochs.
+- **Release summary** (`/populace`) — calibration loss and convergence, within-10%
+  and within-tolerance, records kept after L0, acceptance gates, solver
+  provenance, per-family fit, and worst-fit / biggest-improvement targets, for
+  the current release (or any release via `?release=`).
+- **Target diagnostics** (`/populace/targets`) — browse the calibration target
+  surface by the quantity each constraint measures (e.g. *adjusted gross income*),
+  then drill its breakdown dimensions (income band x return type x filing status,
+  geography, ...). Every axis a variable varies on becomes a filterable, sortable
+  facet, and any target opens a canonical detail card (structured registry
+  fields, source citation, initial -> final -> target).
+- **Compare versions** (`/populace/compare`) — diff two releases: targets matched
+  by name, common targets get a fit change, and added/removed targets are
+  surfaced.
 
-## Architecture
+## API
 
-```
-backend/       Python FastAPI (20 endpoints)
-frontend/      Next.js 15 + React 19 + @policyengine/ui-kit
-```
+The Next.js route handlers are the API layer; all read live from Hugging Face:
 
-The backend loads calibration artifacts at startup and exposes REST endpoints. The frontend calls these endpoints and provides interactive visualization.
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/populace/releases` | List published releases (newest first) |
+| `GET /api/populace?release=<id>` | Release summary (default: latest) |
+| `GET /api/populace/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics |
+| `GET /api/populace/compare?a=<id>&b=<id>` | Version-over-version diff |
 
-## Quick start
-
-### Frontend (fixture mode — no backend needed)
-
-```bash
-cd frontend
-bun install
-NEXT_PUBLIC_USE_FIXTURES=true bun run dev
-```
-
-Open http://localhost:3000. All views render with sample data.
-
-### Backend
-
-Requires calibration artifacts (calibration_package.pkl, calibration_weights.npy, policy_data.db, CPS H5 dataset).
-
-```bash
-pip install -e .
-PACKAGE_PATH=/path/to/calibration_package.pkl \
-WEIGHTS_PATH=/path/to/calibration_weights.npy \
-DB_PATH=/path/to/policy_data.db \
-DATASET_PATH=/path/to/extended_cps_2024.h5 \
-uvicorn backend.app:app --reload
-```
-
-### Both via Make
+## Develop
 
 ```bash
-make install-frontend
-make install-backend
-make frontend   # starts frontend on port 3000
-make backend    # starts backend on port 8000
+make install   # cd frontend && bun install
+make dev       # next dev (http://localhost:3000)
+make typecheck # tsc --noEmit
+make test      # bun test (data-layer suite)
+make build     # next build
 ```
 
-## Frontend views
-
-| View | Description |
-|------|-------------|
-| Overview | Weight distribution stats, income distribution comparison, worst-fit targets |
-| Target Explorer | Sortable target table with detail panel (error decomposition, provenance, constraint audit, contributors, convergence) |
-| Weight Landscape | G-weight histogram with metric/slice controls, distribution stats |
-| Variable Decomposition | Decompose any variable into shifted components |
-| Household Inspector | Filter distorted households by any variable, inspect profiles and target attributions |
-| Convergence | Per-category and per-target error traces over epochs |
-
-## Backend endpoints
-
-20 endpoints across 7 route groups:
-
-- `POST /decompose` — variable decomposition
-- `GET /targets`, `/targets/search`, `/targets/poverty-impact`, `/targets/{id}/error-decomposition`, `/targets/{id}/provenance`, `/targets/{id}/eligibility-audit`, `/targets/{id}/constraint-diff`, `/targets/{id}/contributors`, `/targets/{id}/convergence`
-- `GET /strata/{id}`
-- `GET /households/distorted`, `/households/{id}/profile`, `/households/{id}/attributions`
-- `GET /weights/distribution`, `/weights/histogram`
-- `GET /statistics/poverty-rate`, `/statistics/income-distribution`
-- `GET /epochs/summary`, `/epochs/traces`
-
-## Dependencies
-
-**Backend:** FastAPI, uvicorn, policyengine-us-data, policyengine-us, scipy, numpy, pandas, sqlalchemy, sqlmodel
-
-**Frontend:** Next.js 15, React 19, @policyengine/ui-kit, TanStack React Query v5, Tailwind CSS v4, Recharts
-
-## Deployment
-
-Live:
-
-- **Frontend (Vercel):** https://calibration-diagnostics.vercel.app — project `policy-engine/calibration-diagnostics`, root dir `frontend/`.
-- **Backend (Modal):** https://policyengine--calibration-diagnostics-api.modal.run — Modal app `calibration-diagnostics`, defined in `modal_app.py`.
-
-The frontend reaches the backend via the `NEXT_PUBLIC_API_URL` Vercel env var
-(set to the Modal URL). The backend is self-contained — it downloads every
-calibration run artifact from HuggingFace at request time.
-
-Redeploy the backend:
-
-```bash
-modal deploy modal_app.py
-```
-
-Redeploy the frontend (from `frontend/`):
-
-```bash
-vercel --prod --scope policy-engine
-```
+Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different
+dataset/revision.
