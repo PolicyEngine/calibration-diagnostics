@@ -32,6 +32,23 @@ interface Column {
   render: (row: PopulaceTargetRow) => React.ReactNode;
 }
 
+interface VariableMeasureOption {
+  key: string;
+  label: string;
+  row: PopulaceVariableRow;
+}
+
+interface VariableGroup {
+  groupKey: string;
+  source: string;
+  variable: string;
+  level: string;
+  options: VariableMeasureOption[];
+  defaultKey: string;
+  nTargets: number;
+  within10Pct: number;
+}
+
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
 
@@ -140,6 +157,60 @@ function dimensionColumns(dimensions: PopulaceTargetDimension[]): Column[] {
   }));
 }
 
+function measureLabel(measure: string | null | undefined): string {
+  if (!measure || measure === "total") return "Amount";
+  if (measure === "count") return "Count";
+  return humanizeName(measure);
+}
+
+function measureRank(measure: string | null | undefined): number {
+  if (!measure || measure === "total") return 0;
+  if (measure === "count") return 1;
+  return 2;
+}
+
+function groupVariables(variables: PopulaceVariableRow[]): VariableGroup[] {
+  const groups = new Map<string, PopulaceVariableRow[]>();
+  for (const variable of variables) {
+    const key = [
+      variable.source,
+      variable.level,
+      variable.variable,
+    ].join("::");
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(variable);
+  }
+
+  return [...groups.entries()]
+    .map(([groupKey, rows]) => {
+      const sortedRows = [...rows].sort((a, b) => {
+        const rank = measureRank(a.measure) - measureRank(b.measure);
+        return rank || measureLabel(a.measure).localeCompare(measureLabel(b.measure));
+      });
+      const first = sortedRows[0];
+      const options = sortedRows.map((row) => ({
+        key: row.variable_key,
+        label: measureLabel(row.measure),
+        row,
+      }));
+      const defaultOption =
+        options.find((option) => option.row.measure === "total" || !option.row.measure) ??
+        options[0];
+      const nTargets = sortedRows.reduce((sum, row) => sum + row.n_targets, 0);
+      const within10Pct = sortedRows.reduce((sum, row) => sum + row.within_10pct, 0);
+      return {
+        groupKey,
+        source: first.source,
+        variable: first.variable,
+        level: first.level,
+        options,
+        defaultKey: defaultOption.key,
+        nTargets,
+        within10Pct,
+      };
+    })
+    .sort((a, b) => b.nTargets - a.nTargets);
+}
+
 function VariableBrowser({
   variables,
   active,
@@ -150,9 +221,20 @@ function VariableBrowser({
   onPick: (variableKey: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const groups = useMemo(() => groupVariables(variables), [variables]);
   const filtered = query
-    ? variables.filter((v) => v.variable_key.toLowerCase().includes(query.toLowerCase()))
-    : variables;
+    ? groups.filter((group) => {
+        const haystack = [
+          group.variable,
+          group.source,
+          group.level,
+          ...group.options.map((option) => option.row.variable_key),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(query.toLowerCase());
+      })
+    : groups;
   return (
     <div className="flex flex-col gap-2">
       <input
@@ -167,40 +249,72 @@ function VariableBrowser({
           <thead className="sticky top-0 bg-muted/40 backdrop-blur">
             <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-3 py-2 font-semibold">Variable</th>
+              <th className="px-3 py-2 font-semibold">Measure</th>
               <th className="px-3 py-2 text-right font-semibold">Targets</th>
               <th className="px-3 py-2 text-right font-semibold">Within 10%</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((v) => {
-              const isActive = v.variable_key === active;
+            {filtered.map((group) => {
+              const activeOption = group.options.find((option) => option.key === active);
+              const selectedKey = activeOption?.key ?? group.defaultKey;
+              const selectedOption =
+                group.options.find((option) => option.key === selectedKey) ?? group.options[0];
+              const selectedRow = selectedOption.row;
+              const isActive = Boolean(activeOption);
               return (
                 <tr
-                  key={v.variable_key}
-                  onClick={() => onPick(isActive ? "" : v.variable_key)}
+                  key={group.groupKey}
+                  onClick={() => onPick(isActive ? "" : selectedKey)}
                   className={`cursor-pointer border-t border-border/60 ${
                     isActive ? "bg-primary/10" : "hover:bg-muted/40"
                   }`}
                 >
                   <td className="px-3 py-1.5 align-top">
                     <div className={`leading-snug ${isActive ? "font-medium text-primary" : ""}`}>
-                      {humanizeName(v.variable) || v.variable_key}
+                      {humanizeName(group.variable) || selectedRow.variable_key}
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <span>{v.source}</span>
-                      {v.measure && (
-                        <span className="rounded bg-muted px-1 py-px text-[10px] normal-case text-foreground/70">
-                          {v.measure === "total" ? "amount" : v.measure}
-                        </span>
-                      )}
+                      <span>{group.source}</span>
+                      {group.level ? <span>{group.level}</span> : null}
                     </div>
                   </td>
-                  <td className="px-3 py-1.5 text-right align-top tabular-nums">
-                    {fmt(v.n_targets, { digits: 0 })}
+                  <td className="px-3 py-1.5 align-top">
+                    {group.options.length > 1 ? (
+                      <div
+                        className="inline-flex rounded-md border border-border bg-white p-0.5"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {group.options.map((option) => {
+                          const isSelected = option.key === selectedKey;
+                          return (
+                            <button
+                              key={option.key}
+                              type="button"
+                              onClick={() => onPick(option.key === active ? "" : option.key)}
+                              className={`h-6 px-2 text-[11px] font-medium ${
+                                isSelected
+                                  ? "rounded bg-primary text-primary-foreground"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="inline-flex h-6 items-center rounded bg-muted px-2 text-[11px] font-medium text-foreground/70">
+                        {selectedOption.label}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-1.5 text-right align-top tabular-nums">
-                    {v.n_targets
-                      ? fmt(v.within_10pct / v.n_targets, { pct: true, digits: 0 })
+                    {fmt(selectedRow.n_targets, { digits: 0 })}
+                  </td>
+                  <td className="px-3 py-1.5 text-right align-top tabular-nums">
+                    {selectedRow.n_targets
+                      ? fmt(selectedRow.within_10pct / selectedRow.n_targets, { pct: true, digits: 0 })
                       : "—"}
                   </td>
                 </tr>
@@ -279,6 +393,7 @@ export function PopulaceTargetsView() {
   const variables = data?.variables ?? [];
   const sources = data?.sources ?? [];
   const dimensions = data?.dimensions ?? [];
+  const variableGroupCount = useMemo(() => groupVariables(variables).length, [variables]);
   const filteredTotal = data?.filtered_total ?? 0;
   const pageCount = Math.max(Math.ceil(filteredTotal / PAGE_SIZE), 1);
   const activeVariable = variables.find((v) => v.variable_key === variable);
@@ -346,7 +461,7 @@ export function PopulaceTargetsView() {
       <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <SectionCard
           title="Browse by variable"
-          description={`${fmt(variables.length, { digits: 0 })} measured quantities in this release. Click one to filter the table.`}
+          description={`${fmt(variableGroupCount, { digits: 0 })} variables in this release. Amount is selected by default when amount/count variants both exist.`}
         >
           <VariableBrowser variables={variables} active={variable} onPick={pickVariable} />
         </SectionCard>
