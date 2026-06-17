@@ -206,8 +206,20 @@ export interface PopulaceComparisonRow {
 }
 
 export interface PopulaceComparison {
-  a: { release_id: string; total_targets: number; final_loss: number | null; fraction_within_10pct: number | null };
-  b: { release_id: string; total_targets: number; final_loss: number | null; fraction_within_10pct: number | null };
+  a: {
+    release_id: string;
+    total_targets: number;
+    initial_loss: number | null;
+    final_loss: number | null;
+    fraction_within_10pct: number | null;
+  };
+  b: {
+    release_id: string;
+    total_targets: number;
+    initial_loss: number | null;
+    final_loss: number | null;
+    fraction_within_10pct: number | null;
+  };
   summary: {
     common: number;
     added: number;

@@ -890,8 +890,20 @@ export function buildComparison(a: Calibration, b: Calibration) {
   const surfacesDiffer =
     a.rows.length !== b.rows.length || added > 0 || removed > 0;
   return {
-    a: { release_id: a.release_id, total_targets: a.rows.length, final_loss: a.final_loss, fraction_within_10pct: a.fraction_within_10pct },
-    b: { release_id: b.release_id, total_targets: b.rows.length, final_loss: b.final_loss, fraction_within_10pct: b.fraction_within_10pct },
+    a: {
+      release_id: a.release_id,
+      total_targets: a.rows.length,
+      initial_loss: a.initial_loss,
+      final_loss: a.final_loss,
+      fraction_within_10pct: a.fraction_within_10pct,
+    },
+    b: {
+      release_id: b.release_id,
+      total_targets: b.rows.length,
+      initial_loss: b.initial_loss,
+      final_loss: b.final_loss,
+      fraction_within_10pct: b.fraction_within_10pct,
+    },
     summary: {
       common: common.length,
       added,
