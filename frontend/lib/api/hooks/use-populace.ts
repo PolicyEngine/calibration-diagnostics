@@ -273,10 +273,15 @@ export function usePopulaceVariableValue(params: {
   release?: string;
 }) {
   const variables = params.variables?.map((v) => v.trim()).filter(Boolean) ?? [];
+  const path =
+    typeof window !== "undefined" &&
+    !["localhost", "127.0.0.1"].includes(window.location.hostname)
+      ? "/populace_variable"
+      : "/populace/variable";
   return useQuery({
     queryKey: ["populace", "variable", variables, params.period ?? "2024", params.release ?? "latest"],
     queryFn: () =>
-      apiGet<PopulaceVariableLookupResponse>("/populace/variable", {
+      apiGet<PopulaceVariableLookupResponse>(path, {
         variables,
         period: params.period ?? "2024",
         release: params.release || undefined,
