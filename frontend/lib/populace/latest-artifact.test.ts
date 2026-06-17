@@ -141,6 +141,56 @@ test("dotted ledger target names use metadata for readable fields", () => {
   expect(cal.rows[0].abs_relative_error).toBe(null);
 });
 
+test("source measure details become breakdown dimensions", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_eitc.az.az.eitc_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.state_eitc.az.az.eitc_amount",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 90,
+      relative_error: -0.1,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "eitc",
+        source_measure_id: "eitc_amount",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US04",
+        ledger_layout_groupby_value_id: "az",
+        filing_status: "All",
+      },
+    },
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_eitc.az.az.eitc_no_children_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.state_eitc.az.az.eitc_no_children_amount",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 90,
+      relative_error: -0.1,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "eitc",
+        source_measure_id: "eitc_no_children_amount",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US04",
+        ledger_layout_groupby_value_id: "az",
+        filing_status: "All",
+      },
+    },
+  ]);
+  expect(cal.rows[0].variable).toBe("eitc");
+  expect(cal.rows[0].measure).toBe("total");
+  expect(cal.rows[0].breakdown).toBe("az · all children · All");
+  expect(cal.rows[0].dims).toEqual(["az", "all children", "All"]);
+  expect(cal.rows[0].variable_key).toBe("irs_soi / eitc · total");
+  expect(cal.rows[1].breakdown).toBe("az · no children · All");
+  const result = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics?variable=irs_soi%20%2F%20eitc%20%C2%B7%20total",
+    cal,
+  );
+  expect(result.dimensions.map((dim) => dim.label)).toContain("Qualifying children");
+});
+
 test("zero targets compare as absolute misses, not relative-error movers", () => {
   const target = {
     name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount@2024",

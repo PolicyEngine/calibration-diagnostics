@@ -34,6 +34,13 @@ const FILING_STATUSES = new Set([
 ]);
 const RETURN_TYPES = new Set(["taxable", "all returns", "nontaxable"]);
 const MEASURES = new Set(["total", "count", "mean", "filers", "nonfilers"]);
+const QUALIFYING_CHILDREN = new Set([
+  "all children",
+  "no children",
+  "one child",
+  "two children",
+  "three or more children",
+]);
 
 export function asObject(value: unknown): JsonObject {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -89,6 +96,32 @@ function variableFromMeasure(value: string | null): string | null {
   return value.replace(/_(amount|returns|claims|count|total|collections|projected_amount)$/, "");
 }
 
+function breakdownFromSourceMeasure(
+  variable: string | null,
+  measureId: string | null,
+): string | null {
+  if (!variable || !measureId) return null;
+  const variablePrefix = variable.replace(/\s+/g, "_").toLowerCase();
+  const measure = measureId.toLowerCase();
+  if (!measure.startsWith(`${variablePrefix}_`)) return null;
+  const detail = measure
+    .slice(variablePrefix.length + 1)
+    .replace(/_(amount|returns|claims|count|total|collections|projected_amount)$/, "");
+  if (
+    variablePrefix === "eitc" &&
+    ["amount", "returns", "claims", "count", "total"].includes(detail)
+  ) {
+    return "all children";
+  }
+  if (
+    ["amount", "returns", "claims", "count", "total", "collections", "projected_amount"].includes(detail)
+  ) {
+    return null;
+  }
+  if (!detail || MEASURES.has(detail)) return null;
+  return readableToken(detail);
+}
+
 function measureFromName(value: string | null): string | null {
   if (!value) return null;
   if (/_amount$|_total$|_collections$|_projected_amount$/.test(value)) return "total";
@@ -118,6 +151,7 @@ function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
     "";
   const breakdown = [
     readableToken(stringValue(metadata.ledger_layout_groupby_value_id)),
+    breakdownFromSourceMeasure(variable, measureId),
     readableToken(stringValue(metadata.filing_status)),
   ]
     .filter((value): value is string => Boolean(value && value !== variable))
@@ -196,6 +230,7 @@ function classifyDimension(values: string[]): string {
   if (all((s) => s.startsWith("AGI in "))) return "Income band";
   if (all((s) => RETURN_TYPES.has(s))) return "Return type";
   if (all((s) => FILING_STATUSES.has(firstStatus(s)))) return "Filing status";
+  if (all((s) => QUALIFYING_CHILDREN.has(s))) return "Qualifying children";
   if (all((s) => /^\d+$/.test(s))) return "Age";
   if (all((s) => MEASURES.has(s))) return "Measure";
   return "Breakdown";
