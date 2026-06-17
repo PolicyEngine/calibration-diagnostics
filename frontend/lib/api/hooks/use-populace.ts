@@ -587,6 +587,7 @@ export function usePopulace(release?: string) {
 
 export function usePopulaceTargetDiagnostics(params: {
   release?: string;
+  scope?: "healthcare";
   limit?: number;
   offset?: number;
   family?: string;

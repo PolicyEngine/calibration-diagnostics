@@ -975,6 +975,48 @@ function matchesSearch(row: TargetRow, search: string): boolean {
   return haystack.includes(search.toLowerCase());
 }
 
+const HEALTHCARE_TARGET_ROLES = new Set([
+  "aca_spending",
+  "aca_enrollment",
+  "aca_ptc_recipients",
+  "aca_bronze_aptc_consumers",
+  "medicaid_spending",
+  "medicaid_enrollment",
+  "medicaid_chip_enrollment",
+  "medicare_part_b_premium_total",
+]);
+
+function isHealthcareTarget(row: TargetRow): boolean {
+  const metadata = asObject(row.metadata);
+  const targetRole = stringValue(metadata.target_role);
+  if (targetRole && HEALTHCARE_TARGET_ROLES.has(targetRole)) return true;
+
+  const haystack = [
+    row.name,
+    row.family,
+    row.source,
+    row.variable,
+    row.variable_key,
+    metadata.source_measure_id,
+    metadata.ledger_measure_concept,
+    metadata.ledger_domain,
+  ]
+    .filter((value) => value != null)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    haystack.includes("cms_aca") ||
+    haystack.includes("cms_medicaid") ||
+    haystack.includes("cms_medicare") ||
+    haystack.includes("medicaid") ||
+    haystack.includes("chip") ||
+    haystack.includes("medicare") ||
+    haystack.includes("premium tax credit") ||
+    haystack.includes("aca_ptc")
+  );
+}
+
 function withinToleranceCount(rows: TargetRow[]): number {
   return rows.filter((row) => row.within_tolerance === true).length;
 }
@@ -1579,6 +1621,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? "100") || 100, 1), 500);
   const offset = Math.max(Number(url.searchParams.get("offset") ?? "0") || 0, 0);
   const includeFamilies = url.searchParams.get("include_families") === "1";
+  const scope = stringParam(url.searchParams.get("scope")) === "healthcare" ? "healthcare" : null;
   const family = stringParam(url.searchParams.get("family"));
   const variable = stringParam(url.searchParams.get("variable"));
   const source = stringParam(url.searchParams.get("source"));
@@ -1597,9 +1640,13 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
       return sep < 0 ? null : ([entry.slice(0, sep), entry.slice(sep + 1)] as const);
     })
     .filter((v): v is readonly [string, string] => v != null);
-  const metadata = targetDiagnosticsMetadata(rows);
+  const scopedRows = scope === "healthcare" ? rows.filter(isHealthcareTarget) : rows;
+  const metadata = targetDiagnosticsMetadata(scopedRows);
+  const scopedWithin10Pct = scopedRows.filter(
+    (row) => (numberOrNull(row.abs_relative_error) ?? Infinity) <= 0.1,
+  ).length;
 
-  let filtered = rows;
+  let filtered = scopedRows;
   if (family) filtered = filtered.filter((row) => row.family === family);
   if (variable) filtered = filtered.filter((row) => row.variable_key === variable);
   if (source) filtered = filtered.filter((row) => row.source === source);
@@ -1634,23 +1681,23 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     release_id: cal.release_id,
     schema_version: cal.schema_version,
     metric: "relative_error",
-    families: includeFamilies ? populaceTargetFamilies(rows) : [],
+    families: includeFamilies ? populaceTargetFamilies(scopedRows) : [],
     sources: metadata.sources,
     levels: metadata.levels,
     geographies: metadata.geographies,
     variables: metadata.variables,
     dimensions,
     summary: {
-      total_targets: rows.length,
-      within_tolerance_count: withinToleranceCount(rows),
-      fraction_within_10pct: cal.fraction_within_10pct,
-      included_target_count: cal.included_target_count,
-      skipped_target_count: cal.skipped.length,
-      dropped_target_count: cal.dropped_target_names.length,
+      total_targets: scopedRows.length,
+      within_tolerance_count: withinToleranceCount(scopedRows),
+      fraction_within_10pct: scopedRows.length ? scopedWithin10Pct / scopedRows.length : null,
+      included_target_count: scopedRows.filter((row) => row.calibration_status === "included").length,
+      skipped_target_count: scopedRows.filter((row) => row.calibration_status === "skipped").length,
+      dropped_target_count: scopedRows.filter((row) => row.calibration_status === "not_materialized").length,
       declared_targets: cal.declared_targets,
       compiled_candidate_targets: cal.compiled_candidate_targets,
     },
-    total_targets: rows.length,
+    total_targets: scopedRows.length,
     filtered_total: filtered.length,
     returned: filtered.slice(offset, offset + limit).length,
     limit,
@@ -1658,7 +1705,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     has_next: offset + limit < filtered.length,
     display_limit: limit,
     targets: filtered.slice(offset, offset + limit).map(targetResponseRow),
-    filters: { family, variable, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
+    filters: { scope, family, variable, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
   };
 }
 
