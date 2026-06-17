@@ -58,6 +58,7 @@ interface HealthcareSummary {
   within10Pct: number;
   meanAbsRelativeError: number | null;
   programLabel: string;
+  calculationVariables: string[];
 }
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -127,6 +128,22 @@ const STATUS_COLUMN: Column = {
   ),
 };
 
+function calculationLine(row: {
+  policyengine_variables?: string[] | null;
+  policyengine_map_to?: string | null;
+  policyengine_filter_variable?: string | null;
+}): string | null {
+  const variables = row.policyengine_variables ?? [];
+  if (!variables.length) return null;
+  const suffix = [
+    row.policyengine_map_to ? `map_to ${row.policyengine_map_to}` : null,
+    row.policyengine_filter_variable ? `filter ${row.policyengine_filter_variable}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return `${variables.join(" + ")}${suffix ? ` · ${suffix}` : ""}`;
+}
+
 const METRIC_COLUMNS: Column[] = [
   STATUS_COLUMN,
   {
@@ -171,6 +188,11 @@ const OVERVIEW_COLUMNS: Column[] = [
                 ? "Count"
                 : row.measure || "—"}
         </div>
+        {calculationLine(row) ? (
+          <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+            calc {calculationLine(row)}
+          </div>
+        ) : null}
       </div>
     ),
   },
@@ -322,6 +344,7 @@ function healthcareProgram(row: PopulaceVariableRow): string {
 
 function healthcareSummary(variables: PopulaceVariableRow[]): HealthcareSummary {
   const programs = new Map<string, number>();
+  const calculationVariables = new Set<string>();
   let nTargets = 0;
   let within10Pct = 0;
   let weightedAbsError = 0;
@@ -332,6 +355,9 @@ function healthcareSummary(variables: PopulaceVariableRow[]): HealthcareSummary 
     nTargets += variable.n_targets;
     within10Pct += variable.within_10pct;
     programs.set(program, (programs.get(program) ?? 0) + variable.n_targets);
+    for (const calcVariable of variable.policyengine_variables ?? []) {
+      calculationVariables.add(calcVariable);
+    }
     if (variable.mean_abs_relative_error != null && Number.isFinite(variable.mean_abs_relative_error)) {
       weightedAbsError += variable.mean_abs_relative_error * variable.n_targets;
       weightedAbsErrorTargets += variable.n_targets;
@@ -350,6 +376,7 @@ function healthcareSummary(variables: PopulaceVariableRow[]): HealthcareSummary 
       ? weightedAbsError / weightedAbsErrorTargets
       : null,
     programLabel,
+    calculationVariables: [...calculationVariables].sort(),
   };
 }
 
@@ -402,6 +429,7 @@ function VariableBrowser({
             const within10Share = selectedRow.n_targets
               ? selectedRow.within_10pct / selectedRow.n_targets
               : null;
+            const calcLine = calculationLine(selectedRow);
             return (
               <div
                 key={group.groupKey}
@@ -427,6 +455,11 @@ function VariableBrowser({
                       <span>{group.source}</span>
                       {group.level ? <span>{group.level}</span> : null}
                     </div>
+                    {calcLine ? (
+                      <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+                        calc {calcLine}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-right text-xs tabular-nums">
                     <div className="font-medium text-foreground">
@@ -836,7 +869,7 @@ export function PopulaceTargetsView({
           <KpiCard
             label="Mean Abs Error"
             value={fmt(health.meanAbsRelativeError, { pct: true, digits: 1 })}
-            hint="Average across healthcare variable groups"
+            hint={`${fmt(health.calculationVariables.length, { digits: 0 })} PolicyEngine variables`}
             size="sm"
           />
         </div>
