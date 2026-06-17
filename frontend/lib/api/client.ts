@@ -2,9 +2,8 @@ const EXPLICIT_API_BASE = process.env.NEXT_PUBLIC_API_URL?.trim();
 
 type ParamValue = string | number | boolean | undefined | null | (string | number)[];
 
-// The populace data is served by the Next.js API routes (which read live from
-// Hugging Face); they run on the same origin in dev and prod. Set
-// NEXT_PUBLIC_API_URL to point at an explicit API base (e.g. the FastAPI mirror).
+// The populace data is served by the Next.js API routes, which read live from
+// Hugging Face and run on the same origin in dev and prod.
 function apiUrl(path: string): URL {
   if (EXPLICIT_API_BASE) return new URL(path, EXPLICIT_API_BASE);
   const origin =

@@ -109,98 +109,56 @@ test("comparison matches on base_name across the @period boundary", () => {
   expect(cmp.summary.losses_comparable).toBe(false);
 });
 
-test("zero-target rows have null relative error, not a nonsense percentage", () => {
-  // SOI cells that are genuinely $0 (e.g. the under-$1 AGI band) must not render
-  // a $52B miss as "5191840415890%".
+test("dotted ledger target names use metadata for readable fields", () => {
   const cal = calibration([
-    { name: "nation/irs/real_estate_taxes/total/under 1@2024", target_name: "nation/irs/real_estate_taxes/total/under 1", target: 0, initial_estimate: 51.94e9, final_estimate: 51.92e9, relative_error: 51.92e9, within_tolerance: false },
+    {
+      name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount",
+      target: 0,
+      initial_estimate: 100,
+      final_estimate: 90,
+      relative_error: 90,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "real_estate_taxes",
+        source_measure_id: "real_estate_taxes_amount",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_layout_groupby_value_id: "under_1",
+        filing_status: "All",
+      },
+    },
   ]);
-  const row = cal.rows[0];
-  expect(row.relative_error).toBeNull(); // not the raw 51.92e9 the producer published
-  expect(row.abs_relative_error).toBeNull();
-  expect(row.target_is_zero).toBe(true);
-  expect(row.abs_error).toBeCloseTo(51.92e9, 0); // the miss is still inspectable
-  expect(row.direction).toBe("over");
+  expect(cal.rows[0].source).toBe("irs_soi");
+  expect(cal.rows[0].variable).toBe("real estate taxes");
+  expect(cal.rows[0].measure).toBe("total");
+  expect(cal.rows[0].geography).toBe("United States");
+  expect(cal.rows[0].breakdown).toBe("under 1 · All");
 });
 
-// Dotted ledger names (irs_soi.ty2022.…) must canonicalise like slash names.
-function dotted(name: string) {
-  return { name: `${name}@2024`, target_name: name, target: 100, initial_estimate: 120, final_estimate: 110, relative_error: 0.1, within_tolerance: true };
-}
-
-test("dotted IRS names decompose into source/variable/measure/breakdown", () => {
-  const cal = calibration([
-    dotted("irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_total"),
-  ]);
-  const row = cal.rows[0];
-  expect(row.source).toBe("IRS SOI");
-  expect(row.variable).toBe("eitc");
-  expect(row.measure).toBe("amount"); // "…_total" -> amount
-  expect(row.variable_key).toBe("IRS SOI / eitc · amount");
-  expect(row.dims).toContain("0 children");
-  expect(row.dims).toContain("AGI $25k–$30k");
-});
-
-test("dotted amount/count of the same variable split into two variables", () => {
-  const cal = calibration([
-    dotted("irs_soi.ty2022.historic_table_2.us.under_1.ctc_amount"),
-    dotted("irs_soi.ty2022.historic_table_2.us.under_1.ctc_claims"),
-  ]);
-  const keys = new Set(cal.rows.map((r) => r.variable_key));
-  expect(keys.has("IRS SOI / ctc · amount")).toBe(true);
-  expect(keys.has("IRS SOI / ctc · count")).toBe(true); // claims -> count
-  const ctc = cal.rows[0];
-  expect(ctc.geography).toBe("United States");
-});
-
-test("a pure-measure leaf takes the descriptive token (jct, census)", () => {
-  const cal = calibration([
-    dotted("jct.tax_expenditures.cy2024.salt_deduction.revenue_loss"),
-    dotted("census_stc.fy2024.individual_income_tax_collections.al.t40.collections"),
-  ]);
-  const jct = cal.rows.find((r) => r.source === "JCT")!;
-  expect(jct.variable).toBe("salt deduction"); // not the generic "tax expenditures"
-  const stc = cal.rows.find((r) => r.source === "Census STC")!;
-  expect(stc.variable).toBe("individual income tax collections"); // skips the "t40" code
-  expect(stc.geography).toBe("AL");
-});
-
-test("dotted EITC breakdowns facet by income band and children", () => {
-  const cal = calibration([
-    dotted("irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_total"),
-    dotted("irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.30k_to_35k.eitc_total"),
-    dotted("irs_soi.ty2022.table_2_5.eitc_by_agi_children.one_qualifying_child.25k_to_30k.eitc_total"),
-  ]);
-  const result = page("?variable=IRS%20SOI%20%2F%20eitc%20%C2%B7%20amount", cal);
-  const labels = result.dimensions.map((d) => d.label);
-  expect(labels).toContain("Income band");
-  expect(labels).toContain("Children");
-});
-
-test("variable comparison aligns the slash and dotted naming schemes", () => {
-  // A uses slash names, B uses dotted names; no individual targets match, but
-  // the shared variables (JCT SALT, IRS AGI) must align at the variable level.
-  const a = calibration(
-    [
-      { name: "nation/jct/salt_deduction_expenditure@2024", target_name: "nation/jct/salt_deduction_expenditure", target: 100, final_estimate: 100, relative_error: 0, within_tolerance: true },
-      { name: "nation/irs/adjusted gross income/total/AGI in 200k-500k/taxable/All@2024", target_name: "nation/irs/adjusted gross income/total/AGI in 200k-500k/taxable/All", target: 100, final_estimate: 95, relative_error: -0.05, within_tolerance: true },
-    ],
-    "rel-a",
-  );
-  const b = calibration(
-    [
-      dotted("jct.tax_expenditures.cy2024.salt_deduction.revenue_loss"),
-      dotted("irs_soi.ty2022.historic_table_2.us.all.adjusted_gross_income"),
-    ],
-    "rel-b",
-  );
+test("zero targets compare as absolute misses, not relative-error movers", () => {
+  const target = {
+    name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount@2024",
+    target_name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount",
+    target: 0,
+    registry: { family: "irs_soi" },
+    metadata: {
+      variable: "real_estate_taxes",
+      source_measure_id: "real_estate_taxes_amount",
+      ledger_geography_level: "country",
+      ledger_geography_id: "0100000US",
+      ledger_layout_groupby_value_id: "under_1",
+      filing_status: "All",
+    },
+  };
+  const a = calibration([{ ...target, final_estimate: 100, relative_error: 100 }], "a");
+  const b = calibration([{ ...target, final_estimate: 90, relative_error: 90 }], "b");
   const cmp = buildComparison(a, b);
-  expect(cmp.summary.common).toBe(0); // raw names share nothing
-  const vc = cmp.variable_comparison ?? [];
-  const salt = vc.find((r) => r.key === "jct/salt deduction");
-  expect(salt?.a.n_targets).toBe(1);
-  expect(salt?.b.n_targets).toBe(1);
-  expect(vc.find((r) => r.key === "irs/adjusted gross income")).toBeTruthy();
+  expect(cmp.summary.improved).toBe(0);
+  expect(cmp.rows[0].error_kind).toBe("absolute");
+  expect(cmp.rows[0].a_error).toBe(100);
+  expect(cmp.rows[0].b_error).toBe(90);
+  expect(cmp.rows[0].abs_rel_delta).toBe(null);
 });
 
 test("count and total measures split into distinct variables", () => {

@@ -33,175 +33,7 @@ const FILING_STATUSES = new Set([
   "Married Filing Separately", "Surviving Spouse",
 ]);
 const RETURN_TYPES = new Set(["taxable", "all returns", "nontaxable"]);
-const MEASURES = new Set(["total", "count", "mean", "filers", "nonfilers", "amount"]);
-
-// --- dotted registry-name decomposition --------------------------------------
-// A second naming scheme published by the ledger-backed target surface uses
-// dot-separated paths instead of slashes, e.g.
-//   irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_total
-//   jct.tax_expenditures.cy2024.salt_deduction.revenue_loss
-//   usda_snap.fy2024.state_benefits.nero.ct.total_benefits
-// Both schemes must canonicalise to the same {source, variable, measure,
-// geography, breakdown} so the dashboard groups and faceted-browses them alike.
-const DOTTED_SOURCE_LABELS: Record<string, string> = {
-  irs_soi: "IRS SOI",
-  soi: "IRS SOI",
-  census_stc: "Census STC",
-  census: "Census",
-  cms_aca: "CMS ACA",
-  cms_medicaid: "CMS Medicaid",
-  cms_medicare: "CMS Medicare",
-  cms_nhe: "CMS NHE",
-  hhs_acf_tanf: "HHS ACF TANF",
-  ssa_supplement: "SSA",
-  usda_snap: "USDA SNAP",
-  jct: "JCT",
-  bea: "BEA",
-  treasury: "Treasury",
-  cbo: "CBO",
-};
-// Terminal words that denote the measure (and whether it counts units or sums
-// dollars). The word is stripped from the variable; both an "…_amount" and an
-// "…_returns" row collapse to the same variable with measure=amount vs count.
-const COUNT_MEASURE_WORDS = new Set([
-  "returns", "claims", "count", "recipients", "enrollment", "return",
-]);
-const AMOUNT_MEASURE_WORDS = new Set([
-  "amount", "total", "collections", "loss", "funds", "value", "payments",
-]);
-// Leaf words too generic to name a variable on their own — fall back to the
-// preceding path token (the table/category) when the leaf reduces to these.
-const GENERIC_LEAF_WORDS = new Set([
-  "actual", "total", "all", "gross", "net", "payment", "revenue", "basic",
-  "projected", "estimate", "estimated", "",
-]);
-
-function isPeriodToken(token: string): boolean {
-  return (
-    /^(ty|fy|cy|oep|month|tax_year|year|q[1-4])[\d_]*\d/i.test(token) ||
-    /^\d{4}$/.test(token) ||
-    /^month\d{4}_\d{1,2}$/i.test(token)
-  );
-}
-
-const AGI_BAND_RE =
-  /^(under_-?\d+|-?\d+(?:k|m)?_to_-?\d+(?:k|m)?|-?\d+(?:k|m)?_plus|-?\d+(?:k|m)?_or_more)$/i;
-function isAgiBand(token: string): boolean {
-  return AGI_BAND_RE.test(token);
-}
-function moneyLabel(token: string): string {
-  const m = /^(-?\d+)(k|m)?$/i.exec(token);
-  if (!m) return token;
-  return `$${m[1]}${m[2] ? m[2].toLowerCase() : ""}`;
-}
-function humanizeAgiBand(token: string): string {
-  if (/^under_1$/i.test(token)) return "AGI <$1";
-  const range = /^(-?\d+(?:k|m)?)_to_(-?\d+(?:k|m)?)$/i.exec(token);
-  if (range) return `AGI ${moneyLabel(range[1])}–${moneyLabel(range[2])}`;
-  const plus = /^(-?\d+(?:k|m)?)_(?:plus|or_more)$/i.exec(token);
-  if (plus) return `AGI ${moneyLabel(plus[1])}+`;
-  const under = /^under_(-?\d+(?:k|m)?)$/i.exec(token);
-  if (under) return `AGI <${moneyLabel(under[1])}`;
-  return `AGI ${token.replace(/_/g, " ")}`;
-}
-function humanizeChildren(token: string): string | null {
-  if (/no_qualifying_children/i.test(token)) return "0 children";
-  if (/one_qualifying_child/i.test(token)) return "1 child";
-  if (/two_qualifying_children/i.test(token)) return "2 children";
-  if (/three_or_more_qualifying_children/i.test(token)) return "3+ children";
-  return null;
-}
-// Tokens that name the source table/category rather than a breakdown.
-const TABLE_TOKEN_RE =
-  /(table|district|marketplace|enrollment|assistance|collection|expenditure|premium|payment|benefit|tax_expenditure|by_agi|w2|tips|income_by_source|projection|state_)/i;
-
-function parseDottedTarget(name: string): ParsedTarget {
-  const all = name.split(".").filter(Boolean);
-  const family = all[0] ?? "";
-  const source = DOTTED_SOURCE_LABELS[family] ?? family.replace(/_/g, " ");
-  // Drop the family and every period token wherever it appears (the period is
-  // not always in a fixed position across families).
-  const rest = all.slice(1).filter((t) => !isPeriodToken(t));
-  const leaf = rest.length ? rest[rest.length - 1] : "";
-  const path = rest.slice(0, -1);
-
-  // measure + variable core from the leaf.
-  const leafWords = leaf.split("_");
-  const lastWord = leafWords[leafWords.length - 1] ?? "";
-  let measure: string | null = null;
-  let varWords = leafWords;
-  if (COUNT_MEASURE_WORDS.has(lastWord)) {
-    measure = "count";
-    varWords = leafWords.slice(0, -1);
-  } else if (AMOUNT_MEASURE_WORDS.has(lastWord)) {
-    measure = "amount";
-    varWords = leafWords.slice(0, -1);
-  }
-
-  // classify the path: geography / AGI band / children / filing / table.
-  let geography = "";
-  let level = "";
-  let table: string | null = null;
-  const dims: string[] = [];
-  for (const token of path) {
-    const low = token.toLowerCase();
-    if (low === "us" || low === "national" || low === "national_total") {
-      geography = "United States";
-      level = "national";
-      continue;
-    }
-    const stTotal = /^([a-z]{2})_total$/i.exec(token);
-    const st = (stTotal ? stTotal[1] : token).toUpperCase();
-    if (STATE_ABBRS.has(st) && st !== "US") {
-      geography = st;
-      level = "state";
-      continue;
-    }
-    if (isAgiBand(token)) {
-      dims.push(humanizeAgiBand(token));
-      continue;
-    }
-    const kids = humanizeChildren(token);
-    if (kids) {
-      dims.push(kids);
-      continue;
-    }
-    if (low === "all" || low === "all_returns") continue; // constant filing scope
-    if (TABLE_TOKEN_RE.test(token)) {
-      table = token;
-      continue;
-    }
-    dims.push(token.replace(/_/g, " "));
-  }
-
-  // variable: the leaf core, unless it is empty/too generic (a pure-measure leaf
-  // like "revenue_loss" or "projected_amount"), in which case the most specific
-  // descriptive token names the quantity — the last unclassified path token
-  // (e.g. "salt_deduction"), else the table/category.
-  let variable = varWords.join(" ").trim();
-  const allGeneric = varWords.every((w) => GENERIC_LEAF_WORDS.has(w));
-  if (!variable || allGeneric) {
-    // Prefer the last descriptive breakdown token (e.g. "salt_deduction"),
-    // skipping short code-like tokens (e.g. "t40"); else the table/category.
-    const isCode = (s: string) => /^[a-z]{1,3}\d+$/i.test(s.replace(/\s/g, ""));
-    let descriptor: string | undefined;
-    while (dims.length) {
-      const candidate = dims[dims.length - 1];
-      if (isCode(candidate)) {
-        dims.pop();
-        continue;
-      }
-      descriptor = dims.pop();
-      break;
-    }
-    variable = (descriptor ?? table?.replace(/_/g, " ") ?? path[path.length - 1] ?? leaf)
-      .replace(/_/g, " ");
-  }
-  if (variable === "return") variable = "returns";
-
-  const breakdown = [measure, ...dims].filter(Boolean).join(" · ");
-  return { geography, level, source, variable, breakdown };
-}
+const MEASURES = new Set(["total", "count", "mean", "filers", "nonfilers"]);
 
 export function asObject(value: unknown): JsonObject {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -226,12 +58,7 @@ function numberOrNull(value: unknown): number | null {
 
 function relativeError(estimate: number | null, target: number | null): number | null {
   if (estimate == null || target == null) return null;
-  // Relative error is undefined when the target is 0 — dividing the miss by the
-  // target blows up, and rendering the raw dollar miss as a percentage produces
-  // nonsense (e.g. a $52B estimate against a $0 target shows "5191840415890%").
-  // Callers treat a zero-target row as having no relative error.
-  if (target === 0) return null;
-  return (estimate - target) / Math.abs(target);
+  return target === 0 ? estimate - target : (estimate - target) / Math.abs(target);
 }
 
 interface ParsedTarget {
@@ -242,13 +69,64 @@ interface ParsedTarget {
   breakdown: string;
 }
 
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function stateFromGeoId(value: string | null): string | null {
+  if (!value) return null;
+  const match = /US(\d{2})$/.exec(value);
+  return match ? FIPS_TO_ABBR[match[1]] ?? null : null;
+}
+
+function readableToken(value: string | null): string | null {
+  if (!value) return null;
+  return value.replace(/_/g, " ");
+}
+
+function variableFromMeasure(value: string | null): string | null {
+  if (!value) return null;
+  return value.replace(/_(amount|returns|claims|count|total|collections|projected_amount)$/, "");
+}
+
+function measureFromName(value: string | null): string | null {
+  if (!value) return null;
+  if (/_amount$|_total$|_collections$|_projected_amount$/.test(value)) return "total";
+  if (/_returns$|_claims$|_count$/.test(value)) return "count";
+  return null;
+}
+
+function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
+  if (!name.includes(".")) return null;
+  const metadata = asObject(row.metadata);
+  const registry = asObject(row.registry);
+  const parts = name.split(".");
+  const source = stringValue(registry.family) ?? parts[0] ?? "";
+  const geoLevel = stringValue(metadata.ledger_geography_level);
+  const geoId = stringValue(metadata.ledger_geography_id);
+  const geography =
+    geoLevel === "country"
+      ? "United States"
+      : stateFromGeoId(geoId) ?? stringValue(metadata.state) ?? "";
+  const level =
+    geoLevel === "country" ? "national" : geoLevel === "state" ? "state" : "";
+  const measureId = stringValue(metadata.source_measure_id) ?? parts.at(-1) ?? "";
+  const variable =
+    readableToken(stringValue(metadata.variable)) ??
+    readableToken(variableFromMeasure(measureId)) ??
+    readableToken(parts.at(-2) ?? null) ??
+    "";
+  const breakdown = [
+    readableToken(stringValue(metadata.ledger_layout_groupby_value_id)),
+    readableToken(stringValue(metadata.filing_status)),
+  ]
+    .filter((value): value is string => Boolean(value && value !== variable))
+    .join(" · ");
+
+  return { geography, level, source, variable, breakdown };
+}
+
 function parseTarget(name: string): ParsedTarget {
-  // Two naming schemes coexist; dispatch by shape. Slash names ("nation/irs/…")
-  // fall through to the logic below; dotted ledger names ("irs_soi.ty2022.…")
-  // are decomposed by parseDottedTarget. Both yield the same canonical fields.
-  if (!name.includes("/") && name.includes(".")) {
-    return parseDottedTarget(name);
-  }
   const parts = name.split("/");
   const p0 = parts[0] ?? "";
   const fips = /^US(\d{2})$/.exec(p0);
@@ -315,9 +193,7 @@ function classifyDimension(values: string[]): string {
   if (!v.length) return "Breakdown";
   const all = (pred: (s: string) => boolean) => v.every(pred);
   const firstStatus = (s: string) => s.split(" · ")[0];
-  // "AGI in 30k-40k" (slash) and "AGI <$1" / "AGI $25k–$30k" (dotted) both bands.
-  if (all((s) => s.startsWith("AGI"))) return "Income band";
-  if (all((s) => /\bchild(ren)?$/i.test(s))) return "Children";
+  if (all((s) => s.startsWith("AGI in "))) return "Income band";
   if (all((s) => RETURN_TYPES.has(s))) return "Return type";
   if (all((s) => FILING_STATUSES.has(firstStatus(s)))) return "Filing status";
   if (all((s) => /^\d+$/.test(s))) return "Age";
@@ -335,25 +211,13 @@ function parseAmount(token: string): number {
 }
 
 function bandLowerBound(label: string): number {
-  // Handles both "AGI in 30k-40k" (slash) and "AGI <$1" / "AGI $25k–$30k" /
-  // "AGI $50k+" (dotted). Sort by the band's lower edge.
-  const body = label.replace(/^AGI(?: in)?\s*/, "").replace(/\$/g, "");
-  if (/^<\s*/.test(body)) return -Infinity; // "<$1" sorts first
-  const match = /^(-?inf|-?\d+(?:\.\d+)?[km]?)\s*[-–]\s*(-?inf|-?\d+(?:\.\d+)?[km]?)/i.exec(body);
-  if (match) return parseAmount(match[1]);
-  const plus = /^(-?\d+(?:\.\d+)?[km]?)\s*\+/i.exec(body);
-  if (plus) return parseAmount(plus[1]);
-  return 0;
-}
-
-function childrenOrder(label: string): number {
-  const m = /^(\d+)/.exec(label);
-  return m ? Number(m[1]) : 99;
+  const body = label.replace(/^AGI in /, "");
+  const match = /^(-?inf|-?\d+(?:\.\d+)?[km]?)-(-?inf|-?\d+(?:\.\d+)?[km]?)$/i.exec(body);
+  return match ? parseAmount(match[1]) : 0;
 }
 
 function sortDimensionValues(label: string, values: string[]): string[] {
   if (label === "Income band") return [...values].sort((a, b) => bandLowerBound(a) - bandLowerBound(b));
-  if (label === "Children") return [...values].sort((a, b) => childrenOrder(a) - childrenOrder(b));
   if (label === "Age") return [...values].sort((a, b) => Number(a) - Number(b));
   return [...values].sort((a, b) => (a === "All" ? -1 : b === "All" ? 1 : a.localeCompare(b)));
 }
@@ -431,26 +295,26 @@ function enrichTargetRow(row: TargetRow): TargetRow {
   const target = numberOrNull(row.target);
   const initial = numberOrNull(row.initial_estimate);
   const final = numberOrNull(row.final_estimate);
-  // A zero target has no meaningful relative error — null it out regardless of
-  // what the producer published, and expose the absolute miss instead so the
-  // row is still inspectable (these are SOI cells that are genuinely $0).
-  const targetIsZero = target === 0;
-  const finalRel = targetIsZero ? null : (numberOrNull(row.relative_error) ?? relativeError(final, target));
-  const initialRel = targetIsZero ? null : relativeError(initial, target);
+  const finalRel = numberOrNull(row.relative_error) ?? relativeError(final, target);
+  const initialRel = relativeError(initial, target);
   const absFinalRel = finalRel == null ? null : Math.abs(finalRel);
-  const absError = final == null || target == null ? null : final - target;
   const improvement =
     initialRel == null || finalRel == null ? null : Math.abs(initialRel) - Math.abs(finalRel);
-  const parsed = parseTarget(baseName);
+  const parsed = parseDottedTarget(baseName, row) ?? parseTarget(baseName);
   const measureCol = asObject(row.measure);
   const dims = splitBreakdown(parsed.breakdown);
+  const metadata = asObject(row.metadata);
+  const sourceMeasureId = stringValue(metadata.source_measure_id);
   // The first breakdown token is the measure (total / count / mean / …). Many
   // IRS variables publish both a total (dollar amount) and a count (number of
   // returns), so the measure is part of the variable's identity, not a
   // breakdown within it — fold it into variable_key so they're distinct things.
-  const measure = dims[0] && MEASURES.has(dims[0]) ? dims[0] : null;
+  const measure = dims[0] && MEASURES.has(dims[0])
+    ? dims[0]
+    : measureFromName(sourceMeasureId);
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
+  const errorKind = target === 0 ? "absolute" : "relative";
   return {
     ...row,
     name: fullName,
@@ -462,6 +326,7 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     source: parsed.source,
     variable: parsed.variable,
     measure,
+    error_kind: errorKind,
     breakdown: parsed.breakdown,
     dims,
     variable_key: variableKey,
@@ -471,26 +336,10 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
     period: numberOrNull(row.period),
-    // Override the published relative_error so a zero-target row is null, not
-    // the raw dollar miss that downstream code would render as a percentage.
-    relative_error: finalRel,
     initial_relative_error: initialRel,
     abs_relative_error: absFinalRel,
-    abs_error: absError,
-    target_is_zero: targetIsZero,
     improvement,
-    direction:
-      finalRel == null
-        ? targetIsZero && absError != null && Math.abs(absError) > 1e-9
-          ? absError > 0
-            ? "over"
-            : "under"
-          : null
-        : finalRel > 0
-          ? "over"
-          : finalRel < 0
-            ? "under"
-            : "exact",
+    direction: finalRel == null ? null : finalRel > 0 ? "over" : finalRel < 0 ? "under" : "exact",
   };
 }
 
@@ -708,49 +557,6 @@ export async function loadRelease(releaseId: string, revalidate: number): Promis
 }
 
 // --- shaped outputs ---------------------------------------------------------
-function median(xs: number[]): number | null {
-  if (!xs.length) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-
-// The published loss is mean(((est − target)/(|target| + 1))²). When a target
-// is exactly $0 that term is just est², so a handful of $0-reference SOI cells
-// (where populace estimates billions) dominate the whole figure. We break the
-// loss into its $0-target vs well-defined parts so the UI can show both and be
-// honest about what the headline number actually measures.
-function lossBreakdown(rows: TargetRow[]) {
-  let total = 0;
-  let zeroTotal = 0;
-  let nZero = 0;
-  let sumNonZero = 0;
-  let nNonZero = 0;
-  const absRelNonZero: number[] = [];
-  for (const row of rows) {
-    const t = numberOrNull(row.target);
-    const e = numberOrNull(row.final_estimate);
-    if (t == null || e == null) continue;
-    const contrib = ((e - t) / (Math.abs(t) + 1)) ** 2;
-    total += contrib;
-    if (row.target_is_zero || t === 0) {
-      nZero += 1;
-      zeroTotal += contrib;
-    } else {
-      nNonZero += 1;
-      sumNonZero += contrib;
-      const ar = numberOrNull(row.abs_relative_error);
-      if (ar != null) absRelNonZero.push(ar);
-    }
-  }
-  return {
-    n_zero_target: nZero,
-    loss_excl_zero_target: nNonZero ? sumNonZero / nNonZero : null,
-    zero_target_loss_share: total > 0 ? zeroTotal / total : null,
-    median_abs_rel_error: median(absRelNonZero),
-  };
-}
-
 export function latestPopulaceCalibrationSummary(cal: Calibration) {
   return {
     available: true,
@@ -770,7 +576,6 @@ export function latestPopulaceCalibrationSummary(cal: Calibration) {
     total_targets: cal.rows.length,
     within_tolerance_count: withinToleranceCount(cal.rows),
     family_fit: familyFitSummary(cal.rows),
-    ...lossBreakdown(cal.rows),
   };
 }
 
@@ -879,75 +684,16 @@ function absRel(row: TargetRow | undefined): number | null {
   return row ? numberOrNull(row.abs_relative_error) : null;
 }
 
-// A scheme-independent variable key so the two naming conventions align: the
-// slash surface's "irs / adjusted gross income" and the dotted surface's
-// "IRS SOI / adjusted gross income" both reduce to "irs/adjusted gross income".
-function canonicalVariableKey(row: TargetRow): string {
-  const src = String(row.source ?? "").toLowerCase().replace(/\s+/g, "_");
-  const srcNorm = src === "irs_soi" ? "irs" : src;
-  const variable = String(row.variable ?? "")
-    .toLowerCase()
-    .replace(/_/g, " ")
-    .replace(/\s+expenditure$/, "")
-    .trim();
-  return srcNorm && variable ? `${srcNorm}/${variable}` : "";
+function comparableRelative(row: TargetRow | undefined): number | null {
+  if (!row || numberOrNull(row.target) === 0) return null;
+  return numberOrNull(row.relative_error);
 }
 
-function variableFit(rows: TargetRow[]) {
-  const errs = rows.map(absRel).filter((v): v is number => v != null);
-  return {
-    n_targets: rows.length,
-    within_10pct: errs.filter((e) => e <= 0.1).length,
-    fraction_within_10pct: errs.length ? errs.filter((e) => e <= 0.1).length / errs.length : null,
-    mean_abs_relative_error: errs.length ? errs.reduce((s, v) => s + v, 0) / errs.length : null,
-  };
-}
-
-// Compare the per-variable fit of two releases. Unlike the per-target diff this
-// works across the naming-scheme boundary (and within it): it groups each
-// release's targets by canonical variable and reports the fit of the variables
-// present in both — e.g. the JCT tax expenditures and shared IRS income lines.
-function buildVariableComparison(a: Calibration, b: Calibration) {
-  const group = (rows: TargetRow[]) => {
-    const m = new Map<string, TargetRow[]>();
-    for (const r of rows) {
-      const k = canonicalVariableKey(r);
-      if (!k) continue;
-      (m.get(k) ?? m.set(k, []).get(k)!).push(r);
-    }
-    return m;
-  };
-  const aByVar = group(a.rows);
-  const bByVar = group(b.rows);
-  type VarFit = ReturnType<typeof variableFit>;
-  const common: {
-    key: string;
-    source: string;
-    variable: string;
-    a: VarFit;
-    b: VarFit;
-    within10_delta: number | null;
-  }[] = [];
-  for (const [k, aRows] of aByVar) {
-    const bRows = bByVar.get(k);
-    if (!bRows) continue;
-    const af = variableFit(aRows);
-    const bf = variableFit(bRows);
-    const label = String(aRows[0].variable ?? bRows[0].variable ?? k);
-    common.push({
-      key: k,
-      source: String(aRows[0].source ?? bRows[0].source ?? ""),
-      variable: label,
-      a: af,
-      b: bf,
-      within10_delta:
-        af.fraction_within_10pct != null && bf.fraction_within_10pct != null
-          ? bf.fraction_within_10pct - af.fraction_within_10pct
-          : null,
-    });
-  }
-  common.sort((x, y) => Math.abs(y.within10_delta ?? 0) - Math.abs(x.within10_delta ?? 0));
-  return common;
+function absoluteMiss(row: TargetRow | undefined): number | null {
+  if (!row) return null;
+  const estimate = numberOrNull(row.final_estimate);
+  const target = numberOrNull(row.target);
+  return estimate == null || target == null ? null : estimate - target;
 }
 
 // Diff two releases' calibration by matching targets on name. Common targets
@@ -971,21 +717,32 @@ export function buildComparison(a: Calibration, b: Calibration) {
     const ar = aByName.get(name);
     const br = bByName.get(name);
     if (ar && br) {
-      const aAbs = absRel(ar);
-      const bAbs = absRel(br);
+      const aAbs = numberOrNull(ar.target) === 0 ? null : absRel(ar);
+      const bAbs = numberOrNull(br.target) === 0 ? null : absRel(br);
       const delta = aAbs != null && bAbs != null ? bAbs - aAbs : null;
       if (delta != null && delta < -1e-9) improved += 1;
       else if (delta != null && delta > 1e-9) regressed += 1;
+      const aRelative = comparableRelative(ar);
+      const bRelative = comparableRelative(br);
+      const errorKind = aRelative != null && bRelative != null ? "relative" : "absolute";
       common.push({
         name,
+        target_label: [br.geography ?? ar.geography, br.breakdown ?? ar.breakdown]
+          .filter(Boolean)
+          .join(" · "),
         variable_key: br.variable_key ?? ar.variable_key,
         variable: br.variable ?? ar.variable,
         breakdown: br.breakdown ?? ar.breakdown,
         geography: br.geography ?? ar.geography,
+        a_target: numberOrNull(ar.target),
+        b_target: numberOrNull(br.target),
         a_final_estimate: ar.final_estimate ?? null,
         b_final_estimate: br.final_estimate ?? null,
-        a_relative_error: numberOrNull(ar.relative_error),
-        b_relative_error: numberOrNull(br.relative_error),
+        error_kind: errorKind,
+        a_error: errorKind === "relative" ? aRelative : absoluteMiss(ar),
+        b_error: errorKind === "relative" ? bRelative : absoluteMiss(br),
+        a_relative_error: aRelative,
+        b_relative_error: bRelative,
         a_within_tolerance: ar.within_tolerance ?? null,
         b_within_tolerance: br.within_tolerance ?? null,
         abs_rel_delta: delta,
@@ -1017,7 +774,6 @@ export function buildComparison(a: Calibration, b: Calibration) {
       losses_comparable: !surfacesDiffer,
     },
     rows: common,
-    variable_comparison: buildVariableComparison(a, b),
   };
 }
 

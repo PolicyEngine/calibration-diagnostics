@@ -60,12 +60,7 @@ const METRIC_COLUMNS: Column[] = [
     label: "Rel. error",
     numeric: true,
     sortable: true,
-    // A zero target has no relative error; show the absolute miss instead so the
-    // row stays informative (e.g. "+52B vs 0") rather than a nonsense percent.
-    render: (row) =>
-      row.target_is_zero
-        ? `${fmtCompact(row.abs_error)} vs 0`
-        : fmt(row.relative_error, { pct: true, digits: 1 }),
+    render: (row) => fmt(row.relative_error, { pct: true, digits: 1 }),
   },
   {
     key: "within_tolerance",

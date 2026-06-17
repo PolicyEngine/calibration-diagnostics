@@ -7,7 +7,7 @@ calibrated microdataset published on Hugging Face at
 Everything is read **live from Hugging Face**: the current release is resolved
 through `latest.json`, and each release's manifests and per-target calibration
 diagnostics are fetched on demand. There is no committed data snapshot and no
-separate backend — the Next.js API routes are the API layer.
+separate service layer — the Next.js API routes are the API layer.
 
 ## What it shows
 
@@ -47,4 +47,4 @@ make build     # next build
 ```
 
 Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different
-dataset/revision; `NEXT_PUBLIC_API_URL` to call an external API base.
+dataset/revision.

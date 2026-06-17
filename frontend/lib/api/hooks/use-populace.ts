@@ -50,8 +50,6 @@ export interface PopulaceTargetRow {
   period?: number | null;
   initial_relative_error?: number | null;
   abs_relative_error?: number | null;
-  abs_error?: number | null;
-  target_is_zero?: boolean | null;
   improvement?: number | null;
   direction?: "over" | "under" | "exact" | null;
   [key: string]: unknown;
@@ -101,11 +99,6 @@ export interface PopulaceCalibration {
   total_targets?: number;
   within_tolerance_count?: number;
   family_fit?: PopulaceFamilyFitRow[];
-  // Loss decomposition: the raw loss is dominated by $0-reference targets.
-  n_zero_target?: number | null;
-  loss_excl_zero_target?: number | null;
-  zero_target_loss_share?: number | null;
-  median_abs_rel_error?: number | null;
 }
 
 export interface PopulaceReleaseEntry {
@@ -189,12 +182,18 @@ export interface PopulaceTargetDiagnostics {
 
 export interface PopulaceComparisonRow {
   name: string;
+  target_label?: string | null;
   variable_key?: string | null;
   variable?: string | null;
   breakdown?: string | null;
   geography?: string | null;
+  a_target?: number | null;
+  b_target?: number | null;
   a_final_estimate?: number | null;
   b_final_estimate?: number | null;
+  error_kind?: "relative" | "absolute" | null;
+  a_error?: number | null;
+  b_error?: number | null;
   a_relative_error?: number | null;
   b_relative_error?: number | null;
   a_within_tolerance?: boolean | null;
@@ -215,23 +214,53 @@ export interface PopulaceComparison {
     losses_comparable: boolean;
   };
   rows: PopulaceComparisonRow[];
-  variable_comparison?: PopulaceVariableComparisonRow[];
 }
 
-export interface PopulaceVariableFit {
-  n_targets: number;
-  within_10pct: number;
-  fraction_within_10pct: number | null;
-  mean_abs_relative_error: number | null;
-}
-
-export interface PopulaceVariableComparisonRow {
-  key: string;
-  source: string;
+export interface PopulaceVariableValue {
   variable: string;
-  a: PopulaceVariableFit;
-  b: PopulaceVariableFit;
-  within10_delta: number | null;
+  period: string;
+  release_id: string;
+  dataset: string;
+  entity: string;
+  definition_period: string;
+  label?: string | null;
+  documentation?: string | null;
+  value: number | null;
+  weighted_sum: number | null;
+  raw_sum: number | null;
+  weight_sum: number | null;
+  record_count: number;
+  nonzero_weight_count: number | null;
+  elapsed_seconds: number | null;
+}
+
+export interface PopulaceVariableLookupResponse extends Partial<PopulaceVariableValue> {
+  period: string;
+  release_id: string;
+  dataset: string;
+  dataset_path?: string | null;
+  variables: PopulaceVariableValue[];
+  elapsed_seconds: number | null;
+}
+
+export function usePopulaceVariableValue(params: {
+  variables?: string[];
+  period?: string;
+  release?: string;
+}) {
+  const variables = params.variables?.map((v) => v.trim()).filter(Boolean) ?? [];
+  return useQuery({
+    queryKey: ["populace", "variable", variables, params.period ?? "2024", params.release ?? "latest"],
+    queryFn: () =>
+      apiGet<PopulaceVariableLookupResponse>("/populace/variable", {
+        variables,
+        period: params.period ?? "2024",
+        release: params.release || undefined,
+      }),
+    enabled: variables.length > 0,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  });
 }
 
 export function usePopulaceCompare(a?: string, b?: string, enabled = true) {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtSci, fmtSigned, humanizeName, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtCompact, fmtSigned, humanizeName, releaseLabel } from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -14,63 +14,32 @@ import {
   usePopulaceCompare,
   usePopulaceReleases,
   type PopulaceComparisonRow,
-  type PopulaceVariableComparisonRow,
 } from "@/lib/api/hooks/use-populace";
+
+const MAX_MOVER_REL_ERROR = 10; // Keep the compare summary to bounded relative errors (<= 1000%).
 
 function relErr(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
 }
 
-function fitPct(f: { fraction_within_10pct: number | null; n_targets: number }) {
-  return `${f.fraction_within_10pct == null ? "—" : fmt(f.fraction_within_10pct, { pct: true, digits: 0 })} (${fmt(f.n_targets, { digits: 0 })})`;
+function errorValue(row: PopulaceComparisonRow, side: "a" | "b") {
+  const value = side === "a" ? row.a_error : row.b_error;
+  if (row.error_kind === "absolute") return fmtCompact(value);
+  return relErr(value);
 }
 
-// Variable-level fit, matched on a scheme-independent key — works even when the
-// two releases use different naming conventions (so no individual targets match).
-function VariableComparisonTable({ rows }: { rows: PopulaceVariableComparisonRow[] }) {
-  if (!rows.length) {
-    return <EmptyState title="No variables in common between these releases." variant="compact" />;
-  }
+function targetLabel(row: PopulaceComparisonRow) {
+  return row.target_label || row.breakdown || row.geography || row.name;
+}
+
+function isBoundedRelativeMover(row: PopulaceComparisonRow) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-            <th className="px-3 py-2 font-semibold">Variable</th>
-            <th className="px-3 py-2 text-right font-semibold">A within 10% (n)</th>
-            <th className="px-3 py-2 text-right font-semibold">B within 10% (n)</th>
-            <th className="px-3 py-2 text-right font-semibold">Δ within 10%</th>
-            <th className="px-3 py-2 text-right font-semibold">A → B mean |err|</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key} className="border-b border-border/60 last:border-b-0">
-              <td className="px-3 py-1.5">
-                <span className="font-medium text-foreground">{humanizeName(row.variable)}</span>{" "}
-                <span className="text-xs text-muted-foreground">{row.source}</span>
-              </td>
-              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{fitPct(row.a)}</td>
-              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{fitPct(row.b)}</td>
-              <td
-                className={`px-3 py-1.5 text-right tabular-nums ${
-                  (row.within10_delta ?? 0) > 0
-                    ? "text-emerald-700"
-                    : (row.within10_delta ?? 0) < 0
-                      ? "text-rose-700"
-                      : "text-muted-foreground"
-                }`}
-              >
-                {row.within10_delta == null ? "—" : fmtSigned(row.within10_delta, { pct: true, digits: 0 })}
-              </td>
-              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                {relErr(row.a.mean_abs_relative_error)} → {relErr(row.b.mean_abs_relative_error)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    row.error_kind === "relative" &&
+    row.abs_rel_delta != null &&
+    row.a_error != null &&
+    row.b_error != null &&
+    Math.abs(row.a_error) <= MAX_MOVER_REL_ERROR &&
+    Math.abs(row.b_error) <= MAX_MOVER_REL_ERROR
   );
 }
 
@@ -92,13 +61,17 @@ function MoversTable({ rows }: { rows: PopulaceComparisonRow[] }) {
           {rows.map((row) => (
             <tr key={row.name} className="border-b border-border/60 last:border-b-0">
               <td className="max-w-md truncate px-3 py-1.5" title={row.name}>
-                {row.breakdown || row.name}
+                {targetLabel(row)}
               </td>
               <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">
                 {row.variable ? humanizeName(row.variable as string) : row.variable_key}
               </td>
-              <td className="px-3 py-1.5 text-right tabular-nums">{relErr(row.a_relative_error)}</td>
-              <td className="px-3 py-1.5 text-right tabular-nums">{relErr(row.b_relative_error)}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums">
+                {errorValue(row, "a")}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums">
+                {errorValue(row, "b")}
+              </td>
               <td
                 className={`px-3 py-1.5 text-right tabular-nums ${
                   (row.abs_rel_delta ?? 0) < 0 ? "text-emerald-700" : "text-rose-700"
@@ -140,11 +113,17 @@ export function PopulaceCompareView() {
   };
 
   const improvements = useMemo(
-    () => (data?.rows ?? []).filter((r) => (r.abs_rel_delta ?? 0) < 0).slice(0, 20),
+    () =>
+      (data?.rows ?? [])
+        .filter((r) => isBoundedRelativeMover(r) && (r.abs_rel_delta ?? 0) < 0)
+        .slice(0, 20),
     [data],
   );
   const regressions = useMemo(
-    () => (data?.rows ?? []).filter((r) => (r.abs_rel_delta ?? 0) > 0).slice(0, 20),
+    () =>
+      (data?.rows ?? [])
+        .filter((r) => isBoundedRelativeMover(r) && (r.abs_rel_delta ?? 0) > 0)
+        .slice(0, 20),
     [data],
   );
 
@@ -162,7 +141,7 @@ export function PopulaceCompareView() {
         ) : (
           <div className="flex flex-wrap items-center gap-3">
             <ToolbarSelect
-              label="A (baseline)"
+              label="Release A"
               value={a}
               onChange={setA}
               options={options}
@@ -209,7 +188,7 @@ export function PopulaceCompareView() {
               value={`${fmt(data.a.fraction_within_10pct, { pct: true, digits: 0 })} → ${fmt(data.b.fraction_within_10pct, { pct: true, digits: 0 })}`}
               hint={
                 data.summary.losses_comparable
-                  ? `loss ${fmtSci(data.a.final_loss)} → ${fmtSci(data.b.final_loss)}`
+                  ? `raw loss ${fmt(data.a.final_loss, { digits: 3 })} → ${fmt(data.b.final_loss, { digits: 3 })}`
                   : "surfaces differ — losses not comparable"
               }
             />
@@ -223,32 +202,22 @@ export function PopulaceCompareView() {
             </StatusPill>
           )}
 
-          <SectionCard
-            title="Variable-level fit (A → B)"
-            description="Per-variable fit for the variables present in both releases, matched on a scheme-independent key — so this works even when the two releases use different target-naming conventions and share no individual targets (e.g. the JCT tax expenditures and shared IRS income lines). Δ within 10% positive = B fits the variable better."
-            padded={false}
-          >
-            <VariableComparisonTable rows={data.variable_comparison ?? []} />
-          </SectionCard>
-
-          {data.summary.common > 0 && (
-            <div className="grid gap-5 xl:grid-cols-2">
-              <SectionCard
-                title="Most improved (B vs A)"
-                description="Common targets whose absolute relative error fell the most from A to B."
-                padded={false}
-              >
-                <MoversTable rows={improvements} />
-              </SectionCard>
-              <SectionCard
-                title="Most regressed (B vs A)"
-                description="Common targets whose absolute relative error rose the most from A to B."
-                padded={false}
-              >
-                <MoversTable rows={regressions} />
-              </SectionCard>
-            </div>
-          )}
+          <div className="grid gap-5 xl:grid-cols-2">
+            <SectionCard
+              title="Most improved (B vs A)"
+              description="Common non-zero targets whose absolute relative error fell the most from A to B, excluding tiny-denominator extremes above 1000%."
+              padded={false}
+            >
+              <MoversTable rows={improvements} />
+            </SectionCard>
+            <SectionCard
+              title="Most regressed (B vs A)"
+              description="Common non-zero targets whose absolute relative error rose the most from A to B, excluding tiny-denominator extremes above 1000%."
+              padded={false}
+            >
+              <MoversTable rows={regressions} />
+            </SectionCard>
+          </div>
         </>
       )}
     </div>
