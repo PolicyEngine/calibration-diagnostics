@@ -80,7 +80,6 @@ def main() -> int:
                     "period": args.period,
                     "release_id": args.revision,
                     "dataset": dataset,
-                    "dataset_path": dataset_path,
                     "entity": variable.entity.key,
                     "definition_period": str(variable.definition_period),
                     "label": getattr(variable, "label", None),
@@ -98,7 +97,6 @@ def main() -> int:
             "period": args.period,
             "release_id": args.revision,
             "dataset": dataset,
-            "dataset_path": dataset_path,
             "variables": results,
             "elapsed_seconds": finite_float(time.time() - started),
         }
