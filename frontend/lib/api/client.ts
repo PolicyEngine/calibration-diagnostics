@@ -32,7 +32,15 @@ export async function apiGet<T>(
   if (params) appendParams(url, params);
   const res = await fetch(url.toString());
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${await res.text()}`);
+    const body = await res.text();
+    let detail = body;
+    try {
+      const parsed = JSON.parse(body);
+      if (typeof parsed.detail === "string") detail = parsed.detail;
+    } catch {
+      // Keep the raw response text.
+    }
+    throw new Error(detail || `API error ${res.status}`);
   }
   return res.json();
 }

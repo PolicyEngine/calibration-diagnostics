@@ -32,6 +32,17 @@ interface Column {
   render: (row: PopulaceTargetRow) => React.ReactNode;
 }
 
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timeout);
+  }, [value, delayMs]);
+
+  return debounced;
+}
+
 function finalError(row: PopulaceTargetRow) {
   if (row.error_kind === "absolute") return fmtCompact(row.final_error);
   return fmt(row.final_error, { pct: true, digits: 1 });
@@ -244,6 +255,7 @@ export function PopulaceTargetsView() {
         .map(([key, value]) => `${key}:${value}`),
     [facetFilters],
   );
+  const debouncedSearch = useDebouncedValue(search, 250);
 
   const params = useMemo(
     () => ({
@@ -254,15 +266,15 @@ export function PopulaceTargetsView() {
       source: source || undefined,
       level: level || undefined,
       direction: direction || undefined,
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       facet: facetParam.length ? facetParam : undefined,
       sort_by: sort.by,
       sort_dir: sort.dir,
     }),
-    [release, variable, source, level, direction, search, facetParam, page, sort],
+    [release, variable, source, level, direction, debouncedSearch, facetParam, page, sort],
   );
 
-  const { data, isLoading, error } = usePopulaceTargetDiagnostics(params);
+  const { data, isLoading, isFetching, error } = usePopulaceTargetDiagnostics(params);
 
   const variables = data?.variables ?? [];
   const sources = data?.sources ?? [];
@@ -443,6 +455,9 @@ export function PopulaceTargetsView() {
             <div className="flex items-center justify-between px-5 py-2 text-xs text-muted-foreground">
               <span>
                 Page {page + 1} of {pageCount}
+                {isFetching && !isLoading ? (
+                  <span className="ml-2 text-primary">Updating…</span>
+                ) : null}
               </span>
               <span className="flex gap-2">
                 <button

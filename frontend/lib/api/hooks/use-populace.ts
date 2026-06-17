@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiGet } from "../client";
 
 export interface PopulaceGates {
@@ -312,6 +312,7 @@ export function usePopulaceTargetDiagnostics(params: {
     queryKey: ["populace", "target-diagnostics", params],
     queryFn: () =>
       apiGet<PopulaceTargetDiagnostics>("/populace/target-diagnostics", params),
+    placeholderData: keepPreviousData,
     staleTime: 15 * 60 * 1000,
   });
 }

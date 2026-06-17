@@ -21,6 +21,15 @@ function errorResponse(detail: string, status: number) {
   return NextResponse.json({ detail }, { status });
 }
 
+function hostedPythonUnavailableError() {
+  return Object.assign(
+    new Error(
+      "Variable lookup is not available on the hosted deployment because the Vercel Node runtime cannot run the PolicyEngine Python calculation environment. Use the local app for now, or move this endpoint to a Python-backed service.",
+    ),
+    { status: 503 },
+  );
+}
+
 async function runVariableScript(
   scriptPath: string,
   args: string[],
@@ -44,7 +53,8 @@ async function runVariableScript(
       if (err.code !== "ENOENT") throw err;
     }
   }
-  throw lastError ?? new Error("Python executable was not found.");
+  if (lastError?.code === "ENOENT") throw hostedPythonUnavailableError();
+  throw lastError ?? hostedPythonUnavailableError();
 }
 
 export async function GET(request: Request) {
@@ -99,7 +109,7 @@ export async function GET(request: Request) {
     );
     return NextResponse.json(scrub(JSON.parse(stdout)));
   } catch (error) {
-    const err = error as Error & { stderr?: string; signal?: string };
+    const err = error as Error & { stderr?: string; signal?: string; status?: number };
     let detail = err.stderr || err.message || "Variable calculation failed.";
     try {
       const parsed = JSON.parse(err.stderr ?? "");
@@ -110,6 +120,6 @@ export async function GET(request: Request) {
     if (err.signal === "SIGTERM") {
       detail = "Variable calculation timed out.";
     }
-    return errorResponse(detail.trim(), 502);
+    return errorResponse(detail.trim(), err.status ?? 502);
   }
 }
