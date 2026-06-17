@@ -295,11 +295,22 @@ function enrichTargetRow(row: TargetRow): TargetRow {
   const target = numberOrNull(row.target);
   const initial = numberOrNull(row.initial_estimate);
   const final = numberOrNull(row.final_estimate);
-  const finalRel = numberOrNull(row.relative_error) ?? relativeError(final, target);
-  const initialRel = relativeError(initial, target);
-  const absFinalRel = finalRel == null ? null : Math.abs(finalRel);
+  const errorKind = target === 0 ? "absolute" : "relative";
+  const rawFinalError = numberOrNull(row.relative_error) ?? relativeError(final, target);
+  const rawInitialError = relativeError(initial, target);
+  const initialError =
+    errorKind === "absolute" && initial != null && target != null
+      ? initial - target
+      : rawInitialError;
+  const finalError =
+    errorKind === "absolute" && final != null && target != null
+      ? final - target
+      : rawFinalError;
+  const absFinalError = finalError == null ? null : Math.abs(finalError);
   const improvement =
-    initialRel == null || finalRel == null ? null : Math.abs(initialRel) - Math.abs(finalRel);
+    initialError == null || finalError == null
+      ? null
+      : Math.abs(initialError) - Math.abs(finalError);
   const parsed = parseDottedTarget(baseName, row) ?? parseTarget(baseName);
   const measureCol = asObject(row.measure);
   const dims = splitBreakdown(parsed.breakdown);
@@ -314,7 +325,6 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     : measureFromName(sourceMeasureId);
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
-  const errorKind = target === 0 ? "absolute" : "relative";
   return {
     ...row,
     name: fullName,
@@ -327,6 +337,9 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     variable: parsed.variable,
     measure,
     error_kind: errorKind,
+    initial_error: initialError,
+    final_error: finalError,
+    abs_error: absFinalError,
     breakdown: parsed.breakdown,
     dims,
     variable_key: variableKey,
@@ -336,10 +349,10 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
     period: numberOrNull(row.period),
-    initial_relative_error: initialRel,
-    abs_relative_error: absFinalRel,
+    initial_relative_error: errorKind === "relative" ? initialError : null,
+    abs_relative_error: errorKind === "relative" ? absFinalError : null,
     improvement,
-    direction: finalRel == null ? null : finalRel > 0 ? "over" : finalRel < 0 ? "under" : "exact",
+    direction: finalError == null ? null : finalError > 0 ? "over" : finalError < 0 ? "under" : "exact",
   };
 }
 

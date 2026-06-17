@@ -134,6 +134,11 @@ test("dotted ledger target names use metadata for readable fields", () => {
   expect(cal.rows[0].measure).toBe("total");
   expect(cal.rows[0].geography).toBe("United States");
   expect(cal.rows[0].breakdown).toBe("under 1 · All");
+  expect(cal.rows[0].error_kind).toBe("absolute");
+  expect(cal.rows[0].initial_error).toBe(100);
+  expect(cal.rows[0].final_error).toBe(90);
+  expect(cal.rows[0].initial_relative_error).toBe(null);
+  expect(cal.rows[0].abs_relative_error).toBe(null);
 });
 
 test("zero targets compare as absolute misses, not relative-error movers", () => {

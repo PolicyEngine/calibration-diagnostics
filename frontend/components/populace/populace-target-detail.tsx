@@ -25,6 +25,40 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function relativeErrorText(value: number | null): string {
+  if (value == null) return "—";
+  const digits = Math.abs(value) >= 0.995 ? 2 : 1;
+  return fmt(value, { pct: true, digits });
+}
+
+function signedRelativeErrorText(value: number | null): string | undefined {
+  if (value == null) return undefined;
+  const digits = Math.abs(value) >= 0.995 ? 2 : 1;
+  return fmtSigned(value, { pct: true, digits });
+}
+
+function pointChangeText(value: number | null): React.ReactNode {
+  if (value == null) return "—";
+  if (Math.abs(value) < 0.00005) return "flat";
+  return `${value > 0 ? "+" : ""}${(value * 100).toFixed(2)} pp`;
+}
+
+function errorCaption(
+  errorKind: PopulaceTargetRow["error_kind"],
+  error: number | null,
+): string | undefined {
+  if (errorKind === "absolute") return error == null ? undefined : `miss ${fmtCompact(error)}`;
+  return signedRelativeErrorText(error);
+}
+
+function errorField(
+  errorKind: PopulaceTargetRow["error_kind"],
+  error: number | null,
+): string {
+  if (errorKind === "absolute") return fmtCompact(error);
+  return relativeErrorText(error);
+}
+
 // A horizontal bar for one estimate against the target, scaled to the largest
 // magnitude among target/initial/final so the three rows are comparable.
 function EstimateBar({
@@ -57,9 +91,9 @@ function EstimateBar({
           style={{ width: `${width}%` }}
         />
       </div>
-      <span className="w-40 shrink-0 text-right text-xs tabular-nums">
-        {fmtCompact(value)}
-        {caption ? <span className="ml-1 text-muted-foreground">{caption}</span> : null}
+      <span className="flex w-48 shrink-0 justify-end gap-1 text-right text-xs tabular-nums">
+        <span>{fmtCompact(value)}</span>
+        {caption ? <span className="text-muted-foreground">({caption})</span> : null}
       </span>
     </div>
   );
@@ -85,6 +119,9 @@ export function PopulaceTargetDetail({
   const initialRel =
     typeof row.initial_relative_error === "number" ? row.initial_relative_error : null;
   const finalRel = typeof row.relative_error === "number" ? row.relative_error : null;
+  const initialError = typeof row.initial_error === "number" ? row.initial_error : initialRel;
+  const finalError = typeof row.final_error === "number" ? row.final_error : finalRel;
+  const errorKind = row.error_kind ?? (target === 0 ? "absolute" : "relative");
   const improvement = typeof row.improvement === "number" ? row.improvement : null;
   const within10 =
     typeof row.abs_relative_error === "number" ? row.abs_relative_error <= 0.1 : null;
@@ -144,21 +181,6 @@ export function PopulaceTargetDetail({
             <StatusPill tone={within10 ? "success" : "warning"}>
               {within10 == null ? "—" : within10 ? "within 10%" : "outside 10%"}
             </StatusPill>
-            <StatusPill
-              tone={
-                row.within_tolerance == null
-                  ? "neutral"
-                  : row.within_tolerance
-                    ? "success"
-                    : "danger"
-              }
-            >
-              {row.within_tolerance == null
-                ? "no tolerance"
-                : row.within_tolerance
-                  ? "within tolerance"
-                  : "outside tolerance"}
-            </StatusPill>
           </div>
         </div>
 
@@ -166,6 +188,10 @@ export function PopulaceTargetDetail({
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
             Target vs estimates
           </div>
+          <p className="text-xs leading-snug text-muted-foreground">
+            Initial is the weighted aggregate before calibration; final is the
+            weighted aggregate after applying calibrated weights.
+          </p>
           <div className="flex flex-col gap-2">
             <EstimateBar label="Target" value={target} scale={scale} tone="target" />
             <EstimateBar
@@ -173,33 +199,37 @@ export function PopulaceTargetDetail({
               value={initial}
               scale={scale}
               tone="initial"
-              caption={initialRel == null ? undefined : fmtSigned(initialRel, { pct: true, digits: 1 })}
+              caption={errorCaption(errorKind, initialError)}
             />
             <EstimateBar
               label="Final"
               value={final}
               scale={scale}
               tone="final"
-              caption={finalRel == null ? undefined : fmtSigned(finalRel, { pct: true, digits: 1 })}
+              caption={errorCaption(errorKind, finalError)}
             />
           </div>
           <div className="grid grid-cols-3 gap-3 border-t border-border/60 pt-3 text-sm">
             <Field
-              label="Final rel. error"
-              value={fmt(finalRel, { pct: true, digits: 1 })}
+              label={errorKind === "absolute" ? "Final abs. miss" : "Final rel. error"}
+              value={errorField(errorKind, finalError)}
             />
             <Field
-              label="Initial rel. error"
-              value={fmt(initialRel, { pct: true, digits: 1 })}
+              label={errorKind === "absolute" ? "Initial abs. miss" : "Initial rel. error"}
+              value={errorField(errorKind, initialError)}
             />
             <Field
-              label="Improvement"
+              label={errorKind === "absolute" ? "Miss reduction" : "Improvement"}
               value={
                 improvement == null ? (
                   "—"
+                ) : errorKind === "absolute" ? (
+                  <span className={improvement > 0 ? "text-emerald-700" : "text-rose-700"}>
+                    {fmtCompact(improvement)}
+                  </span>
                 ) : (
                   <span className={improvement > 0 ? "text-emerald-700" : "text-rose-700"}>
-                    {fmtSigned(improvement, { pct: true, digits: 1 })}
+                    {pointChangeText(improvement)}
                   </span>
                 )
               }

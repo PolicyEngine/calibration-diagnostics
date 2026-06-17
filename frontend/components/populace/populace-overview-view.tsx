@@ -1,72 +1,268 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
-import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import {
   usePopulace,
   usePopulaceReleases,
-  type PopulaceFamilyFitRow,
   type PopulaceTargetRow,
 } from "@/lib/api/hooks/use-populace";
 
-const SMOKE_LABELS: Record<string, string> = {
-  people_m: "People (millions)",
-  snap_b: "SNAP ($B)",
-  net_worth_t: "Net worth ($T)",
-  net_stcg_b: "Net short-term capital gains ($B)",
-  tips_b: "Tip income ($B)",
-  pre_subsidy_rent_b: "Pre-subsidy rent ($B)",
-  investment_interest_expense_b: "Investment interest expense ($B)",
-};
-
-const OPTION_LABELS: { key: string; label: string }[] = [
-  { key: "epochs", label: "Epochs" },
-  { key: "learning_rate", label: "Learning rate" },
-  { key: "mass", label: "Mass" },
-  { key: "max_weight_ratio", label: "Max weight ratio" },
-  { key: "seed", label: "Seed" },
-];
-
-function relErr(value: number | null | undefined) {
-  return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
+function targetError(row: PopulaceTargetRow, phase: "initial" | "final") {
+  const value = phase === "initial" ? row.initial_error : row.final_error;
+  if (row.error_kind === "absolute") return fmtCompact(value);
+  return fmt(value, { pct: true, digits: 1 });
 }
 
-function LossSparkline({ trajectory }: { trajectory: number[] }) {
-  if (trajectory.length < 2) {
-    return <span className="text-xs text-muted-foreground">trace unavailable</span>;
+function formatPublishedAt(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function targetLabel(row: PopulaceTargetRow): string {
+  return [
+    row.geography,
+    row.variable ? humanizeName(row.variable) : null,
+    row.breakdown,
+  ]
+    .filter(Boolean)
+    .join(" · ") || String(row.name ?? "");
+}
+
+function fmtLoss(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  if (value === 0) return "0";
+  return value.toExponential(3).replace("e+", "e");
+}
+
+function lossReduction(initial: number | null | undefined, value: number | null | undefined) {
+  if (
+    initial == null ||
+    value == null ||
+    !Number.isFinite(initial) ||
+    !Number.isFinite(value) ||
+    initial === 0
+  ) {
+    return null;
   }
-  const width = 220;
-  const height = 44;
-  const max = Math.max(...trajectory);
-  const min = Math.min(...trajectory);
+  return (initial - value) / Math.abs(initial);
+}
+
+function LossMetric({
+  label,
+  value,
+  hint,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "positive" | "negative" | "neutral";
+}) {
+  const toneClass =
+    tone === "positive"
+      ? "text-emerald-700"
+      : tone === "negative"
+        ? "text-rose-700"
+        : "text-foreground";
+
+  return (
+    <div className="border-b border-border/60 py-3 last:border-b-0">
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </dt>
+      <dd className={`mt-1 font-mono text-xl font-semibold leading-none ${toneClass}`}>
+        {value}
+      </dd>
+      {hint && (
+        <div className="mt-1 text-xs leading-snug text-muted-foreground">{hint}</div>
+      )}
+    </div>
+  );
+}
+
+function LossDevelopmentChart({
+  trajectory,
+  initialLoss,
+  finalLoss,
+}: {
+  trajectory: number[];
+  initialLoss: number | null | undefined;
+  finalLoss: number | null | undefined;
+}) {
+  const values =
+    trajectory.length >= 2
+      ? trajectory.filter((value) => Number.isFinite(value))
+      : [initialLoss, finalLoss].filter(
+          (value): value is number => value != null && Number.isFinite(value),
+        );
+
+  if (values.length < 2) {
+    return (
+      <div className="flex h-48 items-center justify-center rounded-md border border-dashed border-border bg-muted/20 text-sm text-muted-foreground">
+        Loss trajectory unavailable.
+      </div>
+    );
+  }
+
+  const baseline = values[0];
+  const reductions = values.map((value) => lossReduction(baseline, value) ?? 0);
+  const finalReduction = reductions[reductions.length - 1] ?? null;
+  const finalReductionTone =
+    finalReduction == null || Math.abs(finalReduction) < 1e-12
+      ? "text-muted-foreground"
+      : finalReduction > 0
+        ? "text-emerald-700"
+        : "text-rose-700";
+  const min = Math.min(0, ...reductions);
+  const max = Math.max(0, ...reductions);
   const span = max - min || 1;
-  const points = trajectory
+  const width = 620;
+  const height = 210;
+  const pad = { top: 18, right: 22, bottom: 34, left: 58 };
+  const chartWidth = width - pad.left - pad.right;
+  const chartHeight = height - pad.top - pad.bottom;
+  const yFor = (value: number) =>
+    pad.top + chartHeight - ((value - min) / span) * chartHeight;
+  const points = reductions
     .map((value, index) => {
-      const x = (index / (trajectory.length - 1)) * width;
-      const y = height - ((value - min) / span) * height;
+      const x = pad.left + (index / (reductions.length - 1)) * chartWidth;
+      const y = yFor(value);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
+  const zeroY = yFor(0);
+  const firstPoint = {
+    x: pad.left,
+    y: yFor(reductions[0] ?? 0),
+  };
+  const lastPoint = {
+    x: pad.left + chartWidth,
+    y: yFor(reductions[reductions.length - 1] ?? 0),
+  };
+  const topLabel = fmt(max, { pct: true, digits: 3 });
+  const bottomLabel = fmt(min, { pct: true, digits: 3 });
+
   return (
-    <svg width={width} height={height} className="overflow-visible">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        className="text-primary"
-      />
-    </svg>
+    <div className="min-w-0">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold text-foreground">
+            Percent reduction from initial loss
+          </div>
+          <div className="text-xs text-muted-foreground">
+            0% is the starting objective; higher means the optimizer lowered loss.
+          </div>
+        </div>
+        <div className="text-right">
+          <div className={`font-mono text-lg font-semibold ${finalReductionTone}`}>
+            {finalReduction == null ? "—" : fmt(finalReduction, { pct: true, digits: 3 })}
+          </div>
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            final percent reduction
+          </div>
+        </div>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="Percent reduction from initial loss over optimizer steps"
+        className="h-56 w-full overflow-visible rounded-md border border-border bg-white"
+      >
+        <line
+          x1={pad.left}
+          x2={pad.left + chartWidth}
+          y1={pad.top}
+          y2={pad.top}
+          className="stroke-border"
+          strokeDasharray="3 4"
+        />
+        <line
+          x1={pad.left}
+          x2={pad.left + chartWidth}
+          y1={zeroY}
+          y2={zeroY}
+          className="stroke-border"
+        />
+        <line
+          x1={pad.left}
+          x2={pad.left}
+          y1={pad.top}
+          y2={pad.top + chartHeight}
+          className="stroke-border"
+        />
+        <line
+          x1={pad.left}
+          x2={pad.left + chartWidth}
+          y1={pad.top + chartHeight}
+          y2={pad.top + chartHeight}
+          className="stroke-border"
+        />
+        <text x="12" y={pad.top + 4} className="fill-muted-foreground text-[12px]">
+          {topLabel}
+        </text>
+        <text x="12" y={pad.top + chartHeight} className="fill-muted-foreground text-[12px]">
+          {bottomLabel}
+        </text>
+        <text
+          x={pad.left}
+          y={height - 10}
+          className="fill-muted-foreground text-[12px]"
+        >
+          step 0
+        </text>
+        <text
+          x={pad.left + chartWidth}
+          y={height - 10}
+          textAnchor="end"
+          className="fill-muted-foreground text-[12px]"
+        >
+          step {reductions.length - 1}
+        </text>
+        <polyline
+          points={points}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          className="text-primary"
+          vectorEffect="non-scaling-stroke"
+        />
+        <circle
+          cx={firstPoint.x}
+          cy={firstPoint.y}
+          r="4"
+          className="fill-white stroke-primary"
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+        />
+        <circle
+          cx={lastPoint.x}
+          cy={lastPoint.y}
+          r="4"
+          className="fill-primary stroke-primary"
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </div>
   );
 }
 
@@ -84,33 +280,25 @@ function TargetFitTable({
         <thead>
           <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
             <th className="px-3 py-2 font-semibold">Target</th>
-            <th className="px-3 py-2 font-semibold">Family</th>
-            <th className="px-3 py-2 text-right font-semibold">Initial err</th>
-            <th className="px-3 py-2 text-right font-semibold">Final err</th>
-            <th className="px-3 py-2 text-center font-semibold">In tol.</th>
+            <th className="px-3 py-2 font-semibold">Source</th>
+            <th className="px-3 py-2 text-right font-semibold">Initial error</th>
+            <th className="px-3 py-2 text-right font-semibold">Final error</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.name} className="border-b border-border/60 last:border-b-0">
               <td className="max-w-md truncate px-3 py-1.5" title={String(row.name ?? "")}>
-                {row.name}
+                {targetLabel(row)}
               </td>
               <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">
-                {row.family}
+                {row.source}
               </td>
               <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                {relErr(row.initial_relative_error)}
+                {targetError(row, "initial")}
               </td>
               <td className="px-3 py-1.5 text-right tabular-nums">
-                {relErr(row.relative_error)}
-              </td>
-              <td className="px-3 py-1.5 text-center">
-                {row.within_tolerance == null
-                  ? "—"
-                  : row.within_tolerance
-                    ? "✓"
-                    : "✗"}
+                {targetError(row, "final")}
               </td>
             </tr>
           ))}
@@ -146,25 +334,36 @@ export function PopulaceOverviewView() {
     );
   }
 
-  const gates = data.gates ?? {};
-  const calibrationGate = gates.calibration ?? {};
   const cal = data.calibration ?? { available: false };
-  const options = cal.options ?? {};
+  const within10Count = (cal.family_fit ?? []).reduce(
+    (sum, row) => sum + row.within_10pct,
+    0,
+  );
   const lossDelta =
     cal.initial_loss != null && cal.final_loss != null
       ? cal.final_loss - cal.initial_loss
       : null;
-  const recordsKept =
-    cal.n_nonzero != null && cal.n_records != null && cal.n_records > 0
-      ? cal.n_nonzero / cal.n_records
+  const lossChange =
+    cal.initial_loss != null &&
+    cal.initial_loss !== 0 &&
+    lossDelta != null
+      ? lossDelta / Math.abs(cal.initial_loss)
       : null;
-  const withinTolShare =
-    cal.within_tolerance_count != null && cal.total_targets
-      ? cal.within_tolerance_count / cal.total_targets
-      : null;
-  const familyFit: PopulaceFamilyFitRow[] = cal.family_fit ?? [];
-  const diagnosticsNote =
-    typeof options.diagnostics_source === "string" ? options.diagnostics_source : null;
+  const lossReductionValue =
+    lossChange == null ? null : -lossChange;
+  const lossImproved = lossDelta != null && lossDelta < 0;
+  const lossChangeMagnitude =
+    lossChange == null ? null : Math.abs(lossChange);
+  const lossChangeLabel = lossImproved
+    ? "Relative loss reduction"
+    : lossDelta != null && lossDelta > 0
+      ? "Relative loss increase"
+      : "Relative loss change";
+  const lossCalloutClass = lossImproved
+    ? "bg-emerald-50 text-emerald-800"
+    : lossDelta != null && lossDelta > 0
+      ? "bg-rose-50 text-rose-800"
+      : "bg-muted/40 text-muted-foreground";
 
   return (
     <div className="flex flex-col gap-5">
@@ -187,218 +386,103 @@ export function PopulaceOverviewView() {
           </>
         }
         actions={
-          <ToolbarSelect label="Release" value={release} onChange={setRelease} options={releaseOptions} />
-        }
-        status={
-          <StatusPill tone="success">
-            {data.release_id} · {fmt(data.calibration.total_targets ?? null, { digits: 0 })} targets
-          </StatusPill>
+          <ToolbarSelect
+            label="Release"
+            value={release}
+            onChange={setRelease}
+            options={releaseOptions}
+          />
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard
-          label={
-            <HelpHint
-              label="Raw calibration loss"
-              tooltip="The Populace calibrator objective from the release artifact: mean(((est - target)/(target + 1))^2). Zero or tiny targets can dominate this value, so use it with the target diagnostics."
-            />
-          }
-          value={cal.final_loss == null ? "—" : fmt(cal.final_loss, { digits: 4 })}
-          delta={lossDelta == null ? undefined : fmt(lossDelta, { digits: 3 })}
-          tone={lossDelta != null && lossDelta < 0 ? "positive" : "neutral"}
-          hint={`From initial ${fmt(cal.initial_loss, { digits: 3 })}`}
-        />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <KpiCard
           label={
             <HelpHint
               label="Within 10% of target"
-              tooltip="Share of targets whose calibrated aggregate lands within 10% of the declared value."
+              tooltip="Share of calibration targets whose final aggregate is within 10% of the target value."
             />
           }
           value={fmt(cal.fraction_within_10pct, { pct: true, digits: 1 })}
-          hint={
-            withinTolShare == null
-              ? undefined
-              : `${fmt(withinTolShare, { pct: true, digits: 1 })} within declared tolerance`
-          }
+          hint={`${fmt(within10Count, { digits: 0 })} of ${fmt(cal.total_targets, { digits: 0 })} targets`}
         />
         <KpiCard
           label={
             <HelpHint
               label="Records kept"
-              tooltip="Households with a non-zero calibrated weight after L0 pruning, out of the full pool."
+              tooltip="Records with a non-zero calibrated weight in this release."
             />
           }
           value={cal.n_nonzero == null ? "—" : fmtCompact(cal.n_nonzero)}
-          hint={
-            recordsKept == null
-              ? `of ${fmtCompact(cal.n_records)}`
-              : `${fmt(recordsKept, { pct: true, digits: 1 })} of ${fmtCompact(cal.n_records)}`
-          }
+          hint={`${fmtCompact(cal.n_records)} source records`}
         />
         <KpiCard
-          label={
-            <HelpHint
-              label="Targets"
-              tooltip="Total calibration targets in this release's surface, and how many were skipped (failed to compile)."
-            />
-          }
-          value={fmtCompact(cal.total_targets ?? null)}
-          hint={`${(cal.skipped ?? []).length} skipped`}
+          label="Published"
+          value={formatPublishedAt(data.updated_at)}
+          hint={release ? releaseLabel(data.release_id) : "Latest release"}
         />
       </div>
 
       <SectionCard
-        title="Acceptance gates"
-        description={
-          <>
-            Gate verdicts recorded in <code>build_manifest.json</code> for build{" "}
-            <code>{data.release_id}</code>.{" "}
-            {String(data.build_manifest?.construction ?? "")}
-          </>
-        }
+        title="Total loss development"
+        description="Raw optimizer objective reported by the release artifact. Lower is better; this is for within-release convergence, not target-level percent error."
       >
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap gap-2">
-              <StatusPill tone={(gates.parity_gaps ?? 1) === 0 ? "success" : "danger"}>
-                Parity gaps: {fmt(gates.parity_gaps, { digits: 0 })}
-              </StatusPill>
-              <StatusPill tone={gates.exported_nonzero?.passed ? "success" : "danger"}>
-                Exported non-zero ({fmt(gates.exported_nonzero?.stored_columns, { digits: 0 })}{" "}
-                columns)
-              </StatusPill>
-              <StatusPill
-                tone={(calibrationGate.weights_above_500k ?? 1) === 0 ? "success" : "warning"}
-              >
-                Weights above 500k: {fmt(calibrationGate.weights_above_500k, { digits: 0 })}
-              </StatusPill>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Max calibrated weight {fmtCompact(calibrationGate.max_weight)} under a hard{" "}
-              {fmt(calibrationGate.max_weight_ratio, { digits: 0 })}× per-record bound.
+        <div className="grid gap-6 lg:grid-cols-[310px_minmax(0,1fr)]">
+          <div>
+            <dl className="rounded-md border border-border bg-muted/10 px-4">
+              <LossMetric
+                label="Initial total loss"
+                value={fmtLoss(cal.initial_loss)}
+                hint={fmt(cal.initial_loss, { digits: 0 })}
+              />
+              <LossMetric
+                label="Final total loss"
+                value={fmtLoss(cal.final_loss)}
+                hint={fmt(cal.final_loss, { digits: 0 })}
+              />
+              <LossMetric
+                label={lossChangeLabel}
+                value={
+                  lossChangeMagnitude == null
+                    ? "—"
+                    : fmt(lossChangeMagnitude, { pct: true, digits: 3 })
+                }
+                hint={
+                  lossDelta == null
+                    ? undefined
+                    : `Absolute objective change: ${fmtLoss(Math.abs(lossDelta))}`
+                }
+                tone={
+                  lossImproved
+                    ? "positive"
+                    : lossDelta != null && lossDelta > 0
+                      ? "negative"
+                      : "neutral"
+                }
+              />
+            </dl>
+            <div className={`mt-3 rounded-md px-3 py-2 text-xs leading-snug ${lossCalloutClass}`}>
+              {lossImproved
+                ? `Final loss is lower than initial loss by ${lossReductionValue == null ? "—" : fmt(lossReductionValue, { pct: true, digits: 3 })}.`
+                : lossDelta == null
+                  ? "Loss values were not recorded for this release."
+                  : "Final loss did not improve from the initial optimizer objective."}
             </div>
           </div>
-          <table className="w-full text-sm">
-            <tbody>
-              {Object.entries(gates.smoke ?? {}).map(([key, value]) => (
-                <tr key={key} className="border-b border-border/60 last:border-b-0">
-                  <td className="py-1 pr-3 text-muted-foreground">
-                    {SMOKE_LABELS[key] ?? key}
-                  </td>
-                  <td className="py-1 text-right tabular-nums">{fmt(value, { digits: 1 })}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <SectionCard
-          title="Convergence"
-          description="Calibration loss across the optimization."
-        >
-          <div className="flex flex-col gap-3">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Initial → final loss
-                </div>
-                <div className="text-lg font-semibold tabular-nums">
-                  {fmt(cal.initial_loss, { digits: 3 })} →{" "}
-                  {fmt(cal.final_loss, { digits: 4 })}
-                </div>
-              </div>
-              <LossSparkline trajectory={cal.loss_trajectory ?? []} />
-            </div>
-            {diagnosticsNote && (
-              <p className="text-xs leading-snug text-muted-foreground">{diagnosticsNote}</p>
-            )}
+          <div className="min-w-0">
+            <LossDevelopmentChart
+              trajectory={cal.loss_trajectory ?? []}
+              initialLoss={cal.initial_loss}
+              finalLoss={cal.final_loss}
+            />
           </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Solver configuration"
-          description="The options this calibration ran under (release provenance)."
-        >
-          <table className="w-full text-sm">
-            <tbody>
-              {OPTION_LABELS.map(({ key, label }) =>
-                options[key] == null ? null : (
-                  <tr key={key} className="border-b border-border/60 last:border-b-0">
-                    <td className="py-1 pr-3 text-muted-foreground">{label}</td>
-                    <td className="py-1 text-right tabular-nums">{String(options[key])}</td>
-                  </tr>
-                ),
-              )}
-              <tr className="border-b border-border/60 last:border-b-0">
-                <td className="py-1 pr-3 text-muted-foreground">L0 penalty</td>
-                <td className="py-1 text-right tabular-nums">
-                  {cal.l0_lambda == null ? "—" : cal.l0_lambda.toExponential(2)}
-                </td>
-              </tr>
-              <tr className="border-b border-border/60 last:border-b-0">
-                <td className="py-1 pr-3 text-muted-foreground">Weight entity</td>
-                <td className="py-1 text-right">{cal.weight_entity ?? "—"}</td>
-              </tr>
-            </tbody>
-          </table>
-        </SectionCard>
-      </div>
-
-      <SectionCard
-        title="Calibration fit by target family"
-        description="How well each source family is reproduced under the calibrated weights, from the per-target rows."
-        actions={
-          <Link
-            href="/populace/targets"
-            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted/60"
-          >
-            Explore all targets →
-          </Link>
-        }
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-2 font-semibold">Family</th>
-                <th className="px-3 py-2 text-right font-semibold">Targets</th>
-                <th className="px-3 py-2 text-right font-semibold">Within 10%</th>
-                <th className="px-3 py-2 text-right font-semibold">Within tolerance</th>
-                <th className="px-3 py-2 text-right font-semibold">Mean abs rel. error</th>
-              </tr>
-            </thead>
-            <tbody>
-              {familyFit.map((row) => (
-                <tr key={row.family} className="border-b border-border/60 last:border-b-0">
-                  <td className="px-3 py-1.5">{row.family}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">
-                    {fmt(row.n_targets, { digits: 0 })}
-                  </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">
-                    {fmt(row.within_10pct, { digits: 0 })} (
-                    {fmt(row.within_10pct / row.n_targets, { pct: true, digits: 0 })})
-                  </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">
-                    {fmt(row.within_tolerance, { digits: 0 })}
-                  </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">
-                    {relErr(row.mean_abs_relative_error)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </SectionCard>
 
       <div className="grid gap-5 xl:grid-cols-2">
         <SectionCard
-          title="Worst-fit targets"
-          description="Largest absolute relative error under the calibrated weights."
+          title="Largest target errors"
+          description="Percentage error for non-zero targets; absolute miss for zero-valued targets."
           padded={false}
         >
           <TargetFitTable
@@ -408,7 +492,7 @@ export function PopulaceOverviewView() {
         </SectionCard>
         <SectionCard
           title="Biggest calibration improvements"
-          description="Targets where calibration most reduced the relative error from the design weights."
+          description="Largest reduction in error from the initial weights."
           padded={false}
         >
           <TargetFitTable
@@ -417,33 +501,6 @@ export function PopulaceOverviewView() {
           />
         </SectionCard>
       </div>
-
-      {(cal.skipped ?? []).length > 0 && (
-        <SectionCard
-          title={`Skipped targets (${(cal.skipped ?? []).length})`}
-          description="Targets that could not be compiled against the frame, with the reason."
-          padded={false}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2 font-semibold">Target</th>
-                  <th className="px-3 py-2 font-semibold">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(cal.skipped ?? []).map((skip) => (
-                  <tr key={skip.name} className="border-b border-border/60 last:border-b-0">
-                    <td className="px-3 py-1.5">{skip.name}</td>
-                    <td className="px-3 py-1.5 text-muted-foreground">{skip.reason}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </SectionCard>
-      )}
 
       <SectionCard
         title="Release artifacts"

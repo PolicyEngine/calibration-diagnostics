@@ -39,6 +39,10 @@ export interface PopulaceTargetRow {
   source?: string | null;
   variable?: string | null;
   measure?: string | null;
+  error_kind?: "relative" | "absolute" | null;
+  initial_error?: number | null;
+  final_error?: number | null;
+  abs_error?: number | null;
   breakdown?: string | null;
   dims?: string[] | null;
   variable_key?: string | null;
