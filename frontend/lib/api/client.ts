@@ -40,6 +40,14 @@ export async function apiGet<T>(
     } catch {
       // Keep the raw response text.
     }
+    if (
+      detail.trim().startsWith("<!DOCTYPE html") ||
+      detail.trim().startsWith("<html") ||
+      detail.includes("__next_error__")
+    ) {
+      detail = `API error ${res.status}: the server returned an HTML error page instead of JSON.`;
+    }
+    if (detail.length > 600) detail = `${detail.slice(0, 600)}...`;
     throw new Error(detail || `API error ${res.status}`);
   }
   return res.json();

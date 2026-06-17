@@ -21,6 +21,19 @@ function errorResponse(detail: string, status: number) {
   return NextResponse.json({ detail }, { status });
 }
 
+function friendlyErrorDetail(detail: string, fallback = "Variable calculation failed.") {
+  const trimmed = detail.trim();
+  if (!trimmed) return fallback;
+  if (
+    trimmed.startsWith("<!DOCTYPE html") ||
+    trimmed.startsWith("<html") ||
+    trimmed.includes("__next_error__")
+  ) {
+    return "Variable calculation failed in the hosted Python runtime. Please retry; if it persists, check the Vercel function logs.";
+  }
+  return trimmed.length > 600 ? `${trimmed.slice(0, 600)}...` : trimmed;
+}
+
 function hostedPythonUnavailableError() {
   return Object.assign(
     new Error(
@@ -41,8 +54,12 @@ async function runHostedPythonFunction(
   endpoint.searchParams.set("period", period);
   endpoint.searchParams.set("release", release);
   variables.forEach((variable) => endpoint.searchParams.append("variables", variable));
+  endpoint.searchParams.set("_", String(Date.now()));
 
-  const response = await fetch(endpoint, { cache: "no-store" });
+  const response = await fetch(endpoint, {
+    cache: "no-store",
+    headers: { accept: "application/json" },
+  });
   const text = await response.text();
   let payload: unknown = null;
   try {
@@ -58,7 +75,7 @@ async function runHostedPythonFunction(
       typeof payload.detail === "string"
         ? payload.detail
         : "Hosted variable calculation failed.";
-    return errorResponse(detail, response.status);
+    return errorResponse(friendlyErrorDetail(detail, "Hosted variable calculation failed."), response.status);
   }
   return NextResponse.json(scrub(payload));
 }
@@ -156,6 +173,6 @@ export async function GET(request: Request) {
     if (err.signal === "SIGTERM") {
       detail = "Variable calculation timed out.";
     }
-    return errorResponse(detail.trim(), err.status ?? 502);
+    return errorResponse(friendlyErrorDetail(detail), err.status ?? 502);
   }
 }
