@@ -1,8 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "fluid": true,
   "functions": {
     "api/populace_variable.py": {
-      "maxDuration": 300
+      "maxDuration": 800
     }
   }
 }
