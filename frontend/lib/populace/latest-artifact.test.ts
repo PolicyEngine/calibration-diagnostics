@@ -213,10 +213,75 @@ test("EITC table 2.5 child groups come from record set ids", () => {
         filing_status: "All",
       },
     },
+    {
+      name: "irs_soi.ty2022.table_2_5.eitc_by_agi_children.one_qualifying_child.25k_to_30k.eitc_total@2024",
+      target_name: "irs_soi.ty2022.table_2_5.eitc_by_agi_children.one_qualifying_child.25k_to_30k.eitc_total",
+      target: 2717219000,
+      initial_estimate: 1995625464.431402,
+      final_estimate: 910866264.4027674,
+      relative_error: -0.6647799590674262,
+      filter: null,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "eitc",
+        source_measure_id: "eitc_total",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_layout_record_set_id:
+          "irs_soi.ty2022.table_2_5.eitc_by_agi_children.one_qualifying_child",
+        ledger_layout_groupby_value_id: "25k_to_30k",
+        filing_status: "All",
+      },
+    },
   ]);
   expect(cal.rows[0].breakdown).toBe("25k to 30k · no qualifying children · All");
   expect(cal.rows[0].dims).toEqual(["25k to 30k", "no qualifying children", "All"]);
   expect(cal.rows[0].estimate_warning).toContain("no compiled filter");
+});
+
+test("repeated unfiltered sibling estimates get generic scope warnings", () => {
+  const cal = calibration([
+    {
+      name: "source.example.slice_a.under_50.amount@2024",
+      target_name: "source.example.slice_a.under_50.amount",
+      target: 10,
+      initial_estimate: 100,
+      final_estimate: 80,
+      relative_error: 7,
+      filter: null,
+      registry: { family: "example" },
+      metadata: {
+        variable: "example",
+        source_measure_id: "amount",
+        ledger_geography_id: "0100000US",
+        ledger_layout_record_set_id: "source.example.slice_a",
+        ledger_layout_groupby_dimension: "age",
+        ledger_layout_groupby_value_id: "under_50",
+        ledger_layout_measure_id: "amount",
+      },
+    },
+    {
+      name: "source.example.slice_b.under_50.amount@2024",
+      target_name: "source.example.slice_b.under_50.amount",
+      target: 20,
+      initial_estimate: 100,
+      final_estimate: 80,
+      relative_error: 3,
+      filter: null,
+      registry: { family: "example" },
+      metadata: {
+        variable: "example",
+        source_measure_id: "amount",
+        ledger_geography_id: "0100000US",
+        ledger_layout_record_set_id: "source.example.slice_b",
+        ledger_layout_groupby_dimension: "age",
+        ledger_layout_groupby_value_id: "under_50",
+        ledger_layout_measure_id: "amount",
+      },
+    },
+  ]);
+  expect(cal.rows[0].estimate_warning).toContain("sibling slices share the same estimate");
+  expect(cal.rows[1].estimate_warning).toContain("sibling slices share the same estimate");
 });
 
 test("zero targets compare as absolute misses, not relative-error movers", () => {
