@@ -43,7 +43,7 @@ function hostedPythonUnavailableError() {
   );
 }
 
-async function runHostedPythonFunction(
+function hostedPythonFunctionUrl(
   request: Request,
   variables: string[],
   period: string,
@@ -55,29 +55,7 @@ async function runHostedPythonFunction(
   endpoint.searchParams.set("release", release);
   variables.forEach((variable) => endpoint.searchParams.append("variables", variable));
   endpoint.searchParams.set("_", String(Date.now()));
-
-  const response = await fetch(endpoint, {
-    cache: "no-store",
-    headers: { accept: "application/json" },
-  });
-  const text = await response.text();
-  let payload: unknown = null;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    payload = { detail: text || "Hosted variable calculation failed." };
-  }
-  if (!response.ok) {
-    const detail =
-      payload &&
-      typeof payload === "object" &&
-      "detail" in payload &&
-      typeof payload.detail === "string"
-        ? payload.detail
-        : "Hosted variable calculation failed.";
-    return errorResponse(friendlyErrorDetail(detail, "Hosted variable calculation failed."), response.status);
-  }
-  return NextResponse.json(scrub(payload));
+  return endpoint;
 }
 
 async function runVariableScript(
@@ -140,7 +118,10 @@ export async function GET(request: Request) {
         ? (await loadPointerReleaseId(300)).release_id
         : requestedRelease;
     if (process.env.VERCEL === "1" && !process.env.PYTHON) {
-      return runHostedPythonFunction(request, uniqueVariables, period, release);
+      return NextResponse.redirect(
+        hostedPythonFunctionUrl(request, uniqueVariables, period, release),
+        307,
+      );
     }
     const scriptPath = path.join(process.cwd(), "scripts", "populace_variable_value.py");
     const variableArgs = uniqueVariables.flatMap((variable) => ["--variable", variable]);
