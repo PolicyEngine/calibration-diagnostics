@@ -33,6 +33,21 @@ function variableTokens(value: string): string[] {
     .filter(Boolean);
 }
 
+function variableLookupErrorMessage(error: unknown): string {
+  const fallback = "Variable calculation failed on the hosted API. Please retry.";
+  if (!(error instanceof Error)) return fallback;
+  const message = error.message.trim();
+  if (!message) return fallback;
+  if (
+    message.startsWith("<!DOCTYPE html") ||
+    message.startsWith("<html") ||
+    message.includes("__next_error__")
+  ) {
+    return "Variable calculation failed on the hosted API before it could return JSON. Please retry.";
+  }
+  return message.length > 300 ? `${message.slice(0, 300)}...` : message;
+}
+
 function ResultsTable({ rows }: { rows: PopulaceVariableValue[] }) {
   if (!rows.length) return null;
   return (
@@ -231,7 +246,7 @@ export function PopulaceVariableLookupView() {
       ) : query.error ? (
         <EmptyState
           title="Variable calculation unavailable"
-          description={query.error instanceof Error ? query.error.message : "Unknown error."}
+          description={variableLookupErrorMessage(query.error)}
         />
       ) : result ? (
         <SectionCard

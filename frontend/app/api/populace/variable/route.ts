@@ -14,6 +14,7 @@ const execFileAsync = promisify(execFile);
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const VARIABLE_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 

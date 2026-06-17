@@ -26,6 +26,9 @@ class VariableCalculationError(RuntimeError):
     """User-facing calculation failure."""
 
 
+_SIM_CACHE: dict[tuple[str, str, str], tuple[str, Any]] = {}
+
+
 def finite_float(value: Any) -> float | None:
     try:
         number = float(value)
@@ -69,15 +72,21 @@ def calculate_variables(
 
     unique_variables = list(dict.fromkeys(v.strip() for v in variables if v.strip()))
     dataset = f"hf://{repo}/{filename}@{revision}"
+    cache_key = (repo, revision, filename)
 
     try:
-        dataset_path = hf_hub_download(
-            repo_id=repo,
-            filename=filename,
-            revision=revision,
-            repo_type="dataset",
-        )
-        sim = Microsimulation(dataset=dataset_path)
+        cached = _SIM_CACHE.get(cache_key)
+        if cached is None:
+            dataset_path = hf_hub_download(
+                repo_id=repo,
+                filename=filename,
+                revision=revision,
+                repo_type="dataset",
+            )
+            sim = Microsimulation(dataset=dataset_path)
+            _SIM_CACHE[cache_key] = (dataset_path, sim)
+        else:
+            dataset_path, sim = cached
         results = []
         for variable_name in unique_variables:
             variable_started = time.time()

@@ -278,8 +278,16 @@ export function usePopulaceVariableValue(params: {
     !["localhost", "127.0.0.1"].includes(window.location.hostname)
       ? "/populace_variable"
       : "/populace/variable";
+  const endpointCacheKey = path === "/populace_variable" ? "python-hosted-v3" : "node-local-v3";
   return useQuery({
-    queryKey: ["populace", "variable", variables, params.period ?? "2024", params.release ?? "latest"],
+    queryKey: [
+      "populace",
+      "variable",
+      endpointCacheKey,
+      variables,
+      params.period ?? "2024",
+      params.release ?? "latest",
+    ],
     queryFn: () =>
       apiGet<PopulaceVariableLookupResponse>(path, {
         variables,
