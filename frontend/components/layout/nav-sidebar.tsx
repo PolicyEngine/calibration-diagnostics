@@ -23,7 +23,8 @@ export function NavSidebar() {
         <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Dataset
         </div>
-        <div className="text-sm font-semibold text-foreground">populace-US</div>
+        <div className="text-sm font-semibold text-foreground">Populace US</div>
+        <div className="text-xs text-muted-foreground">policyengine/populace-us</div>
       </div>
       <nav className="flex flex-col gap-0.5 px-3">
         {navItems.map((item) => {

@@ -7,7 +7,6 @@ import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
-import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { PopulaceTargetDetail } from "@/components/populace/populace-target-detail";
 import {
@@ -31,6 +30,11 @@ interface Column {
   numeric?: boolean;
   sortable?: boolean;
   render: (row: PopulaceTargetRow) => React.ReactNode;
+}
+
+function finalError(row: PopulaceTargetRow) {
+  if (row.error_kind === "absolute") return fmtCompact(row.final_error);
+  return fmt(row.final_error, { pct: true, digits: 1 });
 }
 
 const METRIC_COLUMNS: Column[] = [
@@ -57,27 +61,10 @@ const METRIC_COLUMNS: Column[] = [
   },
   {
     key: "relative_error",
-    label: "Rel. error",
+    label: "Error",
     numeric: true,
     sortable: true,
-    render: (row) => fmt(row.relative_error, { pct: true, digits: 1 }),
-  },
-  {
-    key: "within_tolerance",
-    label: "In tol.",
-    render: (row) => (
-      <StatusPill
-        tone={
-          row.within_tolerance == null
-            ? "neutral"
-            : row.within_tolerance
-              ? "success"
-              : "danger"
-        }
-      >
-        {row.within_tolerance == null ? "—" : row.within_tolerance ? "yes" : "no"}
-      </StatusPill>
-    ),
+    render: finalError,
   },
 ];
 
@@ -220,7 +207,6 @@ export function PopulaceTargetsView() {
   const [variable, setVariable] = useState("");
   const [source, setSource] = useState("");
   const [level, setLevel] = useState("");
-  const [within, setWithin] = useState("");
   const [direction, setDirection] = useState("");
   const [search, setSearch] = useState("");
   const [facetFilters, setFacetFilters] = useState<Record<string, string>>({});
@@ -267,14 +253,13 @@ export function PopulaceTargetsView() {
       variable: variable || undefined,
       source: source || undefined,
       level: level || undefined,
-      within_tolerance: within || undefined,
       direction: direction || undefined,
       search: search || undefined,
       facet: facetParam.length ? facetParam : undefined,
       sort_by: sort.by,
       sort_dir: sort.dir,
     }),
-    [release, variable, source, level, within, direction, search, facetParam, page, sort],
+    [release, variable, source, level, direction, search, facetParam, page, sort],
   );
 
   const { data, isLoading, error } = usePopulaceTargetDiagnostics(params);
@@ -336,12 +321,13 @@ export function PopulaceTargetsView() {
         eyebrow="Populace"
         title="Target diagnostics"
         description="Browse the calibration target surface by the thing each constraint measures — e.g. adjusted gross income, then its by-income-bracket and by-filing-status breakdowns — and see how well the calibrated weights reproduce each."
-        status={
-          data?.release_id ? (
-            <StatusPill tone="info">
-              {String(data.release_id)} · {fmt(data.total_targets, { digits: 0 })} targets
-            </StatusPill>
-          ) : undefined
+        actions={
+          <ToolbarSelect
+            label="Release"
+            value={release}
+            onChange={pickRelease}
+            options={releaseOptions}
+          />
         }
       />
 
@@ -350,18 +336,6 @@ export function PopulaceTargetsView() {
           title="Browse by variable"
           description={`${fmt(variables.length, { digits: 0 })} measured quantities in this release. Click one to filter the table.`}
         >
-          <div className="mb-3 flex flex-col gap-1">
-            <ToolbarSelect
-              label="Release"
-              value={release}
-              onChange={pickRelease}
-              options={releaseOptions}
-              className="w-full"
-            />
-            <span className="text-[11px] text-muted-foreground">
-              The newest build can be a small surface; switch release to see others.
-            </span>
-          </div>
           <VariableBrowser variables={variables} active={variable} onPick={pickVariable} />
         </SectionCard>
 
@@ -403,7 +377,7 @@ export function PopulaceTargetsView() {
                   activeVariable.within_10pct / Math.max(activeVariable.n_targets, 1),
                   { pct: true, digits: 0 },
                 )} within 10% · mean abs rel. error ${fmt(activeVariable.mean_abs_relative_error, { pct: true, digits: 1 })}`
-              : "Relative error is the calibrated estimate's miss against the target. Click a column header to sort."
+              : "Initial estimate is the weighted aggregate before calibration; final estimate is after calibration. Error is relative for non-zero targets and absolute miss for zero-valued targets."
           }
           padded={false}
           actions={
@@ -463,19 +437,6 @@ export function PopulaceTargetsView() {
                   />
                 </>
               )}
-              <ToolbarSelect
-                label="In tol."
-                value={within}
-                onChange={(value) => {
-                  setWithin(value);
-                  setPage(0);
-                }}
-                options={[
-                  { value: "", label: "Any" },
-                  { value: "true", label: "Within" },
-                  { value: "false", label: "Outside" },
-                ]}
-              />
             </div>
           }
           footer={

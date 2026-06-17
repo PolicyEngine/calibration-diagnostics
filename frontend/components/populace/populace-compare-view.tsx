@@ -8,7 +8,6 @@ import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
-import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import {
   usePopulaceCompare,
@@ -193,14 +192,6 @@ export function PopulaceCompareView() {
               }
             />
           </div>
-
-          {!data.summary.losses_comparable && (
-            <StatusPill tone="warning">
-              These releases calibrate to different target surfaces, so their loss
-              values aren&apos;t directly comparable — the per-target fit changes below
-              (for the {data.summary.common} common targets) are the meaningful diff.
-            </StatusPill>
-          )}
 
           <div className="grid gap-5 xl:grid-cols-2">
             <SectionCard
