@@ -372,10 +372,6 @@ function enrichTargetRow(row: TargetRow): TargetRow {
   const dims = splitBreakdown(parsed.breakdown);
   const metadata = asObject(row.metadata);
   const sourceMeasureId = stringValue(metadata.source_measure_id);
-  const hasUncompiledEitcChildFilter =
-    parsed.variable === "eitc" &&
-    Boolean(qualifyingChildrenFromRecordSet(stringValue(metadata.ledger_layout_record_set_id))) &&
-    row.filter == null;
   // The first breakdown token is the measure (total / count / mean / …). Many
   // IRS variables publish both a total (dollar amount) and a count (number of
   // returns), so the measure is part of the variable's identity, not a
@@ -409,14 +405,74 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
     period: numberOrNull(row.period),
-    estimate_warning: hasUncompiledEitcChildFilter
-      ? "This target is sliced by qualifying children, but the release artifact reports no compiled filter for that slice. Initial and final estimates may reflect a broader EITC aggregate rather than this child group."
-      : null,
     initial_relative_error: errorKind === "relative" ? initialError : null,
     abs_relative_error: errorKind === "relative" ? absFinalError : null,
     improvement,
     direction: finalError == null ? null : finalError > 0 ? "over" : finalError < 0 ? "under" : "exact",
   };
+}
+
+function estimateScopeKey(row: TargetRow): string | null {
+  if (row.filter != null) return null;
+  const metadata = asObject(row.metadata);
+  const recordSet = stringValue(metadata.ledger_layout_record_set_id);
+  const initial = numberOrNull(row.initial_estimate);
+  const final = numberOrNull(row.final_estimate);
+  if (!recordSet || initial == null || final == null) return null;
+  return [
+    row.source,
+    row.period,
+    metadata.ledger_geography_id,
+    metadata.ledger_layout_groupby_dimension,
+    metadata.ledger_layout_groupby_value_id,
+    metadata.ledger_layout_measure_id,
+    metadata.source_measure_id,
+    metadata.variable,
+    initial,
+    final,
+  ].join("||");
+}
+
+function estimateScopeWarning(row: TargetRow): string {
+  const metadata = asObject(row.metadata);
+  const childGroup = qualifyingChildrenFromRecordSet(
+    stringValue(metadata.ledger_layout_record_set_id),
+  );
+  if (childGroup) {
+    return "This target is sliced by qualifying children, but the release artifact reports no compiled filter for that slice. Initial and final estimates may reflect a broader EITC aggregate rather than this child group.";
+  }
+  return "This target is part of a sliced target family, but the release artifact reports no compiled filter for this slice and sibling slices share the same estimate. Initial and final estimates may reflect a broader aggregate than this target row.";
+}
+
+function addEstimateScopeWarnings(rows: TargetRow[]): TargetRow[] {
+  const groups = new Map<string, TargetRow[]>();
+  for (const row of rows) {
+    const key = estimateScopeKey(row);
+    if (!key) continue;
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(row);
+  }
+
+  const flagged = new Set<TargetRow>();
+  for (const group of groups.values()) {
+    const recordSets = new Set(
+      group
+        .map((row) => stringValue(asObject(row.metadata).ledger_layout_record_set_id))
+        .filter((value): value is string => Boolean(value)),
+    );
+    const targets = new Set(group.map((row) => numberOrNull(row.target)));
+    if (recordSets.size <= 1 || targets.size <= 1) continue;
+    for (const row of group) flagged.add(row);
+  }
+
+  if (!flagged.size) return rows;
+  return rows.map((row) =>
+    flagged.has(row)
+      ? {
+          ...row,
+          estimate_warning: estimateScopeWarning(row),
+        }
+      : row,
+  );
 }
 
 function stringParam(value: string | null): string | null {
@@ -548,6 +604,7 @@ export function buildCalibration(
   releaseManifest: JsonObject = {},
 ): Calibration {
   const targets = Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : [];
+  const rows = addEstimateScopeWarnings(targets.map(enrichTargetRow));
   return {
     source: "huggingface_live",
     release_id: String(diag.release_id ?? releaseId),
@@ -565,7 +622,7 @@ export function buildCalibration(
     skipped: Array.isArray(diag.skipped) ? (diag.skipped as JsonObject[]) : [],
     build_manifest: buildManifest,
     release_manifest: releaseManifest,
-    rows: targets.map(enrichTargetRow),
+    rows,
   };
 }
 
