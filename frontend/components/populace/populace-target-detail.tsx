@@ -192,6 +192,11 @@ export function PopulaceTargetDetail({
             Initial is the weighted aggregate before calibration; final is the
             weighted aggregate after applying calibrated weights.
           </p>
+          {row.estimate_warning ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900">
+              {row.estimate_warning}
+            </div>
+          ) : null}
           <div className="flex flex-col gap-2">
             <EstimateBar label="Target" value={target} scale={scale} tone="target" />
             <EstimateBar

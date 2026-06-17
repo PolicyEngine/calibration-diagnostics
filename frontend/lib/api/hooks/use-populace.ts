@@ -52,6 +52,7 @@ export interface PopulaceTargetRow {
   aggregation?: string | null;
   measure_name?: string | null;
   period?: number | null;
+  estimate_warning?: string | null;
   initial_relative_error?: number | null;
   abs_relative_error?: number | null;
   improvement?: number | null;

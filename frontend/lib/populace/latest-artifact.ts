@@ -37,9 +37,13 @@ const MEASURES = new Set(["total", "count", "mean", "filers", "nonfilers"]);
 const QUALIFYING_CHILDREN = new Set([
   "all children",
   "no children",
+  "no qualifying children",
   "one child",
+  "one qualifying child",
   "two children",
+  "two qualifying children",
   "three or more children",
+  "three or more qualifying children",
 ]);
 
 export function asObject(value: unknown): JsonObject {
@@ -122,6 +126,20 @@ function breakdownFromSourceMeasure(
   return readableToken(detail);
 }
 
+function qualifyingChildrenFromRecordSet(value: string | null): string | null {
+  if (!value) return null;
+  const match = /\.eitc_by_agi_children\.([^.]+)$/.exec(value);
+  if (!match) return null;
+  const childGroup = match[1];
+  if (childGroup === "no_qualifying_children") return "no qualifying children";
+  if (childGroup === "one_qualifying_child") return "one qualifying child";
+  if (childGroup === "two_qualifying_children") return "two qualifying children";
+  if (childGroup === "three_or_more_qualifying_children") {
+    return "three or more qualifying children";
+  }
+  return readableToken(childGroup);
+}
+
 function measureFromName(value: string | null): string | null {
   if (!value) return null;
   if (/_amount$|_total$|_collections$|_projected_amount$/.test(value)) return "total";
@@ -149,9 +167,12 @@ function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
     readableToken(variableFromMeasure(measureId)) ??
     readableToken(parts.at(-2) ?? null) ??
     "";
+  const childBreakdown = qualifyingChildrenFromRecordSet(
+    stringValue(metadata.ledger_layout_record_set_id),
+  );
   const breakdown = [
     readableToken(stringValue(metadata.ledger_layout_groupby_value_id)),
-    breakdownFromSourceMeasure(variable, measureId),
+    childBreakdown ?? breakdownFromSourceMeasure(variable, measureId),
     readableToken(stringValue(metadata.filing_status)),
   ]
     .filter((value): value is string => Boolean(value && value !== variable))
@@ -351,6 +372,10 @@ function enrichTargetRow(row: TargetRow): TargetRow {
   const dims = splitBreakdown(parsed.breakdown);
   const metadata = asObject(row.metadata);
   const sourceMeasureId = stringValue(metadata.source_measure_id);
+  const hasUncompiledEitcChildFilter =
+    parsed.variable === "eitc" &&
+    Boolean(qualifyingChildrenFromRecordSet(stringValue(metadata.ledger_layout_record_set_id))) &&
+    row.filter == null;
   // The first breakdown token is the measure (total / count / mean / …). Many
   // IRS variables publish both a total (dollar amount) and a count (number of
   // returns), so the measure is part of the variable's identity, not a
@@ -384,6 +409,9 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
     period: numberOrNull(row.period),
+    estimate_warning: hasUncompiledEitcChildFilter
+      ? "This target is sliced by qualifying children, but the release artifact reports no compiled filter for that slice. Initial and final estimates may reflect a broader EITC aggregate rather than this child group."
+      : null,
     initial_relative_error: errorKind === "relative" ? initialError : null,
     abs_relative_error: errorKind === "relative" ? absFinalError : null,
     improvement,
@@ -675,6 +703,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     aggregation: row.aggregation,
     measure_name: row.measure_name,
     period: row.period,
+    estimate_warning: row.estimate_warning,
     initial_relative_error: row.initial_relative_error,
     abs_relative_error: row.abs_relative_error,
     improvement: row.improvement,

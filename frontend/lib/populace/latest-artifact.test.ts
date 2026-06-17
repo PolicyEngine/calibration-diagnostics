@@ -191,6 +191,34 @@ test("source measure details become breakdown dimensions", () => {
   expect(result.dimensions.map((dim) => dim.label)).toContain("Qualifying children");
 });
 
+test("EITC table 2.5 child groups come from record set ids", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_total@2024",
+      target_name: "irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_total",
+      target: 535000,
+      initial_estimate: 1995625464.431402,
+      final_estimate: 910866264.4027674,
+      relative_error: 1701.5537652388175,
+      filter: null,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "eitc",
+        source_measure_id: "eitc_total",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_layout_record_set_id:
+          "irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children",
+        ledger_layout_groupby_value_id: "25k_to_30k",
+        filing_status: "All",
+      },
+    },
+  ]);
+  expect(cal.rows[0].breakdown).toBe("25k to 30k · no qualifying children · All");
+  expect(cal.rows[0].dims).toEqual(["25k to 30k", "no qualifying children", "All"]);
+  expect(cal.rows[0].estimate_warning).toContain("no compiled filter");
+});
+
 test("zero targets compare as absolute misses, not relative-error movers", () => {
   const target = {
     name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount@2024",
