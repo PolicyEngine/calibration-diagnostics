@@ -708,6 +708,49 @@ export async function loadRelease(releaseId: string, revalidate: number): Promis
 }
 
 // --- shaped outputs ---------------------------------------------------------
+function median(xs: number[]): number | null {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+// The published loss is mean(((est − target)/(|target| + 1))²). When a target
+// is exactly $0 that term is just est², so a handful of $0-reference SOI cells
+// (where populace estimates billions) dominate the whole figure. We break the
+// loss into its $0-target vs well-defined parts so the UI can show both and be
+// honest about what the headline number actually measures.
+function lossBreakdown(rows: TargetRow[]) {
+  let total = 0;
+  let zeroTotal = 0;
+  let nZero = 0;
+  let sumNonZero = 0;
+  let nNonZero = 0;
+  const absRelNonZero: number[] = [];
+  for (const row of rows) {
+    const t = numberOrNull(row.target);
+    const e = numberOrNull(row.final_estimate);
+    if (t == null || e == null) continue;
+    const contrib = ((e - t) / (Math.abs(t) + 1)) ** 2;
+    total += contrib;
+    if (row.target_is_zero || t === 0) {
+      nZero += 1;
+      zeroTotal += contrib;
+    } else {
+      nNonZero += 1;
+      sumNonZero += contrib;
+      const ar = numberOrNull(row.abs_relative_error);
+      if (ar != null) absRelNonZero.push(ar);
+    }
+  }
+  return {
+    n_zero_target: nZero,
+    loss_excl_zero_target: nNonZero ? sumNonZero / nNonZero : null,
+    zero_target_loss_share: total > 0 ? zeroTotal / total : null,
+    median_abs_rel_error: median(absRelNonZero),
+  };
+}
+
 export function latestPopulaceCalibrationSummary(cal: Calibration) {
   return {
     available: true,
@@ -727,6 +770,7 @@ export function latestPopulaceCalibrationSummary(cal: Calibration) {
     total_targets: cal.rows.length,
     within_tolerance_count: withinToleranceCount(cal.rows),
     family_fit: familyFitSummary(cal.rows),
+    ...lossBreakdown(cal.rows),
   };
 }
 
