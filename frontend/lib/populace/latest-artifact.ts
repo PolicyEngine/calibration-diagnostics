@@ -464,6 +464,19 @@ export interface Calibration {
   rows: TargetRow[];
 }
 
+interface ReleaseCacheEntry {
+  expiresAt: number;
+  promise: Promise<Calibration>;
+}
+
+interface TargetDiagnosticsMetadata {
+  sources: string[];
+  variables: ReturnType<typeof populaceVariableSummary>;
+}
+
+const releaseCache = new Map<string, ReleaseCacheEntry>();
+const targetDiagnosticsMetadataCache = new WeakMap<TargetRow[], TargetDiagnosticsMetadata>();
+
 export function buildCalibration(
   diag: JsonObject,
   releaseId: string,
@@ -553,6 +566,25 @@ export async function loadPointerReleaseId(revalidate: number): Promise<{ releas
 // Load one release's manifests + calibration diagnostics. releaseId "latest"
 // resolves through the pointer.
 export async function loadRelease(releaseId: string, revalidate: number): Promise<Calibration> {
+  const cacheKey = `${releaseId || "latest"}:${revalidate}`;
+  const now = Date.now();
+  const cached = releaseCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = loadReleaseUncached(releaseId, revalidate);
+  releaseCache.set(cacheKey, {
+    promise,
+    expiresAt: now + Math.max(revalidate, 1) * 1000,
+  });
+  try {
+    return await promise;
+  } catch (error) {
+    releaseCache.delete(cacheKey);
+    throw error;
+  }
+}
+
+async function loadReleaseUncached(releaseId: string, revalidate: number): Promise<Calibration> {
   let id = releaseId;
   let updatedAt: string | null = null;
   if (releaseId === "latest" || !releaseId) {
@@ -567,6 +599,52 @@ export async function loadRelease(releaseId: string, revalidate: number): Promis
     hfJson(hfResolveUrl(`${prefix}/release_manifest.json`), revalidate).catch(() => ({})),
   ]);
   return buildCalibration(diag, id, updatedAt, buildManifest, releaseManifest);
+}
+
+function targetDiagnosticsMetadata(rows: TargetRow[]): TargetDiagnosticsMetadata {
+  const cached = targetDiagnosticsMetadataCache.get(rows);
+  if (cached) return cached;
+  const metadata = {
+    sources: populaceTargetSources(rows),
+    variables: populaceVariableSummary(rows),
+  };
+  targetDiagnosticsMetadataCache.set(rows, metadata);
+  return metadata;
+}
+
+function targetResponseRow(row: TargetRow): TargetRow {
+  return {
+    name: row.name,
+    target: row.target,
+    initial_estimate: row.initial_estimate,
+    final_estimate: row.final_estimate,
+    relative_error: row.relative_error,
+    within_tolerance: row.within_tolerance,
+    base_name: row.base_name,
+    family: row.family,
+    state: row.state,
+    geography: row.geography,
+    level: row.level,
+    source: row.source,
+    variable: row.variable,
+    measure: row.measure,
+    error_kind: row.error_kind,
+    initial_error: row.initial_error,
+    final_error: row.final_error,
+    abs_error: row.abs_error,
+    breakdown: row.breakdown,
+    dims: row.dims,
+    variable_key: row.variable_key,
+    source_citation: row.source_citation,
+    entity: row.entity,
+    aggregation: row.aggregation,
+    measure_name: row.measure_name,
+    period: row.period,
+    initial_relative_error: row.initial_relative_error,
+    abs_relative_error: row.abs_relative_error,
+    improvement: row.improvement,
+    direction: row.direction,
+  };
 }
 
 // --- shaped outputs ---------------------------------------------------------
@@ -618,6 +696,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   const url = new URL(requestUrl);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? "100") || 100, 1), 500);
   const offset = Math.max(Number(url.searchParams.get("offset") ?? "0") || 0, 0);
+  const includeFamilies = url.searchParams.get("include_families") === "1";
   const family = stringParam(url.searchParams.get("family"));
   const variable = stringParam(url.searchParams.get("variable"));
   const source = stringParam(url.searchParams.get("source"));
@@ -635,6 +714,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
       return sep < 0 ? null : ([entry.slice(0, sep), entry.slice(sep + 1)] as const);
     })
     .filter((v): v is readonly [string, string] => v != null);
+  const metadata = targetDiagnosticsMetadata(rows);
 
   let filtered = rows;
   if (family) filtered = filtered.filter((row) => row.family === family);
@@ -671,9 +751,9 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     release_id: cal.release_id,
     schema_version: cal.schema_version,
     metric: "relative_error",
-    families: populaceTargetFamilies(rows),
-    sources: populaceTargetSources(rows),
-    variables: populaceVariableSummary(rows),
+    families: includeFamilies ? populaceTargetFamilies(rows) : [],
+    sources: metadata.sources,
+    variables: metadata.variables,
     dimensions,
     summary: {
       total_targets: rows.length,
@@ -687,7 +767,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     offset,
     has_next: offset + limit < filtered.length,
     display_limit: limit,
-    targets: filtered.slice(offset, offset + limit),
+    targets: filtered.slice(offset, offset + limit).map(targetResponseRow),
     filters: { family, variable, source, level, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
   };
 }
