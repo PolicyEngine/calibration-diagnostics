@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { loadComparison, loadPointerReleaseId, scrub } from "@/lib/populace/latest-artifact";
 
 export const revalidate = 300;
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

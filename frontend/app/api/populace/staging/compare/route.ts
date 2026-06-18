@@ -4,6 +4,8 @@ import { loadPointerReleaseId, scrub } from "@/lib/populace/latest-artifact";
 import { loadStagingComparison } from "@/lib/populace/staging-artifact";
 
 export const revalidate = 30;
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

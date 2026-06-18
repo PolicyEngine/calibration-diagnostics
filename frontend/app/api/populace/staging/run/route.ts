@@ -4,6 +4,8 @@ import { scrub } from "@/lib/populace/latest-artifact";
 import { loadStagingRun } from "@/lib/populace/staging-artifact";
 
 export const revalidate = 30;
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const runId = new URL(request.url).searchParams.get("id")?.trim();

@@ -7,6 +7,8 @@ import {
 } from "@/lib/populace/latest-artifact";
 
 export const revalidate = 300;
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const release = new URL(request.url).searchParams.get("release") ?? "latest";
