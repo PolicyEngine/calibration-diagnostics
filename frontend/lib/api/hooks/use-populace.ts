@@ -455,7 +455,6 @@ export interface ReformValidationRow {
   abs_relative_error?: number | null;
   within_10pct?: boolean | null;
   direction?: "over" | "under" | "exact" | null;
-  in_sample?: boolean | null;
 }
 
 export interface ReformValidationResponse {
