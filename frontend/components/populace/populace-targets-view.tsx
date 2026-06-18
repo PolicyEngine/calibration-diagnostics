@@ -57,8 +57,6 @@ interface HealthcareSummary {
   nTargets: number;
   within10Pct: number;
   meanAbsRelativeError: number | null;
-  programLabel: string;
-  calculationVariables: string[];
 }
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -326,48 +324,20 @@ function groupVariables(variables: PopulaceVariableRow[]): VariableGroup[] {
     .sort((a, b) => b.nTargets - a.nTargets);
 }
 
-function healthcareProgram(row: PopulaceVariableRow): string {
-  const haystack = [row.source, row.variable, row.variable_key, row.measure]
-    .join(" ")
-    .toLowerCase();
-  if (haystack.includes("medicare")) return "Medicare";
-  if (haystack.includes("medicaid") || haystack.includes("chip")) return "Medicaid/CHIP";
-  if (
-    haystack.includes("aca") ||
-    haystack.includes("ptc") ||
-    haystack.includes("premium tax credit")
-  ) {
-    return "ACA marketplace";
-  }
-  return "Other";
-}
-
 function healthcareSummary(variables: PopulaceVariableRow[]): HealthcareSummary {
-  const programs = new Map<string, number>();
-  const calculationVariables = new Set<string>();
   let nTargets = 0;
   let within10Pct = 0;
   let weightedAbsError = 0;
   let weightedAbsErrorTargets = 0;
 
   for (const variable of variables) {
-    const program = healthcareProgram(variable);
     nTargets += variable.n_targets;
     within10Pct += variable.within_10pct;
-    programs.set(program, (programs.get(program) ?? 0) + variable.n_targets);
-    for (const calcVariable of variable.policyengine_variables ?? []) {
-      calculationVariables.add(calcVariable);
-    }
     if (variable.mean_abs_relative_error != null && Number.isFinite(variable.mean_abs_relative_error)) {
       weightedAbsError += variable.mean_abs_relative_error * variable.n_targets;
       weightedAbsErrorTargets += variable.n_targets;
     }
   }
-
-  const programLabel = [...programs.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([program, count]) => `${program}: ${fmt(count, { digits: 0 })}`)
-    .join(" · ");
 
   return {
     nTargets,
@@ -375,8 +345,6 @@ function healthcareSummary(variables: PopulaceVariableRow[]): HealthcareSummary 
     meanAbsRelativeError: weightedAbsErrorTargets
       ? weightedAbsError / weightedAbsErrorTargets
       : null,
-    programLabel,
-    calculationVariables: [...calculationVariables].sort(),
   };
 }
 
@@ -853,7 +821,6 @@ export function PopulaceTargetsView({
           <KpiCard
             label="Healthcare Targets"
             value={fmt(data.total_targets, { digits: 0 })}
-            hint={health.programLabel || "No healthcare target groups in this release."}
             size="sm"
           />
           <KpiCard
@@ -863,13 +830,11 @@ export function PopulaceTargetsView({
                 ? fmt(health.within10Pct / health.nTargets, { pct: true, digits: 0 })
                 : "—"
             }
-            hint={`${fmt(health.within10Pct, { digits: 0 })} of ${fmt(health.nTargets, { digits: 0 })} healthcare targets`}
             size="sm"
           />
           <KpiCard
             label="Mean Abs Error"
             value={fmt(health.meanAbsRelativeError, { pct: true, digits: 1 })}
-            hint={`${fmt(health.calculationVariables.length, { digits: 0 })} PolicyEngine variables`}
             size="sm"
           />
         </div>
