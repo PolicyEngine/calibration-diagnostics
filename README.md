@@ -27,6 +27,9 @@ separate service layer — the Next.js API routes are the API layer.
 - **Staging runs** (`/populace/staging`) — monitor pre-release Populace build
   runs from the staging Hub repo: current stage, calibration loss progress,
   final candidate diagnostics once uploaded, and candidate-vs-latest fit.
+- **Agentic investigations** (`.claude/`) — Claude Code slash command,
+  specialist agents, and a reusable skill for root-causing a discrepant target
+  from release artifacts and relevant source repos.
 
 ## API
 
@@ -37,11 +40,32 @@ The Next.js route handlers are the API layer; all read live from Hugging Face:
 | `GET /api/populace/releases` | List published releases (newest first) |
 | `GET /api/populace?release=<id>` | Release summary (default: latest) |
 | `GET /api/populace/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics |
+| `GET /api/populace/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, ledger metadata, artifact paths, repo searches, and next checks |
 | `GET /api/populace/compare?a=<id>&b=<id>` | Version-over-version diff |
 | `GET /api/populace/staging/runs` | List staging build runs |
 | `GET /api/populace/staging/run?id=<run_id>` | One staging run's progress and uploaded candidate diagnostics |
 | `GET /api/populace/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
 | `GET /api/populace/staging/compare?run=<run_id>&release=latest` | Diff staging candidate against a published release |
+
+## Agentic target investigations
+
+The dashboard is only the observation surface. Root-cause work should run through
+the Claude Code harness in `.claude/`.
+
+```text
+/investigate-populace-target --release <release-id> <target-id>
+```
+
+The command fetches a target packet, then coordinates specialist agents for
+ledger/source semantics, Populus materialization, PolicyEngine model mapping,
+and calibration mechanics. The underlying packet can also be fetched directly:
+
+```bash
+node scripts/populace-investigation-packet.mjs \
+  --release populace-us-2024-incumbent-improved-996401a-20260618 \
+  irs_soi.ty2022.historic_table_2.us.under_1.ctc_amount \
+  --out investigations/ctc-under-1.json
+```
 
 ## Develop
 

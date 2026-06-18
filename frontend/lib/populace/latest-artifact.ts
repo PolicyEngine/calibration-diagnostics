@@ -1089,6 +1089,18 @@ interface TargetDiagnosticsMetadata {
   variables: ReturnType<typeof populaceVariableSummary>;
 }
 
+interface InvestigationSignal {
+  tone: "critical" | "warning" | "neutral" | "positive";
+  label: string;
+  detail: string;
+}
+
+interface InvestigationSearch {
+  label: string;
+  query: string;
+  url: string;
+}
+
 const releaseCache = new Map<string, ReleaseCacheEntry>();
 const targetDiagnosticsMetadataCache = new WeakMap<TargetRow[], TargetDiagnosticsMetadata>();
 
@@ -1292,6 +1304,172 @@ function targetResponseRow(row: TargetRow): TargetRow {
   };
 }
 
+function githubSearchUrl(query: string): string {
+  const scoped = `org:PolicyEngine ${query}`;
+  return `https://github.com/search?type=code&q=${encodeURIComponent(scoped)}`;
+}
+
+function investigationSearches(row: TargetRow): InvestigationSearch[] {
+  const ledger = asObject(row.ledger);
+  const metadata = asObject(row.metadata);
+  const terms: [string, string | null][] = [
+    ["Source record", stringValue(ledger.source_record_id)],
+    ["Fact key", stringValue(ledger.fact_key)],
+    ["Semantic fact", stringValue(ledger.semantic_fact_key)],
+    ["Aggregate fact", stringValue(ledger.aggregate_fact_key)],
+    ["Legacy fact", stringValue(ledger.legacy_fact_key)],
+    ["Record set", stringValue(ledger.layout_record_set_id)],
+    ["Measure concept", stringValue(ledger.measure_concept)],
+    ["Source concept", stringValue(ledger.source_concept)],
+    ["Source measure", stringValue(metadata.source_measure_id)],
+    ["Variable", stringValue(metadata.variable) ?? stringValue(row.variable)],
+  ];
+  const seen = new Set<string>();
+  const nonEmptyTerms: [string, string][] = [];
+  for (const [label, value] of terms) {
+    if (!value) continue;
+    nonEmptyTerms.push([label, value]);
+  }
+  return nonEmptyTerms
+    .filter(([, value]) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .map(([label, value]) => ({
+      label,
+      query: `"${value}"`,
+      url: githubSearchUrl(`"${value}"`),
+    }));
+}
+
+function investigationSignals(row: TargetRow): InvestigationSignal[] {
+  const signals: InvestigationSignal[] = [];
+  const target = numberOrNull(row.target);
+  const initial = numberOrNull(row.initial_estimate);
+  const final = numberOrNull(row.final_estimate);
+  const initialMiss = numberOrNull(row.initial_miss);
+  const finalMiss = numberOrNull(row.final_miss);
+  const absRel = numberOrNull(row.abs_relative_error);
+  const improvement = numberOrNull(row.improvement);
+  const absoluteImprovement = numberOrNull(row.absolute_improvement);
+  const calibrationStatus = stringValue(row.calibration_status);
+
+  if (calibrationStatus && calibrationStatus !== "included") {
+    signals.push({
+      tone: "critical",
+      label: "Target not included",
+      detail: stringValue(row.calibration_status_reason) ?? "The target was not included in calibration.",
+    });
+  }
+  if (stringValue(row.estimate_warning)) {
+    signals.push({
+      tone: "critical",
+      label: "Estimate scope warning",
+      detail: stringValue(row.estimate_warning)!,
+    });
+  }
+  if (target === 0 && final != null && Math.abs(final) > 0) {
+    signals.push({
+      tone: "warning",
+      label: "Zero target has non-zero estimate",
+      detail: "The dashboard reports absolute miss instead of relative error because the target value is zero.",
+    });
+  }
+  if (absRel != null) {
+    const tone = absRel > 1 ? "critical" : absRel > 0.1 ? "warning" : "positive";
+    signals.push({
+      tone,
+      label: "Final fit",
+      detail:
+        absRel <= 0.1
+          ? "The final estimate is within 10% of the target."
+          : `The final estimate is ${(absRel * 100).toFixed(absRel > 1 ? 1 : 2)}% away from the target.`,
+    });
+  }
+  if (initialMiss != null && finalMiss != null) {
+    const sameDirection = Math.sign(initialMiss) === Math.sign(finalMiss) && Math.sign(finalMiss) !== 0;
+    if (sameDirection && improvement != null && improvement <= 0) {
+      signals.push({
+        tone: "warning",
+        label: "Calibration moved away",
+        detail: "Initial and final miss have the same sign, and the absolute error did not improve.",
+      });
+    } else if (sameDirection && absoluteImprovement != null && absoluteImprovement > 0) {
+      signals.push({
+        tone: absRel != null && absRel > 0.1 ? "warning" : "positive",
+        label: "Same-side miss remains",
+        detail: "Calibration reduced the miss, but the final estimate remains on the same side of the target.",
+      });
+    }
+  }
+  if (initial == null || final == null) {
+    signals.push({
+      tone: "critical",
+      label: "Missing estimate",
+      detail: "The published diagnostics do not contain both initial and final estimates for this target.",
+    });
+  }
+
+  if (!signals.length) {
+    signals.push({
+      tone: "neutral",
+      label: "No artifact-level warnings",
+      detail: "The release artifact does not flag this target; investigate source target construction and model aggregate next.",
+    });
+  }
+  return signals;
+}
+
+function investigationNextSteps(row: TargetRow): string[] {
+  const steps = [
+    "Verify the ledger fact: source period, target period, geography, unit, measure concept, and every filter/group-by value.",
+    "Verify target materialization: confirm the Populus compiler creates a model selector for the exact ledger dimensions, not a broader aggregate.",
+    "Verify model aggregate mapping: confirm the PolicyEngine variable or aggregate used for the estimate has the same unit, tax unit/person entity, sign convention, and period.",
+    "Compare initial versus final miss: if both are badly off in the same direction, inspect source/model scope before tuning calibration weights.",
+    "Inspect competing constraints for the same population slice if calibration improved one target while worsening another.",
+  ];
+  if (row.estimate_warning) {
+    steps.unshift("Start with target materialization: the published diagnostics already indicate this estimate may be broader than the ledger slice.");
+  }
+  if (numberOrNull(row.target) === 0) {
+    steps.unshift("Start with the ledger target value: confirm whether zero means a real zero, suppressed/missing source data, or a target intentionally dropped to zero.");
+  }
+  if (row.calibration_status !== "included") {
+    steps.unshift("Start with the calibration status: the target was not included as an active calibration constraint.");
+  }
+  return [...new Set(steps)];
+}
+
+function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
+  const metadata = asObject(row.metadata);
+  return {
+    release_id: cal.release_id,
+    target: targetResponseRow(row),
+    source_artifact: {
+      hf_repo: POPULACE_HF_REPO,
+      hf_revision: POPULACE_HF_REVISION,
+      calibration_diagnostics_path: `releases/${cal.release_id}/calibration_diagnostics.json`,
+      build_manifest_path: `releases/${cal.release_id}/build_manifest.json`,
+      release_manifest_path: `releases/${cal.release_id}/release_manifest.json`,
+    },
+    source_metadata: {
+      source_measure_id: stringValue(metadata.source_measure_id),
+      variable: stringValue(metadata.variable),
+      source_period: stringValue(metadata.source_period),
+      target_period: stringValue(metadata.target_period),
+    },
+    signals: investigationSignals(row),
+    next_steps: investigationNextSteps(row),
+    repo_searches: investigationSearches(row),
+    limits: [
+      "The dashboard can prove what is in the release artifacts and ledger metadata.",
+      "It cannot prove the generated per-record model filter or expression unless Populus exports that compiler trace for the target.",
+      "When the artifact warns about scope, treat the estimate as provisional until the Populus materialized target is inspected.",
+    ],
+  };
+}
+
 // --- shaped outputs ---------------------------------------------------------
 export function latestPopulaceCalibrationSummary(cal: Calibration) {
   return {
@@ -1481,6 +1659,40 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     display_limit: limit,
     targets: filtered.slice(offset, offset + limit).map(targetResponseRow),
     filters: { family, variable, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
+  };
+}
+
+export function latestPopulaceTargetInvestigation(requestUrl: string, cal: Calibration) {
+  const url = new URL(requestUrl);
+  const target = stringParam(url.searchParams.get("target"));
+  if (!target) {
+    return {
+      available: false,
+      detail: "Missing target query parameter.",
+    };
+  }
+  const row = cal.rows.find((candidate) => {
+    const ledger = asObject(candidate.ledger);
+    return [
+      stringValue(candidate.name),
+      stringValue(candidate.base_name),
+      stringValue(ledger.source_record_id),
+      stringValue(ledger.fact_key),
+      stringValue(ledger.semantic_fact_key),
+      stringValue(ledger.aggregate_fact_key),
+      stringValue(ledger.legacy_fact_key),
+    ].some((value) => value === target);
+  });
+  if (!row) {
+    return {
+      available: false,
+      release_id: cal.release_id,
+      detail: `Target not found: ${target}`,
+    };
+  }
+  return {
+    available: true,
+    ...targetInvestigationPacket(row, cal),
   };
 }
 
