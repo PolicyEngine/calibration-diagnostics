@@ -8,6 +8,7 @@ const navItems = [
   { href: "/populace/targets", label: "Target diagnostics" },
   { href: "/populace/variables", label: "Variable lookup" },
   { href: "/populace/compare", label: "Compare versions" },
+  { href: "/populace/staging", label: "Staging runs" },
 ];
 
 function isActive(pathname: string, href: string): boolean {

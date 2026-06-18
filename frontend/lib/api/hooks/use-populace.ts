@@ -309,6 +309,49 @@ export interface PopulaceComparison {
   rows: PopulaceComparisonRow[];
 }
 
+export interface PopulaceStagingRunSummary {
+  run_id: string;
+  candidate_release_id?: string | null;
+  status?: string | null;
+  stage?: string | null;
+  started_at?: string | null;
+  updated_at?: string | null;
+  progress_path?: string | null;
+  run_manifest_path?: string | null;
+}
+
+export interface PopulaceStagingRunsResponse {
+  available: boolean;
+  source_repo: string;
+  revision: string;
+  runs: PopulaceStagingRunSummary[];
+}
+
+export interface PopulaceStagingRunResponse {
+  available: boolean;
+  source_repo: string;
+  revision: string;
+  run_id: string;
+  candidate_release_id?: string | null;
+  progress?: Record<string, unknown> | null;
+  run_manifest?: Record<string, unknown> | null;
+  calibration_progress?: {
+    events?: {
+      epoch?: number | null;
+      epochs?: number | null;
+      loss?: number | null;
+      time?: string | null;
+      [key: string]: unknown;
+    }[];
+    [key: string]: unknown;
+  } | null;
+  events?: Record<string, unknown>[];
+  has_calibration: boolean;
+  calibration?: PopulaceCalibration | null;
+  build_manifest?: Record<string, unknown> | null;
+  release_manifest?: Record<string, unknown> | null;
+}
+
 export interface PopulaceVariableValue {
   variable: string;
   period: string;
@@ -375,6 +418,40 @@ export function usePopulaceCompare(a?: string, b?: string, enabled = true) {
     queryFn: () => apiGet<PopulaceComparison>("/populace/compare", { a, b }),
     enabled: enabled && Boolean(a && b),
     staleTime: 15 * 60 * 1000,
+  });
+}
+
+export function usePopulaceStagingRuns() {
+  return useQuery({
+    queryKey: ["populace", "staging", "runs"],
+    queryFn: () => apiGet<PopulaceStagingRunsResponse>("/populace/staging/runs"),
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+}
+
+export function usePopulaceStagingRun(runId?: string) {
+  return useQuery({
+    queryKey: ["populace", "staging", "run", runId],
+    queryFn: () => apiGet<PopulaceStagingRunResponse>("/populace/staging/run", { id: runId }),
+    enabled: Boolean(runId),
+    placeholderData: keepPreviousData,
+    staleTime: 10 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+}
+
+export function usePopulaceStagingCompare(runId?: string, release = "latest") {
+  return useQuery({
+    queryKey: ["populace", "staging", "compare", runId, release],
+    queryFn: () =>
+      apiGet<PopulaceComparison & { available?: boolean; detail?: string }>(
+        "/populace/staging/compare",
+        { run: runId, release },
+      ),
+    enabled: Boolean(runId),
+    placeholderData: keepPreviousData,
+    staleTime: 30 * 1000,
   });
 }
 
