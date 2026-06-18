@@ -14,11 +14,25 @@ const execFileAsync = promisify(execFile);
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const VARIABLE_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function errorResponse(detail: string, status: number) {
   return NextResponse.json({ detail }, { status });
+}
+
+function friendlyErrorDetail(detail: string, fallback = "Variable calculation failed.") {
+  const trimmed = detail.trim();
+  if (!trimmed) return fallback;
+  if (
+    trimmed.startsWith("<!DOCTYPE html") ||
+    trimmed.startsWith("<html") ||
+    trimmed.includes("__next_error__")
+  ) {
+    return "Variable calculation failed in the hosted Python runtime. Please retry; if it persists, check the Vercel function logs.";
+  }
+  return trimmed.length > 600 ? `${trimmed.slice(0, 600)}...` : trimmed;
 }
 
 function hostedPythonUnavailableError() {
@@ -28,6 +42,21 @@ function hostedPythonUnavailableError() {
     ),
     { status: 503 },
   );
+}
+
+function hostedPythonFunctionUrl(
+  request: Request,
+  variables: string[],
+  period: string,
+  release: string,
+) {
+  const incomingUrl = new URL(request.url);
+  const endpoint = new URL("/api/populace_variable", incomingUrl.origin);
+  endpoint.searchParams.set("period", period);
+  endpoint.searchParams.set("release", release);
+  variables.forEach((variable) => endpoint.searchParams.append("variables", variable));
+  endpoint.searchParams.set("_", String(Date.now()));
+  return endpoint;
 }
 
 async function runVariableScript(
@@ -89,6 +118,12 @@ export async function GET(request: Request) {
       requestedRelease === "latest"
         ? (await loadPointerReleaseId(300)).release_id
         : requestedRelease;
+    if (process.env.VERCEL === "1" && !process.env.PYTHON) {
+      return NextResponse.redirect(
+        hostedPythonFunctionUrl(request, uniqueVariables, period, release),
+        307,
+      );
+    }
     const scriptPath = path.join(process.cwd(), "scripts", "populace_variable_value.py");
     const variableArgs = uniqueVariables.flatMap((variable) => ["--variable", variable]);
     const { stdout } = await runVariableScript(
@@ -120,6 +155,6 @@ export async function GET(request: Request) {
     if (err.signal === "SIGTERM") {
       detail = "Variable calculation timed out.";
     }
-    return errorResponse(detail.trim(), err.status ?? 502);
+    return errorResponse(friendlyErrorDetail(detail), err.status ?? 502);
   }
 }

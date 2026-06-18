@@ -27,11 +27,13 @@ function formatPublishedAt(value: string | null | undefined): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("en-US", {
+    timeZone: "UTC",
     year: "numeric",
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZoneName: "short",
   });
 }
 
@@ -339,6 +341,12 @@ export function PopulaceOverviewView() {
     (sum, row) => sum + row.within_10pct,
     0,
   );
+  const totalTargets = cal.total_targets ?? 0;
+  const includedTargets = cal.included_target_count ?? totalTargets;
+  const declaredTargets = cal.declared_targets ?? totalTargets;
+  const compiledTargets = cal.compiled_candidate_targets ?? includedTargets;
+  const skippedTargets = cal.skipped?.length ?? 0;
+  const droppedTargets = cal.dropped_target_count ?? Math.max(declaredTargets - compiledTargets, 0);
   const lossDelta =
     cal.initial_loss != null && cal.final_loss != null
       ? cal.final_loss - cal.initial_loss
@@ -395,7 +403,17 @@ export function PopulaceOverviewView() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard
+          label={
+            <HelpHint
+              label="Targets included"
+              tooltip="Targets that made it into the active calibration matrix for this release. Ledger facts can be excluded before this stage if they are unsupported or validation-only."
+            />
+          }
+          value={fmt(includedTargets, { digits: 0 })}
+          hint={`${fmt(declaredTargets, { digits: 0 })} declared · ${fmt(droppedTargets, { digits: 0 })} dropped · ${fmt(skippedTargets, { digits: 0 })} skipped`}
+        />
         <KpiCard
           label={
             <HelpHint
@@ -404,7 +422,7 @@ export function PopulaceOverviewView() {
             />
           }
           value={fmt(cal.fraction_within_10pct, { pct: true, digits: 1 })}
-          hint={`${fmt(within10Count, { digits: 0 })} of ${fmt(cal.total_targets, { digits: 0 })} targets`}
+          hint={`${fmt(within10Count, { digits: 0 })} of ${fmt(totalTargets, { digits: 0 })} targets`}
         />
         <KpiCard
           label={

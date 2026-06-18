@@ -80,6 +80,52 @@ interface ParsedTarget {
   breakdown: string;
 }
 
+interface TargetBreakdownDimension {
+  key: string;
+  label: string;
+  value: string;
+  source_key?: string;
+  raw_value?: string;
+}
+
+interface LedgerFilter {
+  key: string;
+  label: string;
+  value: string;
+  raw_value?: string;
+}
+
+interface LedgerFactFields {
+  fact_key: string | null;
+  source_record_id: string | null;
+  semantic_fact_key: string | null;
+  aggregate_fact_key: string | null;
+  legacy_fact_key: string | null;
+  period_type: string | null;
+  source_period: string | null;
+  target_period: string | null;
+  geography_level: string | null;
+  geography_id: string | null;
+  geography_vintage: string | null;
+  domain: string | null;
+  entity_name: string | null;
+  entity_role: string | null;
+  measure_concept: string | null;
+  source_concept: string | null;
+  concept_relation: string | null;
+  concept_authority: string | null;
+  measure_unit: string | null;
+  value_operation: string | null;
+  layout_record_set_id: string | null;
+  layout_groupby_dimension: string | null;
+  layout_groupby_value_id: string | null;
+  layout_measure_id: string | null;
+  dimension_set_key: string | null;
+  universe_constraint_set_key: string | null;
+  universe_constraint_count: number | null;
+  filters: LedgerFilter[];
+}
+
 function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
@@ -93,6 +139,39 @@ function stateFromGeoId(value: string | null): string | null {
 function readableToken(value: string | null): string | null {
   if (!value) return null;
   return value.replace(/_/g, " ");
+}
+
+function titleCase(value: string): string {
+  return value
+    .replace(/[_:./#-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function dimensionKey(label: string): string {
+  return `bd_${label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`;
+}
+
+function addDimension(
+  dimensions: TargetBreakdownDimension[],
+  label: string,
+  value: string | null,
+  sourceKey?: string,
+  rawValue?: string | null,
+) {
+  if (!value) return;
+  const normalized = value.trim();
+  if (!normalized) return;
+  const key = dimensionKey(label);
+  if (dimensions.some((dim) => dim.key === key && dim.value === normalized)) return;
+  dimensions.push({
+    key,
+    label,
+    value: normalized,
+    source_key: sourceKey,
+    raw_value: rawValue ?? undefined,
+  });
 }
 
 function variableFromMeasure(value: string | null): string | null {
@@ -140,11 +219,226 @@ function qualifyingChildrenFromRecordSet(value: string | null): string | null {
   return readableToken(childGroup);
 }
 
+function qualifyingChildrenFromCount(value: string | null): string | null {
+  if (value == null) return null;
+  if (value === "0") return "no qualifying children";
+  if (value === "1") return "one qualifying child";
+  if (value === "2") return "two qualifying children";
+  if (value === "3" || value === "3+" || value === "3plus") {
+    return "three or more qualifying children";
+  }
+  return readableToken(value);
+}
+
+function qualifyingChildrenFromSourceMeasure(variable: string | null, value: string | null): string | null {
+  if (variable !== "eitc" || !value) return null;
+  if (/^eitc_(amount|claims|returns|total)$/.test(value)) return "all qualifying children";
+  if (/^eitc_no_children_/.test(value)) return "no qualifying children";
+  if (/^eitc_one_child_/.test(value)) return "one qualifying child";
+  if (/^eitc_two_children_/.test(value)) return "two qualifying children";
+  if (/^eitc_three_or_more_children_/.test(value)) {
+    return "three or more qualifying children";
+  }
+  return null;
+}
+
 function measureFromName(value: string | null): string | null {
   if (!value) return null;
   if (/_amount$|_total$|_collections$|_projected_amount$/.test(value)) return "total";
   if (/_returns$|_claims$|_count$/.test(value)) return "count";
   return null;
+}
+
+function measureFromMetadata(metadata: JsonObject): string | null {
+  const sourceMeasure = stringValue(metadata.source_measure_id);
+  const namedMeasure = measureFromName(sourceMeasure);
+  if (namedMeasure) return namedMeasure;
+  const unit = stringValue(metadata.ledger_measure_unit);
+  if (stringValue(metadata.count) === "true" || unit === "count") return "count";
+  if (unit === "usd") return "total";
+  return null;
+}
+
+function dimensionLabel(value: string | null): string {
+  if (!value) return "Breakdown";
+  if (value === "us:statutes/26/62#adjusted_gross_income") return "Income band";
+  if (value === "census_stc.item") return "Item";
+  if (value === "hhs_acf_tanf.spending_category") return "Spending category";
+  if (value.startsWith("cms_medicaid.")) return titleCase(value.replace(/^cms_medicaid\./, ""));
+  const hash = value.split("#").at(-1);
+  const last = hash?.split(".").at(-1) ?? value;
+  return titleCase(last);
+}
+
+function filterDimensionLabel(key: string): string {
+  const suffix = key.replace(/^ledger_filter_/, "");
+  if (suffix === "income_range") return "Income band";
+  if (suffix === "filing_status") return "Filing status";
+  if (suffix === "eitc_child_count") return "Qualifying children";
+  return dimensionLabel(suffix);
+}
+
+function isGeographyLayoutDimension(value: string | null): boolean {
+  return [
+    "geography",
+    "state",
+    "cms_medicaid.state_abbreviation",
+  ].includes(value ?? "");
+}
+
+function isRedundantGeographyValue(metadata: JsonObject, value: string | null): boolean {
+  if (!value) return false;
+  const geography = stateFromGeoId(stringValue(metadata.ledger_geography_id));
+  return Boolean(geography && value.toLowerCase() === geography.toLowerCase());
+}
+
+function readableDimensionValue(value: string | null): string | null {
+  if (!value) return null;
+  if (value === "all") return "All";
+  if (value === "total") return "Total";
+  return readableToken(value);
+}
+
+function readableFilterValue(key: string, value: string | null): string | null {
+  if (key === "ledger_filter_eitc_child_count") {
+    return qualifyingChildrenFromCount(value);
+  }
+  return readableDimensionValue(value);
+}
+
+function ledgerFilters(metadata: JsonObject): LedgerFilter[] {
+  return Object.entries(metadata)
+    .filter(([key, raw]) => key.startsWith("ledger_filter_") && stringValue(raw))
+    .map(([key, raw]) => {
+      const rawValue = stringValue(raw)!;
+      return {
+        key,
+        label: filterDimensionLabel(key),
+        value: readableFilterValue(key, rawValue) ?? rawValue,
+        raw_value: rawValue,
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key));
+}
+
+function ledgerFactFields(metadata: JsonObject): LedgerFactFields {
+  return {
+    fact_key: stringValue(metadata.ledger_fact_key),
+    source_record_id: stringValue(metadata.ledger_source_record_id),
+    semantic_fact_key: stringValue(metadata.ledger_semantic_fact_key),
+    aggregate_fact_key: stringValue(metadata.ledger_aggregate_fact_key),
+    legacy_fact_key: stringValue(metadata.ledger_legacy_fact_key),
+    period_type: stringValue(metadata.ledger_period_type),
+    source_period: stringValue(metadata.source_period),
+    target_period: stringValue(metadata.target_period),
+    geography_level: stringValue(metadata.ledger_geography_level),
+    geography_id: stringValue(metadata.ledger_geography_id),
+    geography_vintage: stringValue(metadata.ledger_geography_vintage),
+    domain: stringValue(metadata.ledger_domain),
+    entity_name: stringValue(metadata.ledger_entity_name),
+    entity_role: stringValue(metadata.ledger_entity_role),
+    measure_concept: stringValue(metadata.ledger_measure_concept),
+    source_concept: stringValue(metadata.ledger_source_concept),
+    concept_relation: stringValue(metadata.ledger_concept_relation),
+    concept_authority: stringValue(metadata.ledger_concept_authority),
+    measure_unit: stringValue(metadata.ledger_measure_unit),
+    value_operation: stringValue(metadata.ledger_value_operation),
+    layout_record_set_id: stringValue(metadata.ledger_layout_record_set_id),
+    layout_groupby_dimension: stringValue(metadata.ledger_layout_groupby_dimension),
+    layout_groupby_value_id: stringValue(metadata.ledger_layout_groupby_value_id),
+    layout_measure_id: stringValue(metadata.ledger_layout_measure_id),
+    dimension_set_key: stringValue(metadata.ledger_dimension_set_key),
+    universe_constraint_set_key: stringValue(metadata.ledger_universe_constraint_set_key),
+    universe_constraint_count: numberOrNull(metadata.ledger_universe_constraint_count),
+    filters: ledgerFilters(metadata),
+  };
+}
+
+function isDuplicateDimension(
+  dimensions: TargetBreakdownDimension[],
+  label: string,
+  value: string | null,
+): boolean {
+  if (!value) return false;
+  const key = dimensionKey(label);
+  return dimensions.some((dim) => dim.key === key && dim.value === value);
+}
+
+function sourceMeasureDetail(metadata: JsonObject): string | null {
+  const variable = stringValue(metadata.variable);
+  const sourceMeasure = stringValue(metadata.source_measure_id);
+  if (!variable || !sourceMeasure) return null;
+  const variablePrefix = variable.replace(/\s+/g, "_").toLowerCase();
+  const measure = sourceMeasure.toLowerCase();
+  if (!measure.startsWith(`${variablePrefix}_`)) return null;
+  const detail = measure
+    .slice(variablePrefix.length + 1)
+    .replace(/_(amount|returns|claims|count|total|collections|projected_amount)$/, "");
+  if (!detail || MEASURES.has(detail)) return null;
+  if (["amount", "returns", "claims", "count", "total", "collections", "projected_amount"].includes(detail)) {
+    return null;
+  }
+  return readableToken(detail);
+}
+
+function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
+  const metadata = asObject(row.metadata);
+  if (!Object.keys(metadata).length) return null;
+  const dimensions: TargetBreakdownDimension[] = [];
+  const layoutDimension = stringValue(metadata.ledger_layout_groupby_dimension);
+  const layoutValue = stringValue(metadata.ledger_layout_groupby_value_id);
+  if (
+    layoutValue &&
+    !isGeographyLayoutDimension(layoutDimension) &&
+    !isRedundantGeographyValue(metadata, layoutValue)
+  ) {
+    addDimension(
+      dimensions,
+      dimensionLabel(layoutDimension),
+      readableDimensionValue(layoutValue),
+      "ledger_layout_groupby_value_id",
+      layoutValue,
+    );
+  }
+  for (const [key, raw] of Object.entries(metadata)) {
+    if (!key.startsWith("ledger_filter_")) continue;
+    const rawValue = stringValue(raw);
+    if (!rawValue) continue;
+    const label = filterDimensionLabel(key);
+    const value = readableFilterValue(key, rawValue);
+    if (isDuplicateDimension(dimensions, label, value)) continue;
+    addDimension(dimensions, label, value, key, rawValue);
+  }
+  addDimension(
+    dimensions,
+    "Qualifying children",
+    qualifyingChildrenFromCount(stringValue(metadata.ledger_filter_eitc_child_count)) ??
+      qualifyingChildrenFromRecordSet(stringValue(metadata.ledger_layout_record_set_id)) ??
+      qualifyingChildrenFromSourceMeasure(
+        stringValue(metadata.variable),
+        stringValue(metadata.source_measure_id),
+      ),
+    stringValue(metadata.ledger_filter_eitc_child_count)
+      ? "ledger_filter_eitc_child_count"
+      : stringValue(metadata.ledger_layout_record_set_id)
+        ? "ledger_layout_record_set_id"
+        : "source_measure_id",
+    stringValue(metadata.ledger_filter_eitc_child_count) ??
+      stringValue(metadata.ledger_layout_record_set_id) ??
+      stringValue(metadata.source_measure_id),
+  );
+  addDimension(dimensions, "Filing status", stringValue(metadata.filing_status));
+  const sourceDetail = sourceMeasureDetail(metadata);
+  const hasExplicitChildDimension = dimensions.some((dim) => dim.label === "Qualifying children");
+  const sourceDetailIsChildDimension = Boolean(sourceDetail && /child|children/.test(sourceDetail));
+  if (
+    sourceDetail &&
+    !(hasExplicitChildDimension && sourceDetailIsChildDimension) &&
+    !dimensions.some((dim) => dim.value === sourceDetail)
+  ) {
+    addDimension(dimensions, "Source measure detail", sourceDetail, "source_measure_id", stringValue(metadata.source_measure_id));
+  }
+  return dimensions;
 }
 
 function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
@@ -258,29 +552,92 @@ function classifyDimension(values: string[]): string {
 }
 
 function parseAmount(token: string): number {
-  if (/^-?inf$/i.test(token)) return token.startsWith("-") ? -Infinity : Infinity;
-  const negative = token.startsWith("-");
-  const magnitude = parseFloat(token);
+  const normalized = token.trim().toLowerCase().replace(/,/g, "");
+  if (/^-?inf(?:inity)?$/.test(normalized)) return normalized.startsWith("-") ? -Infinity : Infinity;
+  const negative = normalized.startsWith("-");
+  const magnitude = parseFloat(normalized);
   if (!Number.isFinite(magnitude)) return 0;
-  const mult = /k$/i.test(token) ? 1e3 : /m$/i.test(token) ? 1e6 : 1;
+  const mult = /k$/.test(normalized) ? 1e3 : /m$/.test(normalized) ? 1e6 : 1;
   return (negative ? -1 : 1) * Math.abs(magnitude) * mult;
 }
 
-function bandLowerBound(label: string): number {
-  const body = label.replace(/^AGI in /, "");
-  const match = /^(-?inf|-?\d+(?:\.\d+)?[km]?)-(-?inf|-?\d+(?:\.\d+)?[km]?)$/i.exec(body);
-  return match ? parseAmount(match[1]) : 0;
+function totalDimensionRank(value: string): number {
+  return /^(all|total|all returns)$/i.test(value.trim()) ? 0 : 1;
+}
+
+function numericRange(value: string): { lower: number; upper: number } | null {
+  const body = value
+    .replace(/^AGI in\s+/i, "")
+    .trim()
+    .toLowerCase()
+    .replace(/,/g, "")
+    .replace(/\s+/g, " ");
+  const amount = "-?\\d+(?:\\.\\d+)?[km]?";
+
+  let match = new RegExp(`^under (${amount})$`).exec(body);
+  if (match) return { lower: -Infinity, upper: parseAmount(match[1]) };
+
+  match = new RegExp(`^(${amount}) plus$`).exec(body);
+  if (match) return { lower: parseAmount(match[1]), upper: Infinity };
+
+  match = new RegExp(`^(${amount}) to (${amount})$`).exec(body);
+  if (match) return { lower: parseAmount(match[1]), upper: parseAmount(match[2]) };
+
+  match = new RegExp(`^(${amount})-(${amount}|inf|infinity)$`).exec(body);
+  if (match) return { lower: parseAmount(match[1]), upper: parseAmount(match[2]) };
+
+  match = new RegExp(`^(${amount})$`).exec(body);
+  if (match) {
+    const point = parseAmount(match[1]);
+    return { lower: point, upper: point };
+  }
+
+  return null;
+}
+
+function compareNumericRangesDescending(a: string, b: string): number {
+  const totalRank = totalDimensionRank(a) - totalDimensionRank(b);
+  if (totalRank !== 0) return totalRank;
+
+  const ar = numericRange(a);
+  const br = numericRange(b);
+  if (ar || br) {
+    if (!ar) return 1;
+    if (!br) return -1;
+    return br.lower - ar.lower || br.upper - ar.upper || a.localeCompare(b);
+  }
+
+  return a.localeCompare(b);
 }
 
 function sortDimensionValues(label: string, values: string[]): string[] {
-  if (label === "Income band") return [...values].sort((a, b) => bandLowerBound(a) - bandLowerBound(b));
-  if (label === "Age") return [...values].sort((a, b) => Number(a) - Number(b));
-  return [...values].sort((a, b) => (a === "All" ? -1 : b === "All" ? 1 : a.localeCompare(b)));
+  if (label === "Income band") return [...values].sort(compareNumericRangesDescending);
+  if (label === "Age") return [...values].sort(compareNumericRangesDescending);
+  if (label === "Qualifying children") {
+    const rank = (value: string) =>
+      [
+        "all qualifying children",
+        "three or more qualifying children",
+        "two qualifying children",
+        "one qualifying child",
+        "no qualifying children",
+      ].indexOf(value);
+    return [...values].sort((a, b) => {
+      const ar = rank(a);
+      const br = rank(b);
+      if (ar >= 0 || br >= 0) return (ar >= 0 ? ar : 99) - (br >= 0 ? br : 99);
+      return compareNumericRangesDescending(a, b);
+    });
+  }
+  return [...values].sort(compareNumericRangesDescending);
 }
 
 function rowFacetValue(row: TargetRow, key: string): string | undefined {
   if (key === "geography") return (row.geography as string) || undefined;
   if (key === "level") return (row.level as string) || undefined;
+  const targetDimensions = row.target_dimensions as TargetBreakdownDimension[] | undefined;
+  const targetDimension = targetDimensions?.find((dim) => dim.key === key);
+  if (targetDimension) return targetDimension.value;
   const dim = /^dim(\d+)$/.exec(key);
   if (dim) return (row.dims as string[] | undefined)?.[Number(dim[1])];
   const value = row[key];
@@ -303,15 +660,18 @@ export interface TargetDimension {
 }
 
 function computeDimensions(rows: TargetRow[]): TargetDimension[] {
-  const maxLen = rows.reduce(
-    (max, row) => Math.max(max, (row.dims as string[] | undefined)?.length ?? 0),
-    0,
-  );
   const candidates: { key: string; label?: string }[] = [
     { key: "geography", label: "Geography" },
-    { key: "level", label: "Level" },
   ];
-  for (let i = 0; i < maxLen; i += 1) candidates.push({ key: `dim${i}` });
+  const seenDimensionKeys = new Set<string>();
+  for (const row of rows) {
+    const targetDimensions = row.target_dimensions as TargetBreakdownDimension[] | undefined;
+    for (const dim of targetDimensions ?? []) {
+      if (seenDimensionKeys.has(dim.key)) continue;
+      seenDimensionKeys.add(dim.key);
+      candidates.push({ key: dim.key, label: dim.label });
+    }
+  }
   const facets: TargetDimension[] = [];
   for (const candidate of candidates) {
     const values = [
@@ -340,14 +700,90 @@ function deriveState(name: string): string | null {
   return parts.length >= 2 && /^[A-Z]{2}$/.test(parts[1]) ? parts[1] : null;
 }
 
+function skippedTargetReasons(skipped: unknown[]): Map<string, string> {
+  const reasons = new Map<string, string>();
+  for (const entry of skipped) {
+    if (typeof entry === "string") {
+      reasons.set(entry, "Skipped by calibration.");
+      continue;
+    }
+    const row = asObject(entry);
+    const name = stringValue(row.name) ?? stringValue(row.target_name);
+    if (!name) continue;
+    reasons.set(name, stringValue(row.reason) ?? "Skipped by calibration.");
+  }
+  return reasons;
+}
+
+function targetNames(row: TargetRow, fullName: string, baseName: string): string[] {
+  const names = [
+    fullName,
+    baseName,
+    stringValue(row.name),
+    stringValue(row.target_name),
+    stringValue(asObject(row.metadata).ledger_source_record_id),
+  ];
+  return [...new Set(names.filter((name): name is string => Boolean(name)))];
+}
+
+function calibrationStatus(
+  row: TargetRow,
+  names: string[],
+  skippedByName: Map<string, string>,
+  droppedTargetNames: Set<string>,
+): {
+  calibration_status: "included" | "skipped" | "not_materialized";
+  calibration_status_label: string;
+  calibration_status_reason: string | null;
+} {
+  const skippedName = names.find((name) => skippedByName.has(name));
+  if (skippedName) {
+    return {
+      calibration_status: "skipped",
+      calibration_status_label: "Skipped",
+      calibration_status_reason: skippedByName.get(skippedName) ?? "Skipped by calibration.",
+    };
+  }
+  const droppedName = names.find((name) => droppedTargetNames.has(name));
+  if (droppedName) {
+    return {
+      calibration_status: "not_materialized",
+      calibration_status_label: "Not materialized",
+      calibration_status_reason: "The target was declared but no model column/filter was materialized for it.",
+    };
+  }
+  if (numberOrNull(row.initial_estimate) == null && numberOrNull(row.final_estimate) == null) {
+    return {
+      calibration_status: "not_materialized",
+      calibration_status_label: "No estimate",
+      calibration_status_reason: "The diagnostics row has no initial or final estimate.",
+    };
+  }
+  return {
+    calibration_status: "included",
+    calibration_status_label: "Included",
+    calibration_status_reason: null,
+  };
+}
+
 // Enrich a raw target row. Schema v2 publishes the canonical registry fields
 // (source citation, entity, aggregation, measure, period, target_name); we keep
 // the parsed geography/source/variable/breakdown for navigation and surface the
 // published metadata alongside. v1 rows simply lack those extra fields.
-function enrichTargetRow(row: TargetRow): TargetRow {
+function enrichTargetRow(
+  row: TargetRow,
+  skippedByName: Map<string, string> = new Map(),
+  droppedTargetNames: Set<string> = new Set(),
+): TargetRow {
   const fullName = String(row.name ?? "");
   // v2 carries target_name (no @period); else strip any @period from the name.
   const baseName = String(row.target_name ?? fullName.split("@")[0]);
+  const status = calibrationStatus(
+    row,
+    targetNames(row, fullName, baseName),
+    skippedByName,
+    droppedTargetNames,
+  );
   const target = numberOrNull(row.target);
   const initial = numberOrNull(row.initial_estimate);
   const final = numberOrNull(row.final_estimate);
@@ -369,8 +805,17 @@ function enrichTargetRow(row: TargetRow): TargetRow {
       : Math.abs(initialError) - Math.abs(finalError);
   const parsed = parseDottedTarget(baseName, row) ?? parseTarget(baseName);
   const measureCol = asObject(row.measure);
-  const dims = splitBreakdown(parsed.breakdown);
   const metadata = asObject(row.metadata);
+  const metadataTargetDimensions = metadataDimensions(row);
+  const targetDimensions =
+    metadataTargetDimensions ??
+    splitBreakdown(parsed.breakdown).map((value, index) => ({
+      key: `dim${index}`,
+      label: classifyDimension([value]),
+      value,
+    }));
+  const dims = targetDimensions.map((dim) => dim.value);
+  const breakdown = metadataTargetDimensions ? dims.join(" · ") : parsed.breakdown;
   const sourceMeasureId = stringValue(metadata.source_measure_id);
   // The first breakdown token is the measure (total / count / mean / …). Many
   // IRS variables publish both a total (dollar amount) and a count (number of
@@ -378,7 +823,7 @@ function enrichTargetRow(row: TargetRow): TargetRow {
   // breakdown within it — fold it into variable_key so they're distinct things.
   const measure = dims[0] && MEASURES.has(dims[0])
     ? dims[0]
-    : measureFromName(sourceMeasureId);
+    : measureFromMetadata(metadata);
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
   return {
@@ -386,7 +831,7 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     name: fullName,
     base_name: baseName,
     family: deriveFamily(baseName),
-    state: deriveState(baseName),
+    state: stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography: parsed.geography,
     level: parsed.level,
     source: parsed.source,
@@ -396,8 +841,9 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     initial_error: initialError,
     final_error: finalError,
     abs_error: absFinalError,
-    breakdown: parsed.breakdown,
+    breakdown,
     dims,
+    target_dimensions: targetDimensions,
     variable_key: variableKey,
     // v2 published metadata (null on v1).
     source_citation: typeof row.source === "string" ? (row.source as string) : null,
@@ -405,10 +851,12 @@ function enrichTargetRow(row: TargetRow): TargetRow {
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
     period: numberOrNull(row.period),
+    ledger: ledgerFactFields(metadata),
     initial_relative_error: errorKind === "relative" ? initialError : null,
     abs_relative_error: errorKind === "relative" ? absFinalError : null,
     improvement,
     direction: finalError == null ? null : finalError > 0 ? "over" : finalError < 0 ? "under" : "exact",
+    ...status,
   };
 }
 
@@ -439,9 +887,9 @@ function estimateScopeWarning(row: TargetRow): string {
     stringValue(metadata.ledger_layout_record_set_id),
   );
   if (childGroup) {
-    return "This target is sliced by qualifying children, but the release artifact reports no compiled filter for that slice. Initial and final estimates may reflect a broader EITC aggregate rather than this child group.";
+    return "This Ledger fact is for a qualifying-children slice, but the calibration diagnostics did not include a compiled model filter for that child-count slice. The estimate may reflect the broader EITC aggregate instead of this exact slice.";
   }
-  return "This target is part of a sliced target family, but the release artifact reports no compiled filter for this slice and sibling slices share the same estimate. Initial and final estimates may reflect a broader aggregate than this target row.";
+  return "This Ledger fact is one slice of a target family, but the calibration diagnostics did not include a compiled model filter for this slice and sibling slices share the same estimate. The estimate may reflect a broader aggregate than this exact fact.";
 }
 
 function addEstimateScopeWarnings(rows: TargetRow[]): TargetRow[] {
@@ -508,6 +956,18 @@ export function populaceTargetFamilies(rows: TargetRow[]): string[] {
 
 export function populaceTargetSources(rows: TargetRow[]): string[] {
   return [...new Set(rows.map((row) => String(row.source ?? "")))].filter(Boolean).sort();
+}
+
+export function populaceTargetLevels(rows: TargetRow[]): string[] {
+  return [...new Set(rows.map((row) => String(row.level ?? "")))].filter(Boolean).sort();
+}
+
+export function populaceTargetGeographies(rows: TargetRow[]): string[] {
+  return [...new Set(rows.map((row) => String(row.geography ?? "")))]
+    .filter(Boolean)
+    .sort((a, b) =>
+      a === "United States" ? -1 : b === "United States" ? 1 : a.localeCompare(b),
+    );
 }
 
 export function populaceVariableSummary(rows: TargetRow[]) {
@@ -577,7 +1037,11 @@ export interface Calibration {
   final_loss: number | null;
   fraction_within_10pct: number | null;
   loss_trajectory: number[];
-  skipped: JsonObject[];
+  skipped: unknown[];
+  declared_targets: number | null;
+  compiled_candidate_targets: number | null;
+  dropped_target_names: string[];
+  included_target_count: number;
   build_manifest: JsonObject;
   release_manifest: JsonObject;
   rows: TargetRow[];
@@ -590,6 +1054,8 @@ interface ReleaseCacheEntry {
 
 interface TargetDiagnosticsMetadata {
   sources: string[];
+  levels: string[];
+  geographies: string[];
   variables: ReturnType<typeof populaceVariableSummary>;
 }
 
@@ -604,7 +1070,19 @@ export function buildCalibration(
   releaseManifest: JsonObject = {},
 ): Calibration {
   const targets = Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : [];
-  const rows = addEstimateScopeWarnings(targets.map(enrichTargetRow));
+  const skipped = Array.isArray(diag.skipped) ? (diag.skipped as JsonObject[]) : [];
+  const targetCompilation = asObject(asObject(buildManifest.gates).target_compilation);
+  const droppedTargetNames = Array.isArray(targetCompilation.dropped_target_names)
+    ? targetCompilation.dropped_target_names
+        .map((value) => (typeof value === "string" ? value : null))
+        .filter((value): value is string => value != null)
+    : [];
+  const skippedByName = skippedTargetReasons(skipped);
+  const dropped = new Set(droppedTargetNames);
+  const rows = addEstimateScopeWarnings(
+    targets.map((row) => enrichTargetRow(row, skippedByName, dropped)),
+  );
+  const includedTargetCount = rows.filter((row) => row.calibration_status === "included").length;
   return {
     source: "huggingface_live",
     release_id: String(diag.release_id ?? releaseId),
@@ -619,7 +1097,11 @@ export function buildCalibration(
     final_loss: numberOrNull(diag.final_loss),
     fraction_within_10pct: numberOrNull(diag.fraction_within_10pct),
     loss_trajectory: Array.isArray(diag.loss_trajectory) ? (diag.loss_trajectory as number[]) : [],
-    skipped: Array.isArray(diag.skipped) ? (diag.skipped as JsonObject[]) : [],
+    skipped,
+    declared_targets: numberOrNull(targetCompilation.declared_targets),
+    compiled_candidate_targets: numberOrNull(targetCompilation.compiled_candidate_targets),
+    dropped_target_names: droppedTargetNames,
+    included_target_count: includedTargetCount,
     build_manifest: buildManifest,
     release_manifest: releaseManifest,
     rows,
@@ -726,6 +1208,8 @@ function targetDiagnosticsMetadata(rows: TargetRow[]): TargetDiagnosticsMetadata
   if (cached) return cached;
   const metadata = {
     sources: populaceTargetSources(rows),
+    levels: populaceTargetLevels(rows),
+    geographies: populaceTargetGeographies(rows),
     variables: populaceVariableSummary(rows),
   };
   targetDiagnosticsMetadataCache.set(rows, metadata);
@@ -754,13 +1238,18 @@ function targetResponseRow(row: TargetRow): TargetRow {
     abs_error: row.abs_error,
     breakdown: row.breakdown,
     dims: row.dims,
+    target_dimensions: row.target_dimensions,
     variable_key: row.variable_key,
     source_citation: row.source_citation,
     entity: row.entity,
     aggregation: row.aggregation,
     measure_name: row.measure_name,
     period: row.period,
+    ledger: row.ledger,
     estimate_warning: row.estimate_warning,
+    calibration_status: row.calibration_status,
+    calibration_status_label: row.calibration_status_label,
+    calibration_status_reason: row.calibration_status_reason,
     initial_relative_error: row.initial_relative_error,
     abs_relative_error: row.abs_relative_error,
     improvement: row.improvement,
@@ -785,6 +1274,10 @@ export function latestPopulaceCalibrationSummary(cal: Calibration) {
     fraction_within_10pct: cal.fraction_within_10pct,
     loss_trajectory: cal.loss_trajectory,
     skipped: cal.skipped,
+    declared_targets: cal.declared_targets,
+    compiled_candidate_targets: cal.compiled_candidate_targets,
+    dropped_target_count: cal.dropped_target_names.length,
+    included_target_count: cal.included_target_count,
     total_targets: cal.rows.length,
     within_tolerance_count: withinToleranceCount(cal.rows),
     family_fit: familyFitSummary(cal.rows),
@@ -822,6 +1315,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   const variable = stringParam(url.searchParams.get("variable"));
   const source = stringParam(url.searchParams.get("source"));
   const level = stringParam(url.searchParams.get("level"));
+  const geography = stringParam(url.searchParams.get("geography"));
   const state = stringParam(url.searchParams.get("state"));
   const direction = stringParam(url.searchParams.get("direction"));
   const within = booleanParam(url.searchParams.get("within_tolerance"));
@@ -842,6 +1336,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   if (variable) filtered = filtered.filter((row) => row.variable_key === variable);
   if (source) filtered = filtered.filter((row) => row.source === source);
   if (level) filtered = filtered.filter((row) => row.level === level);
+  if (geography) filtered = filtered.filter((row) => row.geography === geography);
   if (state) filtered = filtered.filter((row) => row.state === state);
   const dimensions = variable ? computeDimensions(filtered) : [];
   for (const [key, value] of facetFilters) {
@@ -850,9 +1345,8 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   if (direction) filtered = filtered.filter((row) => row.direction === direction);
   if (within !== null) filtered = filtered.filter((row) => row.within_tolerance === within);
   if (search) filtered = filtered.filter((row) => matchesSearch(row, search));
-  const dimSort = /^dim(\d+)$/.exec(sortBy);
   const sortValue = (row: TargetRow) =>
-    dimSort ? (row.dims as string[] | undefined)?.[Number(dimSort[1])] : row[sortBy];
+    rowFacetValue(row, sortBy) ?? row[sortBy];
   filtered = [...filtered].sort((a, b) => {
     const aVal = sortValue(a);
     const bVal = sortValue(b);
@@ -874,12 +1368,19 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     metric: "relative_error",
     families: includeFamilies ? populaceTargetFamilies(rows) : [],
     sources: metadata.sources,
+    levels: metadata.levels,
+    geographies: metadata.geographies,
     variables: metadata.variables,
     dimensions,
     summary: {
       total_targets: rows.length,
       within_tolerance_count: withinToleranceCount(rows),
       fraction_within_10pct: cal.fraction_within_10pct,
+      included_target_count: cal.included_target_count,
+      skipped_target_count: cal.skipped.length,
+      dropped_target_count: cal.dropped_target_names.length,
+      declared_targets: cal.declared_targets,
+      compiled_candidate_targets: cal.compiled_candidate_targets,
     },
     total_targets: rows.length,
     filtered_total: filtered.length,
@@ -889,7 +1390,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     has_next: offset + limit < filtered.length,
     display_limit: limit,
     targets: filtered.slice(offset, offset + limit).map(targetResponseRow),
-    filters: { family, variable, source, level, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
+    filters: { family, variable, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
   };
 }
 
@@ -908,6 +1409,60 @@ function absoluteMiss(row: TargetRow | undefined): number | null {
   const estimate = numberOrNull(row.final_estimate);
   const target = numberOrNull(row.target);
   return estimate == null || target == null ? null : estimate - target;
+}
+
+function mean(values: number[]): number | null {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+function comparisonVariableRows(rows: TargetRow[]) {
+  const groups = new Map<string, TargetRow[]>();
+  for (const row of rows) {
+    const key = String(row.variable_key ?? row.variable ?? "unknown");
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(row);
+  }
+  return [...groups.entries()]
+    .map(([variable_key, group]) => {
+      const relativeRows = group.filter((row) => row.error_kind === "relative");
+      const aErrors = relativeRows
+        .map((row) => numberOrNull(row.a_error))
+        .filter((value): value is number => value != null)
+        .map(Math.abs);
+      const bErrors = relativeRows
+        .map((row) => numberOrNull(row.b_error))
+        .filter((value): value is number => value != null)
+        .map(Math.abs);
+      const aMeanAbsError = mean(aErrors);
+      const bMeanAbsError = mean(bErrors);
+      const meanAbsDelta =
+        aMeanAbsError == null || bMeanAbsError == null
+          ? null
+          : bMeanAbsError - aMeanAbsError;
+      const sample = group[0] ?? {};
+      return {
+        variable_key,
+        source: sample.source ?? null,
+        variable: sample.variable ?? null,
+        measure: sample.measure ?? null,
+        level: sample.level ?? null,
+        common_targets: group.length,
+        relative_targets: relativeRows.length,
+        improved: relativeRows.filter((row) => (numberOrNull(row.abs_rel_delta) ?? 0) < -1e-9).length,
+        regressed: relativeRows.filter((row) => (numberOrNull(row.abs_rel_delta) ?? 0) > 1e-9).length,
+        unchanged: relativeRows.filter((row) => numberOrNull(row.abs_rel_delta) === 0).length,
+        a_mean_abs_error: aMeanAbsError,
+        b_mean_abs_error: bMeanAbsError,
+        mean_abs_delta: meanAbsDelta,
+      };
+    })
+    .sort((a, b) => {
+      const aDelta = numberOrNull(a.mean_abs_delta);
+      const bDelta = numberOrNull(b.mean_abs_delta);
+      if (aDelta == null && bDelta == null) return b.common_targets - a.common_targets;
+      if (aDelta == null) return 1;
+      if (bDelta == null) return -1;
+      return Math.abs(bDelta) - Math.abs(aDelta) || b.relative_targets - a.relative_targets;
+    });
 }
 
 // Diff two releases' calibration by matching targets on name. Common targets
@@ -944,8 +1499,11 @@ export function buildComparison(a: Calibration, b: Calibration) {
         target_label: [br.geography ?? ar.geography, br.breakdown ?? ar.breakdown]
           .filter(Boolean)
           .join(" · "),
+        source: br.source ?? ar.source,
         variable_key: br.variable_key ?? ar.variable_key,
         variable: br.variable ?? ar.variable,
+        measure: br.measure ?? ar.measure,
+        level: br.level ?? ar.level,
         breakdown: br.breakdown ?? ar.breakdown,
         geography: br.geography ?? ar.geography,
         a_target: numberOrNull(ar.target),
@@ -999,6 +1557,7 @@ export function buildComparison(a: Calibration, b: Calibration) {
       unchanged: common.length - improved - regressed,
       losses_comparable: !surfacesDiffer,
     },
+    variables: comparisonVariableRows(common),
     rows: common,
   };
 }

@@ -73,6 +73,45 @@ test("dimensions are the axes that vary; constants drop", () => {
   expect(labels).not.toContain("Return type"); // all "taxable" -> constant
 });
 
+test("income band facets sort total first, then descending numeric bands", () => {
+  const rows = ["total", "under_1", "1_to_10k", "50k_plus", "500k_to_1m", "1m_plus"]
+    .map((band) => ({
+      name: `irs_soi.ty2022.historic_table_2.us.${band}.adjusted_gross_income@2024`,
+      target_name: `irs_soi.ty2022.historic_table_2.us.${band}.adjusted_gross_income`,
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 100,
+      relative_error: 0,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "adjusted_gross_income",
+        source_measure_id: "adjusted_gross_income",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "usd",
+        ledger_layout_groupby_dimension: "us:statutes/26/62#adjusted_gross_income",
+        ledger_layout_groupby_value_id: band,
+        ledger_filter_income_range: band === "total" ? "all" : band,
+        filing_status: "All",
+      },
+    }));
+  const cal = calibration(rows);
+  const result = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics?variable=irs_soi%20%2F%20adjusted%20gross%20income%20%C2%B7%20total",
+    cal,
+  );
+  const incomeBand = result.dimensions.find((dim) => dim.label === "Income band");
+
+  expect(incomeBand?.values).toEqual([
+    "Total",
+    "1m plus",
+    "500k to 1m",
+    "50k plus",
+    "1 to 10k",
+    "under 1",
+  ]);
+});
+
 test("facet filter narrows to a single breakdown", () => {
   const income = page("?variable=irs%20%2F%20adjusted%20gross%20income%20%C2%B7%20total").dimensions.find(
     (d) => d.label === "Income band",
@@ -87,7 +126,48 @@ test("facet filter narrows to a single breakdown", () => {
 test("calibration summary reports per-family fit", () => {
   const summary = latestPopulaceCalibrationSummary(SAMPLE);
   expect(summary.total_targets).toBe(4);
+  expect(summary.included_target_count).toBe(4);
   expect(summary.family_fit.length).toBeGreaterThan(0);
+});
+
+test("calibration inclusion status uses skipped and dropped metadata", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        { name: "included@2024", target: 1, initial_estimate: 1, final_estimate: 1 },
+        { name: "skipped@2024", target_name: "skipped", target: 1 },
+        { name: "dropped@2024", target_name: "dropped", target: 1 },
+      ],
+      skipped: [{ name: "skipped", reason: "No support." }],
+    },
+    "rel-a",
+    null,
+    {
+      gates: {
+        target_compilation: {
+          declared_targets: 3,
+          compiled_candidate_targets: 2,
+          dropped_target_names: ["dropped"],
+        },
+      },
+    },
+  );
+
+  expect(cal.included_target_count).toBe(1);
+  expect(cal.dropped_target_names).toEqual(["dropped"]);
+  expect(cal.rows.map((row) => row.calibration_status)).toEqual([
+    "included",
+    "skipped",
+    "not_materialized",
+  ]);
+  const page = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics",
+    cal,
+  );
+  expect(page.summary.included_target_count).toBe(1);
+  expect(page.summary.skipped_target_count).toBe(1);
+  expect(page.summary.dropped_target_count).toBe(1);
+  expect(page.targets[1].calibration_status_reason).toBe("No support.");
 });
 
 test("comparison matches on base_name across the @period boundary", () => {
@@ -107,6 +187,11 @@ test("comparison matches on base_name across the @period boundary", () => {
   expect(cmp.summary.added).toBe(1); // cbo income tax, only in B
   expect(cmp.summary.removed).toBe(2); // the MFJ AGI row and snap-cost, only in A
   expect(cmp.summary.losses_comparable).toBe(false);
+  expect(cmp.variables[0].variable_key).toBe("irs / adjusted gross income · total");
+  expect(cmp.variables[0].common_targets).toBe(2);
+  expect(cmp.variables[0].relative_targets).toBe(2);
+  expect(cmp.variables[0].improved).toBe(1);
+  expect(cmp.variables[0].regressed).toBe(1);
 });
 
 test("dotted ledger target names use metadata for readable fields", () => {
@@ -180,15 +265,67 @@ test("source measure details become breakdown dimensions", () => {
   ]);
   expect(cal.rows[0].variable).toBe("eitc");
   expect(cal.rows[0].measure).toBe("total");
-  expect(cal.rows[0].breakdown).toBe("az · all children · All");
-  expect(cal.rows[0].dims).toEqual(["az", "all children", "All"]);
+  expect(cal.rows[0].breakdown).toBe("all qualifying children · All");
+  expect(cal.rows[0].dims).toEqual(["all qualifying children", "All"]);
   expect(cal.rows[0].variable_key).toBe("irs_soi / eitc · total");
-  expect(cal.rows[1].breakdown).toBe("az · no children · All");
+  expect(cal.rows[1].breakdown).toBe("no qualifying children · All");
   const result = latestPopulaceTargetDiagnosticsPage(
     "http://x/api/populace/target-diagnostics?variable=irs_soi%20%2F%20eitc%20%C2%B7%20total",
     cal,
   );
   expect(result.dimensions.map((dim) => dim.label)).toContain("Qualifying children");
+});
+
+test("metadata dimensions skip geography repeated as layout breakdown", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_broad.az.all.ctc_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.state_broad.az.all.ctc_amount",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 90,
+      relative_error: -0.1,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "ctc",
+        source_measure_id: "ctc_amount",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US04",
+        ledger_layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_broad.az",
+        ledger_layout_groupby_dimension: "state",
+        ledger_layout_groupby_value_id: "all",
+        ledger_filter_income_range: "all",
+        filing_status: "All",
+      },
+    },
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_broad.ca.all.ctc_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.state_broad.ca.all.ctc_amount",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 90,
+      relative_error: -0.1,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "ctc",
+        source_measure_id: "ctc_amount",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US06",
+        ledger_layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_broad.ca",
+        ledger_layout_groupby_dimension: "state",
+        ledger_layout_groupby_value_id: "all",
+        ledger_filter_income_range: "all",
+        filing_status: "All",
+      },
+    },
+  ]);
+  expect(cal.rows[0].geography).toBe("AZ");
+  expect(cal.rows[0].breakdown).toBe("All · All");
+  const result = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics?variable=irs_soi%20%2F%20ctc%20%C2%B7%20total",
+    cal,
+  );
+  expect(result.dimensions.map((dim) => dim.label)).toEqual(["Geography"]);
 });
 
 test("EITC table 2.5 child groups come from record set ids", () => {
@@ -236,7 +373,7 @@ test("EITC table 2.5 child groups come from record set ids", () => {
   ]);
   expect(cal.rows[0].breakdown).toBe("25k to 30k · no qualifying children · All");
   expect(cal.rows[0].dims).toEqual(["25k to 30k", "no qualifying children", "All"]);
-  expect(cal.rows[0].estimate_warning).toContain("no compiled filter");
+  expect(cal.rows[0].estimate_warning).toContain("compiled model filter");
 });
 
 test("repeated unfiltered sibling estimates get generic scope warnings", () => {

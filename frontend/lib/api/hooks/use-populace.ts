@@ -45,6 +45,13 @@ export interface PopulaceTargetRow {
   abs_error?: number | null;
   breakdown?: string | null;
   dims?: string[] | null;
+  target_dimensions?: {
+    key: string;
+    label: string;
+    value: string;
+    source_key?: string;
+    raw_value?: string;
+  }[] | null;
   variable_key?: string | null;
   // schema v2 published registry metadata (null on v1).
   source_citation?: string | null;
@@ -52,7 +59,45 @@ export interface PopulaceTargetRow {
   aggregation?: string | null;
   measure_name?: string | null;
   period?: number | null;
+  ledger?: {
+    fact_key?: string | null;
+    source_record_id?: string | null;
+    semantic_fact_key?: string | null;
+    aggregate_fact_key?: string | null;
+    legacy_fact_key?: string | null;
+    period_type?: string | null;
+    source_period?: string | null;
+    target_period?: string | null;
+    geography_level?: string | null;
+    geography_id?: string | null;
+    geography_vintage?: string | null;
+    domain?: string | null;
+    entity_name?: string | null;
+    entity_role?: string | null;
+    measure_concept?: string | null;
+    source_concept?: string | null;
+    concept_relation?: string | null;
+    concept_authority?: string | null;
+    measure_unit?: string | null;
+    value_operation?: string | null;
+    layout_record_set_id?: string | null;
+    layout_groupby_dimension?: string | null;
+    layout_groupby_value_id?: string | null;
+    layout_measure_id?: string | null;
+    dimension_set_key?: string | null;
+    universe_constraint_set_key?: string | null;
+    universe_constraint_count?: number | null;
+    filters?: {
+      key: string;
+      label: string;
+      value: string;
+      raw_value?: string;
+    }[];
+  } | null;
   estimate_warning?: string | null;
+  calibration_status?: "included" | "skipped" | "not_materialized" | null;
+  calibration_status_label?: string | null;
+  calibration_status_reason?: string | null;
   initial_relative_error?: number | null;
   abs_relative_error?: number | null;
   improvement?: number | null;
@@ -101,6 +146,10 @@ export interface PopulaceCalibration {
   fraction_within_10pct?: number | null;
   loss_trajectory?: number[];
   skipped?: PopulaceSkippedTarget[];
+  declared_targets?: number | null;
+  compiled_candidate_targets?: number | null;
+  dropped_target_count?: number;
+  included_target_count?: number;
   total_targets?: number;
   within_tolerance_count?: number;
   family_fit?: PopulaceFamilyFitRow[];
@@ -166,12 +215,19 @@ export interface PopulaceTargetDiagnostics {
   metric?: string | null;
   families?: string[];
   sources?: string[];
+  levels?: string[];
+  geographies?: string[];
   variables?: PopulaceVariableRow[];
   dimensions?: PopulaceTargetDimension[];
   summary: {
     total_targets?: number | null;
     within_tolerance_count?: number | null;
     fraction_within_10pct?: number | null;
+    included_target_count?: number | null;
+    skipped_target_count?: number | null;
+    dropped_target_count?: number | null;
+    declared_targets?: number | null;
+    compiled_candidate_targets?: number | null;
     [key: string]: unknown;
   };
   total_targets: number;
@@ -188,8 +244,11 @@ export interface PopulaceTargetDiagnostics {
 export interface PopulaceComparisonRow {
   name: string;
   target_label?: string | null;
+  source?: string | null;
   variable_key?: string | null;
   variable?: string | null;
+  measure?: string | null;
+  level?: string | null;
   breakdown?: string | null;
   geography?: string | null;
   a_target?: number | null;
@@ -204,6 +263,22 @@ export interface PopulaceComparisonRow {
   a_within_tolerance?: boolean | null;
   b_within_tolerance?: boolean | null;
   abs_rel_delta?: number | null;
+}
+
+export interface PopulaceComparisonVariableRow {
+  variable_key: string;
+  source?: string | null;
+  variable?: string | null;
+  measure?: string | null;
+  level?: string | null;
+  common_targets: number;
+  relative_targets: number;
+  improved: number;
+  regressed: number;
+  unchanged: number;
+  a_mean_abs_error: number | null;
+  b_mean_abs_error: number | null;
+  mean_abs_delta: number | null;
 }
 
 export interface PopulaceComparison {
@@ -230,6 +305,7 @@ export interface PopulaceComparison {
     unchanged: number;
     losses_comparable: boolean;
   };
+  variables: PopulaceComparisonVariableRow[];
   rows: PopulaceComparisonRow[];
 }
 
@@ -266,10 +342,23 @@ export function usePopulaceVariableValue(params: {
   release?: string;
 }) {
   const variables = params.variables?.map((v) => v.trim()).filter(Boolean) ?? [];
+  const path =
+    typeof window !== "undefined" &&
+    !["localhost", "127.0.0.1"].includes(window.location.hostname)
+      ? "/populace_variable"
+      : "/populace/variable";
+  const endpointCacheKey = path === "/populace_variable" ? "python-hosted-v3" : "node-local-v3";
   return useQuery({
-    queryKey: ["populace", "variable", variables, params.period ?? "2024", params.release ?? "latest"],
+    queryKey: [
+      "populace",
+      "variable",
+      endpointCacheKey,
+      variables,
+      params.period ?? "2024",
+      params.release ?? "latest",
+    ],
     queryFn: () =>
-      apiGet<PopulaceVariableLookupResponse>("/populace/variable", {
+      apiGet<PopulaceVariableLookupResponse>(path, {
         variables,
         period: params.period ?? "2024",
         release: params.release || undefined,
@@ -282,7 +371,7 @@ export function usePopulaceVariableValue(params: {
 
 export function usePopulaceCompare(a?: string, b?: string, enabled = true) {
   return useQuery({
-    queryKey: ["populace", "compare", a, b],
+    queryKey: ["populace", "compare", "variables-v2", a, b],
     queryFn: () => apiGet<PopulaceComparison>("/populace/compare", { a, b }),
     enabled: enabled && Boolean(a && b),
     staleTime: 15 * 60 * 1000,
@@ -313,6 +402,7 @@ export function usePopulaceTargetDiagnostics(params: {
   variable?: string;
   source?: string;
   level?: string;
+  geography?: string;
   state?: string;
   direction?: string;
   within_tolerance?: string;
