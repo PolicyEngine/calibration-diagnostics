@@ -7,6 +7,7 @@ const navItems = [
   { href: "/populace", label: "Release summary" },
   { href: "/populace/targets", label: "Target diagnostics" },
   { href: "/populace/variables", label: "Variable lookup" },
+  { href: "/populace/reforms", label: "Reform validation" },
   { href: "/populace/compare", label: "Compare versions" },
   { href: "/populace/staging", label: "Staging runs" },
 ];
