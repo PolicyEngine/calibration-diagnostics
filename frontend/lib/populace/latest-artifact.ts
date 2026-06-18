@@ -842,6 +842,8 @@ function enrichTargetRow(
   const dims = targetDimensions.map((dim) => dim.value);
   const breakdown = metadataTargetDimensions ? dims.join(" · ") : parsed.breakdown;
   const sourceMeasureId = stringValue(metadata.source_measure_id);
+  const targetRole = stringValue(metadata.target_role);
+  const policyengineVariables = policyengineVariablesFromMetadata(metadata);
   // The first breakdown token is the measure (total / count / mean / …). Many
   // IRS variables publish both a total (dollar amount) and a count (number of
   // returns), so the measure is part of the variable's identity, not a
@@ -862,6 +864,15 @@ function enrichTargetRow(
     source: parsed.source,
     variable: parsed.variable,
     measure,
+    target_role: targetRole,
+    source_measure_id: sourceMeasureId,
+    policyengine_variables: policyengineVariables.length
+      ? policyengineVariables
+      : fallbackPolicyengineVariables(metadata),
+    policyengine_map_to: stringValue(metadata.count_map_to) ?? fallbackPolicyengineMapTo(metadata),
+    policyengine_filter_variable: stringValue(metadata.count_filter_variable) ?? fallbackPolicyengineFilterVariable(metadata),
+    materializer: stringValue(metadata.materializer),
+    measure_mode: stringValue(metadata.measure_mode) ?? fallbackMeasureMode(metadata),
     error_kind: errorKind,
     initial_error: initialError,
     final_error: finalError,
@@ -957,6 +968,86 @@ function stringParam(value: string | null): string | null {
   return trimmed ? trimmed : null;
 }
 
+function splitVariableList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap(splitVariableList)
+      .filter((variable, index, all) => all.indexOf(variable) === index);
+  }
+  if (typeof value !== "string") return [];
+  return value
+    .split(",")
+    .map((variable) => variable.trim())
+    .filter(Boolean);
+}
+
+function policyengineVariablesFromMetadata(metadata: JsonObject): string[] {
+  const variables = [
+    ...splitVariableList(metadata.base_variables),
+    ...splitVariableList(metadata.base_variable),
+  ];
+  return variables.filter((variable, index) => variables.indexOf(variable) === index);
+}
+
+function fallbackPolicyengineVariables(metadata: JsonObject): string[] {
+  const targetRole = stringValue(metadata.target_role);
+  const sourceMeasureId = stringValue(metadata.source_measure_id);
+  if (
+    targetRole === "aca_spending" ||
+    targetRole === "aca_ptc_recipients" ||
+    sourceMeasureId === "premium_tax_credit_amount" ||
+    sourceMeasureId === "premium_tax_credit_returns"
+  ) {
+    return ["assigned_aca_ptc"];
+  }
+  if (targetRole === "aca_enrollment") {
+    return ["has_marketplace_health_coverage_at_interview"];
+  }
+  if (targetRole === "medicaid_spending") {
+    return ["medicaid"];
+  }
+  if (targetRole === "medicaid_enrollment") {
+    return ["medicaid_enrolled"];
+  }
+  if (targetRole === "medicaid_chip_enrollment") {
+    return ["medicaid_enrolled", "chip_enrolled"];
+  }
+  if (targetRole === "medicare_part_b_premium_total") {
+    return ["gross_medicare_part_b_premium"];
+  }
+  return [];
+}
+
+function fallbackPolicyengineMapTo(metadata: JsonObject): string | null {
+  return stringValue(metadata.target_role) === "aca_ptc_recipients" ? "person" : null;
+}
+
+function fallbackPolicyengineFilterVariable(metadata: JsonObject): string | null {
+  return stringValue(metadata.target_role) === "aca_ptc_recipients"
+    ? "is_aca_ptc_eligible"
+    : null;
+}
+
+function fallbackMeasureMode(metadata: JsonObject): string | null {
+  const targetRole = stringValue(metadata.target_role);
+  if (
+    targetRole === "aca_enrollment" ||
+    targetRole === "aca_ptc_recipients" ||
+    targetRole === "medicaid_enrollment" ||
+    targetRole === "medicaid_chip_enrollment"
+  ) {
+    return "positive_count";
+  }
+  if (
+    targetRole === "aca_spending" ||
+    targetRole === "medicaid_spending" ||
+    targetRole === "medicare_part_b_premium_total"
+  ) {
+    return "sum";
+  }
+  return null;
+}
+
 function booleanParam(value: string | null): boolean | null {
   if (value == null || value === "") return null;
   if (["1", "true", "yes"].includes(value.toLowerCase())) return true;
@@ -973,6 +1064,48 @@ function matchesSearch(row: TargetRow, search: string): boolean {
     .join(" ")
     .toLowerCase();
   return haystack.includes(search.toLowerCase());
+}
+
+const HEALTHCARE_TARGET_ROLES = new Set([
+  "aca_spending",
+  "aca_enrollment",
+  "aca_ptc_recipients",
+  "aca_bronze_aptc_consumers",
+  "medicaid_spending",
+  "medicaid_enrollment",
+  "medicaid_chip_enrollment",
+  "medicare_part_b_premium_total",
+]);
+
+function isHealthcareTarget(row: TargetRow): boolean {
+  const metadata = asObject(row.metadata);
+  const targetRole = stringValue(metadata.target_role);
+  if (targetRole && HEALTHCARE_TARGET_ROLES.has(targetRole)) return true;
+
+  const haystack = [
+    row.name,
+    row.family,
+    row.source,
+    row.variable,
+    row.variable_key,
+    metadata.source_measure_id,
+    metadata.ledger_measure_concept,
+    metadata.ledger_domain,
+  ]
+    .filter((value) => value != null)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    haystack.includes("cms_aca") ||
+    haystack.includes("cms_medicaid") ||
+    haystack.includes("cms_medicare") ||
+    haystack.includes("medicaid") ||
+    haystack.includes("chip") ||
+    haystack.includes("medicare") ||
+    haystack.includes("premium tax credit") ||
+    haystack.includes("aca_ptc")
+  );
 }
 
 function withinToleranceCount(rows: TargetRow[]): number {
@@ -1012,12 +1145,41 @@ export function populaceVariableSummary(rows: TargetRow[]) {
       const absErrors = group
         .map((row) => numberOrNull(row.abs_relative_error))
         .filter((v): v is number => v != null);
+      const policyengineVariables = [
+        ...new Set(
+          group.flatMap((row) =>
+            Array.isArray(row.policyengine_variables)
+              ? row.policyengine_variables.filter(
+                  (value): value is string => typeof value === "string",
+                )
+              : [],
+          ),
+        ),
+      ];
+      const uniqueString = (key: string) => {
+        const values = [
+          ...new Set(
+            group
+              .map((row) => row[key])
+              .filter(
+                (value): value is string =>
+                  typeof value === "string" && value.length > 0,
+              ),
+          ),
+        ];
+        return values.length === 1 ? values[0] : null;
+      };
       return {
         variable_key,
         source: String(first.source ?? ""),
         variable: String(first.variable ?? ""),
         measure: first.measure ? String(first.measure) : null,
         level: String(first.level ?? ""),
+        policyengine_variables: policyengineVariables,
+        policyengine_map_to: uniqueString("policyengine_map_to"),
+        policyengine_filter_variable: uniqueString("policyengine_filter_variable"),
+        materializer: uniqueString("materializer"),
+        measure_mode: uniqueString("measure_mode"),
         n_targets: group.length,
         within_10pct: group.filter((r) => (numberOrNull(r.abs_relative_error) ?? Infinity) <= 0.1).length,
         within_tolerance: group.filter((r) => r.within_tolerance === true).length,
@@ -1275,6 +1437,13 @@ function targetResponseRow(row: TargetRow): TargetRow {
     source: row.source,
     variable: row.variable,
     measure: row.measure,
+    target_role: row.target_role,
+    source_measure_id: row.source_measure_id,
+    policyengine_variables: row.policyengine_variables,
+    policyengine_map_to: row.policyengine_map_to,
+    policyengine_filter_variable: row.policyengine_filter_variable,
+    materializer: row.materializer,
+    measure_mode: row.measure_mode,
     error_kind: row.error_kind,
     initial_error: row.initial_error,
     final_error: row.final_error,
@@ -1579,6 +1748,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? "100") || 100, 1), 500);
   const offset = Math.max(Number(url.searchParams.get("offset") ?? "0") || 0, 0);
   const includeFamilies = url.searchParams.get("include_families") === "1";
+  const scope = stringParam(url.searchParams.get("scope")) === "healthcare" ? "healthcare" : null;
   const family = stringParam(url.searchParams.get("family"));
   const variable = stringParam(url.searchParams.get("variable"));
   const source = stringParam(url.searchParams.get("source"));
@@ -1597,9 +1767,13 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
       return sep < 0 ? null : ([entry.slice(0, sep), entry.slice(sep + 1)] as const);
     })
     .filter((v): v is readonly [string, string] => v != null);
-  const metadata = targetDiagnosticsMetadata(rows);
+  const scopedRows = scope === "healthcare" ? rows.filter(isHealthcareTarget) : rows;
+  const metadata = targetDiagnosticsMetadata(scopedRows);
+  const scopedWithin10Pct = scopedRows.filter(
+    (row) => (numberOrNull(row.abs_relative_error) ?? Infinity) <= 0.1,
+  ).length;
 
-  let filtered = rows;
+  let filtered = scopedRows;
   if (family) filtered = filtered.filter((row) => row.family === family);
   if (variable) filtered = filtered.filter((row) => row.variable_key === variable);
   if (source) filtered = filtered.filter((row) => row.source === source);
@@ -1634,23 +1808,23 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     release_id: cal.release_id,
     schema_version: cal.schema_version,
     metric: "relative_error",
-    families: includeFamilies ? populaceTargetFamilies(rows) : [],
+    families: includeFamilies ? populaceTargetFamilies(scopedRows) : [],
     sources: metadata.sources,
     levels: metadata.levels,
     geographies: metadata.geographies,
     variables: metadata.variables,
     dimensions,
     summary: {
-      total_targets: rows.length,
-      within_tolerance_count: withinToleranceCount(rows),
-      fraction_within_10pct: cal.fraction_within_10pct,
-      included_target_count: cal.included_target_count,
-      skipped_target_count: cal.skipped.length,
-      dropped_target_count: cal.dropped_target_names.length,
+      total_targets: scopedRows.length,
+      within_tolerance_count: withinToleranceCount(scopedRows),
+      fraction_within_10pct: scopedRows.length ? scopedWithin10Pct / scopedRows.length : null,
+      included_target_count: scopedRows.filter((row) => row.calibration_status === "included").length,
+      skipped_target_count: scopedRows.filter((row) => row.calibration_status === "skipped").length,
+      dropped_target_count: scopedRows.filter((row) => row.calibration_status === "not_materialized").length,
       declared_targets: cal.declared_targets,
       compiled_candidate_targets: cal.compiled_candidate_targets,
     },
-    total_targets: rows.length,
+    total_targets: scopedRows.length,
     filtered_total: filtered.length,
     returned: filtered.slice(offset, offset + limit).length,
     limit,
@@ -1658,7 +1832,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     has_next: offset + limit < filtered.length,
     display_limit: limit,
     targets: filtered.slice(offset, offset + limit).map(targetResponseRow),
-    filters: { family, variable, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
+    filters: { scope, family, variable, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
   };
 }
 

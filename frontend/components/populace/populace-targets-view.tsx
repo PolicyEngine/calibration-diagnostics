@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
+import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
@@ -48,6 +49,14 @@ interface VariableGroup {
   defaultKey: string;
   nTargets: number;
   within10Pct: number;
+}
+
+type TargetScope = "all" | "healthcare";
+
+interface HealthcareSummary {
+  nTargets: number;
+  within10Pct: number;
+  meanAbsRelativeError: number | null;
 }
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -117,6 +126,22 @@ const STATUS_COLUMN: Column = {
   ),
 };
 
+function calculationLine(row: {
+  policyengine_variables?: string[] | null;
+  policyengine_map_to?: string | null;
+  policyengine_filter_variable?: string | null;
+}): string | null {
+  const variables = row.policyengine_variables ?? [];
+  if (!variables.length) return null;
+  const suffix = [
+    row.policyengine_map_to ? `map_to ${row.policyengine_map_to}` : null,
+    row.policyengine_filter_variable ? `filter ${row.policyengine_filter_variable}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return `${variables.join(" + ")}${suffix ? ` · ${suffix}` : ""}`;
+}
+
 const METRIC_COLUMNS: Column[] = [
   STATUS_COLUMN,
   {
@@ -161,6 +186,11 @@ const OVERVIEW_COLUMNS: Column[] = [
                 ? "Count"
                 : row.measure || "—"}
         </div>
+        {calculationLine(row) ? (
+          <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+            calc {calculationLine(row)}
+          </div>
+        ) : null}
       </div>
     ),
   },
@@ -294,6 +324,30 @@ function groupVariables(variables: PopulaceVariableRow[]): VariableGroup[] {
     .sort((a, b) => b.nTargets - a.nTargets);
 }
 
+function healthcareSummary(variables: PopulaceVariableRow[]): HealthcareSummary {
+  let nTargets = 0;
+  let within10Pct = 0;
+  let weightedAbsError = 0;
+  let weightedAbsErrorTargets = 0;
+
+  for (const variable of variables) {
+    nTargets += variable.n_targets;
+    within10Pct += variable.within_10pct;
+    if (variable.mean_abs_relative_error != null && Number.isFinite(variable.mean_abs_relative_error)) {
+      weightedAbsError += variable.mean_abs_relative_error * variable.n_targets;
+      weightedAbsErrorTargets += variable.n_targets;
+    }
+  }
+
+  return {
+    nTargets,
+    within10Pct,
+    meanAbsRelativeError: weightedAbsErrorTargets
+      ? weightedAbsError / weightedAbsErrorTargets
+      : null,
+  };
+}
+
 function VariableBrowser({
   variables,
   active,
@@ -343,6 +397,7 @@ function VariableBrowser({
             const within10Share = selectedRow.n_targets
               ? selectedRow.within_10pct / selectedRow.n_targets
               : null;
+            const calcLine = calculationLine(selectedRow);
             return (
               <div
                 key={group.groupKey}
@@ -368,6 +423,11 @@ function VariableBrowser({
                       <span>{group.source}</span>
                       {group.level ? <span>{group.level}</span> : null}
                     </div>
+                    {calcLine ? (
+                      <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+                        calc {calcLine}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-right text-xs tabular-nums">
                     <div className="font-medium text-foreground">
@@ -419,8 +479,18 @@ function VariableBrowser({
   );
 }
 
-export function PopulaceTargetsView() {
+const TARGET_SCOPE_OPTIONS: { value: TargetScope; label: string }[] = [
+  { value: "all", label: "All targets" },
+  { value: "healthcare", label: "Healthcare" },
+];
+
+export function PopulaceTargetsView({
+  initialScope = "all",
+}: {
+  initialScope?: TargetScope;
+}) {
   const [release, setRelease] = useState("");
+  const [scope, setScope] = useState<TargetScope>(initialScope);
   const [variable, setVariable] = useState("");
   const [source, setSource] = useState("");
   const [level, setLevel] = useState("");
@@ -459,6 +529,17 @@ export function PopulaceTargetsView() {
     setPage(0);
   }
 
+  function pickScope(value: TargetScope) {
+    setScope(value);
+    setVariable("");
+    setFacetFilters({});
+    setSource("");
+    setLevel("");
+    setSearch("");
+    setSelected(null);
+    setPage(0);
+  }
+
   const facetParam = useMemo(
     () =>
       Object.entries(facetFilters)
@@ -471,6 +552,7 @@ export function PopulaceTargetsView() {
   const params = useMemo(
     () => ({
       release: release || undefined,
+      scope: scope === "healthcare" ? scope : undefined,
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
       variable: variable || undefined,
@@ -486,6 +568,7 @@ export function PopulaceTargetsView() {
     }),
     [
       release,
+      scope,
       variable,
       source,
       level,
@@ -507,6 +590,10 @@ export function PopulaceTargetsView() {
   const geographies = data?.geographies ?? [];
   const dimensions = data?.dimensions ?? [];
   const variableGroupCount = useMemo(() => groupVariables(variables).length, [variables]);
+  const health = useMemo(
+    () => (scope === "healthcare" ? healthcareSummary(variables) : null),
+    [scope, variables],
+  );
   const filteredTotal = data?.filtered_total ?? 0;
   const includedTargetCount = data?.summary.included_target_count ?? data?.total_targets ?? null;
   const skippedTargetCount = data?.summary.skipped_target_count ?? null;
@@ -688,7 +775,11 @@ export function PopulaceTargetsView() {
       <PageHeader
         eyebrow="Populace"
         title="Target diagnostics"
-        description="Browse the calibration target surface by the thing each constraint measures — e.g. adjusted gross income, then its by-income-bracket and by-filing-status breakdowns — and see how well the calibrated weights reproduce each."
+        description={
+          scope === "healthcare"
+            ? "Focus on ACA marketplace, premium tax credit, Medicaid, CHIP, and Medicare calibration targets across national and state rows."
+            : "Browse the calibration target surface by the thing each constraint measures — e.g. adjusted gross income, then its by-income-bracket and by-filing-status breakdowns — and see how well the calibrated weights reproduce each."
+        }
         actions={
           <ToolbarSelect
             label="Release"
@@ -699,9 +790,59 @@ export function PopulaceTargetsView() {
         }
       />
 
+      <div
+        role="tablist"
+        aria-label="Target diagnostic scope"
+        className="flex w-fit max-w-full flex-wrap items-center gap-0.5 rounded-lg bg-muted p-1"
+      >
+        {TARGET_SCOPE_OPTIONS.map((option) => {
+          const active = scope === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => pickScope(option.value)}
+              className={`h-8 rounded-md px-3 text-sm font-medium transition-colors ${
+                active
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {health && data && !isLoading ? (
+        <div className="grid gap-3 md:grid-cols-3">
+          <KpiCard
+            label="Healthcare Targets"
+            value={fmt(data.total_targets, { digits: 0 })}
+            size="sm"
+          />
+          <KpiCard
+            label="Within 10%"
+            value={
+              health.nTargets
+                ? fmt(health.within10Pct / health.nTargets, { pct: true, digits: 0 })
+                : "—"
+            }
+            size="sm"
+          />
+          <KpiCard
+            label="Mean Abs Error"
+            value={fmt(health.meanAbsRelativeError, { pct: true, digits: 1 })}
+            size="sm"
+          />
+        </div>
+      ) : null}
+
       <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <SectionCard
-          title="Browse by variable"
+          title={scope === "healthcare" ? "Browse healthcare variables" : "Browse by variable"}
           description={`${fmt(variableGroupCount, { digits: 0 })} variables in this release. Amount is selected by default when amount/count variants both exist.`}
         >
           <VariableBrowser variables={variables} active={variable} onPick={pickVariable} />
@@ -736,7 +877,7 @@ export function PopulaceTargetsView() {
                   </button>
                 </span>
               ) : (
-                `Targets (${fmt(filteredTotal, { digits: 0 })} of ${fmt(data?.total_targets ?? null, { digits: 0 })})`
+                `${scope === "healthcare" ? "Healthcare targets" : "Targets"} (${fmt(filteredTotal, { digits: 0 })} of ${fmt(data?.total_targets ?? null, { digits: 0 })})`
               )
             }
             description={
@@ -781,9 +922,9 @@ export function PopulaceTargetsView() {
             {isLoading ? (
               <LoadingBlock label="Loading target diagnostics…" />
             ) : error || !data ? (
-              <EmptyState
-                title="Target diagnostics unavailable"
-                description={error instanceof Error ? error.message : "Unknown error."}
+                <EmptyState
+                  title="Target diagnostics unavailable"
+                  description={error instanceof Error ? error.message : "Unknown error."}
               />
             ) : data.targets.length === 0 ? (
               <EmptyState title="No targets match the current filters." variant="compact" />

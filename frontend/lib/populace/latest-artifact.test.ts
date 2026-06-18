@@ -220,6 +220,99 @@ test("calibration inclusion status uses skipped and dropped metadata", () => {
   expect(page.targets[1].calibration_status_reason).toBe("No support.");
 });
 
+test("healthcare scope includes ACA, Medicaid, Medicare, and PTC targets", () => {
+  const cal = calibration([
+    {
+      name: "cms_aca.oep2024.state_marketplace.ca.aptc_recipients@2024",
+      target_name: "cms_aca.oep2024.state_marketplace.ca.aptc_recipients",
+      target: 100,
+      initial_estimate: 50,
+      final_estimate: 80,
+      relative_error: -0.2,
+      registry: { family: "cms_aca" },
+      metadata: {
+        target_role: "aca_ptc_recipients",
+        base_variable: "assigned_aca_ptc",
+        count_map_to: "person",
+        count_filter_variable: "is_aca_ptc_eligible",
+        measure_mode: "positive_count",
+        materializer: "policyengine_variable",
+        source_measure_id: "aptc_recipients",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US06",
+      },
+    },
+    {
+      name: "US06/cms_medicaid/total_medicaid_enrollment@2024",
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 95,
+      relative_error: -0.05,
+      metadata: {
+        target_role: "medicaid_enrollment",
+        base_variable: "medicaid_enrolled",
+        measure_mode: "positive_count",
+      },
+    },
+    {
+      name: "nation/cms_medicare/part_b_premium_income@2024",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 101,
+      relative_error: 0.01,
+      metadata: {
+        target_role: "medicare_part_b_premium_total",
+        base_variable: "gross_medicare_part_b_premium",
+        measure_mode: "sum",
+      },
+    },
+    {
+      name: "irs_soi.ty2022.historic_table_2.us.all.premium_tax_credit_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.us.all.premium_tax_credit_amount",
+      target: 100,
+      initial_estimate: 60,
+      final_estimate: 70,
+      relative_error: -0.3,
+      registry: { family: "irs_soi" },
+      metadata: {
+        target_role: "aca_spending",
+        base_variable: "assigned_aca_ptc",
+        measure_mode: "sum",
+        source_measure_id: "premium_tax_credit_amount",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+      },
+    },
+    agiTarget("AGI in 30k-40k", "taxable", "All", 0.01),
+  ]);
+
+  const result = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics?scope=healthcare",
+    cal,
+  );
+
+  expect(result.total_targets).toBe(4);
+  expect(result.filtered_total).toBe(4);
+  expect(result.summary.fraction_within_10pct).toBe(0.5);
+  expect(result.targets.map((row) => row.name)).not.toContain(
+    "nation/irs/adjusted gross income/total/AGI in 30k-40k/taxable/All@2024",
+  );
+  const aptc = result.targets.find((row) => row.source_measure_id === "aptc_recipients");
+  expect(aptc?.policyengine_variables).toEqual(["assigned_aca_ptc"]);
+  expect(aptc?.policyengine_map_to).toBe("person");
+  expect(aptc?.policyengine_filter_variable).toBe("is_aca_ptc_eligible");
+  expect(aptc?.measure_mode).toBe("positive_count");
+  const ptcAmount = result.targets.find(
+    (row) => row.source_measure_id === "premium_tax_credit_amount",
+  );
+  expect(ptcAmount?.policyengine_variables).toEqual(["assigned_aca_ptc"]);
+  expect(result.variables.map((row) => row.source)).toContain("cms_aca");
+  expect(result.variables.map((row) => row.source)).toContain("irs_soi");
+  expect(result.variables.find((row) => row.source === "cms_aca")?.policyengine_variables).toEqual([
+    "assigned_aca_ptc",
+  ]);
+});
+
 test("comparison matches on base_name across the @period boundary", () => {
   // B drops one target, changes one fit, adds a new one.
   const b = calibration(

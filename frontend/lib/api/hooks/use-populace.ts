@@ -39,6 +39,13 @@ export interface PopulaceTargetRow {
   source?: string | null;
   variable?: string | null;
   measure?: string | null;
+  target_role?: string | null;
+  source_measure_id?: string | null;
+  policyengine_variables?: string[] | null;
+  policyengine_map_to?: string | null;
+  policyengine_filter_variable?: string | null;
+  materializer?: string | null;
+  measure_mode?: string | null;
   error_kind?: "relative" | "absolute" | null;
   initial_error?: number | null;
   final_error?: number | null;
@@ -115,6 +122,11 @@ export interface PopulaceVariableRow {
   variable: string;
   measure: string | null;
   level: string;
+  policyengine_variables?: string[];
+  policyengine_map_to?: string | null;
+  policyengine_filter_variable?: string | null;
+  materializer?: string | null;
+  measure_mode?: string | null;
   n_targets: number;
   within_10pct: number;
   within_tolerance: number;
@@ -587,6 +599,7 @@ export function usePopulace(release?: string) {
 
 export function usePopulaceTargetDiagnostics(params: {
   release?: string;
+  scope?: "healthcare";
   limit?: number;
   offset?: number;
   family?: string;

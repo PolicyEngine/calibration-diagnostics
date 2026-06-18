@@ -44,6 +44,22 @@ function CodeField({ label, value }: { label: string; value: string | null | und
   );
 }
 
+function CodeChips({ values }: { values: string[] }) {
+  if (!values.length) return "—";
+  return (
+    <span className="flex flex-wrap gap-1">
+      {values.map((value) => (
+        <code
+          key={value}
+          className="rounded bg-white px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+        >
+          {value}
+        </code>
+      ))}
+    </span>
+  );
+}
+
 function titleFromIdentifier(value: string | null | undefined): string {
   if (!value) return "";
   const leaf = value.split(/[.#:]/).filter(Boolean).at(-1) ?? value;
@@ -174,6 +190,7 @@ export function PopulaceTargetDetail({
   const within10 =
     typeof row.abs_relative_error === "number" ? row.abs_relative_error <= 0.1 : null;
   const ledger = row.ledger;
+  const policyengineVariables = row.policyengine_variables ?? [];
 
   // The axes of variation shown as facets (geography, breakdown dims, …), each
   // resolved on this row. Geography/level are also in the canonical fields above,
@@ -230,6 +247,20 @@ export function PopulaceTargetDetail({
               ))}
             </div>
           )}
+          {policyengineVariables.length > 0 ? (
+            <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+              <Field
+                label="PolicyEngine variables"
+                value={<CodeChips values={policyengineVariables} />}
+              />
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <Field label="Measure mode" value={row.measure_mode} />
+                <Field label="map_to" value={row.policyengine_map_to} />
+                <Field label="Filter variable" value={row.policyengine_filter_variable} />
+                <Field label="Target role" value={row.target_role} />
+              </div>
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2 pt-1">
             <StatusPill tone={calibrationStatusTone(row.calibration_status)}>
               {row.calibration_status_label ?? "Unknown calibration status"}
