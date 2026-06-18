@@ -5,6 +5,7 @@
 
 type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
+export type CalibrationLossKind = "normalized_target_loss" | "raw_optimizer_objective";
 
 export const POPULACE_HF_REPO = process.env.POPULACE_HF_REPO ?? "policyengine/populace-us";
 export const POPULACE_HF_REVISION = process.env.POPULACE_HF_REVISION ?? "main";
@@ -65,6 +66,22 @@ export function scrub(value: unknown): unknown {
 
 function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function calibrationLossKind(
+  diag: JsonObject,
+  buildManifest: JsonObject,
+): CalibrationLossKind {
+  const options = asObject(diag.options);
+  if (
+    options.target_loss_scales != null ||
+    options.target_loss_weights != null ||
+    buildManifest.target_loss_weighting != null ||
+    buildManifest.target_loss_cap != null
+  ) {
+    return "normalized_target_loss";
+  }
+  return "raw_optimizer_objective";
 }
 
 function relativeError(estimate: number | null, target: number | null): number | null {
@@ -1035,6 +1052,7 @@ export interface Calibration {
   n_records: number | null;
   initial_loss: number | null;
   final_loss: number | null;
+  loss_kind: CalibrationLossKind;
   fraction_within_10pct: number | null;
   loss_trajectory: number[];
   skipped: unknown[];
@@ -1095,6 +1113,7 @@ export function buildCalibration(
     n_records: numberOrNull(diag.n_records),
     initial_loss: numberOrNull(diag.initial_loss),
     final_loss: numberOrNull(diag.final_loss),
+    loss_kind: calibrationLossKind(diag, buildManifest),
     fraction_within_10pct: numberOrNull(diag.fraction_within_10pct),
     loss_trajectory: Array.isArray(diag.loss_trajectory) ? (diag.loss_trajectory as number[]) : [],
     skipped,
@@ -1271,6 +1290,7 @@ export function latestPopulaceCalibrationSummary(cal: Calibration) {
     n_records: cal.n_records,
     initial_loss: cal.initial_loss,
     final_loss: cal.final_loss,
+    loss_kind: cal.loss_kind,
     fraction_within_10pct: cal.fraction_within_10pct,
     loss_trajectory: cal.loss_trajectory,
     skipped: cal.skipped,
@@ -1539,6 +1559,7 @@ export function buildComparison(a: Calibration, b: Calibration) {
       total_targets: a.rows.length,
       initial_loss: a.initial_loss,
       final_loss: a.final_loss,
+      loss_kind: a.loss_kind,
       fraction_within_10pct: a.fraction_within_10pct,
     },
     b: {
@@ -1546,6 +1567,7 @@ export function buildComparison(a: Calibration, b: Calibration) {
       total_targets: b.rows.length,
       initial_loss: b.initial_loss,
       final_loss: b.final_loss,
+      loss_kind: b.loss_kind,
       fraction_within_10pct: b.fraction_within_10pct,
     },
     summary: {
@@ -1555,7 +1577,8 @@ export function buildComparison(a: Calibration, b: Calibration) {
       improved,
       regressed,
       unchanged: common.length - improved - regressed,
-      losses_comparable: !surfacesDiffer,
+      losses_comparable: !surfacesDiffer && a.loss_kind === b.loss_kind,
+      loss_kind: a.loss_kind === b.loss_kind ? a.loss_kind : "mixed",
     },
     variables: comparisonVariableRows(common),
     rows: common,

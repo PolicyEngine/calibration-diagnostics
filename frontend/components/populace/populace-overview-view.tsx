@@ -47,10 +47,21 @@ function targetLabel(row: PopulaceTargetRow): string {
     .join(" · ") || String(row.name ?? "");
 }
 
-function fmtLoss(value: number | null | undefined): string {
+type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
+
+function isNormalizedLoss(kind: LossKind): boolean {
+  return kind === "normalized_target_loss";
+}
+
+function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
   if (value === 0) return "0";
+  if (isNormalizedLoss(kind)) return fmt(value, { digits: value < 1 ? 4 : 3 });
   return value.toExponential(3).replace("e+", "e");
+}
+
+function lossMetricLabel(kind: LossKind): string {
+  return isNormalizedLoss(kind) ? "Normalized target loss" : "Raw optimizer objective";
 }
 
 function lossReduction(initial: number | null | undefined, value: number | null | undefined) {
@@ -347,6 +358,7 @@ export function PopulaceOverviewView() {
   const compiledTargets = cal.compiled_candidate_targets ?? includedTargets;
   const skippedTargets = cal.skipped?.length ?? 0;
   const droppedTargets = cal.dropped_target_count ?? Math.max(declaredTargets - compiledTargets, 0);
+  const lossKind = cal.loss_kind;
   const lossDelta =
     cal.initial_loss != null && cal.final_loss != null
       ? cal.final_loss - cal.initial_loss
@@ -442,21 +454,33 @@ export function PopulaceOverviewView() {
       </div>
 
       <SectionCard
-        title="Total loss development"
-        description="Raw optimizer objective reported by the release artifact. Lower is better; this is for within-release convergence, not target-level percent error."
+        title={isNormalizedLoss(lossKind) ? "Normalized loss development" : "Raw loss development"}
+        description={
+          isNormalizedLoss(lossKind)
+            ? "Target-normalized calibration loss reported by newer Populus runs. Lower is better; roughly 0 means the weighted estimates match the target surface."
+            : "Raw optimizer objective reported by legacy release artifacts. Lower is better within a release, but the scale is not directly comparable across target surfaces."
+        }
       >
         <div className="grid gap-6 lg:grid-cols-[310px_minmax(0,1fr)]">
           <div>
             <dl className="rounded-md border border-border bg-muted/10 px-4">
               <LossMetric
-                label="Initial total loss"
-                value={fmtLoss(cal.initial_loss)}
-                hint={fmt(cal.initial_loss, { digits: 0 })}
+                label={`Initial ${lossMetricLabel(lossKind)}`}
+                value={fmtLoss(cal.initial_loss, lossKind)}
+                hint={
+                  isNormalizedLoss(lossKind)
+                    ? "new target-normalized metric"
+                    : fmt(cal.initial_loss, { digits: 0 })
+                }
               />
               <LossMetric
-                label="Final total loss"
-                value={fmtLoss(cal.final_loss)}
-                hint={fmt(cal.final_loss, { digits: 0 })}
+                label={`Final ${lossMetricLabel(lossKind)}`}
+                value={fmtLoss(cal.final_loss, lossKind)}
+                hint={
+                  isNormalizedLoss(lossKind)
+                    ? "new target-normalized metric"
+                    : fmt(cal.final_loss, { digits: 0 })
+                }
               />
               <LossMetric
                 label={lossChangeLabel}
@@ -468,7 +492,7 @@ export function PopulaceOverviewView() {
                 hint={
                   lossDelta == null
                     ? undefined
-                    : `Absolute objective change: ${fmtLoss(Math.abs(lossDelta))}`
+                    : `Absolute ${isNormalizedLoss(lossKind) ? "loss" : "objective"} change: ${fmtLoss(Math.abs(lossDelta), lossKind)}`
                 }
                 tone={
                   lossImproved
