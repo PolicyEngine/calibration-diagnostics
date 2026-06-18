@@ -27,6 +27,44 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function CodeField({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      {value ? (
+        <code className="break-all rounded bg-muted/50 px-1 py-0.5 text-xs text-foreground">
+          {value}
+        </code>
+      ) : (
+        <span className="text-sm text-muted-foreground">—</span>
+      )}
+    </div>
+  );
+}
+
+function titleFromIdentifier(value: string | null | undefined): string {
+  if (!value) return "";
+  const leaf = value.split(/[.#:]/).filter(Boolean).at(-1) ?? value;
+  return humanizeName(leaf.replace(/[^a-zA-Z0-9]+/g, "_"));
+}
+
+function periodText(row: PopulaceTargetRow): string {
+  const target = row.ledger?.target_period ?? (row.period == null ? null : String(row.period));
+  const source = row.ledger?.source_period;
+  if (target && source && target !== source) return `${source} → ${target}`;
+  return target ?? source ?? "";
+}
+
+function measureText(row: PopulaceTargetRow): string {
+  return (
+    titleFromIdentifier(row.ledger?.measure_concept) ||
+    humanizeName(row.variable as string) ||
+    titleFromIdentifier(row.ledger?.layout_measure_id)
+  );
+}
+
 function relativeErrorText(value: number | null): string {
   if (value == null) return "—";
   const digits = Math.abs(value) >= 0.995 ? 2 : 1;
@@ -59,6 +97,14 @@ function errorField(
 ): string {
   if (errorKind === "absolute") return fmtCompact(error);
   return relativeErrorText(error);
+}
+
+function calibrationStatusTone(
+  status: PopulaceTargetRow["calibration_status"],
+): "success" | "warning" | "neutral" {
+  if (status === "included") return "success";
+  if (status === "skipped" || status === "not_materialized") return "warning";
+  return "neutral";
 }
 
 // A horizontal bar for one estimate against the target, scaled to the largest
@@ -127,6 +173,7 @@ export function PopulaceTargetDetail({
   const improvement = typeof row.improvement === "number" ? row.improvement : null;
   const within10 =
     typeof row.abs_relative_error === "number" ? row.abs_relative_error <= 0.1 : null;
+  const ledger = row.ledger;
 
   // The axes of variation shown as facets (geography, breakdown dims, …), each
   // resolved on this row. Geography/level are also in the canonical fields above,
@@ -144,13 +191,13 @@ export function PopulaceTargetDetail({
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 px-5 py-3">
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-            Canonical target
+            Ledger target
           </div>
           <div className="text-base font-semibold leading-tight text-foreground">
-            {humanizeName(row.variable as string) || row.name}
+            {measureText(row) || row.name}
           </div>
           <code className="mt-1 block break-all text-xs text-muted-foreground">
-            {row.name}
+            {ledger?.source_record_id ?? row.name}
           </code>
         </div>
         <button
@@ -166,9 +213,11 @@ export function PopulaceTargetDetail({
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Geography" value={row.geography} />
-            <Field label="Level" value={row.level} />
             <Field label="Source" value={row.source} />
-            <Field label="Variable" value={humanizeName(row.variable as string)} />
+            <Field label="Period" value={periodText(row)} />
+            <Field label="Measure" value={measureText(row)} />
+            <Field label="Unit" value={ledger?.measure_unit?.toUpperCase()} />
+            <Field label="Domain" value={titleFromIdentifier(ledger?.domain)} />
           </div>
           {shownDims.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
@@ -182,10 +231,53 @@ export function PopulaceTargetDetail({
             </div>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
+            <StatusPill tone={calibrationStatusTone(row.calibration_status)}>
+              {row.calibration_status_label ?? "Unknown calibration status"}
+            </StatusPill>
             <StatusPill tone={within10 ? "success" : "warning"}>
               {within10 == null ? "—" : within10 ? "within 10%" : "outside 10%"}
             </StatusPill>
           </div>
+          {row.calibration_status_reason ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900">
+              {row.calibration_status_reason}
+            </div>
+          ) : null}
+          <div className="grid grid-cols-1 gap-3 border-t border-border/60 pt-3">
+            <CodeField label="Fact key" value={ledger?.fact_key} />
+            <CodeField label="Source record ID" value={ledger?.source_record_id} />
+            <CodeField label="Measure concept" value={ledger?.measure_concept} />
+            <CodeField label="Source concept" value={ledger?.source_concept} />
+            <CodeField label="Record set" value={ledger?.layout_record_set_id} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <CodeField label="Group-by dimension" value={ledger?.layout_groupby_dimension} />
+            <CodeField label="Group-by value" value={ledger?.layout_groupby_value_id} />
+            <CodeField label="Layout measure" value={ledger?.layout_measure_id} />
+            <CodeField label="Geography ID" value={ledger?.geography_id} />
+          </div>
+          {ledger?.filters?.length ? (
+            <div className="border-t border-border/60 pt-3">
+              <div className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+                Filters
+              </div>
+              <div className="grid gap-2">
+                {ledger.filters.map((filter) => (
+                  <div
+                    key={filter.key}
+                    className="grid gap-1 rounded-md border border-border/70 bg-white px-3 py-2 text-xs sm:grid-cols-[9rem_minmax(0,1fr)]"
+                  >
+                    <span className="font-medium text-muted-foreground">
+                      {filter.label}
+                    </span>
+                    <span className="break-words text-foreground" title={filter.raw_value}>
+                      {filter.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-3">

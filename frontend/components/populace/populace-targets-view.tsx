@@ -7,6 +7,7 @@ import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
+import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { PopulaceTargetDetail } from "@/components/populace/populace-target-detail";
 import {
@@ -65,7 +66,59 @@ function finalError(row: PopulaceTargetRow) {
   return fmt(row.final_error, { pct: true, digits: 1 });
 }
 
+function titleFromIdentifier(value: string | null | undefined): string {
+  if (!value) return "";
+  const leaf = value.split(/[.#:]/).filter(Boolean).at(-1) ?? value;
+  return humanizeName(leaf.replace(/[^a-zA-Z0-9]+/g, "_"));
+}
+
+function measureTitle(row: PopulaceTargetRow): string {
+  return (
+    titleFromIdentifier(row.ledger?.measure_concept) ||
+    humanizeName(row.variable as string) ||
+    titleFromIdentifier(row.ledger?.layout_measure_id) ||
+    "—"
+  );
+}
+
+function periodTitle(row: PopulaceTargetRow): string {
+  const target = row.ledger?.target_period ?? (row.period == null ? null : String(row.period));
+  const source = row.ledger?.source_period;
+  if (target && source && target !== source) return `${source} → ${target}`;
+  return target ?? source ?? "—";
+}
+
+function dimensionSummary(row: PopulaceTargetRow): string {
+  const dims = row.target_dimensions?.map((dim) => dim.value).filter(Boolean) ?? [];
+  if (dims.length) return dims.join(" · ");
+  const group = row.ledger?.layout_groupby_value_id;
+  if (group && group !== "all") return humanizeName(group);
+  return "All";
+}
+
+function calibrationStatusTone(
+  status: PopulaceTargetRow["calibration_status"],
+): "success" | "warning" | "neutral" {
+  if (status === "included") return "success";
+  if (status === "skipped" || status === "not_materialized") return "warning";
+  return "neutral";
+}
+
+const STATUS_COLUMN: Column = {
+  key: "calibration_status",
+  label: "Calibration",
+  sortable: true,
+  render: (row) => (
+    <span title={row.calibration_status_reason ?? undefined}>
+      <StatusPill tone={calibrationStatusTone(row.calibration_status)}>
+        {row.calibration_status_label ?? "Unknown"}
+      </StatusPill>
+    </span>
+  ),
+};
+
 const METRIC_COLUMNS: Column[] = [
+  STATUS_COLUMN,
   {
     key: "target",
     label: "Target",
@@ -89,21 +142,25 @@ const METRIC_COLUMNS: Column[] = [
   },
 ];
 
-// Without a variable selected: the "thing" (variable + breakdown) plus source
-// and geography. With a variable selected: one column per breakdown dimension.
+// Without a variable selected: mirror Arch aggregate_facts concepts in readable
+// form. With a variable selected: one column per breakdown dimension.
 const OVERVIEW_COLUMNS: Column[] = [
   {
-    key: "variable",
-    label: "Target",
+    key: "measure",
+    label: "Measure",
     sortable: true,
     render: (row) => (
-      <div className="max-w-md" title={String(row.name ?? "")}>
-        <div className="font-medium text-foreground">
-          {humanizeName(row.variable as string) || row.name}
+      <div className="max-w-sm" title={row.ledger?.measure_concept ?? String(row.name ?? "")}>
+        <div className="font-medium text-foreground">{measureTitle(row)}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {row.ledger?.measure_unit
+            ? row.ledger.measure_unit.toUpperCase()
+            : row.measure === "total"
+              ? "Amount"
+              : row.measure === "count"
+                ? "Count"
+                : row.measure || "—"}
         </div>
-        {row.breakdown ? (
-          <div className="truncate text-xs text-muted-foreground">{row.breakdown}</div>
-        ) : null}
       </div>
     ),
   },
@@ -111,13 +168,44 @@ const OVERVIEW_COLUMNS: Column[] = [
     key: "source",
     label: "Source",
     sortable: true,
-    render: (row) => <span className="whitespace-nowrap text-muted-foreground">{row.source}</span>,
+    render: (row) => (
+      <div className="max-w-[11rem]" title={row.ledger?.source_record_id ?? String(row.name ?? "")}>
+        <div className="font-medium text-foreground">{row.source || "—"}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {titleFromIdentifier(row.ledger?.domain)}
+        </div>
+      </div>
+    ),
+  },
+  {
+    key: "period",
+    label: "Period",
+    sortable: true,
+    render: (row) => (
+      <span className="whitespace-nowrap" title={row.ledger?.period_type ?? undefined}>
+        {periodTitle(row)}
+      </span>
+    ),
   },
   {
     key: "geography",
-    label: "Geo",
+    label: "Geography",
     sortable: true,
-    render: (row) => <span className="whitespace-nowrap">{row.geography}</span>,
+    render: (row) => (
+      <span className="whitespace-nowrap" title={row.ledger?.geography_id ?? undefined}>
+        {row.geography || "—"}
+      </span>
+    ),
+  },
+  {
+    key: "breakdown",
+    label: "Dimensions",
+    sortable: true,
+    render: (row) => (
+      <div className="max-w-md truncate" title={dimensionSummary(row)}>
+        {dimensionSummary(row)}
+      </div>
+    ),
   },
 ];
 
@@ -240,83 +328,92 @@ function VariableBrowser({
         className="h-8 w-full rounded-md border border-border bg-white px-3 text-xs focus:border-primary/60 focus:outline-none"
       />
       <div className="max-h-[65vh] overflow-y-auto rounded-md border border-border">
-        <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 bg-muted/40 backdrop-blur">
-            <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="px-3 py-2 font-semibold">Variable</th>
-              <th className="px-3 py-2 font-semibold">Measure</th>
-              <th className="px-3 py-2 text-right font-semibold">Targets</th>
-              <th className="px-3 py-2 text-right font-semibold">Within 10%</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((group) => {
-              const activeOption = group.options.find((option) => option.key === active);
-              const selectedKey = activeOption?.key ?? group.defaultKey;
-              const selectedOption =
-                group.options.find((option) => option.key === selectedKey) ?? group.options[0];
-              const selectedRow = selectedOption.row;
-              const isActive = Boolean(activeOption);
-              return (
-                <tr
-                  key={group.groupKey}
-                  onClick={() => onPick(isActive ? "" : selectedKey)}
-                  className={`cursor-pointer border-t border-border/60 ${
-                    isActive ? "bg-primary/10" : "hover:bg-muted/40"
-                  }`}
-                >
-                  <td className="px-3 py-1.5 align-top">
-                    <div className={`leading-snug ${isActive ? "font-medium text-primary" : ""}`}>
+        <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-border bg-muted/40 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
+          <span>Variable</span>
+          <span className="text-right">Targets</span>
+        </div>
+        <div className="divide-y divide-border/60">
+          {filtered.map((group) => {
+            const activeOption = group.options.find((option) => option.key === active);
+            const selectedKey = activeOption?.key ?? group.defaultKey;
+            const selectedOption =
+              group.options.find((option) => option.key === selectedKey) ?? group.options[0];
+            const selectedRow = selectedOption.row;
+            const isActive = Boolean(activeOption);
+            const within10Share = selectedRow.n_targets
+              ? selectedRow.within_10pct / selectedRow.n_targets
+              : null;
+            return (
+              <div
+                key={group.groupKey}
+                role="button"
+                tabIndex={0}
+                onClick={() => onPick(isActive ? "" : selectedKey)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onPick(isActive ? "" : selectedKey);
+                  }
+                }}
+                className={`block w-full min-w-0 cursor-pointer px-3 py-2 text-left ${
+                  isActive ? "bg-primary/10" : "hover:bg-muted/40"
+                }`}
+              >
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3">
+                  <div className="min-w-0">
+                    <div className={`truncate text-sm leading-snug ${isActive ? "font-medium text-primary" : "text-foreground"}`}>
                       {humanizeName(group.variable) || selectedRow.variable_key}
                     </div>
-                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
                       <span>{group.source}</span>
                       {group.level ? <span>{group.level}</span> : null}
                     </div>
-                  </td>
-                  <td className="px-3 py-1.5 align-top">
-                    {group.options.length > 1 ? (
-                      <div
-                        className="inline-flex rounded-md border border-border bg-white p-0.5"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        {group.options.map((option) => {
-                          const isSelected = option.key === selectedKey;
-                          return (
-                            <button
-                              key={option.key}
-                              type="button"
-                              onClick={() => onPick(option.key === active ? "" : option.key)}
-                              className={`h-6 px-2 text-[11px] font-medium ${
-                                isSelected
-                                  ? "rounded bg-primary text-primary-foreground"
-                                  : "text-muted-foreground hover:text-foreground"
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="inline-flex h-6 items-center rounded bg-muted px-2 text-[11px] font-medium text-foreground/70">
-                        {selectedOption.label}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-1.5 text-right align-top tabular-nums">
-                    {fmt(selectedRow.n_targets, { digits: 0 })}
-                  </td>
-                  <td className="px-3 py-1.5 text-right align-top tabular-nums">
-                    {selectedRow.n_targets
-                      ? fmt(selectedRow.within_10pct / selectedRow.n_targets, { pct: true, digits: 0 })
-                      : "—"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </div>
+                  <div className="shrink-0 text-right text-xs tabular-nums">
+                    <div className="font-medium text-foreground">
+                      {fmt(selectedRow.n_targets, { digits: 0 })}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {within10Share == null
+                        ? "—"
+                        : `${fmt(within10Share, { pct: true, digits: 0 })} in 10%`}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className="mt-2 flex min-w-0 flex-wrap items-center gap-1"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {group.options.length > 1 ? (
+                    <div className="inline-flex max-w-full rounded-md border border-border bg-white p-0.5">
+                      {group.options.map((option) => {
+                        const isSelected = option.key === selectedKey;
+                        return (
+                          <button
+                            key={option.key}
+                            type="button"
+                            onClick={() => onPick(option.key === active ? "" : option.key)}
+                            className={`h-6 min-w-0 px-2 text-[11px] font-medium ${
+                              isSelected
+                                ? "rounded bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span className="inline-flex h-6 items-center rounded bg-muted px-2 text-[11px] font-medium text-foreground/70">
+                      {selectedOption.label}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -326,7 +423,10 @@ export function PopulaceTargetsView() {
   const [release, setRelease] = useState("");
   const [variable, setVariable] = useState("");
   const [source, setSource] = useState("");
+  const [level, setLevel] = useState("");
+  const [geography, setGeography] = useState("");
   const [direction, setDirection] = useState("");
+  const [withinTolerance, setWithinTolerance] = useState("");
   const [search, setSearch] = useState("");
   const [facetFilters, setFacetFilters] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<PopulaceTargetRow | null>(null);
@@ -351,6 +451,10 @@ export function PopulaceTargetsView() {
     setVariable("");
     setFacetFilters({});
     setSource("");
+    setLevel("");
+    setGeography("");
+    setDirection("");
+    setWithinTolerance("");
     setSelected(null);
     setPage(0);
   }
@@ -371,22 +475,42 @@ export function PopulaceTargetsView() {
       offset: page * PAGE_SIZE,
       variable: variable || undefined,
       source: source || undefined,
+      level: level || undefined,
+      geography: geography || undefined,
       direction: direction || undefined,
+      within_tolerance: withinTolerance || undefined,
       search: debouncedSearch || undefined,
       facet: facetParam.length ? facetParam : undefined,
       sort_by: sort.by,
       sort_dir: sort.dir,
     }),
-    [release, variable, source, direction, debouncedSearch, facetParam, page, sort],
+    [
+      release,
+      variable,
+      source,
+      level,
+      geography,
+      direction,
+      withinTolerance,
+      debouncedSearch,
+      facetParam,
+      page,
+      sort,
+    ],
   );
 
   const { data, isLoading, isFetching, error } = usePopulaceTargetDiagnostics(params);
 
   const variables = data?.variables ?? [];
   const sources = data?.sources ?? [];
+  const levels = data?.levels ?? [];
+  const geographies = data?.geographies ?? [];
   const dimensions = data?.dimensions ?? [];
   const variableGroupCount = useMemo(() => groupVariables(variables).length, [variables]);
   const filteredTotal = data?.filtered_total ?? 0;
+  const includedTargetCount = data?.summary.included_target_count ?? data?.total_targets ?? null;
+  const skippedTargetCount = data?.summary.skipped_target_count ?? null;
+  const droppedTargetCount = data?.summary.dropped_target_count ?? null;
   const pageCount = Math.max(Math.ceil(filteredTotal / PAGE_SIZE), 1);
   const activeVariable = variables.find((v) => v.variable_key === variable);
   const columns = useMemo<Column[]>(
@@ -496,7 +620,7 @@ export function PopulaceTargetsView() {
                   activeVariable.within_10pct / Math.max(activeVariable.n_targets, 1),
                   { pct: true, digits: 0 },
                 )} within 10% · mean abs rel. error ${fmt(activeVariable.mean_abs_relative_error, { pct: true, digits: 1 })}`
-              : "Final estimate is the weighted aggregate after calibration. Error is relative for non-zero targets and absolute miss for zero-valued targets."
+              : `${fmt(includedTargetCount, { digits: 0 })} targets included in calibration · ${fmt(droppedTargetCount, { digits: 0 })} dropped before calibration · ${fmt(skippedTargetCount, { digits: 0 })} skipped by calibration. Final estimate is after calibrated weights.`
           }
           padded={false}
           actions={
@@ -527,22 +651,75 @@ export function PopulaceTargetsView() {
                     ]}
                   />
                 ))
-              ) : (
-                <>
-                  <ToolbarSelect
-                    label="Source"
-                    value={source}
-                    onChange={(value) => {
-                      setSource(value);
-                      setPage(0);
-                    }}
-                    options={[
-                      { value: "", label: "Any" },
-                      ...sources.map((value) => ({ value, label: value })),
-                    ]}
-                  />
-                </>
-              )}
+              ) : null}
+              <ToolbarSelect
+                label="Source"
+                value={source}
+                onChange={(value) => {
+                  setSource(value);
+                  setSelected(null);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "", label: "Any" },
+                  ...sources.map((value) => ({ value, label: value })),
+                ]}
+              />
+              <ToolbarSelect
+                label="Level"
+                value={level}
+                onChange={(value) => {
+                  setLevel(value);
+                  setSelected(null);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "", label: "Any" },
+                  ...levels.map((value) => ({ value, label: value })),
+                ]}
+              />
+              <ToolbarSelect
+                label="Geography"
+                value={geography}
+                onChange={(value) => {
+                  setGeography(value);
+                  setSelected(null);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "", label: "Any" },
+                  ...geographies.map((value) => ({ value, label: value })),
+                ]}
+              />
+              <ToolbarSelect
+                label="Fit"
+                value={withinTolerance}
+                onChange={(value) => {
+                  setWithinTolerance(value);
+                  setSelected(null);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "", label: "Any" },
+                  { value: "true", label: "Within tolerance" },
+                  { value: "false", label: "Outside tolerance" },
+                ]}
+              />
+              <ToolbarSelect
+                label="Direction"
+                value={direction}
+                onChange={(value) => {
+                  setDirection(value);
+                  setSelected(null);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "", label: "Any" },
+                  { value: "under", label: "Under target" },
+                  { value: "over", label: "Over target" },
+                  { value: "exact", label: "Exact" },
+                ]}
+              />
             </div>
           }
           footer={
