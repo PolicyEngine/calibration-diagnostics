@@ -42,6 +42,10 @@ export interface PopulaceTargetRow {
   error_kind?: "relative" | "absolute" | null;
   initial_error?: number | null;
   final_error?: number | null;
+  initial_miss?: number | null;
+  final_miss?: number | null;
+  abs_final_miss?: number | null;
+  absolute_improvement?: number | null;
   abs_error?: number | null;
   breakdown?: string | null;
   dims?: string[] | null;
@@ -205,6 +209,12 @@ export interface PopulaceResponse {
   highlights: {
     worst_fit: PopulaceTargetRow[];
     biggest_improvements: PopulaceTargetRow[];
+    worst_bounded_relative_fit?: PopulaceTargetRow[];
+    extreme_relative_outliers?: PopulaceTargetRow[];
+    extreme_relative_outlier_count?: number;
+    largest_absolute_misses?: PopulaceTargetRow[];
+    biggest_relative_improvements?: PopulaceTargetRow[];
+    biggest_absolute_improvements?: PopulaceTargetRow[];
   };
 }
 
@@ -251,6 +261,14 @@ export interface PopulaceComparisonRow {
   measure?: string | null;
   level?: string | null;
   breakdown?: string | null;
+  dims?: string[] | null;
+  target_dimensions?: {
+    key: string;
+    label: string;
+    value: string;
+    source_key?: string;
+    raw_value?: string;
+  }[] | null;
   geography?: string | null;
   a_target?: number | null;
   b_target?: number | null;

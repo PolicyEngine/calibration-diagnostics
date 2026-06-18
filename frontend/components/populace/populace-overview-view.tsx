@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtCompact, fmtMoney, humanizeName, releaseLabel } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -41,10 +41,41 @@ function targetLabel(row: PopulaceTargetRow): string {
   return [
     row.geography,
     row.variable ? humanizeName(row.variable) : null,
-    row.breakdown,
   ]
     .filter(Boolean)
     .join(" · ") || String(row.name ?? "");
+}
+
+function measureLabel(row: PopulaceTargetRow): string {
+  if (!row.measure || row.measure === "total") return "amount";
+  if (row.measure === "count") return "count";
+  return humanizeName(row.measure).toLowerCase();
+}
+
+function dimensionLabel(row: PopulaceTargetRow): string {
+  const parts =
+    row.breakdown
+      ?.split(" · ")
+      .map((part) => part.trim())
+      .filter((part) => part && part !== "All" && part !== "Total") ?? [];
+  return parts.length ? parts.join(" · ") : "overall";
+}
+
+function formatTargetValue(row: PopulaceTargetRow, value: number | null | undefined): string {
+  const unit = row.ledger?.measure_unit?.toLowerCase();
+  if (unit === "usd") return fmtMoney(value);
+  return fmtCompact(value);
+}
+
+function fmtPointReduction(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${(value * 100).toFixed(1)} pp`;
+}
+
+function signedTargetValue(row: PopulaceTargetRow, value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+  return `${sign}${formatTargetValue(row, Math.abs(value))}`;
 }
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
@@ -279,44 +310,116 @@ function LossDevelopmentChart({
   );
 }
 
-function TargetFitTable({
+function HighlightChip({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "positive" | "negative" | "neutral";
+}) {
+  const toneClass =
+    tone === "positive"
+      ? "text-emerald-700"
+      : tone === "negative"
+        ? "text-rose-700"
+        : "text-foreground";
+  return (
+    <div className="grid min-w-0 gap-0.5 rounded border border-border bg-white px-2 py-1">
+      <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <span className={`truncate font-mono text-xs font-semibold tabular-nums ${toneClass}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function HighlightList({
   rows,
   emptyLabel,
+  mode,
 }: {
   rows: PopulaceTargetRow[];
   emptyLabel: string;
+  mode: "relative_miss" | "absolute_miss" | "relative_improvement" | "absolute_improvement";
 }) {
   if (!rows.length) return <EmptyState title={emptyLabel} variant="compact" />;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-            <th className="px-3 py-2 font-semibold">Target</th>
-            <th className="px-3 py-2 font-semibold">Source</th>
-            <th className="px-3 py-2 text-right font-semibold">Initial error</th>
-            <th className="px-3 py-2 text-right font-semibold">Final error</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.name} className="border-b border-border/60 last:border-b-0">
-              <td className="max-w-md truncate px-3 py-1.5" title={String(row.name ?? "")}>
+    <div className="divide-y divide-border/60 rounded-md border border-border">
+      {rows.map((row) => (
+        <div
+          key={row.name}
+          className="grid gap-2 px-3 py-2.5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center"
+        >
+          <div className="min-w-0 pr-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="truncate text-sm font-medium text-foreground" title={String(row.name ?? "")}>
                 {targetLabel(row)}
-              </td>
-              <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">
-                {row.source}
-              </td>
-              <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                {targetError(row, "initial")}
-              </td>
-              <td className="px-3 py-1.5 text-right tabular-nums">
-                {targetError(row, "final")}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </div>
+            </div>
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+              <span>{row.source || "source"}</span>
+              <span>·</span>
+              <span>{measureLabel(row)}</span>
+              <span>·</span>
+              <span className="truncate">{dimensionLabel(row)}</span>
+            </div>
+          </div>
+          <div className="grid min-w-0 grid-cols-3 gap-1.5 xl:w-[20rem]">
+            {mode === "relative_miss" ? (
+              <>
+                <HighlightChip label="Target" value={formatTargetValue(row, row.target)} />
+                <HighlightChip label="Final" value={formatTargetValue(row, row.final_estimate)} />
+                <HighlightChip label="Diff" value={signedTargetValue(row, row.final_miss)} tone="negative" />
+              </>
+            ) : mode === "absolute_miss" ? (
+              <>
+                <HighlightChip label="Target" value={formatTargetValue(row, row.target)} />
+                <HighlightChip label="Final" value={formatTargetValue(row, row.final_estimate)} />
+                <HighlightChip label="Diff" value={signedTargetValue(row, row.final_miss)} tone="negative" />
+              </>
+            ) : mode === "relative_improvement" ? (
+              <>
+                <HighlightChip label="Initial diff" value={signedTargetValue(row, row.initial_miss)} />
+                <HighlightChip label="Final diff" value={signedTargetValue(row, row.final_miss)} />
+                <HighlightChip label="Gain" value={fmtPointReduction(row.improvement)} tone="positive" />
+              </>
+            ) : (
+              <>
+                <HighlightChip
+                  label="Initial diff"
+                  value={signedTargetValue(row, row.initial_miss)}
+                />
+                <HighlightChip label="Final diff" value={signedTargetValue(row, row.final_miss)} />
+                <HighlightChip label="Gain" value={formatTargetValue(row, row.absolute_improvement)} tone="positive" />
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HighlightPanel({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="mb-2">
+        <div className="text-sm font-semibold text-foreground">{title}</div>
+        <div className="text-xs leading-snug text-muted-foreground">{description}</div>
+      </div>
+      {children}
     </div>
   );
 }
@@ -521,28 +624,60 @@ export function PopulaceOverviewView() {
         </div>
       </SectionCard>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <SectionCard
-          title="Largest target errors"
-          description="Percentage error for non-zero targets; absolute miss for zero-valued targets."
-          padded={false}
-        >
-          <TargetFitTable
-            rows={data.highlights?.worst_fit ?? []}
-            emptyLabel="No targets recorded."
-          />
-        </SectionCard>
-        <SectionCard
-          title="Biggest calibration improvements"
-          description="Largest reduction in error from the initial weights."
-          padded={false}
-        >
-          <TargetFitTable
-            rows={data.highlights?.biggest_improvements ?? []}
-            emptyLabel="No targets recorded."
-          />
-        </SectionCard>
-      </div>
+      <SectionCard
+        title="Target fit highlights"
+        description="Separate views of remaining fit problems and calibration gains. Rows focus on target, final estimate, and signed difference in the target's own unit."
+      >
+        {data.highlights?.extreme_relative_outlier_count ? (
+          <div className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900">
+            {fmt(data.highlights.extreme_relative_outlier_count, { digits: 0 })} extreme
+            percent-error outliers above 1000% are excluded from the bounded percent
+            lists below. They remain available in Target diagnostics.
+          </div>
+        ) : null}
+        <div className="grid gap-6 xl:grid-cols-2">
+          <HighlightPanel
+            title="Worst bounded percent fit"
+            description="Largest final percent errors among non-zero targets, shown as target to final estimate to signed diff."
+          >
+            <HighlightList
+              rows={(data.highlights?.worst_bounded_relative_fit ?? data.highlights?.worst_fit ?? []).slice(0, 8)}
+              emptyLabel="No bounded percent-error targets recorded."
+              mode="relative_miss"
+            />
+          </HighlightPanel>
+          <HighlightPanel
+            title="Largest absolute misses"
+            description="Largest final gaps between target and calibrated estimate, in dollars or counts."
+          >
+            <HighlightList
+              rows={(data.highlights?.largest_absolute_misses ?? []).slice(0, 8)}
+              emptyLabel="No absolute misses recorded."
+              mode="absolute_miss"
+            />
+          </HighlightPanel>
+          <HighlightPanel
+            title="Best percent-error reductions"
+            description="Largest reductions in percent error; chips show how the signed miss changed."
+          >
+            <HighlightList
+              rows={(data.highlights?.biggest_relative_improvements ?? data.highlights?.biggest_improvements ?? []).slice(0, 8)}
+              emptyLabel="No percent-error improvements recorded."
+              mode="relative_improvement"
+            />
+          </HighlightPanel>
+          <HighlightPanel
+            title="Largest absolute-miss reductions"
+            description="Largest reductions in dollar or count miss from initial weights to calibrated weights."
+          >
+            <HighlightList
+              rows={(data.highlights?.biggest_absolute_improvements ?? []).slice(0, 8)}
+              emptyLabel="No absolute-miss improvements recorded."
+              mode="absolute_improvement"
+            />
+          </HighlightPanel>
+        </div>
+      </SectionCard>
 
       <SectionCard
         title="Release artifacts"

@@ -18,6 +18,11 @@ import {
 const MAX_MOVER_REL_ERROR = 10; // Keep the compare summary to bounded relative errors (<= 1000%).
 const TARGET_COMPARE_PAGE_SIZE = 100;
 
+interface CompareSortState {
+  by: string;
+  dir: "asc" | "desc";
+}
+
 function relErr(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
 }
@@ -66,9 +71,9 @@ function targetLabel(row: PopulaceComparisonRow) {
 }
 
 function measureLabel(measure: string | null | undefined): string {
-  if (!measure || measure === "total") return "Amount";
-  if (measure === "count") return "Count";
-  return humanizeName(measure);
+  if (!measure || measure === "total") return "amount";
+  if (measure === "count") return "count";
+  return humanizeName(measure).toLowerCase();
 }
 
 function fmtPointDelta(value: number | null | undefined) {
@@ -77,16 +82,13 @@ function fmtPointDelta(value: number | null | undefined) {
   return `${sign}${Math.abs(value * 100).toFixed(1)} pp`;
 }
 
-function fmtPointMagnitude(value: number) {
-  return `${Math.abs(value * 100).toFixed(1)} pp`;
-}
-
-function fitChangeLabel(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  if (Math.abs(value) < 1e-9) return "unchanged";
-  return value < 0
-    ? `better by ${fmtPointMagnitude(value)}`
-    : `worse by ${fmtPointMagnitude(value)}`;
+function comparisonDimensionLabel(row: PopulaceComparisonRow): string {
+  const parts =
+    row.breakdown
+      ?.split(" · ")
+      .map((part) => part.trim())
+      .filter((part) => part && part !== "All" && part !== "Total") ?? [];
+  return parts.length ? parts.join(" · ") : "overall";
 }
 
 function targetSearchText(row: PopulaceComparisonRow) {
@@ -106,11 +108,76 @@ function targetSearchText(row: PopulaceComparisonRow) {
     .toLowerCase();
 }
 
+function uniqueSorted(values: (string | null | undefined)[]): string[] {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))]
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function dimensionValue(row: PopulaceComparisonRow, label: string): string | null {
+  const dim = row.target_dimensions?.find((entry) => entry.label === label);
+  if (dim?.value) return dim.value;
+  return null;
+}
+
+function dimensionFilters(rows: PopulaceComparisonRow[]) {
+  const byLabel = new Map<string, Set<string>>();
+  for (const row of rows) {
+    for (const dim of row.target_dimensions ?? []) {
+      if (!dim.label || !dim.value || dim.value === "All") continue;
+      const values = byLabel.get(dim.label) ?? new Set<string>();
+      values.add(dim.value);
+      byLabel.set(dim.label, values);
+    }
+  }
+  return [...byLabel.entries()]
+    .filter(([, values]) => values.size > 1)
+    .map(([label, values]) => ({
+      label,
+      values: [...values].sort((a, b) => {
+        if (a === "Total") return -1;
+        if (b === "Total") return 1;
+        return a.localeCompare(b, undefined, { numeric: true });
+      }),
+    }))
+    .sort((a, b) => b.values.length - a.values.length || a.label.localeCompare(b.label));
+}
+
+function compareSortValue(row: PopulaceComparisonRow, key: string): string | number | null {
+  switch (key) {
+    case "source":
+      return row.source ?? null;
+    case "measure":
+      return row.variable ?? row.variable_key ?? null;
+    case "geography":
+      return row.geography ?? null;
+    case "breakdown":
+      return row.breakdown ?? row.target_label ?? null;
+    case "target":
+      return row.b_target ?? row.a_target ?? null;
+    case "a_final":
+      return row.a_final_estimate ?? null;
+    case "b_final":
+      return row.b_final_estimate ?? null;
+    case "a_error":
+      return row.a_error == null ? null : Math.abs(row.a_error);
+    case "b_error":
+      return row.b_error == null ? null : Math.abs(row.b_error);
+    case "abs_rel_delta":
+      return row.abs_rel_delta ?? null;
+    default:
+      return null;
+  }
+}
+
 function comparisonTargetValue(row: PopulaceComparisonRow) {
   if (row.a_target != null && row.b_target != null && row.a_target !== row.b_target) {
     return `${fmtCompact(row.a_target)} → ${fmtCompact(row.b_target)}`;
   }
   return fmtCompact(row.b_target ?? row.a_target);
+}
+
+function formatCompareValue(value: number | null | undefined): string {
+  return fmtCompact(value);
 }
 
 function isBoundedRelativeMover(row: PopulaceComparisonRow) {
@@ -124,29 +191,65 @@ function isBoundedRelativeMover(row: PopulaceComparisonRow) {
   );
 }
 
+function CompareChip({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "positive" | "negative" | "neutral";
+}) {
+  const toneClass =
+    tone === "positive"
+      ? "text-emerald-700"
+      : tone === "negative"
+        ? "text-rose-700"
+        : "text-foreground";
+  return (
+    <div className="grid min-w-0 gap-0.5 rounded border border-border bg-white px-2 py-1">
+      <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <span className={`truncate font-mono text-xs font-semibold tabular-nums ${toneClass}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function MoverList({ rows }: { rows: PopulaceComparisonRow[] }) {
   if (!rows.length) return <EmptyState title="No common targets to compare." variant="compact" />;
   return (
-    <div className="divide-y divide-border/60">
+    <div className="divide-y divide-border/60 rounded-md border border-border">
       {rows.map((row) => {
         const improved = (row.abs_rel_delta ?? 0) < 0;
         return (
-          <div key={row.name} className="grid gap-1 px-3 py-2">
-            <div className="min-w-0">
+          <div
+            key={row.name}
+            className="grid gap-2 px-3 py-2.5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center"
+          >
+            <div className="min-w-0 pr-2">
               <div className="truncate text-sm font-medium text-foreground" title={row.name}>
                 {targetLabel(row)}
               </div>
-              <div className="truncate text-xs text-muted-foreground">
-                {row.variable ? humanizeName(row.variable as string) : row.variable_key}
+              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+                <span>{row.source || "source"}</span>
+                <span>·</span>
+                <span>{measureLabel(row.measure)}</span>
+                <span>·</span>
+                <span className="truncate">{comparisonDimensionLabel(row)}</span>
               </div>
             </div>
-            <div className="flex items-center justify-between gap-3 text-xs tabular-nums">
-              <span className="text-muted-foreground">
-                A {errorValue(row, "a")} · B {errorValue(row, "b")}
-              </span>
-              <span className={improved ? "text-emerald-700" : "text-rose-700"}>
-                |err| {fitChangeLabel(row.abs_rel_delta)}
-              </span>
+            <div className="grid min-w-0 grid-cols-4 gap-1.5 xl:w-[24rem]">
+              <CompareChip label="Target" value={comparisonTargetValue(row)} />
+              <CompareChip label="A final" value={formatCompareValue(row.a_final_estimate)} />
+              <CompareChip label="B final" value={formatCompareValue(row.b_final_estimate)} />
+              <CompareChip
+                label="Fit change"
+                value={fmtPointDelta(row.abs_rel_delta)}
+                tone={improved ? "positive" : "negative"}
+              />
             </div>
           </div>
         );
@@ -157,11 +260,51 @@ function MoverList({ rows }: { rows: PopulaceComparisonRow[] }) {
 
 function TargetComparisonTable({ rows }: { rows: PopulaceComparisonRow[] }) {
   const [query, setQuery] = useState("");
+  const [source, setSource] = useState("");
+  const [measure, setMeasure] = useState("");
+  const [geography, setGeography] = useState("");
+  const [fit, setFit] = useState("");
+  const [direction, setDirection] = useState("");
+  const [facets, setFacets] = useState<Record<string, string>>({});
+  const [sort, setSort] = useState<CompareSortState>({ by: "abs_rel_delta", dir: "asc" });
   const [page, setPage] = useState(0);
+  const sources = useMemo(() => uniqueSorted(rows.map((row) => row.source)), [rows]);
+  const measures = useMemo(
+    () => uniqueSorted(rows.map((row) => row.variable ?? row.variable_key)),
+    [rows],
+  );
+  const geographies = useMemo(() => uniqueSorted(rows.map((row) => row.geography)), [rows]);
+  const dimensions = useMemo(() => dimensionFilters(rows), [rows]);
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return needle ? rows.filter((row) => targetSearchText(row).includes(needle)) : rows;
-  }, [rows, query]);
+    const result = rows.filter((row) => {
+      if (needle && !targetSearchText(row).includes(needle)) return false;
+      if (source && row.source !== source) return false;
+      if (measure && (row.variable ?? row.variable_key) !== measure) return false;
+      if (geography && row.geography !== geography) return false;
+      if (fit === "improved" && !((row.abs_rel_delta ?? 0) < 0)) return false;
+      if (fit === "regressed" && !((row.abs_rel_delta ?? 0) > 0)) return false;
+      if (fit === "unchanged" && Math.abs(row.abs_rel_delta ?? Infinity) > 1e-9) return false;
+      if (direction === "under" && !((row.b_error ?? 0) < 0)) return false;
+      if (direction === "over" && !((row.b_error ?? 0) > 0)) return false;
+      if (direction === "exact" && Math.abs(row.b_error ?? Infinity) > 1e-9) return false;
+      return Object.entries(facets).every(
+        ([label, value]) => !value || dimensionValue(row, label) === value,
+      );
+    });
+    return [...result].sort((aRow, bRow) => {
+      const aValue = compareSortValue(aRow, sort.by);
+      const bValue = compareSortValue(bRow, sort.by);
+      const directionMultiplier = sort.dir === "asc" ? 1 : -1;
+      if (aValue == null && bValue == null) return 0;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return (aValue - bValue) * directionMultiplier;
+      }
+      return String(aValue).localeCompare(String(bValue)) * directionMultiplier;
+    });
+  }, [rows, query, source, measure, geography, fit, direction, facets, sort]);
   const pageCount = Math.max(Math.ceil(filtered.length / TARGET_COMPARE_PAGE_SIZE), 1);
   const pageRows = filtered.slice(
     page * TARGET_COMPARE_PAGE_SIZE,
@@ -170,36 +313,137 @@ function TargetComparisonTable({ rows }: { rows: PopulaceComparisonRow[] }) {
 
   useEffect(() => {
     setPage(0);
-  }, [query, rows]);
+  }, [query, rows, source, measure, geography, fit, direction, facets, sort]);
+
+  function setFacet(label: string, value: string) {
+    setFacets((current) => {
+      const next = { ...current };
+      if (value) next[label] = value;
+      else delete next[label];
+      return next;
+    });
+  }
+
+  function toggleSort(key: string) {
+    setSort((current) =>
+      current.by === key
+        ? { by: key, dir: current.dir === "asc" ? "desc" : "asc" }
+        : { by: key, dir: key === "abs_rel_delta" ? "asc" : "desc" },
+    );
+  }
+
+  function sortableHeader(key: string, label: string, align: "left" | "right" = "left") {
+    return (
+      <th className={`px-3 py-2 font-semibold ${align === "right" ? "text-right" : ""}`}>
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-foreground ${
+            align === "right" ? "justify-end" : ""
+          }`}
+        >
+          {label}
+          {sort.by === key ? (sort.dir === "desc" ? "↓" : "↑") : ""}
+        </button>
+      </th>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <input
-          type="search"
-          value={query}
-          placeholder="Search targets or variables…"
-          onChange={(event) => setQuery(event.target.value)}
-          className="h-8 w-full max-w-xs rounded-md border border-border bg-white px-3 text-xs focus:border-primary/60 focus:outline-none"
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+        <label className="grid min-w-0 gap-1">
+          <span className="truncate text-xs font-medium text-muted-foreground">Search</span>
+          <input
+            type="search"
+            value={query}
+            placeholder="Search targets or variables…"
+            onChange={(event) => setQuery(event.target.value)}
+            className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus:border-primary/60 focus:outline-none"
+          />
+        </label>
+        <ToolbarSelect
+          label="Source"
+          value={source}
+          onChange={setSource}
+          options={[{ value: "", label: "Any" }, ...sources.map((value) => ({ value, label: value }))]}
+          layout="stacked"
+          className="w-full"
         />
-        <div className="text-xs text-muted-foreground">
-          {fmt(filtered.length, { digits: 0 })} of {fmt(rows.length, { digits: 0 })} common targets
-        </div>
+        <ToolbarSelect
+          label="Measure"
+          value={measure}
+          onChange={setMeasure}
+          options={[{ value: "", label: "Any" }, ...measures.map((value) => ({ value, label: humanizeName(value) }))]}
+          layout="stacked"
+          className="w-full"
+        />
+        <ToolbarSelect
+          label="Geography"
+          value={geography}
+          onChange={setGeography}
+          options={[{ value: "", label: "Any" }, ...geographies.map((value) => ({ value, label: value }))]}
+          layout="stacked"
+          className="w-full"
+        />
+        <ToolbarSelect
+          label="Fit"
+          value={fit}
+          onChange={setFit}
+          options={[
+            { value: "", label: "Any" },
+            { value: "improved", label: "Improved" },
+            { value: "regressed", label: "Regressed" },
+            { value: "unchanged", label: "Unchanged" },
+          ]}
+          layout="stacked"
+          className="w-full"
+        />
+        <ToolbarSelect
+          label="Direction"
+          value={direction}
+          onChange={setDirection}
+          options={[
+            { value: "", label: "Any" },
+            { value: "under", label: "B under target" },
+            { value: "over", label: "B over target" },
+            { value: "exact", label: "B exact" },
+          ]}
+          layout="stacked"
+          className="w-full"
+        />
+        {dimensions.map((dim) => (
+          <ToolbarSelect
+            key={dim.label}
+            label={dim.label}
+            value={facets[dim.label] ?? ""}
+            onChange={(value) => setFacet(dim.label, value)}
+            options={[
+              { value: "", label: "Any" },
+              ...dim.values.map((value) => ({ value, label: value.replace(/^AGI in /, "") })),
+            ]}
+            layout="stacked"
+            className="w-full"
+          />
+        ))}
+      </div>
+      <div className="text-xs text-muted-foreground">
+        {fmt(filtered.length, { digits: 0 })} of {fmt(rows.length, { digits: 0 })} common targets
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="px-3 py-2 font-semibold">Source</th>
-              <th className="px-3 py-2 font-semibold">Measure</th>
-              <th className="px-3 py-2 font-semibold">Geography</th>
-              <th className="px-3 py-2 font-semibold">Dimensions</th>
-              <th className="px-3 py-2 text-right font-semibold">Target</th>
-              <th className="px-3 py-2 text-right font-semibold">A est.</th>
-              <th className="px-3 py-2 text-right font-semibold">B est.</th>
-              <th className="px-3 py-2 text-right font-semibold">A err</th>
-              <th className="px-3 py-2 text-right font-semibold">B err</th>
-              <th className="px-3 py-2 text-right font-semibold">|err| change</th>
+              {sortableHeader("source", "Source")}
+              {sortableHeader("measure", "Measure")}
+              {sortableHeader("geography", "Geography")}
+              {sortableHeader("breakdown", "Dimensions")}
+              {sortableHeader("target", "Target", "right")}
+              {sortableHeader("a_final", "A est.", "right")}
+              {sortableHeader("b_final", "B est.", "right")}
+              {sortableHeader("a_error", "A err", "right")}
+              {sortableHeader("b_error", "B err", "right")}
+              {sortableHeader("abs_rel_delta", "|err| change", "right")}
             </tr>
           </thead>
           <tbody>
