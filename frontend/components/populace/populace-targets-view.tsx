@@ -565,18 +565,20 @@ export function PopulaceTargetsView() {
 
   const targetFilters = (
     <div className="border-b border-border bg-white px-4 py-3">
-      <div className="grid gap-3 xl:grid-cols-[minmax(220px,320px)_minmax(0,1fr)]">
-        <input
-          type="search"
-          value={search}
-          placeholder="Search targets…"
-          onChange={(event) => {
-            setSearch(event.target.value);
-            setPage(0);
-          }}
-          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus:border-primary/60 focus:outline-none"
-        />
-        <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+        <label className="grid min-w-0 gap-1">
+          <span className="truncate text-xs font-medium text-muted-foreground">Search</span>
+          <input
+            type="search"
+            value={search}
+            placeholder="Search targets…"
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(0);
+            }}
+            className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus:border-primary/60 focus:outline-none"
+          />
+        </label>
           {activeVariable ? (
             dimensions.map((dim) => (
               <ToolbarSelect
@@ -677,7 +679,6 @@ export function PopulaceTargetsView() {
             className="w-full"
             layout="stacked"
           />
-        </div>
       </div>
     </div>
   );

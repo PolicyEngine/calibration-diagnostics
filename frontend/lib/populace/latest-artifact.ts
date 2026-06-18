@@ -807,13 +807,21 @@ function enrichTargetRow(
   const errorKind = target === 0 ? "absolute" : "relative";
   const rawFinalError = numberOrNull(row.relative_error) ?? relativeError(final, target);
   const rawInitialError = relativeError(initial, target);
+  const initialMiss = initial != null && target != null ? initial - target : null;
+  const finalMiss = final != null && target != null ? final - target : null;
+  const absInitialMiss = initialMiss == null ? null : Math.abs(initialMiss);
+  const absFinalMiss = finalMiss == null ? null : Math.abs(finalMiss);
+  const absoluteImprovement =
+    absInitialMiss == null || absFinalMiss == null
+      ? null
+      : absInitialMiss - absFinalMiss;
   const initialError =
     errorKind === "absolute" && initial != null && target != null
-      ? initial - target
+      ? initialMiss
       : rawInitialError;
   const finalError =
     errorKind === "absolute" && final != null && target != null
-      ? final - target
+      ? finalMiss
       : rawFinalError;
   const absFinalError = finalError == null ? null : Math.abs(finalError);
   const improvement =
@@ -857,6 +865,10 @@ function enrichTargetRow(
     error_kind: errorKind,
     initial_error: initialError,
     final_error: finalError,
+    initial_miss: initialMiss,
+    final_miss: finalMiss,
+    abs_final_miss: absFinalMiss,
+    absolute_improvement: absoluteImprovement,
     abs_error: absFinalError,
     breakdown,
     dims,
@@ -1254,6 +1266,10 @@ function targetResponseRow(row: TargetRow): TargetRow {
     error_kind: row.error_kind,
     initial_error: row.initial_error,
     final_error: row.final_error,
+    initial_miss: row.initial_miss,
+    final_miss: row.final_miss,
+    abs_final_miss: row.abs_final_miss,
+    absolute_improvement: row.absolute_improvement,
     abs_error: row.abs_error,
     breakdown: row.breakdown,
     dims: row.dims,
@@ -1304,24 +1320,78 @@ export function latestPopulaceCalibrationSummary(cal: Calibration) {
   };
 }
 
-function worstFit(rows: TargetRow[], limit: number): TargetRow[] {
+const EXTREME_RELATIVE_ERROR_THRESHOLD = 10; // 1000%; usually tiny-denominator artifacts.
+
+function worstBoundedRelativeFit(rows: TargetRow[], limit: number): TargetRow[] {
   return [...rows]
-    .filter((row) => numberOrNull(row.abs_relative_error) != null)
+    .filter((row) => {
+      const error = numberOrNull(row.abs_relative_error);
+      return error != null && error <= EXTREME_RELATIVE_ERROR_THRESHOLD;
+    })
     .sort((a, b) => (numberOrNull(b.abs_relative_error) ?? 0) - (numberOrNull(a.abs_relative_error) ?? 0))
     .slice(0, limit);
 }
 
-function biggestImprovements(rows: TargetRow[], limit: number): TargetRow[] {
+function extremeRelativeOutliers(rows: TargetRow[], limit: number): TargetRow[] {
   return [...rows]
-    .filter((row) => numberOrNull(row.improvement) != null)
+    .filter((row) => {
+      const error = numberOrNull(row.abs_relative_error);
+      return error != null && error > EXTREME_RELATIVE_ERROR_THRESHOLD;
+    })
+    .sort((a, b) => (numberOrNull(b.abs_relative_error) ?? 0) - (numberOrNull(a.abs_relative_error) ?? 0))
+    .slice(0, limit);
+}
+
+function largestAbsoluteMisses(rows: TargetRow[], limit: number): TargetRow[] {
+  return [...rows]
+    .filter((row) => numberOrNull(row.abs_final_miss) != null)
+    .sort((a, b) => (numberOrNull(b.abs_final_miss) ?? 0) - (numberOrNull(a.abs_final_miss) ?? 0))
+    .slice(0, limit);
+}
+
+function biggestRelativeImprovements(rows: TargetRow[], limit: number): TargetRow[] {
+  return [...rows]
+    .filter((row) => {
+      const improvement = numberOrNull(row.improvement);
+      const initial = numberOrNull(row.initial_relative_error);
+      const final = numberOrNull(row.abs_relative_error);
+      return (
+        improvement != null &&
+        improvement > 0 &&
+        initial != null &&
+        final != null &&
+        Math.abs(initial) <= EXTREME_RELATIVE_ERROR_THRESHOLD &&
+        final <= EXTREME_RELATIVE_ERROR_THRESHOLD
+      );
+    })
     .sort((a, b) => (numberOrNull(b.improvement) ?? 0) - (numberOrNull(a.improvement) ?? 0))
     .slice(0, limit);
 }
 
+function biggestAbsoluteImprovements(rows: TargetRow[], limit: number): TargetRow[] {
+  return [...rows]
+    .filter((row) => {
+      const improvement = numberOrNull(row.absolute_improvement);
+      return improvement != null && improvement > 0;
+    })
+    .sort((a, b) => (numberOrNull(b.absolute_improvement) ?? 0) - (numberOrNull(a.absolute_improvement) ?? 0))
+    .slice(0, limit);
+}
+
 export function latestPopulaceCalibrationHighlights(cal: Calibration, limit = 15) {
+  const extremeOutliers = extremeRelativeOutliers(cal.rows, limit);
   return {
-    worst_fit: worstFit(cal.rows, limit),
-    biggest_improvements: biggestImprovements(cal.rows, limit),
+    worst_fit: worstBoundedRelativeFit(cal.rows, limit),
+    biggest_improvements: biggestRelativeImprovements(cal.rows, limit),
+    worst_bounded_relative_fit: worstBoundedRelativeFit(cal.rows, limit),
+    extreme_relative_outliers: extremeOutliers,
+    extreme_relative_outlier_count: cal.rows.filter((row) => {
+      const error = numberOrNull(row.abs_relative_error);
+      return error != null && error > EXTREME_RELATIVE_ERROR_THRESHOLD;
+    }).length,
+    largest_absolute_misses: largestAbsoluteMisses(cal.rows, limit),
+    biggest_relative_improvements: biggestRelativeImprovements(cal.rows, limit),
+    biggest_absolute_improvements: biggestAbsoluteImprovements(cal.rows, limit),
   };
 }
 
@@ -1525,6 +1595,8 @@ export function buildComparison(a: Calibration, b: Calibration) {
         measure: br.measure ?? ar.measure,
         level: br.level ?? ar.level,
         breakdown: br.breakdown ?? ar.breakdown,
+        dims: br.dims ?? ar.dims,
+        target_dimensions: br.target_dimensions ?? ar.target_dimensions,
         geography: br.geography ?? ar.geography,
         a_target: numberOrNull(ar.target),
         b_target: numberOrNull(br.target),

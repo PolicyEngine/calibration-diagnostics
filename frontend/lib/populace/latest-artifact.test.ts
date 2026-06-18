@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import {
   buildCalibration,
   buildComparison,
+  latestPopulaceCalibrationHighlights,
   latestPopulaceCalibrationSummary,
   latestPopulaceTargetDiagnosticsPage,
   type Calibration,
@@ -130,6 +131,55 @@ test("calibration summary reports per-family fit", () => {
   expect(summary.family_fit.length).toBeGreaterThan(0);
 });
 
+test("release highlights split bounded percent fit from absolute miss magnitude", () => {
+  const cal = calibration([
+    {
+      name: "source.us.total.relative-bounded@2024",
+      target_name: "source.us.total.relative-bounded",
+      target: 100,
+      initial_estimate: 1000,
+      final_estimate: 900,
+      relative_error: 8,
+      within_tolerance: false,
+    },
+    {
+      name: "source.us.total.relative-extreme@2024",
+      target_name: "source.us.total.relative-extreme",
+      target: 1,
+      initial_estimate: 120,
+      final_estimate: 100,
+      relative_error: 99,
+      within_tolerance: false,
+    },
+    {
+      name: "source.us.total.absolute-large@2024",
+      target_name: "source.us.total.absolute-large",
+      target: 1_000_000_000,
+      initial_estimate: 1_600_000_000,
+      final_estimate: 1_400_000_000,
+      relative_error: 0.4,
+      within_tolerance: false,
+    },
+  ]);
+  const highlights = latestPopulaceCalibrationHighlights(cal, 10);
+
+  expect(highlights.extreme_relative_outlier_count).toBe(1);
+  expect(highlights.worst_bounded_relative_fit.map((row) => row.base_name)).toContain(
+    "source.us.total.relative-bounded",
+  );
+  expect(highlights.worst_bounded_relative_fit.map((row) => row.base_name)).not.toContain(
+    "source.us.total.relative-extreme",
+  );
+  expect(highlights.extreme_relative_outliers[0].base_name).toBe(
+    "source.us.total.relative-extreme",
+  );
+  expect(highlights.largest_absolute_misses[0].base_name).toBe(
+    "source.us.total.absolute-large",
+  );
+  expect(highlights.largest_absolute_misses[0].abs_final_miss).toBe(400_000_000);
+  expect(highlights.biggest_absolute_improvements[0].absolute_improvement).toBe(200_000_000);
+});
+
 test("calibration inclusion status uses skipped and dropped metadata", () => {
   const cal = buildCalibration(
     {
@@ -192,6 +242,7 @@ test("comparison matches on base_name across the @period boundary", () => {
   expect(cmp.variables[0].relative_targets).toBe(2);
   expect(cmp.variables[0].improved).toBe(1);
   expect(cmp.variables[0].regressed).toBe(1);
+  expect(Array.isArray(cmp.rows[0].target_dimensions)).toBe(true);
 });
 
 test("new target loss weighting metadata marks loss as normalized", () => {
