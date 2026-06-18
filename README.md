@@ -24,6 +24,9 @@ separate service layer — the Next.js API routes are the API layer.
 - **Compare versions** (`/populace/compare`) — diff two releases: targets matched
   by name, common targets get a fit change, and added/removed targets are
   surfaced.
+- **Staging runs** (`/populace/staging`) — monitor pre-release Populace build
+  runs from the staging Hub repo: current stage, calibration loss progress,
+  final candidate diagnostics once uploaded, and candidate-vs-latest fit.
 
 ## API
 
@@ -35,6 +38,10 @@ The Next.js route handlers are the API layer; all read live from Hugging Face:
 | `GET /api/populace?release=<id>` | Release summary (default: latest) |
 | `GET /api/populace/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics |
 | `GET /api/populace/compare?a=<id>&b=<id>` | Version-over-version diff |
+| `GET /api/populace/staging/runs` | List staging build runs |
+| `GET /api/populace/staging/run?id=<run_id>` | One staging run's progress and uploaded candidate diagnostics |
+| `GET /api/populace/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
+| `GET /api/populace/staging/compare?run=<run_id>&release=latest` | Diff staging candidate against a published release |
 
 ## Develop
 
@@ -47,4 +54,6 @@ make build     # next build
 ```
 
 Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different
-dataset/revision.
+published dataset/revision. Staging defaults to `policyengine/populace-us-staging`;
+set `POPULACE_STAGING_HF_REPO`, `POPULACE_STAGING_HF_REVISION`, and `HF_TOKEN`
+if the staging dataset is private.
