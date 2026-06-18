@@ -534,6 +534,11 @@ export function PopulaceTargetsView() {
   function pickVariable(key: string) {
     setVariable(key);
     setFacetFilters({});
+    if (key) {
+      setSource("");
+      setLevel("");
+      setGeography("");
+    }
     setSelected(null);
     setPage(0);
   }
@@ -557,6 +562,125 @@ export function PopulaceTargetsView() {
         : { by: key, dir: "desc" },
     );
   }
+
+  const targetFilters = (
+    <div className="border-b border-border bg-white px-4 py-3">
+      <div className="grid gap-3 xl:grid-cols-[minmax(220px,320px)_minmax(0,1fr)]">
+        <input
+          type="search"
+          value={search}
+          placeholder="Search targets…"
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(0);
+          }}
+          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus:border-primary/60 focus:outline-none"
+        />
+        <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {activeVariable ? (
+            dimensions.map((dim) => (
+              <ToolbarSelect
+                key={dim.key}
+                label={dim.label}
+                value={facetFilters[dim.key] ?? ""}
+                onChange={(value) => setFacet(dim.key, value)}
+                options={[
+                  { value: "", label: "Any" },
+                  ...dim.values.map((value) => ({
+                    value,
+                    label: value.replace(/^AGI in /, ""),
+                  })),
+                ]}
+                className="w-full"
+                layout="stacked"
+              />
+            ))
+          ) : (
+            <>
+              <ToolbarSelect
+                label="Source"
+                value={source}
+                onChange={(value) => {
+                  setSource(value);
+                  setSelected(null);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "", label: "Any" },
+                  ...sources.map((value) => ({ value, label: value })),
+                ]}
+                className="w-full"
+                layout="stacked"
+              />
+              <ToolbarSelect
+                label="Level"
+                value={level}
+                onChange={(value) => {
+                  setLevel(value);
+                  setSelected(null);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "", label: "Any" },
+                  ...levels.map((value) => ({ value, label: value })),
+                ]}
+                className="w-full"
+                layout="stacked"
+              />
+              <ToolbarSelect
+                label="Geography"
+                value={geography}
+                onChange={(value) => {
+                  setGeography(value);
+                  setSelected(null);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "", label: "Any" },
+                  ...geographies.map((value) => ({ value, label: value })),
+                ]}
+                className="w-full"
+                layout="stacked"
+              />
+            </>
+          )}
+          <ToolbarSelect
+            label="Fit"
+            value={withinTolerance}
+            onChange={(value) => {
+              setWithinTolerance(value);
+              setSelected(null);
+              setPage(0);
+            }}
+            options={[
+              { value: "", label: "Any" },
+              { value: "true", label: "Within tolerance" },
+              { value: "false", label: "Outside tolerance" },
+            ]}
+            className="w-full"
+            layout="stacked"
+          />
+          <ToolbarSelect
+            label="Direction"
+            value={direction}
+            onChange={(value) => {
+              setDirection(value);
+              setSelected(null);
+              setPage(0);
+            }}
+            options={[
+              { value: "", label: "Any" },
+              { value: "under", label: "Under target" },
+              { value: "over", label: "Over target" },
+              { value: "exact", label: "Exact" },
+            ]}
+            className="w-full"
+            layout="stacked"
+          />
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -591,227 +715,129 @@ export function PopulaceTargetsView() {
             />
           )}
           <SectionCard
-          title={
-            activeVariable ? (
-              <span className="flex flex-wrap items-center gap-2">
+            title={
+              activeVariable ? (
+                <span className="flex flex-wrap items-center gap-2">
+                  <span>
+                    {activeVariable.source} / {humanizeName(activeVariable.variable)}
+                    {activeVariable.measure ? (
+                      <span className="ml-1 text-sm font-normal text-muted-foreground">
+                        ({activeVariable.measure === "total" ? "amount" : activeVariable.measure})
+                      </span>
+                    ) : null}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => pickVariable("")}
+                    className="rounded-full border border-border px-2 py-0.5 text-[11px] font-normal text-muted-foreground hover:bg-muted/60"
+                  >
+                    clear ✕
+                  </button>
+                </span>
+              ) : (
+                `Targets (${fmt(filteredTotal, { digits: 0 })} of ${fmt(data?.total_targets ?? null, { digits: 0 })})`
+              )
+            }
+            description={
+              activeVariable
+                ? `${fmt(activeVariable.n_targets, { digits: 0 })} breakdowns · ${fmt(
+                    activeVariable.within_10pct / Math.max(activeVariable.n_targets, 1),
+                    { pct: true, digits: 0 },
+                  )} within 10% · mean abs rel. error ${fmt(activeVariable.mean_abs_relative_error, { pct: true, digits: 1 })}`
+                : `${fmt(includedTargetCount, { digits: 0 })} targets included in calibration · ${fmt(droppedTargetCount, { digits: 0 })} dropped before calibration · ${fmt(skippedTargetCount, { digits: 0 })} skipped by calibration. Final estimate is after calibrated weights.`
+            }
+            padded={false}
+            footer={
+              <div className="flex items-center justify-between px-5 py-2 text-xs text-muted-foreground">
                 <span>
-                  {activeVariable.source} / {humanizeName(activeVariable.variable)}
-                  {activeVariable.measure ? (
-                    <span className="ml-1 text-sm font-normal text-muted-foreground">
-                      ({activeVariable.measure === "total" ? "amount" : activeVariable.measure})
-                    </span>
+                  Page {page + 1} of {pageCount}
+                  {isFetching && !isLoading ? (
+                    <span className="ml-2 text-primary">Updating…</span>
                   ) : null}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => pickVariable("")}
-                  className="rounded-full border border-border px-2 py-0.5 text-[11px] font-normal text-muted-foreground hover:bg-muted/60"
-                >
-                  clear ✕
-                </button>
-              </span>
+                <span className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={page === 0}
+                    onClick={() => setPage((current) => Math.max(current - 1, 0))}
+                    className="rounded-md border border-border px-2 py-1 disabled:opacity-40"
+                  >
+                    ← Prev
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!data?.has_next}
+                    onClick={() => setPage((current) => current + 1)}
+                    className="rounded-md border border-border px-2 py-1 disabled:opacity-40"
+                  >
+                    Next →
+                  </button>
+                </span>
+              </div>
+            }
+          >
+            {targetFilters}
+            {isLoading ? (
+              <LoadingBlock label="Loading target diagnostics…" />
+            ) : error || !data ? (
+              <EmptyState
+                title="Target diagnostics unavailable"
+                description={error instanceof Error ? error.message : "Unknown error."}
+              />
+            ) : data.targets.length === 0 ? (
+              <EmptyState title="No targets match the current filters." variant="compact" />
             ) : (
-              `Targets (${fmt(filteredTotal, { digits: 0 })} of ${fmt(data?.total_targets ?? null, { digits: 0 })})`
-            )
-          }
-          description={
-            activeVariable
-              ? `${fmt(activeVariable.n_targets, { digits: 0 })} breakdowns · ${fmt(
-                  activeVariable.within_10pct / Math.max(activeVariable.n_targets, 1),
-                  { pct: true, digits: 0 },
-                )} within 10% · mean abs rel. error ${fmt(activeVariable.mean_abs_relative_error, { pct: true, digits: 1 })}`
-              : `${fmt(includedTargetCount, { digits: 0 })} targets included in calibration · ${fmt(droppedTargetCount, { digits: 0 })} dropped before calibration · ${fmt(skippedTargetCount, { digits: 0 })} skipped by calibration. Final estimate is after calibrated weights.`
-          }
-          padded={false}
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="search"
-                value={search}
-                placeholder="Search targets…"
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setPage(0);
-                }}
-                className="h-8 w-44 rounded-md border border-border bg-white px-3 text-xs focus:border-primary/60 focus:outline-none"
-              />
-              {activeVariable ? (
-                dimensions.map((dim) => (
-                  <ToolbarSelect
-                    key={dim.key}
-                    label={dim.label}
-                    value={facetFilters[dim.key] ?? ""}
-                    onChange={(value) => setFacet(dim.key, value)}
-                    options={[
-                      { value: "", label: "Any" },
-                      ...dim.values.map((value) => ({
-                        value,
-                        label: value.replace(/^AGI in /, ""),
-                      })),
-                    ]}
-                  />
-                ))
-              ) : null}
-              <ToolbarSelect
-                label="Source"
-                value={source}
-                onChange={(value) => {
-                  setSource(value);
-                  setSelected(null);
-                  setPage(0);
-                }}
-                options={[
-                  { value: "", label: "Any" },
-                  ...sources.map((value) => ({ value, label: value })),
-                ]}
-              />
-              <ToolbarSelect
-                label="Level"
-                value={level}
-                onChange={(value) => {
-                  setLevel(value);
-                  setSelected(null);
-                  setPage(0);
-                }}
-                options={[
-                  { value: "", label: "Any" },
-                  ...levels.map((value) => ({ value, label: value })),
-                ]}
-              />
-              <ToolbarSelect
-                label="Geography"
-                value={geography}
-                onChange={(value) => {
-                  setGeography(value);
-                  setSelected(null);
-                  setPage(0);
-                }}
-                options={[
-                  { value: "", label: "Any" },
-                  ...geographies.map((value) => ({ value, label: value })),
-                ]}
-              />
-              <ToolbarSelect
-                label="Fit"
-                value={withinTolerance}
-                onChange={(value) => {
-                  setWithinTolerance(value);
-                  setSelected(null);
-                  setPage(0);
-                }}
-                options={[
-                  { value: "", label: "Any" },
-                  { value: "true", label: "Within tolerance" },
-                  { value: "false", label: "Outside tolerance" },
-                ]}
-              />
-              <ToolbarSelect
-                label="Direction"
-                value={direction}
-                onChange={(value) => {
-                  setDirection(value);
-                  setSelected(null);
-                  setPage(0);
-                }}
-                options={[
-                  { value: "", label: "Any" },
-                  { value: "under", label: "Under target" },
-                  { value: "over", label: "Over target" },
-                  { value: "exact", label: "Exact" },
-                ]}
-              />
-            </div>
-          }
-          footer={
-            <div className="flex items-center justify-between px-5 py-2 text-xs text-muted-foreground">
-              <span>
-                Page {page + 1} of {pageCount}
-                {isFetching && !isLoading ? (
-                  <span className="ml-2 text-primary">Updating…</span>
-                ) : null}
-              </span>
-              <span className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={page === 0}
-                  onClick={() => setPage((current) => Math.max(current - 1, 0))}
-                  className="rounded-md border border-border px-2 py-1 disabled:opacity-40"
-                >
-                  ← Prev
-                </button>
-                <button
-                  type="button"
-                  disabled={!data?.has_next}
-                  onClick={() => setPage((current) => current + 1)}
-                  className="rounded-md border border-border px-2 py-1 disabled:opacity-40"
-                >
-                  Next →
-                </button>
-              </span>
-            </div>
-          }
-        >
-          {isLoading ? (
-            <LoadingBlock label="Loading target diagnostics…" />
-          ) : error || !data ? (
-            <EmptyState
-              title="Target diagnostics unavailable"
-              description={error instanceof Error ? error.message : "Unknown error."}
-            />
-          ) : data.targets.length === 0 ? (
-            <EmptyState title="No targets match the current filters." variant="compact" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                    {columns.map((column) => (
-                      <th
-                        key={column.key}
-                        className={`px-3 py-2 font-semibold ${column.numeric ? "text-right" : ""}`}
-                      >
-                        {column.sortable ? (
-                          <button
-                            type="button"
-                            onClick={() => toggleSort(column.key)}
-                            className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-foreground"
-                          >
-                            {column.label}
-                            {sort.by === column.key ? (sort.dir === "desc" ? "↓" : "↑") : ""}
-                          </button>
-                        ) : (
-                          column.label
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.targets.map((row) => {
-                    const isSelected = selected?.name === row.name;
-                    return (
-                      <tr
-                        key={row.name}
-                        onClick={() => setSelected(isSelected ? null : row)}
-                        className={`cursor-pointer border-b border-border/60 last:border-b-0 ${
-                          isSelected ? "bg-primary/10" : "hover:bg-muted/30"
-                        }`}
-                      >
-                        {columns.map((column) => (
-                          <td
-                            key={column.key}
-                            className={`px-3 py-1.5 tabular-nums ${column.numeric ? "text-right" : ""}`}
-                          >
-                            {column.render(row)}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                      {columns.map((column) => (
+                        <th
+                          key={column.key}
+                          className={`px-3 py-2 font-semibold ${column.numeric ? "text-right" : ""}`}
+                        >
+                          {column.sortable ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(column.key)}
+                              className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-foreground"
+                            >
+                              {column.label}
+                              {sort.by === column.key ? (sort.dir === "desc" ? "↓" : "↑") : ""}
+                            </button>
+                          ) : (
+                            column.label
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.targets.map((row) => {
+                      const isSelected = selected?.name === row.name;
+                      return (
+                        <tr
+                          key={row.name}
+                          onClick={() => setSelected(isSelected ? null : row)}
+                          className={`cursor-pointer border-b border-border/60 last:border-b-0 ${
+                            isSelected ? "bg-primary/10" : "hover:bg-muted/30"
+                          }`}
+                        >
+                          {columns.map((column) => (
+                            <td
+                              key={column.key}
+                              className={`px-3 py-1.5 tabular-nums ${column.numeric ? "text-right" : ""}`}
+                            >
+                              {column.render(row)}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </SectionCard>
         </div>
       </div>

@@ -22,10 +22,21 @@ function relErr(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
 }
 
-function fmtLoss(value: number | null | undefined): string {
+type LossKind = "normalized_target_loss" | "raw_optimizer_objective";
+
+function isNormalizedLoss(kind: LossKind | undefined): boolean {
+  return kind === "normalized_target_loss";
+}
+
+function fmtLoss(value: number | null | undefined, kind?: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
   if (value === 0) return "0";
+  if (isNormalizedLoss(kind)) return fmt(value, { digits: value < 1 ? 4 : 3 });
   return value.toExponential(3).replace("e+", "e");
+}
+
+function lossKindLabel(kind: LossKind | undefined): string {
+  return isNormalizedLoss(kind) ? "normalized" : "raw";
 }
 
 function relativeChange(
@@ -280,17 +291,19 @@ function LossRow({
   label,
   initial,
   final,
+  lossKind,
 }: {
   label: string;
   initial: number | null | undefined;
   final: number | null | undefined;
+  lossKind: LossKind;
 }) {
   const reduction = relativeChange(initial, final);
   return (
     <tr className="border-b border-border/60 last:border-b-0">
       <td className="px-3 py-2 font-medium">{label}</td>
-      <td className="px-3 py-2 text-right font-mono tabular-nums">{fmtLoss(initial)}</td>
-      <td className="px-3 py-2 text-right font-mono tabular-nums">{fmtLoss(final)}</td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">{fmtLoss(initial, lossKind)}</td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">{fmtLoss(final, lossKind)}</td>
       <td className="px-3 py-2 text-right tabular-nums">
         {reduction == null ? "—" : fmt(-reduction, { pct: true, digits: 3 })}
       </td>
@@ -341,25 +354,31 @@ export function PopulaceCompareView() {
     data?.a.final_loss != null && data.b.final_loss != null
       ? data.b.final_loss - data.a.final_loss
       : null;
-  const lossChange = data ? relativeChange(data.a.final_loss, data.b.final_loss) : null;
-  const bLossLower = lossDelta != null && lossDelta < 0;
-  const bLossHigher = lossDelta != null && lossDelta > 0;
+  const sameLossKind = data ? data.a.loss_kind === data.b.loss_kind : false;
+  const comparableLossDelta = sameLossKind ? lossDelta : null;
+  const lossChange = data && sameLossKind ? relativeChange(data.a.final_loss, data.b.final_loss) : null;
+  const bLossLower = comparableLossDelta != null && comparableLossDelta < 0;
+  const bLossHigher = comparableLossDelta != null && comparableLossDelta > 0;
   const lossTone = bLossLower ? "positive" : bLossHigher ? "negative" : "neutral";
   const lossHeadline =
-    lossChange == null
+    !sameLossKind
+      ? "—"
+      : lossChange == null
       ? "—"
       : fmt(Math.abs(lossChange), { pct: true, digits: 3 });
-  const lossHeadlineLabel = data?.summary.losses_comparable
-    ? bLossLower
+  const lossHeadlineLabel = !sameLossKind
+    ? "Loss metrics differ"
+    : data?.summary.losses_comparable
+      ? bLossLower
       ? "B better by final loss"
       : bLossHigher
         ? "B worse by final loss"
         : "Final loss unchanged"
-    : bLossLower
-      ? "B lower raw loss"
-      : bLossHigher
-        ? "B higher raw loss"
-        : "Raw loss unchanged";
+      : bLossLower
+        ? `B lower ${lossKindLabel(data?.b.loss_kind)} loss`
+        : bLossHigher
+          ? `B higher ${lossKindLabel(data?.b.loss_kind)} loss`
+          : `${isNormalizedLoss(data?.b.loss_kind) ? "Normalized" : "Raw"} loss unchanged`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -427,9 +446,11 @@ export function PopulaceCompareView() {
           <SectionCard
             title="Version-over-version loss"
             description={
-              data.summary.losses_comparable
+              !sameLossKind
+                ? "Release A and B report different loss metrics, so their final loss values should not be compared directly."
+                : data.summary.losses_comparable
                 ? "Final optimizer loss for B compared with A. Lower is better when target surfaces match."
-                : "Raw optimizer loss for B compared with A. These releases have different target surfaces, so treat this as directional context rather than a clean apples-to-apples fit score."
+                : `${isNormalizedLoss(data.b.loss_kind) ? "Normalized target loss" : "Raw optimizer loss"} for B compared with A. These releases have different target surfaces, so treat this as directional context rather than a clean apples-to-apples fit score.`
             }
           >
             <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -438,9 +459,11 @@ export function PopulaceCompareView() {
                 value={lossHeadline}
                 tone={lossTone}
                 hint={
-                  lossDelta == null
+                  !sameLossKind
+                    ? `${lossKindLabel(data.a.loss_kind)} → ${lossKindLabel(data.b.loss_kind)}`
+                    : comparableLossDelta == null
                     ? "final loss unavailable"
-                    : `${fmtLoss(data.a.final_loss)} → ${fmtLoss(data.b.final_loss)}`
+                    : `${fmtLoss(data.a.final_loss, data.a.loss_kind)} → ${fmtLoss(data.b.final_loss, data.b.loss_kind)}`
                 }
                 size="lg"
               />
@@ -455,8 +478,18 @@ export function PopulaceCompareView() {
                     </tr>
                   </thead>
                   <tbody>
-                    <LossRow label="A" initial={data.a.initial_loss} final={data.a.final_loss} />
-                    <LossRow label="B" initial={data.b.initial_loss} final={data.b.final_loss} />
+                    <LossRow
+                      label="A"
+                      initial={data.a.initial_loss}
+                      final={data.a.final_loss}
+                      lossKind={data.a.loss_kind}
+                    />
+                    <LossRow
+                      label="B"
+                      initial={data.b.initial_loss}
+                      final={data.b.final_loss}
+                      lossKind={data.b.loss_kind}
+                    />
                     <tr className="border-t border-border bg-muted/20">
                       <td className="px-3 py-2 font-medium">B vs A final</td>
                       <td className="px-3 py-2 text-right text-muted-foreground">—</td>
@@ -465,7 +498,9 @@ export function PopulaceCompareView() {
                           bLossLower ? "text-emerald-700" : bLossHigher ? "text-rose-700" : ""
                         }`}
                       >
-                        {lossDelta == null ? "—" : fmtLoss(Math.abs(lossDelta))}
+                        {comparableLossDelta == null
+                          ? "—"
+                          : fmtLoss(Math.abs(comparableLossDelta), data.b.loss_kind)}
                       </td>
                       <td
                         className={`px-3 py-2 text-right tabular-nums ${

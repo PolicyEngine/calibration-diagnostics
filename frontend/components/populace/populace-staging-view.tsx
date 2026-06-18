@@ -16,6 +16,14 @@ import {
   type PopulaceStagingRunSummary,
 } from "@/lib/api/hooks/use-populace";
 
+type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
+
+function fmtLoss(value: number | null | undefined, kind: LossKind): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  if (kind === "normalized_target_loss") return fmt(value, { digits: value < 1 ? 4 : 3 });
+  return fmtCompact(value);
+}
+
 function statusTone(status: string | null | undefined): StatusTone {
   if (status === "passed" || status === "published") return "success";
   if (status === "failed") return "danger";
@@ -258,9 +266,19 @@ export function PopulaceStagingView() {
                       hint={`${fmt(runData.calibration.within_tolerance_count, { digits: 0 })} in tolerance`}
                     />
                     <KpiCard
-                      label="Final loss"
-                      value={fmtCompact(runData.calibration.final_loss)}
-                      hint={`initial ${fmtCompact(runData.calibration.initial_loss)}`}
+                      label={
+                        runData.calibration.loss_kind === "normalized_target_loss"
+                          ? "Final normalized loss"
+                          : "Final raw loss"
+                      }
+                      value={fmtLoss(
+                        runData.calibration.final_loss,
+                        runData.calibration.loss_kind,
+                      )}
+                      hint={`initial ${fmtLoss(
+                        runData.calibration.initial_loss,
+                        runData.calibration.loss_kind,
+                      )}`}
                     />
                     <KpiCard
                       label="Non-zero records"

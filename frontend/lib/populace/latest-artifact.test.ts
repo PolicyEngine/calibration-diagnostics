@@ -194,6 +194,30 @@ test("comparison matches on base_name across the @period boundary", () => {
   expect(cmp.variables[0].regressed).toBe(1);
 });
 
+test("new target loss weighting metadata marks loss as normalized", () => {
+  const normalized = buildCalibration(
+    {
+      targets: [],
+      initial_loss: 0.42,
+      final_loss: 0.39,
+      options: {
+        target_loss_scales: { wages: 1 },
+        target_loss_weights: { wages: 1 },
+      },
+    },
+    "normalized-release",
+  );
+  const raw = buildCalibration(
+    { targets: [], initial_loss: 752_000_000_000, final_loss: 751_000_000_000 },
+    "raw-release",
+  );
+
+  expect(latestPopulaceCalibrationSummary(normalized).loss_kind).toBe("normalized_target_loss");
+  expect(latestPopulaceCalibrationSummary(raw).loss_kind).toBe("raw_optimizer_objective");
+  expect(buildComparison(raw, normalized).summary.losses_comparable).toBe(false);
+  expect(buildComparison(raw, normalized).summary.loss_kind).toBe("mixed");
+});
+
 test("dotted ledger target names use metadata for readable fields", () => {
   const cal = calibration([
     {

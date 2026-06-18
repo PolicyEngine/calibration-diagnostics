@@ -27,7 +27,7 @@ export function SectionCard({
       className={`overflow-visible border-border/80 shadow-[0_1px_0_rgba(15,23,42,0.04)] ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-muted/20 px-5 py-3">
-        <div className="min-w-0">
+        <div className="min-w-[220px] flex-1">
           <div className="text-sm font-semibold leading-tight text-foreground">
             {title}
           </div>
@@ -38,7 +38,9 @@ export function SectionCard({
           )}
         </div>
         {actions && (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+            {actions}
+          </div>
         )}
       </div>
       <CardContent className={padded ? "p-5" : "p-0"}>{children}</CardContent>

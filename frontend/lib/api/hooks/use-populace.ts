@@ -143,6 +143,7 @@ export interface PopulaceCalibration {
   n_records?: number | null;
   initial_loss?: number | null;
   final_loss?: number | null;
+  loss_kind?: "normalized_target_loss" | "raw_optimizer_objective";
   fraction_within_10pct?: number | null;
   loss_trajectory?: number[];
   skipped?: PopulaceSkippedTarget[];
@@ -287,6 +288,7 @@ export interface PopulaceComparison {
     total_targets: number;
     initial_loss: number | null;
     final_loss: number | null;
+    loss_kind: "normalized_target_loss" | "raw_optimizer_objective";
     fraction_within_10pct: number | null;
   };
   b: {
@@ -294,6 +296,7 @@ export interface PopulaceComparison {
     total_targets: number;
     initial_loss: number | null;
     final_loss: number | null;
+    loss_kind: "normalized_target_loss" | "raw_optimizer_objective";
     fraction_within_10pct: number | null;
   };
   summary: {
@@ -304,6 +307,7 @@ export interface PopulaceComparison {
     regressed: number;
     unchanged: number;
     losses_comparable: boolean;
+    loss_kind: "normalized_target_loss" | "raw_optimizer_objective" | "mixed";
   };
   variables: PopulaceComparisonVariableRow[];
   rows: PopulaceComparisonRow[];
