@@ -370,6 +370,7 @@ export interface PopulaceStagingRunResponse {
   events?: Record<string, unknown>[];
   has_calibration: boolean;
   calibration?: PopulaceCalibration | null;
+  reform_validation?: ReformValidationResponse | null;
   build_manifest?: Record<string, unknown> | null;
   release_manifest?: Record<string, unknown> | null;
 }

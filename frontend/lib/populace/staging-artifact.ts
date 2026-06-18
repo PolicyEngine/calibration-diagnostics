@@ -7,6 +7,10 @@ import {
   latestPopulaceTargetDiagnosticsPage,
   loadRelease,
 } from "@/lib/populace/latest-artifact";
+import {
+  type ReformValidation,
+  buildReformValidation,
+} from "@/lib/populace/reforms";
 
 type JsonObject = Record<string, unknown>;
 
@@ -84,6 +88,7 @@ export interface StagingRunDetail {
   events: JsonObject[];
   has_calibration: boolean;
   calibration: ReturnType<typeof latestPopulaceCalibrationSummary> | null;
+  reform_validation: ReformValidation | null;
   build_manifest: JsonObject | null;
   release_manifest: JsonObject | null;
 }
@@ -206,27 +211,44 @@ export async function loadStagingCalibration(
 }
 
 export async function loadStagingRun(runId: string, revalidate: number): Promise<StagingRunDetail> {
-  const [progress, runManifest, calibrationProgress, eventsText, cal] = await Promise.all([
+  const [
+    progress,
+    runManifest,
+    calibrationProgress,
+    eventsText,
+    cal,
+    reformValidationRaw,
+  ] = await Promise.all([
     stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate),
     stagingJsonOrNull(`runs/${runId}/run_manifest.json`, revalidate),
     stagingJsonOrNull(`runs/${runId}/calibration_progress.json`, revalidate),
     stagingTextOrNull(`runs/${runId}/events.ndjson`, revalidate),
     loadStagingCalibration(runId, revalidate),
+    stagingJsonOrNull(`runs/${runId}/reform_validation.json`, revalidate),
   ]);
+  const candidateReleaseId =
+    stringValue(progress?.candidate_release_id) ??
+    stringValue(runManifest?.candidate_release_id) ??
+    runId;
   return {
     available: true,
     source_repo: POPULACE_STAGING_HF_REPO,
     revision: POPULACE_STAGING_HF_REVISION,
     run_id: runId,
-    candidate_release_id:
-      stringValue(progress?.candidate_release_id) ??
-      stringValue(runManifest?.candidate_release_id),
+    candidate_release_id: candidateReleaseId,
     progress,
     run_manifest: runManifest,
     calibration_progress: calibrationProgress,
     events: parseNdjson(eventsText),
     has_calibration: cal != null,
     calibration: cal ? latestPopulaceCalibrationSummary(cal) : null,
+    reform_validation: reformValidationRaw
+      ? buildReformValidation(
+          reformValidationRaw,
+          candidateReleaseId,
+          stringValue(progress?.updated_at),
+        )
+      : null,
     build_manifest: cal?.build_manifest ?? null,
     release_manifest: cal?.release_manifest ?? null,
   };

@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, releaseLabel } from "@/components/shared/format";
+import {
+  fmt,
+  fmtCompact,
+  fmtMoney,
+  fmtSignedMoney,
+  releaseLabel,
+} from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -14,6 +20,7 @@ import {
   usePopulaceStagingRun,
   usePopulaceStagingRuns,
   type PopulaceStagingRunSummary,
+  type ReformValidationRow,
 } from "@/lib/api/hooks/use-populace";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
@@ -22,6 +29,17 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
   if (kind === "normalized_target_loss") return fmt(value, { digits: value < 1 ? 4 : 3 });
   return fmtCompact(value);
+}
+
+function pct(value: number | null | undefined) {
+  return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
+}
+
+function validationTone(absRel: number | null | undefined): "positive" | "neutral" | "negative" {
+  if (absRel == null) return "neutral";
+  if (absRel <= 0.1) return "positive";
+  if (absRel <= 0.25) return "neutral";
+  return "negative";
 }
 
 function statusTone(status: string | null | undefined): StatusTone {
@@ -110,6 +128,67 @@ function LossSparkline({ values }: { values: number[] }) {
           title={fmt(value, { digits: 4 })}
         />
       ))}
+    </div>
+  );
+}
+
+function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
+  const ordered = [...rows]
+    .filter((row) => row.populace_estimate != null || row.jct_score != null)
+    .sort((a, b) => Number(a.in_sample ?? false) - Number(b.in_sample ?? false));
+  if (!ordered.length) {
+    return <EmptyState title="No reform validation rows yet." variant="compact" />;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+            <th className="px-3 py-2 font-semibold">Test</th>
+            <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
+            <th className="px-3 py-2 text-right font-semibold">Candidate</th>
+            <th className="px-3 py-2 text-right font-semibold">Diff</th>
+            <th className="px-3 py-2 text-right font-semibold">Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ordered.map((row) => (
+            <tr key={row.id} className="border-b border-border/60 last:border-b-0">
+              <td className="px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-foreground">{row.name}</span>
+                  <StatusPill tone={row.in_sample ? "neutral" : "info"}>
+                    {row.in_sample ? "in-sample" : "out-of-sample"}
+                  </StatusPill>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {row.category || "Reform score"}
+                </div>
+              </td>
+              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                {fmtMoney(row.jct_score)}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                {fmtMoney(row.populace_estimate)}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                {fmtSignedMoney(row.abs_error)}
+              </td>
+              <td
+                className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
+                  validationTone(row.abs_relative_error) === "positive"
+                    ? "text-emerald-700"
+                    : validationTone(row.abs_relative_error) === "negative"
+                      ? "text-rose-700"
+                      : "text-foreground"
+                }`}
+              >
+                {pct(row.abs_relative_error)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -293,6 +372,68 @@ export function PopulaceStagingView() {
                   description="This appears once the run uploads calibration_diagnostics.json."
                 >
                   <EmptyState title="Calibration diagnostics not uploaded yet." variant="compact" />
+                </SectionCard>
+              )}
+
+              {runData.reform_validation ? (
+                <SectionCard
+                  title="Reform validation"
+                  description="External score tests uploaded by this staging run. Out-of-sample rows are the main signal; in-sample rows were direct or near-direct calibration targets."
+                  padded={false}
+                >
+                  <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4">
+                    <KpiCard
+                      label="Out-of-sample mean |error|"
+                      value={pct(
+                        runData.reform_validation.summary
+                          ?.out_of_sample_mean_abs_relative_error,
+                      )}
+                      tone={validationTone(
+                        runData.reform_validation.summary
+                          ?.out_of_sample_mean_abs_relative_error,
+                      )}
+                      hint="reforms calibration did not directly see"
+                    />
+                    <KpiCard
+                      label="Out-of-sample within 10%"
+                      value={`${fmt(
+                        runData.reform_validation.summary?.out_of_sample_within_10pct ?? 0,
+                        { digits: 0 },
+                      )} / ${fmt(
+                        runData.reform_validation.summary?.n_out_of_sample_scored ?? 0,
+                        { digits: 0 },
+                      )}`}
+                      hint={`${fmt(
+                        runData.reform_validation.summary?.n_out_of_sample ?? 0,
+                        { digits: 0 },
+                      )} out-of-sample tests`}
+                    />
+                    <KpiCard
+                      label="Tests scored"
+                      value={fmt(runData.reform_validation.summary?.n_scored ?? 0, {
+                        digits: 0,
+                      })}
+                      hint={`${fmt(runData.reform_validation.summary?.n_reforms ?? 0, {
+                        digits: 0,
+                      })} total tests`}
+                    />
+                    <KpiCard
+                      label="All-test mean |error|"
+                      value={pct(runData.reform_validation.summary?.mean_abs_relative_error)}
+                      tone={validationTone(
+                        runData.reform_validation.summary?.mean_abs_relative_error,
+                      )}
+                      hint="includes in-sample rows"
+                    />
+                  </div>
+                  <ReformValidationTable rows={runData.reform_validation.rows ?? []} />
+                </SectionCard>
+              ) : (
+                <SectionCard
+                  title="Reform validation"
+                  description="This appears once the run uploads reform_validation.json."
+                >
+                  <EmptyState title="Reform validation not uploaded yet." variant="compact" />
                 </SectionCard>
               )}
 
