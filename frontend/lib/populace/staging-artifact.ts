@@ -19,6 +19,29 @@ export const POPULACE_STAGING_HF_REPO =
 export const POPULACE_STAGING_HF_REVISION =
   process.env.POPULACE_STAGING_HF_REVISION ?? "main";
 
+class StagingFetchError extends Error {
+  constructor(
+    public readonly status: number,
+    path: string,
+  ) {
+    super(stagingFetchMessage(status, path));
+  }
+}
+
+function stagingFetchMessage(status: number, path: string): string {
+  if (status === 401 || status === 403) {
+    return (
+      `Staging repo ${POPULACE_STAGING_HF_REPO} is not readable by this deployment ` +
+      `(${status} fetching ${path}). Set HF_TOKEN/HUGGINGFACE_TOKEN on the server, ` +
+      "or publish staging telemetry to a public dataset repo."
+    );
+  }
+  if (status === 404) {
+    return `Staging artifact not found (${path}).`;
+  }
+  return `Staging fetch failed ${status}: ${path}`;
+}
+
 function hfHeaders(): HeadersInit | undefined {
   const token = process.env.HF_TOKEN ?? process.env.HUGGINGFACE_TOKEN;
   return token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -33,14 +56,15 @@ async function stagingJson(path: string, revalidate: number): Promise<JsonObject
     headers: hfHeaders(),
     next: { revalidate },
   });
-  if (!res.ok) throw new Error(`Staging fetch failed ${res.status}: ${path}`);
+  if (!res.ok) throw new StagingFetchError(res.status, path);
   return asObject(await res.json());
 }
 
 async function stagingJsonOrNull(path: string, revalidate: number): Promise<JsonObject | null> {
   try {
     return await stagingJson(path, revalidate);
-  } catch {
+  } catch (error) {
+    if (error instanceof StagingFetchError && error.status !== 404) throw error;
     return null;
   }
 }
@@ -50,7 +74,10 @@ async function stagingTextOrNull(path: string, revalidate: number): Promise<stri
     headers: hfHeaders(),
     next: { revalidate },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw new StagingFetchError(res.status, path);
+  }
   return res.text();
 }
 
@@ -60,7 +87,7 @@ async function stagingTree(revalidate: number): Promise<JsonObject[]> {
     headers: hfHeaders(),
     next: { revalidate },
   });
-  if (!res.ok) throw new Error(`Staging tree failed ${res.status}`);
+  if (!res.ok) throw new StagingFetchError(res.status, "runs tree");
   const tree = await res.json();
   return Array.isArray(tree) ? tree.map(asObject) : [];
 }
@@ -148,7 +175,8 @@ export async function loadStagingRuns(revalidate: number) {
       const match = /^runs\/([^/]+)\/progress\.json$/.exec(entry.path);
       if (match) runIds.add(match[1]);
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof StagingFetchError && error.status !== 404) throw error;
     // A staging repo may exist before any tree listing is public; keep runs.json.
   }
 
