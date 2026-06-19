@@ -11,10 +11,11 @@ export default async function PopulaceTargetsPage({
   const params = await searchParams;
   const rawScope = Array.isArray(params?.scope) ? params.scope[0] : params?.scope;
   const initialScope = rawScope === "healthcare" ? "healthcare" : "all";
+  const rawSource = Array.isArray(params?.source) ? params.source[0] : params?.source;
 
   return (
     <AppShell>
-      <PopulaceTargetsView initialScope={initialScope} />
+      <PopulaceTargetsView initialScope={initialScope} initialSource={rawSource ?? ""} />
     </AppShell>
   );
 }

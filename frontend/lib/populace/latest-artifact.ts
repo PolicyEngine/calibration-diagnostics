@@ -1213,6 +1213,156 @@ function familyFitSummary(rows: TargetRow[]) {
     .sort((a, b) => b.n_targets - a.n_targets);
 }
 
+// --- calibration map (treemap) ----------------------------------------------
+// Human labels for the source authorities behind each target group.
+const SOURCE_LABELS: Record<string, string> = {
+  cbo: "CBO",
+  census_population: "Census population",
+  cms_aca: "CMS · ACA marketplace",
+  cms_medicaid: "CMS · Medicaid / CHIP",
+  cms_medicare: "CMS · Medicare",
+  hhs_acf_tanf: "HHS · TANF",
+  irs_soi: "IRS Statistics of Income",
+  jct: "JCT",
+  ssa: "SSA",
+  state_income_tax: "State income tax",
+  usda_snap: "USDA · SNAP",
+};
+
+function sourceLabel(source: string): string {
+  if (SOURCE_LABELS[source]) return SOURCE_LABELS[source];
+  return source
+    .split("_")
+    .map((word) => (word.length <= 3 ? word.toUpperCase() : word[0].toUpperCase() + word.slice(1)))
+    .join(" ");
+}
+
+// A few IRS targets sit near zero and blow up the relative error (the same
+// "extreme outliers" the diagnostics lists exclude). Winsorize the per-target
+// error before squaring so the loss map shows where error broadly concentrates
+// rather than which single target is the most pathological, and color by the
+// median so one outlier can't paint a whole group red.
+const LOSS_ERROR_CAP = 2.0; // 200%
+
+function median(values: number[]): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+export interface TreemapLeaf {
+  key: string;
+  source: string;
+  variable: string;
+  measure: string | null;
+  n_targets: number;
+  within_10pct: number;
+  scored: number;
+  loss: number;
+  mean_abs_relative_error: number | null;
+  median_abs_relative_error: number | null;
+}
+
+export interface TreemapGroup {
+  source: string;
+  label: string;
+  n_targets: number;
+  within_10pct: number;
+  scored: number;
+  loss: number;
+  mean_abs_relative_error: number | null;
+  median_abs_relative_error: number | null;
+  children: TreemapLeaf[];
+}
+
+export interface TreemapData {
+  release_id: string;
+  total_targets: number;
+  total_within_10pct: number;
+  total_scored: number;
+  total_loss: number;
+  groups: TreemapGroup[];
+}
+
+// Build the source → variable hierarchy that powers the calibration map.
+// Each leaf carries both "how much we calibrate to it" (n_targets) and "how
+// much of the calibration loss lands here" (loss = sum of squared relative
+// errors, the per-target term of the normalized target loss). Targets with no
+// relative error (absolute targets where the target value is zero) still count
+// toward n_targets but contribute nothing to loss or fit.
+export function populaceTargetTreemap(rows: TargetRow[], releaseId: string): TreemapData {
+  const groups = new Map<string, Map<string, TargetRow[]>>();
+  for (const row of rows) {
+    const source = String(row.source ?? "").trim() || "other";
+    const key = String(row.variable_key ?? row.variable ?? "—");
+    const byVar = groups.get(source) ?? groups.set(source, new Map()).get(source)!;
+    (byVar.get(key) ?? byVar.set(key, []).get(key)!).push(row);
+  }
+
+  const leafOf = (source: string, key: string, group: TargetRow[]): TreemapLeaf => {
+    const absErrors = group
+      .map((row) => numberOrNull(row.abs_relative_error))
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    const first = group[0];
+    return {
+      key,
+      source,
+      variable: String(first.variable ?? key),
+      measure: first.measure ? String(first.measure) : null,
+      n_targets: group.length,
+      scored: absErrors.length,
+      within_10pct: absErrors.filter((v) => v <= 0.1).length,
+      loss: absErrors.reduce((sum, v) => {
+        const capped = Math.min(v, LOSS_ERROR_CAP);
+        return sum + capped * capped;
+      }, 0),
+      mean_abs_relative_error: absErrors.length
+        ? absErrors.reduce((s, v) => s + v, 0) / absErrors.length
+        : null,
+      median_abs_relative_error: median(absErrors),
+    };
+  };
+
+  const groupList: TreemapGroup[] = [...groups.entries()]
+    .map(([source, byVar]) => {
+      const children = [...byVar.entries()]
+        .map(([key, group]) => leafOf(source, key, group))
+        .sort((a, b) => b.n_targets - a.n_targets);
+      const allErrors = [...byVar.values()]
+        .flat()
+        .map((row) => numberOrNull(row.abs_relative_error))
+        .filter((v): v is number => v != null && Number.isFinite(v));
+      const n_targets = children.reduce((s, c) => s + c.n_targets, 0);
+      const scored = children.reduce((s, c) => s + c.scored, 0);
+      const within_10pct = children.reduce((s, c) => s + c.within_10pct, 0);
+      const loss = children.reduce((s, c) => s + c.loss, 0);
+      return {
+        source,
+        label: sourceLabel(source),
+        n_targets,
+        scored,
+        within_10pct,
+        loss,
+        mean_abs_relative_error: allErrors.length
+          ? allErrors.reduce((s, v) => s + v, 0) / allErrors.length
+          : null,
+        median_abs_relative_error: median(allErrors),
+        children,
+      };
+    })
+    .sort((a, b) => b.n_targets - a.n_targets);
+
+  return {
+    release_id: releaseId,
+    total_targets: groupList.reduce((s, g) => s + g.n_targets, 0),
+    total_within_10pct: groupList.reduce((s, g) => s + g.within_10pct, 0),
+    total_scored: groupList.reduce((s, g) => s + g.scored, 0),
+    total_loss: groupList.reduce((s, g) => s + g.loss, 0),
+    groups: groupList,
+  };
+}
+
 // --- the calibration source (one release) -----------------------------------
 export interface Calibration {
   source: "huggingface_live";
