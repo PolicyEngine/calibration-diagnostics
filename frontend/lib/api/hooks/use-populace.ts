@@ -597,6 +597,52 @@ export function usePopulace(release?: string) {
   });
 }
 
+export interface PopulaceTreemapLeaf {
+  key: string;
+  source: string;
+  variable: string;
+  measure: string | null;
+  n_targets: number;
+  within_10pct: number;
+  scored: number;
+  loss: number;
+  mean_abs_relative_error: number | null;
+  median_abs_relative_error: number | null;
+}
+
+export interface PopulaceTreemapGroup {
+  source: string;
+  label: string;
+  n_targets: number;
+  within_10pct: number;
+  scored: number;
+  loss: number;
+  mean_abs_relative_error: number | null;
+  median_abs_relative_error: number | null;
+  children: PopulaceTreemapLeaf[];
+}
+
+export interface PopulaceTreemapResponse {
+  release_id: string;
+  total_targets: number;
+  total_within_10pct: number;
+  total_scored: number;
+  total_loss: number;
+  groups: PopulaceTreemapGroup[];
+}
+
+export function usePopulaceTargetTreemap(release?: string) {
+  return useQuery({
+    queryKey: ["populace", "target-treemap", release ?? "latest"],
+    queryFn: () =>
+      apiGet<PopulaceTreemapResponse>(
+        "/populace/target-treemap",
+        release ? { release } : undefined,
+      ),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function usePopulaceTargetDiagnostics(params: {
   release?: string;
   scope?: "healthcare";

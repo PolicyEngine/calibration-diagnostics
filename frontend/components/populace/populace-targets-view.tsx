@@ -486,13 +486,15 @@ const TARGET_SCOPE_OPTIONS: { value: TargetScope; label: string }[] = [
 
 export function PopulaceTargetsView({
   initialScope = "all",
+  initialSource = "",
 }: {
   initialScope?: TargetScope;
+  initialSource?: string;
 }) {
   const [release, setRelease] = useState("");
   const [scope, setScope] = useState<TargetScope>(initialScope);
   const [variable, setVariable] = useState("");
-  const [source, setSource] = useState("");
+  const [source, setSource] = useState(initialSource);
   const [level, setLevel] = useState("");
   const [geography, setGeography] = useState("");
   const [direction, setDirection] = useState("");
