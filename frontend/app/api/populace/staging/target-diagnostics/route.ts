@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { scrub } from "@/lib/populace/latest-artifact";
 import { loadStagingTargetDiagnostics } from "@/lib/populace/staging-artifact";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
   try {
     return NextResponse.json(
       scrub(await loadStagingTargetDiagnostics(request.url, runId, revalidate)),
+      { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
     return NextResponse.json(

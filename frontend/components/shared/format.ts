@@ -27,10 +27,14 @@ export function formatReleaseDate(date: string | null | undefined): string {
   return h ? `${y}-${mo}-${d} ${h}:${mi}Z` : `${y}-${mo}-${d}`;
 }
 
+function releaseDateFromId(releaseId: string): string {
+  return releaseId.match(/-(\d{8}(?:T\d{6}Z)?)$/)?.[1] ?? "";
+}
+
 // A readable label for a release: "2026-06-14 · f32c2e5".
 export function releaseLabel(releaseId: string, date?: string | null): string {
   const sha = releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0];
-  const formatted = formatReleaseDate(date);
+  const formatted = formatReleaseDate(date || releaseDateFromId(releaseId));
   return formatted ? `${formatted} · ${sha}` : sha;
 }
 

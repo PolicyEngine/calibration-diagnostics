@@ -12,6 +12,8 @@ frontend/.next/
 frontend/out/
 frontend/tsconfig.tsbuildinfo
 frontend/.vercel/
+frontend/test-results/
+test-results/
 
 # IDE
 .idea/
@@ -21,6 +23,7 @@ frontend/.vercel/
 # Artifact cache (HuggingFace-downloaded calibration bundles, large binary files)
 .artifacts/
 frontend/.artifacts/
+.tmp/
 
 # Target-index full per-record dump (regenerable; committed summary suffices)
 backend/data/target_index.json.union.jsonl
