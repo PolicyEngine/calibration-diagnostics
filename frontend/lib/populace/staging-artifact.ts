@@ -51,11 +51,15 @@ export function stagingResolveUrl(path: string): string {
   return `https://huggingface.co/datasets/${POPULACE_STAGING_HF_REPO}/resolve/${POPULACE_STAGING_HF_REVISION}/${path}`;
 }
 
-async function stagingJson(path: string, revalidate: number): Promise<JsonObject> {
-  const res = await fetch(stagingResolveUrl(path), {
+function stagingFetchOptions(revalidate: number): RequestInit {
+  return {
     headers: hfHeaders(),
-    next: { revalidate },
-  });
+    ...(revalidate > 0 ? { next: { revalidate } } : { cache: "no-store" as const }),
+  };
+}
+
+async function stagingJson(path: string, revalidate: number): Promise<JsonObject> {
+  const res = await fetch(stagingResolveUrl(path), stagingFetchOptions(revalidate));
   if (!res.ok) throw new StagingFetchError(res.status, path);
   return asObject(await res.json());
 }
@@ -70,10 +74,7 @@ async function stagingJsonOrNull(path: string, revalidate: number): Promise<Json
 }
 
 async function stagingTextOrNull(path: string, revalidate: number): Promise<string | null> {
-  const res = await fetch(stagingResolveUrl(path), {
-    headers: hfHeaders(),
-    next: { revalidate },
-  });
+  const res = await fetch(stagingResolveUrl(path), stagingFetchOptions(revalidate));
   if (!res.ok) {
     if (res.status === 404) return null;
     throw new StagingFetchError(res.status, path);
@@ -83,10 +84,7 @@ async function stagingTextOrNull(path: string, revalidate: number): Promise<stri
 
 async function stagingTree(revalidate: number): Promise<JsonObject[]> {
   const url = `https://huggingface.co/api/datasets/${POPULACE_STAGING_HF_REPO}/tree/${POPULACE_STAGING_HF_REVISION}/runs?recursive=true`;
-  const res = await fetch(url, {
-    headers: hfHeaders(),
-    next: { revalidate },
-  });
+  const res = await fetch(url, stagingFetchOptions(revalidate));
   if (!res.ok) throw new StagingFetchError(res.status, "runs tree");
   const tree = await res.json();
   return Array.isArray(tree) ? tree.map(asObject) : [];
@@ -169,15 +167,17 @@ export async function loadStagingRuns(revalidate: number) {
     : [];
 
   let runIds = new Set(indexedRuns.map((run) => run.run_id));
-  try {
-    for (const entry of await stagingTree(revalidate)) {
-      if (entry.type !== "file" || typeof entry.path !== "string") continue;
-      const match = /^runs\/([^/]+)\/progress\.json$/.exec(entry.path);
-      if (match) runIds.add(match[1]);
+  if (!indexedRuns.length) {
+    try {
+      for (const entry of await stagingTree(revalidate)) {
+        if (entry.type !== "file" || typeof entry.path !== "string") continue;
+        const match = /^runs\/([^/]+)\/progress\.json$/.exec(entry.path);
+        if (match) runIds.add(match[1]);
+      }
+    } catch (error) {
+      if (error instanceof StagingFetchError && error.status !== 404) throw error;
+      // A staging repo may exist before any tree listing is public.
     }
-  } catch (error) {
-    if (error instanceof StagingFetchError && error.status !== 404) throw error;
-    // A staging repo may exist before any tree listing is public; keep runs.json.
   }
 
   const byId = new Map(indexedRuns.map((run) => [run.run_id, run]));
