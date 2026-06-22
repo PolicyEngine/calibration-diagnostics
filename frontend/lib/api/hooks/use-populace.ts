@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { releaseLabel } from "@/components/shared/format";
+import { useCountry } from "@/components/layout/country-context";
 import { apiGet } from "../client";
 
 export interface PopulaceGates {
@@ -561,9 +562,10 @@ export function usePopulaceReformHistory() {
 }
 
 export function usePopulaceCompare(a?: string, b?: string, enabled = true) {
+  const { country } = useCountry();
   return useQuery({
-    queryKey: ["populace", "compare", "variables-v2", a, b],
-    queryFn: () => apiGet<PopulaceComparison>("/populace/compare", { a, b }),
+    queryKey: ["populace", "compare", "variables-v2", country, a, b],
+    queryFn: () => apiGet<PopulaceComparison>("/populace/compare", { a, b, country }),
     enabled: enabled && Boolean(a && b),
     staleTime: 15 * 60 * 1000,
   });
@@ -604,9 +606,10 @@ export function usePopulaceStagingCompare(runId?: string, release = "latest") {
 }
 
 export function usePopulaceReleases() {
+  const { country } = useCountry();
   return useQuery({
-    queryKey: ["populace", "releases"],
-    queryFn: () => apiGet<PopulaceReleasesResponse>("/populace/releases"),
+    queryKey: ["populace", "releases", country],
+    queryFn: () => apiGet<PopulaceReleasesResponse>("/populace/releases", { country }),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -634,9 +637,11 @@ export function releaseSelectOptions(
 }
 
 export function usePopulace(release?: string) {
+  const { country } = useCountry();
   return useQuery({
-    queryKey: ["populace", release ?? "latest"],
-    queryFn: () => apiGet<PopulaceResponse>("/populace", release ? { release } : undefined),
+    queryKey: ["populace", country, release ?? "latest"],
+    queryFn: () =>
+      apiGet<PopulaceResponse>("/populace", { release: release || undefined, country }),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -676,13 +681,14 @@ export interface PopulaceTreemapResponse {
 }
 
 export function usePopulaceTargetTreemap(release?: string) {
+  const { country } = useCountry();
   return useQuery({
-    queryKey: ["populace", "target-treemap", release ?? "latest"],
+    queryKey: ["populace", "target-treemap", country, release ?? "latest"],
     queryFn: () =>
-      apiGet<PopulaceTreemapResponse>(
-        "/populace/target-treemap",
-        release ? { release } : undefined,
-      ),
+      apiGet<PopulaceTreemapResponse>("/populace/target-treemap", {
+        release: release || undefined,
+        country,
+      }),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -705,10 +711,11 @@ export function usePopulaceTargetDiagnostics(params: {
   sort_by?: string;
   sort_dir?: string;
 }) {
+  const { country } = useCountry();
   return useQuery({
-    queryKey: ["populace", "target-diagnostics", params],
+    queryKey: ["populace", "target-diagnostics", country, params],
     queryFn: () =>
-      apiGet<PopulaceTargetDiagnostics>("/populace/target-diagnostics", params),
+      apiGet<PopulaceTargetDiagnostics>("/populace/target-diagnostics", { ...params, country }),
     placeholderData: keepPreviousData,
     staleTime: 15 * 60 * 1000,
   });

@@ -10,6 +10,31 @@ export type CalibrationLossKind = "normalized_target_loss" | "raw_optimizer_obje
 export const POPULACE_HF_REPO = process.env.POPULACE_HF_REPO ?? "policyengine/populace-us";
 export const POPULACE_HF_REVISION = process.env.POPULACE_HF_REVISION ?? "main";
 
+// Populace ships one HF dataset per country. US is public; UK is private and
+// needs an HF token on the server.
+export type PopulaceCountry = "us" | "uk";
+
+const COUNTRY_REPO: Record<PopulaceCountry, { repo: string; revision: string }> = {
+  us: { repo: POPULACE_HF_REPO, revision: POPULACE_HF_REVISION },
+  uk: {
+    repo: process.env.POPULACE_UK_HF_REPO ?? "policyengine/populace-uk-private",
+    revision: process.env.POPULACE_UK_HF_REVISION ?? "main",
+  },
+};
+
+export function parseCountry(value: string | null | undefined): PopulaceCountry {
+  return value === "uk" ? "uk" : "us";
+}
+
+export function populaceRepo(country: PopulaceCountry): string {
+  return COUNTRY_REPO[country].repo;
+}
+
+function hfAuthHeaders(): HeadersInit | undefined {
+  const token = process.env.HF_TOKEN ?? process.env.HUGGINGFACE_TOKEN;
+  return token ? { Authorization: `Bearer ${token}` } : undefined;
+}
+
 // --- name decomposition (matches populace.dev's parse_target) ---------------
 const FIPS_TO_ABBR: Record<string, string> = {
   "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO",
@@ -1464,12 +1489,13 @@ export function buildCalibration(
 }
 
 // --- HF access --------------------------------------------------------------
-export function hfResolveUrl(path: string): string {
-  return `https://huggingface.co/datasets/${POPULACE_HF_REPO}/resolve/${POPULACE_HF_REVISION}/${path}`;
+export function hfResolveUrl(path: string, country: PopulaceCountry = "us"): string {
+  const { repo, revision } = COUNTRY_REPO[country];
+  return `https://huggingface.co/datasets/${repo}/resolve/${revision}/${path}`;
 }
 
 async function hfJson(url: string, revalidate: number): Promise<JsonObject> {
-  const res = await fetch(url, { next: { revalidate } });
+  const res = await fetch(url, { next: { revalidate }, headers: hfAuthHeaders() });
   if (!res.ok) throw new Error(`HF fetch failed ${res.status}: ${url}`);
   return asObject(await res.json());
 }
@@ -1487,9 +1513,13 @@ function releaseDate(id: string): string {
   return m ? m[1] : id;
 }
 
-export async function loadReleases(revalidate: number): Promise<ReleaseEntry[]> {
-  const url = `https://huggingface.co/api/datasets/${POPULACE_HF_REPO}/tree/${POPULACE_HF_REVISION}/releases?recursive=true`;
-  const res = await fetch(url, { next: { revalidate } });
+export async function loadReleases(
+  revalidate: number,
+  country: PopulaceCountry = "us",
+): Promise<ReleaseEntry[]> {
+  const { repo, revision } = COUNTRY_REPO[country];
+  const url = `https://huggingface.co/api/datasets/${repo}/tree/${revision}/releases?recursive=true`;
+  const res = await fetch(url, { next: { revalidate }, headers: hfAuthHeaders() });
   if (!res.ok) throw new Error(`HF tree failed ${res.status}`);
   const tree = await res.json();
   const files = new Map<string, Set<string>>();
@@ -1512,8 +1542,11 @@ export async function loadReleases(revalidate: number): Promise<ReleaseEntry[]> 
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
-export async function loadPointerReleaseId(revalidate: number): Promise<{ release_id: string; updated_at: string | null }> {
-  const pointer = await hfJson(hfResolveUrl("latest.json"), revalidate);
+export async function loadPointerReleaseId(
+  revalidate: number,
+  country: PopulaceCountry = "us",
+): Promise<{ release_id: string; updated_at: string | null }> {
+  const pointer = await hfJson(hfResolveUrl("latest.json", country), revalidate);
   return {
     release_id: String(pointer.release_id ?? ""),
     updated_at: typeof pointer.updated_at === "string" ? pointer.updated_at : null,
@@ -1522,13 +1555,17 @@ export async function loadPointerReleaseId(revalidate: number): Promise<{ releas
 
 // Load one release's manifests + calibration diagnostics. releaseId "latest"
 // resolves through the pointer.
-export async function loadRelease(releaseId: string, revalidate: number): Promise<Calibration> {
-  const cacheKey = `${releaseId || "latest"}:${revalidate}`;
+export async function loadRelease(
+  releaseId: string,
+  revalidate: number,
+  country: PopulaceCountry = "us",
+): Promise<Calibration> {
+  const cacheKey = `${country}:${releaseId || "latest"}:${revalidate}`;
   const now = Date.now();
   const cached = releaseCache.get(cacheKey);
   if (cached && cached.expiresAt > now) return cached.promise;
 
-  const promise = loadReleaseUncached(releaseId, revalidate);
+  const promise = loadReleaseUncached(releaseId, revalidate, country);
   releaseCache.set(cacheKey, {
     promise,
     expiresAt: now + Math.max(revalidate, 1) * 1000,
@@ -1541,19 +1578,23 @@ export async function loadRelease(releaseId: string, revalidate: number): Promis
   }
 }
 
-async function loadReleaseUncached(releaseId: string, revalidate: number): Promise<Calibration> {
+async function loadReleaseUncached(
+  releaseId: string,
+  revalidate: number,
+  country: PopulaceCountry,
+): Promise<Calibration> {
   let id = releaseId;
   let updatedAt: string | null = null;
   if (releaseId === "latest" || !releaseId) {
-    const ptr = await loadPointerReleaseId(revalidate);
+    const ptr = await loadPointerReleaseId(revalidate, country);
     id = ptr.release_id;
     updatedAt = ptr.updated_at;
   }
   const prefix = `releases/${id}`;
   const [diag, buildManifest, releaseManifest] = await Promise.all([
-    hfJson(hfResolveUrl(`${prefix}/calibration_diagnostics.json`), revalidate),
-    hfJson(hfResolveUrl(`${prefix}/build_manifest.json`), revalidate).catch(() => ({})),
-    hfJson(hfResolveUrl(`${prefix}/release_manifest.json`), revalidate).catch(() => ({})),
+    hfJson(hfResolveUrl(`${prefix}/calibration_diagnostics.json`, country), revalidate),
+    hfJson(hfResolveUrl(`${prefix}/build_manifest.json`, country), revalidate).catch(() => ({})),
+    hfJson(hfResolveUrl(`${prefix}/release_manifest.json`, country), revalidate).catch(() => ({})),
   ]);
   return buildCalibration(diag, id, updatedAt, buildManifest, releaseManifest);
 }
@@ -2202,10 +2243,15 @@ export function buildComparison(a: Calibration, b: Calibration) {
   };
 }
 
-export async function loadComparison(aId: string, bId: string, revalidate: number) {
+export async function loadComparison(
+  aId: string,
+  bId: string,
+  revalidate: number,
+  country: PopulaceCountry = "us",
+) {
   const [a, b] = await Promise.all([
-    loadRelease(aId, revalidate),
-    loadRelease(bId, revalidate),
+    loadRelease(aId, revalidate, country),
+    loadRelease(bId, revalidate, country),
   ]);
   return buildComparison(a, b);
 }

@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server";
 
-import { loadPointerReleaseId, loadReleases, scrub } from "@/lib/populace/latest-artifact";
+import {
+  loadPointerReleaseId,
+  loadReleases,
+  parseCountry,
+  scrub,
+} from "@/lib/populace/latest-artifact";
 
 export const revalidate = 300;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const country = parseCountry(new URL(request.url).searchParams.get("country"));
   try {
     const [releases, pointer] = await Promise.all([
-      loadReleases(revalidate),
-      loadPointerReleaseId(revalidate).catch(() => ({ release_id: "", updated_at: null })),
+      loadReleases(revalidate, country),
+      loadPointerReleaseId(revalidate, country).catch(() => ({ release_id: "", updated_at: null })),
     ]);
     return NextResponse.json(
       scrub({

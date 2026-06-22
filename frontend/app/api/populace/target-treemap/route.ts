@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   loadRelease,
+  parseCountry,
   populaceTargetTreemap,
   scrub,
 } from "@/lib/populace/latest-artifact";
@@ -11,9 +12,11 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
-  const release = new URL(request.url).searchParams.get("release") ?? "latest";
+  const params = new URL(request.url).searchParams;
+  const release = params.get("release") ?? "latest";
+  const country = parseCountry(params.get("country"));
   try {
-    const cal = await loadRelease(release, revalidate);
+    const cal = await loadRelease(release, revalidate, country);
     return NextResponse.json(
       scrub(populaceTargetTreemap(cal.rows, cal.release_id)),
     );

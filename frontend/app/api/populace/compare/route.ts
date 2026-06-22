@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { loadComparison, loadPointerReleaseId, scrub } from "@/lib/populace/latest-artifact";
+import {
+  loadComparison,
+  loadPointerReleaseId,
+  parseCountry,
+  scrub,
+} from "@/lib/populace/latest-artifact";
 
 export const revalidate = 300;
 export const runtime = "nodejs";
@@ -10,16 +15,17 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   let a = url.searchParams.get("a");
   let b = url.searchParams.get("b");
+  const country = parseCountry(url.searchParams.get("country"));
   try {
     // Default b to the latest release; a is required for a real diff.
-    if (!b) b = (await loadPointerReleaseId(revalidate)).release_id;
+    if (!b) b = (await loadPointerReleaseId(revalidate, country)).release_id;
     if (!a || !b) {
       return NextResponse.json(
         { detail: "Provide two releases to compare via ?a=&b=." },
         { status: 400 },
       );
     }
-    const comparison = await loadComparison(a, b, revalidate);
+    const comparison = await loadComparison(a, b, revalidate, country);
     return NextResponse.json(scrub(comparison));
   } catch (error) {
     return NextResponse.json(
