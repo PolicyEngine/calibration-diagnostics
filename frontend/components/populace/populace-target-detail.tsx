@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { fmt, fmtCompact, fmtSigned, humanizeName } from "@/components/shared/format";
 import { StatusPill } from "@/components/shared/status-pill";
 import {
@@ -16,13 +18,24 @@ function facetValue(row: PopulaceTargetRow, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
+function Field({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: string;
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <span className="text-sm text-foreground">{value || "—"}</span>
+      {hint ? (
+        <span className="text-[11px] leading-snug text-muted-foreground">{hint}</span>
+      ) : null}
     </div>
   );
 }
@@ -192,6 +205,11 @@ export function PopulaceTargetDetail({
   const ledger = row.ledger;
   const policyengineVariables = row.policyengine_variables ?? [];
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [row.name]);
+
   // The axes of variation shown as facets (geography, breakdown dims, …), each
   // resolved on this row. Geography/level are also in the canonical fields above,
   // so skip them here to avoid duplication; show the breakdown dims.
@@ -204,7 +222,10 @@ export function PopulaceTargetDetail({
       : (row.dims ?? []).map((value, index) => ({ label: `Breakdown ${index + 1}`, value }));
 
   return (
-    <div className="rounded-lg border border-primary/30 bg-primary/[0.03] shadow-sm">
+    <div
+      ref={rootRef}
+      className="scroll-mt-4 rounded-lg border border-primary/30 bg-primary/[0.03] shadow-sm"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 px-5 py-3">
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">
@@ -248,15 +269,37 @@ export function PopulaceTargetDetail({
             </div>
           )}
           {policyengineVariables.length > 0 ? (
-            <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
-              <Field
-                label="PolicyEngine variables"
-                value={<CodeChips values={policyengineVariables} />}
-              />
+            <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+                How PolicyEngine estimates this
+              </div>
+              <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                These model variables are summed across the weighted population to
+                produce the estimate compared against the official figure above.
+              </p>
+              <div className="mt-2.5">
+                <Field
+                  label="Model variable"
+                  value={<CodeChips values={policyengineVariables} />}
+                  hint="The PolicyEngine variable(s) whose weighted total becomes the estimate."
+                />
+              </div>
               <div className="mt-2 grid grid-cols-2 gap-3">
-                <Field label="Measure mode" value={row.measure_mode} />
-                <Field label="map_to" value={row.policyengine_map_to} />
-                <Field label="Filter variable" value={row.policyengine_filter_variable} />
+                <Field
+                  label="Aggregation"
+                  value={row.measure_mode}
+                  hint="How the variable is combined (e.g. sum, count)."
+                />
+                <Field
+                  label="Counted per"
+                  value={row.policyengine_map_to}
+                  hint="Entity the count maps to, if any."
+                />
+                <Field
+                  label="Filter"
+                  value={row.policyengine_filter_variable}
+                  hint="Variable used to restrict which records count."
+                />
                 <Field label="Target role" value={row.target_role} />
               </div>
             </div>
