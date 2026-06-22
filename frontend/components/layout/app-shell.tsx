@@ -9,11 +9,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <DashboardShell>
       <GlobalLoader />
       <Header navItems={[]} logoHref="/" />
-      <div className="flex min-h-[calc(100vh-4rem)]">
-        <aside className="w-56 shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-border bg-muted/30">
+      <div className="flex h-[calc(100vh-4rem)]">
+        <aside className="w-56 shrink-0 overflow-y-auto border-r border-border bg-muted/30">
           <NavSidebar />
         </aside>
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 overflow-auto p-6 pt-0">
           {children}
         </main>
       </div>

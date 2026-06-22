@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { releaseLabel } from "@/components/shared/format";
 import { apiGet } from "../client";
 
 export interface PopulaceGates {
@@ -608,6 +609,28 @@ export function usePopulaceReleases() {
     queryFn: () => apiGet<PopulaceReleasesResponse>("/populace/releases"),
     staleTime: 5 * 60 * 1000,
   });
+}
+
+// Release dropdown options. "Latest" resolves to the newest build, so we show
+// its date/sha on the label to make clear which release it currently points at.
+export function releaseSelectOptions(
+  data?: PopulaceReleasesResponse,
+): { value: string; label: string }[] {
+  const releases = data?.releases ?? [];
+  const latest =
+    (data?.latest_release_id
+      ? releases.find((r) => r.release_id === data.latest_release_id)
+      : undefined) ?? releases[0];
+  return [
+    {
+      value: "",
+      label: latest ? `Latest · ${releaseLabel(latest.release_id, latest.date)}` : "Latest",
+    },
+    ...releases.map((r) => ({
+      value: r.release_id,
+      label: releaseLabel(r.release_id, r.date),
+    })),
+  ];
 }
 
 export function usePopulace(release?: string) {

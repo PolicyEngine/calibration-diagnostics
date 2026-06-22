@@ -4,11 +4,12 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, fmtMoney, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtCompact, fmtMoney } from "@/components/shared/format";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import {
+  releaseSelectOptions,
   usePopulaceReleases,
   usePopulaceVariableValue,
   useVariableCatalog,
@@ -115,16 +116,7 @@ export function PopulaceVariableLookupView() {
 
   const { data: catalog = [], isLoading: catalogLoading } = useVariableCatalog();
   const { data: releaseData } = usePopulaceReleases();
-  const releaseOptions = useMemo(
-    () => [
-      { value: "", label: "Latest" },
-      ...(releaseData?.releases ?? []).map((r) => ({
-        value: r.release_id,
-        label: releaseLabel(r.release_id, r.date),
-      })),
-    ],
-    [releaseData],
-  );
+  const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
 
   const query = usePopulaceVariableValue({
     variables: submitted,

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtCompact, humanizeName } from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -11,6 +11,7 @@ import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { PopulaceTargetDetail } from "@/components/populace/populace-target-detail";
 import {
+  releaseSelectOptions,
   usePopulaceReleases,
   usePopulaceTargetDiagnostics,
   type PopulaceTargetDimension,
@@ -574,16 +575,7 @@ export function PopulaceTargetsView({
   const [refineIndex, setRefineIndex] = useState(0);
 
   const { data: releaseData } = usePopulaceReleases();
-  const releaseOptions = useMemo(
-    () => [
-      { value: "", label: "Latest" },
-      ...(releaseData?.releases ?? []).map((r) => ({
-        value: r.release_id,
-        label: releaseLabel(r.release_id, r.date),
-      })),
-    ],
-    [releaseData],
-  );
+  const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
 
   function pickRelease(value: string) {
     // A different release is a different surface — reset everything below it.
