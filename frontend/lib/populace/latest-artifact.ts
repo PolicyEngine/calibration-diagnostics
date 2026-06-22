@@ -1935,7 +1935,16 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     filtered = filtered.filter((row) => rowFacetValue(row, key) === value);
   }
   if (direction) filtered = filtered.filter((row) => row.direction === direction);
-  if (within !== null) filtered = filtered.filter((row) => row.within_tolerance === within);
+  // The artifact does not populate row.within_tolerance, so derive the "within
+  // 10%" fit from the relative error — consistent with the within_10pct counts
+  // and the "% on target" shown elsewhere.
+  if (within !== null) {
+    filtered = filtered.filter((row) => {
+      const error = numberOrNull(row.abs_relative_error);
+      const isWithin = error != null && error <= 0.1;
+      return isWithin === within;
+    });
+  }
   if (search) filtered = filtered.filter((row) => matchesSearch(row, search));
   const sortValue = (row: TargetRow) =>
     rowFacetValue(row, sortBy) ?? row[sortBy];

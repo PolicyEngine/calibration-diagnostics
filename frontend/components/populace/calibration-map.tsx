@@ -250,7 +250,6 @@ function FitLegend() {
       <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">
         Median error
       </span>
-      <span className="font-medium text-foreground">On target</span>
       <div className="flex flex-col gap-1">
         <span
           className="h-2 w-36 rounded-full ring-1 ring-black/5"
@@ -266,7 +265,6 @@ function FitLegend() {
           ))}
         </div>
       </div>
-      <span className="font-medium text-foreground">Off target</span>
     </div>
   );
 }

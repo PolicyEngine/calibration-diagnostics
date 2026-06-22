@@ -8,7 +8,6 @@ import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
-import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { PopulaceTargetDetail } from "@/components/populace/populace-target-detail";
 import {
@@ -90,13 +89,6 @@ function measureTitle(row: PopulaceTargetRow): string {
   );
 }
 
-function periodTitle(row: PopulaceTargetRow): string {
-  const target = row.ledger?.target_period ?? (row.period == null ? null : String(row.period));
-  const source = row.ledger?.source_period;
-  if (target && source && target !== source) return `${source} → ${target}`;
-  return target ?? source ?? "—";
-}
-
 function dimensionSummary(row: PopulaceTargetRow): string {
   const dims = row.target_dimensions?.map((dim) => dim.value).filter(Boolean) ?? [];
   if (dims.length) return dims.join(" · ");
@@ -104,27 +96,6 @@ function dimensionSummary(row: PopulaceTargetRow): string {
   if (group && group !== "all") return humanizeName(group);
   return "All";
 }
-
-function calibrationStatusTone(
-  status: PopulaceTargetRow["calibration_status"],
-): "success" | "warning" | "neutral" {
-  if (status === "included") return "success";
-  if (status === "skipped" || status === "not_materialized") return "warning";
-  return "neutral";
-}
-
-const STATUS_COLUMN: Column = {
-  key: "calibration_status",
-  label: "Calibration",
-  sortable: true,
-  render: (row) => (
-    <span title={row.calibration_status_reason ?? undefined}>
-      <StatusPill tone={calibrationStatusTone(row.calibration_status)}>
-        {row.calibration_status_label ?? "Unknown"}
-      </StatusPill>
-    </span>
-  ),
-};
 
 function calculationLine(row: {
   policyengine_variables?: string[] | null;
@@ -143,7 +114,6 @@ function calculationLine(row: {
 }
 
 const METRIC_COLUMNS: Column[] = [
-  STATUS_COLUMN,
   {
     key: "target",
     label: "Target",
@@ -205,16 +175,6 @@ const OVERVIEW_COLUMNS: Column[] = [
           {titleFromIdentifier(row.ledger?.domain)}
         </div>
       </div>
-    ),
-  },
-  {
-    key: "period",
-    label: "Period",
-    sortable: true,
-    render: (row) => (
-      <span className="whitespace-nowrap" title={row.ledger?.period_type ?? undefined}>
-        {periodTitle(row)}
-      </span>
     ),
   },
   {
@@ -348,6 +308,34 @@ function healthcareSummary(variables: PopulaceVariableRow[]): HealthcareSummary 
   };
 }
 
+
+const SOURCE_LABELS: Record<string, string> = {
+  irs_soi: "IRS — income & taxes",
+  census_population: "Census — population",
+  cms_aca: "CMS — ACA marketplace",
+  cms_medicaid: "CMS — Medicaid & CHIP",
+  cms_medicare: "CMS — Medicare",
+  hhs_acf_tanf: "HHS — TANF",
+  usda_snap: "USDA — SNAP",
+  ssa: "Social Security",
+  cbo: "CBO projections",
+  jct: "JCT scores",
+  state_income_tax: "State income tax",
+};
+
+function sourceLabel(source: string): string {
+  return (
+    SOURCE_LABELS[source] ??
+    source
+      .split("_")
+      .map((w) => (w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)))
+      .join(" ")
+  );
+}
+
+// Friendlier statistic picker: statistics grouped under plain-English source
+// headings, each a clean card with a fit dot, human name, and amount/count
+// pills — no source codes, calc lines, or variable_key clutter.
 function VariableBrowser({
   variables,
   active,
@@ -359,130 +347,207 @@ function VariableBrowser({
 }) {
   const [query, setQuery] = useState("");
   const groups = useMemo(() => groupVariables(variables), [variables]);
-  const filtered = query
-    ? groups.filter((group) => {
-        const haystack = [
-          group.variable,
-          group.source,
-          group.level,
-          ...group.options.map((option) => option.row.variable_key),
-        ]
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? groups.filter((group) =>
+        [group.variable, sourceLabel(group.source), group.source]
           .join(" ")
-          .toLowerCase();
-        return haystack.includes(query.toLowerCase());
-      })
+          .toLowerCase()
+          .includes(q),
+      )
     : groups;
+  const sections = useMemo(() => {
+    const map = new Map<string, typeof filtered>();
+    for (const group of filtered) {
+      const list = map.get(group.source) ?? map.set(group.source, []).get(group.source)!;
+      list.push(group);
+    }
+    return [...map.entries()]
+      .map(([source, items]) => ({
+        source,
+        items: [...items].sort((a, b) => b.nTargets - a.nTargets),
+        total: items.reduce((sum, item) => sum + item.nTargets, 0),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [filtered]);
+
   return (
-    <div className="flex flex-col gap-2">
-      <input
-        type="search"
-        value={query}
-        placeholder="Filter variables…"
-        onChange={(event) => setQuery(event.target.value)}
-        className="h-8 w-full rounded-md border border-border bg-white px-3 text-xs focus:border-primary/60 focus:outline-none"
-      />
-      <div className="max-h-[65vh] overflow-y-auto rounded-md border border-border">
-        <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-border bg-muted/40 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
-          <span>Variable</span>
-          <span className="text-right">Targets</span>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <input
+          type="search"
+          value={query}
+          placeholder="Search statistics — e.g. EITC, Medicaid, income…"
+          onChange={(event) => setQuery(event.target.value)}
+          className="h-10 w-full rounded-lg border border-border bg-white px-3.5 text-sm focus:border-primary/60 focus:outline-none"
+        />
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Each bar shows the share of that statistic&apos;s breakdowns whose calibrated
+          estimate lands within 10% of the official published figure.
+        </p>
+      </div>
+      {sections.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+          No statistics match “{query}”.
         </div>
-        <div className="divide-y divide-border/60">
-          {filtered.map((group) => {
-            const activeOption = group.options.find((option) => option.key === active);
-            const selectedKey = activeOption?.key ?? group.defaultKey;
-            const selectedOption =
-              group.options.find((option) => option.key === selectedKey) ?? group.options[0];
-            const selectedRow = selectedOption.row;
-            const isActive = Boolean(activeOption);
-            const within10Share = selectedRow.n_targets
-              ? selectedRow.within_10pct / selectedRow.n_targets
-              : null;
-            const calcLine = calculationLine(selectedRow);
-            return (
-              <div
-                key={group.groupKey}
-                role="button"
-                tabIndex={0}
-                onClick={() => onPick(isActive ? "" : selectedKey)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onPick(isActive ? "" : selectedKey);
-                  }
-                }}
-                className={`block w-full min-w-0 cursor-pointer px-3 py-2 text-left ${
-                  isActive ? "bg-primary/10" : "hover:bg-muted/40"
-                }`}
-              >
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3">
-                  <div className="min-w-0">
-                    <div className={`truncate text-sm leading-snug ${isActive ? "font-medium text-primary" : "text-foreground"}`}>
-                      {humanizeName(group.variable) || selectedRow.variable_key}
+      ) : (
+        sections.map((section) => (
+          <div key={section.source}>
+            <div className="mb-3 flex items-baseline justify-between gap-3 border-b border-border/70 pb-2">
+              <h3 className="text-sm font-semibold text-foreground">{sourceLabel(section.source)}</h3>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {fmt(section.items.length, { digits: 0 })} statistics · {fmt(section.total, { digits: 0 })} targets
+              </span>
+            </div>
+            <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+              {section.items.map((group) => {
+                const share = group.nTargets ? group.within10Pct / group.nTargets : null;
+                const isActive = group.options.some((option) => option.key === active);
+                const hasMeasures = group.options.length > 1;
+                return (
+                  <button
+                    key={group.groupKey}
+                    type="button"
+                    onClick={() => onPick(group.defaultKey)}
+                    className={`group flex flex-col gap-3 rounded-xl border bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                      isActive ? "border-primary ring-1 ring-primary" : "border-border"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                        {humanizeName(group.variable)}
+                      </span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {fmt(group.nTargets, { digits: 0 })}
+                      </span>
                     </div>
-                    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <span>{group.source}</span>
-                      {group.level ? <span>{group.level}</span> : null}
-                    </div>
-                    {calcLine ? (
-                      <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
-                        calc {calcLine}
+
+                    <div className="mt-auto">
+                      <div className="mb-1 flex items-baseline justify-between">
+                        <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
+                          Within 10%
+                        </span>
+                        <span className="font-mono text-xs font-semibold tabular-nums text-foreground">
+                          {share == null ? "—" : fmt(share, { pct: true, digits: 0 })}
+                        </span>
                       </div>
-                    ) : null}
-                  </div>
-                  <div className="shrink-0 text-right text-xs tabular-nums">
-                    <div className="font-medium text-foreground">
-                      {fmt(selectedRow.n_targets, { digits: 0 })}
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-[width]"
+                          style={{ width: `${Math.round((share ?? 0) * 100)}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {within10Share == null
-                        ? "—"
-                        : `${fmt(within10Share, { pct: true, digits: 0 })} in 10%`}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  className="mt-2 flex min-w-0 flex-wrap items-center gap-1"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {group.options.length > 1 ? (
-                    <div className="inline-flex max-w-full rounded-md border border-border bg-white p-0.5">
-                      {group.options.map((option) => {
-                        const isSelected = option.key === selectedKey;
-                        return (
-                          <button
+
+                    {hasMeasures ? (
+                      <div
+                        className="flex flex-wrap gap-1.5"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {group.options.map((option) => (
+                          <span
                             key={option.key}
-                            type="button"
-                            onClick={() => onPick(option.key === active ? "" : option.key)}
-                            className={`h-6 min-w-0 px-2 text-[11px] font-medium ${
-                              isSelected
-                                ? "rounded bg-primary text-primary-foreground"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => onPick(option.key)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                onPick(option.key);
+                              }
+                            }}
+                            className="cursor-pointer rounded-full border border-border px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
                           >
                             {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <span className="inline-flex h-6 items-center rounded bg-muted px-2 text-[11px] font-medium text-foreground/70">
-                      {selectedOption.label}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[11px] font-medium text-muted-foreground/70">
+                        {group.options[0].label}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
 
-const TARGET_SCOPE_OPTIONS: { value: TargetScope; label: string }[] = [
-  { value: "all", label: "All targets" },
-  { value: "healthcare", label: "Healthcare" },
-];
+type WizardStep = "home" | "pick" | "refine" | "results";
+type WizardAccent = "teal" | "amber" | "slate";
+
+const ACCENTS: Record<
+  WizardAccent,
+  { chip: string; ink: string; border: string; glow: string }
+> = {
+  teal: {
+    chip: "bg-primary/10 text-primary",
+    ink: "text-primary",
+    border: "hover:border-primary/50",
+    glow: "group-hover:shadow-[0_18px_40px_-20px_rgba(49,151,149,0.55)]",
+  },
+  amber: {
+    chip: "bg-amber-100 text-amber-700",
+    ink: "text-amber-700",
+    border: "hover:border-amber-400/60",
+    glow: "group-hover:shadow-[0_18px_40px_-20px_rgba(217,119,6,0.5)]",
+  },
+  slate: {
+    chip: "bg-slate-100 text-slate-600",
+    ink: "text-slate-600",
+    border: "hover:border-slate-400/60",
+    glow: "group-hover:shadow-[0_18px_40px_-20px_rgba(71,85,105,0.45)]",
+  },
+};
+
+function WizardCard({
+  eyebrow,
+  title,
+  body,
+  stat,
+  accent,
+  onClick,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+  stat: string;
+  accent: WizardAccent;
+  onClick: () => void;
+}) {
+  const a = ACCENTS[accent];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative flex h-full flex-col gap-5 rounded-2xl border border-border bg-white p-6 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-1 ${a.border} ${a.glow} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary`}
+    >
+      <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${a.ink}`}>
+        {eyebrow}
+      </span>
+      <div className="flex-1">
+        <h3 className="text-xl font-semibold leading-snug tracking-tight text-foreground">
+          {title}
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
+      </div>
+      <div className="flex items-center justify-between border-t border-border/60 pt-4">
+        <span className={`text-sm font-semibold tabular-nums ${a.ink}`}>{stat}</span>
+        <span
+          className={`grid h-8 w-8 place-items-center rounded-full border border-border text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:border-current ${a.ink}`}
+          aria-hidden
+        >
+          →
+        </span>
+      </div>
+    </button>
+  );
+}
 
 export function PopulaceTargetsView({
   initialScope = "all",
@@ -504,6 +569,9 @@ export function PopulaceTargetsView({
   const [selected, setSelected] = useState<PopulaceTargetRow | null>(null);
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<SortState>({ by: "abs_relative_error", dir: "desc" });
+  const [step, setStep] = useState<WizardStep>(initialSource ? "results" : "home");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [refineIndex, setRefineIndex] = useState(0);
 
   const { data: releaseData } = usePopulaceReleases();
   const releaseOptions = useMemo(
@@ -531,15 +599,54 @@ export function PopulaceTargetsView({
     setPage(0);
   }
 
-  function pickScope(value: TargetScope) {
-    setScope(value);
+  function resetFilters() {
     setVariable("");
     setFacetFilters({});
     setSource("");
     setLevel("");
+    setGeography("");
+    setDirection("");
+    setWithinTolerance("");
     setSearch("");
+    setScope("all");
     setSelected(null);
+    setShowAdvanced(false);
+    setRefineIndex(0);
     setPage(0);
+  }
+
+  function startOver() {
+    resetFilters();
+    setStep("home");
+  }
+
+  function startExplore() {
+    resetFilters();
+    setStep("pick");
+  }
+
+  function startHealthcare() {
+    resetFilters();
+    setScope("healthcare");
+    setStep("results");
+  }
+
+  function startEverything() {
+    resetFilters();
+    setStep("results");
+  }
+
+  // Step back one level toward the starting cards.
+  function goBack() {
+    if (step === "results" && activeVariable) {
+      setStep("refine");
+      return;
+    }
+    if (step === "refine") {
+      setStep("pick");
+      return;
+    }
+    startOver();
   }
 
   const facetParam = useMemo(
@@ -597,11 +704,36 @@ export function PopulaceTargetsView({
     [scope, variables],
   );
   const filteredTotal = data?.filtered_total ?? 0;
-  const includedTargetCount = data?.summary.included_target_count ?? data?.total_targets ?? null;
-  const skippedTargetCount = data?.summary.skipped_target_count ?? null;
-  const droppedTargetCount = data?.summary.dropped_target_count ?? null;
+  const allTargets = data?.total_targets ?? null;
   const pageCount = Math.max(Math.ceil(filteredTotal / PAGE_SIZE), 1);
   const activeVariable = variables.find((v) => v.variable_key === variable);
+
+  // Guided "Explore" refine questions: the selected statistic's own breakdown
+  // dimensions (placeholder-only ones dropped), then a fit-quality question.
+  const usableDimensions = useMemo(
+    () =>
+      dimensions
+        .map((d) => ({
+          ...d,
+          values: d.values.filter((v) => v && v !== "All" && v !== "Total"),
+        }))
+        .filter((d) => d.values.length > 0),
+    [dimensions],
+  );
+  type RefineQuestion =
+    | { kind: "dim"; key: string; label: string; values: string[] }
+    | { kind: "fit"; key: "fit"; label: string };
+  const refineQuestions: RefineQuestion[] = [
+    ...usableDimensions.map((d) => ({
+      kind: "dim" as const,
+      key: d.key,
+      label: d.label,
+      values: d.values,
+    })),
+    { kind: "fit", key: "fit", label: "Fit quality" },
+  ];
+  const refineStepIndex = Math.min(refineIndex, refineQuestions.length - 1);
+
   const columns = useMemo<Column[]>(
     () =>
       activeVariable && dimensions.length
@@ -627,6 +759,11 @@ export function PopulaceTargetsView({
       setSource("");
       setLevel("");
       setGeography("");
+      setWithinTolerance("");
+      setRefineIndex(0);
+      setStep("refine");
+    } else {
+      setStep("pick");
     }
     setSelected(null);
     setPage(0);
@@ -772,16 +909,139 @@ export function PopulaceTargetsView({
     </div>
   );
 
+  const activeMeasure =
+    activeVariable?.measure === "total" || !activeVariable?.measure
+      ? activeVariable
+        ? "amount"
+        : null
+      : activeVariable.measure;
+
+  const pathLabel = activeVariable
+    ? `${activeVariable.source} / ${humanizeName(activeVariable.variable)}${activeMeasure ? ` · ${activeMeasure}` : ""}`
+    : withinTolerance === "false"
+      ? "Where calibration struggles"
+      : scope === "healthcare"
+        ? "Healthcare programs"
+        : "All targets";
+
+  const slimRefiners = (
+    <div className="flex flex-wrap items-end gap-3 border-b border-border bg-white px-4 py-3">
+      {activeVariable && dimensions.length ? (
+        dimensions.map((dim) => (
+          <ToolbarSelect
+            key={dim.key}
+            label={dim.label}
+            value={facetFilters[dim.key] ?? ""}
+            onChange={(value) => setFacet(dim.key, value)}
+            options={[
+              { value: "", label: "Any" },
+              ...dim.values.map((value) => ({ value, label: value.replace(/^AGI in /, "") })),
+            ]}
+            layout="stacked"
+          />
+        ))
+      ) : (
+        <ToolbarSelect
+          label="Source"
+          value={source}
+          onChange={(value) => {
+            setSource(value);
+            setSelected(null);
+            setPage(0);
+          }}
+          options={[
+            { value: "", label: "Any source" },
+            ...sources.map((value) => ({ value, label: value })),
+          ]}
+          layout="stacked"
+        />
+      )}
+      <ToolbarSelect
+        label="Fit"
+        value={withinTolerance}
+        onChange={(value) => {
+          setWithinTolerance(value);
+          setSelected(null);
+          setPage(0);
+        }}
+        options={[
+          { value: "", label: "Any" },
+          { value: "true", label: "Within 10%" },
+          { value: "false", label: "Outside 10%" },
+        ]}
+        layout="stacked"
+      />
+    </div>
+  );
+
+  const resultsTable = isLoading ? (
+    <LoadingBlock label="Loading target diagnostics…" />
+  ) : error || !data ? (
+    <EmptyState
+      title="Target diagnostics unavailable"
+      description={error instanceof Error ? error.message : "Unknown error."}
+    />
+  ) : data.targets.length === 0 ? (
+    <EmptyState title="No targets match the current filters." variant="compact" />
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+            {columns.map((column) => (
+              <th
+                key={column.key}
+                className={`px-3 py-2 font-semibold ${column.numeric ? "text-right" : ""}`}
+              >
+                {column.sortable ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleSort(column.key)}
+                    className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-foreground"
+                  >
+                    {column.label}
+                    {sort.by === column.key ? (sort.dir === "desc" ? "↓" : "↑") : ""}
+                  </button>
+                ) : (
+                  column.label
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.targets.map((row) => {
+            const isSelected = selected?.name === row.name;
+            return (
+              <tr
+                key={row.name}
+                onClick={() => setSelected(isSelected ? null : row)}
+                className={`cursor-pointer border-b border-border/60 last:border-b-0 ${
+                  isSelected ? "bg-primary/10" : "hover:bg-muted/30"
+                }`}
+              >
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className={`px-3 py-1.5 tabular-nums ${column.numeric ? "text-right" : ""}`}
+                  >
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Populace"
         title="Target diagnostics"
-        description={
-          scope === "healthcare"
-            ? "Focus on ACA marketplace, premium tax credit, Medicaid, CHIP, and Medicare calibration targets across national and state rows."
-            : "Browse the calibration target surface by the thing each constraint measures — e.g. adjusted gross income, then its by-income-bracket and by-filing-status breakdowns — and see how well the calibrated weights reproduce each."
-        }
+        description="See how closely the calibrated weights reproduce each official statistic — by source, measure, and breakdown."
         actions={
           <ToolbarSelect
             label="Release"
@@ -792,65 +1052,265 @@ export function PopulaceTargetsView({
         }
       />
 
-      <div
-        role="tablist"
-        aria-label="Target diagnostic scope"
-        className="flex w-fit max-w-full flex-wrap items-center gap-0.5 rounded-lg bg-muted p-1"
-      >
-        {TARGET_SCOPE_OPTIONS.map((option) => {
-          const active = scope === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => pickScope(option.value)}
-              className={`h-8 rounded-md px-3 text-sm font-medium transition-colors ${
-                active
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {health && data && !isLoading ? (
-        <div className="grid gap-3 md:grid-cols-3">
-          <KpiCard
-            label="Healthcare Targets"
-            value={fmt(data.total_targets, { digits: 0 })}
-            size="sm"
-          />
-          <KpiCard
-            label="Within 10%"
-            value={
-              health.nTargets
-                ? fmt(health.within10Pct / health.nTargets, { pct: true, digits: 0 })
-                : "—"
-            }
-            size="sm"
-          />
-          <KpiCard
-            label="Mean Abs Error"
-            value={fmt(health.meanAbsRelativeError, { pct: true, digits: 1 })}
-            size="sm"
-          />
+      {step === "home" && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-base font-semibold text-foreground">
+            Where would you like to start?
+          </h2>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <WizardCard
+              eyebrow="Browse"
+              title="Explore a statistic"
+              body="Pick a measure like EITC, population, or AGI and see how each breakdown is calibrated."
+              stat={variableGroupCount ? `${fmt(variableGroupCount, { digits: 0 })} statistics` : "Browse measures"}
+              accent="teal"
+              onClick={startExplore}
+            />
+            <WizardCard
+              eyebrow="Focus"
+              title="Healthcare programs"
+              body="ACA marketplace, Medicaid, CHIP, and Medicare enrollment and premium targets."
+              stat="ACA · Medicaid · Medicare"
+              accent="teal"
+              onClick={startHealthcare}
+            />
+            <WizardCard
+              eyebrow="Everything"
+              title="See everything"
+              body="Browse the full target surface with all filters and column sorting."
+              stat={allTargets != null ? `${fmt(allTargets, { digits: 0 })} targets` : "All targets"}
+              accent="slate"
+              onClick={startEverything}
+            />
+          </div>
         </div>
-      ) : null}
+      )}
 
-      <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <SectionCard
-          title={scope === "healthcare" ? "Browse healthcare variables" : "Browse by variable"}
-          description={`${fmt(variableGroupCount, { digits: 0 })} variables in this release. Amount is selected by default when amount/count variants both exist.`}
-        >
-          <VariableBrowser variables={variables} active={variable} onPick={pickVariable} />
-        </SectionCard>
+      {step === "pick" && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white px-4 py-2.5 text-sm shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <button
+              type="button"
+              onClick={goBack}
+              className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+            >
+              <span aria-hidden>←</span> Back
+            </button>
+            <span className="text-muted-foreground/50">/</span>
+            <span className="font-semibold text-foreground">Pick a statistic</span>
+          </div>
+          <SectionCard
+            title="Which statistic?"
+            description={`${fmt(variableGroupCount, { digits: 0 })} measures in this release — pick one to see its breakdowns.`}
+          >
+            <VariableBrowser variables={variables} active={variable} onPick={pickVariable} />
+          </SectionCard>
+        </div>
+      )}
 
-        <div className="flex flex-col gap-5">
+      {step === "refine" && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+              <button type="button" onClick={goBack} className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground">
+                <span aria-hidden>←</span> Back
+              </button>
+              <span className="text-muted-foreground/50">/</span>
+              <span className="truncate font-semibold text-foreground">
+                {activeVariable ? humanizeName(activeVariable.variable) : "Statistic"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={startOver}
+                className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              >
+                Start over
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep("results")}
+                className="rounded-md border border-primary bg-primary/5 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-primary/10"
+              >
+                Skip to results →
+              </button>
+            </div>
+          </div>
+
+          {isLoading || !data ? (
+            <LoadingBlock label="Loading breakdowns…" />
+          ) : (
+            (() => {
+              const q = refineQuestions[refineStepIndex];
+              const isLast = refineStepIndex >= refineQuestions.length - 1;
+              const current =
+                q.kind === "fit" ? withinTolerance : facetFilters[q.key] ?? "";
+              const options =
+                q.kind === "fit"
+                  ? [
+                      { value: "", label: "Any fit" },
+                      { value: "true", label: "Within 10%" },
+                      { value: "false", label: "Outside 10%" },
+                    ]
+                  : [
+                      { value: "", label: `Any ${q.label.toLowerCase()}` },
+                      ...q.values.map((v) => ({ value: v, label: v.replace(/^AGI in /, "") })),
+                    ];
+              const setValue = (value: string) => {
+                if (q.kind === "fit") setWithinTolerance(value);
+                else setFacet(q.key, value);
+              };
+              const advance = () => {
+                if (isLast) setStep("results");
+                else setRefineIndex((i) => i + 1);
+              };
+              const prevQuestion = () => {
+                if (refineStepIndex === 0) setStep("pick");
+                else setRefineIndex((i) => Math.max(i - 1, 0));
+              };
+              const title =
+                q.kind === "fit"
+                  ? "Filter by fit quality?"
+                  : `Narrow by ${q.label.toLowerCase()}?`;
+
+              return (
+                <SectionCard
+                  title={
+                    <span className="flex items-center gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                        Step {refineStepIndex + 1} of {refineQuestions.length}
+                      </span>
+                    </span>
+                  }
+                  description={title}
+                  footer={
+                    <div className="flex items-center justify-between px-5 py-2.5 text-xs text-muted-foreground">
+                      <button
+                        type="button"
+                        onClick={prevQuestion}
+                        className="rounded-md border border-border px-2.5 py-1 hover:bg-muted/60 hover:text-foreground"
+                      >
+                        ← Previous
+                      </button>
+                      <span>
+                        <span className="font-mono font-semibold text-foreground">
+                          {fmt(filteredTotal, { digits: 0 })}
+                        </span>{" "}
+                        targets match
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setStep("results")}
+                        className="rounded-md border border-primary bg-primary/5 px-2.5 py-1 font-medium text-foreground hover:bg-primary/10"
+                      >
+                        See results →
+                      </button>
+                    </div>
+                  }
+                >
+                  <div className="flex max-h-72 flex-wrap gap-2 overflow-y-auto p-1">
+                    {options.map((opt) => {
+                      const active = current === opt.value;
+                      return (
+                        <button
+                          key={opt.value || "__any__"}
+                          type="button"
+                          onClick={() => {
+                            setValue(opt.value);
+                            advance();
+                          }}
+                          className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : opt.value === ""
+                                ? "border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                                : "border-border bg-white text-foreground hover:border-primary/50 hover:bg-primary/5"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </SectionCard>
+              );
+            })()
+          )}
+        </div>
+      )}
+
+      {step === "results" && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+              <button
+                type="button"
+                onClick={goBack}
+                className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+              >
+                <span aria-hidden>←</span> Back
+              </button>
+              <span className="text-muted-foreground/50">/</span>
+              <span className="truncate font-semibold text-foreground">{pathLabel}</span>
+              {activeVariable && (
+                <button
+                  type="button"
+                  onClick={() => setStep("pick")}
+                  className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted/60"
+                >
+                  change
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {activeVariable && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((value) => !value)}
+                  className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
+                    showAdvanced
+                      ? "border-primary bg-primary/5 text-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  }`}
+                >
+                  Advanced filters {showAdvanced ? "▴" : "▾"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={startOver}
+                className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              >
+                Start over
+              </button>
+            </div>
+          </div>
+
+          {health && data && !isLoading ? (
+            <div className="grid gap-3 md:grid-cols-3">
+              <KpiCard
+                label="Healthcare targets"
+                value={fmt(data.total_targets, { digits: 0 })}
+                size="sm"
+              />
+              <KpiCard
+                label="Within 10%"
+                value={
+                  health.nTargets
+                    ? fmt(health.within10Pct / health.nTargets, { pct: true, digits: 0 })
+                    : "—"
+                }
+                size="sm"
+              />
+              <KpiCard
+                label="Mean abs error"
+                value={fmt(health.meanAbsRelativeError, { pct: true, digits: 1 })}
+                size="sm"
+              />
+            </div>
+          ) : null}
+
           {selected && (
             <PopulaceTargetDetail
               row={selected}
@@ -858,37 +1318,16 @@ export function PopulaceTargetsView({
               onClose={() => setSelected(null)}
             />
           )}
+
           <SectionCard
-            title={
-              activeVariable ? (
-                <span className="flex flex-wrap items-center gap-2">
-                  <span>
-                    {activeVariable.source} / {humanizeName(activeVariable.variable)}
-                    {activeVariable.measure ? (
-                      <span className="ml-1 text-sm font-normal text-muted-foreground">
-                        ({activeVariable.measure === "total" ? "amount" : activeVariable.measure})
-                      </span>
-                    ) : null}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => pickVariable("")}
-                    className="rounded-full border border-border px-2 py-0.5 text-[11px] font-normal text-muted-foreground hover:bg-muted/60"
-                  >
-                    clear ✕
-                  </button>
-                </span>
-              ) : (
-                `${scope === "healthcare" ? "Healthcare targets" : "Targets"} (${fmt(filteredTotal, { digits: 0 })} of ${fmt(data?.total_targets ?? null, { digits: 0 })})`
-              )
-            }
+            title={`${fmt(filteredTotal, { digits: 0 })} of ${fmt(data?.total_targets ?? null, { digits: 0 })} targets`}
             description={
               activeVariable
                 ? `${fmt(activeVariable.n_targets, { digits: 0 })} breakdowns · ${fmt(
                     activeVariable.within_10pct / Math.max(activeVariable.n_targets, 1),
                     { pct: true, digits: 0 },
-                  )} within 10% · mean abs rel. error ${fmt(activeVariable.mean_abs_relative_error, { pct: true, digits: 1 })}`
-                : `${fmt(includedTargetCount, { digits: 0 })} targets included in calibration · ${fmt(droppedTargetCount, { digits: 0 })} dropped before calibration · ${fmt(skippedTargetCount, { digits: 0 })} skipped by calibration. Final estimate is after calibrated weights.`
+                  )} within 10% · mean abs error ${fmt(activeVariable.mean_abs_relative_error, { pct: true, digits: 1 })}`
+                : "Final estimate is after calibrated weights. Click any row for its full lineage."
             }
             padded={false}
             footer={
@@ -920,71 +1359,11 @@ export function PopulaceTargetsView({
               </div>
             }
           >
-            {targetFilters}
-            {isLoading ? (
-              <LoadingBlock label="Loading target diagnostics…" />
-            ) : error || !data ? (
-                <EmptyState
-                  title="Target diagnostics unavailable"
-                  description={error instanceof Error ? error.message : "Unknown error."}
-              />
-            ) : data.targets.length === 0 ? (
-              <EmptyState title="No targets match the current filters." variant="compact" />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                      {columns.map((column) => (
-                        <th
-                          key={column.key}
-                          className={`px-3 py-2 font-semibold ${column.numeric ? "text-right" : ""}`}
-                        >
-                          {column.sortable ? (
-                            <button
-                              type="button"
-                              onClick={() => toggleSort(column.key)}
-                              className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-foreground"
-                            >
-                              {column.label}
-                              {sort.by === column.key ? (sort.dir === "desc" ? "↓" : "↑") : ""}
-                            </button>
-                          ) : (
-                            column.label
-                          )}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.targets.map((row) => {
-                      const isSelected = selected?.name === row.name;
-                      return (
-                        <tr
-                          key={row.name}
-                          onClick={() => setSelected(isSelected ? null : row)}
-                          className={`cursor-pointer border-b border-border/60 last:border-b-0 ${
-                            isSelected ? "bg-primary/10" : "hover:bg-muted/30"
-                          }`}
-                        >
-                          {columns.map((column) => (
-                            <td
-                              key={column.key}
-                              className={`px-3 py-1.5 tabular-nums ${column.numeric ? "text-right" : ""}`}
-                            >
-                              {column.render(row)}
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {!activeVariable || showAdvanced ? targetFilters : slimRefiners}
+            {resultsTable}
           </SectionCard>
         </div>
-      </div>
+      )}
     </div>
   );
 }
