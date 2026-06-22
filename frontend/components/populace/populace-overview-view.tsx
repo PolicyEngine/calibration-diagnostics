@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { CalibrationMap } from "@/components/populace/calibration-map";
+import { useCountry } from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -44,6 +45,7 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
 }
 
 export function PopulaceOverviewView() {
+  const { country } = useCountry();
   const [release, setRelease] = useState("");
   const { data: releaseData } = usePopulaceReleases();
   const { data, isLoading, error } = usePopulace(release || undefined);
@@ -74,9 +76,13 @@ export function PopulaceOverviewView() {
         description={
           <>
             Populace reweights survey microdata so it matches thousands of official
-            statistics from agencies like the IRS, Census, and CMS. Each tile below is
-            one of those things we calibrate to — EITC, population, Medicaid enrollment.
-            Tile size shows how much we calibrate to it; color shows how closely the
+            statistics from agencies like{" "}
+            {country === "uk" ? "the ONS, OBR, and HMRC" : "the IRS, Census, and CMS"}. Each
+            tile below is one of those things we calibrate to —{" "}
+            {country === "uk"
+              ? "population by region and age, household types, tax receipts"
+              : "EITC, population, Medicaid enrollment"}
+            . Tile size shows how much we calibrate to it; color shows how closely the
             weighted data matches. Built live from{" "}
             <a
               className="underline decoration-dotted underline-offset-2"
