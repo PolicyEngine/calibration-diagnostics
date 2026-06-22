@@ -414,6 +414,27 @@ export interface PopulaceVariableLookupResponse extends Partial<PopulaceVariable
   elapsed_seconds: number | null;
 }
 
+export interface CatalogVariable {
+  name: string;
+  label: string | null;
+  entity: string | null;
+  unit: string | null;
+}
+
+export function useVariableCatalog() {
+  return useQuery({
+    queryKey: ["variable-catalog"],
+    queryFn: async (): Promise<CatalogVariable[]> => {
+      const res = await fetch("/variable-catalog.json");
+      if (!res.ok) throw new Error("Could not load the variable catalog.");
+      const data = (await res.json()) as { variables?: CatalogVariable[] };
+      return data.variables ?? [];
+    },
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+}
+
 export function usePopulaceVariableValue(params: {
   variables?: string[];
   period?: string;
