@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { CalibrationMap } from "@/components/populace/calibration-map";
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtCompact } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import {
+  releaseSelectOptions,
   usePopulace,
   usePopulaceReleases,
   usePopulaceTargetTreemap,
@@ -48,16 +49,7 @@ export function PopulaceOverviewView() {
   const { data, isLoading, error } = usePopulace(release || undefined);
   const { data: treemap } = usePopulaceTargetTreemap(release || undefined);
 
-  const releaseOptions = useMemo(
-    () => [
-      { value: "", label: "Latest" },
-      ...(releaseData?.releases ?? []).map((r) => ({
-        value: r.release_id,
-        label: releaseLabel(r.release_id, r.date),
-      })),
-    ],
-    [releaseData],
-  );
+  const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
 
   if (isLoading) return <LoadingBlock label="Loading populace release…" />;
   if (error || !data) {
