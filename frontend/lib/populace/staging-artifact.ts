@@ -166,18 +166,19 @@ export async function loadStagingRuns(revalidate: number) {
         .filter((row): row is StagingRunSummary => row != null)
     : [];
 
-  let runIds = new Set(indexedRuns.map((run) => run.run_id));
-  if (!indexedRuns.length) {
-    try {
-      for (const entry of await stagingTree(revalidate)) {
-        if (entry.type !== "file" || typeof entry.path !== "string") continue;
-        const match = /^runs\/([^/]+)\/progress\.json$/.exec(entry.path);
-        if (match) runIds.add(match[1]);
-      }
-    } catch (error) {
-      if (error instanceof StagingFetchError && error.status !== 404) throw error;
-      // A staging repo may exist before any tree listing is public.
+  // Always union the index with the actual run directories: runs.json can lag
+  // behind (or only carry the latest run), so list runs/ and pick up any run
+  // folder that isn't already indexed.
+  const runIds = new Set(indexedRuns.map((run) => run.run_id));
+  try {
+    for (const entry of await stagingTree(revalidate)) {
+      if (typeof entry.path !== "string") continue;
+      const match = /^runs\/([^/]+)\//.exec(entry.path);
+      if (match) runIds.add(match[1]);
     }
+  } catch (error) {
+    if (error instanceof StagingFetchError && error.status !== 404) throw error;
+    // A staging repo may exist before any tree listing is public.
   }
 
   const byId = new Map(indexedRuns.map((run) => [run.run_id, run]));

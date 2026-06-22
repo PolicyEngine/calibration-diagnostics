@@ -237,7 +237,7 @@ export function PopulaceStagingView() {
           title="Runs"
           description={
             runsData
-              ? `${runs.length} runs from ${runsData.source_repo}`
+              ? `${runs.length} ${runs.length === 1 ? "run" : "runs"} from ${runsData.source_repo}`
               : "Loading staging run index."
           }
         >
