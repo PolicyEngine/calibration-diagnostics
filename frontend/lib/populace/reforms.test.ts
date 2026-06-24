@@ -1,6 +1,21 @@
 import { expect, test } from "bun:test";
 
 import { buildReformHistory, buildReformValidation } from "./reforms";
+import { REFORM_OVERRIDES } from "./reform-overrides";
+
+test("committed reform overrides carry simulated out-of-sample estimates", () => {
+  const entries = Object.entries(REFORM_OVERRIDES);
+  expect(entries.length).toBeGreaterThan(0);
+  for (const [releaseId, payload] of entries) {
+    const built = buildReformValidation(payload as Record<string, unknown>, releaseId, null);
+    expect(built.available).toBe(true);
+    if (!built.available) continue;
+    const outOfSample = built.rows.filter((r) => !r.in_sample);
+    expect(outOfSample.length).toBeGreaterThan(0);
+    // The whole point of the backfill: every out-of-sample row is now scored.
+    expect(outOfSample.every((r) => r.populace_estimate !== null)).toBe(true);
+  }
+});
 
 function raw(reforms: object[], releaseId = "rel-a") {
   return { schema_version: 1, release_id: releaseId, scoring_window: "FY2025-2034", reforms };

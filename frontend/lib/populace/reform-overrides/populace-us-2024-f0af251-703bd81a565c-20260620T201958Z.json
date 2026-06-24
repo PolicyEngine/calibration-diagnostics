@@ -1,0 +1,676 @@
+{
+ "schema_version": 1,
+ "baseline_period": 2024,
+ "scoring_window": "see per-reform jct.window",
+ "reforms": [
+  {
+   "id": "jct.tax_expenditures.cy2024.salt_deduction.revenue_loss",
+   "name": "jct.tax_expenditures.cy2024.salt_deduction.revenue_loss",
+   "category": "JCT tax expenditure",
+   "in_sample": true,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 21700000000.0,
+    "score_type": "conventional",
+    "window": "annual",
+    "source": "JCT tax-expenditure (calibration target)",
+    "source_url": null
+   },
+   "populace": {
+    "budget_effect": 22082301564.772278,
+    "period": 2024,
+    "window": "annual",
+    "measure": "income_tax",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "jct.tax_expenditures.cy2024.medical_expense_deduction.revenue_loss",
+   "name": "jct.tax_expenditures.cy2024.medical_expense_deduction.revenue_loss",
+   "category": "JCT tax expenditure",
+   "in_sample": true,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 11400000000.0,
+    "score_type": "conventional",
+    "window": "annual",
+    "source": "JCT tax-expenditure (calibration target)",
+    "source_url": null
+   },
+   "populace": {
+    "budget_effect": 8156765518.46868,
+    "period": 2024,
+    "window": "annual",
+    "measure": "income_tax",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "jct.tax_expenditures.cy2024.charitable_deduction.revenue_loss",
+   "name": "jct.tax_expenditures.cy2024.charitable_deduction.revenue_loss",
+   "category": "JCT tax expenditure",
+   "in_sample": true,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 60400000000.0,
+    "score_type": "conventional",
+    "window": "annual",
+    "source": "JCT tax-expenditure (calibration target)",
+    "source_url": null
+   },
+   "populace": {
+    "budget_effect": 56044984882.4609,
+    "period": 2024,
+    "window": "annual",
+    "measure": "income_tax",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "jct.tax_expenditures.cy2024.deductible_mortgage_interest.revenue_loss",
+   "name": "jct.tax_expenditures.cy2024.deductible_mortgage_interest.revenue_loss",
+   "category": "JCT tax expenditure",
+   "in_sample": true,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 24800000000.0,
+    "score_type": "conventional",
+    "window": "annual",
+    "source": "JCT tax-expenditure (calibration target)",
+    "source_url": null
+   },
+   "populace": {
+    "budget_effect": 29701683323.062687,
+    "period": 2024,
+    "window": "annual",
+    "measure": "income_tax",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "jct.tax_expenditures.cy2024.qualified_business_income_deduction.revenue_loss",
+   "name": "jct.tax_expenditures.cy2024.qualified_business_income_deduction.revenue_loss",
+   "category": "JCT tax expenditure",
+   "in_sample": true,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 63100000000.0,
+    "score_type": "conventional",
+    "window": "annual",
+    "source": "JCT tax-expenditure (calibration target)",
+    "source_url": null
+   },
+   "populace": {
+    "budget_effect": 43413964160.975395,
+    "period": 2024,
+    "window": "annual",
+    "measure": "income_tax",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "obbba_reduced_rates",
+   "name": "OBBBA - Reduced individual income tax rates",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Permanent extension and limited enhancement of reduced individual income tax rates. Validated by reverting 2026 rates and brackets to the post-TCJA-expiration counterfactual.",
+   "jct": {
+    "score": -147679000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 1 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -192704837549.84277,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2478675433142.573
+   }
+  },
+  {
+   "id": "obbba_standard_deduction",
+   "name": "OBBBA - Increased standard deduction",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Extension and enhancement of the increased standard deduction. Validated by reverting 2026 standard-deduction amounts to the post-TCJA-expiration counterfactual.",
+   "jct": {
+    "score": -92124000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 2 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -166982203944.45752,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2504398066747.9585
+   }
+  },
+  {
+   "id": "obbba_personal_exemption_termination",
+   "name": "OBBBA - Termination of personal exemptions",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Termination of the deduction for personal exemptions, excluding the temporary senior deduction. Validated by unsuspending personal exemptions in 2026.",
+   "jct": {
+    "score": 110625000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 3 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": 228313516408.49658,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2899693787100.9126
+   }
+  },
+  {
+   "id": "obbba_child_tax_credit",
+   "name": "OBBBA - Increased child tax credit",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Extension and enhancement of the increased child tax credit. Validated by reverting 2026 CTC amount, phase-out, refundable cap, phase-in threshold, and adult SSN requirement to the post-TCJA-expiration counterfactual.",
+   "jct": {
+    "score": -48769000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 4 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -82994942625.39258,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2588385328067.0234
+   }
+  },
+  {
+   "id": "obbba_qbi_deduction",
+   "name": "OBBBA - Qualified business income deduction",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Extension and enhancement of the qualified business income deduction. Validated by reverting the QBI deduction rates and OBBBA floor.",
+   "jct": {
+    "score": -44331000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 5 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -53139746830.44043,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2618240523861.9756
+   }
+  },
+  {
+   "id": "obbba_estate_gift_exemption",
+   "name": "OBBBA - Estate and gift tax exemption",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Extension and enhancement of increased estate and gift tax exemption amounts. Validated by reverting the 2026 estate-tax base exclusion to the post-TCJA-expiration counterfactual.",
+   "jct": {
+    "score": -3672000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 6 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": 0.0,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "estate_tax",
+    "baseline_total": 0.0,
+    "reform_total": 0.0
+   }
+  },
+  {
+   "id": "obbba_amt",
+   "name": "OBBBA - Alternative minimum tax parameters",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Extension of increased AMT exemption amounts, modification of phaseout thresholds, and increased phaseout rate. Validated by reverting 2026 AMT parameters to the post-TCJA-expiration counterfactual.",
+   "jct": {
+    "score": -76835000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 7 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -40976228924.29248,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2630404041768.1235
+   }
+  },
+  {
+   "id": "obbba_mortgage_interest_limit",
+   "name": "OBBBA - Qualified residence interest limit",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Extension of limitation on deduction for qualified residence interest. Validated by reverting mortgage-interest acquisition-debt caps to pre-TCJA levels.",
+   "jct": {
+    "score": 1639000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 8 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": 631651122.9599609,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2672011921815.376
+   }
+  },
+  {
+   "id": "obbba_casualty_loss_limit",
+   "name": "OBBBA - Casualty loss deduction limit",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Extension and modification of limitation on casualty loss deduction. Validated by reactivating the casualty expense deduction in 2026.",
+   "jct": {
+    "score": 86000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 9 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": 602195179.8955078,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2671982465872.3115
+   }
+  },
+  {
+   "id": "obbba_misc_itemized_deductions",
+   "name": "OBBBA - Miscellaneous itemized deductions",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Termination of miscellaneous itemized deductions other than educator expenses. Validated by reactivating miscellaneous itemized deductions in 2026.",
+   "jct": {
+    "score": 13419000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 10 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": 22838359662.228027,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2694218630354.644
+   }
+  },
+  {
+   "id": "obbba_itemized_tax_benefit_limit",
+   "name": "OBBBA - Limitation on itemized deduction tax benefit",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Limitation on tax benefit of itemized deductions. Validated by disabling the OBBBA itemized-deduction limitation structure in 2026.",
+   "jct": {
+    "score": -16040000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 11 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": 8371959217.51416,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2679752229909.93
+   }
+  },
+  {
+   "id": "obbba_salt_limit",
+   "name": "OBBBA - State and local tax deduction limit",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Limitation on individual deductions for certain State and local taxes. Validated by reverting the SALT cap to the post-TCJA-expiration counterfactual in 2026.",
+   "jct": {
+    "score": 31617000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.1 line 20 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": 64632630479.30908,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2736012901171.725
+   }
+  },
+  {
+   "id": "obbba_no_tax_on_tips",
+   "name": "OBBBA - No tax on tips",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Deduction for qualified tip income. Validated by reverting the tip-income deduction cap to 0 in 2026.",
+   "jct": {
+    "score": -10121000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.2 line 1 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -4384512905.120605,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2666995757787.2954
+   }
+  },
+  {
+   "id": "obbba_no_tax_on_overtime",
+   "name": "OBBBA - No tax on overtime",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Deduction for qualified overtime premium income. Validated by reverting overtime-income deduction caps to 0 in 2026.",
+   "jct": {
+    "score": -32806000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.2 line 2 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -15643512457.645508,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2655736758234.7705
+   }
+  },
+  {
+   "id": "obbba_auto_loan_interest",
+   "name": "OBBBA - No tax on car loan interest",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Deduction for qualifying auto loan interest. Validated by reverting the auto-loan-interest deduction cap to 0 in 2026.",
+   "jct": {
+    "score": -5400000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.2 line 3 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": 0.0,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2671380270692.416
+   }
+  },
+  {
+   "id": "obbba_senior_deduction",
+   "name": "OBBBA - Temporary senior deduction",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Temporary senior deduction. JCX-35-25 does not report a standalone FY2026 line; this row publishes the modeled Populace score without a JCT-comparison benchmark.",
+   "jct": {
+    "score": null,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "No standalone FY2026 line in JCX-35-25",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -19695386454.83789,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2651684884237.578
+   }
+  },
+  {
+   "id": "obbba_cdcc",
+   "name": "OBBBA - Child and dependent care tax credit",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Enhancement of the child and dependent care tax credit. Validated by reverting 2026 CDCC rate and amended phase-out structure.",
+   "jct": {
+    "score": -409000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.4.A line 5 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -1061956063.1767578,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2670318314629.2393
+   }
+  },
+  {
+   "id": "obbba_charitable_nonitemizer_deduction",
+   "name": "OBBBA - Non-itemizer charitable deduction",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Permanent and expanded reinstatement of the partial deduction for charitable contributions of individuals who do not elect to itemize. Validated by reverting 2026 non-itemizer charitable deduction amounts to 0.",
+   "jct": {
+    "score": -1543000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.4.C line 4 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": -437884535.75341797,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2670942386156.6626
+   }
+  },
+  {
+   "id": "obbba_charitable_floor",
+   "name": "OBBBA - Charitable deduction floor",
+   "category": "OBBBA",
+   "in_sample": false,
+   "period": 2026,
+   "description": "0.5 percent floor on deduction of charitable contributions made by individuals. Validated by disabling the charitable donation floor in 2026.",
+   "jct": {
+    "score": 1346000000.0,
+    "score_type": "conventional",
+    "window": "FY2026",
+    "source": "JCX-35-25, Ch.4.C line 5 (FY2026)",
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+   },
+   "populace": {
+    "budget_effect": 10611732745.680664,
+    "period": 2026,
+    "window": "FY2026",
+    "measure": "income_tax",
+    "baseline_total": 2671380270692.416,
+    "reform_total": 2681992003438.0967
+   }
+  },
+  {
+   "id": "te_ctc",
+   "name": "Child Tax Credit (incl. ODC)",
+   "category": "Tax expenditure",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Repeal the Child Tax Credit and Credit for Other Dependents. JCT line is 'Credit for children and other dependents'.",
+   "jct": {
+    "score": 173800000000.0,
+    "score_type": "tax_expenditure",
+    "window": "FY2024",
+    "source": "JCT JCX-48-24 Table 1 (rev 127.1B + outlay 46.7B)",
+    "source_url": "https://www.jct.gov/publications/2024/jcx-48-24/"
+   },
+   "populace": {
+    "budget_effect": 118788171018.83984,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "income_tax",
+    "baseline_total": 2018852457080.9902,
+    "reform_total": 2137640628099.83
+   }
+  },
+  {
+   "id": "te_eitc",
+   "name": "Earned Income Tax Credit",
+   "category": "Tax expenditure",
+   "in_sample": true,
+   "period": 2024,
+   "description": "Repeal the EITC. Mostly refundable, so the bulk is the outlay portion. The dataset is calibrated to SOI EITC-by-AGI targets, so this is an in-sample check.",
+   "jct": {
+    "score": 124200000000.0,
+    "score_type": "tax_expenditure",
+    "window": "FY2024",
+    "source": "JCT JCX-48-24 Table 1 (rev 66.9B + outlay 57.3B)",
+    "source_url": "https://www.jct.gov/publications/2024/jcx-48-24/"
+   },
+   "populace": {
+    "budget_effect": 58913321337.521484,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "income_tax",
+    "baseline_total": 2018852457080.9902,
+    "reform_total": 2077765778418.5117
+   }
+  },
+  {
+   "id": "te_cdcc",
+   "name": "Child & Dependent Care Credit",
+   "category": "Tax expenditure",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Repeal the CDCC. JCT bundles it with the employer-provided-childcare exclusion, so the clean CDCC-only benchmark is Treasury's.",
+   "jct": {
+    "score": 3690000000.0,
+    "score_type": "tax_expenditure",
+    "window": "FY2024",
+    "source": "Treasury Tax Expenditures FY2025, Table 1 item 120",
+    "source_url": "https://home.treasury.gov/policy-issues/tax-policy/tax-expenditures"
+   },
+   "populace": {
+    "budget_effect": 2323839546.114502,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "income_tax",
+    "baseline_total": 2018852457080.9902,
+    "reform_total": 2021176296627.1047
+   }
+  },
+  {
+   "id": "te_standard_deduction",
+   "name": "Standard deduction (no official benchmark)",
+   "category": "Tax expenditure",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Repeal the standard deduction. Both JCT and Treasury treat the regular standard deduction as part of the normal-tax baseline, so there is no published tax-expenditure figure; shown as a repeal magnitude only.",
+   "jct": {
+    "score": null,
+    "score_type": "none",
+    "window": "FY2024",
+    "source": "Not scored \u2014 standard deduction is baseline in both JCT and Treasury",
+    "source_url": "https://www.jct.gov/publications/2024/jcx-48-24/"
+   },
+   "populace": {
+    "budget_effect": 288063662500.4287,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "income_tax",
+    "baseline_total": 2018852457080.9902,
+    "reform_total": 2306916119581.419
+   }
+  },
+  {
+   "id": "te_itemized_total",
+   "name": "All itemized deductions (no combined benchmark)",
+   "category": "Tax expenditure",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Repeal all itemized deductions at once. Neither JCT nor Treasury publishes a single combined itemized-deduction tax-expenditure figure (only components: SALT, mortgage, charitable, medical, \u2026), so this carries no benchmark; the individual components are validated in-sample. Shown as a repeal magnitude only.",
+   "jct": {
+    "score": null,
+    "score_type": "none",
+    "window": "FY2024",
+    "source": "Not published as a combined figure \u2014 JCT/Treasury score itemized components individually",
+    "source_url": "https://www.jct.gov/publications/2024/jcx-48-24/"
+   },
+   "populace": {
+    "budget_effect": 79363701936.78174,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "income_tax",
+    "baseline_total": 2018852457080.9902,
+    "reform_total": 2098216159017.772
+   }
+  }
+ ],
+ "release_id": "populace-us-2024-f0af251-703bd81a565c-20260620T201958Z",
+ "out_of_sample_simulated": true
+}

@@ -49,6 +49,7 @@ import {
   loadPointerReleaseId,
   loadReleases,
 } from "./latest-artifact";
+import { REFORM_OVERRIDES } from "./reform-overrides";
 
 type JsonObject = Record<string, unknown>;
 
@@ -216,6 +217,11 @@ async function fetchReformValidation(
   releaseId: string,
   revalidate: number,
 ): Promise<JsonObject | null> {
+  // A committed correction takes precedence over the published artifact for
+  // releases backfilled after the build pipeline fix (see reform-overrides.ts).
+  const override = REFORM_OVERRIDES[releaseId];
+  if (override) return asObject(override);
+
   const url = hfResolveUrl(`releases/${releaseId}/${REFORM_VALIDATION_FILE}`);
   const res = await fetch(url, { next: { revalidate } });
   if (res.status === 404) return null;
