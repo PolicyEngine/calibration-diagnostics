@@ -270,6 +270,8 @@ export interface PopulaceComparisonRow {
   name: string;
   target_label?: string | null;
   source?: string | null;
+  target_role?: string | null;
+  source_measure_id?: string | null;
   variable_key?: string | null;
   variable?: string | null;
   measure?: string | null;
@@ -332,6 +334,7 @@ export interface PopulaceComparison {
     fraction_within_10pct: number | null;
   };
   summary: {
+    scope?: "healthcare" | null;
     common: number;
     added: number;
     removed: number;
@@ -561,11 +564,17 @@ export function usePopulaceReformHistory() {
   });
 }
 
-export function usePopulaceCompare(a?: string, b?: string, enabled = true) {
+export function usePopulaceCompare(
+  a?: string,
+  b?: string,
+  scope?: "healthcare" | "all",
+  enabled = true,
+) {
   const { country } = useCountry();
+  const apiScope = scope === "healthcare" ? scope : undefined;
   return useQuery({
-    queryKey: ["populace", "compare", "variables-v2", country, a, b],
-    queryFn: () => apiGet<PopulaceComparison>("/populace/compare", { a, b, country }),
+    queryKey: ["populace", "compare", "variables-v2", country, apiScope ?? "all", a, b],
+    queryFn: () => apiGet<PopulaceComparison>("/populace/compare", { a, b, scope: apiScope, country }),
     enabled: enabled && Boolean(a && b),
     staleTime: 15 * 60 * 1000,
   });

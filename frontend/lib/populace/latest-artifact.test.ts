@@ -313,6 +313,67 @@ test("healthcare scope includes ACA, Medicaid, Medicare, and PTC targets", () =>
   ]);
 });
 
+test("comparison healthcare scope filters the matched target surface", () => {
+  const acaA = {
+    name: "cms_aca.oep2024.state_marketplace.ca.aptc_recipients@2024",
+    target_name: "cms_aca.oep2024.state_marketplace.ca.aptc_recipients",
+    target: 100,
+    initial_estimate: 50,
+    final_estimate: 80,
+    relative_error: -0.2,
+    registry: { family: "cms_aca" },
+    metadata: {
+      target_role: "aca_ptc_recipients",
+      source_measure_id: "aptc_recipients",
+      variable: "assigned_aca_ptc",
+      ledger_geography_level: "state",
+      ledger_geography_id: "0400000US06",
+    },
+  };
+  const acaB = {
+    ...acaA,
+    final_estimate: 95,
+    relative_error: -0.05,
+  };
+  const removedHealthcare = {
+    name: "US06/cms_medicaid/total_medicaid_enrollment@2024",
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 95,
+    relative_error: -0.05,
+    metadata: {
+      target_role: "medicaid_enrollment",
+      source_measure_id: "total_medicaid_enrollment",
+    },
+  };
+  const addedHealthcare = {
+    name: "nation/cms_medicare/part_b_premium_income@2024",
+    target: 100,
+    initial_estimate: 100,
+    final_estimate: 101,
+    relative_error: 0.01,
+    metadata: {
+      target_role: "medicare_part_b_premium_total",
+      source_measure_id: "part_b_premium_income",
+    },
+  };
+  const a = calibration([acaA, removedHealthcare, agiTarget("AGI in 30k-40k", "taxable", "All", 0.2)], "a");
+  const b = calibration([acaB, addedHealthcare, agiTarget("AGI in 30k-40k", "taxable", "All", 0.01)], "b");
+
+  const cmp = buildComparison(a, b, { scope: "healthcare" });
+
+  expect(cmp.a.total_targets).toBe(2);
+  expect(cmp.b.total_targets).toBe(2);
+  expect(cmp.summary.scope).toBe("healthcare");
+  expect(cmp.summary.common).toBe(1);
+  expect(cmp.summary.added).toBe(1);
+  expect(cmp.summary.removed).toBe(1);
+  expect(cmp.summary.improved).toBe(1);
+  expect(cmp.rows.map((row) => row.source)).toEqual(["cms_aca"]);
+  expect(cmp.rows[0].target_role).toBe("aca_ptc_recipients");
+  expect(cmp.rows[0].source_measure_id).toBe("aptc_recipients");
+});
+
 test("comparison matches on base_name across the @period boundary", () => {
   // B drops one target, changes one fit, adds a new one.
   const b = calibration(

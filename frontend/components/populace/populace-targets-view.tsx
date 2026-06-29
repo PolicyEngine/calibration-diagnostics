@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
@@ -570,12 +571,25 @@ export function PopulaceTargetsView({
   const [selected, setSelected] = useState<PopulaceTargetRow | null>(null);
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<SortState>({ by: "abs_relative_error", dir: "desc" });
-  const [step, setStep] = useState<WizardStep>(initialSource ? "results" : "home");
+  const [step, setStep] = useState<WizardStep>(
+    initialSource || initialScope === "healthcare" ? "results" : "home",
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [refineIndex, setRefineIndex] = useState(0);
 
   const { data: releaseData } = usePopulaceReleases();
   const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
+  const releases = releaseData?.releases ?? [];
+  const currentReleaseId = release || releaseData?.latest_release_id || releases[0]?.release_id || "";
+  const currentReleaseIndex = releases.findIndex((entry) => entry.release_id === currentReleaseId);
+  const previousRelease =
+    currentReleaseIndex >= 0 ? releases[currentReleaseIndex + 1] : undefined;
+  const healthcareCompareHref =
+    previousRelease && currentReleaseId
+      ? `/populace/compare?scope=healthcare&a=${encodeURIComponent(
+          previousRelease.release_id,
+        )}&b=${encodeURIComponent(currentReleaseId)}`
+      : null;
 
   function pickRelease(value: string) {
     // A different release is a different surface — reset everything below it.
@@ -1256,6 +1270,14 @@ export function PopulaceTargetsView({
               )}
             </div>
             <div className="flex items-center gap-2">
+              {scope === "healthcare" && healthcareCompareHref ? (
+                <Link
+                  href={healthcareCompareHref}
+                  className="rounded-md border border-primary bg-primary/5 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-primary/10"
+                >
+                  Compare this release to previous
+                </Link>
+              ) : null}
               {activeVariable && (
                 <button
                   type="button"
