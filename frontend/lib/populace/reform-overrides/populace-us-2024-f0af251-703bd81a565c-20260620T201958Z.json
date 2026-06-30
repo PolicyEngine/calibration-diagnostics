@@ -133,12 +133,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": -192704837549.84277,
+    "budget_effect": -195573235348.0337,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2671380270692.416,
-    "reform_total": 2478675433142.573
+    "baseline_total": 2703208383364.684,
+    "reform_total": 2507635148016.6504
    }
   },
   {
@@ -156,12 +156,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": -131324135110.55371,
+    "budget_effect": -131957559775.17188,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2478675433142.573,
-    "reform_total": 2347351298032.0195
+    "baseline_total": 2507635148016.6504,
+    "reform_total": 2375677588241.4785
    }
   },
   {
@@ -179,12 +179,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": 149241772851.38428,
+    "budget_effect": 149241645907.31738,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2347351298032.0195,
-    "reform_total": 2496593070883.404
+    "baseline_total": 2375677588241.4785,
+    "reform_total": 2524919234148.796
    }
   },
   {
@@ -202,12 +202,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": -85642146969.64551,
+    "budget_effect": -85642146969.64697,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2496593070883.404,
-    "reform_total": 2410950923913.7583
+    "baseline_total": 2524919234148.796,
+    "reform_total": 2439277087179.149
    }
   },
   {
@@ -225,12 +225,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": -48202583781.15137,
+    "budget_effect": -48232133814.86182,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2410950923913.7583,
-    "reform_total": 2362748340132.607
+    "baseline_total": 2439277087179.149,
+    "reform_total": 2391044953364.287
    }
   },
   {
@@ -252,8 +252,8 @@
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2362748340132.607,
-    "reform_total": 2362748340132.607
+    "baseline_total": 2391044953364.287,
+    "reform_total": 2391044953364.287
    }
   },
   {
@@ -271,12 +271,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": -102676596582.51465,
+    "budget_effect": -101486827382.99512,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2362748340132.607,
-    "reform_total": 2260071743550.0923
+    "baseline_total": 2391044953364.287,
+    "reform_total": 2289558125981.292
    }
   },
   {
@@ -294,12 +294,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": 506527807.80126953,
+    "budget_effect": 500400830.5161133,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2260071743550.0923,
-    "reform_total": 2260578271357.8936
+    "baseline_total": 2289558125981.292,
+    "reform_total": 2290058526811.808
    }
   },
   {
@@ -317,12 +317,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": 661176087.6782227,
+    "budget_effect": 662376582.5058594,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2260578271357.8936,
-    "reform_total": 2261239447445.572
+    "baseline_total": 2290058526811.808,
+    "reform_total": 2290720903394.314
    }
   },
   {
@@ -340,12 +340,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": 17264152394.734863,
+    "budget_effect": 16987843852.270508,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2261239447445.572,
-    "reform_total": 2278503599840.3066
+    "baseline_total": 2290720903394.314,
+    "reform_total": 2307708747246.5845
    }
   },
   {
@@ -363,12 +363,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": 7145038989.324707,
+    "budget_effect": -22060108416.086426,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2278503599840.3066,
-    "reform_total": 2285648638829.6313
+    "baseline_total": 2307708747246.5845,
+    "reform_total": 2285648638830.498
    }
   },
   {
@@ -386,11 +386,11 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": 63969895980.73389,
+    "budget_effect": 63969895979.86719,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
-    "baseline_total": 2285648638829.6313,
+    "baseline_total": 2285648638830.498,
     "reform_total": 2349618534810.365
    }
   },
