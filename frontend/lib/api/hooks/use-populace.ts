@@ -478,7 +478,7 @@ export interface ReformValidationRow {
   in_sample?: boolean;
   period?: number | null;
   jct_score?: number | null;
-  jct_score_fy2027?: number | null;
+  jct_score_fy2026?: number | null;
   jct_score_type?: string | null;
   jct_window?: string | null;
   jct_source?: string | null;
@@ -490,7 +490,6 @@ export interface ReformValidationRow {
   abs_error?: number | null;
   relative_error?: number | null;
   abs_relative_error?: number | null;
-  relative_error_fy2027?: number | null;
   within_10pct?: boolean | null;
   direction?: "over" | "under" | "exact" | null;
 }
