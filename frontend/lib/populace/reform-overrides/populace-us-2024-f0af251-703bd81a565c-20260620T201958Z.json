@@ -742,7 +742,7 @@
    "category": "IRS SOI actual",
    "in_sample": false,
    "period": 2024,
-   "description": null,
+   "description": "SOI reports the credit amount used to offset tax; the populace side is min(credit available, income tax before credits) per tax unit \u2014 an approximation that ignores IRS credit ordering, so populace remains a slight upper bound.",
    "jct": {
     "score": 3468910000.0,
     "score_fy2027": null,
@@ -766,7 +766,7 @@
    "category": "IRS SOI actual",
    "in_sample": false,
    "period": 2024,
-   "description": "populace's education_tax_credits is the nonrefundable American Opportunity credit plus the Lifetime Learning credit \u2014 the same scope as SOI's nonrefundable education credit column (the refundable AOTC portion is excluded on both sides).",
+   "description": "populace's education_tax_credits is the nonrefundable American Opportunity credit plus the Lifetime Learning credit \u2014 the same scope as SOI's nonrefundable education credit column (the refundable AOTC portion is excluded on both sides). SOI reports the credit amount used to offset tax; the populace side is min(credit available, income tax before credits) per tax unit \u2014 an approximation that ignores IRS credit ordering, so populace remains a slight upper bound.",
    "jct": {
     "score": 7554668000.0,
     "score_fy2027": null,
@@ -790,7 +790,7 @@
    "category": "IRS SOI actual",
    "in_sample": false,
    "period": 2024,
-   "description": null,
+   "description": "SOI reports the credit amount used to offset tax; the populace side is min(credit available, income tax before credits) per tax unit \u2014 an approximation that ignores IRS credit ordering, so populace remains a slight upper bound.",
    "jct": {
     "score": 2037572000.0,
     "score_fy2027": null,
@@ -814,7 +814,7 @@
    "category": "IRS SOI actual",
    "in_sample": false,
    "period": 2024,
-   "description": null,
+   "description": "SOI reports the credit amount used to offset tax; the populace side is min(credit available, income tax before credits) per tax unit \u2014 an approximation that ignores IRS credit ordering, so populace remains a slight upper bound.",
    "jct": {
     "score": 84418366000.0,
     "score_fy2027": null,
@@ -824,11 +824,11 @@
     "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
    },
    "populace": {
-    "budget_effect": 105826791721.11238,
+    "budget_effect": 85626405288.38922,
     "period": 2024,
     "window": "TY2023",
     "measure": "non_refundable_ctc",
-    "baseline_total": 105826791721.11238,
+    "baseline_total": 85626405288.38922,
     "reform_total": null
    }
   },
