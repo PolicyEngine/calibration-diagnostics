@@ -77,6 +77,7 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
             </th>
             <th className="px-3 py-2 text-right font-semibold">populace</th>
             <th className="px-3 py-2 text-right font-semibold">Error %</th>
+            <th className="px-3 py-2 font-semibold">Year</th>
             <th className="px-3 py-2 font-semibold">Source</th>
           </tr>
         </thead>
@@ -116,6 +117,9 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
                 }`}
               >
                 {pct(row.abs_relative_error)}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground tabular-nums">
+                {row.jct_benchmark_window ?? "—"}
               </td>
               <td className="px-3 py-2 text-xs text-muted-foreground">
                 {row.jct_source_url ? (

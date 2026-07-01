@@ -82,6 +82,10 @@ export interface ReformValidationRow {
   jct_score_fy2026: number | null;
   jct_score_type: string | null;
   jct_window: string | null;
+  // The year/window the benchmark (jct_score) actually refers to — "FY2027"
+  // for OBBBA rows (the full-year default), the annual window for in-sample.
+  // Differs row to row, so it's shown as its own column.
+  jct_benchmark_window: string | null;
   jct_source: string | null;
   jct_source_url: string | null;
   jct_published: string | null;
@@ -155,6 +159,7 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
     jct_score_fy2026: jctFy2026,
     jct_score_type: stringOrNull(jct.score_type),
     jct_window: stringOrNull(jct.window),
+    jct_benchmark_window: jctFy2027 != null ? "FY2027" : stringOrNull(jct.window),
     jct_source: stringOrNull(jct.source),
     jct_source_url: stringOrNull(jct.source_url),
     jct_published: stringOrNull(jct.published),
