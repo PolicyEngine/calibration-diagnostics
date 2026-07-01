@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
@@ -17,6 +18,8 @@ import {
 
 const MAX_MOVER_REL_ERROR = 10; // Keep the compare summary to bounded relative errors (<= 1000%).
 const TARGET_COMPARE_PAGE_SIZE = 100;
+
+type CompareScope = "all" | "healthcare";
 
 interface CompareSortState {
   by: string;
@@ -80,6 +83,202 @@ function fmtPointDelta(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "—";
   const sign = value > 0 ? "+" : value < 0 ? "-" : "";
   return `${sign}${Math.abs(value * 100).toFixed(1)} pp`;
+}
+
+interface HealthcareSummarySpec {
+  key: string;
+  label: string;
+  matches: (row: PopulaceComparisonRow) => boolean;
+}
+
+interface HealthcareComparisonSummary {
+  key: string;
+  label: string;
+  commonTargets: number;
+  aMeanAbsError: number | null;
+  bMeanAbsError: number | null;
+  fitChange: number | null;
+}
+
+function healthcareRowText(row: PopulaceComparisonRow): string {
+  return [
+    row.name,
+    row.source,
+    row.target_role,
+    row.source_measure_id,
+    row.variable_key,
+    row.variable,
+    row.measure,
+    row.breakdown,
+    row.target_label,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function rowHasAny(row: PopulaceComparisonRow, terms: string[]): boolean {
+  const text = healthcareRowText(row);
+  return terms.some((term) => text.includes(term));
+}
+
+function isMedicaidEnrollmentRow(row: PopulaceComparisonRow): boolean {
+  return (
+    row.target_role === "medicaid_enrollment" ||
+    rowHasAny(row, ["total_medicaid_enrollment", "medicaid enrollment"])
+  );
+}
+
+function isMedicaidChipEnrollmentRow(row: PopulaceComparisonRow): boolean {
+  return (
+    row.target_role === "medicaid_chip_enrollment" ||
+    rowHasAny(row, ["medicaid_chip", "medicaid chip", "medicaid + chip"])
+  );
+}
+
+const HEALTHCARE_SUMMARY_SPECS: HealthcareSummarySpec[] = [
+  {
+    key: "aca_marketplace",
+    label: "ACA marketplace",
+    matches: (row) => row.source === "cms_aca" || rowHasAny(row, ["cms_aca", "aca marketplace"]),
+  },
+  {
+    key: "aptc_recipients",
+    label: "APTC recipients",
+    matches: (row) =>
+      row.target_role === "aca_ptc_recipients" ||
+      rowHasAny(row, ["aptc_recipients", "aptc recipients", "premium tax credit recipients"]),
+  },
+  {
+    key: "medicaid",
+    label: "Medicaid",
+    matches: isMedicaidEnrollmentRow,
+  },
+  {
+    key: "medicaid_chip",
+    label: "Medicaid + CHIP",
+    matches: isMedicaidChipEnrollmentRow,
+  },
+  {
+    key: "medicare_part_b",
+    label: "Medicare Part B",
+    matches: (row) =>
+      row.target_role === "medicare_part_b_premium_total" ||
+      rowHasAny(row, ["part_b", "part b", "medicare_part_b"]),
+  },
+];
+
+function comparisonPairKey(row: PopulaceComparisonRow): string {
+  const dimensions =
+    row.target_dimensions
+      ?.filter((dim) => !dim.label.toLowerCase().includes("measure"))
+      .map((dim) => `${dim.label}:${dim.value}`) ?? [];
+  return [row.level ?? "", row.geography ?? "", ...dimensions].join("||");
+}
+
+function relativeErrorFromEstimate(
+  estimate: number | null | undefined,
+  target: number | null | undefined,
+): number | null {
+  if (
+    estimate == null ||
+    target == null ||
+    !Number.isFinite(estimate) ||
+    !Number.isFinite(target) ||
+    target === 0
+  ) {
+    return null;
+  }
+  return (estimate - target) / Math.abs(target);
+}
+
+function meanAbs(values: (number | null)[]): number | null {
+  const finite = values
+    .filter((value): value is number => value != null && Number.isFinite(value))
+    .map(Math.abs);
+  return finite.length ? finite.reduce((sum, value) => sum + value, 0) / finite.length : null;
+}
+
+function meanAbsError(rows: PopulaceComparisonRow[], side: "a" | "b"): number | null {
+  const values = rows
+    .filter((row) => row.error_kind === "relative")
+    .map((row) => (side === "a" ? row.a_error : row.b_error))
+    .filter((value): value is number => value != null && Number.isFinite(value))
+    .map(Math.abs);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+function healthcareSummaries(rows: PopulaceComparisonRow[]): HealthcareComparisonSummary[] {
+  const direct = HEALTHCARE_SUMMARY_SPECS.map((spec) => {
+    const matches = rows.filter(spec.matches);
+    const aMeanAbsError = meanAbsError(matches, "a");
+    const bMeanAbsError = meanAbsError(matches, "b");
+    return {
+      key: spec.key,
+      label: spec.label,
+      commonTargets: matches.length,
+      aMeanAbsError,
+      bMeanAbsError,
+      fitChange:
+        aMeanAbsError == null || bMeanAbsError == null
+          ? null
+          : bMeanAbsError - aMeanAbsError,
+    };
+  });
+  direct.splice(4, 0, impliedChipSummary(rows));
+  return direct;
+}
+
+function impliedChipSummary(rows: PopulaceComparisonRow[]): HealthcareComparisonSummary {
+  const medicaidByKey = new Map(
+    rows.filter(isMedicaidEnrollmentRow).map((row) => [comparisonPairKey(row), row]),
+  );
+  const aErrors: (number | null)[] = [];
+  const bErrors: (number | null)[] = [];
+  let commonTargets = 0;
+
+  for (const combined of rows.filter(isMedicaidChipEnrollmentRow)) {
+    const medicaid = medicaidByKey.get(comparisonPairKey(combined));
+    if (!medicaid) continue;
+    commonTargets += 1;
+    const aTarget =
+      combined.a_target == null || medicaid.a_target == null
+        ? null
+        : combined.a_target - medicaid.a_target;
+    const bTarget =
+      combined.b_target == null || medicaid.b_target == null
+        ? null
+        : combined.b_target - medicaid.b_target;
+    const aEstimate =
+      combined.a_final_estimate == null || medicaid.a_final_estimate == null
+        ? null
+        : combined.a_final_estimate - medicaid.a_final_estimate;
+    const bEstimate =
+      combined.b_final_estimate == null || medicaid.b_final_estimate == null
+        ? null
+        : combined.b_final_estimate - medicaid.b_final_estimate;
+    aErrors.push(relativeErrorFromEstimate(aEstimate, aTarget));
+    bErrors.push(relativeErrorFromEstimate(bEstimate, bTarget));
+  }
+
+  const aMeanAbsError = meanAbs(aErrors);
+  const bMeanAbsError = meanAbs(bErrors);
+  return {
+    key: "chip_implied",
+    label: "CHIP implied",
+    commonTargets,
+    aMeanAbsError,
+    bMeanAbsError,
+    fitChange:
+      aMeanAbsError == null || bMeanAbsError == null
+        ? null
+        : bMeanAbsError - aMeanAbsError,
+  };
+}
+
+function summaryTone(value: number | null): "positive" | "negative" | "neutral" {
+  if (value == null || Math.abs(value) <= 1e-9) return "neutral";
+  return value < 0 ? "positive" : "negative";
 }
 
 function comparisonDimensionLabel(row: PopulaceComparisonRow): string {
@@ -213,6 +412,43 @@ function CompareChip({
       </span>
       <span className={`truncate font-mono text-xs font-semibold tabular-nums ${toneClass}`}>
         {value}
+      </span>
+    </div>
+  );
+}
+
+function ScopeSegmentedControl({
+  scope,
+  onChange,
+}: {
+  scope: CompareScope;
+  onChange: (scope: CompareScope) => void;
+}) {
+  const options: { value: CompareScope; label: string }[] = [
+    { value: "all", label: "All targets" },
+    { value: "healthcare", label: "Healthcare" },
+  ];
+  return (
+    <div className="grid gap-1">
+      <span className="text-xs font-medium text-muted-foreground">Scope</span>
+      <span className="inline-flex h-9 overflow-hidden rounded-md border border-border bg-white">
+        {options.map((option) => {
+          const active = scope === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={`px-3 text-sm font-medium transition-colors ${
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
       </span>
     </div>
   );
@@ -555,12 +791,23 @@ function LossRow({
   );
 }
 
-export function PopulaceCompareView() {
+export function PopulaceCompareView({
+  initialA = "",
+  initialB = "",
+  initialScope = "all",
+}: {
+  initialA?: string;
+  initialB?: string;
+  initialScope?: CompareScope;
+}) {
+  const pathname = usePathname();
+  const router = useRouter();
   const { data: releaseData, isLoading: releasesLoading } = usePopulaceReleases();
   const releases = releaseData?.releases ?? [];
 
-  const [a, setA] = useState("");
-  const [b, setB] = useState("");
+  const [scope, setScope] = useState<CompareScope>(initialScope);
+  const [a, setA] = useState(initialA);
+  const [b, setB] = useState(initialB);
 
   // Default B to the latest release and A to the next one down.
   useEffect(() => {
@@ -569,7 +816,16 @@ export function PopulaceCompareView() {
     if (!a && releases[1]) setA(releases[1].release_id);
   }, [releases, releaseData, a, b]);
 
-  const { data, isLoading, error } = usePopulaceCompare(a, b);
+  useEffect(() => {
+    if (!a || !b) return;
+    const params = new URLSearchParams();
+    if (scope === "healthcare") params.set("scope", scope);
+    params.set("a", a);
+    params.set("b", b);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [a, b, pathname, router, scope]);
+
+  const { data, isLoading, error } = usePopulaceCompare(a, b, scope);
 
   const options = useMemo(
     () => releases.map((r) => ({ value: r.release_id, label: releaseLabel(r.release_id, r.date) })),
@@ -592,6 +848,10 @@ export function PopulaceCompareView() {
       (data?.rows ?? [])
         .filter((r) => isBoundedRelativeMover(r) && (r.abs_rel_delta ?? 0) > 0)
         .slice(0, 10),
+    [data],
+  );
+  const healthcareProgramSummaries = useMemo(
+    () => healthcareSummaries(data?.rows ?? []),
     [data],
   );
   const lossDelta =
@@ -636,7 +896,8 @@ export function PopulaceCompareView() {
         {releasesLoading ? (
           <LoadingBlock label="Loading releases…" height="h-20" />
         ) : (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <ScopeSegmentedControl scope={scope} onChange={setScope} />
             <ToolbarSelect
               label="Release A"
               value={a}
@@ -665,7 +926,7 @@ export function PopulaceCompareView() {
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <KpiCard
-              label="Targets A → B"
+              label={scope === "healthcare" ? "Healthcare targets A → B" : "Targets A → B"}
               value={`${fmt(data.a.total_targets, { digits: 0 })} → ${fmt(data.b.total_targets, { digits: 0 })}`}
               hint={`${fmt(data.summary.common, { digits: 0 })} in common`}
             />
@@ -686,6 +947,33 @@ export function PopulaceCompareView() {
               hint={`${fmt(data.summary.common, { digits: 0 })} common targets`}
             />
           </div>
+
+          {scope === "healthcare" ? (
+            <SectionCard
+              title="Healthcare fit by program"
+              description="Mean absolute relative error across common healthcare targets; negative fit change means release B is closer to target."
+            >
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {healthcareProgramSummaries.map((summary) => (
+                  <KpiCard
+                    key={summary.key}
+                    label={summary.label}
+                    value={`${relErr(summary.aMeanAbsError)} → ${relErr(summary.bMeanAbsError)}`}
+                    delta={
+                      summary.fitChange == null ? null : fmtPointDelta(summary.fitChange)
+                    }
+                    tone={summaryTone(summary.fitChange)}
+                    hint={
+                      summary.commonTargets
+                        ? `${fmt(summary.commonTargets, { digits: 0 })} common targets`
+                        : "No common targets"
+                    }
+                    size="sm"
+                  />
+                ))}
+              </div>
+            </SectionCard>
+          ) : null}
 
           <SectionCard
             title="Version-over-version loss"
@@ -780,7 +1068,11 @@ export function PopulaceCompareView() {
           </div>
 
           <SectionCard
-            title="All targets version over version"
+            title={
+              scope === "healthcare"
+                ? "Healthcare targets version over version"
+                : "All targets version over version"
+            }
             description="Every common target matched across releases. Negative |err| change means B fits that target better than A."
           >
             <TargetComparisonTable rows={data.rows ?? []} />

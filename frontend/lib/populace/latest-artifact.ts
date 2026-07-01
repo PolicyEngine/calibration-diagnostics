@@ -6,6 +6,7 @@
 type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
 export type CalibrationLossKind = "normalized_target_loss" | "raw_optimizer_objective";
+export type ComparisonScope = "healthcare";
 
 export const POPULACE_HF_REPO = process.env.POPULACE_HF_REPO ?? "policyengine/populace-us";
 export const POPULACE_HF_REVISION = process.env.POPULACE_HF_REVISION ?? "main";
@@ -2091,6 +2092,19 @@ function mean(values: number[]): number | null {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
 
+function comparisonRowsForScope(rows: TargetRow[], scope?: ComparisonScope | null): TargetRow[] {
+  return scope === "healthcare" ? rows.filter(isHealthcareTarget) : rows;
+}
+
+function fractionWithin10Pct(rows: TargetRow[]): number | null {
+  if (!rows.length) return null;
+  const within = rows.filter((row) => {
+    const error = numberOrNull(row.abs_relative_error);
+    return error != null && error <= 0.1;
+  }).length;
+  return within / rows.length;
+}
+
 function comparisonVariableRows(rows: TargetRow[]) {
   const groups = new Map<string, TargetRow[]>();
   for (const row of rows) {
@@ -2145,12 +2159,18 @@ function comparisonVariableRows(rows: TargetRow[]) {
 // get a fit delta (|b rel err| - |a rel err|; negative = b fits better);
 // targets present in only one release are listed as added/removed. Losses
 // across releases are NOT comparable when the surfaces differ — flagged.
-export function buildComparison(a: Calibration, b: Calibration) {
+export function buildComparison(
+  a: Calibration,
+  b: Calibration,
+  options: { scope?: ComparisonScope | null } = {},
+) {
+  const aRows = comparisonRowsForScope(a.rows, options.scope);
+  const bRows = comparisonRowsForScope(b.rows, options.scope);
   // Match on base_name (the period-stripped name) so v1 and v2 releases align —
   // v2 appends an @<period> suffix the older convention lacks.
   const key = (r: TargetRow) => String(r.base_name ?? r.name);
-  const aByName = new Map(a.rows.map((r) => [key(r), r]));
-  const bByName = new Map(b.rows.map((r) => [key(r), r]));
+  const aByName = new Map(aRows.map((r) => [key(r), r]));
+  const bByName = new Map(bRows.map((r) => [key(r), r]));
   const names = new Set([...aByName.keys(), ...bByName.keys()]);
 
   const common: TargetRow[] = [];
@@ -2176,6 +2196,8 @@ export function buildComparison(a: Calibration, b: Calibration) {
           .filter(Boolean)
           .join(" · "),
         source: br.source ?? ar.source,
+        target_role: br.target_role ?? ar.target_role,
+        source_measure_id: br.source_measure_id ?? ar.source_measure_id,
         variable_key: br.variable_key ?? ar.variable_key,
         variable: br.variable ?? ar.variable,
         measure: br.measure ?? ar.measure,
@@ -2210,25 +2232,26 @@ export function buildComparison(a: Calibration, b: Calibration) {
   );
 
   const surfacesDiffer =
-    a.rows.length !== b.rows.length || added > 0 || removed > 0;
+    aRows.length !== bRows.length || added > 0 || removed > 0;
   return {
     a: {
       release_id: a.release_id,
-      total_targets: a.rows.length,
+      total_targets: aRows.length,
       initial_loss: a.initial_loss,
       final_loss: a.final_loss,
       loss_kind: a.loss_kind,
-      fraction_within_10pct: a.fraction_within_10pct,
+      fraction_within_10pct: fractionWithin10Pct(aRows),
     },
     b: {
       release_id: b.release_id,
-      total_targets: b.rows.length,
+      total_targets: bRows.length,
       initial_loss: b.initial_loss,
       final_loss: b.final_loss,
       loss_kind: b.loss_kind,
-      fraction_within_10pct: b.fraction_within_10pct,
+      fraction_within_10pct: fractionWithin10Pct(bRows),
     },
     summary: {
+      scope: options.scope ?? null,
       common: common.length,
       added,
       removed,
@@ -2248,10 +2271,11 @@ export async function loadComparison(
   bId: string,
   revalidate: number,
   country: PopulaceCountry = "us",
+  scope?: ComparisonScope | null,
 ) {
   const [a, b] = await Promise.all([
     loadRelease(aId, revalidate, country),
     loadRelease(bId, revalidate, country),
   ]);
-  return buildComparison(a, b);
+  return buildComparison(a, b, { scope });
 }
