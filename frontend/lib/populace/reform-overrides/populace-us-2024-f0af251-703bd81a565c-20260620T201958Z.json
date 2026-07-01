@@ -244,7 +244,7 @@
    "category": "OBBBA",
    "in_sample": false,
    "period": 2026,
-   "description": "Extension and enhancement of increased estate and gift tax exemption amounts. Validated by reverting the 2026 estate-tax base exclusion to the post-TCJA-expiration counterfactual.",
+   "description": "Extension and enhancement of increased estate and gift tax exemption amounts. Validated by reverting the 2026 estate-tax base exclusion to the post-TCJA-expiration counterfactual, measured on estate_tax (estate tax is not a component of income_tax, so it stacks as its own measure group). Caveat: decedent estates are essentially absent from living-household survey microdata, so populace is expected to understate this provision regardless of calibration.",
    "jct": {
     "score": -3672000000.0,
     "score_type": "conventional",
@@ -257,9 +257,9 @@
     "budget_effect": 0.0,
     "period": 2026,
     "window": "FY2026",
-    "measure": "income_tax",
-    "baseline_total": 2391044953364.287,
-    "reform_total": 2391044953364.287
+    "measure": "estate_tax",
+    "baseline_total": 0.0,
+    "reform_total": 0.0
    }
   },
   {
@@ -686,6 +686,222 @@
     "measure": "income_tax",
     "baseline_total": 2018852457080.9902,
     "reform_total": 2098216159017.772
+   }
+  },
+  {
+   "id": "soi_income_tax_net",
+   "name": "Total income tax (net of refundable credits)",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "SOI total income tax minus refundable credits \u2014 the same net concept as populace's income_tax. Small known scope difference: the populace measure also includes qualified-retirement-plan penalty taxes and unreported payroll tax (~0.5% of the total), which SOI books outside income tax.",
+   "jct": {
+    "score": 2042047899000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (total income tax minus refundable credits)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 2018852457080.9902,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "income_tax",
+    "baseline_total": 2018852457080.9902,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_amt",
+   "name": "Alternative minimum tax",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Post-TCJA AMT is small (about 150,000 returns in TY2023), so this line is sensitive to the top tail of the income distribution.",
+   "jct": {
+    "score": 2752164000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 1.4 (alternative minimum tax)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in14ar.xls"
+   },
+   "populace": {
+    "budget_effect": 1129388175.525363,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "alternative_minimum_tax",
+    "baseline_total": 1129388175.525363,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_cdcc",
+   "name": "Child and dependent care credit",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 3468910000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (credit for child and dependent care)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 2399795693.2078676,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "cdcc",
+    "baseline_total": 2399795693.2078676,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_education_credits",
+   "name": "Education credits (nonrefundable)",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "populace's education_tax_credits is the nonrefundable American Opportunity credit plus the Lifetime Learning credit \u2014 the same scope as SOI's nonrefundable education credit column (the refundable AOTC portion is excluded on both sides).",
+   "jct": {
+    "score": 7554668000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (nonrefundable education credit)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 4557222527.763736,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "education_tax_credits",
+    "baseline_total": 4557222527.763736,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_savers_credit",
+   "name": "Retirement savings contribution (saver's) credit",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 2037572000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (retirement savings contribution credit)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 2553964256.9502316,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "savers_credit",
+    "baseline_total": 2553964256.9502316,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_ctc_nonrefundable",
+   "name": "Child tax credit + ODC (nonrefundable)",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 84418366000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (nonrefundable child and other dependent tax credit)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 105826791721.11238,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "non_refundable_ctc",
+    "baseline_total": 105826791721.11238,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_ctc_refundable",
+   "name": "Additional child tax credit (refundable)",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 34533251000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (refundable child tax credit or additional child tax credit)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 33501196828.01478,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "refundable_ctc",
+    "baseline_total": 33501196828.01478,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_niit",
+   "name": "Net investment income tax",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Concentrated in top-decile capital income, so this line tests the investment-income tail.",
+   "jct": {
+    "score": 39330017000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (net investment income tax)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 54942915669.26922,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "net_investment_income_tax",
+    "baseline_total": 54942915669.26922,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_se_tax",
+   "name": "Self-employment tax",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 81087060000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (self-employment tax)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 87878482172.53986,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "self_employment_tax",
+    "baseline_total": 87878482172.53986,
+    "reform_total": null
    }
   }
  ],
