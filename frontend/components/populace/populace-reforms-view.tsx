@@ -239,7 +239,7 @@ export function PopulaceReformsView() {
 
           <SectionCard
             title="populace vs benchmark"
-            description="Benchmark is JCT's first full fiscal year (FY2027) for OBBBA provisions, since JCT scores are fiscal-year cash receipts and FY2026 is a partial ramp year for provisions effective 1/1/2026 — an unfair match for populace's calendar-year liability. The FY2026 figure is shown for reference. Error % is |populace − benchmark| / |benchmark|. Out-of-sample reforms are the real test; in-sample reforms are ones the dataset was calibrated to, shown for completeness."
+            description="Benchmark is JCT's first full fiscal year (FY2027) for OBBBA provisions: JCT scores fiscal-year cash receipts, so FY2026 captures only part of a tax year's effect — a ramp year for the 2026-effective provisions, and mostly the prior tax year's filing settlement for the 2025-effective ones (standard deduction, exemptions, SALT, tips, overtime, auto loans). FY2026 is shown for reference. Error % is |populace − benchmark| / |benchmark|. populace is a static calendar-year liability estimate on 2024-vintage data uprated to 2026, so it should run slightly below JCT's conventional (behavior-inclusive, 2026-population) scores. Out-of-sample reforms are the real test; in-sample reforms are ones the dataset was calibrated to, shown for completeness."
             padded={false}
           >
             <ReformTable rows={data.rows ?? []} />
