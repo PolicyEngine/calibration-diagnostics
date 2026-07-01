@@ -73,12 +73,13 @@ export interface ReformValidationRow {
   // the genuine fidelity test.
   in_sample: boolean;
   period: number | null;
-  // JCT (the authority's official score) and populace's microsim estimate.
+  // The JCT figure we benchmark against — JCT's first full fiscal year
+  // (FY2027) for provisions effective 1/1/2026, since FY2026 is a partial ramp
+  // year vs populace's calendar-year liability. In-sample rows fall back to
+  // their annual figure. Error metrics below are all relative to this.
   jct_score: number | null;
-  // JCT's first full fiscal year (FY2027). FY2026 is a partial ramp year for
-  // provisions effective 1/1/2026, so error % vs FY2026 overstates the gap;
-  // FY2027 is a fairer like-for-like against populace's calendar-year liability.
-  jct_score_fy2027: number | null;
+  // The FY2026 figure, kept for reference (the partial ramp year).
+  jct_score_fy2026: number | null;
   jct_score_type: string | null;
   jct_window: string | null;
   jct_source: string | null;
@@ -87,12 +88,10 @@ export interface ReformValidationRow {
   populace_estimate: number | null;
   populace_window: string | null;
   populace_annual: Record<string, number> | null;
-  // Derived.
+  // Derived (relative to jct_score, i.e. the FY2027 benchmark where available).
   abs_error: number | null; // populace − jct (USD)
   relative_error: number | null; // (populace − jct) / |jct|
   abs_relative_error: number | null;
-  // Error against the full-year (FY2027) figure — the fairer like-for-like.
-  relative_error_fy2027: number | null;
   within_10pct: boolean | null;
   direction: "over" | "under" | "exact" | null;
 }
@@ -123,18 +122,19 @@ export interface ReformValidation {
 function enrichReform(raw: JsonObject): ReformValidationRow {
   const jct = asObject(raw.jct);
   const populace = asObject(raw.populace);
-  const jctScore = numberOrNull(jct.score);
+  const jctFy2026 = numberOrNull(jct.score);
   const jctFy2027 = numberOrNull(jct.score_fy2027);
+  // Benchmark defaults to JCT's first full fiscal year (FY2027). FY2026 is a
+  // partial ramp year for provisions effective 1/1/2026, so error vs FY2026
+  // overstates the gap against populace's calendar-year liability. In-sample
+  // rows have no FY2027 figure, so they fall back to their annual (FY2026) one.
+  const benchmark = jctFy2027 ?? jctFy2026;
   const estimate = numberOrNull(populace.budget_effect);
-  const absError = jctScore != null && estimate != null ? estimate - jctScore : null;
-  const relErrorFy2027 =
-    jctFy2027 != null && estimate != null && jctFy2027 !== 0
-      ? (estimate - jctFy2027) / Math.abs(jctFy2027)
-      : null;
+  const absError = benchmark != null && estimate != null ? estimate - benchmark : null;
   const relError =
-    jctScore != null && estimate != null && jctScore !== 0
-      ? (estimate - jctScore) / Math.abs(jctScore)
-      : jctScore === 0 && absError != null
+    benchmark != null && estimate != null && benchmark !== 0
+      ? (estimate - benchmark) / Math.abs(benchmark)
+      : benchmark === 0 && absError != null
         ? absError
         : null;
   const absRel = relError == null ? null : Math.abs(relError);
@@ -151,8 +151,8 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
     description: stringOrNull(raw.description),
     in_sample: raw.in_sample === true,
     period: numberOrNull(raw.period),
-    jct_score: jctScore,
-    jct_score_fy2027: jctFy2027,
+    jct_score: benchmark,
+    jct_score_fy2026: jctFy2026,
     jct_score_type: stringOrNull(jct.score_type),
     jct_window: stringOrNull(jct.window),
     jct_source: stringOrNull(jct.source),
@@ -164,7 +164,6 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
     abs_error: absError,
     relative_error: relError,
     abs_relative_error: absRel,
-    relative_error_fy2027: relErrorFy2027,
     within_10pct: absRel == null ? null : absRel <= 0.1,
     direction:
       absError == null ? null : absError > 0 ? "over" : absError < 0 ? "under" : "exact",
