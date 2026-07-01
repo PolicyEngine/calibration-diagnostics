@@ -481,6 +481,7 @@ export interface ReformValidationRow {
   jct_score_fy2026?: number | null;
   jct_score_type?: string | null;
   jct_window?: string | null;
+  jct_benchmark_window?: string | null;
   jct_source?: string | null;
   jct_source_url?: string | null;
   jct_published?: string | null;
