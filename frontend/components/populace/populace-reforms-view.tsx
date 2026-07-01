@@ -57,7 +57,13 @@ function Sparkline({ series }: { series: ReformHistorySeries }) {
   );
 }
 
-function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
+function ReformTable({
+  rows,
+  history,
+}: {
+  rows: ReformValidationRow[];
+  history: Map<string, ReformHistorySeries>;
+}) {
   if (!rows.length) {
     return <EmptyState title="No reforms in this release's validation set." variant="compact" />;
   }
@@ -72,11 +78,10 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
           <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
             <th className="px-3 py-2 font-semibold">Reform</th>
             <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
-            <th className="px-3 py-2 text-right font-semibold text-muted-foreground/70">
-              FY26
-            </th>
             <th className="px-3 py-2 text-right font-semibold">populace</th>
             <th className="px-3 py-2 text-right font-semibold">Error %</th>
+            <th className="px-3 py-2 font-semibold">Trend</th>
+            <th className="px-3 py-2 text-right font-semibold">Δ vs prev</th>
             <th className="px-3 py-2 font-semibold">Year</th>
             <th className="px-3 py-2 font-semibold">Source</th>
           </tr>
@@ -98,12 +103,6 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                 {fmtMoney(row.jct_score)}
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground/70">
-                {row.jct_score_fy2026 != null &&
-                row.jct_score_fy2026 !== row.jct_score
-                  ? fmtMoney(row.jct_score_fy2026)
-                  : "—"}
-              </td>
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                 {fmtMoney(row.populace_estimate)}
               </td>
@@ -118,6 +117,34 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
               >
                 {pct(row.abs_relative_error)}
               </td>
+              {(() => {
+                const series = history.get(row.id);
+                const delta = series?.delta ?? null;
+                return (
+                  <>
+                    <td className="px-3 py-2">
+                      {series ? (
+                        <Sparkline series={series} />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td
+                      className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
+                        delta == null
+                          ? "text-muted-foreground"
+                          : delta < 0
+                            ? "text-emerald-700"
+                            : delta > 0
+                              ? "text-rose-700"
+                              : "text-muted-foreground"
+                      }`}
+                    >
+                      {delta == null ? "—" : `${delta > 0 ? "+" : ""}${pct(delta)}`}
+                    </td>
+                  </>
+                );
+              })()}
               <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground tabular-nums">
                 {row.jct_benchmark_window ?? "—"}
               </td>
@@ -160,7 +187,15 @@ export function PopulaceReformsView() {
     [releases],
   );
 
-  const trackedReforms = (history?.reforms ?? []).filter((r) => r.points.length >= 2);
+  const historyById = useMemo(
+    () =>
+      new Map(
+        (history?.reforms ?? [])
+          .filter((r) => r.points.length >= 2)
+          .map((r) => [r.id, r] as const),
+      ),
+    [history],
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -239,67 +274,12 @@ export function PopulaceReformsView() {
 
           <SectionCard
             title="populace vs benchmark"
-            description="Benchmark is JCT's first full fiscal year (FY2027) for OBBBA provisions: JCT scores fiscal-year cash receipts, so FY2026 captures only part of a tax year's effect — a ramp year for the 2026-effective provisions, and mostly the prior tax year's filing settlement for the 2025-effective ones (standard deduction, exemptions, SALT, tips, overtime, auto loans). FY2026 is shown for reference. Error % is |populace − benchmark| / |benchmark|. populace is a static calendar-year liability estimate on 2024-vintage data uprated to 2026, so it should run slightly below JCT's conventional (behavior-inclusive, 2026-population) scores. Out-of-sample reforms are the real test; in-sample reforms are ones the dataset was calibrated to, shown for completeness."
+            description="Benchmark is JCT's first full fiscal year (FY2027) for OBBBA provisions: JCT scores fiscal-year cash receipts, so FY2026 captures only part of a tax year's effect — a ramp year for the 2026-effective provisions, and mostly the prior tax year's filing settlement for the 2025-effective ones (standard deduction, exemptions, SALT, tips, overtime, auto loans). Error % is |populace − benchmark| / |benchmark|. populace is a static calendar-year liability estimate on 2024-vintage data uprated to 2026, so it should run slightly below JCT's conventional (behavior-inclusive, 2026-population) scores. Out-of-sample reforms are the real test; in-sample reforms are ones the dataset was calibrated to, shown for completeness. Trend and Δ track each reform's |error| across releases that published a validation set (down and green is better)."
             padded={false}
           >
-            <ReformTable rows={data.rows ?? []} />
+            <ReformTable rows={data.rows ?? []} history={historyById} />
           </SectionCard>
 
-          <SectionCard
-            title="Run-over-run"
-            description="How each reform's |error| against its benchmark has moved across releases that published a validation set. Down (and green) is better."
-            padded={false}
-          >
-            {trackedReforms.length ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                      <th className="px-3 py-2 font-semibold">Reform</th>
-                      <th className="px-3 py-2 font-semibold">Trend</th>
-                      <th className="px-3 py-2 text-right font-semibold">Latest |error|</th>
-                      <th className="px-3 py-2 text-right font-semibold">Δ vs prev</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {trackedReforms.map((r) => (
-                      <tr key={r.id} className="border-b border-border/60 last:border-b-0">
-                        <td className="px-3 py-2 font-medium text-foreground">{r.name}</td>
-                        <td className="px-3 py-2">
-                          <Sparkline series={r} />
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {pct(r.latest_abs_relative_error)}
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-right tabular-nums ${
-                            r.delta == null
-                              ? "text-muted-foreground"
-                              : r.delta < 0
-                                ? "text-emerald-700"
-                                : r.delta > 0
-                                  ? "text-rose-700"
-                                  : "text-muted-foreground"
-                          }`}
-                        >
-                          {r.delta == null
-                            ? "—"
-                            : `${r.delta > 0 ? "+" : ""}${pct(r.delta)}`}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="px-5 py-4">
-                <StatusPill tone="info">
-                  Run-over-run needs at least two releases with a published validation set — only one
-                  is available so far.
-                </StatusPill>
-              </div>
-            )}
-          </SectionCard>
         </>
       ) : null}
     </div>
