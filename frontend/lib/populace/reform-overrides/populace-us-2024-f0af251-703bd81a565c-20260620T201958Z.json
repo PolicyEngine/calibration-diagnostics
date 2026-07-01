@@ -130,7 +130,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 1 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -222154000000
    },
    "populace": {
     "budget_effect": -195573235348.0337,
@@ -153,7 +154,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 2 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -144689000000
    },
    "populace": {
     "budget_effect": -131957559775.17188,
@@ -176,7 +178,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 3 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": 173453000000
    },
    "populace": {
     "budget_effect": 149241645907.31738,
@@ -199,7 +202,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 4 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -87599000000
    },
    "populace": {
     "budget_effect": -85642146969.64697,
@@ -222,7 +226,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 5 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -74617000000
    },
    "populace": {
     "budget_effect": -48232133814.86182,
@@ -245,7 +250,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 6 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -20276000000
    },
    "populace": {
     "budget_effect": 0.0,
@@ -268,7 +274,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 7 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -137508000000
    },
    "populace": {
     "budget_effect": -101486827382.99512,
@@ -291,7 +298,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 8 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": 3398000000
    },
    "populace": {
     "budget_effect": 500400830.5161133,
@@ -314,7 +322,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 9 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": 128000000
    },
    "populace": {
     "budget_effect": 662376582.5058594,
@@ -337,7 +346,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 10 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": 23707000000
    },
    "populace": {
     "budget_effect": 16987843852.270508,
@@ -360,7 +370,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 11 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -26393000000
    },
    "populace": {
     "budget_effect": -22060108416.086426,
@@ -383,7 +394,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.1 line 20 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": 79250000000
    },
    "populace": {
     "budget_effect": 63969895979.86719,
@@ -406,7 +418,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.2 line 1 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -7664000000
    },
    "populace": {
     "budget_effect": -3497376183.126465,
@@ -429,7 +442,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.2 line 2 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -25672000000
    },
    "populace": {
     "budget_effect": -13097305258.78955,
@@ -452,7 +466,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.2 line 3 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -8070000000
    },
    "populace": {
     "budget_effect": 0.0,
@@ -498,7 +513,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.4.A line 5 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -1197000000
    },
    "populace": {
     "budget_effect": -1042680280.1430664,
@@ -521,7 +537,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.4.C line 4 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": -7791000000
    },
    "populace": {
     "budget_effect": -2948014748.9399414,
@@ -544,7 +561,8 @@
     "score_type": "conventional",
     "window": "FY2026",
     "source": "JCX-35-25, Ch.4.C line 5 (FY2026)",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
+    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/",
+    "score_fy2027": 7083000000
    },
    "populace": {
     "budget_effect": 7150150930.540527,

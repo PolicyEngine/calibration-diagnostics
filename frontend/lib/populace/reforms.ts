@@ -75,6 +75,10 @@ export interface ReformValidationRow {
   period: number | null;
   // JCT (the authority's official score) and populace's microsim estimate.
   jct_score: number | null;
+  // JCT's first full fiscal year (FY2027). FY2026 is a partial ramp year for
+  // provisions effective 1/1/2026, so error % vs FY2026 overstates the gap;
+  // FY2027 is a fairer like-for-like against populace's calendar-year liability.
+  jct_score_fy2027: number | null;
   jct_score_type: string | null;
   jct_window: string | null;
   jct_source: string | null;
@@ -87,6 +91,8 @@ export interface ReformValidationRow {
   abs_error: number | null; // populace − jct (USD)
   relative_error: number | null; // (populace − jct) / |jct|
   abs_relative_error: number | null;
+  // Error against the full-year (FY2027) figure — the fairer like-for-like.
+  relative_error_fy2027: number | null;
   within_10pct: boolean | null;
   direction: "over" | "under" | "exact" | null;
 }
@@ -118,8 +124,13 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
   const jct = asObject(raw.jct);
   const populace = asObject(raw.populace);
   const jctScore = numberOrNull(jct.score);
+  const jctFy2027 = numberOrNull(jct.score_fy2027);
   const estimate = numberOrNull(populace.budget_effect);
   const absError = jctScore != null && estimate != null ? estimate - jctScore : null;
+  const relErrorFy2027 =
+    jctFy2027 != null && estimate != null && jctFy2027 !== 0
+      ? (estimate - jctFy2027) / Math.abs(jctFy2027)
+      : null;
   const relError =
     jctScore != null && estimate != null && jctScore !== 0
       ? (estimate - jctScore) / Math.abs(jctScore)
@@ -141,6 +152,7 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
     in_sample: raw.in_sample === true,
     period: numberOrNull(raw.period),
     jct_score: jctScore,
+    jct_score_fy2027: jctFy2027,
     jct_score_type: stringOrNull(jct.score_type),
     jct_window: stringOrNull(jct.window),
     jct_source: stringOrNull(jct.source),
@@ -152,6 +164,7 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
     abs_error: absError,
     relative_error: relError,
     abs_relative_error: absRel,
+    relative_error_fy2027: relErrorFy2027,
     within_10pct: absRel == null ? null : absRel <= 0.1,
     direction:
       absError == null ? null : absError > 0 ? "over" : absError < 0 ? "under" : "exact",
