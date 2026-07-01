@@ -3,6 +3,33 @@ import { expect, test } from "bun:test";
 import { buildReformHistory, buildReformValidation } from "./reforms";
 import { REFORM_OVERRIDES } from "./reform-overrides";
 
+test("FY2027 full-year benchmark and its relative error are parsed", () => {
+  const built = buildReformValidation(
+    {
+      release_id: "r",
+      reforms: [
+        {
+          id: "obbba_salt_limit",
+          name: "SALT",
+          in_sample: false,
+          jct: { score: 31617000000, score_fy2027: 79250000000 },
+          populace: { budget_effect: 64000000000 },
+        },
+      ],
+    },
+    "r",
+    null,
+  );
+  expect(built.available).toBe(true);
+  if (!built.available) return;
+  const row = built.rows[0];
+  expect(row.jct_score_fy2027).toBe(79250000000);
+  // +102% vs FY2026, but ~-19% vs the full-year FY2027 figure.
+  expect(row.relative_error).toBeGreaterThan(0.9);
+  expect(row.relative_error_fy2027).toBeLessThan(0);
+  expect(Math.abs(row.relative_error_fy2027!)).toBeLessThan(0.25);
+});
+
 test("committed reform overrides carry simulated out-of-sample estimates", () => {
   const entries = Object.entries(REFORM_OVERRIDES);
   expect(entries.length).toBeGreaterThan(0);

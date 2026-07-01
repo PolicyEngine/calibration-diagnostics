@@ -25,6 +25,10 @@ function pct(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
 }
 
+function absOrNull(value: number | null | undefined) {
+  return value == null ? null : Math.abs(value);
+}
+
 function errorTone(absRel: number | null | undefined): "positive" | "neutral" | "negative" {
   if (absRel == null) return "neutral";
   if (absRel <= 0.1) return "positive";
@@ -71,10 +75,11 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
         <thead>
           <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
             <th className="px-3 py-2 font-semibold">Reform</th>
-            <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
+            <th className="px-3 py-2 text-right font-semibold">JCT FY26</th>
+            <th className="px-3 py-2 text-right font-semibold">JCT FY27</th>
             <th className="px-3 py-2 text-right font-semibold">populace</th>
-            <th className="px-3 py-2 text-right font-semibold">Error</th>
-            <th className="px-3 py-2 text-right font-semibold">Error %</th>
+            <th className="px-3 py-2 text-right font-semibold">Err % FY26</th>
+            <th className="px-3 py-2 text-right font-semibold">Err % FY27</th>
             <th className="px-3 py-2 font-semibold">Source</th>
           </tr>
         </thead>
@@ -95,11 +100,11 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                 {fmtMoney(row.jct_score)}
               </td>
+              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                {fmtMoney(row.jct_score_fy2027)}
+              </td>
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                 {fmtMoney(row.populace_estimate)}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
-                {fmtSignedMoney(row.abs_error)}
               </td>
               <td
                 className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
@@ -111,6 +116,17 @@ function ReformTable({ rows }: { rows: ReformValidationRow[] }) {
                 }`}
               >
                 {pct(row.abs_relative_error)}
+              </td>
+              <td
+                className={`whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums ${
+                  errorTone(absOrNull(row.relative_error_fy2027)) === "positive"
+                    ? "text-emerald-700"
+                    : errorTone(absOrNull(row.relative_error_fy2027)) === "negative"
+                      ? "text-rose-700"
+                      : "text-foreground"
+                }`}
+              >
+                {pct(absOrNull(row.relative_error_fy2027))}
               </td>
               <td className="px-3 py-2 text-xs text-muted-foreground">
                 {row.jct_source_url ? (
@@ -230,7 +246,7 @@ export function PopulaceReformsView() {
 
           <SectionCard
             title="populace vs benchmark"
-            description="Error is populace − benchmark; Error % is relative to the benchmark. Some provisions (the standard deduction, all-itemized) have no published figure — both JCT and Treasury treat the standard deduction as baseline — so they show the repeal magnitude only. Out-of-sample reforms are the real test; in-sample reforms are ones the dataset was calibrated to, shown for completeness."
+            description="JCT scores are fiscal-year cash receipts; populace is calendar-year 2026 liability. For provisions effective 1/1/2026, FY2026 is a partial ramp year, so Err % FY26 overstates the gap — FY2027 (the first full fiscal year) is the fairer like-for-like, and most provisions land within ~15% of it. Err % is |populace − JCT| / |JCT|. Out-of-sample reforms are the real test; in-sample reforms are ones the dataset was calibrated to, shown for completeness."
             padded={false}
           >
             <ReformTable rows={data.rows ?? []} />
