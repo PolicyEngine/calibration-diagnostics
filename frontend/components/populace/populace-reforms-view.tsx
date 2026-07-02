@@ -14,6 +14,7 @@ import {
   usePopulaceReformHistory,
   usePopulaceReforms,
   usePopulaceReleases,
+  usePopulaceStagingRuns,
   type ReformHistorySeries,
   type ReformValidationRow,
 } from "@/lib/api/hooks/use-populace";
@@ -182,9 +183,19 @@ export function PopulaceReformsView() {
   const { data, isLoading, error } = usePopulaceReforms(release || undefined);
   const { data: history } = usePopulaceReformHistory();
 
+  const { data: stagingData } = usePopulaceStagingRuns();
   const options = useMemo(
-    () => releases.map((r) => ({ value: r.release_id, label: releaseLabel(r.release_id, r.date) })),
-    [releases],
+    () => [
+      ...releases.map((r) => ({ value: r.release_id, label: releaseLabel(r.release_id, r.date) })),
+      // Candidate staging runs, reviewable with the same page before publish.
+      ...(stagingData?.runs ?? []).map((r) => ({
+        value: `staging:${r.run_id}`,
+        label: `candidate · ${releaseLabel(r.run_id, r.updated_at)}${
+          r.status && r.status !== "completed" ? ` (${r.status})` : ""
+        }`,
+      })),
+    ],
+    [releases, stagingData],
   );
 
   const historyById = useMemo(

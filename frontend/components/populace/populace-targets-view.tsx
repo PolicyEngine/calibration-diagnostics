@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, humanizeName } from "@/components/shared/format";
+import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
+import { useCountry } from "@/components/layout/country-context";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -12,6 +13,7 @@ import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { PopulaceTargetDetail } from "@/components/populace/populace-target-detail";
 import {
   releaseSelectOptions,
+  usePopulaceStagingRuns,
   usePopulaceReleases,
   usePopulaceTargetDiagnostics,
   type PopulaceTargetDimension,
@@ -574,8 +576,22 @@ export function PopulaceTargetsView({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [refineIndex, setRefineIndex] = useState(0);
 
+  const { country } = useCountry();
   const { data: releaseData } = usePopulaceReleases();
-  const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
+  const { data: stagingData } = usePopulaceStagingRuns();
+  const releaseOptions = useMemo(
+    () => [
+      ...releaseSelectOptions(releaseData),
+      // Candidate staging runs (US-only), reviewable like a release pre-publish.
+      ...(country === "us" ? (stagingData?.runs ?? []) : []).map((r) => ({
+        value: `staging:${r.run_id}`,
+        label: `candidate · ${releaseLabel(r.run_id, r.updated_at)}${
+          r.status && r.status !== "completed" ? ` (${r.status})` : ""
+        }`,
+      })),
+    ],
+    [releaseData, stagingData, country],
+  );
 
   function pickRelease(value: string) {
     // A different release is a different surface — reset everything below it.
