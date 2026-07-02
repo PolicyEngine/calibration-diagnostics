@@ -12,10 +12,15 @@ export default async function PopulaceTargetsPage({
   const rawScope = Array.isArray(params?.scope) ? params.scope[0] : params?.scope;
   const initialScope = rawScope === "healthcare" ? "healthcare" : "all";
   const rawSource = Array.isArray(params?.source) ? params.source[0] : params?.source;
+  const rawLevel = Array.isArray(params?.level) ? params.level[0] : params?.level;
 
   return (
     <AppShell>
-      <PopulaceTargetsView initialScope={initialScope} initialSource={rawSource ?? ""} />
+      <PopulaceTargetsView
+        initialScope={initialScope}
+        initialSource={rawSource ?? ""}
+        initialLevel={rawLevel ?? ""}
+      />
     </AppShell>
   );
 }

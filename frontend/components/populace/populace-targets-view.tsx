@@ -555,15 +555,17 @@ function WizardCard({
 export function PopulaceTargetsView({
   initialScope = "all",
   initialSource = "",
+  initialLevel = "",
 }: {
   initialScope?: TargetScope;
   initialSource?: string;
+  initialLevel?: string;
 }) {
   const [release, setRelease] = useState("");
   const [scope, setScope] = useState<TargetScope>(initialScope);
   const [variable, setVariable] = useState("");
   const [source, setSource] = useState(initialSource);
-  const [level, setLevel] = useState("");
+  const [level, setLevel] = useState(initialLevel);
   const [geography, setGeography] = useState("");
   const [direction, setDirection] = useState("");
   const [withinTolerance, setWithinTolerance] = useState("");
