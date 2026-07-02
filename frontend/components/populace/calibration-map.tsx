@@ -332,9 +332,13 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 export function CalibrationMap({
   data,
   release,
+  level,
 }: {
   data: PopulaceTreemapResponse;
   release?: string;
+  // Geography level the map is filtered to — threaded into the cluster
+  // popup so its target list matches the tile counts.
+  level?: string;
 }) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -361,6 +365,13 @@ export function CalibrationMap({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // A new filter surface invalidates any open cluster popup — its leaf may no
+  // longer exist in the filtered data.
+  useEffect(() => {
+    setSelected(null);
+    setHover(null);
+  }, [data]);
 
   const height = Math.round(Math.min(Math.max(width * 0.58, 460), 680));
   const groups = useMemo(
@@ -555,6 +566,7 @@ export function CalibrationMap({
                 leaf={selected.leaf}
                 group={selected.group}
                 release={release}
+                level={level}
                 onClose={() => setSelected(null)}
               />
             </div>
