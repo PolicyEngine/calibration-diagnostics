@@ -193,7 +193,11 @@ export function PopulaceOverviewView() {
         }
       >
         {treemap ? (
-          <CalibrationMap data={treemap} release={release || undefined} />
+          <CalibrationMap
+            data={treemap}
+            release={release || undefined}
+            level={geoLevel || undefined}
+          />
         ) : (
           <LoadingBlock label="Building calibration map…" />
         )}

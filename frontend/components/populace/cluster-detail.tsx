@@ -58,11 +58,15 @@ export function ClusterDetail({
   leaf,
   group,
   release,
+  level,
   onClose,
 }: {
   leaf: PopulaceTreemapLeaf;
   group: PopulaceTreemapGroup;
   release?: string;
+  // Geography level the parent map is filtered to; scopes the target list so
+  // it matches the tile's counts.
+  level?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -90,6 +94,7 @@ export function ClusterDetail({
     release,
     variable: synthetic ? undefined : leaf.key,
     source: synthetic ? leaf.source : undefined,
+    level: level || undefined,
     facet: facetParam.length ? facetParam : undefined,
     within_tolerance: fit || undefined,
     direction: direction || undefined,
@@ -328,7 +333,9 @@ export function ClusterDetail({
             router.push(
               synthetic && leaf.source === "__other_sources__"
                 ? "/populace/targets"
-                : `/populace/targets?source=${encodeURIComponent(leaf.source)}`,
+                : `/populace/targets?source=${encodeURIComponent(leaf.source)}${
+                    level ? `&level=${encodeURIComponent(level)}` : ""
+                  }`,
             )
           }
           className="font-medium text-primary hover:underline"
