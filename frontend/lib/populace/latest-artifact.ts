@@ -178,6 +178,16 @@ function stateFromGeoId(value: string | null): string | null {
   return match ? FIPS_TO_ABBR[match[1]] ?? null : null;
 }
 
+// Census CD geo ids end in SSDD (state FIPS + district number), e.g.
+// 5001700US0101 -> AL-01.
+function districtFromGeoId(value: string | null): string | null {
+  if (!value) return null;
+  const match = /US(\d{2})(\d{2})$/.exec(value);
+  if (!match) return null;
+  const state = FIPS_TO_ABBR[match[1]];
+  return state ? `${state}-${match[2]}` : null;
+}
+
 function readableToken(value: string | null): string | null {
   if (!value) return null;
   return value.replace(/_/g, " ");
@@ -494,9 +504,17 @@ function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
   const geography =
     geoLevel === "country"
       ? "United States"
-      : stateFromGeoId(geoId) ?? stringValue(metadata.state) ?? "";
+      : geoLevel === "congressional_district"
+        ? districtFromGeoId(geoId) ?? ""
+        : stateFromGeoId(geoId) ?? stringValue(metadata.state) ?? "";
   const level =
-    geoLevel === "country" ? "national" : geoLevel === "state" ? "state" : "";
+    geoLevel === "country"
+      ? "national"
+      : geoLevel === "state"
+        ? "state"
+        : geoLevel === "congressional_district"
+          ? "congressional_district"
+          : "";
   const measureId = stringValue(metadata.source_measure_id) ?? parts.at(-1) ?? "";
   const variable =
     readableToken(stringValue(metadata.variable)) ??
@@ -1316,7 +1334,12 @@ export interface TreemapData {
 // errors, the per-target term of the normalized target loss). Targets with no
 // relative error (absolute targets where the target value is zero) still count
 // toward n_targets but contribute nothing to loss or fit.
-export function populaceTargetTreemap(rows: TargetRow[], releaseId: string): TreemapData {
+export function populaceTargetTreemap(
+  rows: TargetRow[],
+  releaseId: string,
+  level?: string | null,
+): TreemapData {
+  if (level) rows = rows.filter((row) => row.level === level);
   const groups = new Map<string, Map<string, TargetRow[]>>();
   for (const row of rows) {
     const source = String(row.source ?? "").trim() || "other";
