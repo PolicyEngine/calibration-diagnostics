@@ -682,13 +682,14 @@ export interface PopulaceTreemapResponse {
   groups: PopulaceTreemapGroup[];
 }
 
-export function usePopulaceTargetTreemap(release?: string) {
+export function usePopulaceTargetTreemap(release?: string, level?: string) {
   const { country } = useCountry();
   return useQuery({
-    queryKey: ["populace", "target-treemap", country, release ?? "latest"],
+    queryKey: ["populace", "target-treemap", country, release ?? "latest", level ?? "all"],
     queryFn: () =>
       apiGet<PopulaceTreemapResponse>("/populace/target-treemap", {
         release: release || undefined,
+        level: level || undefined,
         country,
       }),
     staleTime: 5 * 60 * 1000,

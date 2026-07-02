@@ -15,10 +15,11 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const release = params.get("release") ?? "latest";
   const country = parseCountry(params.get("country"));
+  const level = params.get("level") || null;
   try {
     const cal = await loadRelease(release, revalidate, country);
     return NextResponse.json(
-      scrub(populaceTargetTreemap(cal.rows, cal.release_id)),
+      scrub(populaceTargetTreemap(cal.rows, cal.release_id, level)),
     );
   } catch (error) {
     return NextResponse.json(

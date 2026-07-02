@@ -47,9 +47,13 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
 export function PopulaceOverviewView() {
   const { country } = useCountry();
   const [release, setRelease] = useState("");
+  const [geoLevel, setGeoLevel] = useState("");
   const { data: releaseData } = usePopulaceReleases();
   const { data, isLoading, error } = usePopulace(release || undefined);
-  const { data: treemap } = usePopulaceTargetTreemap(release || undefined);
+  const { data: treemap } = usePopulaceTargetTreemap(
+    release || undefined,
+    geoLevel || undefined,
+  );
 
   const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
 
@@ -145,7 +149,22 @@ export function PopulaceOverviewView() {
         <KpiCard label="Published" value={formatPublishedAt(data.updated_at)} />
       </div>
 
-      <SectionCard title="Calibration map">
+      <SectionCard
+        title="Calibration map"
+        actions={
+          <ToolbarSelect
+            label="Geography"
+            value={geoLevel}
+            onChange={setGeoLevel}
+            options={[
+              { value: "", label: "All geographies" },
+              { value: "national", label: "National" },
+              { value: "state", label: "State" },
+              { value: "congressional_district", label: "Congressional district" },
+            ]}
+          />
+        }
+      >
         {treemap ? (
           <CalibrationMap data={treemap} release={release || undefined} />
         ) : (
