@@ -283,6 +283,13 @@ export async function loadStagingRun(runId: string, revalidate: number): Promise
   };
 }
 
+export async function loadStagingReformValidationRaw(
+  runId: string,
+  revalidate: number,
+): Promise<JsonObject | null> {
+  return stagingJsonOrNull(`runs/${runId}/reform_validation.json`, revalidate);
+}
+
 export async function loadStagingTargetDiagnostics(
   requestUrl: string,
   runId: string,

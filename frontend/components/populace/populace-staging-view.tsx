@@ -465,6 +465,61 @@ export function PopulaceStagingView() {
                       hint={releaseLabel(compareData.b.release_id)}
                     />
                   </div>
+                  {(() => {
+                    const regressions = (compareData.rows ?? [])
+                      .filter(
+                        (row) =>
+                          (row.abs_rel_delta ?? 0) > 1e-9 &&
+                          // Drop tiny-denominator artifacts (>1000% errors),
+                          // same convention as the release highlights.
+                          Math.abs(row.b_relative_error ?? 0) <= 10 &&
+                          Math.abs(row.a_relative_error ?? 0) <= 10,
+                      )
+                      .slice(0, 12);
+                    if (!regressions.length) return null;
+                    const pctOrDash = (v: number | null | undefined) =>
+                      v == null ? "—" : fmt(Math.abs(v), { pct: true, digits: 1 });
+                    return (
+                      <div className="mt-4 overflow-x-auto">
+                        <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Biggest regressions
+                        </div>
+                        <table className="w-full text-left text-sm">
+                          <thead>
+                            <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                              <th className="px-3 py-2 font-semibold">Target</th>
+                              <th className="px-3 py-2 text-right font-semibold">Latest |error|</th>
+                              <th className="px-3 py-2 text-right font-semibold">Candidate |error|</th>
+                              <th className="px-3 py-2 text-right font-semibold">Δ</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {regressions.map((row) => (
+                              <tr key={row.name} className="border-b border-border/60 last:border-b-0">
+                                <td className="px-3 py-1.5">
+                                  <span className="font-medium text-foreground">
+                                    {row.variable ?? row.name}
+                                  </span>
+                                  {row.target_label ? (
+                                    <span className="text-xs text-muted-foreground"> · {row.target_label}</span>
+                                  ) : null}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                                  {pctOrDash(row.a_relative_error)}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                                  {pctOrDash(row.b_relative_error)}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-rose-700">
+                                  +{fmt(row.abs_rel_delta, { pct: true, digits: 1 })}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
                 </SectionCard>
               ) : null}
 
