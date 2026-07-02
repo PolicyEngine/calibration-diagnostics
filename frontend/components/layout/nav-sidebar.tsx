@@ -19,6 +19,7 @@ const navItems = [
   { href: "/populace/reforms", label: "Reform validation", usOnly: true },
   { href: "/populace/compare", label: "Compare versions" },
   { href: "/populace/staging", label: "Staging runs", usOnly: true },
+  { href: "/populace/pipeline", label: "Pipeline", usOnly: true },
 ];
 
 function isActive(pathname: string, href: string): boolean {
