@@ -44,6 +44,33 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   return value.toExponential(3).replace("e+", "e");
 }
 
+// Compact loss-trajectory chart: epochs on x, log10(loss) on y.
+function LossCurve({ trajectory }: { trajectory: number[] }) {
+  const points = trajectory.filter((v) => Number.isFinite(v) && v > 0);
+  if (points.length < 2) return null;
+  const w = 420;
+  const h = 96;
+  const logs = points.map((v) => Math.log10(v));
+  const min = Math.min(...logs);
+  const max = Math.max(...logs);
+  const span = max - min || 1;
+  const path = logs
+    .map((v, i) => {
+      const x = (i / (points.length - 1)) * (w - 8) + 4;
+      const y = h - 14 - ((v - min) / span) * (h - 24);
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-md" role="img" aria-label="calibration loss by epoch">
+      <path d={path} fill="none" stroke="#319795" strokeWidth="1.8" />
+      <text x="4" y={h - 2} fontSize="9" fill="#94A3B8">epoch 1</text>
+      <text x={w - 4} y={h - 2} fontSize="9" fill="#94A3B8" textAnchor="end">{points.length}</text>
+      <text x="4" y="10" fontSize="9" fill="#94A3B8">log loss</text>
+    </svg>
+  );
+}
+
 export function PopulaceOverviewView() {
   const { country } = useCountry();
   const [release, setRelease] = useState("");
@@ -171,6 +198,87 @@ export function PopulaceOverviewView() {
           <LoadingBlock label="Building calibration map…" />
         )}
       </SectionCard>
+
+      <details className="group overflow-hidden rounded-lg border border-border/80 bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold leading-tight text-foreground">
+              Calibration details
+            </div>
+            <div className="mt-1 max-w-2xl text-xs leading-snug text-muted-foreground">
+              Optimizer recipe, convergence curve, and any targets dropped at compilation.
+              {(data.build_manifest as { staging?: { run_id?: string } | null })?.staging
+                ?.run_id && (
+                <>
+                  {" "}
+                  <a
+                    href="/populace/staging"
+                    className="text-primary underline decoration-dotted underline-offset-2"
+                  >
+                    Built via staging run ↗
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+          <span className="shrink-0 text-xs text-muted-foreground transition-transform group-open:rotate-180">
+            ▾
+          </span>
+        </summary>
+        <div className="flex flex-col gap-4 border-t border-border p-5">
+          {cal.options && (
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3 lg:grid-cols-4">
+              {[
+                ["method", "Method"],
+                ["epochs", "Epochs"],
+                ["learning_rate", "Learning rate"],
+                ["mass", "Mass policy"],
+                ["max_weight_ratio", "Max weight ratio"],
+                ["l0_lambda", "L0 λ"],
+                ["l1_lambda", "L1 λ"],
+                ["l2_lambda", "L2 λ"],
+                ["seed", "Seed"],
+              ].map(([key, label]) => {
+                const value = (cal.options as Record<string, unknown>)[key];
+                if (value == null || typeof value === "object") return null;
+                return (
+                  <div key={key} className="flex justify-between gap-2 border-b border-border/40 py-1">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-mono text-foreground">{String(value)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {(cal.loss_trajectory ?? []).length >= 2 && (
+            <div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Loss trajectory
+              </div>
+              <LossCurve trajectory={cal.loss_trajectory ?? []} />
+            </div>
+          )}
+          {(() => {
+            const tc = (data.gates ?? {}).target_compilation as
+              | { declared_targets?: number; compiled_candidate_targets?: number; dropped_target_names?: string[] }
+              | undefined;
+            const dropped = tc?.dropped_target_names ?? [];
+            return (
+              <div className="text-xs text-muted-foreground">
+                Declared {fmt(tc?.declared_targets ?? null, { digits: 0 })} targets · compiled{" "}
+                {fmt(tc?.compiled_candidate_targets ?? null, { digits: 0 })} · dropped {dropped.length}
+                {dropped.length > 0 && (
+                  <ul className="mt-1 max-h-40 list-inside list-disc overflow-y-auto font-mono text-[11px]">
+                    {dropped.map((name) => (
+                      <li key={name}>{name}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      </details>
 
       <details className="group overflow-hidden rounded-lg border border-border/80 bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
