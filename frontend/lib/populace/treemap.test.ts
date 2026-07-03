@@ -8,8 +8,9 @@ function row(
   variable: string,
   measure: string | null,
   abs_relative_error: number | null,
+  level?: string,
 ) {
-  return { source, variable_key, variable, measure, abs_relative_error };
+  return { source, variable_key, variable, measure, abs_relative_error, level };
 }
 
 test("groups by source then variable_key and sums targets", () => {
@@ -51,6 +52,27 @@ test("loss winsorizes extreme outliers but median stays robust", () => {
   expect(leaf.mean_abs_relative_error).toBeGreaterThan(10);
   // Loss caps the outlier at 2.0 before squaring: 0.02^2*2 + 0.04^2 + 2^2 ≈ 4.0024.
   expect(leaf.loss).toBeCloseTo(0.0008 + 0.0016 + 4, 4);
+});
+
+test("levels lists the release's distinct levels even when level-filtered", () => {
+  const rows = [
+    row("irs_soi", "eitc · total", "eitc", "total", 0.05, "national"),
+    row("irs_soi", "eitc · total", "eitc", "total", 0.07, "state"),
+    row("census_population", "population · count", "population", "count", 0.002, "state"),
+  ];
+
+  expect(populaceTargetTreemap(rows, "rel-x").levels).toEqual(["national", "state"]);
+
+  const filtered = populaceTargetTreemap(rows, "rel-x", "state");
+  expect(filtered.total_targets).toBe(2);
+  expect(filtered.levels).toEqual(["national", "state"]);
+
+  // UK-style names parse to no level at all → no levels to filter by.
+  const uk = populaceTargetTreemap(
+    [row("ons", "population · count", "population", "count", 0.01, "")],
+    "rel-x",
+  );
+  expect(uk.levels).toEqual([]);
 });
 
 test("targets without a relative error count but add no loss", () => {

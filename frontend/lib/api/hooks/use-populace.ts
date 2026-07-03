@@ -675,6 +675,8 @@ export interface PopulaceTreemapGroup {
 
 export interface PopulaceTreemapResponse {
   release_id: string;
+  // Distinct geography levels across the whole release (pre level filter).
+  levels: string[];
   total_targets: number;
   total_within_10pct: number;
   total_scored: number;

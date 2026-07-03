@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { CalibrationMap } from "@/components/populace/calibration-map";
 import { useCountry } from "@/components/layout/country-context";
@@ -29,6 +29,35 @@ function formatPublishedAt(value: string | null | undefined): string {
     month: "short",
     day: "numeric",
   });
+}
+
+// Labels (and preferred order) for the geography levels a release can carry.
+// Unknown levels fall back to a title-cased key, after the known ones.
+const GEO_LEVEL_LABELS: Record<string, string> = {
+  national: "National",
+  state: "State",
+  congressional_district: "Congressional district",
+  region: "Region",
+};
+const GEO_LEVEL_ORDER = Object.keys(GEO_LEVEL_LABELS);
+
+function geoLevelLabel(level: string): string {
+  if (GEO_LEVEL_LABELS[level]) return GEO_LEVEL_LABELS[level];
+  const words = level.replace(/_/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function geoLevelOptions(levels: string[]): { value: string; label: string }[] {
+  const rank = (level: string) => {
+    const index = GEO_LEVEL_ORDER.indexOf(level);
+    return index === -1 ? GEO_LEVEL_ORDER.length : index;
+  };
+  return [
+    { value: "", label: "All geographies" },
+    ...[...levels]
+      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+      .map((level) => ({ value: level, label: geoLevelLabel(level) })),
+  ];
 }
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
@@ -83,6 +112,18 @@ export function PopulaceOverviewView() {
   );
 
   const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
+  const geoLevels = useMemo(() => treemap?.levels ?? [], [treemap]);
+
+  // The geography options are data-driven, so a level selected under another
+  // country or release may not exist here (UK releases have no US levels at
+  // all). Reset rather than filter the map down to zero tiles. Resetting to ""
+  // is stable, so the refetch it triggers cannot loop.
+  useEffect(() => {
+    setGeoLevel("");
+  }, [country]);
+  useEffect(() => {
+    if (geoLevel && treemap && !geoLevels.includes(geoLevel)) setGeoLevel("");
+  }, [geoLevel, treemap, geoLevels]);
 
   if (isLoading) return <LoadingBlock label="Loading populace release…" />;
   if (error || !data) {
@@ -179,17 +220,14 @@ export function PopulaceOverviewView() {
       <SectionCard
         title="Calibration map"
         actions={
-          <ToolbarSelect
-            label="Geography"
-            value={geoLevel}
-            onChange={setGeoLevel}
-            options={[
-              { value: "", label: "All geographies" },
-              { value: "national", label: "National" },
-              { value: "state", label: "State" },
-              { value: "congressional_district", label: "Congressional district" },
-            ]}
-          />
+          geoLevels.length > 0 && (
+            <ToolbarSelect
+              label="Geography"
+              value={geoLevel}
+              onChange={setGeoLevel}
+              options={geoLevelOptions(geoLevels)}
+            />
+          )
         }
       >
         {treemap ? (

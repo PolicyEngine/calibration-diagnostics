@@ -1321,6 +1321,9 @@ export interface TreemapGroup {
 
 export interface TreemapData {
   release_id: string;
+  // Distinct geography levels across the whole release (pre level filter), so
+  // the UI can offer only the levels this release actually has.
+  levels: string[];
   total_targets: number;
   total_within_10pct: number;
   total_scored: number;
@@ -1339,6 +1342,7 @@ export function populaceTargetTreemap(
   releaseId: string,
   level?: string | null,
 ): TreemapData {
+  const levels = populaceTargetLevels(rows);
   if (level) rows = rows.filter((row) => row.level === level);
   const groups = new Map<string, Map<string, TargetRow[]>>();
   for (const row of rows) {
@@ -1403,6 +1407,7 @@ export function populaceTargetTreemap(
 
   return {
     release_id: releaseId,
+    levels,
     total_targets: groupList.reduce((s, g) => s + g.n_targets, 0),
     total_within_10pct: groupList.reduce((s, g) => s + g.within_10pct, 0),
     total_scored: groupList.reduce((s, g) => s + g.scored, 0),
