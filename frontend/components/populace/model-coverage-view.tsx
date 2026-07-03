@@ -401,6 +401,14 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
     setSelected(null);
   }
 
+  // Clicking a tile with children zooms into it AND selects it, so the map
+  // re-roots on the cluster while its covered/uncovered lists open below.
+  // Leaf tiles just select.
+  function openTile(path: string[], node: CoverageNode) {
+    if (node.children?.length) setRoot(path);
+    setSelected({ path, node });
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -458,7 +466,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
 
       <SectionCard
         title="Validation reach map"
-        description="Tile area is the number of rule variables in that part of the tree; color is the share reached by dashboard validation — same scale as the calibration map: green means watched, amber and rose are blind spots. Click a tile for its covered / uncovered variables; click a section header (or use the filter) to zoom in."
+        description="Tile area is the number of rule variables in that part of the tree; color is the share reached by dashboard validation — same scale as the calibration map: green means watched, amber and rose are blind spots. Click a tile to zoom into it and list its covered / uncovered variables; the breadcrumb takes you back up."
         actions={
           <ToolbarSelect
             label="Section"
@@ -550,10 +558,10 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
                         stroke={isSelected ? "#0F172A" : "none"}
                         strokeWidth="1.5"
                         className="cursor-pointer transition-opacity hover:opacity-75"
-                        onClick={() => setSelected({ path: leaf.data.path, node: n })}
+                        onClick={() => openTile(leaf.data.path, n)}
                       >
                         <title>
-                          {`${leafPath} — ${reachedCount(n)}/${n.rules} rules reached (${Math.round(share * 100)}%, ${n.anchored} anchored) — click for details`}
+                          {`${leafPath} — ${reachedCount(n)}/${n.rules} rules reached (${Math.round(share * 100)}%, ${n.anchored} anchored) — ${n.children?.length ? "click to zoom in" : "click for details"}`}
                         </title>
                       </rect>
                       {leaf.w > 62 && leaf.h > 26 && (
@@ -604,15 +612,16 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
             description={`${reachedCount(selected.node)}/${selected.node.rules} rules reached (${Math.round((reachedCount(selected.node) / Math.max(selected.node.rules, 1)) * 100)}%) · ${selected.node.anchored} anchored · ${selected.node.exercised} exercised · ${unreachedIn(selected.node)} unreached · ${selected.node.inputs} pure inputs`}
             actions={
               <div className="flex items-center gap-2">
-                {(selected.node.children?.length ?? 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => drillTo(selected.path)}
-                    className="rounded border border-primary/40 bg-primary/5 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
-                  >
-                    Expand cluster ↘
-                  </button>
-                )}
+                {(selected.node.children?.length ?? 0) > 0 &&
+                  selected.path.join("/") !== resolvedRoot.join("/") && (
+                    <button
+                      type="button"
+                      onClick={() => drillTo(selected.path)}
+                      className="rounded border border-primary/40 bg-primary/5 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+                    >
+                      Expand cluster ↘
+                    </button>
+                  )}
                 <button
                   type="button"
                   onClick={() => setSelected(null)}
