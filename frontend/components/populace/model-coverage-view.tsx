@@ -475,16 +475,20 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
       .catch((e) => setError(String(e)));
   }, []);
 
+  // Depends on `data`: the container only renders once loading finishes, so
+  // observing on first mount would attach to nothing and the map would stay
+  // at its fallback width.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    setWidth(Math.round(el.getBoundingClientRect().width));
     const observer = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width;
       if (w) setWidth(Math.round(w));
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [data]);
 
   // An unknown path (stale link, typo) falls back to the whole tree.
   const resolvedRoot = useMemo(
