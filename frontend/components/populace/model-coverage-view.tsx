@@ -465,6 +465,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
     initialPath ? initialPath.split("/").filter(Boolean) : [],
   );
   const [selected, setSelected] = useState<Selection | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1100);
 
@@ -700,6 +701,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
                 const h = Math.max(leaf.h - 2, 0);
                 if (w < 4 || h < 4) return null;
                 const isSelected = selected?.path.join("/") === leafPath;
+                const isHover = hovered === leafPath;
                 const showText = w >= 46 && h >= 24;
                 return (
                   <button
@@ -709,6 +711,8 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
                     aria-pressed={isSelected}
                     title={`${leafPath} — ${reachedCount(n)}/${n.rules} rules reached (${Math.round(share * 100)}%) — click for details`}
                     onClick={() => setSelected({ path: leaf.data.path, node: n })}
+                    onMouseEnter={() => setHovered(leafPath)}
+                    onMouseLeave={() => setHovered(null)}
                     className="group absolute flex flex-col overflow-hidden px-1.5 py-1 text-left outline-none transition-[transform,box-shadow,opacity] duration-150 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     style={{
                       left: leaf.x + 1,
@@ -718,11 +722,14 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
                       borderRadius: Math.max(1.5, Math.min(5, Math.min(w, h) * 0.25)),
                       background: coverageColor(share),
                       color: coverageTextColor(share),
-                      opacity: selected && !isSelected ? 0.65 : 0.92,
-                      zIndex: isSelected ? 11 : 1,
+                      opacity: selected && !isSelected ? 0.65 : isHover ? 1 : 0.92,
+                      zIndex: isSelected ? 11 : isHover ? 10 : 1,
+                      transform: isHover || isSelected ? "scale(1.015)" : "scale(1)",
                       boxShadow: isSelected
                         ? "0 0 0 2px #ffffff, 0 0 0 4px #319795, 0 8px 22px -6px rgba(15,23,42,0.35)"
-                        : "inset 0 0 0 1px rgba(255,255,255,0.08)",
+                        : isHover
+                          ? "0 6px 20px -4px rgba(15,23,42,0.3), inset 0 0 0 1px rgba(255,255,255,0.25)"
+                          : "inset 0 0 0 1px rgba(255,255,255,0.08)",
                     }}
                   >
                     {showText && (
