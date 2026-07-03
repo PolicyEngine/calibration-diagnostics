@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtSignedMoney, fmtMoney, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtMoney, releaseLabel } from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -19,8 +19,7 @@ import {
   type ReformValidationRow,
 } from "@/lib/api/hooks/use-populace";
 
-const POPULACE_REFORMS_ISSUE =
-  "https://github.com/PolicyEngine/populace/issues";
+const POPULACE_REFORMS_ISSUE = "https://github.com/PolicyEngine/populace/issues";
 
 function pct(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
@@ -31,6 +30,108 @@ function errorTone(absRel: number | null | undefined): "positive" | "neutral" | 
   if (absRel <= 0.1) return "positive";
   if (absRel <= 0.25) return "neutral";
   return "negative";
+}
+
+// ---------------------------------------------------------------------------
+// Validation suites: rows group mechanically by their artifact `category`, so
+// new producer checks (SOI backtest lines, CBO baselines, state scores…)
+// appear as new sections without dashboard changes. SUITE_META only adds a
+// methodology note where we have one — unknown categories still render.
+// ---------------------------------------------------------------------------
+
+interface SuiteMeta {
+  blurb: string;
+}
+
+const SUITE_META: Record<string, SuiteMeta> = {
+  OBBBA: {
+    blurb:
+      "Each OBBBA provision is reverted from the current-law baseline and the income-tax delta is compared to JCT's score (JCX-35-25). Benchmark is the first full fiscal year (FY2027): JCT scores fiscal-year cash receipts, so FY2026 captures only part of a tax year's effect. populace is a static calendar-year liability estimate, so it should run slightly below JCT's conventional scores.",
+  },
+  "Tax expenditure": {
+    blurb:
+      "The big credits and deductions are repealed outright (neutralized) and the income-tax delta is compared to the published JCT/Treasury tax-expenditure value. These provisions were not calibration targets — a genuine out-of-sample test of the underlying distributions.",
+  },
+  "JCT tax expenditure": {
+    blurb:
+      "Provisions the dataset is explicitly calibrated to — the optimizer saw these values, so near-zero error confirms the calibration converged, not that the model generalizes. Shown for completeness.",
+  },
+  "SOI baseline level": {
+    blurb:
+      "Simulated baseline totals compared to published IRS SOI actuals for tax items that are not calibration targets. TY2023 actuals vs a 2024-period dataset — a one-year vintage gap plus growth applies, so populace should run slightly above.",
+  },
+};
+
+interface Suite {
+  category: string;
+  rows: ReformValidationRow[];
+  scored: number;
+  within10: number;
+  medianAbsError: number | null;
+  worst: ReformValidationRow | null;
+  inSample: "all" | "none" | "mixed";
+}
+
+function median(values: number[]): number | null {
+  if (!values.length) return null;
+  const s = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+function buildSuites(rows: ReformValidationRow[]): Suite[] {
+  const byCategory = new Map<string, ReformValidationRow[]>();
+  for (const row of rows) {
+    const key = row.category ?? "Other checks";
+    byCategory.set(key, [...(byCategory.get(key) ?? []), row]);
+  }
+  const suites = [...byCategory.entries()].map(([category, suiteRows]) => {
+    const errors = suiteRows
+      .map((r) => r.abs_relative_error)
+      .filter((v): v is number => v != null);
+    const scoredRows = suiteRows.filter((r) => r.abs_relative_error != null);
+    const inSampleCount = suiteRows.filter((r) => r.in_sample).length;
+    return {
+      category,
+      // Worst first inside a suite — problems surface at the top.
+      rows: [...suiteRows].sort(
+        (a, b) => (b.abs_relative_error ?? -1) - (a.abs_relative_error ?? -1),
+      ),
+      scored: scoredRows.length,
+      within10: suiteRows.filter((r) => r.within_10pct).length,
+      medianAbsError: median(errors),
+      worst: scoredRows.length
+        ? scoredRows.reduce((w, r) =>
+            (r.abs_relative_error ?? 0) > (w.abs_relative_error ?? 0) ? r : w,
+          )
+        : null,
+      inSample:
+        inSampleCount === suiteRows.length
+          ? ("all" as const)
+          : inSampleCount === 0
+            ? ("none" as const)
+            : ("mixed" as const),
+    };
+  });
+  // Out-of-sample suites (the genuine tests) first, largest first; fully
+  // in-sample suites last.
+  return suites.sort((a, b) => {
+    const rank = (s: Suite) => (s.inSample === "all" ? 1 : 0);
+    return rank(a) - rank(b) || b.rows.length - a.rows.length;
+  });
+}
+
+function suiteAnchor(category: string): string {
+  return `suite-${category.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+}
+
+function SampleBadge({ inSample }: { inSample: Suite["inSample"] }) {
+  if (inSample === "mixed") return null;
+  return (
+    <StatusPill tone={inSample === "all" ? "neutral" : "info"}>
+      {inSample === "all" ? "in-sample" : "out-of-sample"}
+    </StatusPill>
+  );
 }
 
 // A compact bar series of a reform's |error| across releases (oldest → newest).
@@ -61,23 +162,21 @@ function Sparkline({ series }: { series: ReformHistorySeries }) {
 function ReformTable({
   rows,
   history,
+  showSamplePill,
 }: {
   rows: ReformValidationRow[];
   history: Map<string, ReformHistorySeries>;
+  showSamplePill: boolean;
 }) {
   if (!rows.length) {
-    return <EmptyState title="No reforms in this release's validation set." variant="compact" />;
+    return <EmptyState title="No checks in this suite." variant="compact" />;
   }
-  // Out-of-sample reforms (the genuine test) first, then in-sample targets.
-  const ordered = [...rows].sort(
-    (a, b) => Number(a.in_sample ?? false) - Number(b.in_sample ?? false),
-  );
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-            <th className="px-3 py-2 font-semibold">Reform</th>
+            <th className="px-3 py-2 font-semibold">Check</th>
             <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
             <th className="px-3 py-2 text-right font-semibold">populace</th>
             <th className="px-3 py-2 text-right font-semibold">Error %</th>
@@ -88,17 +187,19 @@ function ReformTable({
           </tr>
         </thead>
         <tbody>
-          {ordered.map((row) => (
+          {rows.map((row) => (
             <tr key={row.id} className="border-b border-border/60 align-top last:border-b-0">
               <td className="px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-foreground">{row.name}</span>
-                  <StatusPill tone={row.in_sample ? "neutral" : "info"}>
-                    {row.in_sample ? "in-sample" : "out-of-sample"}
-                  </StatusPill>
+                  {showSamplePill && (
+                    <StatusPill tone={row.in_sample ? "neutral" : "info"}>
+                      {row.in_sample ? "in-sample" : "out-of-sample"}
+                    </StatusPill>
+                  )}
                 </div>
-                {row.category && (
-                  <div className="text-xs text-muted-foreground">{row.category}</div>
+                {row.description && (
+                  <div className="max-w-md text-xs text-muted-foreground">{row.description}</div>
                 )}
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
@@ -208,25 +309,22 @@ export function PopulaceReformsView() {
     [history],
   );
 
+  const suites = useMemo(() => buildSuites(data?.rows ?? []), [data]);
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Populace"
         title="Reform validation"
-        description="How closely populace-US reproduces the budget effects of reforms with an official score — JCT-scored provisions (OBBBA) and JCT/Treasury tax-expenditure values for the big credits and deductions. Each reform is simulated on the dataset by the build pipeline; we compare to the published figure and track the gap release-over-release."
+        description="Every external check the build pipeline runs against an official figure — reform scores, tax-expenditure values, and baseline actuals — grouped into suites by what they test. Out-of-sample suites are the genuine fidelity tests; in-sample suites confirm the calibration converged. populace is a static calendar-year liability estimate on uprated survey data, so small gaps vs cash-receipts scores are expected. Trend and Δ track each check's |error| across releases (down and green is better)."
+        actions={
+          releasesLoading ? undefined : (
+            <ToolbarSelect label="Release" value={release} onChange={setRelease} options={options} />
+          )
+        }
       />
 
-      <SectionCard title="Release">
-        {releasesLoading ? (
-          <LoadingBlock label="Loading releases…" height="h-16" />
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <ToolbarSelect label="Release" value={release} onChange={setRelease} options={options} />
-          </div>
-        )}
-      </SectionCard>
-
-      {isLoading ? (
+      {isLoading || releasesLoading ? (
         <LoadingBlock label="Loading reform validation…" />
       ) : error ? (
         <EmptyState
@@ -262,21 +360,21 @@ export function PopulaceReformsView() {
               label="Out-of-sample mean |error|"
               value={pct(data.summary?.out_of_sample_mean_abs_relative_error)}
               tone={errorTone(data.summary?.out_of_sample_mean_abs_relative_error)}
-              hint="the genuine fidelity test — reforms calibration never saw"
+              hint="the genuine fidelity test — checks calibration never saw"
             />
             <KpiCard
               label="Out-of-sample within 10%"
               value={`${fmt(data.summary?.out_of_sample_within_10pct ?? 0, { digits: 0 })} / ${fmt(data.summary?.n_out_of_sample_scored ?? 0, { digits: 0 })}`}
               tone="positive"
-              hint={`${fmt(data.summary?.n_out_of_sample ?? 0, { digits: 0 })} out-of-sample reforms`}
+              hint={`${fmt(data.summary?.n_out_of_sample ?? 0, { digits: 0 })} out-of-sample checks`}
             />
             <KpiCard
-              label="Reforms scored"
+              label="Checks scored"
               value={fmt(data.summary?.n_scored ?? 0, { digits: 0 })}
-              hint={`of ${fmt(data.summary?.n_reforms ?? 0, { digits: 0 })} (incl. in-sample targets)`}
+              hint={`of ${fmt(data.summary?.n_reforms ?? 0, { digits: 0 })} across ${fmt(suites.length, { digits: 0 })} suites`}
             />
             <KpiCard
-              label="All-reform mean |error|"
+              label="All-check mean |error|"
               value={pct(data.summary?.mean_abs_relative_error)}
               tone={errorTone(data.summary?.mean_abs_relative_error)}
               hint={`median ${pct(data.summary?.median_abs_relative_error)}`}
@@ -284,13 +382,100 @@ export function PopulaceReformsView() {
           </div>
 
           <SectionCard
-            title="populace vs benchmark"
-            description="Benchmark is JCT's first full fiscal year (FY2027) for OBBBA provisions: JCT scores fiscal-year cash receipts, so FY2026 captures only part of a tax year's effect — a ramp year for the 2026-effective provisions, and mostly the prior tax year's filing settlement for the 2025-effective ones (standard deduction, exemptions, SALT, tips, overtime, auto loans). Error % is |populace − benchmark| / |benchmark|. populace is a static calendar-year liability estimate on 2024-vintage data uprated to 2026, so it should run slightly below JCT's conventional (behavior-inclusive, 2026-population) scores. Out-of-sample reforms are the real test; in-sample reforms are ones the dataset was calibrated to, shown for completeness. Trend and Δ track each reform's |error| across releases that published a validation set (down and green is better)."
+            title="Validation suites"
+            description="One row per suite of checks; click a suite to jump to its table. New producer checks group in automatically by category."
             padded={false}
           >
-            <ReformTable rows={data.rows ?? []} history={historyById} />
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-2 font-semibold">Suite</th>
+                  <th className="px-3 py-2 font-semibold">Sample</th>
+                  <th className="px-3 py-2 text-right font-semibold">Checks</th>
+                  <th className="px-3 py-2 text-right font-semibold">Within 10%</th>
+                  <th className="px-3 py-2 text-right font-semibold">Median |error|</th>
+                  <th className="px-3 py-2 font-semibold">Worst check</th>
+                </tr>
+              </thead>
+              <tbody>
+                {suites.map((suite) => (
+                  <tr
+                    key={suite.category}
+                    className="border-b border-border/60 last:border-b-0"
+                  >
+                    <td className="px-3 py-2">
+                      <a
+                        href={`#${suiteAnchor(suite.category)}`}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {suite.category}
+                      </a>
+                    </td>
+                    <td className="px-3 py-2">
+                      <SampleBadge inSample={suite.inSample} />
+                      {suite.inSample === "mixed" && (
+                        <span className="text-xs text-muted-foreground">mixed</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{suite.rows.length}</td>
+                    <td
+                      className={`px-3 py-2 text-right tabular-nums ${
+                        suite.scored > 0 && suite.within10 === suite.scored
+                          ? "text-emerald-700"
+                          : ""
+                      }`}
+                    >
+                      {suite.within10} / {suite.scored}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right font-medium tabular-nums ${
+                        errorTone(suite.medianAbsError) === "positive"
+                          ? "text-emerald-700"
+                          : errorTone(suite.medianAbsError) === "negative"
+                            ? "text-rose-700"
+                            : "text-foreground"
+                      }`}
+                    >
+                      {pct(suite.medianAbsError)}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {suite.worst ? (
+                        <>
+                          {suite.worst.name}{" "}
+                          <span className="font-medium text-rose-700">
+                            {pct(suite.worst.abs_relative_error)}
+                          </span>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </SectionCard>
 
+          {suites.map((suite) => (
+            <div key={suite.category} id={suiteAnchor(suite.category)} className="scroll-mt-4">
+              <SectionCard
+                title={
+                  <span className="flex items-center gap-2">
+                    {suite.category}
+                    <SampleBadge inSample={suite.inSample} />
+                  </span>
+                }
+                description={`${suite.within10}/${suite.scored} within 10% · median |error| ${pct(suite.medianAbsError)}. ${SUITE_META[suite.category]?.blurb ?? ""}`}
+                padded={false}
+              >
+                <ReformTable
+                  rows={suite.rows}
+                  history={historyById}
+                  showSamplePill={suite.inSample === "mixed"}
+                />
+              </SectionCard>
+            </div>
+          ))}
         </>
       ) : null}
     </div>
