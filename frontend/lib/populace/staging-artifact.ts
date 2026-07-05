@@ -170,6 +170,7 @@ export async function loadStagingRuns(revalidate: number) {
   // behind (or only carry the latest run), so list runs/ and pick up any run
   // folder that isn't already indexed.
   const runIds = new Set(indexedRuns.map((run) => run.run_id));
+  let treeMissing = false;
   try {
     for (const entry of await stagingTree(revalidate)) {
       if (typeof entry.path !== "string") continue;
@@ -179,6 +180,29 @@ export async function loadStagingRuns(revalidate: number) {
   } catch (error) {
     if (error instanceof StagingFetchError && error.status !== 404) throw error;
     // A staging repo may exist before any tree listing is public.
+    treeMissing = true;
+  }
+
+  // HF answers 404 (not 401/403) for private repos when auth is missing or
+  // expired, so "everything 404'd" is ambiguous between "no runs yet" and "we
+  // can't see the repo". Disambiguate via the repo API before reporting an
+  // empty list — a silent empty state hides a broken token.
+  if (index == null && treeMissing && runIds.size === 0) {
+    const repoRes = await fetch(
+      `https://huggingface.co/api/datasets/${POPULACE_STAGING_HF_REPO}`,
+      stagingFetchOptions(revalidate),
+    );
+    if (!repoRes.ok) {
+      return {
+        available: false,
+        source_repo: POPULACE_STAGING_HF_REPO,
+        revision: POPULACE_STAGING_HF_REVISION,
+        detail:
+          `Staging repo ${POPULACE_STAGING_HF_REPO} is not visible (HTTP ${repoRes.status}). ` +
+          "It is private — a missing or expired HF token reads as 404, not 401.",
+        runs: [],
+      };
+    }
   }
 
   const byId = new Map(indexedRuns.map((run) => [run.run_id, run]));

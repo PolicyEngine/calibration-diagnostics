@@ -400,6 +400,12 @@ export function PopulaceStagingView() {
               description={runsError instanceof Error ? runsError.message : "Unknown error."}
               variant="compact"
             />
+          ) : runsData && runsData.available === false ? (
+            <EmptyState
+              title="Staging repo not reachable"
+              description={runsData.detail || "The staging repo could not be read."}
+              variant="compact"
+            />
           ) : (
             <RunList runs={runs} selected={selectedRun} onSelect={setSelectedRun} />
           )}
