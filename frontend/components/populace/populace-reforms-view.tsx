@@ -358,7 +358,7 @@ export function PopulaceReformsView() {
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Populace"
-        title="Reform validation"
+        title="External checks"
         description="Every external check the build pipeline runs against an official figure — reform scores, tax-expenditure values, and baseline actuals — grouped into suites by what they test. Out-of-sample suites are the genuine fidelity tests; in-sample suites confirm the calibration converged. populace is a static calendar-year liability estimate on uprated survey data, so small gaps vs cash-receipts scores are expected. Trend and Δ track each check's |error| across releases (down and green is better)."
         actions={
           releasesLoading ? undefined : (
