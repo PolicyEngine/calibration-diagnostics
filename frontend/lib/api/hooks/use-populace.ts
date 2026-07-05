@@ -360,6 +360,7 @@ export interface PopulaceStagingRunsResponse {
   available: boolean;
   source_repo: string;
   revision: string;
+  detail?: string | null;
   runs: PopulaceStagingRunSummary[];
 }
 

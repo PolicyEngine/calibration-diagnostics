@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import {
+  usePopulaceReforms,
   usePopulaceStagingCompare,
   usePopulaceStagingRun,
   usePopulaceStagingRuns,
@@ -45,6 +46,7 @@ function validationTone(absRel: number | null | undefined): "positive" | "neutra
 function statusTone(status: string | null | undefined): StatusTone {
   if (status === "passed" || status === "published") return "success";
   if (status === "failed") return "danger";
+  if (status === "stalled") return "warning";
   if (status === "running" || status === "queued") return "info";
   return "neutral";
 }
@@ -59,6 +61,55 @@ function timeLabel(value: string | null | undefined): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// A "running" run that hasn't reported for two hours is dead in practice —
+// builds emit events at least every stage, and stages run minutes, not hours.
+const STALL_MS = 2 * 60 * 60 * 1000;
+
+function effectiveStatus(
+  status: string | null | undefined,
+  updatedAt: string | null | undefined,
+): string | null {
+  if (status !== "running" && status !== "queued") return status ?? null;
+  const t = updatedAt ? new Date(updatedAt).valueOf() : NaN;
+  if (Number.isFinite(t) && Date.now() - t > STALL_MS) return "stalled";
+  return status ?? null;
+}
+
+function agoLabel(value: string | null | undefined): string {
+  const t = value ? new Date(value).valueOf() : NaN;
+  if (!Number.isFinite(t)) return "";
+  const mins = Math.round((Date.now() - t) / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60 * 48) return `${Math.round(mins / 60)}h ago`;
+  return `${Math.round(mins / 60 / 24)}d ago`;
+}
+
+// Human rendering for the small details dicts events carry (n_targets,
+// learning_rate, gate results, repair factors…).
+function detailChips(details: unknown): [string, string][] {
+  if (!details || typeof details !== "object") return [];
+  return Object.entries(details as Record<string, unknown>)
+    .filter(([, v]) => v == null || ["string", "number", "boolean"].includes(typeof v))
+    .slice(0, 8)
+    .map(([k, v]) => {
+      const num = typeof v === "number";
+      const shown = num
+        ? Math.abs(v as number) >= 1000
+          ? fmtCompact(v as number)
+          : fmt(v as number, { digits: Math.abs(v as number) < 1 ? 4 : 2 })
+        : String(v);
+      return [k, shown] as [string, string];
+    });
+}
+
+function durationLabel(ms: number | null): string {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+  return `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
 }
 
 function RunList({
@@ -102,7 +153,12 @@ function RunList({
                     {run.stage || "—"} · {timeLabel(run.updated_at)}
                   </div>
                 </div>
-                <StatusPill tone={statusTone(run.status)}>{run.status || "unknown"}</StatusPill>
+                {(() => {
+                  const shown = effectiveStatus(run.status, run.updated_at);
+                  return (
+                    <StatusPill tone={statusTone(shown)}>{shown || "unknown"}</StatusPill>
+                  );
+                })()}
               </div>
             </button>
           );
@@ -132,13 +188,23 @@ function LossSparkline({ values }: { values: number[] }) {
   );
 }
 
-function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
+function ReformValidationTable({
+  rows,
+  publishedErrors,
+  publishedReleaseId,
+}: {
+  rows: ReformValidationRow[];
+  // |error| per check id in the currently published release, for side-by-side.
+  publishedErrors: Map<string, number | null>;
+  publishedReleaseId?: string | null;
+}) {
   const ordered = [...rows]
     .filter((row) => row.populace_estimate != null || row.jct_score != null)
     .sort((a, b) => Number(a.in_sample ?? false) - Number(b.in_sample ?? false));
   if (!ordered.length) {
     return <EmptyState title="No reform validation rows yet." variant="compact" />;
   }
+  const hasPublished = publishedErrors.size > 0;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -147,49 +213,148 @@ function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
             <th className="px-3 py-2 font-semibold">Test</th>
             <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
             <th className="px-3 py-2 text-right font-semibold">Candidate</th>
-            <th className="px-3 py-2 text-right font-semibold">Diff</th>
             <th className="px-3 py-2 text-right font-semibold">Error</th>
+            {hasPublished && (
+              <>
+                <th className="px-3 py-2 text-right font-semibold">
+                  Published{publishedReleaseId ? ` (${releaseLabel(publishedReleaseId)})` : ""}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">Δ</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
-          {ordered.map((row) => (
-            <tr key={row.id} className="border-b border-border/60 last:border-b-0">
-              <td className="px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground">{row.name}</span>
-                  <StatusPill tone={row.in_sample ? "neutral" : "info"}>
-                    {row.in_sample ? "in-sample" : "out-of-sample"}
-                  </StatusPill>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {row.category || "Reform score"}
-                </div>
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                {fmtMoney(row.jct_score)}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                {fmtMoney(row.populace_estimate)}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
-                {fmtSignedMoney(row.abs_error)}
-              </td>
-              <td
-                className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
-                  validationTone(row.abs_relative_error) === "positive"
-                    ? "text-emerald-700"
-                    : validationTone(row.abs_relative_error) === "negative"
-                      ? "text-rose-700"
-                      : "text-foreground"
-                }`}
-              >
-                {pct(row.abs_relative_error)}
-              </td>
-            </tr>
-          ))}
+          {ordered.map((row) => {
+            const published = publishedErrors.get(row.id) ?? null;
+            const delta =
+              published != null && row.abs_relative_error != null
+                ? row.abs_relative_error - published
+                : null;
+            return (
+              <tr key={row.id} className="border-b border-border/60 last:border-b-0">
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground">{row.name}</span>
+                    <StatusPill tone={row.in_sample ? "neutral" : "info"}>
+                      {row.in_sample ? "in-sample" : "out-of-sample"}
+                    </StatusPill>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {row.category || "Reform score"}
+                  </div>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                  {fmtMoney(row.jct_score)}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                  {fmtMoney(row.populace_estimate)}
+                </td>
+                <td
+                  className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
+                    validationTone(row.abs_relative_error) === "positive"
+                      ? "text-emerald-700"
+                      : validationTone(row.abs_relative_error) === "negative"
+                        ? "text-rose-700"
+                        : "text-foreground"
+                  }`}
+                >
+                  {pct(row.abs_relative_error)}
+                </td>
+                {hasPublished && (
+                  <>
+                    <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                      {pct(published)}
+                    </td>
+                    <td
+                      className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
+                        delta == null
+                          ? "text-muted-foreground"
+                          : delta < -1e-4
+                            ? "text-emerald-700"
+                            : delta > 1e-4
+                              ? "text-rose-700"
+                              : "text-muted-foreground"
+                      }`}
+                    >
+                      {delta == null ? "—" : `${delta > 0 ? "+" : ""}${pct(delta)}`}
+                    </td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+// Common-target fit stats for the candidate-vs-published verdict: computed on
+// the SAME targets, since headline within-10% rates over different target sets
+// (32k national-only vs 4k) are not comparable.
+interface SideStats {
+  n: number;
+  within10: number;
+  median: number | null;
+  mean: number | null;
+}
+
+function sideStats(errors: number[]): SideStats {
+  if (!errors.length) return { n: 0, within10: 0, median: null, mean: null };
+  const sorted = [...errors].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return {
+    n: errors.length,
+    within10: errors.filter((e) => e <= 0.1).length,
+    median: sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2,
+    mean: errors.reduce((s, e) => s + e, 0) / errors.length,
+  };
+}
+
+// One row of the validation scorecard: a metric on both sides plus a verdict.
+function ScoreRow({
+  label,
+  published,
+  candidate,
+  higherBetter,
+  render = pct,
+}: {
+  label: string;
+  published: number | null;
+  candidate: number | null;
+  higherBetter: boolean;
+  render?: (v: number | null | undefined) => string;
+}) {
+  const better =
+    published != null && candidate != null
+      ? higherBetter
+        ? candidate > published + 1e-6
+        : candidate < published - 1e-6
+      : null;
+  const worse =
+    published != null && candidate != null
+      ? higherBetter
+        ? candidate < published - 1e-6
+        : candidate > published + 1e-6
+      : null;
+  return (
+    <tr className="border-b border-border/60 last:border-b-0">
+      <td className="px-3 py-1.5 font-medium">{label}</td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+        {render(published)}
+      </td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right font-medium tabular-nums">
+        {render(candidate)}
+      </td>
+      <td
+        className={`whitespace-nowrap px-3 py-1.5 text-right text-xs font-semibold ${
+          better ? "text-emerald-700" : worse ? "text-rose-700" : "text-muted-foreground"
+        }`}
+      >
+        {better ? "candidate better" : worse ? "candidate worse" : published == null || candidate == null ? "—" : "tie"}
+      </td>
+    </tr>
   );
 }
 
@@ -197,6 +362,7 @@ export function PopulaceStagingView() {
   const { data: runsData, isLoading: runsLoading, error: runsError } = usePopulaceStagingRuns();
   const runs = runsData?.runs ?? [];
   const [selectedRun, setSelectedRun] = useState("");
+  const [targetSearch, setTargetSearch] = useState("");
 
   useEffect(() => {
     if (!selectedRun && runs[0]) setSelectedRun(runs[0].run_id);
@@ -204,10 +370,37 @@ export function PopulaceStagingView() {
 
   const { data: runData, isLoading: runLoading, error: runError } =
     usePopulaceStagingRun(selectedRun);
-  const { data: compareData } = usePopulaceStagingCompare(
+  const { data: compareData, isLoading: compareLoading } = usePopulaceStagingCompare(
     runData?.has_calibration ? selectedRun : undefined,
     "latest",
   );
+  // Published release's reform validation, for side-by-side with the candidate.
+  const { data: publishedReforms } = usePopulaceReforms();
+  const publishedErrors = useMemo(
+    () =>
+      new Map(
+        (publishedReforms?.rows ?? []).map(
+          (row) => [row.id, row.abs_relative_error ?? null] as const,
+        ),
+      ),
+    [publishedReforms],
+  );
+  // Fit stats on the targets both sides share — the honest better-or-worse basis.
+  const commonStats = useMemo(() => {
+    const rows = compareData?.rows ?? [];
+    const a: number[] = [];
+    const b: number[] = [];
+    for (const row of rows) {
+      const ae = row.a_relative_error;
+      const be = row.b_relative_error;
+      if (ae == null || be == null) continue;
+      // Drop tiny-denominator artifacts, same convention as the highlights.
+      if (Math.abs(ae) > 10 || Math.abs(be) > 10) continue;
+      a.push(Math.abs(ae));
+      b.push(Math.abs(be));
+    }
+    return { a: sideStats(a), b: sideStats(b) };
+  }, [compareData]);
   const calibrationEvents = runData?.calibration_progress?.events ?? [];
   const lossValues = useMemo(
     () =>
@@ -218,11 +411,16 @@ export function PopulaceStagingView() {
   );
   const lastCalibrationEvent = calibrationEvents.at(-1);
   const progress = runData?.progress ?? {};
-  const status = typeof progress.status === "string" ? progress.status : null;
+  const rawStatus = typeof progress.status === "string" ? progress.status : null;
   const stage = typeof progress.stage === "string" ? progress.stage : null;
   const message = typeof progress.message === "string" ? progress.message : null;
   const updatedAt = typeof progress.updated_at === "string" ? progress.updated_at : null;
+  const status = effectiveStatus(rawStatus, updatedAt);
+  const progressDetails = detailChips(progress.details);
   const candidateReleaseId = runData?.candidate_release_id ?? selectedRun;
+  const buildManifest = (runData?.build_manifest ?? null) as Record<string, unknown> | null;
+  const artifacts = ((runData?.run_manifest as Record<string, unknown> | null)?.artifacts ??
+    {}) as Record<string, { path?: string; staging_path?: string }>;
 
   return (
     <div className="flex flex-col gap-5">
@@ -249,6 +447,12 @@ export function PopulaceStagingView() {
               description={runsError instanceof Error ? runsError.message : "Unknown error."}
               variant="compact"
             />
+          ) : runsData && runsData.available === false ? (
+            <EmptyState
+              title="Staging repo not reachable"
+              description={runsData.detail || "The staging repo could not be read."}
+              variant="compact"
+            />
           ) : (
             <RunList runs={runs} selected={selectedRun} onSelect={setSelectedRun} />
           )}
@@ -270,8 +474,18 @@ export function PopulaceStagingView() {
                 <KpiCard
                   label="Status"
                   value={status || "unknown"}
-                  hint={stage || "no stage reported"}
-                  tone={status === "failed" ? "negative" : status === "passed" ? "positive" : "neutral"}
+                  hint={
+                    status === "stalled"
+                      ? `no update since ${timeLabel(updatedAt)} — died at ${stage ?? "?"}`
+                      : stage || "no stage reported"
+                  }
+                  tone={
+                    status === "failed" || status === "stalled"
+                      ? "negative"
+                      : status === "passed"
+                        ? "positive"
+                        : "neutral"
+                  }
                 />
                 <KpiCard
                   label="Candidate"
@@ -280,7 +494,7 @@ export function PopulaceStagingView() {
                 />
                 <KpiCard
                   label="Last update"
-                  value={timeLabel(updatedAt)}
+                  value={`${timeLabel(updatedAt)}${agoLabel(updatedAt) ? ` · ${agoLabel(updatedAt)}` : ""}`}
                   hint={message || "progress.json"}
                 />
                 <KpiCard
@@ -294,6 +508,289 @@ export function PopulaceStagingView() {
                 />
               </div>
 
+              {progressDetails.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="font-medium">Last stage detail:</span>
+                  {progressDetails.map(([k, v]) => (
+                    <span
+                      key={k}
+                      className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+                    >
+                      {k}={v}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {runData.has_calibration && compareLoading && !compareData && (
+                <LoadingBlock
+                  label="Comparing candidate vs published release (loads both calibration packages)…"
+                  height="h-24"
+                />
+              )}
+
+              {(compareData?.summary || runData.reform_validation) && (
+                <SectionCard
+                  title="Validation scorecard"
+                  description={`The main validation points, candidate vs the published release${compareData?.a ? ` (${releaseLabel(compareData.a.release_id)})` : ""}. Target fit is scored on the ${fmt(commonStats.a.n, { digits: 0 })} targets both sides share; full-surface rates over different target sets are not comparable.`}
+                  padded={false}
+                >
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                        <th className="px-3 py-2 font-semibold">Validation point</th>
+                        <th className="px-3 py-2 text-right font-semibold">Published</th>
+                        <th className="px-3 py-2 text-right font-semibold">Candidate</th>
+                        <th className="px-3 py-2 text-right font-semibold">Verdict</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compareData?.summary && (
+                        <>
+                          <ScoreRow
+                            label="Targets · within 10% (common)"
+                            published={commonStats.a.n ? commonStats.a.within10 / commonStats.a.n : null}
+                            candidate={commonStats.b.n ? commonStats.b.within10 / commonStats.b.n : null}
+                            higherBetter
+                          />
+                          <ScoreRow
+                            label="Targets · median |error| (common)"
+                            published={commonStats.a.median}
+                            candidate={commonStats.b.median}
+                            higherBetter={false}
+                          />
+                          <ScoreRow
+                            label="Targets · mean |error| (common)"
+                            published={commonStats.a.mean}
+                            candidate={commonStats.b.mean}
+                            higherBetter={false}
+                          />
+                        </>
+                      )}
+                      {runData.reform_validation && (
+                        <>
+                          <ScoreRow
+                            label="Reforms · out-of-sample mean |error|"
+                            published={
+                              publishedReforms?.summary?.out_of_sample_mean_abs_relative_error ??
+                              null
+                            }
+                            candidate={
+                              runData.reform_validation.summary
+                                ?.out_of_sample_mean_abs_relative_error ?? null
+                            }
+                            higherBetter={false}
+                          />
+                          <ScoreRow
+                            label="Reforms · out-of-sample within 10%"
+                            published={
+                              (publishedReforms?.summary?.n_out_of_sample_scored ?? 0) > 0
+                                ? (publishedReforms?.summary?.out_of_sample_within_10pct ?? 0) /
+                                  (publishedReforms?.summary?.n_out_of_sample_scored ?? 1)
+                                : null
+                            }
+                            candidate={
+                              (runData.reform_validation.summary?.n_out_of_sample_scored ?? 0) > 0
+                                ? (runData.reform_validation.summary?.out_of_sample_within_10pct ??
+                                    0) /
+                                  (runData.reform_validation.summary?.n_out_of_sample_scored ?? 1)
+                                : null
+                            }
+                            higherBetter
+                          />
+                        </>
+                      )}
+                      {compareData?.summary && (
+                        <tr className="border-b border-border/60 last:border-b-0">
+                          <td className="px-3 py-1.5 font-medium">Coverage · target surface</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                            {fmt(compareData.a.total_targets, { digits: 0 })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right font-medium tabular-nums">
+                            {fmt(compareData.b.total_targets, { digits: 0 })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right text-xs text-muted-foreground">
+                            +{fmt(compareData.summary.added, { digits: 0 })} new / -
+                            {fmt(compareData.summary.removed, { digits: 0 })} dropped
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                  {compareData?.summary && (
+                    <div className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                      <span className="text-emerald-700">
+                        {fmt(compareData.summary.improved, { digits: 0 })} targets improved
+                      </span>
+                      {" · "}
+                      <span className="text-rose-700">
+                        {fmt(compareData.summary.regressed, { digits: 0 })} regressed
+                      </span>{" "}
+                      — search the breakdown below for any statistic.
+                    </div>
+                  )}
+                </SectionCard>
+              )}
+
+              {(compareData?.rows ?? []).length > 0 && (
+                <SectionCard
+                  title="Target breakdown"
+                  description="Every target both sides share, worst movement first. Search by statistic, variable, or geography."
+                  actions={
+                    <input
+                      type="search"
+                      value={targetSearch}
+                      placeholder="Search targets…"
+                      onChange={(e) => setTargetSearch(e.target.value)}
+                      className="h-8 w-56 rounded-md border border-border bg-white px-2.5 text-sm focus:border-primary/60 focus:outline-none"
+                    />
+                  }
+                  padded={false}
+                >
+                  {(() => {
+                    const q = targetSearch.trim().toLowerCase();
+                    const usable = (compareData?.rows ?? []).filter(
+                      (row) =>
+                        // Drop tiny-denominator artifacts (>1000% errors),
+                        // same convention as the release highlights.
+                        Math.abs(row.b_relative_error ?? 0) <= 10 &&
+                        Math.abs(row.a_relative_error ?? 0) <= 10,
+                    );
+                    const matched = q
+                      ? usable.filter((row) =>
+                          [row.name, row.variable, row.target_label, row.geography, row.source]
+                            .filter(Boolean)
+                            .some((v) => String(v).toLowerCase().includes(q)),
+                        )
+                      : usable;
+                    const shown = [...matched]
+                      .sort(
+                        (x, y) =>
+                          Math.abs(y.abs_rel_delta ?? 0) - Math.abs(x.abs_rel_delta ?? 0),
+                      )
+                      .slice(0, 50);
+                    const pctOrDash = (v: number | null | undefined) =>
+                      v == null ? "—" : fmt(Math.abs(v), { pct: true, digits: 1 });
+                    if (!shown.length) {
+                      return (
+                        <EmptyState
+                          title={q ? `No targets match “${targetSearch}”.` : "No comparable targets."}
+                          variant="compact"
+                        />
+                      );
+                    }
+                    return (
+                      <>
+                        <div className="max-h-96 overflow-y-auto">
+                          <table className="w-full text-left text-sm">
+                            <thead className="sticky top-0 bg-white shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+                              <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                                <th className="px-3 py-2 font-semibold">Target</th>
+                                <th className="px-3 py-2 text-right font-semibold">Published</th>
+                                <th className="px-3 py-2 text-right font-semibold">Candidate</th>
+                                <th className="px-3 py-2 text-right font-semibold">Δ</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {shown.map((row) => {
+                                const delta = row.abs_rel_delta ?? null;
+                                return (
+                                  <tr
+                                    key={row.name}
+                                    className="border-b border-border/60 last:border-b-0"
+                                  >
+                                    <td className="px-3 py-1.5">
+                                      <span className="font-medium text-foreground">
+                                        {row.variable ?? row.name}
+                                      </span>
+                                      {row.target_label ? (
+                                        <span className="text-xs text-muted-foreground">
+                                          {" "}
+                                          · {row.target_label}
+                                        </span>
+                                      ) : null}
+                                      {row.geography ? (
+                                        <span className="text-xs text-muted-foreground">
+                                          {" "}
+                                          · {row.geography}
+                                        </span>
+                                      ) : null}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                                      {pctOrDash(row.a_relative_error)}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                                      {pctOrDash(row.b_relative_error)}
+                                    </td>
+                                    <td
+                                      className={`whitespace-nowrap px-3 py-1.5 text-right tabular-nums ${
+                                        delta == null
+                                          ? "text-muted-foreground"
+                                          : delta > 1e-9
+                                            ? "text-rose-700"
+                                            : delta < -1e-9
+                                              ? "text-emerald-700"
+                                              : "text-muted-foreground"
+                                      }`}
+                                    >
+                                      {delta == null
+                                        ? "—"
+                                        : `${delta > 0 ? "+" : ""}${fmt(delta, { pct: true, digits: 1 })}`}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                          Showing {fmt(shown.length, { digits: 0 })} of{" "}
+                          {fmt(matched.length, { digits: 0 })}
+                          {q ? " matching" : ""} targets, biggest |Δ| first.
+                        </div>
+                      </>
+                    );
+                  })()}
+                </SectionCard>
+              )}
+
+              {runData.reform_validation ? (
+                <SectionCard
+                  title="External checks breakdown"
+                  description="Each score test the run uploaded, side by side with the published release. Out-of-sample rows are the main signal; in-sample rows were direct or near-direct calibration targets."
+                  padded={false}
+                >
+                  <ReformValidationTable
+                    rows={runData.reform_validation.rows ?? []}
+                    publishedErrors={publishedErrors}
+                    publishedReleaseId={publishedReforms?.release_id}
+                  />
+                </SectionCard>
+              ) : (
+                <SectionCard
+                  title="External checks breakdown"
+                  description="This appears once the run uploads reform_validation.json."
+                >
+                  <EmptyState title="Reform validation not uploaded yet." variant="compact" />
+                </SectionCard>
+              )}
+
+              <details className="group overflow-hidden rounded-lg border border-border/80 bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold leading-tight text-foreground">
+                      Run internals
+                    </div>
+                    <div className="mt-1 max-w-2xl text-xs leading-snug text-muted-foreground">
+                      Optimizer progress, stage timeline with logged numbers, build manifest
+                      (versions, hashes, gates), and uploaded artifacts.
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground transition-transform group-open:rotate-180">
+                    ▾
+                  </span>
+                </summary>
+                <div className="flex flex-col gap-5 border-t border-border p-4">
               <SectionCard
                 title="Calibration progress"
                 description="Loss points emitted by the Populace calibrator while the staging build runs."
@@ -375,179 +872,83 @@ export function PopulaceStagingView() {
                 </SectionCard>
               )}
 
-              {runData.reform_validation ? (
-                <SectionCard
-                  title="Reform validation"
-                  description="External score tests uploaded by this staging run. Out-of-sample rows are the main signal; in-sample rows were direct or near-direct calibration targets."
-                  padded={false}
-                >
-                  <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4">
-                    <KpiCard
-                      label="Out-of-sample mean |error|"
-                      value={pct(
-                        runData.reform_validation.summary
-                          ?.out_of_sample_mean_abs_relative_error,
-                      )}
-                      tone={validationTone(
-                        runData.reform_validation.summary
-                          ?.out_of_sample_mean_abs_relative_error,
-                      )}
-                      hint="reforms calibration did not directly see"
-                    />
-                    <KpiCard
-                      label="Out-of-sample within 10%"
-                      value={`${fmt(
-                        runData.reform_validation.summary?.out_of_sample_within_10pct ?? 0,
-                        { digits: 0 },
-                      )} / ${fmt(
-                        runData.reform_validation.summary?.n_out_of_sample_scored ?? 0,
-                        { digits: 0 },
-                      )}`}
-                      hint={`${fmt(
-                        runData.reform_validation.summary?.n_out_of_sample ?? 0,
-                        { digits: 0 },
-                      )} out-of-sample tests`}
-                    />
-                    <KpiCard
-                      label="Tests scored"
-                      value={fmt(runData.reform_validation.summary?.n_scored ?? 0, {
-                        digits: 0,
-                      })}
-                      hint={`${fmt(runData.reform_validation.summary?.n_reforms ?? 0, {
-                        digits: 0,
-                      })} total tests`}
-                    />
-                    <KpiCard
-                      label="All-test mean |error|"
-                      value={pct(runData.reform_validation.summary?.mean_abs_relative_error)}
-                      tone={validationTone(
-                        runData.reform_validation.summary?.mean_abs_relative_error,
-                      )}
-                      hint="includes in-sample rows"
-                    />
-                  </div>
-                  <ReformValidationTable rows={runData.reform_validation.rows ?? []} />
-                </SectionCard>
-              ) : (
-                <SectionCard
-                  title="Reform validation"
-                  description="This appears once the run uploads reform_validation.json."
-                >
-                  <EmptyState title="Reform validation not uploaded yet." variant="compact" />
-                </SectionCard>
-              )}
 
-              {compareData?.available !== false && compareData?.summary ? (
-                <SectionCard
-                  title="Candidate vs latest release"
-                  description="Target-level diff between production latest and this staging candidate."
-                >
-                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <KpiCard
-                      label="Common targets"
-                      value={fmt(compareData.summary.common, { digits: 0 })}
-                      hint={`+${fmt(compareData.summary.added, { digits: 0 })} / -${fmt(compareData.summary.removed, { digits: 0 })}`}
-                    />
-                    <KpiCard
-                      label="Improved"
-                      value={fmt(compareData.summary.improved, { digits: 0 })}
-                      tone="positive"
-                      hint={`${fmt(compareData.summary.regressed, { digits: 0 })} regressed`}
-                    />
-                    <KpiCard
-                      label="Latest targets"
-                      value={fmt(compareData.a.total_targets, { digits: 0 })}
-                      hint={releaseLabel(compareData.a.release_id)}
-                    />
-                    <KpiCard
-                      label="Candidate targets"
-                      value={fmt(compareData.b.total_targets, { digits: 0 })}
-                      hint={releaseLabel(compareData.b.release_id)}
-                    />
-                  </div>
-                  {(() => {
-                    const regressions = (compareData.rows ?? [])
-                      .filter(
-                        (row) =>
-                          (row.abs_rel_delta ?? 0) > 1e-9 &&
-                          // Drop tiny-denominator artifacts (>1000% errors),
-                          // same convention as the release highlights.
-                          Math.abs(row.b_relative_error ?? 0) <= 10 &&
-                          Math.abs(row.a_relative_error ?? 0) <= 10,
-                      )
-                      .slice(0, 12);
-                    if (!regressions.length) return null;
-                    const pctOrDash = (v: number | null | undefined) =>
-                      v == null ? "—" : fmt(Math.abs(v), { pct: true, digits: 1 });
-                    return (
-                      <div className="mt-4 overflow-x-auto">
-                        <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Biggest regressions
-                        </div>
-                        <table className="w-full text-left text-sm">
-                          <thead>
-                            <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                              <th className="px-3 py-2 font-semibold">Target</th>
-                              <th className="px-3 py-2 text-right font-semibold">Latest |error|</th>
-                              <th className="px-3 py-2 text-right font-semibold">Candidate |error|</th>
-                              <th className="px-3 py-2 text-right font-semibold">Δ</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {regressions.map((row) => (
-                              <tr key={row.name} className="border-b border-border/60 last:border-b-0">
-                                <td className="px-3 py-1.5">
-                                  <span className="font-medium text-foreground">
-                                    {row.variable ?? row.name}
-                                  </span>
-                                  {row.target_label ? (
-                                    <span className="text-xs text-muted-foreground"> · {row.target_label}</span>
-                                  ) : null}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                                  {pctOrDash(row.a_relative_error)}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                                  {pctOrDash(row.b_relative_error)}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-rose-700">
-                                  +{fmt(row.abs_rel_delta, { pct: true, digits: 1 })}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    );
-                  })()}
-                </SectionCard>
-              ) : null}
 
-              <SectionCard title="Stage events" padded={false}>
+              <SectionCard
+                title="Stage timeline"
+                description="Every stage the build reported, with how long it ran and the numbers it logged. A run that stops mid-list without a failed event died silently — the last row is where."
+                padded={false}
+              >
                 {(runData.events ?? []).length ? (
-                  <div className="max-h-72 overflow-y-auto">
+                  <div className="max-h-96 overflow-y-auto">
                     <table className="w-full text-left text-sm">
                       <thead>
                         <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                          <th className="px-3 py-2 font-semibold">Time</th>
                           <th className="px-3 py-2 font-semibold">Stage</th>
-                          <th className="px-3 py-2 font-semibold">Status</th>
-                          <th className="px-3 py-2 font-semibold">Message</th>
+                          <th className="px-3 py-2 font-semibold">Started</th>
+                          <th className="px-3 py-2 text-right font-semibold">Duration</th>
+                          <th className="px-3 py-2 font-semibold">Detail</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(runData.events ?? []).slice().reverse().map((event, index) => (
-                          <tr key={index} className="border-b border-border/60 last:border-b-0">
-                            <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
-                              {timeLabel(typeof event.time === "string" ? event.time : null)}
-                            </td>
-                            <td className="px-3 py-1.5">{String(event.stage ?? "—")}</td>
-                            <td className="px-3 py-1.5">{String(event.status ?? "—")}</td>
-                            <td className="px-3 py-1.5 text-muted-foreground">
-                              {String(event.message ?? "—")}
-                            </td>
-                          </tr>
-                        ))}
+                        {(runData.events ?? []).map((event, index, all) => {
+                          const time = typeof event.time === "string" ? event.time : null;
+                          const next = all[index + 1];
+                          const nextTime =
+                            next && typeof next.time === "string" ? next.time : null;
+                          const duration =
+                            time && nextTime
+                              ? new Date(nextTime).valueOf() - new Date(time).valueOf()
+                              : null;
+                          const chips = detailChips(event.details);
+                          const failed = event.status === "failed";
+                          return (
+                            <tr
+                              key={index}
+                              className={`border-b border-border/60 last:border-b-0 ${
+                                failed ? "bg-rose-50/60" : ""
+                              }`}
+                            >
+                              <td className="whitespace-nowrap px-3 py-1.5">
+                                <span className={failed ? "font-medium text-rose-700" : ""}>
+                                  {String(event.stage ?? "—")}
+                                </span>
+                                {failed && (
+                                  <StatusPill tone="danger">failed</StatusPill>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
+                                {timeLabel(time)}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                                {index === all.length - 1 &&
+                                event.stage !== "complete" &&
+                                !failed
+                                  ? status === "stalled"
+                                    ? "⚠ last event"
+                                    : "…"
+                                  : durationLabel(duration)}
+                              </td>
+                              <td className="px-3 py-1.5">
+                                <div className="text-xs text-muted-foreground">
+                                  {String(event.message ?? "—")}
+                                </div>
+                                {chips.length > 0 && (
+                                  <div className="mt-0.5 flex flex-wrap gap-1">
+                                    {chips.map(([k, v]) => (
+                                      <span
+                                        key={k}
+                                        className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+                                      >
+                                        {k}={v}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -555,6 +956,125 @@ export function PopulaceStagingView() {
                   <EmptyState title="No stage events yet." variant="compact" />
                 )}
               </SectionCard>
+
+              {buildManifest && (
+                <SectionCard
+                  title="Build manifest"
+                  description="Exactly what produced this candidate — code commit, package versions, artifact hashes, and gate results."
+                >
+                  <div className="flex flex-col gap-4">
+                    {(() => {
+                      const code = (buildManifest.code ?? {}) as Record<string, unknown>;
+                      const runtime = (buildManifest.runtime ?? {}) as Record<string, unknown>;
+                      const gates = (buildManifest.gates ?? {}) as Record<string, unknown>;
+                      const dataset = (buildManifest.dataset ?? {}) as Record<string, unknown>;
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3 lg:grid-cols-4">
+                            <div className="flex justify-between gap-2 border-b border-border/40 py-1">
+                              <span className="text-muted-foreground">Commit</span>
+                              <a
+                                href={`https://github.com/PolicyEngine/populace/commit/${String(code.git_commit ?? "")}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-mono text-primary hover:underline"
+                              >
+                                {String(code.git_commit ?? "—").slice(0, 7)}
+                                {code.git_dirty ? " (dirty)" : ""}
+                              </a>
+                            </div>
+                            {Object.entries(runtime)
+                              .filter(([k]) =>
+                                ["python", "policyengine-us", "policyengine-core", "torch"].includes(k),
+                              )
+                              .map(([k, v]) => (
+                                <div
+                                  key={k}
+                                  className="flex justify-between gap-2 border-b border-border/40 py-1"
+                                >
+                                  <span className="text-muted-foreground">{k}</span>
+                                  <span className="font-mono text-foreground">{String(v)}</span>
+                                </div>
+                              ))}
+                            <div className="flex justify-between gap-2 border-b border-border/40 py-1">
+                              <span className="text-muted-foreground">Dataset sha256</span>
+                              <span className="font-mono text-foreground">
+                                {String(dataset.sha256 ?? "—").slice(0, 12)}…
+                              </span>
+                            </div>
+                          </div>
+                          {Object.keys(gates).length > 0 && (
+                            <div>
+                              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                Gates
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(gates).map(([name, result]) => {
+                                  const r = (result ?? {}) as Record<string, unknown>;
+                                  const passed = r.passed === true;
+                                  const failures = Array.isArray(r.failures) ? r.failures : [];
+                                  return (
+                                    <div
+                                      key={name}
+                                      className={`rounded-md border px-2 py-1 text-xs ${
+                                        passed
+                                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                          : "border-rose-200 bg-rose-50 text-rose-800"
+                                      }`}
+                                    >
+                                      <span className="font-medium">{name}</span>{" "}
+                                      {passed ? "passed" : "failed"}
+                                      {failures.length > 0 && (
+                                        <span className="ml-1 font-mono text-[10px]">
+                                          {failures.map((f) => String(f)).join("; ")}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </SectionCard>
+              )}
+
+              {Object.keys(artifacts).length > 0 && (
+                <SectionCard
+                  title="Uploaded artifacts"
+                  description="Files this run has published to the staging repo so far."
+                  padded={false}
+                >
+                  <table className="w-full text-left text-sm">
+                    <tbody>
+                      {Object.entries(artifacts).map(([name, meta]) => (
+                        <tr key={name} className="border-b border-border/60 last:border-b-0">
+                          <td className="px-3 py-1.5 font-medium">{name}</td>
+                          <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                            {meta.staging_path ? (
+                              <a
+                                href={`https://huggingface.co/datasets/${runData.source_repo}/blob/main/${meta.staging_path}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline decoration-dotted underline-offset-2 hover:text-primary"
+                              >
+                                {meta.staging_path}
+                              </a>
+                            ) : (
+                              (meta.path ?? "—")
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </SectionCard>
+              )}
+                </div>
+              </details>
             </>
           )}
         </div>
