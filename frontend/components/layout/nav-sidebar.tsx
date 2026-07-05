@@ -20,6 +20,7 @@ const navItems = [
   { href: "/populace/compare", label: "Compare versions" },
   { href: "/populace/staging", label: "Staging runs", usOnly: true },
   { href: "/populace/pipeline", label: "Pipeline", usOnly: true },
+  { href: "/populace/model-coverage", label: "Model coverage", usOnly: true },
 ];
 
 function isActive(pathname: string, href: string): boolean {
