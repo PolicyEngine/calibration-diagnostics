@@ -45,6 +45,7 @@ function validationTone(absRel: number | null | undefined): "positive" | "neutra
 function statusTone(status: string | null | undefined): StatusTone {
   if (status === "passed" || status === "published") return "success";
   if (status === "failed") return "danger";
+  if (status === "stalled") return "warning";
   if (status === "running" || status === "queued") return "info";
   return "neutral";
 }
@@ -59,6 +60,55 @@ function timeLabel(value: string | null | undefined): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// A "running" run that hasn't reported for two hours is dead in practice —
+// builds emit events at least every stage, and stages run minutes, not hours.
+const STALL_MS = 2 * 60 * 60 * 1000;
+
+function effectiveStatus(
+  status: string | null | undefined,
+  updatedAt: string | null | undefined,
+): string | null {
+  if (status !== "running" && status !== "queued") return status ?? null;
+  const t = updatedAt ? new Date(updatedAt).valueOf() : NaN;
+  if (Number.isFinite(t) && Date.now() - t > STALL_MS) return "stalled";
+  return status ?? null;
+}
+
+function agoLabel(value: string | null | undefined): string {
+  const t = value ? new Date(value).valueOf() : NaN;
+  if (!Number.isFinite(t)) return "";
+  const mins = Math.round((Date.now() - t) / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60 * 48) return `${Math.round(mins / 60)}h ago`;
+  return `${Math.round(mins / 60 / 24)}d ago`;
+}
+
+// Human rendering for the small details dicts events carry (n_targets,
+// learning_rate, gate results, repair factors…).
+function detailChips(details: unknown): [string, string][] {
+  if (!details || typeof details !== "object") return [];
+  return Object.entries(details as Record<string, unknown>)
+    .filter(([, v]) => v == null || ["string", "number", "boolean"].includes(typeof v))
+    .slice(0, 8)
+    .map(([k, v]) => {
+      const num = typeof v === "number";
+      const shown = num
+        ? Math.abs(v as number) >= 1000
+          ? fmtCompact(v as number)
+          : fmt(v as number, { digits: Math.abs(v as number) < 1 ? 4 : 2 })
+        : String(v);
+      return [k, shown] as [string, string];
+    });
+}
+
+function durationLabel(ms: number | null): string {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+  return `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
 }
 
 function RunList({
@@ -102,7 +152,12 @@ function RunList({
                     {run.stage || "—"} · {timeLabel(run.updated_at)}
                   </div>
                 </div>
-                <StatusPill tone={statusTone(run.status)}>{run.status || "unknown"}</StatusPill>
+                {(() => {
+                  const shown = effectiveStatus(run.status, run.updated_at);
+                  return (
+                    <StatusPill tone={statusTone(shown)}>{shown || "unknown"}</StatusPill>
+                  );
+                })()}
               </div>
             </button>
           );
@@ -218,11 +273,16 @@ export function PopulaceStagingView() {
   );
   const lastCalibrationEvent = calibrationEvents.at(-1);
   const progress = runData?.progress ?? {};
-  const status = typeof progress.status === "string" ? progress.status : null;
+  const rawStatus = typeof progress.status === "string" ? progress.status : null;
   const stage = typeof progress.stage === "string" ? progress.stage : null;
   const message = typeof progress.message === "string" ? progress.message : null;
   const updatedAt = typeof progress.updated_at === "string" ? progress.updated_at : null;
+  const status = effectiveStatus(rawStatus, updatedAt);
+  const progressDetails = detailChips(progress.details);
   const candidateReleaseId = runData?.candidate_release_id ?? selectedRun;
+  const buildManifest = (runData?.build_manifest ?? null) as Record<string, unknown> | null;
+  const artifacts = ((runData?.run_manifest as Record<string, unknown> | null)?.artifacts ??
+    {}) as Record<string, { path?: string; staging_path?: string }>;
 
   return (
     <div className="flex flex-col gap-5">
@@ -270,8 +330,18 @@ export function PopulaceStagingView() {
                 <KpiCard
                   label="Status"
                   value={status || "unknown"}
-                  hint={stage || "no stage reported"}
-                  tone={status === "failed" ? "negative" : status === "passed" ? "positive" : "neutral"}
+                  hint={
+                    status === "stalled"
+                      ? `no update since ${timeLabel(updatedAt)} — died at ${stage ?? "?"}`
+                      : stage || "no stage reported"
+                  }
+                  tone={
+                    status === "failed" || status === "stalled"
+                      ? "negative"
+                      : status === "passed"
+                        ? "positive"
+                        : "neutral"
+                  }
                 />
                 <KpiCard
                   label="Candidate"
@@ -280,7 +350,7 @@ export function PopulaceStagingView() {
                 />
                 <KpiCard
                   label="Last update"
-                  value={timeLabel(updatedAt)}
+                  value={`${timeLabel(updatedAt)}${agoLabel(updatedAt) ? ` · ${agoLabel(updatedAt)}` : ""}`}
                   hint={message || "progress.json"}
                 />
                 <KpiCard
@@ -293,6 +363,20 @@ export function PopulaceStagingView() {
                   }
                 />
               </div>
+
+              {progressDetails.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="font-medium">Last stage detail:</span>
+                  {progressDetails.map(([k, v]) => (
+                    <span
+                      key={k}
+                      className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+                    >
+                      {k}={v}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <SectionCard
                 title="Calibration progress"
@@ -523,31 +607,81 @@ export function PopulaceStagingView() {
                 </SectionCard>
               ) : null}
 
-              <SectionCard title="Stage events" padded={false}>
+              <SectionCard
+                title="Stage timeline"
+                description="Every stage the build reported, with how long it ran and the numbers it logged. A run that stops mid-list without a failed event died silently — the last row is where."
+                padded={false}
+              >
                 {(runData.events ?? []).length ? (
-                  <div className="max-h-72 overflow-y-auto">
+                  <div className="max-h-96 overflow-y-auto">
                     <table className="w-full text-left text-sm">
                       <thead>
                         <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                          <th className="px-3 py-2 font-semibold">Time</th>
                           <th className="px-3 py-2 font-semibold">Stage</th>
-                          <th className="px-3 py-2 font-semibold">Status</th>
-                          <th className="px-3 py-2 font-semibold">Message</th>
+                          <th className="px-3 py-2 font-semibold">Started</th>
+                          <th className="px-3 py-2 text-right font-semibold">Duration</th>
+                          <th className="px-3 py-2 font-semibold">Detail</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(runData.events ?? []).slice().reverse().map((event, index) => (
-                          <tr key={index} className="border-b border-border/60 last:border-b-0">
-                            <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
-                              {timeLabel(typeof event.time === "string" ? event.time : null)}
-                            </td>
-                            <td className="px-3 py-1.5">{String(event.stage ?? "—")}</td>
-                            <td className="px-3 py-1.5">{String(event.status ?? "—")}</td>
-                            <td className="px-3 py-1.5 text-muted-foreground">
-                              {String(event.message ?? "—")}
-                            </td>
-                          </tr>
-                        ))}
+                        {(runData.events ?? []).map((event, index, all) => {
+                          const time = typeof event.time === "string" ? event.time : null;
+                          const next = all[index + 1];
+                          const nextTime =
+                            next && typeof next.time === "string" ? next.time : null;
+                          const duration =
+                            time && nextTime
+                              ? new Date(nextTime).valueOf() - new Date(time).valueOf()
+                              : null;
+                          const chips = detailChips(event.details);
+                          const failed = event.status === "failed";
+                          return (
+                            <tr
+                              key={index}
+                              className={`border-b border-border/60 last:border-b-0 ${
+                                failed ? "bg-rose-50/60" : ""
+                              }`}
+                            >
+                              <td className="whitespace-nowrap px-3 py-1.5">
+                                <span className={failed ? "font-medium text-rose-700" : ""}>
+                                  {String(event.stage ?? "—")}
+                                </span>
+                                {failed && (
+                                  <StatusPill tone="danger">failed</StatusPill>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
+                                {timeLabel(time)}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                                {index === all.length - 1 &&
+                                event.stage !== "complete" &&
+                                !failed
+                                  ? status === "stalled"
+                                    ? "⚠ last event"
+                                    : "…"
+                                  : durationLabel(duration)}
+                              </td>
+                              <td className="px-3 py-1.5">
+                                <div className="text-xs text-muted-foreground">
+                                  {String(event.message ?? "—")}
+                                </div>
+                                {chips.length > 0 && (
+                                  <div className="mt-0.5 flex flex-wrap gap-1">
+                                    {chips.map(([k, v]) => (
+                                      <span
+                                        key={k}
+                                        className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+                                      >
+                                        {k}={v}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -555,6 +689,123 @@ export function PopulaceStagingView() {
                   <EmptyState title="No stage events yet." variant="compact" />
                 )}
               </SectionCard>
+
+              {buildManifest && (
+                <SectionCard
+                  title="Build manifest"
+                  description="Exactly what produced this candidate — code commit, package versions, artifact hashes, and gate results."
+                >
+                  <div className="flex flex-col gap-4">
+                    {(() => {
+                      const code = (buildManifest.code ?? {}) as Record<string, unknown>;
+                      const runtime = (buildManifest.runtime ?? {}) as Record<string, unknown>;
+                      const gates = (buildManifest.gates ?? {}) as Record<string, unknown>;
+                      const dataset = (buildManifest.dataset ?? {}) as Record<string, unknown>;
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3 lg:grid-cols-4">
+                            <div className="flex justify-between gap-2 border-b border-border/40 py-1">
+                              <span className="text-muted-foreground">Commit</span>
+                              <a
+                                href={`https://github.com/PolicyEngine/populace/commit/${String(code.git_commit ?? "")}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-mono text-primary hover:underline"
+                              >
+                                {String(code.git_commit ?? "—").slice(0, 7)}
+                                {code.git_dirty ? " (dirty)" : ""}
+                              </a>
+                            </div>
+                            {Object.entries(runtime)
+                              .filter(([k]) =>
+                                ["python", "policyengine-us", "policyengine-core", "torch"].includes(k),
+                              )
+                              .map(([k, v]) => (
+                                <div
+                                  key={k}
+                                  className="flex justify-between gap-2 border-b border-border/40 py-1"
+                                >
+                                  <span className="text-muted-foreground">{k}</span>
+                                  <span className="font-mono text-foreground">{String(v)}</span>
+                                </div>
+                              ))}
+                            <div className="flex justify-between gap-2 border-b border-border/40 py-1">
+                              <span className="text-muted-foreground">Dataset sha256</span>
+                              <span className="font-mono text-foreground">
+                                {String(dataset.sha256 ?? "—").slice(0, 12)}…
+                              </span>
+                            </div>
+                          </div>
+                          {Object.keys(gates).length > 0 && (
+                            <div>
+                              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                Gates
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(gates).map(([name, result]) => {
+                                  const r = (result ?? {}) as Record<string, unknown>;
+                                  const passed = r.passed === true;
+                                  const failures = Array.isArray(r.failures) ? r.failures : [];
+                                  return (
+                                    <div
+                                      key={name}
+                                      className={`rounded-md border px-2 py-1 text-xs ${
+                                        passed
+                                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                          : "border-rose-200 bg-rose-50 text-rose-800"
+                                      }`}
+                                    >
+                                      <span className="font-medium">{name}</span>{" "}
+                                      {passed ? "passed" : "failed"}
+                                      {failures.length > 0 && (
+                                        <span className="ml-1 font-mono text-[10px]">
+                                          {failures.map((f) => String(f)).join("; ")}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </SectionCard>
+              )}
+
+              {Object.keys(artifacts).length > 0 && (
+                <SectionCard
+                  title="Uploaded artifacts"
+                  description="Files this run has published to the staging repo so far."
+                  padded={false}
+                >
+                  <table className="w-full text-left text-sm">
+                    <tbody>
+                      {Object.entries(artifacts).map(([name, meta]) => (
+                        <tr key={name} className="border-b border-border/60 last:border-b-0">
+                          <td className="px-3 py-1.5 font-medium">{name}</td>
+                          <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                            {meta.staging_path ? (
+                              <a
+                                href={`https://huggingface.co/datasets/${runData.source_repo}/blob/main/${meta.staging_path}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline decoration-dotted underline-offset-2 hover:text-primary"
+                              >
+                                {meta.staging_path}
+                              </a>
+                            ) : (
+                              (meta.path ?? "—")
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </SectionCard>
+              )}
             </>
           )}
         </div>
