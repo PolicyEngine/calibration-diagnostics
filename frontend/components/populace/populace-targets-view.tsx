@@ -1049,9 +1049,18 @@ export function PopulaceTargetsView({
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace"
+        eyebrow="Populace · calibration fit"
         title="Target diagnostics"
-        description="See how closely the calibrated weights reproduce each official statistic — by source, measure, and breakdown."
+        description={
+          <>
+            See how closely the calibrated weights reproduce each official statistic — by
+            source, measure, and breakdown. This is the drill-down behind the{" "}
+            <a href="/populace" className="text-primary hover:underline">
+              calibration map
+            </a>
+            .
+          </>
+        }
         actions={
           <ToolbarSelect
             label="Release"

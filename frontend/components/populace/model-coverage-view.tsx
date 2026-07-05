@@ -565,7 +565,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Populace · rules engine"
-        title="Model validation coverage"
+        title="Validation reach"
         description={
           <>
             Which rule variables in{" "}

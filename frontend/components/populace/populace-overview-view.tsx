@@ -102,7 +102,7 @@ export function PopulaceOverviewView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace · calibration map"
+        eyebrow="Populace · calibration fit"
         title="What the data is anchored to"
         description={
           <>
@@ -179,17 +179,25 @@ export function PopulaceOverviewView() {
       <SectionCard
         title="Calibration map"
         actions={
-          <ToolbarSelect
-            label="Geography"
-            value={geoLevel}
-            onChange={setGeoLevel}
-            options={[
-              { value: "", label: "All geographies" },
-              { value: "national", label: "National" },
-              { value: "state", label: "State" },
-              { value: "congressional_district", label: "Congressional district" },
-            ]}
-          />
+          <div className="flex items-center gap-3">
+            <ToolbarSelect
+              label="Geography"
+              value={geoLevel}
+              onChange={setGeoLevel}
+              options={[
+                { value: "", label: "All geographies" },
+                { value: "national", label: "National" },
+                { value: "state", label: "State" },
+                { value: "congressional_district", label: "Congressional district" },
+              ]}
+            />
+            <a
+              href="/populace/targets"
+              className="whitespace-nowrap text-sm font-medium text-primary hover:underline"
+            >
+              All targets →
+            </a>
+          </div>
         }
       >
         {treemap ? (
