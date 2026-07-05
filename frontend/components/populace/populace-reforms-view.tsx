@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtMoney, releaseLabel } from "@/components/shared/format";
@@ -159,6 +159,30 @@ function Sparkline({ series }: { series: ReformHistorySeries }) {
   );
 }
 
+// |error| as a small bar next to the number, so a suite scans visually.
+function ErrorCell({ absRel }: { absRel: number | null | undefined }) {
+  const tone = errorTone(absRel);
+  const color =
+    tone === "positive" ? "bg-emerald-500" : tone === "negative" ? "bg-rose-500" : "bg-amber-500";
+  const text =
+    tone === "positive" ? "text-emerald-700" : tone === "negative" ? "text-rose-700" : "text-foreground";
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <span className={`font-medium tabular-nums ${absRel == null ? "text-muted-foreground" : text}`}>
+        {pct(absRel)}
+      </span>
+      <span className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-muted">
+        {absRel != null && (
+          <span
+            className={`block h-full rounded-full ${color}`}
+            style={{ width: `${Math.min(Math.max(absRel, 0), 1) * 100}%` }}
+          />
+        )}
+      </span>
+    </div>
+  );
+}
+
 function ReformTable({
   rows,
   history,
@@ -168,9 +192,20 @@ function ReformTable({
   history: Map<string, ReformHistorySeries>;
   showSamplePill: boolean;
 }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   if (!rows.length) {
     return <EmptyState title="No checks in this suite." variant="compact" />;
   }
+
+  function toggle(id: string) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -179,93 +214,101 @@ function ReformTable({
             <th className="px-3 py-2 font-semibold">Check</th>
             <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
             <th className="px-3 py-2 text-right font-semibold">populace</th>
-            <th className="px-3 py-2 text-right font-semibold">Error %</th>
+            <th className="px-3 py-2 text-right font-semibold">Error</th>
             <th className="px-3 py-2 font-semibold">Trend</th>
             <th className="px-3 py-2 text-right font-semibold">Δ vs prev</th>
             <th className="px-3 py-2 font-semibold">Year</th>
-            <th className="px-3 py-2 font-semibold">Source</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-b border-border/60 align-top last:border-b-0">
-              <td className="px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground">{row.name}</span>
-                  {showSamplePill && (
-                    <StatusPill tone={row.in_sample ? "neutral" : "info"}>
-                      {row.in_sample ? "in-sample" : "out-of-sample"}
-                    </StatusPill>
-                  )}
-                </div>
-                {row.description && (
-                  <div className="max-w-md text-xs text-muted-foreground">{row.description}</div>
-                )}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                {fmtMoney(row.jct_score)}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                {fmtMoney(row.populace_estimate)}
-              </td>
-              <td
-                className={`whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums ${
-                  errorTone(row.abs_relative_error) === "positive"
-                    ? "text-emerald-700"
-                    : errorTone(row.abs_relative_error) === "negative"
-                      ? "text-rose-700"
-                      : "text-foreground"
-                }`}
-              >
-                {pct(row.abs_relative_error)}
-              </td>
-              {(() => {
-                const series = history.get(row.id);
-                const delta = series?.delta ?? null;
-                return (
-                  <>
-                    <td className="px-3 py-2">
-                      {series ? (
-                        <Sparkline series={series} />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+          {rows.map((row) => {
+            const isOpen = expanded.has(row.id);
+            const series = history.get(row.id);
+            const delta = series?.delta ?? null;
+            return (
+              <Fragment key={row.id}>
+                <tr
+                  onClick={() => toggle(row.id)}
+                  className="cursor-pointer border-b border-border/60 last:border-b-0 hover:bg-muted/30"
+                >
+                  <td className="px-3 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] text-muted-foreground transition-transform ${
+                          isOpen ? "rotate-90" : ""
+                        }`}
+                      >
+                        ▸
+                      </span>
+                      <span className="font-medium text-foreground">{row.name}</span>
+                      {showSamplePill && (
+                        <StatusPill tone={row.in_sample ? "neutral" : "info"}>
+                          {row.in_sample ? "in-sample" : "out-of-sample"}
+                        </StatusPill>
                       )}
-                    </td>
-                    <td
-                      className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
-                        delta == null
-                          ? "text-muted-foreground"
-                          : delta < 0
-                            ? "text-emerald-700"
-                            : delta > 0
-                              ? "text-rose-700"
-                              : "text-muted-foreground"
-                      }`}
-                    >
-                      {delta == null ? "—" : `${delta > 0 ? "+" : ""}${pct(delta)}`}
-                    </td>
-                  </>
-                );
-              })()}
-              <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground tabular-nums">
-                {row.jct_benchmark_window ?? "—"}
-              </td>
-              <td className="px-3 py-2 text-xs text-muted-foreground">
-                {row.jct_source_url ? (
-                  <a
-                    href={row.jct_source_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary hover:underline"
+                    </div>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                    {fmtMoney(row.jct_score)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                    {fmtMoney(row.populace_estimate)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-1.5">
+                    <ErrorCell absRel={row.abs_relative_error} />
+                  </td>
+                  <td className="px-3 py-1.5">
+                    {series ? (
+                      <Sparkline series={series} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td
+                    className={`whitespace-nowrap px-3 py-1.5 text-right tabular-nums ${
+                      delta == null
+                        ? "text-muted-foreground"
+                        : delta < 0
+                          ? "text-emerald-700"
+                          : delta > 0
+                            ? "text-rose-700"
+                            : "text-muted-foreground"
+                    }`}
                   >
-                    {row.jct_source ?? "JCT"}
-                  </a>
-                ) : (
-                  (row.jct_source ?? "—")
+                    {delta == null ? "—" : `${delta > 0 ? "+" : ""}${pct(delta)}`}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground tabular-nums">
+                    {row.jct_benchmark_window ?? "—"}
+                  </td>
+                </tr>
+                {isOpen && (
+                  <tr className="border-b border-border/60 bg-muted/20">
+                    <td colSpan={7} className="px-3 py-2 pl-9">
+                      <div className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+                        {row.description || "No description published for this check."}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Source:{" "}
+                        {row.jct_source_url ? (
+                          <a
+                            href={row.jct_source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {row.jct_source ?? "JCT"}
+                          </a>
+                        ) : (
+                          (row.jct_source ?? "—")
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 )}
-              </td>
-            </tr>
-          ))}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -463,9 +506,18 @@ export function PopulaceReformsView() {
                   <span className="flex items-center gap-2">
                     {suite.category}
                     <SampleBadge inSample={suite.inSample} />
+                    <span className="font-normal text-muted-foreground">
+                      {suite.within10}/{suite.scored} within 10% · median |error|{" "}
+                      {pct(suite.medianAbsError)}
+                    </span>
                   </span>
                 }
-                description={`${suite.within10}/${suite.scored} within 10% · median |error| ${pct(suite.medianAbsError)}. ${SUITE_META[suite.category]?.blurb ?? ""}`}
+                description={
+                  <>
+                    {SUITE_META[suite.category]?.blurb ?? ""} Click a row for its
+                    methodology and source.
+                  </>
+                }
                 padded={false}
               >
                 <ReformTable
