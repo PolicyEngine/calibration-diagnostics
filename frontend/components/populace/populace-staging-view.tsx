@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import {
+  usePopulaceReforms,
   usePopulaceStagingCompare,
   usePopulaceStagingRun,
   usePopulaceStagingRuns,
@@ -187,13 +188,23 @@ function LossSparkline({ values }: { values: number[] }) {
   );
 }
 
-function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
+function ReformValidationTable({
+  rows,
+  publishedErrors,
+  publishedReleaseId,
+}: {
+  rows: ReformValidationRow[];
+  // |error| per check id in the currently published release, for side-by-side.
+  publishedErrors: Map<string, number | null>;
+  publishedReleaseId?: string | null;
+}) {
   const ordered = [...rows]
     .filter((row) => row.populace_estimate != null || row.jct_score != null)
     .sort((a, b) => Number(a.in_sample ?? false) - Number(b.in_sample ?? false));
   if (!ordered.length) {
     return <EmptyState title="No reform validation rows yet." variant="compact" />;
   }
+  const hasPublished = publishedErrors.size > 0;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -202,50 +213,103 @@ function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
             <th className="px-3 py-2 font-semibold">Test</th>
             <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
             <th className="px-3 py-2 text-right font-semibold">Candidate</th>
-            <th className="px-3 py-2 text-right font-semibold">Diff</th>
             <th className="px-3 py-2 text-right font-semibold">Error</th>
+            {hasPublished && (
+              <>
+                <th className="px-3 py-2 text-right font-semibold">
+                  Published{publishedReleaseId ? ` (${releaseLabel(publishedReleaseId)})` : ""}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">Δ</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
-          {ordered.map((row) => (
-            <tr key={row.id} className="border-b border-border/60 last:border-b-0">
-              <td className="px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground">{row.name}</span>
-                  <StatusPill tone={row.in_sample ? "neutral" : "info"}>
-                    {row.in_sample ? "in-sample" : "out-of-sample"}
-                  </StatusPill>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {row.category || "Reform score"}
-                </div>
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                {fmtMoney(row.jct_score)}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                {fmtMoney(row.populace_estimate)}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
-                {fmtSignedMoney(row.abs_error)}
-              </td>
-              <td
-                className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
-                  validationTone(row.abs_relative_error) === "positive"
-                    ? "text-emerald-700"
-                    : validationTone(row.abs_relative_error) === "negative"
-                      ? "text-rose-700"
-                      : "text-foreground"
-                }`}
-              >
-                {pct(row.abs_relative_error)}
-              </td>
-            </tr>
-          ))}
+          {ordered.map((row) => {
+            const published = publishedErrors.get(row.id) ?? null;
+            const delta =
+              published != null && row.abs_relative_error != null
+                ? row.abs_relative_error - published
+                : null;
+            return (
+              <tr key={row.id} className="border-b border-border/60 last:border-b-0">
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground">{row.name}</span>
+                    <StatusPill tone={row.in_sample ? "neutral" : "info"}>
+                      {row.in_sample ? "in-sample" : "out-of-sample"}
+                    </StatusPill>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {row.category || "Reform score"}
+                  </div>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                  {fmtMoney(row.jct_score)}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                  {fmtMoney(row.populace_estimate)}
+                </td>
+                <td
+                  className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
+                    validationTone(row.abs_relative_error) === "positive"
+                      ? "text-emerald-700"
+                      : validationTone(row.abs_relative_error) === "negative"
+                        ? "text-rose-700"
+                        : "text-foreground"
+                  }`}
+                >
+                  {pct(row.abs_relative_error)}
+                </td>
+                {hasPublished && (
+                  <>
+                    <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+                      {pct(published)}
+                    </td>
+                    <td
+                      className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
+                        delta == null
+                          ? "text-muted-foreground"
+                          : delta < -1e-4
+                            ? "text-emerald-700"
+                            : delta > 1e-4
+                              ? "text-rose-700"
+                              : "text-muted-foreground"
+                      }`}
+                    >
+                      {delta == null ? "—" : `${delta > 0 ? "+" : ""}${pct(delta)}`}
+                    </td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
+}
+
+// Common-target fit stats for the candidate-vs-published verdict: computed on
+// the SAME targets, since headline within-10% rates over different target sets
+// (32k national-only vs 4k) are not comparable.
+interface SideStats {
+  n: number;
+  within10: number;
+  median: number | null;
+  mean: number | null;
+}
+
+function sideStats(errors: number[]): SideStats {
+  if (!errors.length) return { n: 0, within10: 0, median: null, mean: null };
+  const sorted = [...errors].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return {
+    n: errors.length,
+    within10: errors.filter((e) => e <= 0.1).length,
+    median: sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2,
+    mean: errors.reduce((s, e) => s + e, 0) / errors.length,
+  };
 }
 
 export function PopulaceStagingView() {
@@ -263,6 +327,33 @@ export function PopulaceStagingView() {
     runData?.has_calibration ? selectedRun : undefined,
     "latest",
   );
+  // Published release's reform validation, for side-by-side with the candidate.
+  const { data: publishedReforms } = usePopulaceReforms();
+  const publishedErrors = useMemo(
+    () =>
+      new Map(
+        (publishedReforms?.rows ?? []).map(
+          (row) => [row.id, row.abs_relative_error ?? null] as const,
+        ),
+      ),
+    [publishedReforms],
+  );
+  // Fit stats on the targets both sides share — the honest better-or-worse basis.
+  const commonStats = useMemo(() => {
+    const rows = compareData?.rows ?? [];
+    const a: number[] = [];
+    const b: number[] = [];
+    for (const row of rows) {
+      const ae = row.a_relative_error;
+      const be = row.b_relative_error;
+      if (ae == null || be == null) continue;
+      // Drop tiny-denominator artifacts, same convention as the highlights.
+      if (Math.abs(ae) > 10 || Math.abs(be) > 10) continue;
+      a.push(Math.abs(ae));
+      b.push(Math.abs(be));
+    }
+    return { a: sideStats(a), b: sideStats(b) };
+  }, [compareData]);
   const calibrationEvents = runData?.calibration_progress?.events ?? [];
   const lossValues = useMemo(
     () =>
@@ -510,7 +601,11 @@ export function PopulaceStagingView() {
                       hint="includes in-sample rows"
                     />
                   </div>
-                  <ReformValidationTable rows={runData.reform_validation.rows ?? []} />
+                  <ReformValidationTable
+                    rows={runData.reform_validation.rows ?? []}
+                    publishedErrors={publishedErrors}
+                    publishedReleaseId={publishedReforms?.release_id}
+                  />
                 </SectionCard>
               ) : (
                 <SectionCard
@@ -523,84 +618,165 @@ export function PopulaceStagingView() {
 
               {compareData?.available !== false && compareData?.summary ? (
                 <SectionCard
-                  title="Candidate vs latest release"
-                  description="Target-level diff between production latest and this staging candidate."
+                  title="Better or worse than the published release?"
+                  description={`Scored on the ${fmt(commonStats.a.n, { digits: 0 })} targets both sides share — headline rates over different target surfaces (${fmt(compareData.a.total_targets, { digits: 0 })} published vs ${fmt(compareData.b.total_targets, { digits: 0 })} candidate) are not comparable. Published = ${releaseLabel(compareData.a.release_id)}.`}
                 >
-                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <KpiCard
-                      label="Common targets"
-                      value={fmt(compareData.summary.common, { digits: 0 })}
-                      hint={`+${fmt(compareData.summary.added, { digits: 0 })} / -${fmt(compareData.summary.removed, { digits: 0 })}`}
-                    />
-                    <KpiCard
-                      label="Improved"
-                      value={fmt(compareData.summary.improved, { digits: 0 })}
-                      tone="positive"
-                      hint={`${fmt(compareData.summary.regressed, { digits: 0 })} regressed`}
-                    />
-                    <KpiCard
-                      label="Latest targets"
-                      value={fmt(compareData.a.total_targets, { digits: 0 })}
-                      hint={releaseLabel(compareData.a.release_id)}
-                    />
-                    <KpiCard
-                      label="Candidate targets"
-                      value={fmt(compareData.b.total_targets, { digits: 0 })}
-                      hint={releaseLabel(compareData.b.release_id)}
-                    />
+                  <div className="overflow-x-auto">
+                    <table className="w-full max-w-2xl text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                          <th className="px-3 py-2 font-semibold">Common-target fit</th>
+                          <th className="px-3 py-2 text-right font-semibold">Published</th>
+                          <th className="px-3 py-2 text-right font-semibold">Candidate</th>
+                          <th className="px-3 py-2 text-right font-semibold">Verdict</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(
+                          [
+                            [
+                              "Within 10%",
+                              commonStats.a.n ? commonStats.a.within10 / commonStats.a.n : null,
+                              commonStats.b.n ? commonStats.b.within10 / commonStats.b.n : null,
+                              true, // higher is better
+                            ],
+                            ["Median |error|", commonStats.a.median, commonStats.b.median, false],
+                            ["Mean |error|", commonStats.a.mean, commonStats.b.mean, false],
+                          ] as [string, number | null, number | null, boolean][]
+                        ).map(([label, a, b, higherBetter]) => {
+                          const better =
+                            a != null && b != null
+                              ? higherBetter
+                                ? b > a + 1e-6
+                                : b < a - 1e-6
+                              : null;
+                          const worse =
+                            a != null && b != null
+                              ? higherBetter
+                                ? b < a - 1e-6
+                                : b > a + 1e-6
+                              : null;
+                          return (
+                            <tr key={label} className="border-b border-border/60 last:border-b-0">
+                              <td className="px-3 py-1.5 font-medium">{label}</td>
+                              <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                                {pct(a)}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-1.5 text-right font-medium tabular-nums">
+                                {pct(b)}
+                              </td>
+                              <td
+                                className={`whitespace-nowrap px-3 py-1.5 text-right text-xs font-semibold ${
+                                  better
+                                    ? "text-emerald-700"
+                                    : worse
+                                      ? "text-rose-700"
+                                      : "text-muted-foreground"
+                                }`}
+                              >
+                                {better ? "candidate better" : worse ? "candidate worse" : "tie"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr>
+                          <td className="px-3 py-1.5 font-medium">Targets moved</td>
+                          <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground" colSpan={2}>
+                            <span className="text-emerald-700">{fmt(compareData.summary.improved, { digits: 0 })} improved</span>
+                            {" · "}
+                            <span className="text-rose-700">{fmt(compareData.summary.regressed, { digits: 0 })} regressed</span>
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-xs text-muted-foreground">
+                            +{fmt(compareData.summary.added, { digits: 0 })} new / -
+                            {fmt(compareData.summary.removed, { digits: 0 })} dropped
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                   {(() => {
-                    const regressions = (compareData.rows ?? [])
-                      .filter(
-                        (row) =>
-                          (row.abs_rel_delta ?? 0) > 1e-9 &&
-                          // Drop tiny-denominator artifacts (>1000% errors),
-                          // same convention as the release highlights.
-                          Math.abs(row.b_relative_error ?? 0) <= 10 &&
-                          Math.abs(row.a_relative_error ?? 0) <= 10,
-                      )
-                      .slice(0, 12);
-                    if (!regressions.length) return null;
+                    const usable = (compareData.rows ?? []).filter(
+                      (row) =>
+                        // Drop tiny-denominator artifacts (>1000% errors),
+                        // same convention as the release highlights.
+                        Math.abs(row.b_relative_error ?? 0) <= 10 &&
+                        Math.abs(row.a_relative_error ?? 0) <= 10,
+                    );
+                    const regressions = usable
+                      .filter((row) => (row.abs_rel_delta ?? 0) > 1e-9)
+                      .slice(0, 10);
+                    const improvements = usable
+                      .filter((row) => (row.abs_rel_delta ?? 0) < -1e-9)
+                      .sort((x, y) => (x.abs_rel_delta ?? 0) - (y.abs_rel_delta ?? 0))
+                      .slice(0, 10);
                     const pctOrDash = (v: number | null | undefined) =>
                       v == null ? "—" : fmt(Math.abs(v), { pct: true, digits: 1 });
-                    return (
-                      <div className="mt-4 overflow-x-auto">
-                        <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Biggest regressions
-                        </div>
-                        <table className="w-full text-left text-sm">
-                          <thead>
-                            <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                              <th className="px-3 py-2 font-semibold">Target</th>
-                              <th className="px-3 py-2 text-right font-semibold">Latest |error|</th>
-                              <th className="px-3 py-2 text-right font-semibold">Candidate |error|</th>
-                              <th className="px-3 py-2 text-right font-semibold">Δ</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {regressions.map((row) => (
-                              <tr key={row.name} className="border-b border-border/60 last:border-b-0">
-                                <td className="px-3 py-1.5">
-                                  <span className="font-medium text-foreground">
-                                    {row.variable ?? row.name}
-                                  </span>
-                                  {row.target_label ? (
-                                    <span className="text-xs text-muted-foreground"> · {row.target_label}</span>
-                                  ) : null}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                                  {pctOrDash(row.a_relative_error)}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                                  {pctOrDash(row.b_relative_error)}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-rose-700">
-                                  +{fmt(row.abs_rel_delta, { pct: true, digits: 1 })}
-                                </td>
+                    const MoveTable = ({
+                      label,
+                      rows,
+                      negative,
+                    }: {
+                      label: string;
+                      rows: typeof regressions;
+                      negative: boolean;
+                    }) =>
+                      rows.length ? (
+                        <div className="min-w-0 overflow-x-auto">
+                          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            {label}
+                          </div>
+                          <table className="w-full text-left text-sm">
+                            <thead>
+                              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                                <th className="px-3 py-2 font-semibold">Target</th>
+                                <th className="px-3 py-2 text-right font-semibold">Published</th>
+                                <th className="px-3 py-2 text-right font-semibold">Candidate</th>
+                                <th className="px-3 py-2 text-right font-semibold">Δ</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {rows.map((row) => (
+                                <tr key={row.name} className="border-b border-border/60 last:border-b-0">
+                                  <td className="px-3 py-1.5">
+                                    <span className="font-medium text-foreground">
+                                      {row.variable ?? row.name}
+                                    </span>
+                                    {row.target_label ? (
+                                      <span className="text-xs text-muted-foreground">
+                                        {" "}
+                                        · {row.target_label}
+                                      </span>
+                                    ) : null}
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                                    {pctOrDash(row.a_relative_error)}
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                                    {pctOrDash(row.b_relative_error)}
+                                  </td>
+                                  <td
+                                    className={`whitespace-nowrap px-3 py-1.5 text-right tabular-nums ${
+                                      negative ? "text-rose-700" : "text-emerald-700"
+                                    }`}
+                                  >
+                                    {negative ? "+" : ""}
+                                    {fmt(row.abs_rel_delta, { pct: true, digits: 1 })}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : null;
+                    if (!regressions.length && !improvements.length) return null;
+                    return (
+                      <div className="mt-4 grid gap-5 xl:grid-cols-2">
+                        <MoveTable label="Biggest regressions" rows={regressions} negative />
+                        <MoveTable
+                          label="Biggest improvements"
+                          rows={improvements}
+                          negative={false}
+                        />
                       </div>
                     );
                   })()}
