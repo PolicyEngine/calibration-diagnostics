@@ -312,10 +312,57 @@ function sideStats(errors: number[]): SideStats {
   };
 }
 
+// One row of the validation scorecard: a metric on both sides plus a verdict.
+function ScoreRow({
+  label,
+  published,
+  candidate,
+  higherBetter,
+  render = pct,
+}: {
+  label: string;
+  published: number | null;
+  candidate: number | null;
+  higherBetter: boolean;
+  render?: (v: number | null | undefined) => string;
+}) {
+  const better =
+    published != null && candidate != null
+      ? higherBetter
+        ? candidate > published + 1e-6
+        : candidate < published - 1e-6
+      : null;
+  const worse =
+    published != null && candidate != null
+      ? higherBetter
+        ? candidate < published - 1e-6
+        : candidate > published + 1e-6
+      : null;
+  return (
+    <tr className="border-b border-border/60 last:border-b-0">
+      <td className="px-3 py-1.5 font-medium">{label}</td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+        {render(published)}
+      </td>
+      <td className="whitespace-nowrap px-3 py-1.5 text-right font-medium tabular-nums">
+        {render(candidate)}
+      </td>
+      <td
+        className={`whitespace-nowrap px-3 py-1.5 text-right text-xs font-semibold ${
+          better ? "text-emerald-700" : worse ? "text-rose-700" : "text-muted-foreground"
+        }`}
+      >
+        {better ? "candidate better" : worse ? "candidate worse" : published == null || candidate == null ? "—" : "tie"}
+      </td>
+    </tr>
+  );
+}
+
 export function PopulaceStagingView() {
   const { data: runsData, isLoading: runsLoading, error: runsError } = usePopulaceStagingRuns();
   const runs = runsData?.runs ?? [];
   const [selectedRun, setSelectedRun] = useState("");
+  const [targetSearch, setTargetSearch] = useState("");
 
   useEffect(() => {
     if (!selectedRun && runs[0]) setSelectedRun(runs[0].run_id);
@@ -323,7 +370,7 @@ export function PopulaceStagingView() {
 
   const { data: runData, isLoading: runLoading, error: runError } =
     usePopulaceStagingRun(selectedRun);
-  const { data: compareData } = usePopulaceStagingCompare(
+  const { data: compareData, isLoading: compareLoading } = usePopulaceStagingCompare(
     runData?.has_calibration ? selectedRun : undefined,
     "latest",
   );
@@ -475,6 +522,275 @@ export function PopulaceStagingView() {
                 </div>
               )}
 
+              {runData.has_calibration && compareLoading && !compareData && (
+                <LoadingBlock
+                  label="Comparing candidate vs published release (loads both calibration packages)…"
+                  height="h-24"
+                />
+              )}
+
+              {(compareData?.summary || runData.reform_validation) && (
+                <SectionCard
+                  title="Validation scorecard"
+                  description={`The main validation points, candidate vs the published release${compareData?.a ? ` (${releaseLabel(compareData.a.release_id)})` : ""}. Target fit is scored on the ${fmt(commonStats.a.n, { digits: 0 })} targets both sides share; full-surface rates over different target sets are not comparable.`}
+                  padded={false}
+                >
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                        <th className="px-3 py-2 font-semibold">Validation point</th>
+                        <th className="px-3 py-2 text-right font-semibold">Published</th>
+                        <th className="px-3 py-2 text-right font-semibold">Candidate</th>
+                        <th className="px-3 py-2 text-right font-semibold">Verdict</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compareData?.summary && (
+                        <>
+                          <ScoreRow
+                            label="Targets · within 10% (common)"
+                            published={commonStats.a.n ? commonStats.a.within10 / commonStats.a.n : null}
+                            candidate={commonStats.b.n ? commonStats.b.within10 / commonStats.b.n : null}
+                            higherBetter
+                          />
+                          <ScoreRow
+                            label="Targets · median |error| (common)"
+                            published={commonStats.a.median}
+                            candidate={commonStats.b.median}
+                            higherBetter={false}
+                          />
+                          <ScoreRow
+                            label="Targets · mean |error| (common)"
+                            published={commonStats.a.mean}
+                            candidate={commonStats.b.mean}
+                            higherBetter={false}
+                          />
+                        </>
+                      )}
+                      {runData.reform_validation && (
+                        <>
+                          <ScoreRow
+                            label="Reforms · out-of-sample mean |error|"
+                            published={
+                              publishedReforms?.summary?.out_of_sample_mean_abs_relative_error ??
+                              null
+                            }
+                            candidate={
+                              runData.reform_validation.summary
+                                ?.out_of_sample_mean_abs_relative_error ?? null
+                            }
+                            higherBetter={false}
+                          />
+                          <ScoreRow
+                            label="Reforms · out-of-sample within 10%"
+                            published={
+                              (publishedReforms?.summary?.n_out_of_sample_scored ?? 0) > 0
+                                ? (publishedReforms?.summary?.out_of_sample_within_10pct ?? 0) /
+                                  (publishedReforms?.summary?.n_out_of_sample_scored ?? 1)
+                                : null
+                            }
+                            candidate={
+                              (runData.reform_validation.summary?.n_out_of_sample_scored ?? 0) > 0
+                                ? (runData.reform_validation.summary?.out_of_sample_within_10pct ??
+                                    0) /
+                                  (runData.reform_validation.summary?.n_out_of_sample_scored ?? 1)
+                                : null
+                            }
+                            higherBetter
+                          />
+                        </>
+                      )}
+                      {compareData?.summary && (
+                        <tr className="border-b border-border/60 last:border-b-0">
+                          <td className="px-3 py-1.5 font-medium">Coverage · target surface</td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                            {fmt(compareData.a.total_targets, { digits: 0 })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right font-medium tabular-nums">
+                            {fmt(compareData.b.total_targets, { digits: 0 })}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-1.5 text-right text-xs text-muted-foreground">
+                            +{fmt(compareData.summary.added, { digits: 0 })} new / -
+                            {fmt(compareData.summary.removed, { digits: 0 })} dropped
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                  {compareData?.summary && (
+                    <div className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                      <span className="text-emerald-700">
+                        {fmt(compareData.summary.improved, { digits: 0 })} targets improved
+                      </span>
+                      {" · "}
+                      <span className="text-rose-700">
+                        {fmt(compareData.summary.regressed, { digits: 0 })} regressed
+                      </span>{" "}
+                      — search the breakdown below for any statistic.
+                    </div>
+                  )}
+                </SectionCard>
+              )}
+
+              {(compareData?.rows ?? []).length > 0 && (
+                <SectionCard
+                  title="Target breakdown"
+                  description="Every target both sides share, worst movement first. Search by statistic, variable, or geography."
+                  actions={
+                    <input
+                      type="search"
+                      value={targetSearch}
+                      placeholder="Search targets…"
+                      onChange={(e) => setTargetSearch(e.target.value)}
+                      className="h-8 w-56 rounded-md border border-border bg-white px-2.5 text-sm focus:border-primary/60 focus:outline-none"
+                    />
+                  }
+                  padded={false}
+                >
+                  {(() => {
+                    const q = targetSearch.trim().toLowerCase();
+                    const usable = (compareData?.rows ?? []).filter(
+                      (row) =>
+                        // Drop tiny-denominator artifacts (>1000% errors),
+                        // same convention as the release highlights.
+                        Math.abs(row.b_relative_error ?? 0) <= 10 &&
+                        Math.abs(row.a_relative_error ?? 0) <= 10,
+                    );
+                    const matched = q
+                      ? usable.filter((row) =>
+                          [row.name, row.variable, row.target_label, row.geography, row.source]
+                            .filter(Boolean)
+                            .some((v) => String(v).toLowerCase().includes(q)),
+                        )
+                      : usable;
+                    const shown = [...matched]
+                      .sort(
+                        (x, y) =>
+                          Math.abs(y.abs_rel_delta ?? 0) - Math.abs(x.abs_rel_delta ?? 0),
+                      )
+                      .slice(0, 50);
+                    const pctOrDash = (v: number | null | undefined) =>
+                      v == null ? "—" : fmt(Math.abs(v), { pct: true, digits: 1 });
+                    if (!shown.length) {
+                      return (
+                        <EmptyState
+                          title={q ? `No targets match “${targetSearch}”.` : "No comparable targets."}
+                          variant="compact"
+                        />
+                      );
+                    }
+                    return (
+                      <>
+                        <div className="max-h-96 overflow-y-auto">
+                          <table className="w-full text-left text-sm">
+                            <thead className="sticky top-0 bg-white shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+                              <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                                <th className="px-3 py-2 font-semibold">Target</th>
+                                <th className="px-3 py-2 text-right font-semibold">Published</th>
+                                <th className="px-3 py-2 text-right font-semibold">Candidate</th>
+                                <th className="px-3 py-2 text-right font-semibold">Δ</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {shown.map((row) => {
+                                const delta = row.abs_rel_delta ?? null;
+                                return (
+                                  <tr
+                                    key={row.name}
+                                    className="border-b border-border/60 last:border-b-0"
+                                  >
+                                    <td className="px-3 py-1.5">
+                                      <span className="font-medium text-foreground">
+                                        {row.variable ?? row.name}
+                                      </span>
+                                      {row.target_label ? (
+                                        <span className="text-xs text-muted-foreground">
+                                          {" "}
+                                          · {row.target_label}
+                                        </span>
+                                      ) : null}
+                                      {row.geography ? (
+                                        <span className="text-xs text-muted-foreground">
+                                          {" "}
+                                          · {row.geography}
+                                        </span>
+                                      ) : null}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                                      {pctOrDash(row.a_relative_error)}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                                      {pctOrDash(row.b_relative_error)}
+                                    </td>
+                                    <td
+                                      className={`whitespace-nowrap px-3 py-1.5 text-right tabular-nums ${
+                                        delta == null
+                                          ? "text-muted-foreground"
+                                          : delta > 1e-9
+                                            ? "text-rose-700"
+                                            : delta < -1e-9
+                                              ? "text-emerald-700"
+                                              : "text-muted-foreground"
+                                      }`}
+                                    >
+                                      {delta == null
+                                        ? "—"
+                                        : `${delta > 0 ? "+" : ""}${fmt(delta, { pct: true, digits: 1 })}`}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                          Showing {fmt(shown.length, { digits: 0 })} of{" "}
+                          {fmt(matched.length, { digits: 0 })}
+                          {q ? " matching" : ""} targets, biggest |Δ| first.
+                        </div>
+                      </>
+                    );
+                  })()}
+                </SectionCard>
+              )}
+
+              {runData.reform_validation ? (
+                <SectionCard
+                  title="External checks breakdown"
+                  description="Each score test the run uploaded, side by side with the published release. Out-of-sample rows are the main signal; in-sample rows were direct or near-direct calibration targets."
+                  padded={false}
+                >
+                  <ReformValidationTable
+                    rows={runData.reform_validation.rows ?? []}
+                    publishedErrors={publishedErrors}
+                    publishedReleaseId={publishedReforms?.release_id}
+                  />
+                </SectionCard>
+              ) : (
+                <SectionCard
+                  title="External checks breakdown"
+                  description="This appears once the run uploads reform_validation.json."
+                >
+                  <EmptyState title="Reform validation not uploaded yet." variant="compact" />
+                </SectionCard>
+              )}
+
+              <details className="group overflow-hidden rounded-lg border border-border/80 bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold leading-tight text-foreground">
+                      Run internals
+                    </div>
+                    <div className="mt-1 max-w-2xl text-xs leading-snug text-muted-foreground">
+                      Optimizer progress, stage timeline with logged numbers, build manifest
+                      (versions, hashes, gates), and uploaded artifacts.
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground transition-transform group-open:rotate-180">
+                    ▾
+                  </span>
+                </summary>
+                <div className="flex flex-col gap-5 border-t border-border p-4">
               <SectionCard
                 title="Calibration progress"
                 description="Loss points emitted by the Populace calibrator while the staging build runs."
@@ -556,238 +872,7 @@ export function PopulaceStagingView() {
                 </SectionCard>
               )}
 
-              {runData.reform_validation ? (
-                <SectionCard
-                  title="Reform validation"
-                  description="External score tests uploaded by this staging run. Out-of-sample rows are the main signal; in-sample rows were direct or near-direct calibration targets."
-                  padded={false}
-                >
-                  <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4">
-                    <KpiCard
-                      label="Out-of-sample mean |error|"
-                      value={pct(
-                        runData.reform_validation.summary
-                          ?.out_of_sample_mean_abs_relative_error,
-                      )}
-                      tone={validationTone(
-                        runData.reform_validation.summary
-                          ?.out_of_sample_mean_abs_relative_error,
-                      )}
-                      hint="reforms calibration did not directly see"
-                    />
-                    <KpiCard
-                      label="Out-of-sample within 10%"
-                      value={`${fmt(
-                        runData.reform_validation.summary?.out_of_sample_within_10pct ?? 0,
-                        { digits: 0 },
-                      )} / ${fmt(
-                        runData.reform_validation.summary?.n_out_of_sample_scored ?? 0,
-                        { digits: 0 },
-                      )}`}
-                      hint={`${fmt(
-                        runData.reform_validation.summary?.n_out_of_sample ?? 0,
-                        { digits: 0 },
-                      )} out-of-sample tests`}
-                    />
-                    <KpiCard
-                      label="Tests scored"
-                      value={fmt(runData.reform_validation.summary?.n_scored ?? 0, {
-                        digits: 0,
-                      })}
-                      hint={`${fmt(runData.reform_validation.summary?.n_reforms ?? 0, {
-                        digits: 0,
-                      })} total tests`}
-                    />
-                    <KpiCard
-                      label="All-test mean |error|"
-                      value={pct(runData.reform_validation.summary?.mean_abs_relative_error)}
-                      tone={validationTone(
-                        runData.reform_validation.summary?.mean_abs_relative_error,
-                      )}
-                      hint="includes in-sample rows"
-                    />
-                  </div>
-                  <ReformValidationTable
-                    rows={runData.reform_validation.rows ?? []}
-                    publishedErrors={publishedErrors}
-                    publishedReleaseId={publishedReforms?.release_id}
-                  />
-                </SectionCard>
-              ) : (
-                <SectionCard
-                  title="Reform validation"
-                  description="This appears once the run uploads reform_validation.json."
-                >
-                  <EmptyState title="Reform validation not uploaded yet." variant="compact" />
-                </SectionCard>
-              )}
 
-              {compareData?.available !== false && compareData?.summary ? (
-                <SectionCard
-                  title="Better or worse than the published release?"
-                  description={`Scored on the ${fmt(commonStats.a.n, { digits: 0 })} targets both sides share — headline rates over different target surfaces (${fmt(compareData.a.total_targets, { digits: 0 })} published vs ${fmt(compareData.b.total_targets, { digits: 0 })} candidate) are not comparable. Published = ${releaseLabel(compareData.a.release_id)}.`}
-                >
-                  <div className="overflow-x-auto">
-                    <table className="w-full max-w-2xl text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                          <th className="px-3 py-2 font-semibold">Common-target fit</th>
-                          <th className="px-3 py-2 text-right font-semibold">Published</th>
-                          <th className="px-3 py-2 text-right font-semibold">Candidate</th>
-                          <th className="px-3 py-2 text-right font-semibold">Verdict</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(
-                          [
-                            [
-                              "Within 10%",
-                              commonStats.a.n ? commonStats.a.within10 / commonStats.a.n : null,
-                              commonStats.b.n ? commonStats.b.within10 / commonStats.b.n : null,
-                              true, // higher is better
-                            ],
-                            ["Median |error|", commonStats.a.median, commonStats.b.median, false],
-                            ["Mean |error|", commonStats.a.mean, commonStats.b.mean, false],
-                          ] as [string, number | null, number | null, boolean][]
-                        ).map(([label, a, b, higherBetter]) => {
-                          const better =
-                            a != null && b != null
-                              ? higherBetter
-                                ? b > a + 1e-6
-                                : b < a - 1e-6
-                              : null;
-                          const worse =
-                            a != null && b != null
-                              ? higherBetter
-                                ? b < a - 1e-6
-                                : b > a + 1e-6
-                              : null;
-                          return (
-                            <tr key={label} className="border-b border-border/60 last:border-b-0">
-                              <td className="px-3 py-1.5 font-medium">{label}</td>
-                              <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                                {pct(a)}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-1.5 text-right font-medium tabular-nums">
-                                {pct(b)}
-                              </td>
-                              <td
-                                className={`whitespace-nowrap px-3 py-1.5 text-right text-xs font-semibold ${
-                                  better
-                                    ? "text-emerald-700"
-                                    : worse
-                                      ? "text-rose-700"
-                                      : "text-muted-foreground"
-                                }`}
-                              >
-                                {better ? "candidate better" : worse ? "candidate worse" : "tie"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        <tr>
-                          <td className="px-3 py-1.5 font-medium">Targets moved</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground" colSpan={2}>
-                            <span className="text-emerald-700">{fmt(compareData.summary.improved, { digits: 0 })} improved</span>
-                            {" · "}
-                            <span className="text-rose-700">{fmt(compareData.summary.regressed, { digits: 0 })} regressed</span>
-                          </td>
-                          <td className="px-3 py-1.5 text-right text-xs text-muted-foreground">
-                            +{fmt(compareData.summary.added, { digits: 0 })} new / -
-                            {fmt(compareData.summary.removed, { digits: 0 })} dropped
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  {(() => {
-                    const usable = (compareData.rows ?? []).filter(
-                      (row) =>
-                        // Drop tiny-denominator artifacts (>1000% errors),
-                        // same convention as the release highlights.
-                        Math.abs(row.b_relative_error ?? 0) <= 10 &&
-                        Math.abs(row.a_relative_error ?? 0) <= 10,
-                    );
-                    const regressions = usable
-                      .filter((row) => (row.abs_rel_delta ?? 0) > 1e-9)
-                      .slice(0, 10);
-                    const improvements = usable
-                      .filter((row) => (row.abs_rel_delta ?? 0) < -1e-9)
-                      .sort((x, y) => (x.abs_rel_delta ?? 0) - (y.abs_rel_delta ?? 0))
-                      .slice(0, 10);
-                    const pctOrDash = (v: number | null | undefined) =>
-                      v == null ? "—" : fmt(Math.abs(v), { pct: true, digits: 1 });
-                    const MoveTable = ({
-                      label,
-                      rows,
-                      negative,
-                    }: {
-                      label: string;
-                      rows: typeof regressions;
-                      negative: boolean;
-                    }) =>
-                      rows.length ? (
-                        <div className="min-w-0 overflow-x-auto">
-                          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            {label}
-                          </div>
-                          <table className="w-full text-left text-sm">
-                            <thead>
-                              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                                <th className="px-3 py-2 font-semibold">Target</th>
-                                <th className="px-3 py-2 text-right font-semibold">Published</th>
-                                <th className="px-3 py-2 text-right font-semibold">Candidate</th>
-                                <th className="px-3 py-2 text-right font-semibold">Δ</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {rows.map((row) => (
-                                <tr key={row.name} className="border-b border-border/60 last:border-b-0">
-                                  <td className="px-3 py-1.5">
-                                    <span className="font-medium text-foreground">
-                                      {row.variable ?? row.name}
-                                    </span>
-                                    {row.target_label ? (
-                                      <span className="text-xs text-muted-foreground">
-                                        {" "}
-                                        · {row.target_label}
-                                      </span>
-                                    ) : null}
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                                    {pctOrDash(row.a_relative_error)}
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                                    {pctOrDash(row.b_relative_error)}
-                                  </td>
-                                  <td
-                                    className={`whitespace-nowrap px-3 py-1.5 text-right tabular-nums ${
-                                      negative ? "text-rose-700" : "text-emerald-700"
-                                    }`}
-                                  >
-                                    {negative ? "+" : ""}
-                                    {fmt(row.abs_rel_delta, { pct: true, digits: 1 })}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : null;
-                    if (!regressions.length && !improvements.length) return null;
-                    return (
-                      <div className="mt-4 grid gap-5 xl:grid-cols-2">
-                        <MoveTable label="Biggest regressions" rows={regressions} negative />
-                        <MoveTable
-                          label="Biggest improvements"
-                          rows={improvements}
-                          negative={false}
-                        />
-                      </div>
-                    );
-                  })()}
-                </SectionCard>
-              ) : null}
 
               <SectionCard
                 title="Stage timeline"
@@ -988,6 +1073,8 @@ export function PopulaceStagingView() {
                   </table>
                 </SectionCard>
               )}
+                </div>
+              </details>
             </>
           )}
         </div>
