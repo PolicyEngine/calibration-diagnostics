@@ -588,11 +588,11 @@
    "period": 2024,
    "description": "Repeal the Child Tax Credit and Credit for Other Dependents. JCT line is 'Credit for children and other dependents'.",
    "jct": {
-    "score": 173800000000.0,
+    "score": 127100000000.0,
     "score_fy2027": null,
     "score_type": "tax_expenditure",
     "window": "FY2024",
-    "source": "JCT JCX-48-24 Table 1 (rev 127.1B + outlay 46.7B)",
+    "source": "JCT JCX-48-24 Table 1 (127.1B, incl. 46.7B outlay portion per footnote [4])",
     "source_url": "https://www.jct.gov/publications/2024/jcx-48-24/"
    },
    "populace": {
@@ -612,11 +612,11 @@
    "period": 2024,
    "description": "Repeal the EITC. Mostly refundable, so the bulk is the outlay portion. The dataset is calibrated to SOI EITC-by-AGI targets, so this is an in-sample check.",
    "jct": {
-    "score": 124200000000.0,
+    "score": 66900000000.0,
     "score_fy2027": null,
     "score_type": "tax_expenditure",
     "window": "FY2024",
-    "source": "JCT JCX-48-24 Table 1 (rev 66.9B + outlay 57.3B)",
+    "source": "JCT JCX-48-24 Table 1 (66.9B, incl. 57.3B outlay portion per footnote [4])",
     "source_url": "https://www.jct.gov/publications/2024/jcx-48-24/"
    },
    "populace": {
