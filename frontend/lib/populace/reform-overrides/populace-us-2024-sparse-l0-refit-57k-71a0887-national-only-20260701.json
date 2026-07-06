@@ -174,11 +174,11 @@
   },
   {
    "id": "obbba_personal_exemption_termination",
-   "name": "OBBBA - Termination of personal exemptions",
+   "name": "OBBBA - Termination of personal exemptions other than temporary senior deduction",
    "category": "OBBBA",
    "in_sample": false,
    "period": 2026,
-   "description": "Termination of the deduction for personal exemptions, excluding the temporary senior deduction. Validated by unsuspending personal exemptions in 2026.",
+   "description": "Termination of the deduction for personal exemptions other than the temporary senior deduction \u2014 the combined provision of OBBBA Sec. 70103 exactly as JCX-35-25 Ch.1 line 3 scores it (the line nets the senior deduction's cost against exemption-termination revenue). Estimate is the sum of this release's isolated increments for the two parameters (+235.4B exemptions, -21.0B senior deduction); the cross-term between them is not captured and will be from the next release, which scores the merged patch directly.",
    "jct": {
     "score": 110625000000.0,
     "score_fy2027": 173453000000.0,
@@ -188,12 +188,12 @@
     "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
    },
    "populace": {
-    "budget_effect": 235404179698.58252,
+    "budget_effect": 214380228203.10742,
     "period": 2026,
     "window": "FY2026",
     "measure": "income_tax",
     "baseline_total": 2735781560137.224,
-    "reform_total": 2971185739835.8066
+    "reform_total": 2950161788340.3315
    }
   },
   {
@@ -482,30 +482,6 @@
     "measure": "income_tax",
     "baseline_total": 2735781560137.224,
     "reform_total": 2735781560137.224
-   }
-  },
-  {
-   "id": "obbba_senior_deduction",
-   "name": "OBBBA - Temporary senior deduction",
-   "category": "OBBBA",
-   "in_sample": false,
-   "period": 2026,
-   "description": "Temporary senior deduction. Its JCT score is netted inside JCX-35-25 Ch.1 line 3; this row publishes the modeled Populace score without a benchmark.",
-   "jct": {
-    "score": null,
-    "score_fy2027": null,
-    "score_type": "conventional",
-    "window": "FY2026",
-    "source": "No standalone line in JCX-35-25 \u2014 netted inside Ch.1 line 3",
-    "source_url": "https://www.jct.gov/publications/2025/jcx-35-25/"
-   },
-   "populace": {
-    "budget_effect": -21023951495.475098,
-    "period": 2026,
-    "window": "FY2026",
-    "measure": "income_tax",
-    "baseline_total": 2735781560137.224,
-    "reform_total": 2714757608641.749
    }
   },
   {
@@ -2358,5 +2334,5 @@
   }
  ],
  "release_id": "populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701",
- "_backfill_note": "State reform rows appended offline (PolicyEngine/populace#319 suite) by scoring the released populace_us_2024.h5 at policyengine-us 1.729.0; the release itself was built at 1.752.2, so minor state-tax logic drift is possible. All other rows are the published artifact, untouched. | 2026-07-06 benchmark audit: mortgage FY2027 3,398M->3,110M (wrong-line transcription), GA -778M->-680M (corporate excluded), MD -149.6M->-115.2M (catch-up FY), OK -5.3B->-4.947B (TY2026 line); all other 94 external values verified against primary sources. | MA H5007 removed: benchmark exists only as press paraphrase, no primary source (suite policy: official published notes only). | 2026-07-06 wiring fixes (populace#342): MD repeal rescored with both tax-path components neutralized (456.1M, was a proven no-op at 0); IL benchmark switched to the combined EITC+CTC official figures (487.4M) matching the entangled repeal; YCTC/CO-CTC gap mechanisms annotated (populace#341, #340; #298 comment)."
+ "_backfill_note": "State reform rows appended offline (PolicyEngine/populace#319 suite) by scoring the released populace_us_2024.h5 at policyengine-us 1.729.0; the release itself was built at 1.752.2, so minor state-tax logic drift is possible. All other rows are the published artifact, untouched. | 2026-07-06 benchmark audit: mortgage FY2027 3,398M->3,110M (wrong-line transcription), GA -778M->-680M (corporate excluded), MD -149.6M->-115.2M (catch-up FY), OK -5.3B->-4.947B (TY2026 line); all other 94 external values verified against primary sources. | MA H5007 removed: benchmark exists only as press paraphrase, no primary source (suite policy: official published notes only). | 2026-07-06 line-3 scope fix: exemption row now scores the combined Sec. 70103 scope (termination + senior deduction, matching the JCX line); standalone senior row removed. Note: this release's OBBBA effects were scored in isolation against pre-OBBBA law (all rows share the 2,735.78B baseline), not stacked; the stacked producer applies from the next release. | 2026-07-06 wiring fixes (populace#342): MD repeal rescored with both tax-path components neutralized (456.1M, was a proven no-op at 0); IL benchmark switched to the combined EITC+CTC official figures (487.4M) matching the entangled repeal; YCTC/CO-CTC gap mechanisms annotated (populace#341, #340; #298 comment)."
 }
