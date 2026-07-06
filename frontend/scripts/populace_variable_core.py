@@ -88,68 +88,114 @@ class VariableCalculationError(RuntimeError):
 _SIM_CACHE: dict[tuple[str, str, str, str | None], tuple[str, Any]] = {}
 
 
-# revision -> (memfd, symlink path). The fd must stay open: the symlink
-# resolves through /proc/self/fd and the memory frees when the fd closes.
-_MEMFD_DATASETS: dict[str, tuple[int, str]] = {}
+# Sentinel .h5 path -> the release H5 bytes held in RAM. Populated only when
+# the dataset can't fit on the ephemeral disk (see _download_dataset).
+_CORE_IMAGES: dict[str, bytes] = {}
+_CORE_LABEL_SEQ = [0]
+_CORE_PATCH_INSTALLED = [False]
+
+
+def _install_core_hdfstore_patch() -> None:
+    """Route pd.HDFStore(sentinel) reads through HDF5's in-memory core driver.
+
+    policyengine-us opens datasets with a hardcoded ``pd.HDFStore(path,
+    mode="r")`` in several places (schema validation, format sniffing, our own
+    state filter). When ``path`` is one of our sentinels we inject the core
+    driver with the release bytes as an in-memory image — HDF5 reads the exact
+    same file content from RAM (verified byte-identical), so no dataset ever
+    has to touch the too-small disk. The core driver refuses an existing file,
+    so it opens under a throwaway label; the sentinel itself stays a 0-byte
+    file purely so the loaders' ``Path.exists()`` checks pass.
+    """
+    if _CORE_PATCH_INSTALLED[0]:
+        return
+    import pandas as pd
+
+    real_hdfstore = pd.HDFStore
+
+    class _CoreImageHDFStore(real_hdfstore):  # type: ignore[misc, valid-type]
+        def __init__(self, path: Any, *args: Any, **kwargs: Any) -> None:
+            image = _CORE_IMAGES.get(str(path))
+            if image is not None and "driver" not in kwargs:
+                _CORE_LABEL_SEQ[0] += 1
+                label = f"/tmp/.populace-core-{os.getpid()}-{_CORE_LABEL_SEQ[0]}.h5"
+                kwargs.update(
+                    driver="H5FD_CORE",
+                    driver_core_image=image,
+                    driver_core_backing_store=0,
+                )
+                super().__init__(label, *args, **kwargs)
+                return
+            super().__init__(path, *args, **kwargs)
+
+    pd.HDFStore = _CoreImageHDFStore
+    _CORE_PATCH_INSTALLED[0] = True
 
 
 def _download_dataset(hf_hub_download: Any, repo: str, filename: str, revision: str) -> str:
-    """Fetch the release H5 to somewhere it actually fits.
+    """Fetch the release H5 to wherever it fits.
 
-    Vercel's ephemeral disk is 550MB with ~150MB of function bundle, so a
-    ~340MB H5 can never land on disk, and /dev/shm mounts are container-tiny.
-    A memfd is an anonymous RAM-backed file charged to the function's memory
-    (3GB), exposed through a zero-byte /tmp symlink so pytables gets a real
-    .h5 path. One release resident at a time; local dev (no memfd on macOS)
-    keeps the normal HF cache download.
+    The normal HF cache download is used everywhere it works (local dev, and
+    any host whose disk holds the file). Vercel's ephemeral disk is only
+    ~550MB with ~150MB of function bundle, so a ~340MB H5 cannot land on disk
+    at all — hf_hub_download fails there with ENOSPC. In that case the H5 is
+    streamed into RAM and served through HDF5's in-memory core driver instead,
+    charged to the function's much larger memory allocation.
     """
-    if not hasattr(os, "memfd_create"):
+    try:
         return hf_hub_download(
             repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
         )
-    cached = _MEMFD_DATASETS.get(revision)
-    if cached and os.path.exists(cached[1]):
-        return cached[1]
-    for rev, (fd, link) in list(_MEMFD_DATASETS.items()):
-        if rev != revision:
-            for key in [k for k in _SIM_CACHE if k[1] == rev]:
-                _SIM_CACHE.pop(key, None)
-            try:
-                os.close(fd)
-            except OSError:
-                pass
-            try:
-                os.unlink(link)
-            except OSError:
-                pass
-            _MEMFD_DATASETS.pop(rev, None)
+    except OSError as exc:
+        if getattr(exc, "errno", None) != 28:
+            raise
+        return _load_release_into_ram(repo, filename, revision)
 
+
+def _load_release_into_ram(repo: str, filename: str, revision: str) -> str:
+    import shutil
     from urllib.request import Request
+
+    sentinel = f"/tmp/populace-{revision}.h5"
+    if sentinel in _CORE_IMAGES and os.path.exists(sentinel):
+        return sentinel
+
+    # Drop other releases held in RAM (image + any cached simulation) so only
+    # one dataset is resident at a time.
+    for other in [k for k in _CORE_IMAGES if k != sentinel]:
+        _CORE_IMAGES.pop(other, None)
+        try:
+            os.unlink(other)
+        except OSError:
+            pass
+    for key in [k for k in _SIM_CACHE if k[1] != revision]:
+        _SIM_CACHE.pop(key, None)
+
+    # Remove any partial hf_hub_download left by the ENOSPC attempt.
+    cache_root = os.environ.get("HF_HUB_CACHE", "/tmp/huggingface/hub")
+    shutil.rmtree(
+        os.path.join(cache_root, f"datasets--{repo.replace('/', '--')}"),
+        ignore_errors=True,
+    )
 
     url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{filename}"
     request = Request(url)
     token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
     if token:
         request.add_header("Authorization", f"Bearer {token}")
-    fd = os.memfd_create(f"populace-{revision}")
-    try:
-        with urlopen(request, timeout=600) as response:
-            while True:
-                chunk = response.read(16 * 1024 * 1024)
-                if not chunk:
-                    break
-                os.write(fd, chunk)
-        link = f"/tmp/populace-{revision}.h5"
-        try:
-            os.unlink(link)
-        except FileNotFoundError:
-            pass
-        os.symlink(f"/proc/self/fd/{fd}", link)
-    except BaseException:
-        os.close(fd)
-        raise
-    _MEMFD_DATASETS[revision] = (fd, link)
-    return link
+    buffer = bytearray()
+    with urlopen(request, timeout=600) as response:
+        while True:
+            chunk = response.read(16 * 1024 * 1024)
+            if not chunk:
+                break
+            buffer.extend(chunk)
+
+    _install_core_hdfstore_patch()
+    _CORE_IMAGES[sentinel] = bytes(buffer)
+    with open(sentinel, "wb"):  # 0-byte marker so Path.exists() checks pass
+        pass
+    return sentinel
 
 
 def _disk_usage_report(root: str = "/tmp") -> str:
