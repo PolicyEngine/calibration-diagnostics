@@ -20,6 +20,11 @@ DEFAULT_FILENAME = "populace_us_2024.h5"
 os.environ.setdefault("HF_HOME", "/tmp/huggingface")
 os.environ.setdefault("HF_HUB_CACHE", "/tmp/huggingface/hub")
 os.environ.setdefault("XDG_CACHE_HOME", "/tmp/.cache")
+# The Xet download backend keeps a content-chunk cache (HF_HOME/xet) that
+# grows across every release ever fetched and fails mid-download with
+# 'File reconstruction error: No space left on device' once the ephemeral
+# disk fills. Plain HTTP streams straight to the blob instead.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 STATE_FIPS = {
     "AL": 1,
@@ -109,6 +114,9 @@ def _evict_other_releases(repo: str, filename: str, revision: str) -> None:
     cache_root = os.environ.get("HF_HUB_CACHE", "/tmp/huggingface/hub")
     repo_dir = os.path.join(cache_root, f"datasets--{repo.replace('/', '--')}")
     shutil.rmtree(repo_dir, ignore_errors=True)
+    # Xet chunk cache from any request that ran before it was disabled.
+    hf_home = os.environ.get("HF_HOME", "/tmp/huggingface")
+    shutil.rmtree(os.path.join(hf_home, "xet"), ignore_errors=True)
 
 
 def finite_float(value: Any) -> float | None:
