@@ -88,6 +88,38 @@ class VariableCalculationError(RuntimeError):
 _SIM_CACHE: dict[tuple[str, str, str, str | None], tuple[str, Any]] = {}
 
 
+def _disk_usage_report(root: str = "/tmp") -> str:
+    """Top disk consumers under /tmp plus free space — inlined into ENOSPC
+    errors so a full serverless instance tells us what filled it."""
+    import shutil
+
+    entries = []
+    try:
+        for name in os.listdir(root):
+            path = os.path.join(root, name)
+            total = 0
+            if os.path.isfile(path):
+                total = os.path.getsize(path)
+            elif os.path.isdir(path):
+                for dirpath, _dirnames, filenames in os.walk(path, onerror=lambda e: None):
+                    for f in filenames:
+                        try:
+                            total += os.path.getsize(os.path.join(dirpath, f))
+                        except OSError:
+                            pass
+            entries.append((total, name))
+    except OSError as exc:
+        return f"(could not scan {root}: {exc})"
+    entries.sort(reverse=True)
+    top = ", ".join(f"{name}={size / 1e6:.0f}MB" for size, name in entries[:6])
+    try:
+        usage = shutil.disk_usage(root)
+        free = f"free={usage.free / 1e6:.0f}MB of {usage.total / 1e6:.0f}MB"
+    except OSError:
+        free = "free=?"
+    return f"{free}; {top}"
+
+
 def _evict_other_releases(repo: str, filename: str, revision: str) -> None:
     """Keep at most one dataset in the ephemeral HF cache.
 
@@ -266,6 +298,12 @@ def calculate_variables(
             )
     except VariableCalculationError:
         raise
+    except OSError as exc:
+        if getattr(exc, "errno", None) == 28:
+            raise VariableCalculationError(
+                f"{exc} — disk usage: {_disk_usage_report()}"
+            ) from exc
+        raise VariableCalculationError(str(exc)) from exc
     except Exception as exc:
         raise VariableCalculationError(str(exc)) from exc
 
