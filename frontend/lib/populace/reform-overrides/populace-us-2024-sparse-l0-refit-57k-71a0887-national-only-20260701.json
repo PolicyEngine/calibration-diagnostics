@@ -869,30 +869,6 @@
    }
   },
   {
-   "id": "state.ma.h5007",
-   "name": "MA H5007 \u2014 income tax rate cut (5% \u2192 4%)",
-   "category": "State reform",
-   "in_sample": false,
-   "period": 2029,
-   "description": "Phases the Part B rate from 5% to 4% over 2027-2029. Benchmark is the midpoint of the DOR range, known only via press paraphrase with unstated assumptions; MTF's explicitly static estimate (-$5.4B FY2030) would imply a ~15% gap instead of ~1%. The SJC struck the ballot question in June 2026.",
-   "jct": {
-    "score": -4500000000.0,
-    "score_fy2027": null,
-    "score_type": "fiscal_note",
-    "window": "fully implemented (DOR range midpoint)",
-    "source": "Massachusetts DOR estimate (-$4.2B to -$4.8B), press paraphrase only; published static estimates run higher (MTF -$5.4B FY2030, cSPA/Tufts -$5.1B)",
-    "source_url": null
-   },
-   "populace": {
-    "budget_effect": -4545025976.454876,
-    "period": 2029,
-    "window": "fully implemented (DOR range midpoint)",
-    "measure": "ma_income_tax",
-    "baseline_total": 24829790335.148205,
-    "reform_total": 20284764358.69333
-   }
-  },
-  {
    "id": "state.ca.ab2591",
    "name": "CA AB2591 \u2014 standard deduction increase",
    "category": "State reform",
@@ -2382,5 +2358,5 @@
   }
  ],
  "release_id": "populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701",
- "_backfill_note": "State reform rows appended offline (PolicyEngine/populace#319 suite) by scoring the released populace_us_2024.h5 at policyengine-us 1.729.0; the release itself was built at 1.752.2, so minor state-tax logic drift is possible. All other rows are the published artifact, untouched. | 2026-07-06 benchmark audit: mortgage FY2027 3,398M->3,110M (wrong-line transcription), GA -778M->-680M (corporate excluded), MD -149.6M->-115.2M (catch-up FY), OK -5.3B->-4.947B (TY2026 line); all other 94 external values verified against primary sources."
+ "_backfill_note": "State reform rows appended offline (PolicyEngine/populace#319 suite) by scoring the released populace_us_2024.h5 at policyengine-us 1.729.0; the release itself was built at 1.752.2, so minor state-tax logic drift is possible. All other rows are the published artifact, untouched. | 2026-07-06 benchmark audit: mortgage FY2027 3,398M->3,110M (wrong-line transcription), GA -778M->-680M (corporate excluded), MD -149.6M->-115.2M (catch-up FY), OK -5.3B->-4.947B (TY2026 line); all other 94 external values verified against primary sources. | MA H5007 removed: benchmark exists only as press paraphrase, no primary source (suite policy: official published notes only)."
 }
