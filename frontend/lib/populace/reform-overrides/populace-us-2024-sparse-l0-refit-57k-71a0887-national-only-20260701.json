@@ -915,6 +915,1470 @@
     "baseline_total": 131586763779.92633,
     "reform_total": 125635591230.54272
    }
+  },
+  {
+   "id": "state_repeal_mn_cwfc",
+   "name": "Repeal Minnesota CTC + Working Family Credit",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Combined credits (shared phase-out); benchmark is the House Research combined cost.",
+   "jct": {
+    "score": 755500000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "MN House Research, May 2026, p.1",
+    "source_url": "https://www.house.mn.gov/hrd/pubs/ss/sschldwfc.pdf"
+   },
+   "populace": {
+    "budget_effect": 801306594.5341797,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457728015942.1797
+   }
+  },
+  {
+   "id": "state_repeal_ca_eitc",
+   "name": "Repeal California CalEITC",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": "One-year vintage gap: TY2023 actual vs the 2024 dataset period.",
+   "jct": {
+    "score": 941000000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "CA FTB EITC/YCTC/FYTC Report (Oct 2025), Table 1 p.8",
+    "source_url": "https://www.ftb.ca.gov/about-ftb/data-reports-plans/California-Earned-Income-Tax-Credit-and-Young-Child-Tax-credit-Report-2023.pdf"
+   },
+   "populace": {
+    "budget_effect": 819736642.3215942,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457746445989.9671
+   }
+  },
+  {
+   "id": "state_repeal_ca_yctc",
+   "name": "Repeal California Young Child Tax Credit",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 413000000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "CA FTB EITC/YCTC/FYTC Report (Oct 2025), Table 1 p.8",
+    "source_url": "https://www.ftb.ca.gov/about-ftb/data-reports-plans/California-Earned-Income-Tax-Credit-and-Young-Child-Tax-credit-Report-2023.pdf"
+   },
+   "populace": {
+    "budget_effect": 572858116.2839355,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457499567463.92944
+   }
+  },
+  {
+   "id": "state_repeal_ny_eitc",
+   "name": "Repeal New York EITC",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": "NYS EITC only; the NYC and noncustodial credits are separate variables.",
+   "jct": {
+    "score": 1116252683.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "NYS DTF open data, EITC Claims Table 3",
+    "source_url": "https://data.ny.gov/d/caik-8a9b"
+   },
+   "populace": {
+    "budget_effect": 1008031210.4362793,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457934740558.0818
+   }
+  },
+  {
+   "id": "state_repeal_ny_escc",
+   "name": "Repeal New York Empire State Child Credit",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": "TY2023 and the 2024 dataset period share the regular 33%-of-federal structure.",
+   "jct": {
+    "score": 693091767.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "NYS DTF open data, ESCC Study",
+    "source_url": "https://data.ny.gov/d/m4q6-x2yw"
+   },
+   "populace": {
+    "budget_effect": 751164986.0195312,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457677874333.66504
+   }
+  },
+  {
+   "id": "state_repeal_co_eitc",
+   "name": "Repeal Colorado EITC",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": "TY2023 and the 2024 model year both use a 50% match; the separately reported $23.1M Expanded COEITC is excluded from the benchmark.",
+   "jct": {
+    "score": 356491619.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "CO DOR ORA, Individual Income Tax Credits TY2023",
+    "source_url": "https://cdor.colorado.gov/data-and-reports/income-tax-data/income-tax-credits"
+   },
+   "populace": {
+    "budget_effect": 328708150.92089844,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457255417498.5664
+   }
+  },
+  {
+   "id": "state_repeal_co_ctc",
+   "name": "Repeal Colorado Child Tax Credit",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 89158930.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "CO DOR ORA, Individual Income Tax Credits TY2023",
+    "source_url": "https://cdor.colorado.gov/data-and-reports/income-tax-data/income-tax-credits"
+   },
+   "populace": {
+    "budget_effect": 116252187.52886963,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457042961535.1744
+   }
+  },
+  {
+   "id": "state_repeal_ct_eitc",
+   "name": "Repeal Connecticut EITC",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 195066537.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "CT DRS Annual Report FY2024-25, p.35",
+    "source_url": "https://portal.ct.gov/-/media/drs/research/annualreport/drs-fy25-annual-report.pdf"
+   },
+   "populace": {
+    "budget_effect": 181308329.45373535,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457108017677.09924
+   }
+  },
+  {
+   "id": "state_repeal_nm_eitc",
+   "name": "Repeal New Mexico Working Families Tax Credit",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 130807000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "2025 NM Tax Expenditure Report, p.259",
+    "source_url": "https://www.nmlegis.gov/handouts/RSTP%20121525%20Item%202%20B%20Tax%20Expenditure%20Report.pdf"
+   },
+   "populace": {
+    "budget_effect": 110759432.71051025,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457037468780.356
+   }
+  },
+  {
+   "id": "state_repeal_nm_ctc",
+   "name": "Repeal New Mexico Child Income Tax Credit",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 133590000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "2025 NM Tax Expenditure Report, p.81",
+    "source_url": "https://www.nmlegis.gov/handouts/RSTP%20121525%20Item%202%20B%20Tax%20Expenditure%20Report.pdf"
+   },
+   "populace": {
+    "budget_effect": 155831474.25982666,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457082540821.90533
+   }
+  },
+  {
+   "id": "state_repeal_md_eitc",
+   "name": "Repeal Maryland EITC",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Benchmark sums the refundable ($410.1M) and nonrefundable ($140.8M) lines; repealing the take-better-of credit removes both.",
+   "jct": {
+    "score": 550881492.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "Comptroller of Maryland, Income Tax Summary Report TY2024, pp.18-23",
+    "source_url": "https://www.marylandcomptroller.gov/content/dam/mdcomp/md/reports/annual/summary24.pdf"
+   },
+   "populace": {
+    "budget_effect": 0.0,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 456926709347.6455
+   }
+  },
+  {
+   "id": "state_repeal_il_eitc",
+   "name": "Repeal Illinois EITC",
+   "category": "State program",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Illinois-resident returns; 20% match in both years.",
+   "jct": {
+    "score": 437387169.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IDOR TY2023 final stratification, p.1",
+    "source_url": "https://tax.illinois.gov/content/dam/soi/en/web/tax/research/taxstats/indincomestratifications/2023-iit-1040il-return-final.pdf"
+   },
+   "populace": {
+    "budget_effect": 491398823.88549805,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "state_income_tax",
+    "baseline_total": 456926709347.6455,
+    "reform_total": 457418108171.531
+   }
+  },
+  {
+   "id": "soi_income_tax_net",
+   "name": "Total income tax (net of refundable credits)",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "SOI total income tax minus refundable credits \u2014 the same net concept as populace's income_tax. Small known scope difference: the populace measure also includes qualified-retirement-plan penalty taxes and unreported payroll tax (~0.5% of the total), which SOI books outside income tax.",
+   "jct": {
+    "score": 2042047899000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (total income tax minus refundable credits)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 2013482523462.149,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "income_tax",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_amt",
+   "name": "Alternative minimum tax",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Post-TCJA AMT is small (about 150,000 returns in TY2023), so this line is sensitive to the top tail of the income distribution.",
+   "jct": {
+    "score": 2752164000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 1.4 (alternative minimum tax)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in14ar.xls"
+   },
+   "populace": {
+    "budget_effect": 1698972367.1629837,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "alternative_minimum_tax",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_cdcc",
+   "name": "Child and dependent care credit",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "SOI reports the credit amount used to offset tax; the populace side is min(credit available, income tax before credits) per tax unit \u2014 an approximation that ignores IRS credit ordering, so populace remains a slight upper bound.",
+   "jct": {
+    "score": 3468910000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (credit for child and dependent care)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 0.0,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "cdcc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_education_credits",
+   "name": "Education credits (nonrefundable)",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "populace's education_tax_credits is the nonrefundable American Opportunity credit plus the Lifetime Learning credit \u2014 the same scope as SOI's nonrefundable education credit column (the refundable AOTC portion is excluded on both sides). SOI reports the credit amount used to offset tax; the populace side is min(credit available, income tax before credits) per tax unit \u2014 an approximation that ignores IRS credit ordering, so populace remains a slight upper bound.",
+   "jct": {
+    "score": 7554668000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (nonrefundable education credit)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 0.0,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "education_tax_credits",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_savers_credit",
+   "name": "Retirement savings contribution (saver's) credit",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "SOI reports the credit amount used to offset tax; the populace side is min(credit available, income tax before credits) per tax unit \u2014 an approximation that ignores IRS credit ordering, so populace remains a slight upper bound.",
+   "jct": {
+    "score": 2037572000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (retirement savings contribution credit)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 0.0,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "savers_credit",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_ctc_nonrefundable",
+   "name": "Child tax credit + ODC (nonrefundable)",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "SOI reports the credit amount used to offset tax; the populace side is min(credit available, income tax before credits) per tax unit \u2014 an approximation that ignores IRS credit ordering, so populace remains a slight upper bound.",
+   "jct": {
+    "score": 84418366000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (nonrefundable child and other dependent tax credit)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 85191024535.62398,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "non_refundable_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_ctc_refundable",
+   "name": "Additional child tax credit (refundable)",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 34533251000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (refundable child tax credit or additional child tax credit)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 33389367272.539368,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "refundable_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_niit",
+   "name": "Net investment income tax",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Concentrated in top-decile capital income, so this line tests the investment-income tail.",
+   "jct": {
+    "score": 39330017000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (net investment income tax)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 41642927071.519646,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "net_investment_income_tax",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "soi_se_tax",
+   "name": "Self-employment tax",
+   "category": "IRS SOI actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": null,
+   "jct": {
+    "score": 81087060000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IRS SOI Pub 1304 TY2023, Table 3.3 (self-employment tax)",
+    "source_url": "https://www.irs.gov/pub/irs-soi/23in33ar.xls"
+   },
+   "populace": {
+    "budget_effect": 69547029583.4678,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "self_employment_tax",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ca_eitc",
+   "name": "California CalEITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable; 3,340,639 returns, avg $282. Tax-year basis (process-year basis is $986M). TY2024 report not yet published, so a one-year vintage gap applies.",
+   "jct": {
+    "score": 941000000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "CA FTB, California EITC / YCTC / FYTC Report (Oct 2025), Table 1 p.8",
+    "source_url": "https://www.ftb.ca.gov/about-ftb/data-reports-plans/California-Earned-Income-Tax-Credit-and-Young-Child-Tax-credit-Report-2023.pdf"
+   },
+   "populace": {
+    "budget_effect": 819736648.1434908,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "ca_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ca_yctc",
+   "name": "California Young Child Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable; 398,059 returns, 483,629 qualifying children.",
+   "jct": {
+    "score": 413000000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "CA FTB, California EITC / YCTC / FYTC Report (Oct 2025), Table 1 p.8",
+    "source_url": "https://www.ftb.ca.gov/about-ftb/data-reports-plans/California-Earned-Income-Tax-Credit-and-Young-Child-Tax-credit-Report-2023.pdf"
+   },
+   "populace": {
+    "budget_effect": 572858122.8276322,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "ca_yctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ny_eitc",
+   "name": "New York EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 30% of federal less the household credit; 1,435,448 claims. NYS EITC only - the separate NYC and noncustodial EITCs are excluded from both sides.",
+   "jct": {
+    "score": 1116252683.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "NYS DTF open data, EITC Claims by Place of Residence, Table 3 (Grand Total)",
+    "source_url": "https://data.ny.gov/d/caik-8a9b"
+   },
+   "populace": {
+    "budget_effect": 1008031213.5556183,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "ny_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ny_escc",
+   "name": "New York Empire State Child Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable; 1,451,132 claims, 2,429,901 qualifying children. TY2023 and the 2024 dataset period both use the regular 33%-of-federal structure with the under-4 expansion; the age-based restructure begins 2025. Excludes the one-time 2024 supplemental checks.",
+   "jct": {
+    "score": 693091767.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "NYS DTF open data, Empire State Child Credit Study by Place of Residence",
+    "source_url": "https://data.ny.gov/d/m4q6-x2yw"
+   },
+   "populace": {
+    "budget_effect": 751164993.0182365,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "ny_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_co_eitc",
+   "name": "Colorado EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable; 311,343 claims, avg $1,145. TY2023 used a one-year 50% match and the 2024 model year is also 50% (HB24-1134), so the rates align. A further $23.1M Expanded COEITC (ITIN and under-25 filers) is reported separately; populace models the under-25 expansion, so its total may sit between the two figures.",
+   "jct": {
+    "score": 356491619.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "CO DOR Office of Research and Analysis, Individual Income Tax Credits TY2023 (updated Mar 2026)",
+    "source_url": "https://cdor.colorado.gov/data-and-reports/income-tax-data/income-tax-credits"
+   },
+   "populace": {
+    "budget_effect": 328708146.55802834,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "co_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_co_ctc",
+   "name": "Colorado Child Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable; 130,188 claims, avg $685. Children under 6, 10-60% of the federal CTC by AGI tier.",
+   "jct": {
+    "score": 89158930.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "CO DOR Office of Research and Analysis, Individual Income Tax Credits TY2023 (updated Mar 2026)",
+    "source_url": "https://cdor.colorado.gov/data-and-reports/income-tax-data/income-tax-credits"
+   },
+   "populace": {
+    "budget_effect": 116252186.54583246,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "co_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_wa_wftc",
+   "name": "Washington Working Families Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "284,416 approved applications as of Oct 2025. Claims may be filed up to three years late, so the published total still grows; populace, which assumes take-up among modeled eligibles, should sit at or above it.",
+   "jct": {
+    "score": 205589501.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "WA DOR, WFTC Program 2025 Report to the Legislature (Dec 2025), Tables 2 and 4",
+    "source_url": "https://dor.wa.gov/sites/default/files/2025-12/WFTC_2025-LegReport.pdf"
+   },
+   "populace": {
+    "budget_effect": 187608253.61543414,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "wa_working_families_tax_credit",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_mn_cwfc",
+   "name": "Minnesota Child Tax Credit + Working Family Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "The two credits share one phase-out and populace computes them as one combined variable. House Research combined cost: 240,100 returns with children (avg $2,773) plus 301,500 childless returns (avg $297). MN DOR separately reports the CTC share as $564M across 219k families and 447k children.",
+   "jct": {
+    "score": 755500000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "MN House Research, Minnesota Child Credit and Working Family Credit (May 2026), p.1",
+    "source_url": "https://www.house.mn.gov/hrd/pubs/ss/sschldwfc.pdf"
+   },
+   "populace": {
+    "budget_effect": 801306594.67186,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "mn_child_and_working_families_credits",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_mn_wfc",
+   "name": "Minnesota Working Family Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "No standalone official WFC total is published; this subtracts two official figures from different sources, so treat as approximate. The childless-return subtotal ($89.6M) is a clean official lower bound.",
+   "jct": {
+    "score": 191500000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "TY2024",
+    "source": "Derived: House Research combined CTC+WFC $755.5M minus MN DOR CTC $564M (both TY2024)",
+    "source_url": "https://www.house.mn.gov/hrd/pubs/ss/sschldwfc.pdf"
+   },
+   "populace": {
+    "budget_effect": 202258814.25093198,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "mn_wfc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ct_eitc",
+   "name": "Connecticut EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Fully refundable, 40% of federal; 193,283 credits. The $250-per-filer qualifying-child supplement begins TY2025 and is excluded from both sides.",
+   "jct": {
+    "score": 195066537.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "CT DRS Annual Report FY2024-25, p.35",
+    "source_url": "https://portal.ct.gov/-/media/drs/research/annualreport/drs-fy25-annual-report.pdf"
+   },
+   "populace": {
+    "budget_effect": 181308329.88287282,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "ct_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_nm_eitc",
+   "name": "New Mexico Working Families Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 25% of federal; 201,819 claims.",
+   "jct": {
+    "score": 130807000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "2025 New Mexico Tax Expenditure Report (TRD), p.259 (reliability 1: separately reported actuals)",
+    "source_url": "https://www.nmlegis.gov/handouts/RSTP%20121525%20Item%202%20B%20Tax%20Expenditure%20Report.pdf"
+   },
+   "populace": {
+    "budget_effect": 110759432.93538785,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "nm_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_nm_ctc",
+   "name": "New Mexico Child Income Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, $25-$600 per child stepping down with AGI; 243,909 claiming returns.",
+   "jct": {
+    "score": 133590000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "2025 New Mexico Tax Expenditure Report (TRD), p.81 (reliability 1)",
+    "source_url": "https://www.nmlegis.gov/handouts/RSTP%20121525%20Item%202%20B%20Tax%20Expenditure%20Report.pdf"
+   },
+   "populace": {
+    "budget_effect": 155831474.7637574,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "nm_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ri_eitc",
+   "name": "Rhode Island EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable; 73,463 taxpayers. TY2023 used the 15% match; the 2024 model year is 16%, so populace should run roughly 7% above (ORA projects TY2024 at $29.8M).",
+   "jct": {
+    "score": 26193666.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "2026 RI Tax Expenditures Report (Office of Revenue Analysis, Jan 2026), Credits item 8, p.77",
+    "source_url": "https://dor.ri.gov/media/7751/download?language=en"
+   },
+   "populace": {
+    "budget_effect": 25629368.85789679,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "ri_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_il_eitc",
+   "name": "Illinois EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 20% of federal in both TY2023 and the 2024 model year; 899,078 Illinois-resident returns. The all-filer total including non-IL addresses is $451.0M; populace models residents.",
+   "jct": {
+    "score": 437387169.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "IDOR, Individual Income Tax Returns by AGI, TY2023 final stratification (Nov 2025), p.1",
+    "source_url": "https://tax.illinois.gov/content/dam/soi/en/web/tax/research/taxstats/indincomestratifications/2023-iit-1040il-return-final.pdf"
+   },
+   "populace": {
+    "budget_effect": 428926113.9274645,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "il_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_hi_eitc",
+   "name": "Hawaii EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 40% of federal; 78,399 new-credit claims. Excludes pre-2023 nonrefundable-credit carryover the report also counts.",
+   "jct": {
+    "score": 76981028.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "HI DOTAX, Earned Income Tax Credit Report TY2024 (Act 107 report, Dec 2025), Table 1 p.5",
+    "source_url": "https://files.hawaii.gov/tax/stats/stats/act107_2017/act107_earnedincome_txcredit_2024.pdf"
+   },
+   "populace": {
+    "budget_effect": 73096632.55865684,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "hi_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ia_eitc",
+   "name": "Iowa EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 15% of federal. FY2025 actual claims basis.",
+   "jct": {
+    "score": 72117991.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "IA DOR, Tax Credits Contingent Liabilities Report (Mar 2026), Tables 2 and 8",
+    "source_url": "https://revenue.iowa.gov/media/4472/download?inline="
+   },
+   "populace": {
+    "budget_effect": 61572080.11792596,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "ia_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ks_eitc",
+   "name": "Kansas EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 17% of federal; 171,232 claims (process year 2024, i.e. TY2023 returns).",
+   "jct": {
+    "score": 76378592.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "KS DOR, Tax Expenditure Report CY2024, Earned Income Credit (K.S.A. 79-32,205), p.9",
+    "source_url": "https://www.ksrevenue.gov/pdf/taxexpreport24.pdf"
+   },
+   "populace": {
+    "budget_effect": 71544117.92476171,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "ks_total_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_la_eitc",
+   "name": "Louisiana EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 5% of federal. Fiscal-year revenue-loss basis (FYE June 2025, mostly TY2024 returns).",
+   "jct": {
+    "score": 78713535.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "FY2025",
+    "source": "LA DOR, Tax Exemption Budget 2025-2026, item 78, p.38",
+    "source_url": "https://dam.ldr.la.gov/publications/TEB(2025)(WEB).pdf"
+   },
+   "populace": {
+    "budget_effect": 69575984.72549078,
+    "period": 2024,
+    "window": "FY2025",
+    "measure": "la_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ne_eitc",
+   "name": "Nebraska EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 10% of federal; 111,150 claims. Residents only.",
+   "jct": {
+    "score": 30250000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "NE DOR, Nebraska Statistics of Individual Income Tax, Table F2 2024 (refundable credits)",
+    "source_url": "https://revenue.nebraska.gov/sites/default/files/doc/research/stats_income_ind/2024/Table%20F2%202024.xls"
+   },
+   "populace": {
+    "budget_effect": 26368405.6973718,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "ne_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_wi_eic",
+   "name": "Wisconsin Earned Income Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 4/11/34% of federal by number of children (childless ineligible); 193,799 claims, avg $453.",
+   "jct": {
+    "score": 87723239.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "WI Legislative Fiscal Bureau, Updated Tax Information for 2025 LFB Informational Papers (Apr 2025), Tables 8-10",
+    "source_url": "https://docs.legis.wisconsin.gov/misc/lfb/informational_papers/january_2025/0015_updated_tax_information_for_2025_legislative_fiscal_bureau_informational_papers_2_5_9_11_12_13_and_14_4_3_25.pdf"
+   },
+   "populace": {
+    "budget_effect": 103091412.68665081,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "wi_earned_income_credit",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_vt_eitc",
+   "name": "Vermont EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 38% of federal in both TY2022 and the 2024 model year (the childless rate rises to 100% only from TY2025); 33,520 returns. Oldest benchmark in this file - a two-year vintage gap applies.",
+   "jct": {
+    "score": 24524566.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2022",
+    "source": "2025 Vermont Tax Expenditures Biennial Report (JFO and Dept of Taxes, Jan 2025), Appendix C p.77",
+    "source_url": "https://legislature.vermont.gov/assets/Legislative-Reports/GENERAL-379073-v3-2025_Tax_Expenditure_Report.pdf"
+   },
+   "populace": {
+    "budget_effect": 25738117.60612409,
+    "period": 2024,
+    "window": "TY2022",
+    "measure": "vt_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_vt_ctc",
+   "name": "Vermont Child Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, $1,000 per child under 6 with a 2% per $1,000 phase-out above $125k AGI; 21,296 returns, 27,214 children. Age limit rises to under 7 only from TY2025.",
+   "jct": {
+    "score": 25423933.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2022",
+    "source": "2025 Vermont Tax Expenditures Biennial Report, Appendix C p.77; VT JFO one-year lookback brief (Dec 2023)",
+    "source_url": "https://legislature.vermont.gov/assets/Legislative-Reports/GENERAL-379073-v3-2025_Tax_Expenditure_Report.pdf"
+   },
+   "populace": {
+    "budget_effect": 20139538.706424832,
+    "period": 2024,
+    "window": "TY2022",
+    "measure": "vt_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_md_eitc",
+   "name": "Maryland EITC (refundable + nonrefundable)",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Sum of two official lines: $410.1M refunded EIC (361,865 returns) plus $140.8M nonrefundable EIC claimed against liability (246,823 returns) - populace md_eitc pays whichever of the two credits is larger per filer, matching the summed concept. The local EITC is netted out of local tax and never published.",
+   "jct": {
+    "score": 550881492.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2024",
+    "source": "Comptroller of Maryland, Income Tax Summary Report TY2024, refund summary pp.18-19 and selected credits pp.21-23",
+    "source_url": "https://www.marylandcomptroller.gov/content/dam/mdcomp/md/reports/annual/summary24.pdf"
+   },
+   "populace": {
+    "budget_effect": 475688643.94965386,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "md_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_or_eitc",
+   "name": "Oregon EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 9% of federal (12% with a child under 3); 212,930 full-year-resident returns including ITIN filers. Full-year residents only - all-filer totals run 6-7% higher, so populace should land at or slightly above.",
+   "jct": {
+    "score": 47200000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "TY2023 Oregon Personal Income Tax Statistics (150-101-406, revised), Exhibits 36 and 38",
+    "source_url": "https://www.oregon.gov/dor/programs/gov-research/Documents/TY%202023%20Oregon%20Personal%20Income%20Tax%20Statistics%20Report%20150-101-406%20(Secured)%20Revised.pdf"
+   },
+   "populace": {
+    "budget_effect": 46529827.44550864,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "or_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_or_kids_credit",
+   "name": "Oregon Kids Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, $1,000 per child 0-5 with a $25k-$30k MAGI phase-out; 30,110 full-year-resident returns, avg $1,140. DOR reported over $39M across all filers; official take-up is roughly half of eligible families, while populace assumes full take-up - expect populace above the benchmark.",
+   "jct": {
+    "score": 34200000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2023",
+    "source": "TY2023 Oregon Personal Income Tax Statistics (150-101-406, revised), Exhibit 36",
+    "source_url": "https://www.oregon.gov/dor/programs/gov-research/Documents/TY%202023%20Oregon%20Personal%20Income%20Tax%20Statistics%20Report%20150-101-406%20(Secured)%20Revised.pdf"
+   },
+   "populace": {
+    "budget_effect": 27426052.378213055,
+    "period": 2024,
+    "window": "TY2023",
+    "measure": "or_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_md_ctc",
+   "name": "Maryland Child Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable $500 per child under 6 (or disabled under 17) for AGI under $15k. FY2024 reflects TY2023, the first expanded year; the report's EITC lines match tax-year actuals exactly, so the figure is claims-based. No claim counts published.",
+   "jct": {
+    "score": 13800000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "FY2024",
+    "source": "Maryland Tax Expenditures Report FY2024 (DBM Bureau of Revenue Estimates), pp.23 and 47",
+    "source_url": "https://dbm.maryland.gov/budget/taxexpendreports/FY2024TaxExpenditureReport.pdf"
+   },
+   "populace": {
+    "budget_effect": 11425760.348945856,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "md_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_nj_eitc",
+   "name": "New Jersey EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 40% of federal. Total computed from printed claims and average (total not printed), so treat as approximate; the report projects $628.1M for FY2027.",
+   "jct": {
+    "score": 603600000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "TY2024",
+    "source": "NJ Tax Expenditure Report FY2027 (Treasury/Taxation), item 40 p.33: 617,800 claims x $977 average",
+    "source_url": "https://www.nj.gov/treasury/taxation/pdf/taxexpenditurereport2027.pdf"
+   },
+   "populace": {
+    "budget_effect": 569545717.687674,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "nj_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_nj_ctc",
+   "name": "New Jersey Child Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, $200-$1,000 per child under 6 by income tier up to $80k. Total computed from printed claims and average.",
+   "jct": {
+    "score": 220600000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "TY2024",
+    "source": "NJ Tax Expenditure Report FY2027 (Treasury/Taxation), item 63 p.44: 232,500 credits x $949 average",
+    "source_url": "https://www.nj.gov/treasury/taxation/pdf/taxexpenditurereport2027.pdf"
+   },
+   "populace": {
+    "budget_effect": 256802741.55314267,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "nj_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ma_eitc",
+   "name": "Massachusetts EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 40% of federal from TY2023. Fiscal-year tax-expenditure estimate (no claim counts published); FY2025 estimate is $341.4M.",
+   "jct": {
+    "score": 300000000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2024",
+    "source": "MA FY26 Tax Expenditure Budget, item 1.605",
+    "source_url": "https://budget.digital.mass.gov/govbudget/fy26/tax-expenditure-budget/personal-income-tax/credits-against-tax/1-605/"
+   },
+   "populace": {
+    "budget_effect": 286357413.3774758,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "ma_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ma_cftc",
+   "name": "Massachusetts Child and Family Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, uncapped $440 per dependent from TY2024. The FY2025 estimate reflects the $440 rate that also applies in the 2024 model year (FY2024 reflected the first-year $310 rate).",
+   "jct": {
+    "score": 460000000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2025",
+    "source": "MA FY26 Tax Expenditure Budget, item 1.628",
+    "source_url": "https://budget.digital.mass.gov/govbudget/fy26/tax-expenditure-budget/personal-income-tax/credits-against-tax/1-628/"
+   },
+   "populace": {
+    "budget_effect": 421793487.6905416,
+    "period": 2024,
+    "window": "FY2025",
+    "measure": "ma_child_and_family_credit",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_me_eitc",
+   "name": "Maine EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 25% of federal (50% for childless filers); roughly 92,000 taxpayers. Microsimulation-based fiscal-year revenue-loss estimate, net of a TANF-fund offset.",
+   "jct": {
+    "score": 38150000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2024",
+    "source": "Maine State Tax Expenditure Report 2026-2027 (MRS Office of Tax Policy), item 1.032 p.36",
+    "source_url": "https://www.maine.gov/revenue/sites/maine.gov.revenue/files/inline-files/Tax%20Expenditure%20Report%2026-27%20.pdf"
+   },
+   "populace": {
+    "budget_effect": 42952554.34883132,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "me_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_mi_eitc",
+   "name": "Michigan EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 30% of federal. Total implied from the printed claim count and average (Treasury prints no total), so treat as approximate.",
+   "jct": {
+    "score": 591900000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "TY2024",
+    "source": "MI Treasury press releases (Oct 2025, Apr 2024): about 665,000 claims at an $890 average",
+    "source_url": "https://www.michigan.gov/treasury/news/2025/10/13/state-and-federal-earned-income-tax-credits-for-working-families"
+   },
+   "populace": {
+    "budget_effect": 528888836.60307336,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "mi_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_mt_eitc",
+   "name": "Montana EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Montana's match rose from 3% to 10% in TY2024; the only official actual ($3.9M, DOR biennial report Table 3.13) is from the 3% era, so the IRS-derived figure is the fairer current-rate benchmark.",
+   "jct": {
+    "score": 15610000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "TY2024",
+    "source": "Approximation: 10% statutory match x $156.1M federal EITC claimed in MT (IRS EITC Central, TY2024 returns processed in 2025)",
+    "source_url": "https://www.irs.gov/tax-professionals/eitc-central/statistics-for-tax-returns-with-the-earned-income-tax-credit-eitc"
+   },
+   "populace": {
+    "budget_effect": 14344819.55426386,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "mt_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_in_eitc",
+   "name": "Indiana EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 10% of federal under Indiana-specific qualifying rules. FY2024 LSA estimate (latest actual is FY2022 at $77.5M, before the 10% recoupling).",
+   "jct": {
+    "score": 112500000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2024",
+    "source": "2024 Indiana Tax Expenditure Review (LSA OFMA, Oct 2024), item IT42 p.21",
+    "source_url": "https://iga.in.gov/publications/tax_expenditure_report/2024%20Tax%20Expenditure%20Review%20FINAL.pdf"
+   },
+   "populace": {
+    "budget_effect": 103766200.72026642,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "in_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_ok_eitc",
+   "name": "Oklahoma EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 5% of federal computed under frozen pre-2021 federal parameters, so an IRS-derived approximation is invalid here; the official TY2022 actual (321,693 claims) is the best available despite the two-year vintage gap.",
+   "jct": {
+    "score": 40249000.0,
+    "score_fy2027": null,
+    "score_type": "actual",
+    "window": "TY2022",
+    "source": "Oklahoma Tax Commission, Tax Expenditure Report 2023-2024, income tax credits item 13, p.6 (reliability level 1)",
+    "source_url": "https://oklahoma.gov/content/dam/ok/en/tax/documents/resources/reports/tax-expenditure/TaxExpenditureReport-2023-2024.pdf"
+   },
+   "populace": {
+    "budget_effect": 29450491.421086088,
+    "period": 2024,
+    "window": "TY2022",
+    "measure": "ok_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_de_eitc",
+   "name": "Delaware EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Filers choose a 20% nonrefundable or 4.5% refundable credit; Delaware publishes only an estimated fiscal-year revenue loss (FY2026 estimate: $18.0-18.5M), with no claim counts.",
+   "jct": {
+    "score": 17500000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2025",
+    "source": "2025 Delaware Tax Preference Report, Personal Income Tax chapter section 1.16, p.1-28",
+    "source_url": "https://financefiles.delaware.gov/Reports/TaxPref/3-PIT-2025.pdf"
+   },
+   "populace": {
+    "budget_effect": 18366743.18008861,
+    "period": 2024,
+    "window": "FY2025",
+    "measure": "de_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_dc_eitc",
+   "name": "District of Columbia EITC",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable; ORA revenue-loss estimate at the 70% match in force for TY2022-2024 (the match rises to 100% in TY2025). Latest published actual is TY2021 ($69.6M at the 40% match). Credits of $1,200+ are paid in monthly installments, blurring fiscal-year timing.",
+   "jct": {
+    "score": 98372000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2024",
+    "source": "DC Tax Expenditure Report (OCFO/ORA, Sept 2024), item 128 p.235",
+    "source_url": "https://ora-cfo.dc.gov/sites/default/files/dc/sites/ora-cfo/publication/attachments/2024%20Tax%20Expenditure%20Report.pdf"
+   },
+   "populace": {
+    "budget_effect": 79401566.62085198,
+    "period": 2024,
+    "window": "FY2024",
+    "measure": "dc_eitc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_il_ctc",
+   "name": "Illinois Child Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Refundable, 20% of the filer's Illinois EITC (child under 12) in TY2024, doubling to 40% for TY2025+. GOMB statewide estimate - no official actuals or claim counts published yet.",
+   "jct": {
+    "score": 50000000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "TY2024",
+    "source": "Illinois State Budget FY2027 (GOMB, Feb 2026), p.28",
+    "source_url": "https://budget.illinois.gov/content/dam/soi/en/web/budget/documents/budget-book/fy2027-budget/Fiscal-Year-2027-Operating-Budget.pdf"
+   },
+   "populace": {
+    "budget_effect": 62472713.12650105,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "il_ctc",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_az_dependent_credit",
+   "name": "Arizona Dependent Tax Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "About 1.49M Arizonans under 17 x $100 plus roughly 99k 17-year-olds x $25. Upper bound: the credit phases out above $200k single / $400k joint AGI, and 18+ dependents (omitted here) partially offset that.",
+   "jct": {
+    "score": 151000000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "TY2024",
+    "source": "Approximation: ACS 2024 1-year age counts for Arizona x statutory amounts ($100 per dependent under 17, $25 at 17+)",
+    "source_url": "https://data.census.gov/table/ACSDT1Y2024.B09001?g=040XX00US04"
+   },
+   "populace": {
+    "budget_effect": 124615505.33502397,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "az_dependent_tax_credit",
+    "baseline_total": null,
+    "reform_total": null
+   }
+  },
+  {
+   "id": "state_id_grocery_credit",
+   "name": "Idaho Grocery Credit",
+   "category": "State program actual",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Upper bound: the credit is prorated by months not receiving SNAP and excludes incarcerated months, and the seniors add-on ($20, in force through 2024) is omitted; expect populace below the benchmark.",
+   "jct": {
+    "score": 240200000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "TY2024",
+    "source": "Approximation: ACS 2024 1-year Idaho population (2,001,619) x the $120 per-person credit",
+    "source_url": "https://data.census.gov/table/ACSDT1Y2024.B01003?g=040XX00US16"
+   },
+   "populace": {
+    "budget_effect": 201021782.9918459,
+    "period": 2024,
+    "window": "TY2024",
+    "measure": "id_grocery_credit",
+    "baseline_total": null,
+    "reform_total": null
+   }
   }
  ],
  "release_id": "populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701",
