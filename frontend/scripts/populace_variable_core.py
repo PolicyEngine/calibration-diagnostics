@@ -152,6 +152,39 @@ def _download_dataset(hf_hub_download: Any, repo: str, filename: str, revision: 
         return _load_release_into_ram(repo, filename, revision)
 
 
+def _cgroup_memory_limit_bytes() -> int | None:
+    """The function's hard memory limit, from the cgroup (v2 then v1)."""
+    for path in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+        try:
+            with open(path) as handle:
+                raw = handle.read().strip()
+        except OSError:
+            continue
+        if raw and raw != "max":
+            try:
+                value = int(raw)
+            except ValueError:
+                continue
+            # cgroup v1 reports a huge sentinel when unlimited.
+            if 0 < value < (1 << 62):
+                return value
+    return None
+
+
+def _url_content_length(url: str, headers: dict[str, str]) -> int | None:
+    from urllib.request import Request
+
+    request = Request(url, method="HEAD")
+    for key, value in headers.items():
+        request.add_header(key, value)
+    try:
+        with urlopen(request, timeout=60) as response:
+            length = response.headers.get("Content-Length")
+            return int(length) if length else None
+    except (OSError, ValueError):
+        return None
+
+
 def _load_release_into_ram(repo: str, filename: str, revision: str) -> str:
     import shutil
     from urllib.request import Request
@@ -159,6 +192,27 @@ def _load_release_into_ram(repo: str, filename: str, revision: str) -> str:
     sentinel = f"/tmp/populace-{revision}.h5"
     if sentinel in _CORE_IMAGES and os.path.exists(sentinel):
         return sentinel
+
+    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{filename}"
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    auth = {"Authorization": f"Bearer {token}"} if token else {}
+
+    # A full Microsimulation over a populace release needs base runtime + two
+    # copies of the H5 (our retained image + HDF5's transient core copy) +
+    # entity arrays — empirically >3GB, which OOM-kills a 3GB serverless
+    # function. When the cgroup limit is that tight, refuse up front with a
+    # clear message instead of being OOM-killed mid-load. A host with more
+    # memory (the Modal backend, or local dev with no cgroup limit) proceeds.
+    limit = _cgroup_memory_limit_bytes()
+    if limit is not None and limit < 4_000_000_000:
+        size = _url_content_length(url, auth)
+        size_note = f" ({size / 1e6:.0f}MB)" if size else ""
+        raise VariableCalculationError(
+            f"This release's dataset{size_note} is too large to compute in the "
+            f"hosted environment (memory limit {limit / 1e9:.1f}GB; a full "
+            "microsimulation needs over 3GB). Run the variable lookup locally, "
+            "or point the endpoint at a higher-memory backend."
+        )
 
     # Drop other releases held in RAM (image + any cached simulation) so only
     # one dataset is resident at a time.
@@ -178,21 +232,14 @@ def _load_release_into_ram(repo: str, filename: str, revision: str) -> str:
         ignore_errors=True,
     )
 
-    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{filename}"
     request = Request(url)
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    if token:
-        request.add_header("Authorization", f"Bearer {token}")
-    buffer = bytearray()
+    for key, value in auth.items():
+        request.add_header(key, value)
     with urlopen(request, timeout=600) as response:
-        while True:
-            chunk = response.read(16 * 1024 * 1024)
-            if not chunk:
-                break
-            buffer.extend(chunk)
+        image = response.read()  # single bytes object; no bytearray double-copy
 
     _install_core_hdfstore_patch()
-    _CORE_IMAGES[sentinel] = bytes(buffer)
+    _CORE_IMAGES[sentinel] = image
     with open(sentinel, "wb"):  # 0-byte marker so Path.exists() checks pass
         pass
     return sentinel
