@@ -203,15 +203,22 @@ def _load_release_into_ram(repo: str, filename: str, revision: str) -> str:
     # function. When the cgroup limit is that tight, refuse up front with a
     # clear message instead of being OOM-killed mid-load. A host with more
     # memory (the Modal backend, or local dev with no cgroup limit) proceeds.
+    # Reaching here means the H5 didn't fit on disk (ENOSPC) — which only
+    # happens on the tiny-disk Vercel function; Modal and local dev have disk
+    # and never take this branch. Unless we can positively confirm a generous
+    # memory limit (>=4GB, e.g. a big-RAM/small-disk host), refuse with a clear
+    # message rather than be OOM-killed loading a >3GB microsimulation. The
+    # cgroup file is often unreadable on serverless, so unknown == refuse.
     limit = _cgroup_memory_limit_bytes()
-    if limit is not None and limit < 4_000_000_000:
+    if limit is None or limit < 4_000_000_000:
         size = _url_content_length(url, auth)
         size_note = f" ({size / 1e6:.0f}MB)" if size else ""
+        limit_note = f"memory limit {limit / 1e9:.1f}GB" if limit else "limited memory"
         raise VariableCalculationError(
             f"This release's dataset{size_note} is too large to compute in the "
-            f"hosted environment (memory limit {limit / 1e9:.1f}GB; a full "
-            "microsimulation needs over 3GB). Run the variable lookup locally, "
-            "or point the endpoint at a higher-memory backend."
+            f"hosted environment ({limit_note}; a full microsimulation needs "
+            "over 3GB). Run the variable lookup locally, or point the endpoint "
+            "at a higher-memory backend."
         )
 
     # Drop other releases held in RAM (image + any cached simulation) so only
