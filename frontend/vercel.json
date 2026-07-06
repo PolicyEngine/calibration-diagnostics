@@ -3,7 +3,8 @@
   "fluid": true,
   "functions": {
     "api/populace_variable.py": {
-      "maxDuration": 800
+      "maxDuration": 800,
+      "memory": 3009
     }
   }
 }
