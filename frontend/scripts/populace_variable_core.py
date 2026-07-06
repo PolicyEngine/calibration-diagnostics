@@ -88,34 +88,68 @@ class VariableCalculationError(RuntimeError):
 _SIM_CACHE: dict[tuple[str, str, str, str | None], tuple[str, Any]] = {}
 
 
+# revision -> (memfd, symlink path). The fd must stay open: the symlink
+# resolves through /proc/self/fd and the memory frees when the fd closes.
+_MEMFD_DATASETS: dict[str, tuple[int, str]] = {}
+
+
 def _download_dataset(hf_hub_download: Any, repo: str, filename: str, revision: str) -> str:
-    """Fetch the release H5 to wherever it actually fits.
+    """Fetch the release H5 to somewhere it actually fits.
 
-    Vercel's ephemeral disk is 550MB and the function bundle takes ~150MB, so
-    a ~340MB H5 cannot land in /tmp at all. /dev/shm is memory-backed and
-    sized by the function's RAM, so prefer it when writable; each release id
-    is one file there, and other releases' files are evicted first.
+    Vercel's ephemeral disk is 550MB with ~150MB of function bundle, so a
+    ~340MB H5 can never land on disk, and /dev/shm mounts are container-tiny.
+    A memfd is an anonymous RAM-backed file charged to the function's memory
+    (3GB), exposed through a zero-byte /tmp symlink so pytables gets a real
+    .h5 path. One release resident at a time; local dev (no memfd on macOS)
+    keeps the normal HF cache download.
     """
-    import shutil
-
-    shm = "/dev/shm"
-    if os.access(shm, os.W_OK):
-        target_dir = os.path.join(shm, "populace", revision)
-        parent = os.path.join(shm, "populace")
-        if os.path.isdir(parent):
-            for entry in os.listdir(parent):
-                if entry != revision:
-                    shutil.rmtree(os.path.join(parent, entry), ignore_errors=True)
+    if not hasattr(os, "memfd_create"):
         return hf_hub_download(
-            repo_id=repo,
-            filename=filename,
-            revision=revision,
-            repo_type="dataset",
-            local_dir=target_dir,
+            repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
         )
-    return hf_hub_download(
-        repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
-    )
+    cached = _MEMFD_DATASETS.get(revision)
+    if cached and os.path.exists(cached[1]):
+        return cached[1]
+    for rev, (fd, link) in list(_MEMFD_DATASETS.items()):
+        if rev != revision:
+            for key in [k for k in _SIM_CACHE if k[1] == rev]:
+                _SIM_CACHE.pop(key, None)
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                os.unlink(link)
+            except OSError:
+                pass
+            _MEMFD_DATASETS.pop(rev, None)
+
+    from urllib.request import Request
+
+    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{filename}"
+    request = Request(url)
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    fd = os.memfd_create(f"populace-{revision}")
+    try:
+        with urlopen(request, timeout=600) as response:
+            while True:
+                chunk = response.read(16 * 1024 * 1024)
+                if not chunk:
+                    break
+                os.write(fd, chunk)
+        link = f"/tmp/populace-{revision}.h5"
+        try:
+            os.unlink(link)
+        except FileNotFoundError:
+            pass
+        os.symlink(f"/proc/self/fd/{fd}", link)
+    except BaseException:
+        os.close(fd)
+        raise
+    _MEMFD_DATASETS[revision] = (fd, link)
+    return link
 
 
 def _disk_usage_report(root: str = "/tmp") -> str:
