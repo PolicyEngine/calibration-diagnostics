@@ -13,7 +13,13 @@
 // map is a finite backfill of already-published releases, keyed by release id.
 
 import f0af251 from "./reform-overrides/populace-us-2024-f0af251-703bd81a565c-20260620T201958Z.json";
+// State legislative reform rows (PolicyEngine/populace#319 suite) appended
+// offline to the published artifact — scored one reform at a time on the
+// released H5. See _backfill_note inside the file for version provenance.
+import nationalOnly20260701 from "./reform-overrides/populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701.json";
 
 export const REFORM_OVERRIDES: Record<string, unknown> = {
   "populace-us-2024-f0af251-703bd81a565c-20260620T201958Z": f0af251,
+  "populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701":
+    nationalOnly20260701,
 };
