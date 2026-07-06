@@ -46,7 +46,7 @@ interface SuiteMeta {
 const SUITE_META: Record<string, SuiteMeta> = {
   OBBBA: {
     blurb:
-      "Each OBBBA provision is reverted from the current-law baseline and the income-tax delta is compared to JCT's score (JCX-35-25). Benchmark is the first full fiscal year (FY2027): JCT scores fiscal-year cash receipts, so FY2026 captures only part of a tax year's effect. populace is a static calendar-year liability estimate, so it should run slightly below JCT's conventional scores.",
+      "Each OBBBA provision is reverted from the current-law baseline and the income-tax delta is compared to JCT's score (JCX-35-25). Benchmark is the first full fiscal year (FY2027): JCT scores fiscal-year cash receipts, so FY2026 captures only part of a tax year's effect. populace is a static calendar-year liability estimate, so it should run slightly below JCT's conventional scores. This release scored each provision in isolation against pre-OBBBA law, while JCT's lines are incremental — each conditioned on the lines above it — so interaction-heavy provisions (AMT especially: relief scored alone against post-TCJA-expiration law, vs JCT's line conditioned on the rate cuts) read worse than the model gap alone. The producer now stacks provisions in JCX order; the next release scores like-for-like.",
   },
   "Tax expenditure": {
     blurb:
