@@ -83,6 +83,34 @@ class VariableCalculationError(RuntimeError):
 _SIM_CACHE: dict[tuple[str, str, str, str | None], tuple[str, Any]] = {}
 
 
+def _evict_other_releases(repo: str, filename: str, revision: str) -> None:
+    """Keep at most one dataset in the ephemeral HF cache.
+
+    Each release id is a git revision on the HF repo, so a warm serverless
+    instance accumulates one multi-hundred-MB H5 (plus partial downloads) per
+    release it has served — until a download dies mid-write with 'No space
+    left on device'. Before downloading a revision we don't already have,
+    wipe the repo's cache directory and drop cached simulations for other
+    revisions (they also hold the instance's memory).
+    """
+    try:
+        from huggingface_hub import try_to_load_from_cache
+    except Exception:  # pragma: no cover - depends on host Python env.
+        return
+    cached = try_to_load_from_cache(
+        repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
+    )
+    if isinstance(cached, str) and os.path.exists(cached):
+        return
+    import shutil
+
+    for key in [k for k in _SIM_CACHE if k[1] != revision]:
+        _SIM_CACHE.pop(key, None)
+    cache_root = os.environ.get("HF_HUB_CACHE", "/tmp/huggingface/hub")
+    repo_dir = os.path.join(cache_root, f"datasets--{repo.replace('/', '--')}")
+    shutil.rmtree(repo_dir, ignore_errors=True)
+
+
 def finite_float(value: Any) -> float | None:
     try:
         number = float(value)
@@ -177,6 +205,7 @@ def calculate_variables(
     dataset = f"hf://{repo}/{filename}@{revision}"
 
     try:
+        _evict_other_releases(repo, filename, revision)
         dataset_path = hf_hub_download(
             repo_id=repo,
             filename=filename,
