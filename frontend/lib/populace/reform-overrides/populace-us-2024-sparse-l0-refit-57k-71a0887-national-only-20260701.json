@@ -922,7 +922,7 @@
    "category": "State program",
    "in_sample": false,
    "period": 2024,
-   "description": "One-year vintage gap: TY2023 actual vs the 2024 dataset period.",
+   "description": "One-year vintage gap: TY2023 actual vs the 2024 dataset period. Wiring note: ca_yctc survives this repeal \u2014 its eligibility falls back to the ca_eitc_eligible flag via the loss/limited-earnings path ($34,602 threshold in 2024 exceeds the CalEITC ceiling), so the delta is EITC-only (verified: effect equals the ca_eitc baseline level exactly).",
    "jct": {
     "score": 941000000.0,
     "score_fy2027": null,
@@ -946,7 +946,7 @@
    "category": "State program",
    "in_sample": false,
    "period": 2024,
-   "description": null,
+   "description": "Gap analysis (2026-07 audit): +38.7% vs TY2023 = ~6pp benchmark vintage (max $1,117 -> $1,154, phase-out start $25,775 -> $26,626: +6.2% measured on the same data) + ~30pp take-up. The model pays every eligible unit: 546-559k eligible units in the data vs FTB's 398,059 actual returns (claim/eligible 0.71-0.73, matching published take-up: CalEITC 54% among SNAP-enrolled per CPL/JPubE 2023). Per-unit amounts align ($1,025 sim vs $1,037 actual) \u2014 the gap is purely excess unit count; demographics ruled out (weighted CA under-6 is 6.2% BELOW ACS 2024). A flat per-return credit passes the take-up gap straight to the total. Tracked in populace#341.",
    "jct": {
     "score": 413000000.0,
     "score_fy2027": null,
@@ -970,7 +970,7 @@
    "category": "State program",
    "in_sample": false,
    "period": 2024,
-   "description": "NYS EITC only; the NYC and noncustodial credits are separate variables.",
+   "description": "NYS EITC only; the NYC and noncustodial credits are separate variables. Concept note: ny_supplemental_eitc is a separate variable and survives this repeal; the DTF claims benchmark is the core NYS EITC only, so concepts match.",
    "jct": {
     "score": 1116252683.0,
     "score_fy2027": null,
@@ -1042,7 +1042,7 @@
    "category": "State program",
    "in_sample": false,
    "period": 2024,
-   "description": null,
+   "description": "Vintage caveat (2026-07 audit): the +30.4% gap is entirely law-change vintage, proven by replication \u2014 running the pre-HB23-1112 TY2023 law (60/30/10% of federal CTC) on this same data reproduces the DOR actual to the dollar ($89.2M vs $89,158,930), and the TY2024 flat-amount restructure (HB23-1112: $1,200/$600/$200 per under-6 child-dependent, $0-earners newly eligible) adds +30.0%. Against the bill's own fiscal-note-implied TY2024 level (~$135M) the sim runs ~14% under. Replace with CO DOR TY2024 actuals when published.",
    "jct": {
     "score": 89158930.0,
     "score_fy2027": null,
@@ -1138,7 +1138,7 @@
    "category": "State program",
    "in_sample": false,
    "period": 2024,
-   "description": "Benchmark sums the refundable ($410.1M) and nonrefundable ($140.8M) lines; repealing the take-better-of credit removes both.",
+   "description": "Benchmark sums the refundable ($410.1M) and nonrefundable ($140.8M) lines; repealing the take-better-of credit removes both. Wiring note: md_eitc itself is a derived reporting total that Maryland's tax formula never reads \u2014 neutralizing it was a proven no-op ($0.0 effect vs a $475.7M baseline level). Rescored with both tax-path components (md_refundable_eitc + md_non_refundable_eitc) neutralized: $456.1M. The effect sits below the $475.7M component sum because the poverty-line credit expands under repeal. Fixed in populace#342.",
    "jct": {
     "score": 550881492.0,
     "score_fy2027": null,
@@ -1148,12 +1148,12 @@
     "source_url": "https://www.marylandcomptroller.gov/content/dam/mdcomp/md/reports/annual/summary24.pdf"
    },
    "populace": {
-    "budget_effect": 0.0,
+    "budget_effect": 456070794.30285645,
     "period": 2024,
     "window": "TY2024",
     "measure": "state_income_tax",
     "baseline_total": 456926709347.6455,
-    "reform_total": 456926709347.6455
+    "reform_total": 457382780141.94836
    }
   },
   {
@@ -1162,13 +1162,13 @@
    "category": "State program",
    "in_sample": false,
    "period": 2024,
-   "description": "Illinois-resident returns; 20% match in both years.",
+   "description": "Illinois-resident returns; 20% match in both years. Entanglement note: il_ctc (from TY2024) is a percentage of il_eitc, so this repeal removes both credits \u2014 the measured effect ($491.4M) equals the il_eitc ($428.9M) + il_ctc ($62.5M) baseline levels exactly. Benchmark is the sum of both official figures.",
    "jct": {
-    "score": 437387169.0,
+    "score": 487387169,
     "score_fy2027": null,
     "score_type": "actual",
     "window": "TY2023",
-    "source": "IDOR TY2023 final stratification, p.1",
+    "source": "IDOR TY2023 final stratification p.1 (EITC $437,387,169) + IL GOMB FY2027 budget p.28 (IL CTC TY2024 estimate $50M): combined, because il_ctc = 20% x il_eitc and repealing il_eitc removes both",
     "source_url": "https://tax.illinois.gov/content/dam/soi/en/web/tax/research/taxstats/indincomestratifications/2023-iit-1040il-return-final.pdf"
    },
    "populace": {
@@ -1426,7 +1426,7 @@
    "category": "State program actual",
    "in_sample": false,
    "period": 2024,
-   "description": "Refundable; 398,059 returns, 483,629 qualifying children.",
+   "description": "Refundable; 398,059 returns, 483,629 qualifying children. Gap analysis (2026-07 audit): +38.7% vs TY2023 = ~6pp benchmark vintage (max $1,117 -> $1,154, phase-out start $25,775 -> $26,626: +6.2% measured on the same data) + ~30pp take-up. The model pays every eligible unit: 546-559k eligible units in the data vs FTB's 398,059 actual returns (claim/eligible 0.71-0.73, matching published take-up: CalEITC 54% among SNAP-enrolled per CPL/JPubE 2023). Per-unit amounts align ($1,025 sim vs $1,037 actual) \u2014 the gap is purely excess unit count; demographics ruled out (weighted CA under-6 is 6.2% BELOW ACS 2024). A flat per-return credit passes the take-up gap straight to the total. Tracked in populace#341.",
    "jct": {
     "score": 413000000.0,
     "score_fy2027": null,
@@ -1522,7 +1522,7 @@
    "category": "State program actual",
    "in_sample": false,
    "period": 2024,
-   "description": "Refundable; 130,188 claims, avg $685. Children under 6, 10-60% of the federal CTC by AGI tier.",
+   "description": "Refundable; 130,188 claims, avg $685. Children under 6, 10-60% of the federal CTC by AGI tier. Vintage caveat (2026-07 audit): the +30.4% gap is entirely law-change vintage, proven by replication \u2014 running the pre-HB23-1112 TY2023 law (60/30/10% of federal CTC) on this same data reproduces the DOR actual to the dollar ($89.2M vs $89,158,930), and the TY2024 flat-amount restructure (HB23-1112: $1,200/$600/$200 per under-6 child-dependent, $0-earners newly eligible) adds +30.0%. Against the bill's own fiscal-note-implied TY2024 level (~$135M) the sim runs ~14% under. Replace with CO DOR TY2024 actuals when published.",
    "jct": {
     "score": 89158930.0,
     "score_fy2027": null,
@@ -2358,5 +2358,5 @@
   }
  ],
  "release_id": "populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701",
- "_backfill_note": "State reform rows appended offline (PolicyEngine/populace#319 suite) by scoring the released populace_us_2024.h5 at policyengine-us 1.729.0; the release itself was built at 1.752.2, so minor state-tax logic drift is possible. All other rows are the published artifact, untouched. | 2026-07-06 benchmark audit: mortgage FY2027 3,398M->3,110M (wrong-line transcription), GA -778M->-680M (corporate excluded), MD -149.6M->-115.2M (catch-up FY), OK -5.3B->-4.947B (TY2026 line); all other 94 external values verified against primary sources. | MA H5007 removed: benchmark exists only as press paraphrase, no primary source (suite policy: official published notes only)."
+ "_backfill_note": "State reform rows appended offline (PolicyEngine/populace#319 suite) by scoring the released populace_us_2024.h5 at policyengine-us 1.729.0; the release itself was built at 1.752.2, so minor state-tax logic drift is possible. All other rows are the published artifact, untouched. | 2026-07-06 benchmark audit: mortgage FY2027 3,398M->3,110M (wrong-line transcription), GA -778M->-680M (corporate excluded), MD -149.6M->-115.2M (catch-up FY), OK -5.3B->-4.947B (TY2026 line); all other 94 external values verified against primary sources. | MA H5007 removed: benchmark exists only as press paraphrase, no primary source (suite policy: official published notes only). | 2026-07-06 wiring fixes (populace#342): MD repeal rescored with both tax-path components neutralized (456.1M, was a proven no-op at 0); IL benchmark switched to the combined EITC+CTC official figures (487.4M) matching the entangled repeal; YCTC/CO-CTC gap mechanisms annotated (populace#341, #340; #298 comment)."
 }
