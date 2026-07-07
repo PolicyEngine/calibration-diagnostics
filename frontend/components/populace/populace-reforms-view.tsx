@@ -60,6 +60,10 @@ const SUITE_META: Record<string, SuiteMeta> = {
     blurb:
       "Simulated baseline totals compared to published IRS SOI actuals for tax items that are not calibration targets. TY2023 actuals vs a 2024-period dataset — a one-year vintage gap plus growth applies, so populace should run slightly above.",
   },
+  "Federal EITC by state": {
+    blurb:
+      "The national federal EITC sliced to each state's households, compared to IRS EITC Central TY2024 administrative totals. The EITC is calibrated nationally (to an earlier SOI vintage), not per state — so a uniform few-percent undershoot is vintage, and state-specific deviations beyond it are geographic error. Flat-match state EITCs inherit this geography mechanically, which is why it is scored separately from the state-program suite.",
+  },
 };
 
 interface Suite {
