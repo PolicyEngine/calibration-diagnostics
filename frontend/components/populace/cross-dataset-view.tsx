@@ -4,7 +4,6 @@ import { useMemo } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmtMoney } from "@/components/shared/format";
-import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
@@ -161,46 +160,54 @@ export function CrossDatasetView() {
         description="Every dataset scored against the same official actuals — datasets compare by the calibration's own loss (mean capped squared relative error, the per-row term of the normalized target loss we optimize), with median |err| and coverage alongside. Ground truth stays the referee. External columns come from committed JSONs (scripts/score_external_dataset.py); federal-only files simply do not cover state-program rows, and that coverage gap is part of the comparison."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {datasets.map((d) => {
-          const loss = d.errors.length ? mean(d.errors.map(lossTerm)) : null;
-          const med = median(d.errors);
-          const within10 = d.errors.filter((e) => e <= 0.1).length;
-          return (
-            <KpiCard
-              key={d.label}
-              label={d.label}
-              delta={`${d.covered}/${totalRows} rows`}
-              value={
-                loss == null ? (
-                  "—"
-                ) : (
-                  <span className="flex items-baseline gap-1.5">
-                    <span>{loss.toFixed(3)}</span>
-                    <span className="text-xs font-normal text-muted-foreground">
-                      mean target loss
-                    </span>
-                  </span>
-                )
-              }
-              hint={
-                <span className="flex flex-col gap-0.5">
-                  <span>
-                    {med == null ? "no scored rows" : `${(med * 100).toFixed(1)}% median |err|`}
-                    {" · "}
-                    {within10} within 10%
-                  </span>
-                  {d.sub && (
-                    <span className="truncate text-[11px] opacity-80" title={d.sub}>
-                      {d.sub}
-                    </span>
-                  )}
-                </span>
-              }
-            />
-          );
-        })}
-      </div>
+      <SectionCard
+        title="Dataset scorecard"
+        description="Each dataset over the shared comparable surface, led by the calibration's own loss — mean capped squared relative error, the per-row term of the normalized target loss we optimize. Lower is better; median |err| and coverage are shown alongside."
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-3 py-2">Dataset</th>
+                <th className="px-3 py-2 text-right">Mean target loss</th>
+                <th className="px-3 py-2 text-right">Median |err|</th>
+                <th className="px-3 py-2 text-right">Within 10%</th>
+                <th className="px-3 py-2 text-right">Coverage</th>
+                <th className="px-3 py-2">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {datasets.map((d) => {
+                const loss = d.errors.length ? mean(d.errors.map(lossTerm)) : null;
+                const med = median(d.errors);
+                const within10 = d.errors.filter((e) => e <= 0.1).length;
+                return (
+                  <tr key={d.label} className="border-b last:border-0 hover:bg-muted/40">
+                    <td className="px-3 py-1.5 font-medium">{d.label}</td>
+                    <td className="px-3 py-1.5 text-right font-semibold tabular-nums">
+                      {loss == null ? "—" : loss.toFixed(3)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">
+                      {med == null ? "—" : `${(med * 100).toFixed(1)}%`}
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">
+                      {d.covered ? `${within10}/${d.covered}` : "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">
+                      {d.covered}/{totalRows}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                      <span className="block max-w-[26ch] truncate" title={d.sub}>
+                        {d.sub || "—"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
 
       <SectionCard
         title="Benchmark rows"
