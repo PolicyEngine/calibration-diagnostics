@@ -162,14 +162,15 @@ export function CrossDatasetView() {
 
       <SectionCard
         title="Dataset scorecard"
-        description="Each dataset over the shared comparable surface, led by the calibration's own loss — mean capped squared relative error, the per-row term of the normalized target loss we optimize. Lower is better; median |err| and coverage are shown alongside."
+        description="Each dataset over the shared comparable surface. Overall loss is the calibration's own loss functional — the summed capped squared relative error (the normalized target loss we optimize) over the rows a dataset covers; it is what the calibration minimizes, but it scales with coverage, so read it against the Coverage column. Mean loss divides that by covered rows for a coverage-fair comparison. Lower is better on both."
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-3 py-2">Dataset</th>
-                <th className="px-3 py-2 text-right">Mean target loss</th>
+                <th className="px-3 py-2 text-right">Overall loss</th>
+                <th className="px-3 py-2 text-right">Mean loss</th>
                 <th className="px-3 py-2 text-right">Median |err|</th>
                 <th className="px-3 py-2 text-right">Within 10%</th>
                 <th className="px-3 py-2 text-right">Coverage</th>
@@ -178,14 +179,19 @@ export function CrossDatasetView() {
             </thead>
             <tbody>
               {datasets.map((d) => {
-                const loss = d.errors.length ? mean(d.errors.map(lossTerm)) : null;
+                const terms = d.errors.map(lossTerm);
+                const totalLoss = terms.length ? terms.reduce((s, v) => s + v, 0) : null;
+                const meanLoss = mean(terms);
                 const med = median(d.errors);
                 const within10 = d.errors.filter((e) => e <= 0.1).length;
                 return (
                   <tr key={d.label} className="border-b last:border-0 hover:bg-muted/40">
                     <td className="px-3 py-1.5 font-medium">{d.label}</td>
                     <td className="px-3 py-1.5 text-right font-semibold tabular-nums">
-                      {loss == null ? "—" : loss.toFixed(3)}
+                      {totalLoss == null ? "—" : totalLoss.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">
+                      {meanLoss == null ? "—" : meanLoss.toFixed(3)}
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums">
                       {med == null ? "—" : `${(med * 100).toFixed(1)}%`}
