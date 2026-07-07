@@ -26,6 +26,35 @@ export function parseCountry(value: string | null | undefined): PopulaceCountry 
   return value === "uk" ? "uk" : "us";
 }
 
+// Release/run ids are interpolated into HuggingFace URLs that carry the
+// server's HF token, so an unvalidated id ("../../..") could redirect the
+// authenticated request to arbitrary paths after URL normalization. Every id
+// that reaches a URL path segment must pass this allowlist first. "latest" is
+// the one non-id sentinel callers may pass.
+const RELEASE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+export class InvalidReleaseIdError extends Error {}
+
+export function assertSafeReleaseId(id: string, label = "release"): string {
+  if (id === "latest" || id === "") return id;
+  if (!RELEASE_ID_RE.test(id)) {
+    throw new InvalidReleaseIdError(`Invalid ${label} id`);
+  }
+  return id;
+}
+
+// Route catch → HTTP: a bad id is the caller's fault (400); anything else is
+// an upstream/HF failure (502). Keeps status semantics consistent across routes.
+export function classifyApiError(error: unknown): { status: number; body: { detail: string } } {
+  if (error instanceof InvalidReleaseIdError) {
+    return { status: 400, body: { detail: error.message } };
+  }
+  return {
+    status: 502,
+    body: { detail: error instanceof Error ? error.message : String(error) },
+  };
+}
+
 export function populaceRepo(country: PopulaceCountry): string {
   return COUNTRY_REPO[country].repo;
 }
@@ -1517,8 +1546,20 @@ export function hfResolveUrl(path: string, country: PopulaceCountry = "us"): str
   return `https://huggingface.co/datasets/${repo}/resolve/${revision}/${path}`;
 }
 
+// A hung HF request would otherwise block the function for the whole route
+// maxDuration and pin the shared in-flight cache promise; cap each fetch.
+const HF_FETCH_TIMEOUT_MS = 20_000;
+
+async function hfFetch(url: string, revalidate: number): Promise<Response> {
+  return fetch(url, {
+    next: { revalidate },
+    headers: hfAuthHeaders(),
+    signal: AbortSignal.timeout(HF_FETCH_TIMEOUT_MS),
+  });
+}
+
 async function hfJson(url: string, revalidate: number): Promise<JsonObject> {
-  const res = await fetch(url, { next: { revalidate }, headers: hfAuthHeaders() });
+  const res = await hfFetch(url, revalidate);
   if (!res.ok) throw new Error(`HF fetch failed ${res.status}: ${url}`);
   return asObject(await res.json());
 }
@@ -1530,7 +1571,16 @@ export interface ReleaseEntry {
   has_calibration: boolean;
 }
 
-// Trailing timestamp/date in a build id, for newest-first ordering.
+// Trailing timestamp/date in a build id → a real timestamp for ordering. Ids
+// without the trailing YYYYMMDD[THHMMSSZ] sort oldest (rank 0) instead of
+// jumping to the top on a lexical whole-id compare.
+function releaseSortKey(id: string): number {
+  const m = /(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?$/.exec(id);
+  if (!m) return 0;
+  const [, y, mo, d, h = "00", mi = "00", s = "00"] = m;
+  return Date.UTC(+y, +mo - 1, +d, +h, +mi, +s);
+}
+
 function releaseDate(id: string): string {
   const m = /(\d{8}(?:T\d{6}Z)?)$/.exec(id);
   return m ? m[1] : id;
@@ -1541,19 +1591,29 @@ export async function loadReleases(
   country: PopulaceCountry = "us",
 ): Promise<ReleaseEntry[]> {
   const { repo, revision } = COUNTRY_REPO[country];
-  const url = `https://huggingface.co/api/datasets/${repo}/tree/${revision}/releases?recursive=true`;
-  const res = await fetch(url, { next: { revalidate }, headers: hfAuthHeaders() });
-  if (!res.ok) throw new Error(`HF tree failed ${res.status}`);
-  const tree = await res.json();
   const files = new Map<string, Set<string>>();
-  if (Array.isArray(tree)) {
-    for (const entry of tree) {
-      const item = asObject(entry);
-      if (item.type !== "file" || typeof item.path !== "string") continue;
-      const match = item.path.match(/^releases\/([^/]+)\/(.+)$/);
-      if (!match) continue;
-      (files.get(match[1]) ?? files.set(match[1], new Set()).get(match[1])!).add(match[2]);
+  // The HF tree endpoint paginates (~1000 entries/page via a Link cursor);
+  // follow every page so releases don't silently vanish as the repo grows.
+  let url: string | null =
+    `https://huggingface.co/api/datasets/${repo}/tree/${revision}/releases?recursive=true`;
+  let page = 0;
+  while (url && page < 50) {
+    const res: Response = await hfFetch(url, revalidate);
+    if (!res.ok) throw new Error(`HF tree failed ${res.status}`);
+    const tree = await res.json();
+    if (Array.isArray(tree)) {
+      for (const entry of tree) {
+        const item = asObject(entry);
+        if (item.type !== "file" || typeof item.path !== "string") continue;
+        const match = item.path.match(/^releases\/([^/]+)\/(.+)$/);
+        if (!match) continue;
+        (files.get(match[1]) ?? files.set(match[1], new Set()).get(match[1])!).add(match[2]);
+      }
     }
+    const link = res.headers.get("link") ?? "";
+    const next = /<([^>]+)>;\s*rel="next"/.exec(link);
+    url = next ? next[1] : null;
+    page += 1;
   }
   return [...files.entries()]
     .map(([release_id, set]) => ({
@@ -1562,7 +1622,7 @@ export async function loadReleases(
       files: [...set].sort(),
       has_calibration: set.has("calibration_diagnostics.json"),
     }))
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    .sort((a, b) => releaseSortKey(b.release_id) - releaseSortKey(a.release_id));
 }
 
 export async function loadPointerReleaseId(
@@ -1606,7 +1666,7 @@ async function loadReleaseUncached(
   revalidate: number,
   country: PopulaceCountry,
 ): Promise<Calibration> {
-  let id = releaseId;
+  let id = assertSafeReleaseId(releaseId);
   let updatedAt: string | null = null;
   if (releaseId === "latest" || !releaseId) {
     const ptr = await loadPointerReleaseId(revalidate, country);

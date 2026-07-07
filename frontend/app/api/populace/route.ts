@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   POPULACE_HF_REVISION,
   asObject,
+  classifyApiError,
   hfResolveUrl,
   latestPopulaceCalibrationHighlights,
   latestPopulaceCalibrationSummary,
@@ -51,9 +52,7 @@ export async function GET(request: Request) {
       }),
     );
   } catch (error) {
-    return NextResponse.json(
-      { detail: error instanceof Error ? error.message : String(error) },
-      { status: 502 },
-    );
+    const { status, body } = classifyApiError(error);
+    return NextResponse.json(body, { status });
   }
 }

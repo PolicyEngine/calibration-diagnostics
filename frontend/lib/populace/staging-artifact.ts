@@ -1,6 +1,7 @@
 import {
   type Calibration,
   asObject,
+  assertSafeReleaseId,
   buildCalibration,
   buildComparison,
   latestPopulaceCalibrationSummary,
@@ -206,19 +207,27 @@ export async function loadStagingRuns(revalidate: number) {
   }
 
   const byId = new Map(indexedRuns.map((run) => [run.run_id, run]));
-  const missing = [...runIds].filter((runId) => !byId.has(runId));
+  // Run ids are timestamp-prefixed, so descending order is newest-first: if
+  // there are more un-indexed runs than the fetch cap, keep the newest rather
+  // than dropping them arbitrarily (they'd otherwise silently vanish).
+  const missing = [...runIds]
+    .filter((runId) => !byId.has(runId))
+    .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+  const MAX_UNINDEXED_FETCH = 50;
   const fetched = await Promise.all(
-    missing.slice(0, 50).map(async (runId) => {
+    missing.slice(0, MAX_UNINDEXED_FETCH).map(async (runId) => {
       const progress = await stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate);
       return summaryFromProgress(runId, progress);
     }),
   );
   for (const run of fetched) byId.set(run.run_id, run);
+  const truncated = missing.length > MAX_UNINDEXED_FETCH;
 
   return {
     available: true,
     source_repo: POPULACE_STAGING_HF_REPO,
     revision: POPULACE_STAGING_HF_REVISION,
+    truncated,
     runs: [...byId.values()].sort(sortRuns),
   };
 }
@@ -243,6 +252,7 @@ export async function loadStagingCalibration(
   runId: string,
   revalidate: number,
 ): Promise<Calibration | null> {
+  assertSafeReleaseId(runId, "run");
   const progress = await stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate);
   const candidateReleaseId = stringValue(progress?.candidate_release_id) ?? runId;
   const diag = await stagingJsonOrNull(
@@ -264,6 +274,7 @@ export async function loadStagingCalibration(
 }
 
 export async function loadStagingRun(runId: string, revalidate: number): Promise<StagingRunDetail> {
+  assertSafeReleaseId(runId, "run");
   const [
     progress,
     runManifest,
@@ -311,6 +322,7 @@ export async function loadStagingReformValidationRaw(
   runId: string,
   revalidate: number,
 ): Promise<JsonObject | null> {
+  assertSafeReleaseId(runId, "run");
   return stagingJsonOrNull(`runs/${runId}/reform_validation.json`, revalidate);
 }
 

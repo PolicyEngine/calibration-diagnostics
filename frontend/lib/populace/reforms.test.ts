@@ -144,12 +144,22 @@ test("run-over-run series is chronological with an improvement delta", () => {
   expect(hist.releases.map((r) => r.release_id)).toEqual(["r1", "r2"]);
 });
 
-test("zero JCT score does not divide by zero", () => {
+test("zero JCT score leaves the row unscored, not a dollar delta as a ratio", () => {
   const v = buildReformValidation(
-    raw([{ id: "z", name: "Zero-cost", jct: { score: 0 }, populace: { budget_effect: 25 } }]),
+    raw([
+      { id: "z", name: "Zero-cost", jct: { score: 0 }, populace: { budget_effect: 25 } },
+      { id: "ok", name: "Scored", jct: { score: 1000 }, populace: { budget_effect: 1100 } },
+    ]),
     "rel-a",
   );
-  const row = v.rows[0];
-  expect(row.abs_error).toBe(25);
-  expect(Number.isFinite(row.relative_error!)).toBe(true);
+  const zero = v.rows[0];
+  // abs_error/direction still describe the row, but there is no relative error.
+  expect(zero.abs_error).toBe(25);
+  expect(zero.relative_error).toBeNull();
+  expect(zero.abs_relative_error).toBeNull();
+  expect(zero.within_10pct).toBeNull();
+  // The zero-benchmark row must not enter the scored aggregates (a raw $25
+  // treated as a fraction would blow up mean/median and within_10pct).
+  expect(v.summary.n_scored).toBe(1);
+  expect(v.summary.mean_abs_relative_error).toBeCloseTo(0.1, 6);
 });
