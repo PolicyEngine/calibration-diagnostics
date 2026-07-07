@@ -261,11 +261,42 @@ async function fetchReformValidation(
   }
 
   // The override is a committed backfill for releases whose native artifact
-  // ships un-simulated out-of-sample rows. Once a release republishes with
-  // out_of_sample_simulated === true, the native data is fresher and wins.
-  if (artifact && artifact.out_of_sample_simulated === true) return artifact;
+  // predates whole benchmark suites (SOI-actual, federal-EITC-by-state, the
+  // state-program suites) AND ships un-simulated out-of-sample rows. Merge by
+  // reform id rather than picking one side wholesale: when the native artifact
+  // re-simulated a reform (out_of_sample_simulated === true) its score is
+  // fresher and wins for that id, but the suites only the backfill carries must
+  // still come through — otherwise the cross-dataset view loses its entire
+  // comparable surface. When native is un-simulated, the backfill wins shared
+  // ids too, and any native-only reforms are still carried along.
+  if (artifact && override) {
+    return mergeReformSuites(artifact, override, artifact.out_of_sample_simulated === true);
+  }
   if (override) return override;
   return artifact;
+}
+
+// Union the native and backfilled reform lists by id. `preferNative` decides
+// which side wins a shared id; rows unique to the other side are always kept,
+// so no benchmark suite is dropped just because the two artifacts overlap.
+function mergeReformSuites(
+  artifact: JsonObject,
+  override: JsonObject,
+  preferNative: boolean,
+): JsonObject {
+  const reformsOf = (o: JsonObject): JsonObject[] =>
+    Array.isArray(o.reforms) ? (o.reforms as JsonObject[]) : [];
+  const idOf = (r: JsonObject): string | null => (typeof r.id === "string" ? r.id : null);
+
+  const winner = preferNative ? reformsOf(artifact) : reformsOf(override);
+  const filler = preferNative ? reformsOf(override) : reformsOf(artifact);
+  const seen = new Set(winner.map(idOf).filter((id): id is string => id != null));
+  const merged = [...winner, ...filler.filter((r) => idOf(r) != null && !seen.has(idOf(r)!))];
+
+  // Metadata (release_id, scoring window, the out_of_sample_simulated flag)
+  // comes from the winning side so downstream logic reads a consistent header.
+  const base = preferNative ? artifact : override;
+  return { ...base, reforms: merged };
 }
 
 export async function loadReformValidation(
