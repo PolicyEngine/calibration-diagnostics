@@ -63,10 +63,16 @@ function errClass(rel: number | null): string {
   return "text-rose-700";
 }
 
-function ErrCell({ rel }: { rel: number | null }) {
+function ValueErrCell({ value, rel }: { value: number | null; rel: number | null }) {
+  if (value == null) {
+    return <td className="px-3 py-1.5 text-right text-muted-foreground">—</td>;
+  }
   return (
-    <td className={`px-3 py-1.5 text-right tabular-nums ${errClass(rel)}`}>
-      {rel == null ? "—" : `${rel > 0 ? "+" : ""}${(rel * 100).toFixed(1)}%`}
+    <td className="px-3 py-1.5 text-right">
+      <div className="tabular-nums">{fmtMoney(value)}</div>
+      <div className={`text-xs tabular-nums ${errClass(rel)}`}>
+        {rel == null ? "" : `${rel > 0 ? "+" : ""}${(rel * 100).toFixed(1)}%`}
+      </div>
     </td>
   );
 }
@@ -155,7 +161,7 @@ export function CrossDatasetView() {
 
       <SectionCard
         title="Benchmark rows"
-        description="Official actual per row; per-dataset signed error vs that actual. — means the dataset cannot express the row (missing input base, no state model, or no file yet)."
+        description="Official actual per row; each dataset cell shows its simulated total and the signed error vs the actual. — means the dataset cannot express the row (missing input base, no state model, or no file yet)."
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -180,9 +186,9 @@ export function CrossDatasetView() {
                   <td className="px-3 py-1.5 text-right tabular-nums">
                     {fmtMoney(row.jct_score)}
                   </td>
-                  <ErrCell rel={populaceRel} />
+                  <ValueErrCell value={row.populace_estimate ?? null} rel={populaceRel} />
                   {externals.map((e, i) => (
-                    <ErrCell key={i} rel={e.rel} />
+                    <ValueErrCell key={i} value={e.value} rel={e.rel} />
                   ))}
                 </tr>
               ))}
