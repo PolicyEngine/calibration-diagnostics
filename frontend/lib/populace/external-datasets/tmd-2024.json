@@ -1,0 +1,20 @@
+{
+ "dataset": "tmd",
+ "label": "PSL TMD",
+ "engine": "taxcalc 6.7.1",
+ "source": "TMD 2.1.3 built in-house from the licensed 2015 IRS PUF + 2022 CPS (make tmd_files)",
+ "source_url": "https://github.com/PSLmodels/tax-microdata-benchmarking",
+ "year": 2024,
+ "notes": "PUF-derived: only these aggregate totals leave the build machine; the microdata is never committed or uploaded. Weights are national-only, so state EITC rows are out of coverage. taxcalc 6.7.1 models EITC/ACTC claiming probabilities in current law, so its credit totals embed a take-up model (populace pays all eligibles - see populace#341). Local build skipped the tips/overtime/auto-loan imputation stage (raw SIPP/CEX downloads not present) - irrelevant to these rows.",
+ "rows": {
+  "soi_income_tax_net": 2246952790449.963,
+  "soi_amt": 896720205.0104637,
+  "soi_cdcc": 4250089082.659669,
+  "soi_education_credits": 11281641978.14268,
+  "soi_savers_credit": 2306003410.7870836,
+  "soi_ctc_nonrefundable": 94793946040.16342,
+  "soi_ctc_refundable": 37006369346.94381,
+  "soi_niit": 58883032049.4712,
+  "soi_se_tax": 72604357907.73448
+ }
+}

@@ -93,13 +93,73 @@ def score_taxcalc_cps(year: int) -> dict:
     }
 
 
+def score_tmd(year: int, tmd_dir: Path) -> dict:
+    """Score a locally built PSL TMD file (PUF-derived — aggregates only leave
+    this machine; the microdata itself must never be committed or uploaded)."""
+    import taxcalc as tc
+
+    rec = tc.Records.tmd_constructor(
+        data_path=tmd_dir / "tmd.csv.gz",
+        weights_path=tmd_dir / "tmd_weights.csv.gz",
+        growfactors=tmd_dir / "tmd_growfactors.csv",
+    )
+    calc = tc.Calculator(policy=tc.Policy(), records=rec)
+    calc.advance_to_year(year)
+    calc.calc_all()
+
+    def total(expr):
+        return float((expr * calc.array("s006")).sum())
+
+    v = calc.array
+
+    rows: dict[str, float] = {
+        "soi_income_tax_net": total(v("iitax") - v("setax")),
+        "soi_amt": total(v("c09600")),
+        "soi_cdcc": total(v("c07180")),
+        "soi_education_credits": total(v("c07230")),
+        "soi_savers_credit": total(v("c07240")),
+        "soi_ctc_nonrefundable": total(v("c07220") + v("odc")),
+        "soi_ctc_refundable": total(v("c11070")),
+        "soi_niit": total(v("niit")),
+        "soi_se_tax": total(v("setax")),
+    }
+    # TMD carries national weights only — no geographic identifiers — so the
+    # federal-EITC-by-state rows are out of coverage by construction (the
+    # project publishes separate per-area weight files for sub-national work).
+
+    return {
+        "dataset": "tmd",
+        "label": "PSL TMD",
+        "engine": f"taxcalc {tc.__version__}",
+        "source": "TMD 2.1.3 built in-house from the licensed 2015 IRS PUF + 2022 CPS (make tmd_files)",
+        "source_url": "https://github.com/PSLmodels/tax-microdata-benchmarking",
+        "year": year,
+        "notes": (
+            "PUF-derived: only these aggregate totals leave the build machine; the "
+            "microdata is never committed or uploaded. Weights are national-only, so "
+            "state EITC rows are out of coverage. taxcalc 6.7.1 models EITC/ACTC "
+            "claiming probabilities in current law, so its credit totals embed a "
+            "take-up model (populace pays all eligibles - see populace#341). Local "
+            "build skipped the tips/overtime/auto-loan imputation stage (raw SIPP/CEX "
+            "downloads not present) - irrelevant to these rows."
+        ),
+        "rows": rows,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", required=True, choices=["taxcalc-cps"])
+    parser.add_argument("--dataset", required=True, choices=["taxcalc-cps", "tmd"])
     parser.add_argument("--year", type=int, default=2024)
+    parser.add_argument("--tmd-dir", type=Path, help="dir with tmd.csv.gz/weights/growfactors")
     args = parser.parse_args()
 
-    payload = score_taxcalc_cps(args.year)
+    if args.dataset == "tmd":
+        if not args.tmd_dir:
+            parser.error("--tmd-dir is required for --dataset tmd")
+        payload = score_tmd(args.year, args.tmd_dir)
+    else:
+        payload = score_taxcalc_cps(args.year)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / f"{args.dataset}-{args.year}.json"
     out.write_text(json.dumps(payload, indent=1))

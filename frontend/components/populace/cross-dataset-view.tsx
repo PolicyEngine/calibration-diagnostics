@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/hooks/use-populace";
 
 import taxcalcCps2024 from "@/lib/populace/external-datasets/taxcalc-cps-2024.json";
+import tmd2024 from "@/lib/populace/external-datasets/tmd-2024.json";
 
 // ---------------------------------------------------------------------------
 // Cross-dataset comparison: every dataset is scored against the SAME official
@@ -34,7 +35,10 @@ interface ExternalDataset {
   rows: Record<string, number>;
 }
 
-const EXTERNAL_DATASETS: ExternalDataset[] = [taxcalcCps2024 as ExternalDataset];
+const EXTERNAL_DATASETS: ExternalDataset[] = [
+  tmd2024 as ExternalDataset,
+  taxcalcCps2024 as ExternalDataset,
+];
 
 // Benchmark suites external federal-only datasets can express.
 const COMPARABLE_CATEGORIES = new Set(["IRS SOI actual", "Federal EITC by state"]);
