@@ -42,18 +42,20 @@ const EXTERNAL_DATASETS: ExternalDataset[] = [
 // Benchmark suites external federal-only datasets can express.
 const COMPARABLE_CATEGORIES = new Set(["IRS SOI actual", "Federal EITC by state"]);
 
-// Lead with the calibrator's own metric, not a descriptive median. The per-row
-// term of the normalized target loss is the capped squared relative error
-// (min(|err|, 2.0)² — the same LOSS_ERROR_CAP the calibration map uses so a
-// near-zero target can't blow the term up). We report its MEAN over each
-// dataset's covered rows, so datasets with different coverage stay comparable
-// (coverage itself is shown alongside). This is the number the calibration
-// optimizes toward; median |err| is kept as a secondary read.
+// Lead with the calibrator's OWN loss functional, not a descriptive median.
+// The calibration minimizes a capped weighted-MAPE — the mean of the capped
+// absolute relative error across targets (see pipeline.ts; the release's
+// "Final loss" is this same number over all targets). We reproduce that
+// functional over the shared comparable surface, unweighted, so datasets
+// compare apples-to-apples. It is therefore the same KIND of number as the
+// release Final loss but restricted to this slice (and unweighted), so it
+// reads higher than the all-targets release loss. Cap matches the calibration
+// map's LOSS_ERROR_CAP so a near-zero target can't blow a row up. Median |err|
+// is kept as a robustness read beside it.
 const LOSS_ERROR_CAP = 2.0; // 200%
 
-function lossTerm(absRelError: number): number {
-  const capped = Math.min(absRelError, LOSS_ERROR_CAP);
-  return capped * capped;
+function cappedError(absRelError: number): number {
+  return Math.min(absRelError, LOSS_ERROR_CAP);
 }
 
 function mean(values: number[]): number | null {
@@ -157,20 +159,19 @@ export function CrossDatasetView() {
     <div className="space-y-6">
       <PageHeader
         title="Cross-dataset comparison"
-        description="Every dataset scored against the same official actuals — datasets compare by the calibration's own loss (mean capped squared relative error, the per-row term of the normalized target loss we optimize), with median |err| and coverage alongside. Ground truth stays the referee. External columns come from committed JSONs (scripts/score_external_dataset.py); federal-only files simply do not cover state-program rows, and that coverage gap is part of the comparison."
+        description="Every dataset scored against the same official actuals — datasets compare by the calibration's own loss (capped-MAPE: the capped mean absolute relative error the calibrator minimizes, the same functional as the release Final loss but over this comparable slice), with median |err| and coverage alongside. Ground truth stays the referee. External columns come from committed JSONs (scripts/score_external_dataset.py); federal-only files simply do not cover state-program rows, and that coverage gap is part of the comparison."
       />
 
       <SectionCard
         title="Dataset scorecard"
-        description="Each dataset over the shared comparable surface. Overall loss is the calibration's own loss functional — the summed capped squared relative error (the normalized target loss we optimize) over the rows a dataset covers; it is what the calibration minimizes, but it scales with coverage, so read it against the Coverage column. Mean loss divides that by covered rows for a coverage-fair comparison. Lower is better on both."
+        description="Each dataset over the shared comparable surface. Loss is the calibration's own functional — the capped mean absolute relative error (capped-MAPE), the same metric as the release's Final loss, here restricted to this comparable slice and unweighted so datasets compare apples-to-apples. It therefore reads higher than the all-targets release loss. Lower is better; median |err| is a robustness read alongside."
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-3 py-2">Dataset</th>
-                <th className="px-3 py-2 text-right">Overall loss</th>
-                <th className="px-3 py-2 text-right">Mean loss</th>
+                <th className="px-3 py-2 text-right">Loss (capped MAPE)</th>
                 <th className="px-3 py-2 text-right">Median |err|</th>
                 <th className="px-3 py-2 text-right">Within 10%</th>
                 <th className="px-3 py-2 text-right">Coverage</th>
@@ -179,19 +180,14 @@ export function CrossDatasetView() {
             </thead>
             <tbody>
               {datasets.map((d) => {
-                const terms = d.errors.map(lossTerm);
-                const totalLoss = terms.length ? terms.reduce((s, v) => s + v, 0) : null;
-                const meanLoss = mean(terms);
+                const loss = mean(d.errors.map(cappedError));
                 const med = median(d.errors);
                 const within10 = d.errors.filter((e) => e <= 0.1).length;
                 return (
                   <tr key={d.label} className="border-b last:border-0 hover:bg-muted/40">
                     <td className="px-3 py-1.5 font-medium">{d.label}</td>
                     <td className="px-3 py-1.5 text-right font-semibold tabular-nums">
-                      {totalLoss == null ? "—" : totalLoss.toFixed(2)}
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
-                      {meanLoss == null ? "—" : meanLoss.toFixed(3)}
+                      {loss == null ? "—" : loss.toFixed(4)}
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums">
                       {med == null ? "—" : `${(med * 100).toFixed(1)}%`}
