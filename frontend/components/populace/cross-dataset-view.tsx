@@ -43,6 +43,25 @@ const EXTERNAL_DATASETS: ExternalDataset[] = [
 // Benchmark suites external federal-only datasets can express.
 const COMPARABLE_CATEGORIES = new Set(["IRS SOI actual", "Federal EITC by state"]);
 
+// Lead with the calibrator's own metric, not a descriptive median. The per-row
+// term of the normalized target loss is the capped squared relative error
+// (min(|err|, 2.0)² — the same LOSS_ERROR_CAP the calibration map uses so a
+// near-zero target can't blow the term up). We report its MEAN over each
+// dataset's covered rows, so datasets with different coverage stay comparable
+// (coverage itself is shown alongside). This is the number the calibration
+// optimizes toward; median |err| is kept as a secondary read.
+const LOSS_ERROR_CAP = 2.0; // 200%
+
+function lossTerm(absRelError: number): number {
+  const capped = Math.min(absRelError, LOSS_ERROR_CAP);
+  return capped * capped;
+}
+
+function mean(values: number[]): number | null {
+  if (!values.length) return null;
+  return values.reduce((s, v) => s + v, 0) / values.length;
+}
+
 function relError(estimate: number | null | undefined, benchmark: number | null | undefined) {
   if (estimate == null || benchmark == null || benchmark === 0) return null;
   return (estimate - benchmark) / Math.abs(benchmark);
@@ -139,7 +158,7 @@ export function CrossDatasetView() {
     <div className="space-y-6">
       <PageHeader
         title="Cross-dataset comparison"
-        description="Every dataset scored against the same official actuals — datasets compare by their errors, ground truth stays the referee. External columns come from committed JSONs (scripts/score_external_dataset.py); federal-only files simply do not cover state-program rows, and that coverage gap is part of the comparison."
+        description="Every dataset scored against the same official actuals — datasets compare by the calibration's own loss (mean capped squared relative error, the per-row term of the normalized target loss we optimize), with median |err| and coverage alongside. Ground truth stays the referee. External columns come from committed JSONs (scripts/score_external_dataset.py); federal-only files simply do not cover state-program rows, and that coverage gap is part of the comparison."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -149,10 +168,12 @@ export function CrossDatasetView() {
             label={d.label}
             value={
               d.errors.length
-                ? `${((median(d.errors) ?? 0) * 100).toFixed(1)}% median |err|`
+                ? `${(mean(d.errors.map(lossTerm)) ?? 0).toFixed(3)} mean target loss`
                 : "—"
             }
-            hint={`${d.covered}/${totalRows} rows · ${
+            hint={`${((median(d.errors) ?? 0) * 100).toFixed(1)}% median |err| · ${
+              d.covered
+            }/${totalRows} rows · ${
               d.errors.filter((e) => e <= 0.1).length
             } within 10%${d.sub ? ` · ${d.sub}` : ""}`}
           />
