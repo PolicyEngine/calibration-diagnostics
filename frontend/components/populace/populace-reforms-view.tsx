@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtMoney, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtMoney, fmtUnitValue, releaseLabel } from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -253,10 +253,10 @@ function ReformTable({
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                    {fmtMoney(row.jct_score)}
+                    {fmtUnitValue(row.jct_score, row.unit)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                    {fmtMoney(row.populace_estimate)}
+                    {fmtUnitValue(row.populace_estimate, row.unit)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5">
                     <ErrorCell absRel={row.abs_relative_error} />

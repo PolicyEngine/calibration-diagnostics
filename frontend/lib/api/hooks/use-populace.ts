@@ -489,6 +489,8 @@ export interface ReformValidationRow {
   populace_estimate?: number | null;
   populace_window?: string | null;
   populace_annual?: Record<string, number> | null;
+  /** "percent" for rate backtests (decimal fractions); USD otherwise. */
+  unit?: "currency-USD" | "percent" | null;
   abs_error?: number | null;
   relative_error?: number | null;
   abs_relative_error?: number | null;

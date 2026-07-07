@@ -93,6 +93,10 @@ export interface ReformValidationRow {
   populace_estimate: number | null;
   populace_window: string | null;
   populace_annual: Record<string, number> | null;
+  // Value unit: "currency-USD" (default) or "percent" for rate backtests
+  // (e.g. Census state SPM poverty rates, where the values are decimal
+  // fractions like 0.134 rather than dollars).
+  unit: "currency-USD" | "percent";
   // Derived (relative to jct_score, i.e. the FY2027 benchmark where available).
   abs_error: number | null; // populace − jct (USD)
   relative_error: number | null; // (populace − jct) / |jct|
@@ -157,6 +161,7 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
     description: stringOrNull(raw.description),
     in_sample: raw.in_sample === true,
     period: numberOrNull(raw.period),
+    unit: raw.unit === "percent" ? "percent" : "currency-USD",
     jct_score: benchmark,
     jct_score_fy2026: jctFy2026,
     jct_score_type: stringOrNull(jct.score_type),
