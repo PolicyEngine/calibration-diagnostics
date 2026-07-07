@@ -162,22 +162,44 @@ export function CrossDatasetView() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {datasets.map((d) => (
-          <KpiCard
-            key={d.label}
-            label={d.label}
-            value={
-              d.errors.length
-                ? `${(mean(d.errors.map(lossTerm)) ?? 0).toFixed(3)} mean target loss`
-                : "—"
-            }
-            hint={`${((median(d.errors) ?? 0) * 100).toFixed(1)}% median |err| · ${
-              d.covered
-            }/${totalRows} rows · ${
-              d.errors.filter((e) => e <= 0.1).length
-            } within 10%${d.sub ? ` · ${d.sub}` : ""}`}
-          />
-        ))}
+        {datasets.map((d) => {
+          const loss = d.errors.length ? mean(d.errors.map(lossTerm)) : null;
+          const med = median(d.errors);
+          const within10 = d.errors.filter((e) => e <= 0.1).length;
+          return (
+            <KpiCard
+              key={d.label}
+              label={d.label}
+              delta={`${d.covered}/${totalRows} rows`}
+              value={
+                loss == null ? (
+                  "—"
+                ) : (
+                  <span className="flex items-baseline gap-1.5">
+                    <span>{loss.toFixed(3)}</span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      mean target loss
+                    </span>
+                  </span>
+                )
+              }
+              hint={
+                <span className="flex flex-col gap-0.5">
+                  <span>
+                    {med == null ? "no scored rows" : `${(med * 100).toFixed(1)}% median |err|`}
+                    {" · "}
+                    {within10} within 10%
+                  </span>
+                  {d.sub && (
+                    <span className="truncate text-[11px] opacity-80" title={d.sub}>
+                      {d.sub}
+                    </span>
+                  )}
+                </span>
+              }
+            />
+          );
+        })}
       </div>
 
       <SectionCard
