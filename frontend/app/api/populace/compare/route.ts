@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  classifyApiError,
   loadComparison,
   loadPointerReleaseId,
   parseCountry,
@@ -28,9 +29,7 @@ export async function GET(request: Request) {
     const comparison = await loadComparison(a, b, revalidate, country);
     return NextResponse.json(scrub(comparison));
   } catch (error) {
-    return NextResponse.json(
-      { detail: error instanceof Error ? error.message : String(error) },
-      { status: 502 },
-    );
+    const { status, body } = classifyApiError(error);
+    return NextResponse.json(body, { status });
   }
 }

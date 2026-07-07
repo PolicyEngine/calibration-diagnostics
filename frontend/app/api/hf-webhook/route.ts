@@ -26,8 +26,16 @@ interface WebhookPayload {
 
 const TAG_PREFIX = "refs/tags/";
 
-function countryForRepo(repoName: string): PopulaceCountry {
-  return repoName.toLowerCase().includes("uk") ? "uk" : "us";
+// Only these repos may trigger a release alert. The webhook secret is shared
+// across US and UK, so without an allowlist a valid caller could spoof an
+// arbitrary repo name into either Slack channel.
+const ALLOWED_REPOS: Record<string, PopulaceCountry> = {
+  "policyengine/populace-us": "us",
+  "policyengine/populace-uk": "uk",
+};
+
+function countryForRepo(repoName: string): PopulaceCountry | null {
+  return ALLOWED_REPOS[repoName.toLowerCase()] ?? null;
 }
 
 // Constant-time secret check. HF sends the configured secret as the
@@ -57,18 +65,18 @@ export async function POST(request: Request) {
   }
 
   const repo = payload.repo?.name ?? "";
+  const country = countryForRepo(repo);
   const newTags = (payload.updatedRefs ?? [])
-    .filter((r) => r.ref?.startsWith(TAG_PREFIX) && r.oldSha === null && r.newSha)
+    // A newly created tag has no prior sha: oldSha is null OR absent.
+    .filter((r) => r.ref?.startsWith(TAG_PREFIX) && r.oldSha == null && r.newSha)
     .map((r) => r.ref.slice(TAG_PREFIX.length))
     .filter(Boolean);
 
-  // Acknowledge non-release events (commits, deletions, discussions) so HF
-  // doesn't retry them.
-  if (!repo || newTags.length === 0) {
+  // Acknowledge (200) non-release events and unknown repos so HF doesn't retry,
+  // but never alert for a repo outside the allowlist.
+  if (!country || newTags.length === 0) {
     return NextResponse.json({ ok: true, alerted: [] });
   }
-
-  const country = countryForRepo(repo);
   const alerted: string[] = [];
   for (const releaseId of newTags) {
     try {

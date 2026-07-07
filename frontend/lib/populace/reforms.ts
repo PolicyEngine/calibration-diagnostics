@@ -45,6 +45,7 @@
 import {
   POPULACE_HF_REPO,
   asObject,
+  assertSafeReleaseId,
   hfResolveUrl,
   loadPointerReleaseId,
   loadReleases,
@@ -135,12 +136,13 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
   const benchmark = jctFy2027 ?? jctFy2026;
   const estimate = numberOrNull(populace.budget_effect);
   const absError = benchmark != null && estimate != null ? estimate - benchmark : null;
+  // A zero benchmark has no meaningful relative error — leave it unscored
+  // rather than storing the raw dollar delta, which would otherwise be treated
+  // as a fraction and blow up within_10pct and the mean/median aggregates.
   const relError =
     benchmark != null && estimate != null && benchmark !== 0
       ? (estimate - benchmark) / Math.abs(benchmark)
-      : benchmark === 0 && absError != null
-        ? absError
-        : null;
+      : null;
   const absRel = relError == null ? null : Math.abs(relError);
   const annual = asObject(populace.annual);
   const annualClean: Record<string, number> = {};
@@ -234,16 +236,36 @@ async function fetchReformValidation(
   releaseId: string,
   revalidate: number,
 ): Promise<JsonObject | null> {
-  // A committed correction takes precedence over the published artifact for
-  // releases backfilled after the build pipeline fix (see reform-overrides.ts).
-  const override = REFORM_OVERRIDES[releaseId];
-  if (override) return asObject(override);
+  const override = REFORM_OVERRIDES[releaseId]
+    ? asObject(REFORM_OVERRIDES[releaseId])
+    : null;
 
-  const url = hfResolveUrl(`releases/${releaseId}/${REFORM_VALIDATION_FILE}`);
-  const res = await fetch(url, { next: { revalidate } });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`HF fetch failed ${res.status}: ${url}`);
-  return asObject(await res.json());
+  const url = hfResolveUrl(
+    `releases/${assertSafeReleaseId(releaseId)}/${REFORM_VALIDATION_FILE}`,
+  );
+  let artifact: JsonObject | null = null;
+  try {
+    const res = await fetch(url, {
+      next: { revalidate },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (res.ok) artifact = asObject(await res.json());
+    else if (res.status !== 404) {
+      throw new Error(`HF fetch failed ${res.status}: ${url}`);
+    }
+  } catch (error) {
+    // If the native artifact can't be read, still serve the committed override
+    // (that is exactly the release it was backfilled for). Only surface the
+    // error when there is no override to fall back to.
+    if (!override) throw error;
+  }
+
+  // The override is a committed backfill for releases whose native artifact
+  // ships un-simulated out-of-sample rows. Once a release republishes with
+  // out_of_sample_simulated === true, the native data is fresher and wins.
+  if (artifact && artifact.out_of_sample_simulated === true) return artifact;
+  if (override) return override;
+  return artifact;
 }
 
 export async function loadReformValidation(
@@ -291,6 +313,8 @@ export interface ReformHistorySeries {
   points: ReformHistoryPoint[]; // chronological, oldest → newest
   latest_abs_relative_error: number | null;
   delta: number | null; // newest |rel err| − previous |rel err| (− = improving)
+  last_seen_release: string | null;
+  retired: boolean; // absent from the newest release (renamed/removed row id)
 }
 
 export interface ReformHistory {
@@ -318,11 +342,18 @@ export function buildReformHistory(
           points: [],
           latest_abs_relative_error: null,
           delta: null,
+          last_seen_release: null,
+          retired: false,
         };
         series.set(row.id, s);
       }
       s.name = row.name;
       s.jct_score = row.jct_score ?? s.jct_score;
+      // Keep classification current with the latest release the row appears in,
+      // not frozen at first sighting.
+      s.category = row.category;
+      s.in_sample = row.in_sample;
+      s.last_seen_release = build.release_id;
       s.points.push({
         release_id: build.release_id,
         date: build.date,
@@ -332,19 +363,26 @@ export function buildReformHistory(
       });
     }
   }
+  const newestReleaseId = chronological[chronological.length - 1]?.release_id ?? null;
   const reforms = [...series.values()].map((s) => {
+    const retired = s.last_seen_release !== newestReleaseId;
     const scored = s.points.filter((p) => p.abs_relative_error != null);
     const latest = scored[scored.length - 1]?.abs_relative_error ?? null;
     const prev = scored[scored.length - 2]?.abs_relative_error ?? null;
     return {
       ...s,
-      latest_abs_relative_error: latest,
-      delta: latest != null && prev != null ? latest - prev : null,
+      retired,
+      // A retired row's last error is stale, not current — don't report it as
+      // the latest fit (it would otherwise rank among live reforms as if now).
+      latest_abs_relative_error: retired ? null : latest,
+      delta: !retired && latest != null && prev != null ? latest - prev : null,
     };
   });
-  // Worst-fitting (or most-recently-regressed) reforms first.
+  // Live reforms ranked worst-first; retired rows sink below all of them.
   reforms.sort(
-    (a, b) => (b.latest_abs_relative_error ?? -1) - (a.latest_abs_relative_error ?? -1),
+    (a, b) =>
+      Number(a.retired) - Number(b.retired) ||
+      (b.latest_abs_relative_error ?? -1) - (a.latest_abs_relative_error ?? -1),
   );
   return {
     releases: chronological.map((b) => ({ release_id: b.release_id, date: b.date })),
@@ -364,7 +402,11 @@ export async function loadReformHistory(revalidate: number): Promise<ReformHisto
           date: r.date,
           validation: buildReformValidation(raw, r.release_id),
         };
-      } catch {
+      } catch (error) {
+        // Best-effort: a release that fails to load is dropped from the
+        // history rather than failing the whole view — but log it so a
+        // transient HF failure isn't mistaken for "release has no reforms."
+        console.error(`Reform history: skipped ${r.release_id}:`, error);
         return null;
       }
     }),

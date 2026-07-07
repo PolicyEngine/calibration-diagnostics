@@ -58,6 +58,13 @@ class handler(BaseHTTPRequestHandler):
         if not re.match(r"^\d{4}$", period):
             _json_response(self, 400, {"detail": "Period must be a four-digit year."})
             return
+        # release flows into an HF URL path and a /tmp sentinel filename; reject
+        # traversal/injection before it reaches either.
+        if requested_release != "latest" and not re.match(
+            r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$", requested_release
+        ):
+            _json_response(self, 400, {"detail": "Invalid release id."})
+            return
 
         try:
             release = resolve_release_id(repo, hf_revision, requested_release)
@@ -70,6 +77,6 @@ class handler(BaseHTTPRequestHandler):
             )
             _json_response(self, 200, result)
         except VariableCalculationError as exc:
-            _json_response(self, 502, {"detail": str(exc)})
+            _json_response(self, getattr(exc, "status_code", 502), {"detail": str(exc)})
         except Exception as exc:
             _json_response(self, 502, {"detail": f"Variable calculation failed: {exc}"})

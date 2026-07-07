@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  classifyApiError,
   latestPopulaceTargetDiagnosticsPage,
   loadRelease,
   parseCountry,
@@ -29,9 +30,7 @@ export async function GET(request: Request) {
     const cal = await loadRelease(release, revalidate, country);
     return NextResponse.json(scrub(latestPopulaceTargetDiagnosticsPage(request.url, cal)));
   } catch (error) {
-    return NextResponse.json(
-      { detail: error instanceof Error ? error.message : String(error) },
-      { status: 502 },
-    );
+    const { status, body } = classifyApiError(error);
+    return NextResponse.json(body, { status });
   }
 }

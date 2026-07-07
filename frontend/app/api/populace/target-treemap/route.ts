@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  classifyApiError,
   loadRelease,
   parseCountry,
   populaceTargetTreemap,
@@ -22,9 +23,7 @@ export async function GET(request: Request) {
       scrub(populaceTargetTreemap(cal.rows, cal.release_id, level)),
     );
   } catch (error) {
-    return NextResponse.json(
-      { detail: error instanceof Error ? error.message : String(error) },
-      { status: 502 },
-    );
+    const { status, body } = classifyApiError(error);
+    return NextResponse.json(body, { status });
   }
 }

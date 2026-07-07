@@ -82,10 +82,22 @@ STATE_FIPS = {
 
 
 class VariableCalculationError(RuntimeError):
-    """User-facing calculation failure."""
+    """User-facing calculation failure.
+
+    ``status_code`` lets the HTTP handler distinguish a caller error (400,
+    unknown variable), a capacity refusal (503, dataset too large for the
+    host — retryable elsewhere), and an upstream failure (502, default).
+    """
+
+    def __init__(self, message: str, status_code: int = 502) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 _SIM_CACHE: dict[tuple[str, str, str, str | None], tuple[str, Any]] = {}
+# Max state-filtered sims kept resident (plus the national sim); each pins a
+# full Microsimulation, so this caps warm-instance memory.
+_MAX_STATE_SIMS = 3
 
 
 # Sentinel .h5 path -> the release H5 bytes held in RAM. Populated only when
@@ -142,6 +154,27 @@ def _download_dataset(hf_hub_download: Any, repo: str, filename: str, revision: 
     streamed into RAM and served through HDF5's in-memory core driver instead,
     charged to the function's much larger memory allocation.
     """
+    # If the file plainly can't fit on the ephemeral disk, don't waste tens of
+    # seconds and hundreds of MB of egress on a download that will ENOSPC —
+    # go straight to the RAM path (which applies the memory guard and refuses
+    # cleanly on a small-memory host). Only pre-skip when we can positively
+    # confirm the file won't fit; otherwise fall through to the normal path.
+    import shutil
+
+    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{filename}"
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    auth = {"Authorization": f"Bearer {token}"} if token else {}
+    size = _url_content_length(url, auth)
+    cache_root = os.environ.get("HF_HUB_CACHE", "/tmp/huggingface/hub")
+    try:
+        os.makedirs(cache_root, exist_ok=True)
+        free = shutil.disk_usage(cache_root).free
+    except OSError:
+        free = None
+    # 1.2x headroom for HF's temp/blob copy during download.
+    if size is not None and free is not None and size * 1.2 > free:
+        return _load_release_into_ram(repo, filename, revision)
+
     try:
         return hf_hub_download(
             repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
@@ -218,7 +251,8 @@ def _load_release_into_ram(repo: str, filename: str, revision: str) -> str:
             f"This release's dataset{size_note} is too large to compute in the "
             f"hosted environment ({limit_note}; a full microsimulation needs "
             "over 3GB). Run the variable lookup locally, or point the endpoint "
-            "at a higher-memory backend."
+            "at a higher-memory backend.",
+            status_code=503,
         )
 
     # Drop other releases held in RAM (image + any cached simulation) so only
@@ -326,9 +360,18 @@ def finite_float(value: Any) -> float | None:
 def resolve_release_id(repo: str, revision: str, requested_release: str) -> str:
     if requested_release != "latest":
         return requested_release
+    from urllib.request import Request
+
     url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/latest.json"
+    # Attach the token so a private/gated repo's pointer resolves too — the H5
+    # download already authenticates, so an unauthenticated pointer fetch would
+    # be the odd one out and fail on any non-public repo.
+    request = Request(url)
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
     try:
-        with urlopen(url, timeout=20) as response:
+        with urlopen(request, timeout=20) as response:
             pointer = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise VariableCalculationError(f"Could not resolve latest Populace release: {exc}") from exc
@@ -422,6 +465,13 @@ def calculate_variables(
             )
             sim = Microsimulation(dataset=sim_dataset)
             _SIM_CACHE[cache_key] = (dataset_path, sim)
+            # Bound the cache: each state-filtered sim pins another full
+            # Microsimulation, so an unbounded cache OOMs a warm host serving
+            # lookups across many states. Keep the national sim plus the few
+            # most-recent state sims (dict preserves insertion order).
+            state_keys = [k for k in _SIM_CACHE if k[3] is not None]
+            while len(state_keys) > _MAX_STATE_SIMS:
+                _SIM_CACHE.pop(state_keys.pop(0), None)
             return sim
 
         results = []
@@ -429,6 +479,10 @@ def calculate_variables(
             variable_started = time.time()
             sim = get_sim(state_prefix_for_variable(variable_name))
             variable = sim.tax_benefit_system.get_variable(variable_name)
+            if variable is None:
+                raise VariableCalculationError(
+                    f"Unknown variable: {variable_name}", status_code=400
+                )
             values = sim.calculate(variable_name, period)
             raw_values = np.asarray(sim.calculate(variable_name, period, use_weights=False))
             weights = np.asarray(getattr(values, "weights", []))
