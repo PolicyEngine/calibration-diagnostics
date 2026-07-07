@@ -73,6 +73,20 @@ export function fmtCompact(value: number | null | undefined): string {
   return `${sign}${abs.toFixed(0)}`;
 }
 
+/** Format a validation value by its payload unit: "percent" rows hold
+ *  decimal fractions (0.134 -> "13.4%"); everything else is USD. */
+export function fmtUnitValue(
+  value: number | null | undefined,
+  unit: string | null | undefined,
+): string {
+  if (unit === "percent") {
+    return value == null || !Number.isFinite(value)
+      ? "—"
+      : `${(value * 100).toFixed(1)}%`;
+  }
+  return fmtMoney(value);
+}
+
 export function fmtMoney(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
