@@ -413,7 +413,7 @@ function GeographyCoverageSection({
               <span
                 key={district}
                 className={`rounded border border-border px-2 py-0.5 ${
-                  count < 50 ? "text-red-600" : "text-muted-foreground"
+                  count < 50 ? "text-destructive" : "text-muted-foreground"
                 }`}
               >
                 {district}: {count}
