@@ -1463,6 +1463,10 @@ export interface Calibration {
   included_target_count: number;
   build_manifest: JsonObject;
   release_manifest: JsonObject;
+  // demographics.json geography_coverage: unweighted household-record counts
+  // by state / congressional district (the release's sub-national resolution
+  // floor). Null for releases published before the section existed.
+  geography_coverage: JsonObject | null;
   rows: TargetRow[];
 }
 
@@ -1499,6 +1503,7 @@ export function buildCalibration(
   updatedAt: string | null = null,
   buildManifest: JsonObject = {},
   releaseManifest: JsonObject = {},
+  demographics: JsonObject = {},
 ): Calibration {
   const targets = Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : [];
   const skipped = Array.isArray(diag.skipped) ? (diag.skipped as JsonObject[]) : [];
@@ -1536,6 +1541,9 @@ export function buildCalibration(
     included_target_count: includedTargetCount,
     build_manifest: buildManifest,
     release_manifest: releaseManifest,
+    geography_coverage: Object.keys(asObject(demographics.geography_coverage)).length
+      ? asObject(demographics.geography_coverage)
+      : null,
     rows,
   };
 }
@@ -1674,12 +1682,13 @@ async function loadReleaseUncached(
     updatedAt = ptr.updated_at;
   }
   const prefix = `releases/${id}`;
-  const [diag, buildManifest, releaseManifest] = await Promise.all([
+  const [diag, buildManifest, releaseManifest, demographics] = await Promise.all([
     hfJson(hfResolveUrl(`${prefix}/calibration_diagnostics.json`, country), revalidate),
     hfJson(hfResolveUrl(`${prefix}/build_manifest.json`, country), revalidate).catch(() => ({})),
     hfJson(hfResolveUrl(`${prefix}/release_manifest.json`, country), revalidate).catch(() => ({})),
+    hfJson(hfResolveUrl(`${prefix}/demographics.json`, country), revalidate).catch(() => ({})),
   ]);
-  return buildCalibration(diag, id, updatedAt, buildManifest, releaseManifest);
+  return buildCalibration(diag, id, updatedAt, buildManifest, releaseManifest, demographics);
 }
 
 function targetDiagnosticsMetadata(rows: TargetRow[]): TargetDiagnosticsMetadata {
@@ -1938,6 +1947,7 @@ export function latestPopulaceCalibrationSummary(cal: Calibration) {
     total_targets: cal.rows.length,
     within_tolerance_count: withinToleranceCount(cal.rows),
     family_fit: familyFitSummary(cal.rows),
+    geography_coverage: cal.geography_coverage,
   };
 }
 

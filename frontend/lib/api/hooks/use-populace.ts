@@ -149,6 +149,16 @@ export interface PopulaceFamilyFitRow {
   mean_abs_relative_error: number | null;
 }
 
+export interface GeographyCoverageBlock {
+  n_geographies?: number | null;
+  household_records_min?: number | null;
+  household_records_median?: number | null;
+  household_records_max?: number | null;
+  n_under_50?: number | null;
+  n_under_100?: number | null;
+  counts?: Record<string, number>;
+}
+
 export interface PopulaceCalibration {
   available: boolean;
   path?: string | null;
@@ -159,6 +169,11 @@ export interface PopulaceCalibration {
   l0_lambda?: number | null;
   n_nonzero?: number | null;
   n_records?: number | null;
+  geography_coverage?: {
+    unit?: string;
+    states?: GeographyCoverageBlock | null;
+    congressional_districts?: GeographyCoverageBlock | null;
+  } | null;
   initial_loss?: number | null;
   final_loss?: number | null;
   loss_kind?: "normalized_target_loss" | "raw_optimizer_objective";
