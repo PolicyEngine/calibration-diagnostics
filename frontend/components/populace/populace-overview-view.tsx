@@ -20,6 +20,7 @@ import {
   usePopulaceReleases,
   usePopulaceTargetTreemap,
 } from "@/lib/api/hooks/use-populace";
+import type { GeographyCoverageBlock } from "@/lib/api/hooks/use-populace";
 
 function formatPublishedAt(value: string | null | undefined): string {
   if (!value) return "—";
@@ -209,6 +210,8 @@ export function PopulaceOverviewView() {
         <KpiCard label="Published" value={formatPublishedAt(data.updated_at)} />
       </div>
 
+      <GeographyCoverageSection coverage={cal.geography_coverage ?? null} />
+
       <SectionCard
         title="Calibration map"
         actions={
@@ -378,5 +381,80 @@ export function PopulaceOverviewView() {
         </ul>
       </SectionCard>
     </div>
+  );
+}
+
+/** Household-record counts by geography — the release's sub-national
+ *  resolution floor. Records, not weights: no calibration can rescue a
+ *  geography with too few underlying records (48 districts under 50 in the
+ *  2026-07 national-only release blocked district features downstream). */
+function GeographyCoverageSection({
+  coverage,
+}: {
+  coverage: {
+    unit?: string;
+    states?: GeographyCoverageBlock | null;
+    congressional_districts?: GeographyCoverageBlock | null;
+  } | null;
+}) {
+  const districts = coverage?.congressional_districts ?? null;
+  const states = coverage?.states ?? null;
+  if (!districts && !states) return null;
+  const under50 = districts?.n_under_50 ?? null;
+  const thinnest = districts?.counts
+    ? Object.entries(districts.counts)
+        .sort((a, b) => a[1] - b[1])
+        .slice(0, 10)
+    : [];
+  return (
+    <SectionCard
+      title="Geography coverage"
+      description="Unweighted household records per geography — the resolution floor for sub-national analysis. Districts need enough records, not just calibrated weights."
+    >
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KpiCard
+          label="Congressional districts"
+          value={districts?.n_geographies == null ? "—" : fmt(districts.n_geographies, { digits: 0 })}
+        />
+        <KpiCard
+          label="Median records / district"
+          value={districts?.household_records_median == null ? "—" : fmt(districts.household_records_median, { digits: 0 })}
+        />
+        <KpiCard
+          label={
+            <HelpHint
+              label="Districts under 50 records"
+              tooltip="Districts with fewer than 50 household records cannot support district-level rate estimates. Zero here is the readiness bar for congressional-district features."
+            />
+          }
+          value={under50 == null ? "—" : fmt(under50, { digits: 0 })}
+          delta={under50 == null ? undefined : under50 === 0 ? "district-ready" : "blocks district analysis"}
+          tone={under50 == null ? undefined : under50 === 0 ? "positive" : "negative"}
+        />
+        <KpiCard
+          label="Min records / state"
+          value={states?.household_records_min == null ? "—" : fmt(states.household_records_min, { digits: 0 })}
+        />
+      </div>
+      {thinnest.length > 0 && (under50 ?? 0) > 0 && (
+        <div className="mt-4">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Thinnest districts
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs tabular-nums">
+            {thinnest.map(([district, count]) => (
+              <span
+                key={district}
+                className={`rounded border border-border px-2 py-0.5 ${
+                  count < 50 ? "text-red-600" : "text-muted-foreground"
+                }`}
+              >
+                {district}: {count}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </SectionCard>
   );
 }
