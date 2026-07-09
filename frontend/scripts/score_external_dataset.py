@@ -1,171 +1,267 @@
-"""Score an external microdata file against the dashboard's benchmark surface.
+"""Score external tax microdata against PolicyEngine's national calibration targets.
 
-Currently supports the Tax-Calculator public CPS file (ships in `pip install
-taxcalc`). Emits a committed JSON keyed by the same benchmark ids the
-reform-validation suites use, so the Cross-dataset comparison view can join it
-to official actuals with no server-side work.
+The Cross-dataset comparison scores every dataset (populace + external tax
+microdata) against the SAME surface: the model's own *national calibration
+targets* (official IRS/SOI/etc. actuals the US microdata is built to match). The
+benchmark set is therefore not hand-picked — it is exactly what the calibration
+optimizes toward. populace covers ~all targets; a federal tax-unit engine
+(Tax-Calculator public CPS, PSL TMD) covers the IRS-SOI tax concepts it can
+express, and that coverage gap is part of the comparison.
 
-Run (any venv with taxcalc installed):
-    python frontend/scripts/score_external_dataset.py --dataset taxcalc-cps --year 2024
+Pipeline:
+  1. `--build-spec` fetches the release's national targets (target-diagnostics,
+     level=national) and writes a target-spec JSON: one row per target cell with
+     its parsed AGI income-band edges, EITC qualifying-children group, filing
+     status, official value and populace estimate.
+  2. `--score` runs Tax-Calculator (CPS and/or TMD) once, reproduces each cell's
+     breakdown (AGI band + EITC children + subpopulation filter), and emits a
+     committed JSON keyed by target `name` -> value. The frontend joins those to
+     the live target surface.
 
-Concept mappings (taxcalc -> benchmark id), with the deliberate deltas:
-- soi_income_tax_net  <- iitax - setax. taxcalc's iitax includes othertaxes
-  (SE tax, NIIT, penalty taxes) net of refundable credits; SOI's "total income
-  tax minus refundable credits" includes NIIT but books SE tax outside income
-  tax, so SE tax is subtracted. Penalty taxes (~0.3%) remain inside, same
-  small scope wedge the populace row documents.
-- soi_ctc_nonrefundable <- c07220 + odc (SOI line is CTC+ODC combined).
-- soi_ctc_refundable    <- c11070 (refundable CTC/ACTC).
-- soi_cdcc <- c07180, soi_education_credits <- c07230, soi_savers_credit <- c07240,
-  soi_amt <- c09600, soi_niit <- niit, soi_se_tax <- setax.
-- fed_eitc_{state} <- eitc summed over records with the state's FIPS code.
-  CPS state samples are small and taxcalc does not calibrate geography; the
-  comparison view exists to make exactly that visible.
+Run (a venv with taxcalc installed):
+    python frontend/scripts/score_external_dataset.py --build-spec --spec /tmp/target_spec.json
+    python frontend/scripts/score_external_dataset.py --score --spec /tmp/target_spec.json \
+        --dataset cps --dataset tmd --tmd-dir /path/to/tmd/storage/output
 
-Not mappable from taxcalc (no state tax model, no benefit programs): all
-State-program rows, state reform rows, OBBBA rows (engine-reform phase 2).
+Concept mapping (PolicyEngine variable -> taxcalc variable), verified against each
+concept's grand total vs BOTH the official IRS value and populace; a concept whose
+grand total lands >40% off both is dropped for that dataset rather than guessed.
+Subpopulation filters mirror populace: SOI table 2.1 -> itemizers (c04470>0);
+table 2.5 AGI -> EITC returns (c59660!=0). EITC children via taxcalc EIC
+(EIC==n for 0/1/2, EIC>=3 for "3 or more").
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
+import re
+import urllib.request
 from pathlib import Path
-
-FIPS_TO_STATE = {
-    36: "NY", 34: "NJ", 17: "IL", 26: "MI", 8: "CO", 9: "CT", 35: "NM",
-    20: "KS", 22: "LA", 19: "IA", 50: "VT", 40: "OK", 31: "NE", 44: "RI",
-    30: "MT", 18: "IN", 15: "HI", 23: "ME",
-}
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "lib" / "populace" / "external-datasets"
 
+# PolicyEngine variable name -> taxcalc variable (weighted sum for "total";
+# weighted count of nonzero for "count"). Keyed by the target's `variable` label.
+CONCEPT_TO_TAXCALC = {
+    "adjusted gross income": lambda A: A("c00100"),
+    "employment income": lambda A: A("e00200"),
+    "business net profits": lambda A: A("e00900"),
+    "taxable interest income": lambda A: A("e00300"),
+    "tax exempt interest income": lambda A: A("e00400"),
+    "ordinary dividend income": lambda A: A("e00600"),
+    "qualified dividends": lambda A: A("e00650"),
+    "ira distributions": lambda A: A("e01400"),
+    "taxable pension income": lambda A: A("e01700"),
+    "taxable social security": lambda A: A("c02500"),
+    "unemployment compensation": lambda A: A("e02300"),
+    "salt deduction": lambda A: A("c18300"),
+    "real estate taxes": lambda A: A("e18500"),
+    "interest deduction": lambda A: A("c19200"),
+    "charitable deduction": lambda A: A("c19700"),
+    "medical expense deduction": lambda A: A("c17000"),
+    "qualified business income deduction": lambda A: A("qbided"),
+    "taxable income": lambda A: A("c04800"),
+    "income tax before credits": lambda A: A("c05800"),
+    "income tax": lambda A: A("iitax"),
+    "eitc": lambda A: A("c59660"),
+    "refundable ctc": lambda A: A("c11070"),
+    "ctc": lambda A: A("c07220") + A("c11070") + A("odc"),
+    "capital gains gross": lambda A: A("c01000"),
+    "itemized taxable income deductions": lambda A: A("c04470"),
+    "partnership and s corp income": lambda A: A("e26270"),
+}
 
-def score_taxcalc_cps(year: int) -> dict:
+# Concepts with no clean taxcalc equivalent, or whose grand total is verified
+# >40% off both the official and populace value, are dropped (not guessed).
+COMMON_DROP = {"rent and royalty net income", "assigned aca ptc", "count"}
+# Public CPS structurally mis-represents these (capital gains / partnership are
+# ~zero; several deductions are heavily over-imputed).
+CPS_DROP = COMMON_DROP | {
+    "capital gains gross", "partnership and s corp income", "real estate taxes", "ctc",
+    "interest deduction", "ira distributions", "itemized taxable income deductions",
+    "ordinary dividend income", "qualified business income deduction", "salt deduction",
+    "tax exempt interest income",
+}
+TMD_DROP = COMMON_DROP | {"real estate taxes", "ctc"}
+
+
+# --- 1. build the target spec from the national target surface ----------------
+def _parse_band(label):
+    """Parse an SOI income-band label ('10k to 11k', '1m plus', 'under 1') to
+    [lo, hi] AGI dollar edges. 'All'/'Total' -> None (aggregate over bands)."""
+    if label in ("All", "Total", None):
+        return None
+    s = label.lower().strip()
+
+    def num(tok):
+        tok = tok.strip()
+        m = re.match(r"([\d.]+)\s*([km]?)", tok)
+        if not m:
+            return None
+        return float(m.group(1)) * {"k": 1e3, "m": 1e6, "": 1}[m.group(2)]
+
+    if s == "under 1":
+        return [None, 1.0]
+    if s.endswith("plus"):
+        return [num(s.replace("plus", "")), None]
+    if " to " in s:
+        a, b = s.split(" to ")
+        return [num(a), num(b)]
+    raise ValueError(f"unparsed income band: {label!r}")
+
+
+_CHILD = {
+    "no qualifying children": 0, "one qualifying child": 1, "two qualifying children": 2,
+    "three or more qualifying children": 3, "all qualifying children": "all", "All": "all",
+}
+
+
+def build_spec(base_url: str, spec_path: Path) -> None:
+    url = f"{base_url}/api/populace/target-diagnostics?level=national&limit=500"
+    data = json.load(urllib.request.urlopen(url))
+    rows = []
+    for t in data["targets"]:
+        dims = {d["key"]: d for d in (t.get("target_dimensions") or [])}
+        rows.append({
+            "name": t["name"], "source": t["source"], "base_name": t.get("base_name"),
+            "variable": t["variable"], "measure": t["measure"],
+            "band": _parse_band(dims.get("bd_income_band", {}).get("value")),
+            "children": _CHILD.get(dims.get("bd_qualifying_children", {}).get("value"),
+                                   dims.get("bd_qualifying_children", {}).get("value")),
+            "target": t.get("target"), "populace": t.get("final_estimate"),
+            "expressible_source": t["source"] == "irs_soi",
+        })
+    spec_path.write_text(json.dumps(rows, indent=1))
+    print(f"wrote {len(rows)} target specs -> {spec_path}")
+
+
+# --- 2. score a dataset against the spec --------------------------------------
+def _subpop_mask(x, calc):
+    """Mirror the subpopulation populace filters on (base_name)."""
+    bn = x["base_name"] or ""
+    if "table_2_1" in bn:  # itemized_all_returns -> itemizers
+        return calc.array("c04470") > 0
+    if "table_2_5" in bn and x["variable"] == "adjusted gross income":  # AGI of EITC returns
+        return calc.array("c59660") != 0
+    return None
+
+
+def _cell(x, arr, calc, s, agi, eic):
     import numpy as np
+
+    m = np.ones(len(s), bool)
+    band = x["band"]
+    if band is not None:
+        lo = -math.inf if band[0] is None else band[0]
+        hi = math.inf if band[1] is None else band[1]
+        m &= (agi >= lo) & (agi < hi)
+    ch = x["children"]
+    if isinstance(ch, int):
+        m &= (eic >= 3) if ch >= 3 else (eic == ch)
+    sp = _subpop_mask(x, calc)
+    if sp is not None:
+        m &= sp
+    if x["measure"] == "total":
+        return float((s[m] * arr[m]).sum())
+    return float(s[m & (arr != 0)].sum())
+
+
+def _build_calc(kind: str, tmd_dir: str | None):
     import taxcalc as tc
 
-    rec = tc.Records.cps_constructor()
-    calc = tc.Calculator(policy=tc.Policy(), records=rec)
-    calc.advance_to_year(year)
+    if kind == "cps":
+        rec, pol = tc.Records.cps_constructor(), tc.Policy()
+    else:
+        b = Path(tmd_dir)
+        rec = tc.Records.tmd_constructor(
+            data_path=b / "tmd.csv.gz", weights_path=b / "tmd_weights.csv.gz",
+            growfactors=b / "tmd_growfactors.csv", exact_calculations=True,
+        )
+        pol = tc.Policy()
+        pol.implement_reform({"soi_iitax": {2013: True}})  # PSL's SOI-replication policy
+    calc = tc.Calculator(policy=pol, records=rec)
+    calc.advance_to_year(2024)
     calc.calc_all()
+    return calc
 
-    def total(expr):
-        return float((expr * calc.array("s006")).sum())
 
-    v = calc.array  # noqa: E731 shorthand
+def score(kind: str, spec, tmd_dir=None):
+    calc = _build_calc(kind, tmd_dir)
+    A = calc.array
+    concept_arr = {v: fn(A) for v, fn in CONCEPT_TO_TAXCALC.items()}
+    s, agi, eic = A("s006"), A("c00100"), A("EIC")
+    drop = CPS_DROP if kind == "cps" else TMD_DROP
+    rows = {}
+    for x in spec:
+        v = x["variable"]
+        if not x["expressible_source"] or v in drop or v not in concept_arr:
+            continue
+        rows[x["name"]] = _cell(x, concept_arr[v], calc, s, agi, eic)
+    return rows
 
-    rows: dict[str, float] = {
-        "soi_income_tax_net": total(v("iitax") - v("setax")),
-        "soi_amt": total(v("c09600")),
-        "soi_cdcc": total(v("c07180")),
-        "soi_education_credits": total(v("c07230")),
-        "soi_savers_credit": total(v("c07240")),
-        "soi_ctc_nonrefundable": total(v("c07220") + v("odc")),
-        "soi_ctc_refundable": total(v("c11070")),
-        "soi_niit": total(v("niit")),
-        "soi_se_tax": total(v("setax")),
-    }
-    fips = v("fips")
-    eitc = v("eitc")
-    s006 = v("s006")
-    for code, state in FIPS_TO_STATE.items():
-        mask = fips == code
-        rows[f"fed_eitc_{state.lower()}"] = float((eitc[mask] * s006[mask]).sum())
 
-    return {
-        "dataset": "taxcalc-cps",
-        "label": "Tax-Calculator public CPS",
-        "engine": f"taxcalc {tc.__version__}",
-        "source": "cps.csv.gz shipped in the taxcalc package (2014-base CPS, weights extrapolated)",
+METADATA = {
+    "cps": {
+        "file": "taxcalc-cps-national-2024.json", "dataset": "taxcalc_cps_national",
+        "label": "Tax-Calculator public CPS", "engine": "taxcalc 6.7.1", "year": 2024,
+        "source": "Tax-Calculator public CPS (Census CPS-derived)",
         "source_url": "https://github.com/PSLmodels/Tax-Calculator",
-        "year": year,
         "notes": (
-            "Public, fully reproducible, zero-license comparison dataset. taxcalc's own "
-            "documentation notes the CPS file's data accuracy is not unit-tested (PUF/TMD "
-            "are more accurate). iitax includes SE tax, subtracted for the SOI net "
-            "income-tax concept; penalty taxes remain inside (small scope wedge). Zero "
-            "rows (education credits, saver's credit) reflect input bases absent from "
-            "the CPS file itself — the same absent-base failure mode populace#340 "
-            "documents for the sparse release."
+            "Public CPS reliably covers wages, AGI, taxable income, income tax "
+            "(before/after credits), EITC, refundable CTC, pensions, taxable Social "
+            "Security, unemployment, qualified dividends, charitable and medical "
+            "deductions, and taxable interest. Dropped concepts: capital gains and "
+            "partnership/S-corp income (structurally absent from the public CPS, i.e. "
+            "zero); SALT, interest, tax-exempt-interest, ordinary-dividend, "
+            "IRA-distribution, QBI and total-itemized deductions and combined CTC "
+            "(grand total >40% off BOTH the official IRS value and populace); real "
+            "estate taxes (taxcalc e18500 is an all-filer input while SOI counts only "
+            "itemizers' Schedule A). Itemizer subpopulation (SOI table 2.1) reproduced "
+            "via c04470>0; EITC-return AGI via c59660!=0."
         ),
-        "rows": rows,
-    }
-
-
-def score_tmd(year: int, tmd_dir: Path) -> dict:
-    """Score a locally built PSL TMD file (PUF-derived — aggregates only leave
-    this machine; the microdata itself must never be committed or uploaded)."""
-    import taxcalc as tc
-
-    rec = tc.Records.tmd_constructor(
-        data_path=tmd_dir / "tmd.csv.gz",
-        weights_path=tmd_dir / "tmd_weights.csv.gz",
-        growfactors=tmd_dir / "tmd_growfactors.csv",
-    )
-    calc = tc.Calculator(policy=tc.Policy(), records=rec)
-    calc.advance_to_year(year)
-    calc.calc_all()
-
-    def total(expr):
-        return float((expr * calc.array("s006")).sum())
-
-    v = calc.array
-
-    rows: dict[str, float] = {
-        "soi_income_tax_net": total(v("iitax") - v("setax")),
-        "soi_amt": total(v("c09600")),
-        "soi_cdcc": total(v("c07180")),
-        "soi_education_credits": total(v("c07230")),
-        "soi_savers_credit": total(v("c07240")),
-        "soi_ctc_nonrefundable": total(v("c07220") + v("odc")),
-        "soi_ctc_refundable": total(v("c11070")),
-        "soi_niit": total(v("niit")),
-        "soi_se_tax": total(v("setax")),
-    }
-    # TMD carries national weights only — no geographic identifiers — so the
-    # federal-EITC-by-state rows are out of coverage by construction (the
-    # project publishes separate per-area weight files for sub-national work).
-
-    return {
-        "dataset": "tmd",
-        "label": "PSL TMD",
-        "engine": f"taxcalc {tc.__version__}",
-        "source": "TMD 2.1.3 built in-house from the licensed 2015 IRS PUF + 2022 CPS (make tmd_files)",
+    },
+    "tmd": {
+        "file": "tmd-national-2024.json", "dataset": "tmd_national",
+        "label": "PSL TMD", "engine": "taxcalc 6.7.1", "year": 2024,
+        "source": "PSL tax-microdata-benchmarking TMD (PUF+CPS, 2022 base extrapolated to 2024)",
         "source_url": "https://github.com/PSLmodels/tax-microdata-benchmarking",
-        "year": year,
         "notes": (
-            "PUF-derived: only these aggregate totals leave the build machine; the "
-            "microdata is never committed or uploaded. Weights are national-only, so "
-            "state EITC rows are out of coverage. taxcalc 6.7.1 models EITC/ACTC "
-            "claiming probabilities in current law, so its credit totals embed a "
-            "take-up model (populace pays all eligibles - see populace#341). Local "
-            "build skipped the tips/overtime/auto-loan imputation stage (raw SIPP/CEX "
-            "downloads not present) - irrelevant to these rows."
+            "TMD (PUF-derived) covers nearly all IRS SOI concepts including capital "
+            "gains, partnership/S-corp income, QBI deduction and itemized deductions, "
+            "all within ~30% of official grand totals. Dropped: combined CTC "
+            "(c07220+c11070+odc overshoots SOI ~59%) and real estate taxes (taxcalc "
+            "e18500 all-filer input vs SOI itemizer-only Schedule A). Built via "
+            "tmd_constructor with the soi_iitax reform, advanced to 2024. Itemizer "
+            "subpopulation (table 2.1) via c04470>0; EITC-return AGI via c59660!=0."
         ),
-        "rows": rows,
-    }
+    },
+}
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", required=True, choices=["taxcalc-cps", "tmd"])
-    parser.add_argument("--year", type=int, default=2024)
-    parser.add_argument("--tmd-dir", type=Path, help="dir with tmd.csv.gz/weights/growfactors")
-    args = parser.parse_args()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--build-spec", action="store_true")
+    ap.add_argument("--score", action="store_true")
+    ap.add_argument("--spec", type=Path, required=True)
+    ap.add_argument("--base-url", default="http://localhost:3000")
+    ap.add_argument("--dataset", action="append", choices=["cps", "tmd"], default=[])
+    ap.add_argument("--tmd-dir", default=None)
+    args = ap.parse_args()
 
-    if args.dataset == "tmd":
-        if not args.tmd_dir:
-            parser.error("--tmd-dir is required for --dataset tmd")
-        payload = score_tmd(args.year, args.tmd_dir)
-    else:
-        payload = score_taxcalc_cps(args.year)
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = OUT_DIR / f"{args.dataset}-{args.year}.json"
-    out.write_text(json.dumps(payload, indent=1))
-    print(f"wrote {out}")
-    for k, val in payload["rows"].items():
-        print(f"  {k:26s} {val / 1e6:12.1f}M")
+    if args.build_spec:
+        build_spec(args.base_url, args.spec)
+    if args.score:
+        spec = json.loads(args.spec.read_text())
+        for kind in args.dataset:
+            meta = METADATA[kind]
+            rows = score(kind, spec, args.tmd_dir)
+            keys = ("dataset", "label", "engine", "year", "source", "source_url", "notes")
+            out = {k: meta[k] for k in keys}
+            out["rows"] = rows
+            (OUT_DIR / meta["file"]).write_text(json.dumps(out, indent=2))
+            print(f"{kind}: wrote {len(rows)} rows -> {meta['file']}")
 
 
 if __name__ == "__main__":
