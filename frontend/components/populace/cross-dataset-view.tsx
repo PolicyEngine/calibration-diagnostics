@@ -16,6 +16,7 @@ import {
 
 import taxcalcNational from "@/lib/populace/external-datasets/taxcalc-cps-national-2024.json";
 import tmdNational from "@/lib/populace/external-datasets/tmd-national-2024.json";
+import yaleNational from "@/lib/populace/external-datasets/yale-national-2024.json";
 
 // ---------------------------------------------------------------------------
 // Cross-dataset comparison. Every dataset is scored against the SAME surface:
@@ -41,6 +42,7 @@ interface ExternalDataset {
 
 const EXTERNAL_DATASETS: ExternalDataset[] = [
   tmdNational as ExternalDataset,
+  yaleNational as ExternalDataset,
   taxcalcNational as ExternalDataset,
 ];
 
@@ -105,7 +107,7 @@ export function CrossDatasetView() {
 
       <SectionCard
         title="Dataset scorecard"
-        description="Each dataset over the shared national target surface. Loss is the capped-MAPE the calibration minimizes (lower is better). Coverage is how many targets the dataset can express — a federal tax engine cannot express SNAP/Medicaid/census targets, so it covers fewer than populace by design."
+        description="Each dataset over the shared national target surface. Loss is the capped-MAPE the calibration minimizes (lower is better). populace is calibrated to these exact targets, so its loss is in-sample and is expected to be lowest — it is the objective, not an independent measurement; TMD, Yale and Tax-Calculator CPS are out-of-sample independent data. Coverage is how many targets the dataset can express — a federal tax engine cannot express SNAP/Medicaid/census targets, so it covers fewer than populace by design. The two PUF-based engines (TMD and Yale) are scored on an identical concept set. Note: the Yale column is a reconstruction (Yale's inputs are not published, so they were rebuilt from public sources); it runs ~5–10% high vs CBO's baseline, so its loss likely overstates Yale's true divergence — see the Yale card below."
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
