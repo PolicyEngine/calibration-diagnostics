@@ -1,3 +1,5 @@
+import { BASE_PATH } from "@/lib/base-path";
+
 const EXPLICIT_API_BASE = process.env.NEXT_PUBLIC_API_URL?.trim();
 
 type ParamValue = string | number | boolean | undefined | null | (string | number)[];
@@ -8,7 +10,10 @@ function apiUrl(path: string): URL {
   if (EXPLICIT_API_BASE) return new URL(path, EXPLICIT_API_BASE);
   const origin =
     typeof window === "undefined" ? "http://localhost:3000" : window.location.origin;
-  return new URL(`/api${path}`, origin);
+  // Next.js API route handlers live under the app basePath; the native Python
+  // function is routed back to root by a rewrite (see next.config.ts), so all
+  // API calls resolve through `${origin}${BASE_PATH}/api`.
+  return new URL(`${BASE_PATH}/api${path}`, origin);
 }
 
 function appendParams(url: URL, params: Record<string, ParamValue>): void {

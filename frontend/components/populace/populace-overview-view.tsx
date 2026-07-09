@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { CalibrationMap } from "@/components/populace/calibration-map";
 import { useCountry } from "@/components/layout/country-context";
+import { withBasePath } from "@/lib/base-path";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -192,7 +193,7 @@ export function PopulaceOverviewView() {
               ]}
             />
             <a
-              href="/populace/targets"
+              href={withBasePath("/populace/targets")}
               className="whitespace-nowrap text-sm font-medium text-primary hover:underline"
             >
               All targets →
@@ -224,7 +225,7 @@ export function PopulaceOverviewView() {
                 <>
                   {" "}
                   <a
-                    href="/populace/staging"
+                    href={withBasePath("/populace/staging")}
                     className="text-primary underline decoration-dotted underline-offset-2"
                   >
                     Built via staging run ↗

@@ -9,6 +9,7 @@ import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
+import { withBasePath } from "@/lib/base-path";
 import { fitColor, readableInk } from "@/lib/treemap/fit-scale";
 
 // ---------------------------------------------------------------------------
@@ -470,7 +471,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
   const [width, setWidth] = useState(1100);
 
   useEffect(() => {
-    fetch("/model-coverage.json")
+    fetch(withBasePath("/model-coverage.json"))
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(setData)
       .catch((e) => setError(String(e)));
