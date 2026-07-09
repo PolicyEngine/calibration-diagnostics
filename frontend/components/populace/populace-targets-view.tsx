@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { PopulaceTargetDetail } from "@/components/populace/populace-target-detail";
+import { withBasePath } from "@/lib/base-path";
 import {
   releaseSelectOptions,
   usePopulaceStagingRuns,
@@ -1055,7 +1056,7 @@ export function PopulaceTargetsView({
           <>
             See how closely the calibrated weights reproduce each official statistic — by
             source, measure, and breakdown. This is the drill-down behind the{" "}
-            <a href="/populace" className="text-primary hover:underline">
+            <a href={withBasePath("/populace")} className="text-primary hover:underline">
               calibration map
             </a>
             .

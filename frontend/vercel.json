@@ -6,5 +6,11 @@
       "maxDuration": 800,
       "memory": 3009
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/calibration/dashboard/api/populace_variable",
+      "destination": "/api/populace_variable"
+    }
+  ]
 }

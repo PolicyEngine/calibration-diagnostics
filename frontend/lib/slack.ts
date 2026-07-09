@@ -1,6 +1,6 @@
 import type { PopulaceCountry } from "@/lib/populace/latest-artifact";
 
-const DASHBOARD_URL = "https://calibration-diagnostics.vercel.app/populace";
+const DASHBOARD_URL = "https://populace.dev/calibration/dashboard/populace";
 
 const COUNTRY_LABEL: Record<PopulaceCountry, string> = {
   us: "🇺🇸 US",
