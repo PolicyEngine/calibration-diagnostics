@@ -26,11 +26,18 @@ interface Args {
   country: PopulaceCountry;
   dryRun: boolean;
   failOnFlags: boolean;
+  quietWhenClean: boolean;
   help: boolean;
 }
 
 function parseArgv(argv: string[]): Args {
-  const args: Args = { country: "us", dryRun: false, failOnFlags: false, help: false };
+  const args: Args = {
+    country: "us",
+    dryRun: false,
+    failOnFlags: false,
+    quietWhenClean: false,
+    help: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--a") args.a = argv[++i];
@@ -38,6 +45,7 @@ function parseArgv(argv: string[]): Args {
     else if (arg === "--country") args.country = parseCountry(argv[++i]);
     else if (arg === "--dry-run") args.dryRun = true;
     else if (arg === "--fail-on-flags") args.failOnFlags = true;
+    else if (arg === "--quiet-when-clean") args.quietWhenClean = true;
     else if (arg === "--help" || arg === "-h") args.help = true;
   }
   return args;
@@ -51,6 +59,7 @@ Options:
   --country <us|uk>  Dataset (default: us)
   --dry-run          Compute and print, never post to Slack
   --fail-on-flags    Exit 2 when any metric moved beyond its band
+  --quiet-when-clean Skip posting to Slack when nothing moved beyond band
   --help             Show this help
 
 Env: SLACK_WEBHOOK_POPULACE_US / SLACK_WEBHOOK_POPULACE_UK (unset → printed only).`;
@@ -81,7 +90,9 @@ async function main(): Promise<number> {
   console.log("");
 
   const envVar = args.country === "uk" ? "SLACK_WEBHOOK_POPULACE_UK" : "SLACK_WEBHOOK_POPULACE_US";
-  if (args.dryRun) {
+  if (args.quietWhenClean && report.flags.length === 0) {
+    console.log("No beyond-band moves since the previous release — not posting (--quiet-when-clean).");
+  } else if (args.dryRun) {
     console.log(`[dry-run] not posting to Slack (${envVar}).`);
   } else if (!process.env[envVar]) {
     console.log(`${envVar} is unset — printed only, nothing posted.`);
