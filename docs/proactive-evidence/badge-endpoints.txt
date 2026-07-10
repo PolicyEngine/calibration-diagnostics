@@ -1,0 +1,11 @@
+# Live badge endpoints (localhost next start, real buildi release)
+
+GET /api/populace/badge/default-release
+{"schemaVersion":1,"label":"populace-us default","message":"buildi","color":"blue","cacheSeconds":600}
+
+GET /api/populace/badge/gates
+{"schemaVersion":1,"label":"gates","message":"11/11","color":"brightgreen","cacheSeconds":600}
+
+GET /api/populace/badge/within10
+{"schemaVersion":1,"label":"within 10%","message":"88.9%","color":"brightgreen","cacheSeconds":600}
+

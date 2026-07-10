@@ -1,0 +1,19 @@
+
+Populace US release delta
+  previous: populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701
+  latest:   populace-us-2024-buildi-sparse-rmloss100-6e8e929-20260709T034135Z
+
+metric                    previous      latest               Δ
+------------------------------------------------------------------------
+Calibration loss            0.0440      0.0308       -0.013180  (not comparable)
+Within 10% of target         76.5%       88.9%         +12.4pp  ⚠ beyond
+Records kept                 57.2K       57.2K     +58 (+0.1%)  ok
+Targets included             32.6K        5.5K -27.1K (-83.1%)  ⚠ beyond
+
+flags:
+  • Within 10% of target moved 76.5% → 88.9% (Δ +12.4pp), beyond its 2pp band.
+  • Targets included moved 32.6K → 5.5K (Δ -27.1K (-83.1%)), beyond its 5% band.
+  • Target surface changed: +49 added, −27172 removed — loss not directly comparable.
+  • Source coverage shrank: covered 27 → 25, missing 0 → 0.
+
+SLACK_WEBHOOK_POPULACE_US is unset — printed only, nothing posted.
