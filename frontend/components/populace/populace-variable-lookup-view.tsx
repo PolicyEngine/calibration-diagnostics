@@ -66,7 +66,7 @@ function ResultCard({
   unit: string | null | undefined;
 }) {
   return (
-    <div className="flex flex-col rounded-xl border border-border bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <div className="flex flex-col rounded-xl border border-border bg-card p-5 shadow-[var(--elev-2)]">
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-foreground" title={row.label ?? row.variable}>
           {row.label || row.variable}
@@ -189,7 +189,7 @@ export function PopulaceVariableLookupView() {
             placeholder="Search by name or description — e.g. EITC, SNAP, income tax"
             onChange={(event) => setSearch(event.target.value)}
             spellCheck={false}
-            className="h-10 w-full rounded-lg border border-border bg-white px-3.5 text-sm focus:border-primary/60 focus:outline-none"
+            className="h-10 w-full rounded-lg border border-border bg-card px-3.5 text-sm focus:border-primary/60 focus:outline-none"
           />
 
           {search.trim() === "" ? (
@@ -262,7 +262,7 @@ export function PopulaceVariableLookupView() {
                 return (
                   <span
                     key={name}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white py-1 pl-3 pr-1.5 text-sm"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-1 pl-3 pr-1.5 text-sm"
                     title={name}
                   >
                     <span className="max-w-[16rem] truncate text-foreground">
@@ -288,7 +288,7 @@ export function PopulaceVariableLookupView() {
               <select
                 value={period}
                 onChange={(event) => setPeriod(event.target.value)}
-                className="h-9 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
+                className="h-9 rounded-md border border-border bg-card px-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
               >
                 {PERIOD_OPTIONS.map((option) => (
                   <option key={option} value={option}>
@@ -302,7 +302,7 @@ export function PopulaceVariableLookupView() {
               <select
                 value={release}
                 onChange={(event) => setRelease(event.target.value)}
-                className="h-9 min-w-[220px] rounded-md border border-border bg-white px-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
+                className="h-9 min-w-[220px] rounded-md border border-border bg-card px-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
               >
                 {releaseOptions.map((option) => (
                   <option key={option.value} value={option.value}>

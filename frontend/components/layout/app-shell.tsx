@@ -1,25 +1,30 @@
 "use client";
 
-import { DashboardShell, Header } from "@policyengine/ui-kit";
-import { withBasePath } from "@/lib/base-path";
 import { GlobalLoader } from "./global-loader";
 import { NavSidebar } from "./nav-sidebar";
+import { SiteHeader } from "./site-header";
+import { SiteFooter } from "./site-footer";
 
+// The dashboard chrome, skinned to populace.dev. We deliberately do NOT use
+// ui-kit's <DashboardShell>/<Header> here: the shell paints an opaque bg-muted
+// that would hide the body's paper wash + grain, and the header read as a hard
+// exit from populace.dev. The shell stays transparent so the site atmosphere
+// (app/globals.css body::before + .site-grain) shows through, and the header /
+// footer come from the populace.dev-style components.
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <DashboardShell>
+    <div className="flex min-h-screen flex-col text-foreground">
       <GlobalLoader />
-      {/* ui-kit Header renders logoHref as a raw <a> when no linkComponent is
-          passed, so the basePath must be applied explicitly here. */}
-      <Header navItems={[]} logoHref={withBasePath("/populace")} />
+      <SiteHeader />
       <div className="flex h-[calc(100vh-4rem)]">
-        <aside className="w-56 shrink-0 overflow-y-auto border-r border-border bg-muted/30">
+        <aside className="w-56 shrink-0 overflow-y-auto border-r border-border-light bg-card/50 backdrop-blur-sm">
           <NavSidebar />
         </aside>
-        <main className="flex-1 overflow-auto p-6 pt-0">
-          {children}
+        <main className="flex flex-1 flex-col overflow-auto">
+          <div className="flex-1 p-6 pt-0">{children}</div>
+          <SiteFooter />
         </main>
       </div>
-    </DashboardShell>
+    </div>
   );
 }

@@ -1,17 +1,359 @@
 @import "tailwindcss";
 @import "@policyengine/ui-kit/theme.css";
 
+/* ============================================================================
+ * populace.dev continuity layer
+ *
+ * The dashboard mounts at populace.dev/calibration/dashboard and must read as
+ * part of the site — not a hard context switch out of it. Both surfaces consume
+ * @policyengine/ui-kit tokens, so this file re-creates populace.dev's own alias
+ * layer (mirrors PolicyEngine/populace.dev/style.css :root) on top of the ui-kit
+ * theme. One palette, one type system, one chrome, shared by both pages.
+ *
+ * Rule of the house: components never hardcode a palette value. Every colour
+ * resolves through a ui-kit token or one of the semantic aliases / utilities
+ * defined here.
+ * ========================================================================== */
+
+:root {
+  /* Fonts — Inter (display + body) and JetBrains Mono (labels), the exact two
+     families populace.dev vendors. Loaded self-hosted via next/font in
+     app/layout.tsx, exposed as --font-inter / --font-jetbrains, and pointed at
+     here so every ui-kit component renders in the same faces as the site. */
+  --font-sans:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  --font-mono: var(--font-jetbrains), "Fira Code", Consolas, monospace;
+
+  /* populace.dev semantic aliases (verbatim mapping from populace.dev/style.css).
+     "amber" is the site's accent name; on the shared design system it resolves
+     to PolicyEngine teal. */
+  --ink: var(--background); /* page background — paper white */
+  --ink-2: var(--muted); /* raised surface */
+  --paper: var(--foreground); /* primary text */
+  --paper-dim: var(--muted-foreground);
+  --paper-faint: var(--text-tertiary);
+  --amber: var(--primary); /* accent → PolicyEngine teal #2C7A7B */
+  --amber-soft: var(--chart-1); /* brighter teal #319795 for emphasis/hover */
+  --line: var(--border);
+  --line-soft: var(--border-light);
+  --display: var(--font-sans);
+  --mono: var(--font-mono);
+  --max: 1140px;
+
+  /* Data tones. populace's "good" is a deep teal-green, not emerald; "bad" is
+     the ui-kit red. KPI deltas, status pills and table cells read from these. */
+  --pos: var(--text-success); /* #285E61 */
+  --neg: var(--text-error); /* #B91C1C */
+  --warn: var(--text-warning); /* #c2410c */
+  --info: var(--chart-4); /* #026AA2 accessible blue */
+
+  /* Neutral elevation — populace.dev leans on hairline borders, not heavy
+     shadows. Tokenised so components stop inlining slate-tinted rgba(). */
+  --elev-1: 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
+  --elev-2: 0 1px 2px color-mix(in srgb, var(--foreground) 5%, transparent);
+  --scrim: color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+
+/* ---------- page atmosphere: paper wash + grain (from populace.dev) --------- */
+body {
+  position: relative;
+  min-height: 100vh;
+  background: var(--ink);
+  color: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* deep radial teal wash behind everything — the populace.dev ambient signal */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  background:
+    radial-gradient(
+      120% 80% at 50% -10%,
+      color-mix(in srgb, var(--primary) 7%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      90% 60% at 80% 110%,
+      color-mix(in srgb, var(--primary) 4%, transparent),
+      transparent 60%
+    ),
+    var(--ink);
+}
+
+/* faint film grain, identical texture to the site */
+.site-grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- header / nav (populace.dev .nav voice, app-bar height) ---------- */
+.site-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 4rem;
+  flex-shrink: 0;
+  padding: 0 clamp(16px, 4vw, 32px);
+  background: color-mix(in srgb, var(--ink) 82%, transparent);
+  backdrop-filter: blur(7px);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.site-brand {
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  color: var(--paper);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+}
+
+.site-brand-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 8px 1px color-mix(in srgb, var(--primary) 55%, transparent);
+  animation: sitePulse 3.4s ease-in-out infinite;
+}
+@keyframes sitePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.site-crumb {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--paper-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.site-crumb a {
+  color: var(--paper-faint);
+  text-decoration: none;
+  transition: color 0.25s;
+  white-space: nowrap;
+}
+.site-crumb a:hover {
+  color: var(--amber-soft);
+}
+.site-crumb-sep {
+  color: var(--line);
+}
+.site-crumb-current {
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+.site-nav-links {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 2.2vw, 26px);
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+.site-nav-links a {
+  color: var(--paper-dim);
+  text-decoration: none;
+  transition: color 0.25s;
+}
+.site-nav-links a:hover {
+  color: var(--amber-soft);
+}
+.site-nav-gh {
+  color: var(--paper);
+  display: inline-flex;
+  align-items: center;
+}
+.site-nav-gh svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+/* editorial links collapse on narrow app widths (populace.dev does the same) */
+.site-nav-editorial {
+  display: none;
+}
+@media (min-width: 900px) {
+  .site-nav-editorial {
+    display: inline;
+  }
+}
+
+/* ---------- eyebrow / kicker (teal mono, populace.dev .eyebrow) ------------- */
+.site-eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+/* ---------- footer (populace.dev .foot) ------------------------------------ */
+.site-foot {
+  border-top: 1px solid var(--line-soft);
+  margin-top: 40px;
+  padding: 40px clamp(16px, 4vw, 32px) 52px;
+}
+.site-foot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.site-foot-fine {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--paper-faint);
+}
+.site-foot-pe {
+  display: inline-flex;
+  align-items: center;
+}
+.site-foot-pe img {
+  height: 20px;
+  width: auto;
+  display: block;
+  opacity: 0.82;
+  transition: opacity 0.2s;
+}
+.site-foot-pe:hover img {
+  opacity: 1;
+}
+
+/* ============================================================================
+ * Semantic palette-bridge utilities
+ *
+ * Components map their good / bad / warn / info / neutral signals onto these
+ * instead of Tailwind's default emerald/rose/amber/sky/slate ramps, so every
+ * surface reads from the same ui-kit family populace.dev uses. Kept unlayered
+ * so they reliably win over the utility they replace.
+ * ========================================================================== */
+
+/* text tone */
+.tone-pos {
+  color: var(--pos);
+}
+.tone-neg {
+  color: var(--neg);
+}
+.tone-warn {
+  color: var(--warn);
+}
+.tone-info {
+  color: var(--info);
+}
+
+/* pill fills (colour only — geometry stays on the element's own classes),
+   echoing populace.dev's .tag-* treatment: tinted wash + token ink + soft edge */
+.pill-pos {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--pos);
+  border-color: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.pill-neg {
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  color: var(--neg);
+  border-color: color-mix(in srgb, var(--destructive) 22%, transparent);
+}
+.pill-warn {
+  background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--color-warning) 34%, transparent);
+}
+.pill-info {
+  background: color-mix(in srgb, var(--chart-2) 12%, transparent);
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--chart-2) 24%, transparent);
+}
+.pill-neutral {
+  background: color-mix(in srgb, var(--muted-foreground) 8%, transparent);
+  color: var(--paper-dim);
+  border-color: var(--line);
+}
+
+/* wizard-card accent glows (targets page) — token-based hover elevation that
+   replaces per-accent rgba() brand shadows */
+.wiz-glow-teal:hover {
+  box-shadow: 0 18px 40px -20px color-mix(in srgb, var(--chart-1) 55%, transparent);
+}
+.wiz-glow-warn:hover {
+  box-shadow: 0 18px 40px -20px
+    color-mix(in srgb, var(--color-warning) 50%, transparent);
+}
+.wiz-glow-neutral:hover {
+  box-shadow: 0 18px 40px -20px
+    color-mix(in srgb, var(--color-gray-600) 45%, transparent);
+}
+
+/* failed table-row wash */
+.row-neg {
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+/* solid swatches — dots and mini-bars */
+.swatch-pos {
+  background: var(--chart-1);
+}
+.swatch-neg {
+  background: var(--destructive);
+}
+.swatch-warn {
+  background: var(--color-warning);
+}
+.swatch-info {
+  background: var(--chart-2);
+}
+.swatch-neutral {
+  background: var(--paper-faint);
+}
+
+/* ---------- app-specific tweaks -------------------------------------------- */
 /* Override ui-kit DataTable wrapper to allow horizontal scroll */
 .bg-card.overflow-hidden {
   overflow-x: auto !important;
 }
 
 @keyframes loading-bar {
-  0%   { transform: translateX(-100%); }
-  50%  { transform: translateX(150%); }
-  100% { transform: translateX(400%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(150%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
 }
 
 .animate-loading-bar {
   animation: loading-bar 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-brand-dot {
+    animation: none;
+  }
 }

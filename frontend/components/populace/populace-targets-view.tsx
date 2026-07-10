@@ -383,7 +383,7 @@ function VariableBrowser({
           value={query}
           placeholder="Search statistics — e.g. EITC, Medicaid, income…"
           onChange={(event) => setQuery(event.target.value)}
-          className="h-10 w-full rounded-lg border border-border bg-white px-3.5 text-sm focus:border-primary/60 focus:outline-none"
+          className="h-10 w-full rounded-lg border border-border bg-card px-3.5 text-sm focus:border-primary/60 focus:outline-none"
         />
         <p className="text-xs leading-relaxed text-muted-foreground">
           Each bar shows the share of that statistic&apos;s breakdowns whose calibrated
@@ -413,7 +413,7 @@ function VariableBrowser({
                     key={group.groupKey}
                     type="button"
                     onClick={() => onPick(group.defaultKey)}
-                    className={`group flex flex-col gap-3 rounded-xl border bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    className={`group flex flex-col gap-3 rounded-xl border bg-card p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                       isActive ? "border-primary ring-1 ring-primary" : "border-border"
                     }`}
                   >
@@ -493,19 +493,19 @@ const ACCENTS: Record<
     chip: "bg-primary/10 text-primary",
     ink: "text-primary",
     border: "hover:border-primary/50",
-    glow: "group-hover:shadow-[0_18px_40px_-20px_rgba(49,151,149,0.55)]",
+    glow: "wiz-glow-teal",
   },
   amber: {
-    chip: "bg-amber-100 text-amber-700",
-    ink: "text-amber-700",
-    border: "hover:border-amber-400/60",
-    glow: "group-hover:shadow-[0_18px_40px_-20px_rgba(217,119,6,0.5)]",
+    chip: "pill-warn",
+    ink: "tone-warn",
+    border: "hover:border-[var(--warn)]",
+    glow: "wiz-glow-warn",
   },
   slate: {
-    chip: "bg-slate-100 text-slate-600",
-    ink: "text-slate-600",
-    border: "hover:border-slate-400/60",
-    glow: "group-hover:shadow-[0_18px_40px_-20px_rgba(71,85,105,0.45)]",
+    chip: "pill-neutral",
+    ink: "text-muted-foreground",
+    border: "hover:border-border-dark",
+    glow: "wiz-glow-neutral",
   },
 };
 
@@ -529,7 +529,7 @@ function WizardCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex h-full flex-col gap-5 rounded-2xl border border-border bg-white p-6 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-1 ${a.border} ${a.glow} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary`}
+      className={`group relative flex h-full flex-col gap-5 rounded-2xl border border-border bg-card p-6 text-left shadow-[var(--elev-2)] transition-all duration-200 hover:-translate-y-1 ${a.border} ${a.glow} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary`}
     >
       <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${a.ink}`}>
         {eyebrow}
@@ -801,7 +801,7 @@ export function PopulaceTargetsView({
   }
 
   const targetFilters = (
-    <div className="border-b border-border bg-white px-4 py-3">
+    <div className="border-b border-border bg-card px-4 py-3">
       <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
         <label className="grid min-w-0 gap-1">
           <span className="truncate text-xs font-medium text-muted-foreground">Search</span>
@@ -813,7 +813,7 @@ export function PopulaceTargetsView({
               setSearch(event.target.value);
               setPage(0);
             }}
-            className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus:border-primary/60 focus:outline-none"
+            className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm focus:border-primary/60 focus:outline-none"
           />
         </label>
           {activeVariable ? (
@@ -936,7 +936,7 @@ export function PopulaceTargetsView({
         : "All targets";
 
   const slimRefiners = (
-    <div className="flex flex-wrap items-end gap-3 border-b border-border bg-white px-4 py-3">
+    <div className="flex flex-wrap items-end gap-3 border-b border-border bg-card px-4 py-3">
       {activeVariable && dimensions.length ? (
         dimensions.map((dim) => (
           <ToolbarSelect
@@ -1108,7 +1108,7 @@ export function PopulaceTargetsView({
 
       {step === "pick" && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white px-4 py-2.5 text-sm shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm shadow-[var(--elev-2)]">
             <button
               type="button"
               onClick={goBack}
@@ -1130,7 +1130,7 @@ export function PopulaceTargetsView({
 
       {step === "refine" && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 shadow-[var(--elev-2)]">
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
               <button type="button" onClick={goBack} className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground">
                 <span aria-hidden>←</span> Back
@@ -1245,7 +1245,7 @@ export function PopulaceTargetsView({
                               ? "border-primary bg-primary text-primary-foreground"
                               : opt.value === ""
                                 ? "border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                                : "border-border bg-white text-foreground hover:border-primary/50 hover:bg-primary/5"
+                                : "border-border bg-card text-foreground hover:border-primary/50 hover:bg-primary/5"
                           }`}
                         >
                           {opt.label}
@@ -1262,7 +1262,7 @@ export function PopulaceTargetsView({
 
       {step === "results" && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 shadow-[var(--elev-2)]">
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
               <button
                 type="button"

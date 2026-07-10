@@ -50,7 +50,7 @@ export function PopulacePipelineView() {
           {SOURCE_STAGES.map((s) => (
             <div
               key={s.stage}
-              className="rounded-lg border border-border bg-white p-3 shadow-[0_1px_0_rgba(15,23,42,0.04)]"
+              className="rounded-lg border border-border bg-card p-3 shadow-[var(--elev-1)]"
             >
               <div className="font-mono text-xs font-semibold text-foreground">{s.stage}</div>
               <div className="mt-0.5 text-xs text-primary">{s.survey}</div>
@@ -83,7 +83,7 @@ export function PopulacePipelineView() {
                 {phase.steps.map((step) => (
                   <div
                     key={step.id}
-                    className="flex flex-col gap-1.5 rounded-lg border border-border bg-white p-4 shadow-[0_1px_0_rgba(15,23,42,0.04)]"
+                    className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-4 shadow-[var(--elev-1)]"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="text-sm font-medium leading-tight text-foreground">

@@ -11,19 +11,19 @@ interface StatusPillProps {
 }
 
 const toneClasses: Record<StatusTone, string> = {
-  success: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  warning: "bg-amber-50 text-amber-800 border-amber-200",
-  danger: "bg-rose-50 text-rose-800 border-rose-200",
-  info: "bg-sky-50 text-sky-800 border-sky-200",
-  neutral: "bg-muted/60 text-muted-foreground border-border",
+  success: "pill-pos",
+  warning: "pill-warn",
+  danger: "pill-neg",
+  info: "pill-info",
+  neutral: "pill-neutral",
 };
 
 const dotClasses: Record<StatusTone, string> = {
-  success: "bg-emerald-500",
-  warning: "bg-amber-500",
-  danger: "bg-rose-500",
-  info: "bg-sky-500",
-  neutral: "bg-muted-foreground/60",
+  success: "swatch-pos",
+  warning: "swatch-warn",
+  danger: "swatch-neg",
+  info: "swatch-info",
+  neutral: "swatch-neutral",
 };
 
 export function StatusPill({ children, tone = "neutral", icon }: StatusPillProps) {
