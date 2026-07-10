@@ -1,38 +1,25 @@
-// Committed corrections for reform_validation.json.
+// Committed reform_validation.json backfills, keyed by release id.
 //
-// Releases published before the build pipeline restored out-of-sample reform
-// simulation (PolicyEngine/populace#175) shipped a reform_validation.json whose
-// out-of-sample (OBBBA / tax-expenditure) rows all had a null budget effect —
-// the build was run with --skip-out-of-sample-reforms. Those numbers were
-// recomputed offline by running the producer's own reform-validation simulation
-// on the released populace_us_2024.h5 (policyengine-us 1.729.0 / pe-core
-// 3.26.11, matching the build) and committed here, so the dashboard shows the
-// real numbers without a Hugging Face round-trip or republish.
+// A release can reach the dashboard without a reform_validation.json: builds
+// published before out-of-sample simulation was restored (PolicyEngine/populace#175)
+// shipped one with null out-of-sample rows, and builds promoted to `latest` that
+// skipped the reform-validation step entirely shipped none at all. Both are
+// backfilled here — the producer run offline on the released populace_us_2024.h5
+// at the build's exact package versions — so the dashboard shows the real numbers
+// without a Hugging Face round-trip or republish. `fetchReformValidation` prefers
+// / merges a committed override over the native artifact. Provenance for each file
+// is in its own _backfill_note.
 //
-// A second case: a build promoted to `latest` that skipped the reform-validation
-// step entirely and shipped no reform_validation.json at all. That gets a full
-// offline reproduction — the producer run end-to-end on the released H5 at the
-// build's exact package versions — rather than a patch of a partial artifact.
-//
-// New releases simulate out-of-sample by default and won't appear here; this
-// map is a finite backfill of already-published releases, keyed by release id.
+// THIS FILE IS GENERATED. Do not edit by hand — drop a JSON in reform-overrides/
+// and run `node scripts/gen-reform-overrides.mjs`. The scheduled backfill workflow
+// does this automatically for each new release.
 
-import f0af251 from "./reform-overrides/populace-us-2024-f0af251-703bd81a565c-20260620T201958Z.json";
-// State legislative reform rows (PolicyEngine/populace#319 suite) appended
-// offline to the published artifact — scored one reform at a time on the
-// released H5. See _backfill_note inside the file for version provenance.
-import nationalOnly20260701 from "./reform-overrides/populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701.json";
-// The buildi-sparse-rmloss100 build was promoted to latest with no
-// reform_validation.json (its build run skipped the reform-validation step), so
-// this is a FULL offline reproduction — the producer run on the released H5 at
-// the exact build versions (pe-us 1.764.6), not a patch of a partial artifact.
-// See _backfill_note inside the file for provenance.
-import buildiSparseRmloss100 from "./reform-overrides/populace-us-2024-buildi-sparse-rmloss100-6e8e929-20260709T034135Z.json";
+import rv_populace_us_2024_buildi_sparse_rmloss100_6e8e929_20260709T034135Z from "./reform-overrides/populace-us-2024-buildi-sparse-rmloss100-6e8e929-20260709T034135Z.json";
+import rv_populace_us_2024_f0af251_703bd81a565c_20260620T201958Z from "./reform-overrides/populace-us-2024-f0af251-703bd81a565c-20260620T201958Z.json";
+import rv_populace_us_2024_sparse_l0_refit_57k_71a0887_national_only_20260701 from "./reform-overrides/populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701.json";
 
 export const REFORM_OVERRIDES: Record<string, unknown> = {
-  "populace-us-2024-f0af251-703bd81a565c-20260620T201958Z": f0af251,
-  "populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701":
-    nationalOnly20260701,
-  "populace-us-2024-buildi-sparse-rmloss100-6e8e929-20260709T034135Z":
-    buildiSparseRmloss100,
+  "populace-us-2024-buildi-sparse-rmloss100-6e8e929-20260709T034135Z": rv_populace_us_2024_buildi_sparse_rmloss100_6e8e929_20260709T034135Z,
+  "populace-us-2024-f0af251-703bd81a565c-20260620T201958Z": rv_populace_us_2024_f0af251_703bd81a565c_20260620T201958Z,
+  "populace-us-2024-sparse-l0-refit-57k-71a0887-national-only-20260701": rv_populace_us_2024_sparse_l0_refit_57k_71a0887_national_only_20260701,
 };

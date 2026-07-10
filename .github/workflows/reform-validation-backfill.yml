@@ -1,0 +1,132 @@
+name: Reform validation backfill
+
+# Decoupled from the release build pipeline: the reform-validation simulation is
+# slow (~1-2h) and we never want it to block or break a release. This wakes on a
+# timer, checks the current populace-US release, and — only if that release has no
+# committed reform_validation.json override yet — reproduces one on the released H5
+# and opens an auto-merging PR. Most runs are a few-second no-op.
+#
+# Run it by hand for a specific release via the "Run workflow" button (release_id
+# input), or leave it to the schedule.
+
+on:
+  schedule:
+    - cron: "0 */6 * * *" # every 6 hours
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: "Release id to backfill (blank = current latest)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: reform-validation-backfill
+  cancel-in-progress: false
+
+env:
+  HF_BASE: https://huggingface.co/datasets/policyengine/populace-us/resolve/main
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.r.outputs.release_id }}
+      should_run: ${{ steps.r.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: r
+        run: |
+          set -euo pipefail
+          RID="${{ github.event.inputs.release_id }}"
+          if [ -z "$RID" ]; then
+            RID=$(curl -sL "$HF_BASE/latest.json" \
+              | python3 -c "import sys,json;print(json.load(sys.stdin)['release_id'])")
+          fi
+          echo "release_id=$RID" >> "$GITHUB_OUTPUT"
+          if [ -f "frontend/lib/populace/reform-overrides/$RID.json" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$RID already backfilled — nothing to do."
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$RID needs a reform-validation backfill."
+          fi
+
+  backfill:
+    needs: resolve
+    if: needs.resolve.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      RID: ${{ needs.resolve.outputs.release_id }}
+    steps:
+      - name: Checkout dashboard
+        uses: actions/checkout@v4
+
+      - name: Checkout populace (producer)
+        uses: actions/checkout@v4
+        with:
+          repository: PolicyEngine/populace
+          path: populace
+
+      - name: Read exact build package versions
+        id: ver
+        run: |
+          set -euo pipefail
+          curl -sL "$HF_BASE/releases/$RID/release_manifest.json" > /tmp/manifest.json
+          echo "peus=$(python3 -c "import json;print(json.load(open('/tmp/manifest.json'))['build']['built_with_model_package']['version'])")" >> "$GITHUB_OUTPUT"
+          echo "pecore=$(python3 -c "import json;print(json.load(open('/tmp/manifest.json'))['build']['built_with_core_package']['version'])")" >> "$GITHUB_OUTPUT"
+          echo "producer=$(git -C populace rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install producer deps (exact pe-us/pe-core from the release)
+        run: |
+          python -m pip install -U pip
+          pip install \
+            "policyengine-us==${{ steps.ver.outputs.peus }}" \
+            "policyengine-core==${{ steps.ver.outputs.pecore }}" \
+            torch tables microdf-python h5py numpy pandas scipy scikit-learn tqdm
+
+      - name: Generate reform_validation.json
+        env:
+          PYTHONPATH: populace/packages/populace-build/src:populace/packages/populace-frame/src:populace/packages/populace-calibrate/src:populace/packages/populace-fit/src:populace/packages/populace-data/src
+          RV_PRODUCER_COMMIT: ${{ steps.ver.outputs.producer }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rv
+          python tools/reform_validation/backfill.py \
+            --release-id "$RID" --workdir /tmp/rv \
+            --producer-commit "${{ steps.ver.outputs.producer }}"
+          cp /tmp/rv/reform_validation.json \
+            "frontend/lib/populace/reform-overrides/$RID.json"
+
+      - name: Regenerate overrides map + typecheck
+        run: |
+          set -euo pipefail
+          node scripts/gen-reform-overrides.mjs
+          cd frontend && bun install --frozen-lockfile && bun run lint
+
+      - name: Open auto-merge PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BR="reform-validation/$RID"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BR"
+          git add frontend/lib/populace/reform-overrides/ frontend/lib/populace/reform-overrides.ts
+          git commit -m "Backfill reform_validation.json for $RID"
+          git push -u origin "$BR"
+          gh pr create --base main --head "$BR" \
+            --title "Backfill reform_validation.json for $RID" \
+            --body "Automated backfill by \`.github/workflows/reform-validation-backfill.yml\`. The producer was run on the released \`populace_us_2024.h5\` at the build's exact package versions; provenance is in the file's \`_backfill_note\`. Decoupled from the build pipeline so the slow simulation can't block a release."
+          gh pr merge --squash --auto "$BR" || gh pr merge --squash "$BR"
