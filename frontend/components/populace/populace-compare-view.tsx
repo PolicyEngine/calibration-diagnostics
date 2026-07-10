@@ -562,11 +562,14 @@ export function PopulaceCompareView() {
   const [a, setA] = useState("");
   const [b, setB] = useState("");
 
-  // Default B to the latest release and A to the next one down.
+  // Deep links (the "since you last looked" banner and the Slack delta alert)
+  // pass ?a=&b= to preselect the two releases; otherwise default B to the latest
+  // release and A to the next one down.
   useEffect(() => {
     if (!releases.length) return;
-    if (!b) setB(releaseData?.latest_release_id || releases[0].release_id);
-    if (!a && releases[1]) setA(releases[1].release_id);
+    const params = new URLSearchParams(window.location.search);
+    if (!b) setB(params.get("b") || releaseData?.latest_release_id || releases[0].release_id);
+    if (!a) setA(params.get("a") || releases[1]?.release_id || "");
   }, [releases, releaseData, a, b]);
 
   const { data, isLoading, error } = usePopulaceCompare(a, b);
