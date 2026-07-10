@@ -846,3 +846,58 @@ export function usePopulaceCoverage(release?: string) {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+// --- certification panel ----------------------------------------------------
+
+export type GateOutcome = "passed" | "failed" | "skipped" | "waived" | "unknown";
+
+export interface CertificationGate {
+  key: string;
+  label: string;
+  outcome: GateOutcome;
+  enforced: boolean | null;
+  evidence_sha: string | null;
+  failure_count: number;
+  failures: string[];
+  reviewed_exclusions: CoverageExclusion[];
+  stale_exclusions: string[];
+  summary: string | null;
+  source: "build_manifest" | "us_source_coverage" | "input_coverage" | "reform_coverage_smoke";
+}
+
+export interface CertificationResponse {
+  release_id: string;
+  updated_at: string | null;
+  certification: {
+    release_id: string;
+    gates: CertificationGate[];
+    totals: {
+      total: number;
+      passed: number;
+      failed: number;
+      skipped: number;
+      waived: number;
+      enforced: number;
+    };
+    reviewed_exclusion_registers: {
+      gate_key: string;
+      gate_label: string;
+      entries: CoverageExclusion[];
+    }[];
+    stale_exclusion_count: number;
+  };
+  source_artifacts: { name: string; path: string; url: string }[];
+}
+
+export function usePopulaceCertification(release?: string) {
+  const { country } = useCountry();
+  return useQuery({
+    queryKey: ["populace", "certification", country, release ?? "latest"],
+    queryFn: () =>
+      apiGet<CertificationResponse>("/populace/certification", {
+        release: release || undefined,
+        country,
+      }),
+    staleTime: 5 * 60 * 1000,
+  });
+}

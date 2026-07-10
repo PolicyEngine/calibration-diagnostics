@@ -82,7 +82,7 @@ export interface CoverageExclusion {
 }
 
 // A {subject: reason} map into structured exclusions with their linked issues.
-function exclusionsFromMap(map: unknown): CoverageExclusion[] {
+export function exclusionsFromMap(map: unknown): CoverageExclusion[] {
   return Object.entries(asObject(map))
     .map(([subject, reason]) => ({
       subject,

@@ -36,6 +36,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Releases",
     items: [
+      { href: "/populace/certification", label: "Certification", usOnly: true },
       { href: "/populace/compare", label: "Compare versions" },
       { href: "/populace/staging", label: "Staging candidates", usOnly: true },
     ],
