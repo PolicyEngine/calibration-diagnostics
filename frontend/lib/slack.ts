@@ -1,6 +1,8 @@
 import type { PopulaceCountry } from "@/lib/populace/latest-artifact";
+import { deltaSlackPayload, type DeltaReport } from "@/lib/populace/deltas";
 
 const DASHBOARD_URL = "https://populace.dev/calibration/dashboard/populace";
+const COMPARE_URL = "https://populace.dev/calibration/dashboard/populace/compare";
 
 const COUNTRY_LABEL: Record<PopulaceCountry, string> = {
   us: "🇺🇸 US",
@@ -49,6 +51,32 @@ export async function postReleaseAlert(opts: {
     ],
   };
 
+  const res = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Slack webhook ${res.status}: ${body.slice(0, 200)}`);
+  }
+  return true;
+}
+
+// Post a computed release-delta table to the country's Slack incoming webhook.
+// No-op (returns false) when that channel's webhook env var is unset — the same
+// SLACK_WEBHOOK_POPULACE_{US,UK} the populace publish CLI uses.
+export async function postDeltaAlert(opts: {
+  country: PopulaceCountry;
+  report: DeltaReport;
+}): Promise<boolean> {
+  const webhookUrl = process.env[WEBHOOK_ENV[opts.country]];
+  if (!webhookUrl) return false;
+
+  const payload = deltaSlackPayload(opts.report, {
+    dashboardUrl: COMPARE_URL,
+    country: opts.country,
+  });
   const res = await fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

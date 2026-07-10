@@ -901,3 +901,78 @@ export function usePopulaceCertification(release?: string) {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+// --- release deltas ---------------------------------------------------------
+
+export type BandVerdict = "within" | "beyond" | null;
+
+export interface MetricDelta {
+  key: string;
+  label: string;
+  family: string | null;
+  unit: "loss" | "share" | "count";
+  a: number | null;
+  b: number | null;
+  abs_delta: number | null;
+  rel_delta: number | null;
+  improve: "better" | "worse" | "flat" | null;
+  band: BandVerdict;
+  threshold: number | null;
+  comparable: boolean;
+  note: string | null;
+}
+
+export interface ReformDelta {
+  id: string;
+  name: string;
+  category: string | null;
+  in_sample: boolean;
+  a_abs_rel: number | null;
+  b_abs_rel: number | null;
+  delta: number | null;
+  band: BandVerdict;
+}
+
+export interface DeltaReport {
+  available: true;
+  a_release: string;
+  b_release: string;
+  a_date: string;
+  b_date: string;
+  generated_at: string;
+  headline: MetricDelta[];
+  reforms: ReformDelta[];
+  reforms_available: boolean;
+  surfaces_differ: boolean;
+  surface: { added: number; removed: number; improved: number; regressed: number };
+  coverage_delta: {
+    a_covered: number;
+    b_covered: number;
+    a_missing: number;
+    b_missing: number;
+    a_reviewed_excluded: number;
+    b_reviewed_excluded: number;
+    shrank: boolean;
+  } | null;
+  gate_changes: { key: string; label: string; a_outcome: string; b_outcome: string; kind: string }[];
+  flags: string[];
+  top_movers: MetricDelta[];
+}
+
+export interface DeltaUnavailable {
+  available: false;
+  reason: string;
+  a_release: string | null;
+  b_release: string | null;
+}
+
+export type DeltasResponse = DeltaReport | DeltaUnavailable;
+
+export function usePopulaceDeltasLatest() {
+  const { country } = useCountry();
+  return useQuery({
+    queryKey: ["populace", "deltas", "latest", country],
+    queryFn: () => apiGet<DeltasResponse>("/populace/deltas/latest", { country }),
+    staleTime: 5 * 60 * 1000,
+  });
+}

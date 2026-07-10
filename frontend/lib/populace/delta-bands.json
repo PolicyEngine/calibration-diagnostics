@@ -1,0 +1,8 @@
+{
+  "_comment": "Per-metric-family bands for the release delta alert. A move is flagged beyond-band when |absolute delta| exceeds `abs` (for share/loss metrics, in the metric's own units — e.g. 0.02 = 2 percentage points) OR |relative delta| exceeds `rel` (for count/level metrics). Tune per family; the alert and the in-page banner both read these.",
+  "final_loss": { "family": "calibration", "abs": 0.02, "rel": 0.25 },
+  "fraction_within_10pct": { "family": "calibration", "abs": 0.02 },
+  "n_nonzero": { "family": "population", "rel": 0.05 },
+  "included_target_count": { "family": "population", "rel": 0.05 },
+  "reform_validation": { "family": "reform", "abs": 0.05 }
+}

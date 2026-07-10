@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { CalibrationMap } from "@/components/populace/calibration-map";
+import { DeltaBanner } from "@/components/populace/delta-banner";
 import { useCountry } from "@/components/layout/country-context";
 import { withBasePath } from "@/lib/base-path";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -136,6 +137,9 @@ export function PopulaceOverviewView() {
           />
         }
       />
+
+      {/* Only meaningful for the live latest release, not a historical pick. */}
+      {!release && <DeltaBanner />}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <KpiCard
