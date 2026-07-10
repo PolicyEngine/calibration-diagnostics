@@ -152,12 +152,12 @@ export function ClusterDetail({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-white shadow-2xl ring-1 ring-black/5">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl ring-1 ring-border/60">
       {/* header */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-muted/20 px-4 py-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <span
-            className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-black/10"
+            className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-border"
             style={{ background: fitColor(leaf.median_abs_relative_error) }}
           />
           <div className="min-w-0">
@@ -194,7 +194,7 @@ export function ClusterDetail({
       </div>
 
       {/* filters */}
-      <div className="flex flex-wrap items-end gap-2 border-b border-border bg-white px-4 py-2.5">
+      <div className="flex flex-wrap items-end gap-2 border-b border-border bg-card px-4 py-2.5">
         <label className="grid min-w-0 gap-1">
           <span className="text-[11px] font-medium text-muted-foreground">Search</span>
           <input
@@ -202,7 +202,7 @@ export function ClusterDetail({
             value={search}
             placeholder="Filter breakdowns…"
             onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-44 rounded-md border border-border bg-white px-2.5 text-sm focus:border-primary/60 focus:outline-none"
+            className="h-8 w-44 rounded-md border border-border bg-card px-2.5 text-sm focus:border-primary/60 focus:outline-none"
           />
         </label>
         {dimensions.map((dim) => (
@@ -262,7 +262,7 @@ export function ClusterDetail({
           </div>
         ) : (
           <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+            <thead className="sticky top-0 z-10 bg-card shadow-[var(--elev-1)]">
               <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="px-4 py-2 font-semibold">Breakdown</th>
                 <SortHeader label="Target" sortKey="target" sort={sort} onSort={toggleSort} />
@@ -303,7 +303,7 @@ export function ClusterDetail({
                   </td>
                   <td
                     className={`px-4 py-1.5 text-right font-mono tabular-nums ${
-                      (row.abs_relative_error ?? 0) > 0.1 ? "text-rose-700" : "text-foreground"
+                      (row.abs_relative_error ?? 0) > 0.1 ? "tone-neg" : "text-foreground"
                     }`}
                   >
                     {errorText(row)}

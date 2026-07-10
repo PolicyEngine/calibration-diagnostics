@@ -26,11 +26,7 @@ export function PageHeader({
     <>
       <div className="sticky top-0 z-20 -mx-6 flex flex-wrap items-start justify-between gap-4 border-b border-border bg-background/85 px-6 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/75">
         <div className="min-w-0 flex-1">
-          {eyebrow && (
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {eyebrow}
-            </div>
-          )}
+          {eyebrow && <div className="site-eyebrow mb-1">{eyebrow}</div>}
           <div className="flex flex-wrap items-center gap-3">
             <Title order={2}>{title}</Title>
             {status}

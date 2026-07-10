@@ -64,7 +64,7 @@ function CodeChips({ values }: { values: string[] }) {
       {values.map((value) => (
         <code
           key={value}
-          className="rounded bg-white px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+          className="rounded bg-card px-1.5 py-0.5 font-mono text-[11px] text-foreground"
         >
           {value}
         </code>
@@ -155,10 +155,10 @@ function EstimateBar({
     value == null || scale === 0 ? 0 : Math.min(Math.abs(value) / scale, 1) * 100;
   const barColor =
     tone === "target"
-      ? "bg-slate-400"
+      ? "swatch-neutral"
       : tone === "final"
         ? "bg-primary"
-        : "bg-amber-400";
+        : "swatch-warn";
   return (
     <div className="flex items-center gap-3">
       <span className="w-20 shrink-0 text-xs text-muted-foreground">{label}</span>
@@ -313,7 +313,7 @@ export function PopulaceTargetDetail({
             </StatusPill>
           </div>
           {row.calibration_status_reason ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900">
+            <div className="rounded-md border pill-warn px-3 py-2 text-xs leading-snug">
               {row.calibration_status_reason}
             </div>
           ) : null}
@@ -339,7 +339,7 @@ export function PopulaceTargetDetail({
                 {ledger.filters.map((filter) => (
                   <div
                     key={filter.key}
-                    className="grid gap-1 rounded-md border border-border/70 bg-white px-3 py-2 text-xs sm:grid-cols-[9rem_minmax(0,1fr)]"
+                    className="grid gap-1 rounded-md border border-border/70 bg-card px-3 py-2 text-xs sm:grid-cols-[9rem_minmax(0,1fr)]"
                   >
                     <span className="font-medium text-muted-foreground">
                       {filter.label}
@@ -363,7 +363,7 @@ export function PopulaceTargetDetail({
             weighted aggregate after applying calibrated weights.
           </p>
           {row.estimate_warning ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900">
+            <div className="rounded-md border pill-warn px-3 py-2 text-xs leading-snug">
               {row.estimate_warning}
             </div>
           ) : null}
@@ -399,11 +399,11 @@ export function PopulaceTargetDetail({
                 improvement == null ? (
                   "—"
                 ) : errorKind === "absolute" ? (
-                  <span className={improvement > 0 ? "text-emerald-700" : "text-rose-700"}>
+                  <span className={improvement > 0 ? "tone-pos" : "tone-neg"}>
                     {fmtCompact(improvement)}
                   </span>
                 ) : (
-                  <span className={improvement > 0 ? "text-emerald-700" : "text-rose-700"}>
+                  <span className={improvement > 0 ? "tone-pos" : "tone-neg"}>
                     {pointChangeText(improvement)}
                   </span>
                 )

@@ -202,12 +202,12 @@ function CompareChip({
 }) {
   const toneClass =
     tone === "positive"
-      ? "text-emerald-700"
+      ? "tone-pos"
       : tone === "negative"
-        ? "text-rose-700"
+        ? "tone-neg"
         : "text-foreground";
   return (
-    <div className="grid min-w-0 gap-0.5 rounded border border-border bg-white px-2 py-1">
+    <div className="grid min-w-0 gap-0.5 rounded border border-border bg-card px-2 py-1">
       <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
@@ -359,7 +359,7 @@ function TargetComparisonTable({ rows }: { rows: PopulaceComparisonRow[] }) {
             value={query}
             placeholder="Search targets or variables…"
             onChange={(event) => setQuery(event.target.value)}
-            className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus:border-primary/60 focus:outline-none"
+            className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm focus:border-primary/60 focus:outline-none"
           />
         </label>
         <ToolbarSelect
@@ -495,7 +495,7 @@ function TargetComparisonTable({ rows }: { rows: PopulaceComparisonRow[] }) {
                   </td>
                   <td
                     className={`px-3 py-1.5 text-right tabular-nums ${
-                      improved ? "text-emerald-700" : regressed ? "text-rose-700" : ""
+                      improved ? "tone-pos" : regressed ? "tone-neg" : ""
                     }`}
                   >
                     {fmtPointDelta(row.abs_rel_delta)}
@@ -739,7 +739,7 @@ export function PopulaceCompareView() {
                       <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                       <td
                         className={`px-3 py-2 text-right font-mono tabular-nums ${
-                          bLossLower ? "text-emerald-700" : bLossHigher ? "text-rose-700" : ""
+                          bLossLower ? "tone-pos" : bLossHigher ? "tone-neg" : ""
                         }`}
                       >
                         {comparableLossDelta == null
@@ -748,7 +748,7 @@ export function PopulaceCompareView() {
                       </td>
                       <td
                         className={`px-3 py-2 text-right tabular-nums ${
-                          bLossLower ? "text-emerald-700" : bLossHigher ? "text-rose-700" : ""
+                          bLossLower ? "tone-pos" : bLossHigher ? "tone-neg" : ""
                         }`}
                       >
                         {lossChange == null

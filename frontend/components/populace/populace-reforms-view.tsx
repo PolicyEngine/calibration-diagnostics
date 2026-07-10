@@ -153,7 +153,7 @@ function Sparkline({ series }: { series: ReformHistorySeries }) {
         return (
           <div
             key={p.release_id}
-            className={`w-1.5 rounded-sm ${good ? "bg-emerald-500/70" : "bg-amber-500/70"}`}
+            className={`w-1.5 rounded-sm ${good ? "swatch-pos" : "swatch-warn"}`}
             style={{ height: `${h}px` }}
             title={`${releaseLabel(p.release_id, p.date)}: ${pct(p.abs_relative_error)}`}
           />
@@ -167,9 +167,9 @@ function Sparkline({ series }: { series: ReformHistorySeries }) {
 function ErrorCell({ absRel }: { absRel: number | null | undefined }) {
   const tone = errorTone(absRel);
   const color =
-    tone === "positive" ? "bg-emerald-500" : tone === "negative" ? "bg-rose-500" : "bg-amber-500";
+    tone === "positive" ? "swatch-pos" : tone === "negative" ? "swatch-neg" : "swatch-warn";
   const text =
-    tone === "positive" ? "text-emerald-700" : tone === "negative" ? "text-rose-700" : "text-foreground";
+    tone === "positive" ? "tone-pos" : tone === "negative" ? "tone-neg" : "text-foreground";
   return (
     <div className="flex items-center justify-end gap-2">
       <span className={`font-medium tabular-nums ${absRel == null ? "text-muted-foreground" : text}`}>
@@ -273,9 +273,9 @@ function ReformTable({
                       delta == null
                         ? "text-muted-foreground"
                         : delta < 0
-                          ? "text-emerald-700"
+                          ? "tone-pos"
                           : delta > 0
-                            ? "text-rose-700"
+                            ? "tone-neg"
                             : "text-muted-foreground"
                     }`}
                   >
@@ -468,7 +468,7 @@ export function PopulaceReformsView() {
                     <td
                       className={`px-3 py-2 text-right tabular-nums ${
                         suite.scored > 0 && suite.within10 === suite.scored
-                          ? "text-emerald-700"
+                          ? "tone-pos"
                           : ""
                       }`}
                     >
@@ -477,9 +477,9 @@ export function PopulaceReformsView() {
                     <td
                       className={`px-3 py-2 text-right font-medium tabular-nums ${
                         errorTone(suite.medianAbsError) === "positive"
-                          ? "text-emerald-700"
+                          ? "tone-pos"
                           : errorTone(suite.medianAbsError) === "negative"
-                            ? "text-rose-700"
+                            ? "tone-neg"
                             : "text-foreground"
                       }`}
                     >
@@ -489,7 +489,7 @@ export function PopulaceReformsView() {
                       {suite.worst ? (
                         <>
                           {suite.worst.name}{" "}
-                          <span className="font-medium text-rose-700">
+                          <span className="font-medium tone-neg">
                             {pct(suite.worst.abs_relative_error)}
                           </span>
                         </>

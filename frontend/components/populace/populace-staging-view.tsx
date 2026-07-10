@@ -253,9 +253,9 @@ function ReformValidationTable({
                 <td
                   className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
                     validationTone(row.abs_relative_error) === "positive"
-                      ? "text-emerald-700"
+                      ? "tone-pos"
                       : validationTone(row.abs_relative_error) === "negative"
-                        ? "text-rose-700"
+                        ? "tone-neg"
                         : "text-foreground"
                   }`}
                 >
@@ -271,9 +271,9 @@ function ReformValidationTable({
                         delta == null
                           ? "text-muted-foreground"
                           : delta < -1e-4
-                            ? "text-emerald-700"
+                            ? "tone-pos"
                             : delta > 1e-4
-                              ? "text-rose-700"
+                              ? "tone-neg"
                               : "text-muted-foreground"
                       }`}
                     >
@@ -349,7 +349,7 @@ function ScoreRow({
       </td>
       <td
         className={`whitespace-nowrap px-3 py-1.5 text-right text-xs font-semibold ${
-          better ? "text-emerald-700" : worse ? "text-rose-700" : "text-muted-foreground"
+          better ? "tone-pos" : worse ? "tone-neg" : "text-muted-foreground"
         }`}
       >
         {better ? "candidate better" : worse ? "candidate worse" : published == null || candidate == null ? "—" : "tie"}
@@ -619,11 +619,11 @@ export function PopulaceStagingView() {
                   </table>
                   {compareData?.summary && (
                     <div className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
-                      <span className="text-emerald-700">
+                      <span className="tone-pos">
                         {fmt(compareData.summary.improved, { digits: 0 })} targets improved
                       </span>
                       {" · "}
-                      <span className="text-rose-700">
+                      <span className="tone-neg">
                         {fmt(compareData.summary.regressed, { digits: 0 })} regressed
                       </span>{" "}
                       — search the breakdown below for any statistic.
@@ -642,7 +642,7 @@ export function PopulaceStagingView() {
                       value={targetSearch}
                       placeholder="Search targets…"
                       onChange={(e) => setTargetSearch(e.target.value)}
-                      className="h-8 w-56 rounded-md border border-border bg-white px-2.5 text-sm focus:border-primary/60 focus:outline-none"
+                      className="h-8 w-56 rounded-md border border-border bg-card px-2.5 text-sm focus:border-primary/60 focus:outline-none"
                     />
                   }
                   padded={false}
@@ -683,7 +683,7 @@ export function PopulaceStagingView() {
                       <>
                         <div className="max-h-96 overflow-y-auto">
                           <table className="w-full text-left text-sm">
-                            <thead className="sticky top-0 bg-white shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+                            <thead className="sticky top-0 bg-card shadow-[var(--elev-1)]">
                               <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
                                 <th className="px-3 py-2 font-semibold">Target</th>
                                 <th className="px-3 py-2 text-right font-semibold">Published</th>
@@ -727,9 +727,9 @@ export function PopulaceStagingView() {
                                         delta == null
                                           ? "text-muted-foreground"
                                           : delta > 1e-9
-                                            ? "text-rose-700"
+                                            ? "tone-neg"
                                             : delta < -1e-9
-                                              ? "text-emerald-700"
+                                              ? "tone-pos"
                                               : "text-muted-foreground"
                                       }`}
                                     >
@@ -775,7 +775,7 @@ export function PopulaceStagingView() {
                 </SectionCard>
               )}
 
-              <details className="group overflow-hidden rounded-lg border border-border/80 bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+              <details className="group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)]">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold leading-tight text-foreground">
@@ -906,11 +906,11 @@ export function PopulaceStagingView() {
                             <tr
                               key={index}
                               className={`border-b border-border/60 last:border-b-0 ${
-                                failed ? "bg-rose-50/60" : ""
+                                failed ? "row-neg" : ""
                               }`}
                             >
                               <td className="whitespace-nowrap px-3 py-1.5">
-                                <span className={failed ? "font-medium text-rose-700" : ""}>
+                                <span className={failed ? "font-medium tone-neg" : ""}>
                                   {String(event.stage ?? "—")}
                                 </span>
                                 {failed && (
@@ -1018,8 +1018,8 @@ export function PopulaceStagingView() {
                                       key={name}
                                       className={`rounded-md border px-2 py-1 text-xs ${
                                         passed
-                                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                                          : "border-rose-200 bg-rose-50 text-rose-800"
+                                          ? "pill-pos"
+                                          : "pill-neg"
                                       }`}
                                     >
                                       <span className="font-medium">{name}</span>{" "}

@@ -1,7 +1,10 @@
-// Fit heat scale: maps a mean absolute relative error to a color. The ramp runs
-// from a deep sage-green (on target) through warm amber to a muted rose (far
-// off) — a curated earthy palette rather than neon traffic lights, so the map
-// reads as a calm heat surface while still being unmistakably good → bad.
+// Fit heat scale: maps a mean absolute relative error to a color. The ramp is
+// anchored to the ui-kit / populace.dev palette so the map reads as part of the
+// same design system — on-target cells carry the site's PolicyEngine teal, the
+// far-off end lands on the ui-kit error red, and unscored cells use ui-kit gray.
+// The warm midpoints keep the surface reading as a calm good → bad heat map
+// rather than neon traffic lights. Anchors are pre-resolved to RGB because the
+// ramp interpolates numerically; each stop names the ui-kit token it draws from.
 
 interface Stop {
   at: number; // mean absolute relative error
@@ -9,15 +12,15 @@ interface Stop {
 }
 
 const STOPS: Stop[] = [
-  { at: 0.0, rgb: [38, 140, 120] }, // #268C78 teal-green (on target)
-  { at: 0.03, rgb: [86, 162, 108] }, // #56A26C
-  { at: 0.06, rgb: [150, 184, 104] }, // #96B868 sage
-  { at: 0.1, rgb: [223, 168, 92] }, // #DFA85C warm amber
-  { at: 0.2, rgb: [206, 110, 63] }, // #CE6E3F terracotta
-  { at: 0.4, rgb: [167, 58, 75] }, // #A73A4B muted rose
+  { at: 0.0, rgb: [44, 122, 123] }, // --primary   #2C7A7B teal-600 (on target)
+  { at: 0.03, rgb: [49, 151, 149] }, // --chart-1   #319795 teal-500
+  { at: 0.06, rgb: [150, 184, 104] }, // sage transition
+  { at: 0.1, rgb: [223, 168, 92] }, // warm amber
+  { at: 0.2, rgb: [206, 110, 63] }, // terracotta
+  { at: 0.4, rgb: [185, 28, 28] }, // --text-error #B91C1C (far off)
 ];
 
-const MISSING: [number, number, number] = [156, 163, 175]; // slate — no score
+const MISSING: [number, number, number] = [148, 163, 184]; // --color-gray-400 #94A3B8 — no score
 
 function lerp(a: number, b: number, t: number): number {
   return Math.round(a + (b - a) * t);
@@ -55,10 +58,14 @@ export const FIT_LEGEND: { error: number; label: string }[] = [
   { error: 0.4, label: "40%+" },
 ];
 
-// A readable contrast color (dark or light) for text laid over a fill.
+// A readable contrast ink (dark or light) for text laid over a heat fill.
+// Returned as ui-kit tokens (applied via inline `color`), so even the map's
+// overlay text stays in the design system.
 export function readableInk(error: number | null | undefined): string {
-  if (error == null || !Number.isFinite(error)) return "#1f2937";
+  if (error == null || !Number.isFinite(error)) return "var(--foreground)";
   // The pale sage/amber band gets dark ink; deeper greens and the rose end get
   // light ink.
-  return error >= 0.05 && error <= 0.15 ? "#1f2937" : "#ffffff";
+  return error >= 0.05 && error <= 0.15
+    ? "var(--foreground)"
+    : "var(--text-inverse)";
 }

@@ -87,13 +87,40 @@ const EDGES: Edge[] = [
   { from: "staging", to: "publish" },
 ];
 
+// Node styling drawn entirely from ui-kit tokens so the diagram tracks the
+// shared palette. Applied via inline style (not SVG fill/stroke attributes) so
+// var() resolves reliably across browsers.
 const KIND_STYLE: Record<Node["kind"], { fill: string; stroke: string; text: string }> = {
-  source: { fill: "#F0F9FF", stroke: "#7DD3FC", text: "#075985" },
-  input: { fill: "#F5F9FF", stroke: "#94A3B8", text: "#0F172A" },
-  step: { fill: "#FFFFFF", stroke: "#319795", text: "#0F172A" },
-  gate: { fill: "#FFFBEB", stroke: "#F59E0B", text: "#78350F" },
-  artifact: { fill: "#ECFDF5", stroke: "#34D399", text: "#065F46" },
-  publish: { fill: "#319795", stroke: "#2C7A7B", text: "#FFFFFF" },
+  source: {
+    fill: "var(--color-blue-50)",
+    stroke: "var(--color-blue-300)",
+    text: "var(--color-blue-800)",
+  },
+  input: {
+    fill: "var(--background-secondary)",
+    stroke: "var(--color-gray-400)",
+    text: "var(--color-gray-900)",
+  },
+  step: {
+    fill: "var(--card)",
+    stroke: "var(--chart-1)",
+    text: "var(--color-gray-900)",
+  },
+  gate: {
+    fill: "color-mix(in srgb, var(--color-warning) 12%, var(--card))",
+    stroke: "var(--color-warning)",
+    text: "var(--warn)",
+  },
+  artifact: {
+    fill: "color-mix(in srgb, var(--color-success) 12%, var(--card))",
+    stroke: "var(--color-success)",
+    text: "var(--text-success)",
+  },
+  publish: {
+    fill: "var(--chart-1)",
+    stroke: "var(--primary)",
+    text: "var(--primary-foreground)",
+  },
 };
 
 function anchor(node: Node, side: "left" | "right" | "top" | "bottom") {
@@ -145,7 +172,7 @@ export function PipelineDiagram() {
             markerHeight="7"
             orient="auto-start-reverse"
           >
-            <path d="M 0 0 L 8 4 L 0 8 z" fill="#94A3B8" />
+            <path d="M 0 0 L 8 4 L 0 8 z" style={{ fill: "var(--color-gray-400)" }} />
           </marker>
         </defs>
 
@@ -157,7 +184,7 @@ export function PipelineDiagram() {
           { x: 710, label: "COMPUTE" },
           { x: 955, label: "ARTIFACTS & SHIP" },
         ].map((l) => (
-          <text key={l.x} x={l.x} y={14} fontSize="10" fontWeight="700" fill="#94A3B8" letterSpacing="0.08em">
+          <text key={l.x} x={l.x} y={14} fontSize="10" fontWeight="700" style={{ fill: "var(--color-gray-400)" }} letterSpacing="0.08em">
             {l.label}
           </text>
         ))}
@@ -170,7 +197,7 @@ export function PipelineDiagram() {
               key={i}
               d={edgePath(a, b)}
               fill="none"
-              stroke="#CBD5E1"
+              style={{ stroke: "var(--color-gray-300)" }}
               strokeWidth="1.5"
               markerEnd="url(#arrow)"
             />
@@ -187,8 +214,7 @@ export function PipelineDiagram() {
                 width={n.w}
                 height={n.h}
                 rx="8"
-                fill={s.fill}
-                stroke={s.stroke}
+                style={{ fill: s.fill, stroke: s.stroke }}
                 strokeWidth="1.4"
               />
               {/* HTML labels clip/wrap inside the box regardless of the
@@ -204,7 +230,12 @@ export function PipelineDiagram() {
                   {n.sub && (
                     <div
                       className="truncate text-[9px] leading-tight"
-                      style={{ color: n.kind === "publish" ? "#E6FFFA" : "#64748B" }}
+                      style={{
+                        color:
+                          n.kind === "publish"
+                            ? "var(--color-teal-50)"
+                            : "var(--paper-faint)",
+                      }}
                     >
                       {n.sub}
                     </div>
@@ -216,7 +247,7 @@ export function PipelineDiagram() {
         })}
 
         {/* legend */}
-        <g transform={`translate(20, ${H - 44})`} fontSize="10" fill="#64748B">
+        <g transform={`translate(20, ${H - 44})`} fontSize="10" style={{ fill: "var(--paper-faint)" }}>
           {(
             [
               ["source", "survey source"],
@@ -228,7 +259,7 @@ export function PipelineDiagram() {
             ] as const
           ).map(([kind, label], i) => (
             <g key={kind} transform={`translate(${i * 130}, 0)`}>
-              <rect width="14" height="14" rx="4" fill={KIND_STYLE[kind].fill} stroke={KIND_STYLE[kind].stroke} strokeWidth="1.4" />
+              <rect width="14" height="14" rx="4" style={{ fill: KIND_STYLE[kind].fill, stroke: KIND_STYLE[kind].stroke }} strokeWidth="1.4" />
               <text x="20" y="11">{label}</text>
             </g>
           ))}

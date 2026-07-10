@@ -64,10 +64,10 @@ function LossCurve({ trajectory }: { trajectory: number[] }) {
     .join(" ");
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-md" role="img" aria-label="calibration loss by epoch">
-      <path d={path} fill="none" stroke="#319795" strokeWidth="1.8" />
-      <text x="4" y={h - 2} fontSize="9" fill="#94A3B8">epoch 1</text>
-      <text x={w - 4} y={h - 2} fontSize="9" fill="#94A3B8" textAnchor="end">{points.length}</text>
-      <text x="4" y="10" fontSize="9" fill="#94A3B8">log loss</text>
+      <path d={path} fill="none" style={{ stroke: "var(--chart-1)" }} strokeWidth="1.8" />
+      <text x="4" y={h - 2} fontSize="9" style={{ fill: "var(--paper-faint)" }}>epoch 1</text>
+      <text x={w - 4} y={h - 2} fontSize="9" style={{ fill: "var(--paper-faint)" }} textAnchor="end">{points.length}</text>
+      <text x="4" y="10" fontSize="9" style={{ fill: "var(--paper-faint)" }}>log loss</text>
     </svg>
   );
 }
@@ -212,7 +212,7 @@ export function PopulaceOverviewView() {
         )}
       </SectionCard>
 
-      <details className="group overflow-hidden rounded-lg border border-border/80 bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+      <details className="group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
           <div className="min-w-0">
             <div className="text-sm font-semibold leading-tight text-foreground">
@@ -293,7 +293,7 @@ export function PopulaceOverviewView() {
         </div>
       </details>
 
-      <details className="group overflow-hidden rounded-lg border border-border/80 bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+      <details className="group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
           <div className="min-w-0">
             <div className="text-sm font-semibold leading-tight text-foreground">

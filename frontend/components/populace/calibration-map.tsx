@@ -232,7 +232,7 @@ function SegmentedToggle({
             onClick={() => onChange(option.value)}
             className={`h-8 rounded-full px-4 text-[13px] font-medium transition-all ${
               active
-                ? "bg-white text-foreground shadow-sm ring-1 ring-black/5"
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -252,7 +252,7 @@ function FitLegend() {
       </span>
       <div className="flex flex-col gap-1">
         <span
-          className="h-2 w-36 rounded-full ring-1 ring-black/5"
+          className="h-2 w-36 rounded-full ring-1 ring-border/60"
           style={{
             background: `linear-gradient(to right, ${FIT_LEGEND.map((s) =>
               fitColor(s.error),
@@ -285,10 +285,10 @@ function HoverCard({
   const lossShare = totalLoss ? leaf.loss / totalLoss : null;
   const swatch = fitColor(leaf.median_abs_relative_error);
   return (
-    <div className="pointer-events-none w-[17rem] overflow-hidden rounded-xl border border-border bg-white/95 shadow-xl ring-1 ring-black/5 backdrop-blur">
+    <div className="pointer-events-none w-[17rem] overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl ring-1 ring-border/60 backdrop-blur">
       <div className="flex items-center gap-2 border-b border-border/70 px-3.5 py-2.5">
         <span
-          className="h-3 w-3 shrink-0 rounded-full ring-1 ring-black/10"
+          className="h-3 w-3 shrink-0 rounded-full ring-1 ring-border"
           style={{ background: swatch }}
         />
         <div className="min-w-0">
@@ -486,10 +486,10 @@ export function CalibrationMap({
                     transform:
                       isHover || isSelected ? "scale(1.012)" : "scale(1)",
                     boxShadow: isSelected
-                      ? "0 0 0 2px #ffffff, 0 0 0 4px #319795, 0 8px 22px -6px rgba(15,23,42,0.35)"
+                      ? "0 0 0 2px var(--card), 0 0 0 4px var(--chart-1), 0 8px 22px -6px color-mix(in srgb, var(--foreground) 35%, transparent)"
                       : isHover
-                        ? "0 6px 20px -4px rgba(15,23,42,0.28)"
-                        : "inset 0 0 0 1px rgba(255,255,255,0.06)",
+                        ? "0 6px 20px -4px color-mix(in srgb, var(--foreground) 28%, transparent)"
+                        : "inset 0 0 0 1px color-mix(in srgb, var(--background) 6%, transparent)",
                     opacity: selected && !isSelected ? 0.62 : 1,
                   }}
                 >
@@ -558,7 +558,7 @@ export function CalibrationMap({
               type="button"
               aria-label="Close cluster details"
               onClick={() => setSelected(null)}
-              className="absolute inset-0 cursor-default bg-slate-900/20 backdrop-blur-[2px] motion-safe:animate-[scrimIn_140ms_ease-out]"
+              className="absolute inset-0 cursor-default bg-[var(--scrim)] backdrop-blur-[2px] motion-safe:animate-[scrimIn_140ms_ease-out]"
             />
             <div className="absolute inset-2 motion-safe:animate-[popIn_180ms_cubic-bezier(0.16,1,0.3,1)] sm:inset-3">
               <ClusterDetail

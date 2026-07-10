@@ -297,17 +297,17 @@ function tierBreakdown(
 const TIER_META: Record<Tier, { label: string; chip: string; blurb: string }> = {
   unreached: {
     label: "Unreached",
-    chip: "border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100",
+    chip: "pill-neg transition hover:brightness-95",
     blurb: "no dashboard check would move if these broke",
   },
   exercised: {
     label: "Exercised",
-    chip: "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
+    chip: "pill-warn transition hover:brightness-95",
     blurb: "feed an anchored number through the dependency graph",
   },
   anchored: {
     label: "Anchored",
-    chip: "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+    chip: "pill-pos transition hover:brightness-95",
     blurb: "directly compared to an official figure",
   },
 };
@@ -348,12 +348,12 @@ function ClusterPopup({
     .sort((a, b) => b.names.length - a.names.length);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-white shadow-2xl ring-1 ring-black/5">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl ring-1 ring-border/60">
       {/* header */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-muted/20 px-4 py-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <span
-            className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-black/10"
+            className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-border"
             style={{ background: coverageColor(share) }}
           />
           <div className="min-w-0">
@@ -388,7 +388,7 @@ function ClusterPopup({
       </div>
 
       {/* filters */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-white px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2.5">
         <div className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1">
           {(Object.keys(TIER_META) as Tier[]).map((k) => (
             <button
@@ -397,7 +397,7 @@ function ClusterPopup({
               onClick={() => setTier(k)}
               className={`h-7 rounded-full px-3 text-xs font-medium transition-all ${
                 tier === k
-                  ? "bg-white text-foreground shadow-sm ring-1 ring-black/5"
+                  ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -410,7 +410,7 @@ function ClusterPopup({
           value={search}
           placeholder="Filter variables…"
           onChange={(e) => setSearch(e.target.value)}
-          className="h-8 w-44 rounded-md border border-border bg-white px-2.5 text-sm focus:border-primary/60 focus:outline-none"
+          className="h-8 w-44 rounded-md border border-border bg-card px-2.5 text-sm focus:border-primary/60 focus:outline-none"
         />
         <span className="text-[11px] text-muted-foreground">{TIER_META[tier].blurb}</span>
       </div>
@@ -661,7 +661,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
           {laid.map(({ group, headerH, leaves }) => (
             <div key={group.data.label}>
               <div
-                className="absolute rounded-md border border-border/80 bg-slate-50"
+                className="absolute rounded-md border border-border/80 bg-muted"
                 style={{
                   left: group.x + 1.5,
                   top: group.y + 1.5,
@@ -727,10 +727,10 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
                       zIndex: isSelected ? 11 : isHover ? 10 : 1,
                       transform: isHover || isSelected ? "scale(1.015)" : "scale(1)",
                       boxShadow: isSelected
-                        ? "0 0 0 2px #ffffff, 0 0 0 4px #319795, 0 8px 22px -6px rgba(15,23,42,0.35)"
+                        ? "0 0 0 2px var(--card), 0 0 0 4px var(--chart-1), 0 8px 22px -6px color-mix(in srgb, var(--foreground) 35%, transparent)"
                         : isHover
-                          ? "0 6px 20px -4px rgba(15,23,42,0.3), inset 0 0 0 1px rgba(255,255,255,0.25)"
-                          : "inset 0 0 0 1px rgba(255,255,255,0.08)",
+                          ? "0 6px 20px -4px color-mix(in srgb, var(--foreground) 30%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--background) 25%, transparent)"
+                          : "inset 0 0 0 1px color-mix(in srgb, var(--background) 8%, transparent)",
                     }}
                   >
                     {showText && (
@@ -757,7 +757,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
                 type="button"
                 aria-label="Close cluster details"
                 onClick={() => setSelected(null)}
-                className="absolute inset-0 cursor-default bg-slate-900/20 backdrop-blur-[2px] motion-safe:animate-[scrimIn_140ms_ease-out]"
+                className="absolute inset-0 cursor-default bg-[var(--scrim)] backdrop-blur-[2px] motion-safe:animate-[scrimIn_140ms_ease-out]"
               />
               <div className="absolute inset-2 motion-safe:animate-[popIn_180ms_cubic-bezier(0.16,1,0.3,1)] sm:inset-3">
                 <ClusterPopup
@@ -814,7 +814,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
                 <td className="px-3 py-2 font-mono text-xs">{path.replace(/^variables\//, "")}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{rules}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{pocketReached}</td>
-                <td className="px-3 py-2 text-right font-medium tabular-nums text-rose-700">
+                <td className="px-3 py-2 text-right font-medium tabular-nums tone-neg">
                   {unreached.length}
                 </td>
                 <td className="max-w-xl px-3 py-2 font-mono text-[11px] leading-snug text-muted-foreground">

@@ -124,7 +124,7 @@ function FilterPopover({
       </button>
       {open && (
         <div
-          className="absolute top-full left-0 mt-1 z-50 bg-white border border-border rounded-md shadow-md p-1.5"
+          className="absolute top-full left-0 mt-1 z-50 bg-card border border-border rounded-md shadow-md p-1.5"
           onClick={(e) => e.stopPropagation()}
         >
           <input
@@ -134,7 +134,7 @@ function FilterPopover({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             className={cn(
-              'w-36 px-2 py-1 text-xs font-normal rounded border border-border bg-white',
+              'w-36 px-2 py-1 text-xs font-normal rounded border border-border bg-card',
               'focus:outline-none focus:ring-1 focus:ring-ring',
               'placeholder:text-muted-foreground/50',
             )}
