@@ -725,3 +725,124 @@ export function usePopulaceTargetDiagnostics(params: {
     staleTime: 15 * 60 * 1000,
   });
 }
+
+// --- reform-coverage board --------------------------------------------------
+
+export interface CoverageIssueRef {
+  label: string;
+  owner: string;
+  repo: string;
+  number: number;
+  url: string;
+}
+
+export interface CoverageExclusion {
+  subject: string;
+  reason: string;
+  issues: CoverageIssueRef[];
+}
+
+export interface HardTargetFamily {
+  key: string;
+  label: string;
+  required: string[];
+  covered: string[];
+  missing: string[];
+  reviewed_exclusions: CoverageExclusion[];
+  state: "covered" | "partial" | "excluded" | "missing";
+}
+
+export interface SourceCoverageResponse {
+  available: boolean;
+  release_id: string;
+  // present when available === false
+  reason?: string;
+  expected_path?: string;
+  // present when available === true
+  schema_version?: number | null;
+  classification?: string | null;
+  gate?: { name: string | null; passed: boolean | null; failures: string[] };
+  ledger_commit?: string | null;
+  summary?: {
+    hard_target_families: number;
+    required_aliases: number;
+    covered_aliases: number;
+    missing_aliases: number;
+    reviewed_excluded_aliases: number;
+    validation_only_families: number;
+    validation_only_activated: number;
+    source_gap_families: number;
+    missing_source_packages: number;
+  };
+  hard_target_families?: HardTargetFamily[];
+  validation_only_families?: {
+    key: string;
+    label: string;
+    required: string[];
+    activated: boolean;
+  }[];
+  source_gap_families?: { key: string; label: string; missing_source_packages: string[] }[];
+  reviewed_exclusions?: CoverageExclusion[];
+  fiscal_support_exclusions?: CoverageExclusion[];
+  artifact?: { path: string; url: string };
+}
+
+export interface InputColumn {
+  column: string;
+  present: boolean | null;
+  degenerate: boolean | null;
+  reason: string | null;
+  issues: CoverageIssueRef[];
+}
+
+export interface InputColumnCoverageResponse {
+  available: boolean;
+  release_id: string;
+  reason?: string;
+  expected_path?: string;
+  enforced?: boolean | null;
+  gate?: { passed: boolean | null; failures: string[] };
+  summary?: { required: number; reviewed_exclusion: number; failing: number };
+  required?: InputColumn[];
+  reviewed_exclusions?: InputColumn[];
+  artifact?: { path: string; url: string };
+}
+
+export interface ReformProbe {
+  name: string;
+  reform: string | null;
+  scored_value: number | null;
+  verdict: "scored" | "zero" | "unknown";
+  passed: boolean | null;
+  description: string | null;
+  issues: CoverageIssueRef[];
+}
+
+export interface ReformSmokeResponse {
+  available: boolean;
+  release_id: string;
+  reason?: string;
+  expected_path?: string;
+  enforced?: boolean | null;
+  gate?: { passed: boolean | null; failures: string[] };
+  summary?: { probes: number; scored: number; zero: number };
+  probes?: ReformProbe[];
+  artifact?: { path: string; url: string };
+}
+
+export interface CoverageResponse {
+  release_id: string;
+  source: SourceCoverageResponse;
+  input_columns: InputColumnCoverageResponse;
+  reform_smoke: ReformSmokeResponse;
+}
+
+export function usePopulaceCoverage(release?: string) {
+  const { country } = useCountry();
+  return useQuery({
+    queryKey: ["populace", "coverage", country, release ?? "latest"],
+    queryFn: () =>
+      apiGet<CoverageResponse>("/populace/coverage", { release: release || undefined, country }),
+    staleTime: 5 * 60 * 1000,
+  });
+}
