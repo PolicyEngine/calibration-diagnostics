@@ -27,6 +27,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Dataset accuracy",
     items: [
       { href: "/populace", label: "Calibration fit", also: ["/populace/targets"] },
+      { href: "/populace/coverage", label: "Coverage", usOnly: true },
       { href: "/populace/reforms", label: "External checks", usOnly: true },
       { href: "/populace/model-coverage", label: "Validation reach", usOnly: true },
       { href: "/populace/datasets", label: "Cross-dataset", usOnly: true },
@@ -35,6 +36,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Releases",
     items: [
+      { href: "/populace/certification", label: "Certification", usOnly: true },
       { href: "/populace/compare", label: "Compare versions" },
       { href: "/populace/staging", label: "Staging candidates", usOnly: true },
     ],

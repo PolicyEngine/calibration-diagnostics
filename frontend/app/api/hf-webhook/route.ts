@@ -3,7 +3,8 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import type { PopulaceCountry } from "@/lib/populace/latest-artifact";
-import { postReleaseAlert } from "@/lib/slack";
+import { loadLatestDelta } from "@/lib/populace/deltas";
+import { postDeltaAlert, postReleaseAlert } from "@/lib/slack";
 
 export const runtime = "nodejs";
 // Push endpoint — must run on every call, never served from cache.
@@ -88,5 +89,18 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, country, alerted });
+  // Follow the release ping with the computed headline delta (latest vs the
+  // previous registry release) — the epic's "on new latest.json, post the delta
+  // table". Best-effort and read-fresh; a failure here never fails the webhook.
+  let deltaPosted = false;
+  try {
+    const report = await loadLatestDelta(0, country);
+    if (report.available) {
+      deltaPosted = await postDeltaAlert({ country, report });
+    }
+  } catch (error) {
+    console.error("Delta alert failed:", error);
+  }
+
+  return NextResponse.json({ ok: true, country, alerted, deltaPosted });
 }
