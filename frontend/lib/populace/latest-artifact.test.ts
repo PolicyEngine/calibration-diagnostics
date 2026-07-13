@@ -6,6 +6,7 @@ import {
   latestPopulaceCalibrationHighlights,
   latestPopulaceCalibrationSummary,
   latestPopulaceTargetDiagnosticsPage,
+  releaseRole,
   type Calibration,
 } from "./latest-artifact";
 
@@ -624,4 +625,145 @@ test("count and total measures split into distinct variables", () => {
   expect(keys.has("irs / capital gains gross · count")).toBe(true);
   expect(cal.rows.find((r) => r.measure === "count")).toBeTruthy();
   expect(cal.rows.find((r) => r.measure === "total")).toBeTruthy();
+});
+
+// A Build L ACS local-area row as published: the custom driver names the target
+// value and post-calibration estimate `value`/`estimate`, with no canonical
+// `target`/`final_estimate`/`initial_estimate`/`within_tolerance` (populace#398).
+function localAreaTarget(name: string, value: number, estimate: number, rel: number) {
+  return {
+    name: `${name}@2024`,
+    target_name: name,
+    period: 2024,
+    entity: "household",
+    measure: { kind: "column", name },
+    filter: null,
+    source: "USDA SNAP FY2024",
+    metadata: {},
+    value,
+    estimate,
+    relative_error: rel,
+  };
+}
+
+test("local-area diagnostics (value/estimate schema) render as included targets", () => {
+  const cal = buildCalibration(
+    {
+      schema_version: 4,
+      targets: [
+        localAreaTarget("usda_snap.fy2024.state.ct.average_monthly_households", 229620.25, 243424.57, 0.0601),
+        localAreaTarget("usda_snap.fy2024.state.me.average_monthly_households", 100000, 90000, -0.1),
+      ],
+      final_loss: 0.058,
+      fraction_within_10pct: 0.87,
+    },
+    "populace-us-2024-buildl-acs-local-36de5d9a-20260712T104640Z",
+    null,
+    {},
+    { dataset_role: "non_default_local_area", is_default: false, default_datasets: {} },
+  );
+
+  // The bug: without alias normalization every row read as "no estimate" and the
+  // dashboard reported zero calibrated targets. All rows are now included.
+  expect(cal.diagnostics_status).toBe("ok");
+  expect(cal.included_target_count).toBe(2);
+  expect(cal.rows.every((row) => row.calibration_status === "included")).toBe(true);
+  // Aliases are mapped onto the canonical fit fields.
+  expect(cal.rows[0].target).toBe(229620.25);
+  expect(cal.rows[0].final_estimate).toBe(243424.57);
+  // Relative-error-derived fit survives (used by the "within 10%" metrics).
+  expect(cal.rows[0].abs_relative_error).toBeCloseTo(0.0601, 4);
+
+  const summary = latestPopulaceCalibrationSummary(cal);
+  expect(summary.total_targets).toBe(2);
+  expect(summary.included_target_count).toBe(2);
+  expect(summary.diagnostics_status).toBe("ok");
+  expect(summary.dataset_role).toBe("non_default_local_area");
+  expect(summary.is_default).toBe(false);
+  expect(summary.is_local_area).toBe(true);
+
+  const page = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics",
+    cal,
+  );
+  expect(page.summary.total_targets).toBe(2);
+  expect(page.summary.included_target_count).toBe(2);
+  expect(page.summary.diagnostics_status).toBe("ok");
+  expect(page.is_local_area).toBe(true);
+});
+
+test("canonical target/final_estimate are never overwritten by value/estimate aliases", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        {
+          name: "nation/irs/agi/total@2024",
+          target_name: "nation/irs/agi/total",
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 110,
+          value: 999,
+          estimate: 999,
+          relative_error: 0.1,
+        },
+      ],
+    },
+    "rel",
+  );
+  expect(cal.diagnostics_status).toBe("ok");
+  expect(cal.rows[0].target).toBe(100);
+  expect(cal.rows[0].final_estimate).toBe(110);
+  expect(cal.rows[0].calibration_status).toBe("included");
+});
+
+test("unreadable diagnostics rows report an explicit incompatible status, not a silent zero", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        { name: "source.us.total.mystery-a@2024", target_name: "source.us.total.mystery-a", metadata: {}, unknown_metric: 1 },
+        { name: "source.us.total.mystery-b@2024", target_name: "source.us.total.mystery-b", metadata: {} },
+      ],
+    },
+    "rel",
+  );
+  expect(cal.diagnostics_status).toBe("incompatible");
+  expect(cal.included_target_count).toBe(0);
+
+  const page = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics",
+    cal,
+  );
+  expect(page.summary.diagnostics_status).toBe("incompatible");
+  // The rows are still counted — the zero-included is now explained, not silent.
+  expect(page.summary.total_targets).toBe(2);
+});
+
+test("diagnostics with an empty targets list report an explicit empty status", () => {
+  const cal = buildCalibration({ targets: [] }, "rel");
+  expect(cal.diagnostics_status).toBe("empty");
+  expect(latestPopulaceCalibrationSummary(cal).diagnostics_status).toBe("empty");
+});
+
+test("diagnostics missing the targets array report incompatible", () => {
+  const cal = buildCalibration({ final_loss: 0.1 }, "rel");
+  expect(cal.diagnostics_status).toBe("incompatible");
+});
+
+test("releaseRole classifies national default vs non-default local-area", () => {
+  expect(releaseRole({ default_datasets: { national: "populace_us_2024" } })).toEqual({
+    dataset_role: null,
+    is_default: true,
+    is_local_area: false,
+  });
+  expect(
+    releaseRole({
+      dataset_role: "non_default_local_area",
+      is_default: false,
+      default_datasets: {},
+    }),
+  ).toEqual({
+    dataset_role: "non_default_local_area",
+    is_default: false,
+    is_local_area: true,
+  });
 });

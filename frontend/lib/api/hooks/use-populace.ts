@@ -150,8 +150,14 @@ export interface PopulaceFamilyFitRow {
   mean_abs_relative_error: number | null;
 }
 
+export type PopulaceDiagnosticsStatus = "ok" | "empty" | "incompatible";
+
 export interface PopulaceCalibration {
   available: boolean;
+  diagnostics_status?: PopulaceDiagnosticsStatus;
+  dataset_role?: string | null;
+  is_default?: boolean;
+  is_local_area?: boolean;
   path?: string | null;
   release_id?: string | null;
   schema_version?: number | null;
@@ -180,6 +186,9 @@ export interface PopulaceReleaseEntry {
   date: string;
   files: string[];
   has_calibration: boolean;
+  dataset_role?: string | null;
+  is_default?: boolean;
+  is_local_area?: boolean;
 }
 
 export interface PopulaceReleasesResponse {
@@ -246,6 +255,7 @@ export interface PopulaceTargetDiagnostics {
   variables?: PopulaceVariableRow[];
   dimensions?: PopulaceTargetDimension[];
   summary: {
+    diagnostics_status?: PopulaceDiagnosticsStatus;
     total_targets?: number | null;
     within_tolerance_count?: number | null;
     fraction_within_10pct?: number | null;
@@ -618,6 +628,15 @@ export function usePopulaceReleases() {
   });
 }
 
+// Non-default, experimental artifacts (populace#398) are flagged in the picker
+// so a reviewer never mistakes a local-area build for the certified national
+// release.
+export function releaseRoleSuffix(entry: PopulaceReleaseEntry): string {
+  if (entry.is_local_area) return " · local area · experimental";
+  if (entry.is_default === false) return " · non-default";
+  return "";
+}
+
 // Release dropdown options. "Latest" resolves to the newest build, so we show
 // its date/sha on the label to make clear which release it currently points at.
 export function releaseSelectOptions(
@@ -635,7 +654,7 @@ export function releaseSelectOptions(
     },
     ...releases.map((r) => ({
       value: r.release_id,
-      label: releaseLabel(r.release_id, r.date),
+      label: `${releaseLabel(r.release_id, r.date)}${releaseRoleSuffix(r)}`,
     })),
   ];
 }
