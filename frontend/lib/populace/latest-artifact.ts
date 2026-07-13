@@ -1443,6 +1443,7 @@ export function populaceTargetTreemap(
 // --- the calibration source (one release) -----------------------------------
 export interface Calibration {
   source: "huggingface_live";
+  diagnostics_status: DiagnosticsStatus;
   release_id: string;
   updated_at: string | null;
   schema_version: unknown;
@@ -1493,6 +1494,82 @@ interface InvestigationSearch {
 const releaseCache = new Map<string, ReleaseCacheEntry>();
 const targetDiagnosticsMetadataCache = new WeakMap<TargetRow[], TargetDiagnosticsMetadata>();
 
+// Whether this release's per-target diagnostics could be read at all. "ok" is
+// the normal case; "empty" is a diagnostics file that declares no targets; and
+// "incompatible" is a diagnostics file that has target rows we cannot read as
+// calibration fit under any known schema. The dashboard renders an explicit
+// state for the last two so a release never silently shows "0 targets".
+export type DiagnosticsStatus = "ok" | "empty" | "incompatible";
+
+// The national release pipeline writes each target row with canonical fit
+// fields (`target`, `final_estimate`, `initial_estimate`). Some non-default
+// artifacts are built by custom drivers that name the same quantities
+// `value`/`estimate` instead — the Build L ACS local-area release is the first
+// (populace#398: non-default artifacts route around the national pipeline).
+// Its rows carry no `target`/`final_estimate`, so every downstream reader —
+// inclusion status, fit, improvement — read them as "no estimate" and the
+// dashboard reported zero calibrated targets for a release with 742 of them.
+// Map the aliases onto the canonical names so one schema flows downstream,
+// regardless of which driver wrote the file (a copy is made only when a row
+// actually needs it, and an existing canonical value is never overwritten).
+const DIAGNOSTICS_FIELD_ALIASES: ReadonlyArray<readonly [string, string]> = [
+  ["target", "value"],
+  ["final_estimate", "estimate"],
+  ["initial_estimate", "initial_value"],
+];
+
+function normalizeDiagnosticsRow(row: TargetRow): TargetRow {
+  let normalized: TargetRow | null = null;
+  for (const [canonical, alias] of DIAGNOSTICS_FIELD_ALIASES) {
+    if (numberOrNull(row[canonical]) != null) continue;
+    const aliased = numberOrNull(row[alias]);
+    if (aliased == null) continue;
+    normalized ??= { ...row };
+    normalized[canonical] = aliased;
+  }
+  return normalized ?? row;
+}
+
+function diagnosticsStatus(diag: JsonObject, rows: TargetRow[]): DiagnosticsStatus {
+  if (!Array.isArray(diag.targets)) return "incompatible";
+  if (rows.length === 0) return "empty";
+  // Rows are present but not one carries a usable target value or estimate under
+  // any known schema: the diagnostics exist but cannot be read as fit.
+  const anyUsable = rows.some(
+    (row) => numberOrNull(row.target) != null || numberOrNull(row.final_estimate) != null,
+  );
+  return anyUsable ? "ok" : "incompatible";
+}
+
+export interface ReleaseRole {
+  dataset_role: string | null;
+  is_default: boolean;
+  is_local_area: boolean;
+}
+
+// Classify a release from its manifest so the dashboard can flag non-default,
+// experimental artifacts (populace#398). The national default omits
+// `dataset_role` and names a `default_datasets.national` artifact; a non-default
+// artifact sets `dataset_role` (e.g. "non_default_local_area") and
+// `is_default: false`.
+export function releaseRole(releaseManifest: JsonObject): ReleaseRole {
+  const datasetRole = stringValue(releaseManifest.dataset_role);
+  const explicitDefault = releaseManifest.is_default;
+  const nationalDefault = asObject(releaseManifest.default_datasets).national;
+  const isDefault =
+    explicitDefault === true ||
+    (explicitDefault == null &&
+      datasetRole == null &&
+      typeof nationalDefault === "string" &&
+      nationalDefault.length > 0);
+  return {
+    dataset_role: datasetRole,
+    is_default: isDefault,
+    is_local_area:
+      datasetRole != null && (datasetRole === "non_default_local_area" || datasetRole.includes("local_area")),
+  };
+}
+
 export function buildCalibration(
   diag: JsonObject,
   releaseId: string,
@@ -1500,7 +1577,9 @@ export function buildCalibration(
   buildManifest: JsonObject = {},
   releaseManifest: JsonObject = {},
 ): Calibration {
-  const targets = Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : [];
+  const targets = (Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : []).map(
+    normalizeDiagnosticsRow,
+  );
   const skipped = Array.isArray(diag.skipped) ? (diag.skipped as JsonObject[]) : [];
   const targetCompilation = asObject(asObject(buildManifest.gates).target_compilation);
   const droppedTargetNames = Array.isArray(targetCompilation.dropped_target_names)
@@ -1516,6 +1595,7 @@ export function buildCalibration(
   const includedTargetCount = rows.filter((row) => row.calibration_status === "included").length;
   return {
     source: "huggingface_live",
+    diagnostics_status: diagnosticsStatus(diag, rows),
     release_id: String(diag.release_id ?? releaseId),
     updated_at: updatedAt,
     schema_version: diag.schema_version ?? null,
@@ -1569,6 +1649,9 @@ export interface ReleaseEntry {
   date: string;
   files: string[];
   has_calibration: boolean;
+  dataset_role: string | null;
+  is_default: boolean;
+  is_local_area: boolean;
 }
 
 // Trailing timestamp/date in a build id → a real timestamp for ordering. Ids
@@ -1615,14 +1698,38 @@ export async function loadReleases(
     url = next ? next[1] : null;
     page += 1;
   }
-  return [...files.entries()]
+  const entries: ReleaseEntry[] = [...files.entries()]
     .map(([release_id, set]) => ({
       release_id,
       date: releaseDate(release_id),
       files: [...set].sort(),
       has_calibration: set.has("calibration_diagnostics.json"),
+      dataset_role: null as string | null,
+      is_default: true,
+      is_local_area: false,
     }))
     .sort((a, b) => releaseSortKey(b.release_id) - releaseSortKey(a.release_id));
+  // Classify each release from its manifest so the picker can flag non-default,
+  // experimental artifacts (populace#398). Best-effort and parallel: only
+  // releases that actually publish a release_manifest.json are fetched, and a
+  // missing or slow manifest keeps the safe national-default classification
+  // rather than blocking or failing the listing.
+  await Promise.all(
+    entries
+      .filter((entry) => entry.files.includes("release_manifest.json"))
+      .map(async (entry) => {
+        try {
+          const manifest = await hfJson(
+            hfResolveUrl(`releases/${entry.release_id}/release_manifest.json`, country),
+            revalidate,
+          );
+          Object.assign(entry, releaseRole(manifest));
+        } catch {
+          // Best-effort: keep the default classification.
+        }
+      }),
+  );
+  return entries;
 }
 
 export async function loadPointerReleaseId(
@@ -1917,6 +2024,8 @@ function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
 export function latestPopulaceCalibrationSummary(cal: Calibration) {
   return {
     available: true,
+    diagnostics_status: cal.diagnostics_status,
+    ...releaseRole(cal.release_manifest),
     source: cal.source,
     release_id: cal.release_id,
     schema_version: cal.schema_version,
@@ -2087,6 +2196,8 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
 
   return {
     available: true,
+    diagnostics_status: cal.diagnostics_status,
+    ...releaseRole(cal.release_manifest),
     source: cal.source,
     release_id: cal.release_id,
     schema_version: cal.schema_version,
@@ -2098,6 +2209,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     variables: metadata.variables,
     dimensions,
     summary: {
+      diagnostics_status: cal.diagnostics_status,
       total_targets: scopedRows.length,
       within_tolerance_count: withinToleranceCount(scopedRows),
       fraction_within_10pct: scopedRows.length ? scopedWithin10Pct / scopedRows.length : null,

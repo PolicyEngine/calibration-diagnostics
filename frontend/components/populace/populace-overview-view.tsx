@@ -12,6 +12,7 @@ import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
+import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import {
   releaseSelectOptions,
@@ -99,6 +100,8 @@ export function PopulaceOverviewView() {
   const totalTargets = cal.total_targets ?? 0;
   const includedTargets = cal.included_target_count ?? totalTargets;
   const lossKind = cal.loss_kind;
+  const diagnosticsStatus = cal.diagnostics_status ?? "ok";
+  const isNonDefault = cal.is_local_area === true || cal.is_default === false;
 
   return (
     <div className="flex flex-col gap-5">
@@ -137,6 +140,35 @@ export function PopulaceOverviewView() {
         }
       />
 
+      {isNonDefault ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/80 bg-card px-4 py-3 shadow-[var(--elev-1)]">
+          <StatusPill tone="warning">
+            {cal.is_local_area ? "Non-default · local area · experimental" : "Non-default release"}
+          </StatusPill>
+          <p className="text-sm text-muted-foreground">
+            {cal.dataset_role ? `Role ${cal.dataset_role}. ` : ""}
+            This release is calibrated to a different target surface than the certified national
+            default, so its loss and fit are not comparable across releases.
+          </p>
+        </div>
+      ) : null}
+
+      {diagnosticsStatus !== "ok" ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-[var(--warn)] bg-card px-4 py-3 shadow-[var(--elev-1)]"
+        >
+          <StatusPill tone="warning">
+            {diagnosticsStatus === "empty" ? "No target rows" : "Diagnostics incompatible"}
+          </StatusPill>
+          <p className="text-sm text-muted-foreground">
+            {diagnosticsStatus === "empty"
+              ? "This release's calibration diagnostics declare no target rows, so there is nothing to display. The dataset may still be valid — inspect its files on Hugging Face."
+              : "This release's calibration diagnostics use a schema this dashboard does not recognize, so per-target fit can't be shown. This is a display limitation, not necessarily a bad release — inspect its files on Hugging Face."}
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <KpiCard
           label={
@@ -145,7 +177,7 @@ export function PopulaceOverviewView() {
               tooltip="Targets that made it into the active calibration matrix for this release. Ledger facts can be excluded before this stage if they are unsupported or validation-only."
             />
           }
-          value={fmt(includedTargets, { digits: 0 })}
+          value={diagnosticsStatus === "incompatible" ? "—" : fmt(includedTargets, { digits: 0 })}
         />
         <KpiCard
           label={
