@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtMoney, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtUnitValue, releaseLabel } from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -23,14 +23,6 @@ const POPULACE_REFORMS_ISSUE = "https://github.com/PolicyEngine/populace/issues"
 
 function pct(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
-}
-
-// Benchmark/estimate cells: budget-effect rows are dollars; rate backtests
-// (unit === "percent", e.g. Census state SPM poverty rates) carry fractions
-// in the same fields and render as percentages.
-function fmtScore(value: number | null | undefined, unit: string | null | undefined) {
-  if (unit === "percent") return pct(value);
-  return fmtMoney(value);
 }
 
 function errorTone(absRel: number | null | undefined): "positive" | "neutral" | "negative" {
@@ -265,10 +257,10 @@ function ReformTable({
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                    {fmtScore(row.jct_score, row.unit)}
+                    {fmtUnitValue(row.jct_score, row.unit)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                    {fmtScore(row.populace_estimate, row.unit)}
+                    {fmtUnitValue(row.populace_estimate, row.unit)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5">
                     <ErrorCell absRel={row.abs_relative_error} />
