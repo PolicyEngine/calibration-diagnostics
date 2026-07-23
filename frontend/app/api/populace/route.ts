@@ -39,6 +39,7 @@ export async function GET(request: Request) {
           { name: "build_manifest", path: `${prefix}/build_manifest.json`, url: hfResolveUrl(`${prefix}/build_manifest.json`, country) },
           { name: "release_manifest", path: `${prefix}/release_manifest.json`, url: hfResolveUrl(`${prefix}/release_manifest.json`, country) },
           { name: "calibration_diagnostics", path: `${prefix}/calibration_diagnostics.json`, url: hfResolveUrl(`${prefix}/calibration_diagnostics.json`, country) },
+          { name: "demographics", path: `${prefix}/demographics.json`, url: hfResolveUrl(`${prefix}/demographics.json`, country) },
         ],
         limitations: [
           `Everything on this page is read live from the ${populaceRepo(country)} Hugging Face dataset; the current release is resolved through latest.json.`,
