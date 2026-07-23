@@ -47,6 +47,7 @@ from pathlib import Path
 HF_REPO = "policyengine/populace-us"
 PERIOD = 2024
 CHUNK = 2  # baseline + 2 reforms/batch keeps heavy state_income_tax sims bounded
+LEVELS_CHUNK = 16  # baseline-level specs per subprocess (7GB runner headroom)
 
 
 # --------------------------------------------------------------------------- #
@@ -147,16 +148,27 @@ def _is_obbba(spec):
 
 
 def _batches(specs):
-    """(name, subset_specs, include_levels). OBBBA scored jointly; in-sample rows
+    """(name, subset_specs, levels_slice). OBBBA scored jointly; in-sample rows
     ride with it (they read the estimates dict, no sim); remaining reforms chunk by
-    CHUNK; baseline-levels are one batch (all read one shared baseline)."""
+    CHUNK. Baseline-levels chunk by LEVELS_CHUNK: the suite grew from 74 to ~176
+    specs when the Census SPM state-rate backtests joined
+    default_baseline_level_specs(), and computing them all against one
+    accumulating baseline sim OOM-kills the 7GB ubuntu-latest runner. Each
+    levels chunk is a (start, stop) slice into the spec tuple, scored in its
+    own short-lived subprocess with a fresh baseline."""
+    from populace.build.us_runtime.reform_validation import (
+        default_baseline_level_specs,
+    )
+
     obbba = [s for s in specs if _is_obbba(s)]
     insample = [s for s in specs if s.in_sample and not _is_obbba(s)]
     rest = [s for s in specs if not _is_obbba(s) and not s.in_sample]
-    yield ("levels", [], True)
-    yield ("obbba", obbba + insample, False)
+    n_levels = len(default_baseline_level_specs())
+    for i in range(0, n_levels, LEVELS_CHUNK):
+        yield (f"levels{i // LEVELS_CHUNK}", [], (i, i + LEVELS_CHUNK))
+    yield ("obbba", obbba + insample, None)
     for i in range(0, len(rest), CHUNK):
-        yield (f"rest{i // CHUNK}", rest[i : i + CHUNK], False)
+        yield (f"rest{i // CHUNK}", rest[i : i + CHUNK], None)
 
 
 def _load_specs():
@@ -165,7 +177,7 @@ def _load_specs():
     return load_default_reform_specs(period=PERIOD)
 
 
-def run_batch(name, subset, include_levels):
+def run_batch(name, subset, levels_slice):
     from populace.build.us_runtime.reform_validation import (
         default_baseline_level_specs,
         reform_validation_payload,
@@ -178,14 +190,19 @@ def run_batch(name, subset, include_levels):
         print(f"[skip] {name}", flush=True)
         return
     est, tgt = in_sample_dicts(diag)
-    print(f"[run ] {name}: {len(subset)} specs levels={include_levels}", flush=True)
+    levels = (
+        default_baseline_level_specs()[levels_slice[0] : levels_slice[1]]
+        if levels_slice is not None
+        else ()
+    )
+    print(f"[run ] {name}: {len(subset)} specs levels={len(levels)}", flush=True)
     payload = reform_validation_payload(
         subset,
         period=PERIOD,
         simulate=cached_simulate_factory(h5),
         in_sample_estimates=est,
         in_sample_targets=tgt,
-        baseline_levels=default_baseline_level_specs() if include_levels else (),
+        baseline_levels=levels,
         release_id=_release_id(),
     )
     part.write_text(json.dumps(payload, indent=1, allow_nan=False))
