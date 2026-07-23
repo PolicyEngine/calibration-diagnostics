@@ -25,6 +25,14 @@ function pct(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
 }
 
+// Benchmark/estimate cells: budget-effect rows are dollars; rate backtests
+// (unit === "percent", e.g. Census state SPM poverty rates) carry fractions
+// in the same fields and render as percentages.
+function fmtScore(value: number | null | undefined, unit: string | null | undefined) {
+  if (unit === "percent") return pct(value);
+  return fmtMoney(value);
+}
+
 function errorTone(absRel: number | null | undefined): "positive" | "neutral" | "negative" {
   if (absRel == null) return "neutral";
   if (absRel <= 0.1) return "positive";
@@ -63,6 +71,10 @@ const SUITE_META: Record<string, SuiteMeta> = {
   "Federal EITC by state": {
     blurb:
       "The national federal EITC sliced to each state's households, compared to IRS EITC Central TY2024 administrative totals. The EITC is calibrated nationally (to an earlier SOI vintage), not per state — so a uniform few-percent undershoot is vintage, and state-specific deviations beyond it are geographic error. Flat-match state EITCs inherit this geography mechanically, which is why it is scored separately from the state-program suite.",
+  },
+  "Census state SPM": {
+    blurb:
+      "Baseline SPM poverty rates (overall and child) per state, compared to Census P60-287 2022–2024 three-year-average state SPM rates. Rates render as percentages, not dollars. Poverty is nowhere in the calibration target surface, so these are genuinely out-of-sample: person and child counts per state are calibrated (pinning the denominators), but the rates test the income and transfer distributions underneath.",
   },
 };
 
@@ -253,10 +265,10 @@ function ReformTable({
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                    {fmtMoney(row.jct_score)}
+                    {fmtScore(row.jct_score, row.unit)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                    {fmtMoney(row.populace_estimate)}
+                    {fmtScore(row.populace_estimate, row.unit)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5">
                     <ErrorCell absRel={row.abs_relative_error} />
