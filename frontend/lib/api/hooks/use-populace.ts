@@ -489,6 +489,9 @@ export interface ReformValidationRow {
   description?: string | null;
   in_sample?: boolean;
   period?: number | null;
+  // "percent" for rate backtests (fractions in the score fields); absent or
+  // "currency-USD" for budget-effect rows.
+  unit?: "currency-USD" | "percent" | null;
   jct_score?: number | null;
   jct_score_fy2026?: number | null;
   jct_score_type?: string | null;

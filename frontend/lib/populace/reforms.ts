@@ -74,6 +74,11 @@ export interface ReformValidationRow {
   // the genuine fidelity test.
   in_sample: boolean;
   period: number | null;
+  // How score/estimate are denominated. Budget-effect rows are
+  // "currency-USD"; baseline-level rate backtests (Census state SPM poverty
+  // rates) are "percent", carrying fractions (0.134 = 13.4%) in the same
+  // score fields. Missing unit (older payloads) means currency.
+  unit: "currency-USD" | "percent";
   // The JCT figure we benchmark against — JCT's first full fiscal year
   // (FY2027) for provisions effective 1/1/2026, since FY2026 is a partial ramp
   // year vs populace's calendar-year liability. In-sample rows fall back to
@@ -157,6 +162,7 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
     description: stringOrNull(raw.description),
     in_sample: raw.in_sample === true,
     period: numberOrNull(raw.period),
+    unit: raw.unit === "percent" ? "percent" : "currency-USD",
     jct_score: benchmark,
     jct_score_fy2026: jctFy2026,
     jct_score_type: stringOrNull(jct.score_type),

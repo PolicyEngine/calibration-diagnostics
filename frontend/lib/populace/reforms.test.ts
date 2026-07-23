@@ -31,6 +31,38 @@ test("benchmark defaults to the full-year FY2027 figure; FY2026 kept for referen
   expect(row.abs_relative_error!).toBeLessThan(0.25);
 });
 
+test("percent-unit rate rows keep their unit; missing unit means currency", () => {
+  const built = buildReformValidation(
+    {
+      release_id: "r",
+      reforms: [
+        {
+          id: "spm_state_ut_child",
+          name: "Utah SPM child poverty rate",
+          in_sample: false,
+          unit: "percent",
+          jct: { score: 0.059 },
+          populace: { budget_effect: 0.062 },
+        },
+        {
+          id: "obbba_salt_limit",
+          name: "SALT",
+          in_sample: false,
+          jct: { score: 79250000000 },
+          populace: { budget_effect: 64000000000 },
+        },
+      ],
+    },
+    "r",
+    null,
+  );
+  if (!built.available) return;
+  expect(built.rows[0].unit).toBe("percent");
+  // Relative error works identically on fractions: (0.062-0.059)/0.059 ≈ +5.1%.
+  expect(built.rows[0].abs_relative_error!).toBeCloseTo(0.0508, 3);
+  expect(built.rows[1].unit).toBe("currency-USD");
+});
+
 test("in-sample rows (no FY2027) fall back to their annual benchmark", () => {
   const built = buildReformValidation(
     {
