@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import {
+  fmtUnitValue,
   fmt,
   fmtCompact,
   fmtMoney,
@@ -245,10 +246,10 @@ function ReformValidationTable({
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                  {fmtMoney(row.jct_score)}
+                  {fmtUnitValue(row.jct_score, row.unit)}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                  {fmtMoney(row.populace_estimate)}
+                  {fmtUnitValue(row.populace_estimate, row.unit)}
                 </td>
                 <td
                   className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
