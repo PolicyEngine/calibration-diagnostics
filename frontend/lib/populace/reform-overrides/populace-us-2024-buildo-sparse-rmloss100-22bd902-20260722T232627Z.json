@@ -1872,11 +1872,11 @@
     "source_url": "https://www.census.gov/library/publications/2025/demo/p60-287.html"
    },
    "populace": {
-    "budget_effect": 0.1389642182298626,
+    "budget_effect": 0.1389642332405406,
     "period": 2024,
     "window": "2024",
     "measure": "in_poverty",
-    "baseline_total": 0.1389642182298626,
+    "baseline_total": 0.1389642332405406,
     "reform_total": null
    }
   },
@@ -1897,11 +1897,11 @@
     "source_url": "https://www.census.gov/library/publications/2025/demo/p60-287.html"
    },
    "populace": {
-    "budget_effect": 0.1721299841499749,
+    "budget_effect": 0.1721300089308572,
     "period": 2024,
     "window": "2024",
     "measure": "in_poverty",
-    "baseline_total": 0.1721299841499749,
+    "baseline_total": 0.1721300089308572,
     "reform_total": null
    }
   },
@@ -3172,11 +3172,11 @@
     "source_url": "https://www2.census.gov/programs-surveys/demo/tables/p60/287/spm_opm_state.xlsx"
    },
    "populace": {
-    "budget_effect": 0.11002503604198344,
+    "budget_effect": 0.11002544521520172,
     "period": 2024,
     "window": "2022-2024 3-year average",
     "measure": "in_poverty",
-    "baseline_total": 0.11002503604198344,
+    "baseline_total": 0.11002544521520172,
     "reform_total": null
    }
   },
@@ -3197,11 +3197,11 @@
     "source_url": "https://www2.census.gov/programs-surveys/demo/tables/p60/287/spm_opm_state_by_age.xlsx"
    },
    "populace": {
-    "budget_effect": 0.12753923089335623,
+    "budget_effect": 0.12754007054566846,
     "period": 2024,
     "window": "2022-2024 3-year average",
     "measure": "in_poverty",
-    "baseline_total": 0.12753923089335623,
+    "baseline_total": 0.12754007054566846,
     "reform_total": null
    }
   },
@@ -4322,11 +4322,11 @@
     "source_url": "https://www2.census.gov/programs-surveys/demo/tables/p60/287/spm_opm_state.xlsx"
    },
    "populace": {
-    "budget_effect": 0.11340524172733468,
+    "budget_effect": 0.11340589602569066,
     "period": 2024,
     "window": "2022-2024 3-year average",
     "measure": "in_poverty",
-    "baseline_total": 0.11340524172733468,
+    "baseline_total": 0.11340589602569066,
     "reform_total": null
    }
   },
@@ -4347,11 +4347,11 @@
     "source_url": "https://www2.census.gov/programs-surveys/demo/tables/p60/287/spm_opm_state_by_age.xlsx"
    },
    "populace": {
-    "budget_effect": 0.11459585558771279,
+    "budget_effect": 0.11459686342541692,
     "period": 2024,
     "window": "2022-2024 3-year average",
     "measure": "in_poverty",
-    "baseline_total": 0.11459585558771279,
+    "baseline_total": 0.11459686342541692,
     "reform_total": null
    }
   },
@@ -5606,7 +5606,247 @@
     "baseline_total": 147994751566.62692,
     "reform_total": 141586478444.8697
    }
+  },
+  {
+   "id": "state.ks.hb2620",
+   "name": "KS HB2620 \u2014 EITC match 17% \u2192 18%",
+   "category": "State reform",
+   "in_sample": false,
+   "period": 2026,
+   "description": "One-point state EITC match increase (17%->18% of federal), TY2026. Fiscal note basis: $80.5M claimed at 17% in TY2024, scaled with IRS credit-amount growth; FY2027 -$5.0M SGF (captures TY2026), growing ~2.5%/yr. First match-change (not repeal) EITC validation row. Bill died in House Taxation without a hearing; the fiscal note stands regardless.",
+   "jct": {
+    "score": -5000000.0,
+    "score_fy2027": null,
+    "score_type": "fiscal_note",
+    "window": "FY2027",
+    "source": "Kansas Division of the Budget fiscal note on HB2620 (2/19/2026), incorporating KDOR estimate",
+    "source_url": "https://kslegislature.gov/b2025_26/bills/download/?apn=b2025_26/ds_docs_li/fisc_note_hb2620_00_0000/fisc_note_hb2620_00_0000.pdf"
+   },
+   "populace": {
+    "budget_effect": -4761348.070029259,
+    "period": 2026,
+    "window": "FY2027",
+    "measure": "ks_income_tax",
+    "baseline_total": 5691682129.363553,
+    "reform_total": 5686920781.293524
+   }
+  },
+  {
+   "id": "state.ks.hb2629",
+   "name": "KS HB2629 \u2014 standard deduction base increase",
+   "category": "State reform",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Raises the base standard deduction to $3,805 single / $8,640 joint / $6,480 HoH for TY2026. Benchmark is KDOR's single-tax-year liability simulation (-$10.4M on TY2024 data); the headline FY2027 figure (-$13.8M) blends TY2026 with 30% of TY2027 withholding and is NOT the comparator. SEPARATE/SURVIVING_SPOUSE amounts follow statutory ratios.",
+   "jct": {
+    "score": -10400000.0,
+    "score_fy2027": null,
+    "score_type": "fiscal_note",
+    "window": "TY2026",
+    "source": "Kansas Division of the Budget fiscal note on HB2629 (2/20/2026): KDOR simulation on TY2024 return data",
+    "source_url": "https://kslegislature.gov/b2025_26/bills/download/?apn=b2025_26/ds_docs_li/fisc_note_hb2629_00_0000/fisc_note_hb2629_00_0000.pdf"
+   },
+   "populace": {
+    "budget_effect": -12470408.444123268,
+    "period": 2026,
+    "window": "TY2026",
+    "measure": "ks_income_tax",
+    "baseline_total": 5691682129.363553,
+    "reform_total": 5679211720.91943
+   }
+  },
+  {
+   "id": "state.id.sb1450",
+   "name": "ID SB1450 \u2014 $205/child CTC made permanent",
+   "category": "State reform",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Removes the 1/1/2026 sunset on Idaho's $205 nonrefundable per-child credit. The SOP frames it as no impact vs the DFM forecast (which assumed continuation) and puts the standalone cost at $63-65M/yr, with general-fund revenue rising ~$66M in FY2027 absent extension - the extension-cost benchmark used here. Sponsor-drafted range, not an independent fiscal-office point estimate.",
+   "jct": {
+    "score": -66000000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2027",
+    "source": "Idaho S1450 Statement of Purpose / Fiscal Note RS33273 (sponsor-prepared under Joint Rule 18)",
+    "source_url": "https://legislature.idaho.gov/wp-content/uploads/sessioninfo/2026/legislation/S1450SOP.pdf"
+   },
+   "populace": {
+    "budget_effect": -76438059.16168451,
+    "period": 2026,
+    "window": "FY2027",
+    "measure": "id_income_tax",
+    "baseline_total": 2891477238.2893724,
+    "reform_total": 2815039179.127688
+   }
+  },
+  {
+   "id": "state.ct.sb69",
+   "name": "CT SB69 \u2014 EITC repeal (40% of federal)",
+   "category": "State reform",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Eliminates the CT EITC (40% federal match + qualifying-child bonus). SB69 was a Proposed Bill with no fiscal note (OFA only scores bills reported out of committee); the benchmark is OFA's own tax-expenditure repeal figure - fiscal-year expenditure basis, static.",
+   "jct": {
+    "score": 240500000.0,
+    "score_fy2027": null,
+    "score_type": "fiscal_note",
+    "window": "FY2027",
+    "source": "CT OFA Connecticut Tax Expenditure Report, February 2026, summary table p.5 (detail p.37): EITC revenue gain in FY27 if repealed",
+    "source_url": "https://www.cga.ct.gov/ofa/Documents/year/TER/2026TER-20260202_%20Tax%20Expenditure%20Report%20FY%2026.pdf"
+   },
+   "populace": {
+    "budget_effect": 243125259.37642288,
+    "period": 2026,
+    "window": "FY2027",
+    "measure": "ct_income_tax",
+    "baseline_total": 14740770625.482523,
+    "reform_total": 14983895884.858946
+   }
+  },
+  {
+   "id": "state.ct.hb5134",
+   "name": "CT HB5134 \u2014 new $600/child refundable CTC",
+   "category": "State reform",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Refundable $600/child CTC (max 3 children), AGI under $100k single / $200k joint. HB5134 itself (a Proposed Bill) has no fiscal note; OFA scored the same credit design in sSB-6 sec. 1 at -$316M/yr from FY27 (income-tax-only). Not enacted in the FY27 budget.",
+   "jct": {
+    "score": -316000000.0,
+    "score_fy2027": null,
+    "score_type": "fiscal_note",
+    "window": "FY2027",
+    "source": "CT OFA fiscal note on sSB-6 sec. 1 (File #705, 4/17/2026) - the identical $600/child, up-to-3-children refundable CTC",
+    "source_url": "https://www.cga.ct.gov/2026/FN/PDF/2026SB-00006-R010705-FN.PDF"
+   },
+   "populace": {
+    "budget_effect": -307815018.75308037,
+    "period": 2026,
+    "window": "FY2027",
+    "measure": "ct_income_tax",
+    "baseline_total": 14740770625.482523,
+    "reform_total": 14432955606.729443
+   }
+  },
+  {
+   "id": "state.ct.rebate2026",
+   "name": "CT 2026 one-time tax rebate ($200/$400)",
+   "category": "State reform",
+   "in_sample": false,
+   "period": 2026,
+   "description": "Gov. Lamont's proposed one-time $200/person ($400 joint) rebate for AGI under $200k/$400k (~1.6M taxpayers). OPM budgeted -$500.0M one-time in FY27. OPM's design includes a $320/$320k HoH tier and $200/$200k MFS tier - check the contrib parameterization covers them. Dropped from the adopted budget; the OPM estimate stands as the benchmark.",
+   "jct": {
+    "score": -500000000.0,
+    "score_fy2027": null,
+    "score_type": "fiscal_note",
+    "window": "FY2027 (one-time)",
+    "source": "CT OPM, Governor's FY2027 Midterm Adjustment Budget (2/4/2026), Refunds of Taxes line; corroborated by OFA's Synopsis of the Governor's Budget",
+    "source_url": "https://portal.ct.gov/-/media/opm/budget/2027-midterm/2027midterm_pp_final-2-4-26.pdf"
+   },
+   "populace": {
+    "budget_effect": -521540525.05817986,
+    "period": 2026,
+    "window": "FY2027 (one-time)",
+    "measure": "ct_income_tax",
+    "baseline_total": 14740770625.482523,
+    "reform_total": 14219230100.424343
+   }
+  },
+  {
+   "id": "federal.arpa_ctc_2021",
+   "name": "ARPA 2021 CTC expansion (applied to 2024 data)",
+   "category": "Federal reform",
+   "in_sample": false,
+   "period": 2024,
+   "description": "The ARPA $3,000/$3,600 fully-refundable CTC applied as a 2024-period reform and compared to JCT's TY2021 score (the FY21+FY22 sum, since advance payments and filing-season refunds straddle fiscal years). Three-year population/income vintage gap: 2024 incomes are higher (phase-outs bite more) and child counts slightly lower - an approximation band, not an exact target.",
+   "jct": {
+    "score": -105075000000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2021+FY2022 (single tax year 2021)",
+    "source": "JCT JCX-14-21 (3/9/2021), H.R.1319 as amended: Child Tax Credit improvements for 2021, FY21 -$25,826M + FY22 -$79,249M",
+    "source_url": "https://www.jct.gov/publications/2021/jcx-14-21/"
+   },
+   "populace": {
+    "budget_effect": -86548399913.59424,
+    "period": 2024,
+    "window": "FY2021+FY2022 (single tax year 2021)",
+    "measure": "income_tax",
+    "baseline_total": 2266147215659.016,
+    "reform_total": 2179598815745.4219
+   }
+  },
+  {
+   "id": "federal.arpa_childless_eitc",
+   "name": "ARPA 2021 childless EITC expansion (applied to 2024 data)",
+   "category": "Federal reform",
+   "in_sample": false,
+   "period": 2024,
+   "description": "ARPA's one-year childless-EITC expansion (max ~$1,502, 15.3% phase-in/out, phase-out start $11,610, age 19+, 65 cap removed) applied at 2024 and compared to JCT's TY2021 score. All amounts are 2021 dollars applied to 2024 wage levels, which systematically shrinks the eligible range relative to the 2021 economy JCT scored - expect the model below the benchmark. Same vintage caveat as the ARPA CTC row.",
+   "jct": {
+    "score": -11882000000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2021-FY2031 (single tax year 2021)",
+    "source": "JCT JCX-14-21 (3/9/2021): strengthening the EITC for individuals with no qualifying children, total -$11,882M (nearly all FY2022)",
+    "source_url": "https://www.jct.gov/publications/2021/jcx-14-21/"
+   },
+   "populace": {
+    "budget_effect": -7123621842.23584,
+    "period": 2024,
+    "window": "FY2021-FY2031 (single tax year 2021)",
+    "measure": "income_tax",
+    "baseline_total": 2266147215659.016,
+    "reform_total": 2259023593816.7803
+   }
+  },
+  {
+   "id": "federal.cbo_rates_plus_1pt",
+   "name": "CBO option \u2014 all individual rates +1pt (applied to 2024 data)",
+   "category": "Federal reform",
+   "in_sample": false,
+   "period": 2024,
+   "description": "Raises all seven statutory rates on ordinary income by 1 percentage point. CBO/JCT scored $82.3B in FY2025 and $106.3B in FY2026 (first full year) on a pre-OBBBA baseline with TCJA rates in effect; applied here to 2024 law (also TCJA rates), so the comparison is same-rate-structure but different vintage - an approximation band.",
+   "jct": {
+    "score": 106300000000.0,
+    "score_fy2027": null,
+    "score_type": "approximation",
+    "window": "FY2026 (first full fiscal year)",
+    "source": "CBO, Options for Reducing the Deficit: 2025 to 2034 (Dec 2024), 'Increase Individual Income Tax Rates on Ordinary Income', alternative 1 (JCT staff estimate)",
+    "source_url": "https://www.cbo.gov/budget-options/60937"
+   },
+   "populace": {
+    "budget_effect": 113870114490.94482,
+    "period": 2024,
+    "window": "FY2026 (first full fiscal year)",
+    "measure": "income_tax",
+    "baseline_total": 2266147215659.016,
+    "reform_total": 2380017330149.961
+   }
+  },
+  {
+   "id": "federal.ubi_mechanical",
+   "name": "UBI mechanical check \u2014 $1,200/person/year",
+   "category": "Mechanical check",
+   "in_sample": false,
+   "period": 2024,
+   "description": "A flat $1,200/person/year universal basic income measured on the basic_income spending variable itself (not income_tax). The model total must equal weighted-person-mass x $1,200, so this row directly audits the dataset's calibrated person weights through the reform pathway - a UBI-shaped self-consistency check with an exact external anchor.",
+   "jct": {
+    "score": 408133185600.0,
+    "score_fy2027": null,
+    "score_type": "mechanical",
+    "window": "CY2024",
+    "source": "Mechanical: Census PEP Vintage 2024 national resident population (340,110,988) x $1,200",
+    "source_url": "https://www.census.gov/programs-surveys/popest.html"
+   },
+   "populace": {
+    "budget_effect": 408096006624.46716,
+    "period": 2024,
+    "window": "CY2024",
+    "measure": "basic_income",
+    "baseline_total": 0.0,
+    "reform_total": 408096006624.46716
+   }
   }
  ],
- "_backfill_note": "Full offline reproduction of reform_validation.json for a release that shipped without one (the build was promoted to latest with the reform-validation step skipped). Generated by tools/reform_validation/backfill.py (scheduled workflow reform-validation-backfill.yml) running the producer (populace.build.us_runtime.reform_validation.reform_validation_payload) on the released populace_us_2024.h5 (sha256 d28dd2bb133041e4b74d444f7bbef2eee0a6b027e77af7e3e832f2bcb8ee7d6b) under the EXACT build versions policyengine-us 1.764.6 / policyengine-core 3.26.11 (per release_manifest), so no version drift. In-sample JCT rows come from the release's own calibration_diagnostics.json (identical to a native build); out-of-sample rows (OBBBA JCX-stacked, tax-expenditure, state-program and state-reform repeals) and the baseline-level backtests (IRS SOI actual, federal-EITC-by-state, state-program actual) were simulated on the H5. Producer run at populace 3a7f6e4. Computed in small subprocess batches for memory/disk headroom; scoring is identical to the monolithic producer (non-OBBBA reforms independent; OBBBA scored jointly stacked)."
+ "_backfill_note": "Full offline reproduction of reform_validation.json for a release that shipped without one (the build was promoted to latest with the reform-validation step skipped). Generated by tools/reform_validation/backfill.py (scheduled workflow reform-validation-backfill.yml) running the producer (populace.build.us_runtime.reform_validation.reform_validation_payload) on the released populace_us_2024.h5 (sha256 d28dd2bb133041e4b74d444f7bbef2eee0a6b027e77af7e3e832f2bcb8ee7d6b) under the EXACT build versions policyengine-us 1.764.6 / policyengine-core 3.26.11 (per release_manifest), so no version drift. In-sample JCT rows come from the release's own calibration_diagnostics.json (identical to a native build); out-of-sample rows (OBBBA JCX-stacked, tax-expenditure, state-program and state-reform repeals) and the baseline-level backtests (IRS SOI actual, federal-EITC-by-state, state-program actual) were simulated on the H5. Producer run at populace 51fbd3f. Computed in small subprocess batches for memory/disk headroom; scoring is identical to the monolithic producer (non-OBBBA reforms independent; OBBBA scored jointly stacked)."
 }
