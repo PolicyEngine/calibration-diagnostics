@@ -1652,6 +1652,33 @@ async function hfJson(url: string, revalidate: number): Promise<JsonObject> {
   return asObject(await res.json());
 }
 
+export function releasePublishedAtFromTree(tree: unknown): string | null {
+  if (!Array.isArray(tree)) return null;
+  const entries = tree
+    .map((entry) => asObject(entry))
+    .filter((entry) => entry.type === "file" && typeof entry.path === "string");
+  const preferred =
+    entries.find((entry) => String(entry.path).endsWith("/release_manifest.json")) ??
+    entries.find((entry) => String(entry.path).endsWith("/calibration_diagnostics.json")) ??
+    entries[0];
+  const date = asObject(preferred?.lastCommit).date;
+  return typeof date === "string" && date.length > 0 ? date : null;
+}
+
+async function loadReleasePublishedAt(
+  releaseId: string,
+  revalidate: number,
+  country: PopulaceCountry,
+): Promise<string | null> {
+  const { repo, revision } = COUNTRY_REPO[country];
+  const url =
+    `https://huggingface.co/api/datasets/${repo}/tree/${revision}/releases/${releaseId}` +
+    "?recursive=false&expand=true";
+  const res = await hfFetch(url, revalidate);
+  if (!res.ok) throw new Error(`HF tree failed ${res.status}: ${url}`);
+  return releasePublishedAtFromTree(await res.json());
+}
+
 export interface ReleaseEntry {
   release_id: string;
   date: string;
@@ -1789,13 +1816,16 @@ async function loadReleaseUncached(
     updatedAt = ptr.updated_at;
   }
   const prefix = `releases/${id}`;
-  const [diag, buildManifest, releaseManifest, demographics] = await Promise.all([
+  const [diag, buildManifest, releaseManifest, demographics, publishedAt] = await Promise.all([
     hfJson(hfResolveUrl(`${prefix}/calibration_diagnostics.json`, country), revalidate),
     hfJson(hfResolveUrl(`${prefix}/build_manifest.json`, country), revalidate).catch(() => ({})),
     hfJson(hfResolveUrl(`${prefix}/release_manifest.json`, country), revalidate).catch(() => ({})),
     hfJson(hfResolveUrl(`${prefix}/demographics.json`, country), revalidate).catch(() => ({})),
+    updatedAt
+      ? Promise.resolve(updatedAt)
+      : loadReleasePublishedAt(id, revalidate, country).catch(() => null),
   ]);
-  return buildCalibration(diag, id, updatedAt, buildManifest, releaseManifest, demographics);
+  return buildCalibration(diag, id, updatedAt ?? publishedAt, buildManifest, releaseManifest, demographics);
 }
 
 function targetDiagnosticsMetadata(rows: TargetRow[]): TargetDiagnosticsMetadata {

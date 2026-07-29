@@ -6,6 +6,7 @@ import {
   latestPopulaceCalibrationHighlights,
   latestPopulaceCalibrationSummary,
   latestPopulaceTargetDiagnosticsPage,
+  releasePublishedAtFromTree,
   releaseRole,
   type Calibration,
 } from "./latest-artifact";
@@ -52,6 +53,23 @@ test("v2 metadata and parsing survive enrichment", () => {
   expect(row.aggregation).toBe("sum");
   expect(row.period).toBe(2024);
   expect(row.source_citation).toBe("IRS SOI Table 1.1");
+});
+
+test("release publish date prefers the release manifest commit date", () => {
+  expect(
+    releasePublishedAtFromTree([
+      {
+        type: "file",
+        path: "releases/rel/calibration_diagnostics.json",
+        lastCommit: { date: "2026-07-23T02:08:36.000Z" },
+      },
+      {
+        type: "file",
+        path: "releases/rel/release_manifest.json",
+        lastCommit: { date: "2026-07-23T02:08:37.000Z" },
+      },
+    ]),
+  ).toBe("2026-07-23T02:08:37.000Z");
 });
 
 test("FIPS admin target collapses to a measure family", () => {
