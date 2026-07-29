@@ -20,6 +20,7 @@ export const maxDuration = 300;
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const release = params.get("release") ?? "latest";
+  const isLatestRequest = release === "latest" || release === "";
   const country = parseCountry(params.get("country"));
   try {
     const cal = await loadRelease(release, revalidate, country);
@@ -35,14 +36,18 @@ export async function GET(request: Request) {
         release_id: cal.release_id,
         updated_at: cal.updated_at,
         source_artifacts: [
-          { name: "latest_pointer", path: "latest.json", url: hfResolveUrl("latest.json", country) },
+          ...(isLatestRequest
+            ? [{ name: "latest_pointer", path: "latest.json", url: hfResolveUrl("latest.json", country) }]
+            : []),
           { name: "build_manifest", path: `${prefix}/build_manifest.json`, url: hfResolveUrl(`${prefix}/build_manifest.json`, country) },
           { name: "release_manifest", path: `${prefix}/release_manifest.json`, url: hfResolveUrl(`${prefix}/release_manifest.json`, country) },
           { name: "calibration_diagnostics", path: `${prefix}/calibration_diagnostics.json`, url: hfResolveUrl(`${prefix}/calibration_diagnostics.json`, country) },
           { name: "demographics", path: `${prefix}/demographics.json`, url: hfResolveUrl(`${prefix}/demographics.json`, country) },
         ],
         limitations: [
-          `Everything on this page is read live from the ${populaceRepo(country)} Hugging Face dataset; the current release is resolved through latest.json.`,
+          isLatestRequest
+            ? `Everything on this page is read live from the ${populaceRepo(country)} Hugging Face dataset; the current release is resolved through latest.json.`
+            : `Everything on this page is read live from the ${populaceRepo(country)} Hugging Face dataset for the selected release id.`,
           "Loss values are the calibrator's own metric for this release; their scale is not comparable across releases that calibrate to different target surfaces.",
         ],
         build_manifest: cal.build_manifest,

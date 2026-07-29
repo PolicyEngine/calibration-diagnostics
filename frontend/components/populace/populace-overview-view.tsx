@@ -335,7 +335,13 @@ export function PopulaceOverviewView() {
               Release artifacts
             </div>
             <div className="mt-1 max-w-2xl text-xs leading-snug text-muted-foreground">
-              Read live from Hugging Face, resolved through <code>latest.json</code>
+              {release ? (
+                <>Read live from Hugging Face for the selected release</>
+              ) : (
+                <>
+                  Read live from Hugging Face, resolved through <code>latest.json</code>
+                </>
+              )}
               {data.updated_at ? ` (published ${data.updated_at})` : ""}.
             </div>
           </div>
