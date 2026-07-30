@@ -72,7 +72,7 @@ test("program breakdown merges count and amount leaves", () => {
   const data = populaceTargetTreemap(
     [
       row("irs_soi", "irs_soi / taxable interest · total", "taxable interest", "total", 0.1),
-      row("irs_soi", "irs_soi / taxable interest · count", "taxable interest", "count", 0.2),
+      row("irs_soi", "irs_soi / taxable interest · count", "taxable interest returns", "count", 0.2),
       row("irs_soi", "irs_soi / eitc · count", "eitc", "count", 0.05),
     ],
     "rel-x",

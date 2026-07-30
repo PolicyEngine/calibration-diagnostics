@@ -42,9 +42,25 @@ function variableName(leaf: PopulaceTreemapLeaf): string {
   return isSynthetic(leaf.key) ? leaf.variable : humanizeName(leaf.variable) || leaf.variable;
 }
 
-function measureLabel(measure: string | null): string {
-  if (!measure || measure === "total") return "amount";
+function measureLabel(measure: string | null): string | null {
+  if (!measure) return null;
+  if (measure === "total") return "amount";
   return measure;
+}
+
+function leafSubtitle(leaf: PopulaceTreemapLeaf, group: PopulaceTreemapGroup): string {
+  if (isSynthetic(leaf.key)) return "Grouped for legibility";
+  const measure = measureLabel(leaf.measure);
+  return measure
+    ? `${group.label} · ${measure}`
+    : `${group.label} · ${fmt(leaf.n_targets, { digits: 0 })} targets`;
+}
+
+function tileSubtitle(leaf: PopulaceTreemapLeaf): string {
+  const targetCount = `${fmt(leaf.n_targets, { digits: 0 })} targets`;
+  if (isSynthetic(leaf.key)) return targetCount;
+  const measure = measureLabel(leaf.measure);
+  return measure ? `${measure} · ${targetCount}` : targetCount;
 }
 
 // Scored-weighted central error — a fair representative for an aggregated tile.
@@ -336,9 +352,7 @@ function HoverCard({
             {variableName(leaf)}
           </div>
           <div className="truncate text-[11px] text-muted-foreground">
-            {isSynthetic(leaf.key)
-              ? "Grouped for legibility"
-              : `${group.label} · ${measureLabel(leaf.measure)}`}
+            {leafSubtitle(leaf, group)}
           </div>
         </div>
       </div>
@@ -572,9 +586,7 @@ export function CalibrationMap({
                       className="truncate text-[10px] font-medium leading-tight"
                       style={{ opacity: 0.78 }}
                     >
-                      {isSynthetic(leaf.data.key)
-                        ? `${fmt(leaf.data.n_targets, { digits: 0 })} targets`
-                        : `${measureLabel(leaf.data.measure)} · ${fmt(leaf.data.n_targets, { digits: 0 })}`}
+                      {tileSubtitle(leaf.data)}
                     </span>
                   )}
                 </button>

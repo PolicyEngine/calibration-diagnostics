@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { CalibrationMap } from "@/components/populace/calibration-map";
 import { useCountry } from "@/components/layout/country-context";
+import { apiGet } from "@/lib/api/client";
 import { withBasePath } from "@/lib/base-path";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
@@ -20,7 +22,10 @@ import {
   usePopulaceReleases,
   usePopulaceTargetTreemap,
 } from "@/lib/api/hooks/use-populace";
-import type { GeographyCoverageBlock } from "@/lib/api/hooks/use-populace";
+import type {
+  GeographyCoverageBlock,
+  PopulaceTreemapResponse,
+} from "@/lib/api/hooks/use-populace";
 
 function formatPublishedAt(value: string | null | undefined): string {
   if (!value) return "—";
@@ -76,6 +81,7 @@ function LossCurve({ trajectory }: { trajectory: number[] }) {
 
 export function PopulaceOverviewView() {
   const { country } = useCountry();
+  const queryClient = useQueryClient();
   const [release, setRelease] = useState("");
   const [mapBreakdown, setMapBreakdown] = useState<"program" | "geography">("program");
   const { data: releaseData } = usePopulaceReleases();
@@ -86,6 +92,27 @@ export function PopulaceOverviewView() {
   );
 
   const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
+  const activeRelease = release || undefined;
+
+  useEffect(() => {
+    if (!treemap?.release_id || mapBreakdown !== "program") return;
+    void queryClient.prefetchQuery({
+      queryKey: [
+        "populace",
+        "target-treemap",
+        country,
+        activeRelease ?? "latest",
+        "geography",
+      ],
+      queryFn: () =>
+        apiGet<PopulaceTreemapResponse>("/populace/target-treemap", {
+          release: activeRelease,
+          breakdown: "geography",
+          country,
+        }),
+      staleTime: 5 * 60 * 1000,
+    });
+  }, [activeRelease, country, mapBreakdown, queryClient, treemap?.release_id]);
 
   if (isLoading) return <LoadingBlock label="Loading populace release…" />;
   if (error || !data) {

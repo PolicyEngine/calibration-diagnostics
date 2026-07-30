@@ -1382,11 +1382,11 @@ function huberErrorIntensity(huber_loss: number, scored: number): number | null 
 }
 
 function targetProgramKey(row: TargetRow): string {
+  const variableKey = String(row.variable_key ?? "").trim();
+  if (variableKey) return variableKey.replace(/\s+·\s+(count|total|amount|mean)$/i, "");
   const source = String(row.source ?? "").trim();
   const variable = String(row.variable ?? "").trim();
   if (source && variable) return `${source} / ${variable}`;
-  const variableKey = String(row.variable_key ?? "").trim();
-  if (variableKey) return variableKey.replace(/\s+·\s+(count|total|amount|mean)$/i, "");
   return String(row.name ?? row.target_name ?? "unknown");
 }
 
