@@ -434,8 +434,6 @@ function GeographyCoverageSection({
             />
           }
           value={under50 == null ? "—" : fmt(under50, { digits: 0 })}
-          delta={under50 == null ? undefined : under50 === 0 ? "district-ready" : "blocks district analysis"}
-          tone={under50 == null ? undefined : under50 === 0 ? "positive" : "negative"}
         />
         <KpiCard
           label="Min records / state"
