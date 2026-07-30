@@ -54,25 +54,29 @@ function errorText(row: PopulaceTargetRow): string {
   return fmt(row.final_error, { pct: true, digits: 1 });
 }
 
+function measureLabel(measure: string | null): string {
+  if (!measure || measure === "total") return "Amount";
+  if (measure === "count") return "Count";
+  return humanizeName(measure);
+}
+
 export function ClusterDetail({
   leaf,
   group,
   release,
-  level,
   onClose,
 }: {
   leaf: PopulaceTreemapLeaf;
   group: PopulaceTreemapGroup;
   release?: string;
-  // Geography level the parent map is filtered to; scopes the target list so
-  // it matches the tile's counts.
-  level?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
   const synthetic = isSynthetic(leaf.key);
+  const filters = leaf.filters ?? {};
 
   const [facets, setFacets] = useState<Record<string, string>>({});
+  const [measure, setMeasure] = useState("");
   const [fit, setFit] = useState("");
   const [direction, setDirection] = useState("");
   const [search, setSearch] = useState("");
@@ -92,9 +96,15 @@ export function ClusterDetail({
 
   const { data, isLoading } = usePopulaceTargetDiagnostics({
     release,
-    variable: synthetic ? undefined : leaf.key,
+    variable:
+      synthetic || filters.program || filters.geography || filters.missing_geography
+        ? undefined
+        : leaf.key,
+    program: synthetic ? undefined : filters.program,
+    measure: measure || undefined,
     source: synthetic ? leaf.source : undefined,
-    level: level || undefined,
+    geography: synthetic ? undefined : filters.geography,
+    missing_geography: !synthetic && filters.missing_geography ? "true" : undefined,
     facet: facetParam.length ? facetParam : undefined,
     within_tolerance: fit || undefined,
     direction: direction || undefined,
@@ -133,7 +143,14 @@ export function ClusterDetail({
   const filteredTotal = data?.filtered_total ?? rows.length;
   const within = leaf.scored > 0 ? leaf.within_10pct / leaf.scored : null;
   const name = synthetic ? leaf.variable : humanizeName(leaf.variable) || leaf.variable;
-  const hasFilters = facetParam.length > 0 || fit !== "" || direction !== "" || search !== "";
+  const measureOptions = (leaf.measure_counts ?? []).filter((option) => option.measure);
+  const showMeasureFilter = !synthetic && Boolean(filters.program) && measureOptions.length > 1;
+  const hasFilters =
+    facetParam.length > 0 ||
+    measure !== "" ||
+    fit !== "" ||
+    direction !== "" ||
+    search !== "";
 
   function setFacet(key: string, value: string) {
     setFacets((current) => {
@@ -146,9 +163,28 @@ export function ClusterDetail({
 
   function clearFilters() {
     setFacets({});
+    setMeasure("");
     setFit("");
     setDirection("");
     setSearch("");
+  }
+
+  function fullDiagnosticsPath(): string {
+    if (synthetic && leaf.source === "__other_sources__") return "/populace/targets";
+    const params = new URLSearchParams();
+    if (synthetic) {
+      params.set("source", leaf.source);
+    } else if (filters.program) {
+      params.set("program", filters.program);
+      if (measure) params.set("measure", measure);
+    } else if (filters.geography) {
+      params.set("geography", filters.geography);
+    } else if (filters.missing_geography) {
+      params.set("missing_geography", "true");
+    } else {
+      params.set("variable", leaf.key);
+    }
+    return `/populace/targets?${params.toString()}`;
   }
 
   return (
@@ -218,6 +254,21 @@ export function ClusterDetail({
             layout="stacked"
           />
         ))}
+        {showMeasureFilter && (
+          <ToolbarSelect
+            label="Measure"
+            value={measure}
+            onChange={setMeasure}
+            options={[
+              { value: "", label: "Any" },
+              ...measureOptions.map((option) => ({
+                value: option.measure!,
+                label: `${measureLabel(option.measure)} (${fmt(option.n_targets, { digits: 0 })})`,
+              })),
+            ]}
+            layout="stacked"
+          />
+        )}
         <ToolbarSelect
           label="Fit"
           value={fit}
@@ -329,15 +380,7 @@ export function ClusterDetail({
         </span>
         <button
           type="button"
-          onClick={() =>
-            router.push(
-              synthetic && leaf.source === "__other_sources__"
-                ? "/populace/targets"
-                : `/populace/targets?source=${encodeURIComponent(leaf.source)}${
-                    level ? `&level=${encodeURIComponent(level)}` : ""
-                  }`,
-            )
-          }
+          onClick={() => router.push(fullDiagnosticsPath())}
           className="font-medium text-primary hover:underline"
         >
           Open in full diagnostics ↗

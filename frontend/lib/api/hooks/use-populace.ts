@@ -692,10 +692,18 @@ export interface PopulaceTreemapLeaf {
   source: string;
   variable: string;
   measure: string | null;
+  measure_counts: { measure: string | null; n_targets: number }[];
+  filters?: {
+    program?: string;
+    geography?: string;
+    missing_geography?: true;
+  };
   n_targets: number;
   within_10pct: number;
   scored: number;
   loss: number;
+  huber_loss: number;
+  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
 }
@@ -707,6 +715,8 @@ export interface PopulaceTreemapGroup {
   within_10pct: number;
   scored: number;
   loss: number;
+  huber_loss: number;
+  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
   children: PopulaceTreemapLeaf[];
@@ -718,17 +728,18 @@ export interface PopulaceTreemapResponse {
   total_within_10pct: number;
   total_scored: number;
   total_loss: number;
+  total_huber_loss: number;
   groups: PopulaceTreemapGroup[];
 }
 
-export function usePopulaceTargetTreemap(release?: string, level?: string) {
+export function usePopulaceTargetTreemap(release?: string, breakdown?: "program" | "geography") {
   const { country } = useCountry();
   return useQuery({
-    queryKey: ["populace", "target-treemap", country, release ?? "latest", level ?? "all"],
+    queryKey: ["populace", "target-treemap", country, release ?? "latest", breakdown ?? "program"],
     queryFn: () =>
       apiGet<PopulaceTreemapResponse>("/populace/target-treemap", {
         release: release || undefined,
-        level: level || undefined,
+        breakdown: breakdown || undefined,
         country,
       }),
     staleTime: 5 * 60 * 1000,
@@ -742,9 +753,12 @@ export function usePopulaceTargetDiagnostics(params: {
   offset?: number;
   family?: string;
   variable?: string;
+  measure?: string;
+  program?: string;
   source?: string;
   level?: string;
   geography?: string;
+  missing_geography?: string;
   state?: string;
   direction?: string;
   within_tolerance?: string;

@@ -1315,6 +1315,15 @@ function sourceLabel(source: string): string {
 // rather than which single target is the most pathological, and color by the
 // median so one outlier can't paint a whole group red.
 const LOSS_ERROR_CAP = 2.0; // 200%
+const HUBER_DELTA = 2.0;
+
+export type TreemapBreakdown = "program" | "geography";
+
+export interface TreemapFilters {
+  program?: string;
+  geography?: string;
+  missing_geography?: true;
+}
 
 function median(values: number[]): number | null {
   if (!values.length) return null;
@@ -1328,10 +1337,14 @@ export interface TreemapLeaf {
   source: string;
   variable: string;
   measure: string | null;
+  measure_counts: { measure: string | null; n_targets: number }[];
+  filters: TreemapFilters;
   n_targets: number;
   within_10pct: number;
   scored: number;
   loss: number;
+  huber_loss: number;
+  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
 }
@@ -1343,6 +1356,8 @@ export interface TreemapGroup {
   within_10pct: number;
   scored: number;
   loss: number;
+  huber_loss: number;
+  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
   children: TreemapLeaf[];
@@ -1354,7 +1369,68 @@ export interface TreemapData {
   total_within_10pct: number;
   total_scored: number;
   total_loss: number;
+  total_huber_loss: number;
   groups: TreemapGroup[];
+}
+
+function huberLoss(error: number, delta: number = HUBER_DELTA): number {
+  const abs = Math.abs(error);
+  return abs <= delta ? 0.5 * abs * abs : delta * (abs - 0.5 * delta);
+}
+
+function huberErrorIntensity(huber_loss: number, scored: number): number | null {
+  return scored ? Math.sqrt((2 * huber_loss) / scored) : null;
+}
+
+function targetProgramKey(row: TargetRow): string {
+  const variableKey = String(row.variable_key ?? "").trim();
+  if (variableKey) return variableKey.replace(/\s+·\s+(count|total|amount|mean)$/i, "");
+  const source = String(row.source ?? "").trim();
+  const variable = String(row.variable ?? "").trim();
+  if (source && variable) return `${source} / ${variable}`;
+  return String(row.name ?? row.target_name ?? "unknown");
+}
+
+function targetGeographyKey(row: TargetRow): string {
+  const geography = String(row.geography ?? "").trim();
+  return geography || "N/A";
+}
+
+function measureCounts(rows: TargetRow[]): { measure: string | null; n_targets: number }[] {
+  const counts = new Map<string, { measure: string | null; n_targets: number }>();
+  for (const row of rows) {
+    const measure = String(row.measure ?? "").trim() || null;
+    const key = measure ?? "__missing__";
+    const current = counts.get(key) ?? { measure, n_targets: 0 };
+    current.n_targets += 1;
+    counts.set(key, current);
+  }
+  return [...counts.values()].sort((a, b) => {
+    const rank = (value: string | null) =>
+      value === "total" || value == null ? 0 : value === "count" ? 1 : 2;
+    return (
+      rank(a.measure) - rank(b.measure) ||
+      String(a.measure ?? "").localeCompare(String(b.measure ?? ""))
+    );
+  });
+}
+
+function treemapRows(
+  rows: TargetRow[],
+  breakdown: TreemapBreakdown,
+): Map<string, Map<string, TargetRow[]>> {
+  const groups = new Map<string, Map<string, TargetRow[]>>();
+  for (const row of rows) {
+    const source =
+      breakdown === "geography"
+        ? "geography"
+        : String(row.source ?? "").trim() || "other";
+    const key =
+      breakdown === "geography" ? targetGeographyKey(row) : targetProgramKey(row);
+    const byLeaf = groups.get(source) ?? groups.set(source, new Map()).get(source)!;
+    (byLeaf.get(key) ?? byLeaf.set(key, []).get(key)!).push(row);
+  }
+  return groups;
 }
 
 // Build the source → variable hierarchy that powers the calibration map.
@@ -1366,27 +1442,32 @@ export interface TreemapData {
 export function populaceTargetTreemap(
   rows: TargetRow[],
   releaseId: string,
-  level?: string | null,
+  breakdown: TreemapBreakdown = "program",
 ): TreemapData {
-  if (level) rows = rows.filter((row) => row.level === level);
-  const groups = new Map<string, Map<string, TargetRow[]>>();
-  for (const row of rows) {
-    const source = String(row.source ?? "").trim() || "other";
-    const key = String(row.variable_key ?? row.variable ?? "—");
-    const byVar = groups.get(source) ?? groups.set(source, new Map()).get(source)!;
-    (byVar.get(key) ?? byVar.set(key, []).get(key)!).push(row);
-  }
+  const groups = treemapRows(rows, breakdown);
 
   const leafOf = (source: string, key: string, group: TargetRow[]): TreemapLeaf => {
     const absErrors = group
       .map((row) => numberOrNull(row.abs_relative_error))
       .filter((v): v is number => v != null && Number.isFinite(v));
     const first = group[0];
+    const huber_loss = absErrors.reduce((sum, v) => sum + huberLoss(v), 0);
+    const filters: TreemapFilters =
+      breakdown === "geography"
+        ? key === "N/A"
+          ? { missing_geography: true }
+          : { geography: key }
+        : { program: key };
     return {
       key,
       source,
-      variable: String(first.variable ?? key),
-      measure: first.measure ? String(first.measure) : null,
+      variable:
+        breakdown === "geography"
+          ? key
+          : String(first.variable ?? key),
+      measure: null,
+      measure_counts: measureCounts(group),
+      filters,
       n_targets: group.length,
       scored: absErrors.length,
       within_10pct: absErrors.filter((v) => v <= 0.1).length,
@@ -1394,6 +1475,8 @@ export function populaceTargetTreemap(
         const capped = Math.min(v, LOSS_ERROR_CAP);
         return sum + capped * capped;
       }, 0),
+      huber_loss,
+      huber_error_intensity: huberErrorIntensity(huber_loss, absErrors.length),
       mean_abs_relative_error: absErrors.length
         ? absErrors.reduce((s, v) => s + v, 0) / absErrors.length
         : null,
@@ -1414,13 +1497,16 @@ export function populaceTargetTreemap(
       const scored = children.reduce((s, c) => s + c.scored, 0);
       const within_10pct = children.reduce((s, c) => s + c.within_10pct, 0);
       const loss = children.reduce((s, c) => s + c.loss, 0);
+      const huber_loss = children.reduce((s, c) => s + c.huber_loss, 0);
       return {
         source,
-        label: sourceLabel(source),
+        label: source === "geography" ? "Geography" : sourceLabel(source),
         n_targets,
         scored,
         within_10pct,
         loss,
+        huber_loss,
+        huber_error_intensity: huberErrorIntensity(huber_loss, scored),
         mean_abs_relative_error: allErrors.length
           ? allErrors.reduce((s, v) => s + v, 0) / allErrors.length
           : null,
@@ -1436,6 +1522,7 @@ export function populaceTargetTreemap(
     total_within_10pct: groupList.reduce((s, g) => s + g.within_10pct, 0),
     total_scored: groupList.reduce((s, g) => s + g.scored, 0),
     total_loss: groupList.reduce((s, g) => s + g.loss, 0),
+    total_huber_loss: groupList.reduce((s, g) => s + g.huber_loss, 0),
     groups: groupList,
   };
 }
@@ -2174,9 +2261,12 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   const scope = stringParam(url.searchParams.get("scope")) === "healthcare" ? "healthcare" : null;
   const family = stringParam(url.searchParams.get("family"));
   const variable = stringParam(url.searchParams.get("variable"));
+  const program = stringParam(url.searchParams.get("program"));
+  const measure = stringParam(url.searchParams.get("measure"));
   const source = stringParam(url.searchParams.get("source"));
   const level = stringParam(url.searchParams.get("level"));
   const geography = stringParam(url.searchParams.get("geography"));
+  const missingGeography = booleanParam(url.searchParams.get("missing_geography"));
   const state = stringParam(url.searchParams.get("state"));
   const direction = stringParam(url.searchParams.get("direction"));
   const within = booleanParam(url.searchParams.get("within_tolerance"));
@@ -2199,9 +2289,14 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   let filtered = scopedRows;
   if (family) filtered = filtered.filter((row) => row.family === family);
   if (variable) filtered = filtered.filter((row) => row.variable_key === variable);
+  if (program) filtered = filtered.filter((row) => targetProgramKey(row) === program);
+  if (measure) filtered = filtered.filter((row) => row.measure === measure);
   if (source) filtered = filtered.filter((row) => row.source === source);
   if (level) filtered = filtered.filter((row) => row.level === level);
   if (geography) filtered = filtered.filter((row) => row.geography === geography);
+  if (missingGeography === true) {
+    filtered = filtered.filter((row) => !String(row.geography ?? "").trim());
+  }
   if (state) filtered = filtered.filter((row) => row.state === state);
   const dimensions = variable ? computeDimensions(filtered) : [];
   for (const [key, value] of facetFilters) {
@@ -2267,7 +2362,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     has_next: offset + limit < filtered.length,
     display_limit: limit,
     targets: filtered.slice(offset, offset + limit).map(targetResponseRow),
-    filters: { scope, family, variable, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
+    filters: { scope, family, variable, program, measure, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
   };
 }
 

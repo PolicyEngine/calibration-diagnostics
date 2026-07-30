@@ -13,7 +13,8 @@ import type {
   PopulaceTreemapResponse,
 } from "@/lib/api/hooks/use-populace";
 
-type SizeMode = "targets" | "loss";
+type BreakdownMode = "program" | "geography";
+type SizeMode = "targets" | "loss" | "error_intensity";
 
 const GROUP_GAP = 8;
 const LEAF_GAP = 3;
@@ -24,8 +25,13 @@ const MIN_GROUP_AREA = 2600;
 const MIN_LEAF_AREA = 780;
 const OTHER_SOURCES_KEY = "__other_sources__";
 
-function metric(node: { n_targets: number; loss: number }, mode: SizeMode): number {
-  return mode === "targets" ? node.n_targets : node.loss;
+function metric(
+  node: { n_targets: number; loss: number; huber_error_intensity?: number | null },
+  mode: SizeMode,
+): number {
+  if (mode === "targets") return node.n_targets;
+  if (mode === "loss") return node.loss;
+  return node.huber_error_intensity ?? 0;
 }
 
 function isSynthetic(key: string): boolean {
@@ -36,9 +42,25 @@ function variableName(leaf: PopulaceTreemapLeaf): string {
   return isSynthetic(leaf.key) ? leaf.variable : humanizeName(leaf.variable) || leaf.variable;
 }
 
-function measureLabel(measure: string | null): string {
-  if (!measure || measure === "total") return "amount";
+function measureLabel(measure: string | null): string | null {
+  if (!measure) return null;
+  if (measure === "total") return "amount";
   return measure;
+}
+
+function leafSubtitle(leaf: PopulaceTreemapLeaf, group: PopulaceTreemapGroup): string {
+  if (isSynthetic(leaf.key)) return "Grouped for legibility";
+  const measure = measureLabel(leaf.measure);
+  return measure
+    ? `${group.label} · ${measure}`
+    : `${group.label} · ${fmt(leaf.n_targets, { digits: 0 })} targets`;
+}
+
+function tileSubtitle(leaf: PopulaceTreemapLeaf): string {
+  const targetCount = `${fmt(leaf.n_targets, { digits: 0 })} targets`;
+  if (isSynthetic(leaf.key)) return targetCount;
+  const measure = measureLabel(leaf.measure);
+  return measure ? `${measure} · ${targetCount}` : targetCount;
 }
 
 // Scored-weighted central error — a fair representative for an aggregated tile.
@@ -69,12 +91,20 @@ function aggregateLeaves(
     source,
     variable,
     measure: null,
+    measure_counts: [],
     n_targets: leaves.reduce((a, c) => a + c.n_targets, 0),
     scored: leaves.reduce((a, c) => a + c.scored, 0),
     within_10pct: leaves.reduce((a, c) => a + c.within_10pct, 0),
     loss: leaves.reduce((a, c) => a + c.loss, 0),
+    huber_loss: leaves.reduce((a, c) => a + c.huber_loss, 0),
+    huber_error_intensity: (() => {
+      const scored = leaves.reduce((a, c) => a + c.scored, 0);
+      const huber = leaves.reduce((a, c) => a + c.huber_loss, 0);
+      return scored ? Math.sqrt((2 * huber) / scored) : null;
+    })(),
     mean_abs_relative_error: weightedError(leaves, (l) => l.mean_abs_relative_error),
     median_abs_relative_error: weightedError(leaves, (l) => l.median_abs_relative_error),
+    filters: {},
   };
 }
 
@@ -132,6 +162,8 @@ function condense(
         within_10pct: agg.within_10pct,
         scored: agg.scored,
         loss: agg.loss,
+        huber_loss: agg.huber_loss,
+        huber_error_intensity: agg.huber_error_intensity,
         mean_abs_relative_error: agg.mean_abs_relative_error,
         median_abs_relative_error: agg.median_abs_relative_error,
         children: [agg],
@@ -204,42 +236,47 @@ function layout(
   });
 }
 
-function SegmentedToggle({
-  mode,
+function ControlGroup<T extends string>({
+  label,
+  value,
+  options,
   onChange,
 }: {
-  mode: SizeMode;
-  onChange: (mode: SizeMode) => void;
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
 }) {
-  const options: { value: SizeMode; label: string }[] = [
-    { value: "targets", label: "What we calibrate to" },
-    { value: "loss", label: "Loss sources" },
-  ];
   return (
-    <div
-      role="tablist"
-      aria-label="Size tiles by"
-      className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1"
-    >
-      {options.map((option) => {
-        const active = mode === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(option.value)}
-            className={`h-8 rounded-full px-4 text-[13px] font-medium transition-all ${
-              active
-                ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {option.label}
-          </button>
-        );
-      })}
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+        {label}
+      </div>
+      <div
+        role="tablist"
+        aria-label={label}
+        className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1"
+      >
+        {options.map((option) => {
+          const active = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onChange(option.value)}
+              className={`h-8 rounded-md px-3 text-[13px] font-medium transition-all ${
+                active
+                  ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -272,17 +309,37 @@ function FitLegend() {
 function HoverCard({
   leaf,
   group,
+  mode,
   totalTargets,
   totalLoss,
 }: {
   leaf: PopulaceTreemapLeaf;
   group: PopulaceTreemapGroup;
+  mode: SizeMode;
   totalTargets: number;
   totalLoss: number;
 }) {
   const within = leaf.scored > 0 ? leaf.within_10pct / leaf.scored : null;
   const targetShare = totalTargets ? leaf.n_targets / totalTargets : null;
   const lossShare = totalLoss ? leaf.loss / totalLoss : null;
+  const sizeStat =
+    mode === "targets"
+      ? {
+          label: "Target share",
+          value: targetShare == null ? "—" : fmt(targetShare, { pct: true, digits: 1 }),
+        }
+      : mode === "loss"
+        ? {
+            label: "Share of loss",
+            value: lossShare == null ? "—" : fmt(lossShare, { pct: true, digits: 1 }),
+          }
+        : {
+            label: "Huber intensity",
+            value:
+              leaf.huber_error_intensity == null
+                ? "—"
+                : fmt(leaf.huber_error_intensity, { pct: true, digits: 1 }),
+          };
   const swatch = fitColor(leaf.median_abs_relative_error);
   return (
     <div className="pointer-events-none w-[17rem] overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl ring-1 ring-border/60 backdrop-blur">
@@ -296,17 +353,15 @@ function HoverCard({
             {variableName(leaf)}
           </div>
           <div className="truncate text-[11px] text-muted-foreground">
-            {isSynthetic(leaf.key)
-              ? "Grouped for legibility"
-              : `${group.label} · ${measureLabel(leaf.measure)}`}
+            {leafSubtitle(leaf, group)}
           </div>
         </div>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 px-3.5 py-3 text-[12px]">
-        <Stat label="Targets" value={fmt(leaf.n_targets, { digits: 0 })} sub={targetShare == null ? undefined : `${fmt(targetShare, { pct: true, digits: 1 })} of all`} />
+        <Stat label="Targets" value={fmt(leaf.n_targets, { digits: 0 })} />
         <Stat label="Within 10%" value={within == null ? "—" : fmt(within, { pct: true, digits: 0 })} />
         <Stat label="Median error" value={fmt(leaf.median_abs_relative_error, { pct: true, digits: 1 })} />
-        <Stat label="Share of loss" value={lossShare == null ? "—" : fmt(lossShare, { pct: true, digits: 1 })} />
+        <Stat label={sizeStat.label} value={sizeStat.value} />
       </dl>
       <div className="border-t border-border/70 bg-muted/30 px-3.5 py-2 text-[11px] text-muted-foreground">
         Click to open these targets
@@ -332,13 +387,13 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 export function CalibrationMap({
   data,
   release,
-  level,
+  breakdown,
+  onBreakdownChange,
 }: {
   data: PopulaceTreemapResponse;
   release?: string;
-  // Geography level the map is filtered to — threaded into the cluster
-  // popup so its target list matches the tile counts.
-  level?: string;
+  breakdown: BreakdownMode;
+  onBreakdownChange: (breakdown: BreakdownMode) => void;
 }) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -395,15 +450,36 @@ export function CalibrationMap({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <SegmentedToggle
-          mode={mode}
-          onChange={(next) => {
-            setMode(next);
-            setSelected(null);
-          }}
-        />
+        <div className="flex flex-wrap gap-3">
+          <ControlGroup
+            label="Breakdown"
+            value={breakdown}
+            onChange={(next) => {
+              onBreakdownChange(next);
+              setSelected(null);
+              setHover(null);
+            }}
+            options={[
+              { value: "program", label: "Program" },
+              { value: "geography", label: "Geography" },
+            ]}
+          />
+          <ControlGroup
+            label="Size boxes by"
+            value={mode}
+            onChange={(next) => {
+              setMode(next);
+              setSelected(null);
+            }}
+            options={[
+              { value: "targets", label: "Target count" },
+              { value: "loss", label: "Loss sources" },
+              { value: "error_intensity", label: "Error intensity" },
+            ]}
+          />
+        </div>
         <FitLegend />
       </div>
 
@@ -511,9 +587,7 @@ export function CalibrationMap({
                       className="truncate text-[10px] font-medium leading-tight"
                       style={{ opacity: 0.78 }}
                     >
-                      {isSynthetic(leaf.data.key)
-                        ? `${fmt(leaf.data.n_targets, { digits: 0 })} targets`
-                        : `${measureLabel(leaf.data.measure)} · ${fmt(leaf.data.n_targets, { digits: 0 })}`}
+                      {tileSubtitle(leaf.data)}
                     </span>
                   )}
                 </button>
@@ -544,6 +618,7 @@ export function CalibrationMap({
             <HoverCard
               leaf={hover.leaf}
               group={hover.group}
+              mode={mode}
               totalTargets={data.total_targets}
               totalLoss={data.total_loss}
             />
@@ -566,7 +641,6 @@ export function CalibrationMap({
                 leaf={selected.leaf}
                 group={selected.group}
                 release={release}
-                level={level}
                 onClose={() => setSelected(null)}
               />
             </div>
@@ -577,10 +651,17 @@ export function CalibrationMap({
       <p className="text-[12px] leading-relaxed text-muted-foreground">
         Each tile is a group of calibration targets. Area shows{" "}
         <span className="font-medium text-foreground">
-          {mode === "targets" ? "how many targets it covers" : "its share of the calibration loss"}
+          {mode === "targets"
+            ? "how many targets it covers"
+            : mode === "loss"
+              ? "its share of the calibration loss"
+              : "its Huberized error intensity"}
         </span>
         ; color shows the median gap between the weighted data and the official
-        figure. Hover for detail, click a tile to pop out its targets.
+        figure. Error intensity is a Huberized per-target relative error: it
+        behaves like RMSE for ordinary misses, then grows linearly for extreme
+        outliers so one pathological target does not dominate the map. Hover for
+        detail, click a tile to pop out its targets.
       </p>
     </div>
   );

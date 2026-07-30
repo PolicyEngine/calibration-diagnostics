@@ -85,6 +85,116 @@ test("variable filter isolates a variable's breakdowns", () => {
   for (const row of result.targets) expect(row.variable_key).toBe("irs / adjusted gross income · total");
 });
 
+test("program filter includes both count and amount targets", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.ty2022.historic_table_2.us.all.taxable_interest_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.us.all.taxable_interest_amount",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 90,
+      relative_error: -0.1,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "taxable_interest_income",
+        source_measure_id: "taxable_interest_amount",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "usd",
+        ledger_layout_groupby_value_id: "all",
+      },
+    },
+    {
+      name: "irs_soi.ty2022.historic_table_2.us.all.taxable_interest_returns@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.us.all.taxable_interest_returns",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 95,
+      relative_error: -0.05,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "taxable_interest_income",
+        source_measure_id: "taxable_interest_returns",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "count",
+        ledger_layout_groupby_value_id: "all",
+      },
+    },
+    {
+      name: "irs_soi.ty2022.historic_table_2.us.all.eitc_returns@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.us.all.eitc_returns",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 100,
+      relative_error: 0,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "eitc",
+        source_measure_id: "eitc_returns",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "count",
+        ledger_layout_groupby_value_id: "all",
+      },
+    },
+  ]);
+  const result = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics?program=irs_soi%20%2F%20taxable%20interest%20income",
+    cal,
+  );
+  expect(result.filtered_total).toBe(2);
+  expect(result.targets.map((row) => row.measure).sort()).toEqual(["count", "total"]);
+
+  const countOnly = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics?program=irs_soi%20%2F%20taxable%20interest%20income&measure=count",
+    cal,
+  );
+  expect(countOnly.filtered_total).toBe(1);
+  expect(countOnly.targets[0].measure).toBe("count");
+  expect(countOnly.filters?.measure).toBe("count");
+});
+
+test("missing geography filter isolates targets without parsed geography", () => {
+  const cal = calibration([
+    {
+      name: "selection_mass_protection.keogh_distributions@2024",
+      target_name: "selection_mass_protection.keogh_distributions",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 100,
+      relative_error: 0,
+      registry: { family: "unspecified" },
+      metadata: {
+        variable: "keogh_distributions",
+        source_measure_id: "keogh_distributions",
+      },
+    },
+    {
+      name: "irs_soi.ty2022.historic_table_2.us.all.eitc_returns@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.us.all.eitc_returns",
+      target: 100,
+      initial_estimate: 100,
+      final_estimate: 100,
+      relative_error: 0,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "eitc",
+        source_measure_id: "eitc_returns",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "count",
+      },
+    },
+  ]);
+  const result = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics?missing_geography=true",
+    cal,
+  );
+  expect(result.filtered_total).toBe(1);
+  expect(result.targets[0].name).toBe("selection_mass_protection.keogh_distributions@2024");
+});
+
 test("dimensions are the axes that vary; constants drop", () => {
   const result = page("?variable=irs%20%2F%20adjusted%20gross%20income%20%C2%B7%20total");
   const labels = result.dimensions.map((d) => d.label);

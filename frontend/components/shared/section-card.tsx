@@ -24,7 +24,7 @@ export function SectionCard({
 }: SectionCardProps) {
   return (
     <Card
-      className={`overflow-visible border-border/80 shadow-[var(--elev-1)] ${className ?? ""}`}
+      className={`gap-0 overflow-visible border-border/80 py-0 shadow-[var(--elev-1)] ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-muted/20 px-5 py-3">
         <div className="min-w-[220px] flex-1">

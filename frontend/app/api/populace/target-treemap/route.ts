@@ -16,11 +16,12 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const release = params.get("release") ?? "latest";
   const country = parseCountry(params.get("country"));
-  const level = params.get("level") || null;
+  const rawBreakdown = params.get("breakdown");
+  const breakdown = rawBreakdown === "geography" ? "geography" : "program";
   try {
     const cal = await loadRelease(release, revalidate, country);
     return NextResponse.json(
-      scrub(populaceTargetTreemap(cal.rows, cal.release_id, level)),
+      scrub(populaceTargetTreemap(cal.rows, cal.release_id, breakdown)),
     );
   } catch (error) {
     const { status, body } = classifyApiError(error);
