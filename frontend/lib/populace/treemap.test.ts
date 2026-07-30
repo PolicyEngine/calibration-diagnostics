@@ -8,8 +8,9 @@ function row(
   variable: string,
   measure: string | null,
   abs_relative_error: number | null,
+  geography?: string | null,
 ) {
-  return { source, variable_key, variable, measure, abs_relative_error };
+  return { source, variable_key, variable, measure, abs_relative_error, geography };
 }
 
 test("groups by source then variable_key and sums targets", () => {
@@ -65,4 +66,75 @@ test("targets without a relative error count but add no loss", () => {
   expect(group.n_targets).toBe(2);
   expect(group.scored).toBe(1);
   expect(group.within_10pct).toBe(1);
+});
+
+test("program breakdown merges count and amount leaves", () => {
+  const data = populaceTargetTreemap(
+    [
+      row("irs_soi", "irs_soi / taxable interest · total", "taxable interest", "total", 0.1),
+      row("irs_soi", "irs_soi / taxable interest · count", "taxable interest", "count", 0.2),
+      row("irs_soi", "irs_soi / eitc · count", "eitc", "count", 0.05),
+    ],
+    "rel-x",
+    "program",
+  );
+
+  const irs = data.groups.find((g) => g.source === "irs_soi");
+  expect(irs?.children).toHaveLength(2);
+  const taxableInterest = irs?.children.find((leaf) => leaf.variable === "taxable interest");
+  expect(taxableInterest?.key).toBe("irs_soi / taxable interest");
+  expect(taxableInterest?.n_targets).toBe(2);
+  expect(taxableInterest?.measure).toBe(null);
+  expect(taxableInterest?.filters).toEqual({ program: "irs_soi / taxable interest" });
+});
+
+test("geography breakdown groups targets by geography leaves", () => {
+  const data = populaceTargetTreemap(
+    [
+      row("irs_soi", "irs_soi / eitc · total", "eitc", "total", 0.1, "United States"),
+      row("irs_soi", "irs_soi / eitc · total", "eitc", "total", 0.2, "CA"),
+      row("irs_soi", "irs_soi / eitc · total", "eitc", "total", 0.3, null),
+    ],
+    "rel-x",
+    "geography",
+  );
+
+  expect(data.groups).toHaveLength(1);
+  expect(data.groups[0].source).toBe("geography");
+  expect(data.groups[0].label).toBe("Geography");
+  expect(data.groups[0].children.map((leaf) => leaf.key).sort()).toEqual([
+    "CA",
+    "N/A",
+    "United States",
+  ]);
+  expect(data.groups[0].children.find((leaf) => leaf.key === "CA")?.filters).toEqual({
+    geography: "CA",
+  });
+  expect(data.groups[0].children.find((leaf) => leaf.key === "N/A")?.filters).toEqual({
+    missing_geography: true,
+  });
+});
+
+test("treemap computes Huber error intensity", () => {
+  const data = populaceTargetTreemap(
+    [
+      row("irs_soi", "irs_soi / v · total", "v", "total", 0.1),
+      row("irs_soi", "irs_soi / v · total", "v", "total", 1.0),
+      row("irs_soi", "irs_soi / v · total", "v", "total", 5.0),
+      row("irs_soi", "irs_soi / v · total", "v", "total", null),
+    ],
+    "rel-x",
+    "program",
+  );
+
+  const leaf = data.groups[0].children[0];
+  // Huber(delta=2): 0.5*0.1^2, 0.5*1^2, 2*(5 - 1).
+  const expectedHuberLoss = 0.005 + 0.5 + 8;
+  expect(leaf.huber_loss).toBeCloseTo(expectedHuberLoss, 6);
+  expect(leaf.huber_error_intensity).toBeCloseTo(
+    Math.sqrt((2 * expectedHuberLoss) / 3),
+    6,
+  );
+  expect(leaf.n_targets).toBe(4);
+  expect(leaf.scored).toBe(3);
 });
