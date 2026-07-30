@@ -38,7 +38,7 @@ export function KpiCard({
   return (
     <div className="flex h-full flex-col justify-between gap-2 rounded-lg border border-border bg-card p-4 shadow-[var(--elev-1)]">
       <div className="flex items-start justify-between gap-2">
-        <Text size="xs" c="dimmed" className="font-mono font-medium uppercase tracking-wide">
+        <Text size="xs" c="dimmed" className="font-mono font-medium">
           {label}
         </Text>
         {delta != null && (
