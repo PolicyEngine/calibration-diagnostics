@@ -140,12 +140,12 @@ export function PopulaceOverviewView() {
           <>
             Populace reweights survey microdata so it matches thousands of official
             statistics from agencies like{" "}
-            {country === "uk" ? "the ONS, OBR, and HMRC" : "the IRS, Census, and CMS"}. Each
-            tile below is one of those things we calibrate to —{" "}
+            {country === "uk" ? "the ONS, OBR, and HMRC" : "the IRS, the Census Bureau, and CMS"}.
+            Each tile below is one of those things we calibrate to, including{" "}
             {country === "uk"
-              ? "population by region and age, household types, tax receipts"
-              : "EITC, population, Medicaid enrollment"}
-            . Tile size shows how much we calibrate to it; color shows how closely the
+              ? "population by region and age, household types, and tax receipts"
+              : "EITC stats, population, and Medicaid enrollment"}
+            . Tile size shows how much we calibrate to it, while color shows how closely the
             weighted data matches. Built live from{" "}
             <a
               className="underline decoration-dotted underline-offset-2"
@@ -202,7 +202,7 @@ export function PopulaceOverviewView() {
           label={
             <HelpHint
               label="Targets included"
-              tooltip="Targets that made it into the active calibration matrix for this release. Ledger facts can be excluded before this stage if they are unsupported or validation-only."
+              tooltip="Targets that made it into the active calibration matrix for this release."
             />
           }
           value={diagnosticsStatus === "incompatible" ? "—" : fmt(includedTargets, { digits: 0 })}
@@ -228,8 +228,8 @@ export function PopulaceOverviewView() {
         <KpiCard
           label={
             <HelpHint
-              label="Records kept"
-              tooltip="Records with a non-zero calibrated weight in this release."
+              label="Weighted synthetic households"
+              tooltip="Synthetic households with a non-zero calibrated weight in this release."
             />
           }
           value={cal.n_nonzero == null ? "—" : fmtCompact(cal.n_nonzero)}
@@ -432,7 +432,7 @@ function GeographyCoverageSection({
   return (
     <SectionCard
       title="Geography coverage"
-      description="Unweighted household records per geography — the resolution floor for sub-national analysis. Districts need enough records, not just calibrated weights."
+      description="Unique synthetic household records per geography"
     >
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard
