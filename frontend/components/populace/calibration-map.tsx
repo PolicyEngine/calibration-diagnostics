@@ -248,8 +248,8 @@ function ControlGroup<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">
         {label}
       </div>
       <div
@@ -450,7 +450,7 @@ export function CalibrationMap({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-3">
           <ControlGroup
@@ -658,7 +658,10 @@ export function CalibrationMap({
               : "its Huberized error intensity"}
         </span>
         ; color shows the median gap between the weighted data and the official
-        figure. Hover for detail, click a tile to pop out its targets.
+        figure. Error intensity is a Huberized per-target relative error: it
+        behaves like RMSE for ordinary misses, then grows linearly for extreme
+        outliers so one pathological target does not dominate the map. Hover for
+        detail, click a tile to pop out its targets.
       </p>
     </div>
   );
