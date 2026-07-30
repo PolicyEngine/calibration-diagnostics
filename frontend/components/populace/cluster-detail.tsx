@@ -54,6 +54,12 @@ function errorText(row: PopulaceTargetRow): string {
   return fmt(row.final_error, { pct: true, digits: 1 });
 }
 
+function measureLabel(measure: string | null): string {
+  if (!measure || measure === "total") return "Amount";
+  if (measure === "count") return "Count";
+  return humanizeName(measure);
+}
+
 export function ClusterDetail({
   leaf,
   group,
@@ -70,6 +76,7 @@ export function ClusterDetail({
   const filters = leaf.filters ?? {};
 
   const [facets, setFacets] = useState<Record<string, string>>({});
+  const [measure, setMeasure] = useState("");
   const [fit, setFit] = useState("");
   const [direction, setDirection] = useState("");
   const [search, setSearch] = useState("");
@@ -89,8 +96,12 @@ export function ClusterDetail({
 
   const { data, isLoading } = usePopulaceTargetDiagnostics({
     release,
-    variable: synthetic || filters.program || filters.geography || filters.missing_geography ? undefined : leaf.key,
+    variable:
+      synthetic || filters.program || filters.geography || filters.missing_geography
+        ? undefined
+        : leaf.key,
     program: synthetic ? undefined : filters.program,
+    measure: measure || undefined,
     source: synthetic ? leaf.source : undefined,
     geography: synthetic ? undefined : filters.geography,
     missing_geography: !synthetic && filters.missing_geography ? "true" : undefined,
@@ -132,7 +143,14 @@ export function ClusterDetail({
   const filteredTotal = data?.filtered_total ?? rows.length;
   const within = leaf.scored > 0 ? leaf.within_10pct / leaf.scored : null;
   const name = synthetic ? leaf.variable : humanizeName(leaf.variable) || leaf.variable;
-  const hasFilters = facetParam.length > 0 || fit !== "" || direction !== "" || search !== "";
+  const measureOptions = (leaf.measure_counts ?? []).filter((option) => option.measure);
+  const showMeasureFilter = !synthetic && Boolean(filters.program) && measureOptions.length > 1;
+  const hasFilters =
+    facetParam.length > 0 ||
+    measure !== "" ||
+    fit !== "" ||
+    direction !== "" ||
+    search !== "";
 
   function setFacet(key: string, value: string) {
     setFacets((current) => {
@@ -145,6 +163,7 @@ export function ClusterDetail({
 
   function clearFilters() {
     setFacets({});
+    setMeasure("");
     setFit("");
     setDirection("");
     setSearch("");
@@ -157,6 +176,7 @@ export function ClusterDetail({
       params.set("source", leaf.source);
     } else if (filters.program) {
       params.set("program", filters.program);
+      if (measure) params.set("measure", measure);
     } else if (filters.geography) {
       params.set("geography", filters.geography);
     } else if (filters.missing_geography) {
@@ -234,6 +254,21 @@ export function ClusterDetail({
             layout="stacked"
           />
         ))}
+        {showMeasureFilter && (
+          <ToolbarSelect
+            label="Measure"
+            value={measure}
+            onChange={setMeasure}
+            options={[
+              { value: "", label: "Any" },
+              ...measureOptions.map((option) => ({
+                value: option.measure!,
+                label: `${measureLabel(option.measure)} (${fmt(option.n_targets, { digits: 0 })})`,
+              })),
+            ]}
+            layout="stacked"
+          />
+        )}
         <ToolbarSelect
           label="Fit"
           value={fit}

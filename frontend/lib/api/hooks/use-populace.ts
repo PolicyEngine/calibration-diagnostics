@@ -692,6 +692,7 @@ export interface PopulaceTreemapLeaf {
   source: string;
   variable: string;
   measure: string | null;
+  measure_counts: { measure: string | null; n_targets: number }[];
   filters?: {
     program?: string;
     geography?: string;
@@ -752,6 +753,7 @@ export function usePopulaceTargetDiagnostics(params: {
   offset?: number;
   family?: string;
   variable?: string;
+  measure?: string;
   program?: string;
   source?: string;
   level?: string;

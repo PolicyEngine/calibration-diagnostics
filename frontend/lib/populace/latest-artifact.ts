@@ -1337,6 +1337,7 @@ export interface TreemapLeaf {
   source: string;
   variable: string;
   measure: string | null;
+  measure_counts: { measure: string | null; n_targets: number }[];
   filters: TreemapFilters;
   n_targets: number;
   within_10pct: number;
@@ -1395,6 +1396,25 @@ function targetGeographyKey(row: TargetRow): string {
   return geography || "N/A";
 }
 
+function measureCounts(rows: TargetRow[]): { measure: string | null; n_targets: number }[] {
+  const counts = new Map<string, { measure: string | null; n_targets: number }>();
+  for (const row of rows) {
+    const measure = String(row.measure ?? "").trim() || null;
+    const key = measure ?? "__missing__";
+    const current = counts.get(key) ?? { measure, n_targets: 0 };
+    current.n_targets += 1;
+    counts.set(key, current);
+  }
+  return [...counts.values()].sort((a, b) => {
+    const rank = (value: string | null) =>
+      value === "total" || value == null ? 0 : value === "count" ? 1 : 2;
+    return (
+      rank(a.measure) - rank(b.measure) ||
+      String(a.measure ?? "").localeCompare(String(b.measure ?? ""))
+    );
+  });
+}
+
 function treemapRows(
   rows: TargetRow[],
   breakdown: TreemapBreakdown,
@@ -1446,6 +1466,7 @@ export function populaceTargetTreemap(
           ? key
           : String(first.variable ?? key),
       measure: null,
+      measure_counts: measureCounts(group),
       filters,
       n_targets: group.length,
       scored: absErrors.length,
@@ -2241,6 +2262,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   const family = stringParam(url.searchParams.get("family"));
   const variable = stringParam(url.searchParams.get("variable"));
   const program = stringParam(url.searchParams.get("program"));
+  const measure = stringParam(url.searchParams.get("measure"));
   const source = stringParam(url.searchParams.get("source"));
   const level = stringParam(url.searchParams.get("level"));
   const geography = stringParam(url.searchParams.get("geography"));
@@ -2268,6 +2290,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
   if (family) filtered = filtered.filter((row) => row.family === family);
   if (variable) filtered = filtered.filter((row) => row.variable_key === variable);
   if (program) filtered = filtered.filter((row) => targetProgramKey(row) === program);
+  if (measure) filtered = filtered.filter((row) => row.measure === measure);
   if (source) filtered = filtered.filter((row) => row.source === source);
   if (level) filtered = filtered.filter((row) => row.level === level);
   if (geography) filtered = filtered.filter((row) => row.geography === geography);
@@ -2339,7 +2362,7 @@ export function latestPopulaceTargetDiagnosticsPage(requestUrl: string, cal: Cal
     has_next: offset + limit < filtered.length,
     display_limit: limit,
     targets: filtered.slice(offset, offset + limit).map(targetResponseRow),
-    filters: { scope, family, variable, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
+    filters: { scope, family, variable, program, measure, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
   };
 }
 

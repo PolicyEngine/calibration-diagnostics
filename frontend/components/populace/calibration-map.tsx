@@ -91,6 +91,7 @@ function aggregateLeaves(
     source,
     variable,
     measure: null,
+    measure_counts: [],
     n_targets: leaves.reduce((a, c) => a + c.n_targets, 0),
     scored: leaves.reduce((a, c) => a + c.scored, 0),
     within_10pct: leaves.reduce((a, c) => a + c.within_10pct, 0),

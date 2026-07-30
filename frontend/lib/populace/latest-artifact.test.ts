@@ -145,6 +145,14 @@ test("program filter includes both count and amount targets", () => {
   );
   expect(result.filtered_total).toBe(2);
   expect(result.targets.map((row) => row.measure).sort()).toEqual(["count", "total"]);
+
+  const countOnly = latestPopulaceTargetDiagnosticsPage(
+    "http://x/api/populace/target-diagnostics?program=irs_soi%20%2F%20taxable%20interest%20income&measure=count",
+    cal,
+  );
+  expect(countOnly.filtered_total).toBe(1);
+  expect(countOnly.targets[0].measure).toBe("count");
+  expect(countOnly.filters?.measure).toBe("count");
 });
 
 test("missing geography filter isolates targets without parsed geography", () => {

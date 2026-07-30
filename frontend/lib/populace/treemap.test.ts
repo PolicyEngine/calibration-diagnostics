@@ -85,6 +85,10 @@ test("program breakdown merges count and amount leaves", () => {
   expect(taxableInterest?.key).toBe("irs_soi / taxable interest");
   expect(taxableInterest?.n_targets).toBe(2);
   expect(taxableInterest?.measure).toBe(null);
+  expect(taxableInterest?.measure_counts).toEqual([
+    { measure: "total", n_targets: 1 },
+    { measure: "count", n_targets: 1 },
+  ]);
   expect(taxableInterest?.filters).toEqual({ program: "irs_soi / taxable interest" });
 });
 
