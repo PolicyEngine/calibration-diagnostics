@@ -24,7 +24,7 @@ export function SiteFooter() {
         </a>
       </div>
       <p className="site-foot-fine">
-        A weighted synthetic population for public policy. Open source · MIT · a
+        A weighted synthetic population for public policy. Open source · a
         PolicyEngine project.
       </p>
     </footer>
