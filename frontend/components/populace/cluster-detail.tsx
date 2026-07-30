@@ -58,19 +58,16 @@ export function ClusterDetail({
   leaf,
   group,
   release,
-  level,
   onClose,
 }: {
   leaf: PopulaceTreemapLeaf;
   group: PopulaceTreemapGroup;
   release?: string;
-  // Geography level the parent map is filtered to; scopes the target list so
-  // it matches the tile's counts.
-  level?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
   const synthetic = isSynthetic(leaf.key);
+  const filters = leaf.filters ?? {};
 
   const [facets, setFacets] = useState<Record<string, string>>({});
   const [fit, setFit] = useState("");
@@ -92,9 +89,11 @@ export function ClusterDetail({
 
   const { data, isLoading } = usePopulaceTargetDiagnostics({
     release,
-    variable: synthetic ? undefined : leaf.key,
+    variable: synthetic || filters.program || filters.geography || filters.missing_geography ? undefined : leaf.key,
+    program: synthetic ? undefined : filters.program,
     source: synthetic ? leaf.source : undefined,
-    level: level || undefined,
+    geography: synthetic ? undefined : filters.geography,
+    missing_geography: !synthetic && filters.missing_geography ? "true" : undefined,
     facet: facetParam.length ? facetParam : undefined,
     within_tolerance: fit || undefined,
     direction: direction || undefined,
@@ -149,6 +148,23 @@ export function ClusterDetail({
     setFit("");
     setDirection("");
     setSearch("");
+  }
+
+  function fullDiagnosticsPath(): string {
+    if (synthetic && leaf.source === "__other_sources__") return "/populace/targets";
+    const params = new URLSearchParams();
+    if (synthetic) {
+      params.set("source", leaf.source);
+    } else if (filters.program) {
+      params.set("program", filters.program);
+    } else if (filters.geography) {
+      params.set("geography", filters.geography);
+    } else if (filters.missing_geography) {
+      params.set("missing_geography", "true");
+    } else {
+      params.set("variable", leaf.key);
+    }
+    return `/populace/targets?${params.toString()}`;
   }
 
   return (
@@ -329,15 +345,7 @@ export function ClusterDetail({
         </span>
         <button
           type="button"
-          onClick={() =>
-            router.push(
-              synthetic && leaf.source === "__other_sources__"
-                ? "/populace/targets"
-                : `/populace/targets?source=${encodeURIComponent(leaf.source)}${
-                    level ? `&level=${encodeURIComponent(level)}` : ""
-                  }`,
-            )
-          }
+          onClick={() => router.push(fullDiagnosticsPath())}
           className="font-medium text-primary hover:underline"
         >
           Open in full diagnostics ↗

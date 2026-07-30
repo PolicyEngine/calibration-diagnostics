@@ -77,12 +77,12 @@ function LossCurve({ trajectory }: { trajectory: number[] }) {
 export function PopulaceOverviewView() {
   const { country } = useCountry();
   const [release, setRelease] = useState("");
-  const [geoLevel, setGeoLevel] = useState("");
+  const [mapBreakdown, setMapBreakdown] = useState<"program" | "geography">("program");
   const { data: releaseData } = usePopulaceReleases();
   const { data, isLoading, error } = usePopulace(release || undefined);
   const { data: treemap } = usePopulaceTargetTreemap(
     release || undefined,
-    geoLevel || undefined,
+    mapBreakdown,
   );
 
   const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
@@ -216,17 +216,6 @@ export function PopulaceOverviewView() {
         title="Calibration map"
         actions={
           <div className="flex items-center gap-3">
-            <ToolbarSelect
-              label="Geography"
-              value={geoLevel}
-              onChange={setGeoLevel}
-              options={[
-                { value: "", label: "All geographies" },
-                { value: "national", label: "National" },
-                { value: "state", label: "State" },
-                { value: "congressional_district", label: "Congressional district" },
-              ]}
-            />
             <a
               href={withBasePath("/populace/targets")}
               className="whitespace-nowrap text-sm font-medium text-primary hover:underline"
@@ -240,7 +229,8 @@ export function PopulaceOverviewView() {
           <CalibrationMap
             data={treemap}
             release={release || undefined}
-            level={geoLevel || undefined}
+            breakdown={mapBreakdown}
+            onBreakdownChange={setMapBreakdown}
           />
         ) : (
           <LoadingBlock label="Building calibration map…" />
