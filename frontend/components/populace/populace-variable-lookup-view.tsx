@@ -169,7 +169,7 @@ export function PopulaceVariableLookupView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace"
+        eyebrow="Populace · variable lookup"
         title="Variable lookup"
         description="Check the calibrated dataset's baseline total for any PolicyEngine variable — including measures that aren't calibration targets."
       />

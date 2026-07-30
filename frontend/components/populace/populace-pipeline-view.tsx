@@ -15,7 +15,7 @@ export function PopulacePipelineView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace"
+        eyebrow="Populace · data pipeline"
         title="How the dataset is built"
         description={
           <>
