@@ -426,7 +426,7 @@ export function PopulaceStagingView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace"
+        eyebrow="Populace · staging"
         title="Staging candidates"
         description="Monitor Populace build candidates before they are promoted to the published Hugging Face release channel."
       />

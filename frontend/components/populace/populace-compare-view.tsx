@@ -627,7 +627,7 @@ export function PopulaceCompareView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace"
+        eyebrow="Populace · release comparison"
         title="Compare versions"
         description="Diff two published populace-US releases. Targets are matched by name; common targets get a fit change (negative = release B fits it better), and targets present in only one release are counted as added/removed."
       />
