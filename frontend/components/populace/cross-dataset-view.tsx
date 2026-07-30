@@ -101,6 +101,7 @@ export function CrossDatasetView() {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Populace"
         title="Cross-dataset comparison"
         description="Every dataset scored against the model's own national calibration targets — the official IRS/SOI/etc. actuals PolicyEngine's US microdata is built to match, so the benchmark set isn't hand-picked. Datasets compare by the calibration's own loss (capped-MAPE: the capped mean absolute relative error, the same functional the release reports as Final loss). populace covers ~all targets; federal tax-unit engines cover the SOI tax concepts they can express, and that coverage gap is part of the comparison."
       />
