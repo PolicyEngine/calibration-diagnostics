@@ -272,8 +272,8 @@ async function fetchReformValidation(
   // reform id rather than picking one side wholesale: when the native artifact
   // re-simulated a reform (out_of_sample_simulated === true) its score is
   // fresher and wins for that id, but the suites only the backfill carries must
-  // still come through — otherwise the cross-dataset view loses its entire
-  // comparable surface. When native is un-simulated, the backfill wins shared
+  // still come through so External checks retains its full benchmark surface.
+  // When native is un-simulated, the backfill wins shared
   // ids too, and any native-only reforms are still carried along.
   if (artifact && override) {
     return mergeReformSuites(artifact, override, artifact.out_of_sample_simulated === true);
