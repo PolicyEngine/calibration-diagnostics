@@ -11,10 +11,9 @@ separate service layer — the Next.js API routes are the API layer.
 
 ## What it shows
 
-- **Release summary** (`/populace`) — calibration loss and convergence, within-10%
-  and within-tolerance, records kept after L0, acceptance gates, solver
-  provenance, per-family fit, and worst-fit / biggest-improvement targets, for
-  the current release (or any release via `?release=`).
+- **Release summary** (`/populace`) — calibration fit KPIs, target coverage,
+  per-family fit, and worst-fit / biggest-improvement targets, for the current
+  release (or any release via `?release=`).
 - **Target diagnostics** (`/populace/targets`) — browse the calibration target
   surface by the quantity each constraint measures (e.g. *adjusted gross income*),
   then drill its breakdown dimensions (income band x return type x filing status,
