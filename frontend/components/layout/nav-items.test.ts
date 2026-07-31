@@ -33,3 +33,10 @@ test("targets path activates calibration targets instead of calibration fit", ()
   expect(isActive("/populace/targets", calibrationFit)).toBe(false);
   expect(isActive("/populace/targets", calibrationTargets)).toBe(true);
 });
+
+test("does not expose the retired cross-dataset evaluation", () => {
+  const items = datasetAccuracyItems();
+
+  expect(items.some((item) => item.label === "Cross-dataset")).toBe(false);
+  expect(items.some((item) => item.href === "/populace/datasets")).toBe(false);
+});
