@@ -1,13 +1,31 @@
 name: Reform validation backfill
 
-# Decoupled from the release build pipeline: the reform-validation simulation is
-# slow (~1-2h) and we never want it to block or break a release. This wakes on a
-# timer, checks the current populace-US release, and — only if that release has no
-# committed reform_validation.json override yet — reproduces one on the released H5
-# and opens an auto-merging PR. Most runs are a few-second no-op.
+# Decoupled from the release build pipeline AND from the runner's hardware:
+# the producer needs a full Microsimulation per batch plus the populace/torch
+# import stack, which no longer fits GitHub's 7GB ubuntu-latest runner (every
+# run since 2026-07-21 died to the OOM shutdown signal, including post-#107
+# chunked runs). The simulation therefore runs on Modal
+# (tools/reform_validation/modal_backfill_app.py, 64GB container); this
+# workflow is only the trigger/commit layer and every tick finishes in
+# seconds:
 #
-# Run it by hand for a specific release via the "Run workflow" button (release_id
-# input), or leave it to the schedule.
+#   tick N:   release lacks an override and the Volume has no artifact ->
+#             deploy + spawn the Modal run (fire-and-forget) and exit.
+#   tick N+1: artifact is on the Volume -> download, commit the override,
+#             open an auto-merging PR.
+#
+# Liveness (tools/reform_validation/spawn_or_wait.py): the spawner records
+# the Modal call id on the Volume next to the app's `started` marker, and
+# each tick checks that call's actual status — a failed or vanished run
+# re-spawns instead of waiting forever behind a stale marker (age fallback:
+# 24h, past the 8h function timeout). Re-spawns are cheap because the Modal
+# workdir checkpoints batch partials, so they resume rather than restart.
+#
+# Requires repository secrets MODAL_TOKEN_ID / MODAL_TOKEN_SECRET for the
+# PolicyEngine Modal workspace.
+#
+# Run by hand for a specific release via the "Run workflow" button
+# (release_id input), or leave it to the schedule.
 
 on:
   schedule:
@@ -29,6 +47,7 @@ concurrency:
 
 env:
   HF_BASE: https://huggingface.co/datasets/policyengine/populace-us/resolve/main
+  MODAL_VOLUME: cd-reform-validation
 
 jobs:
   resolve:
@@ -59,65 +78,67 @@ jobs:
     needs: resolve
     if: needs.resolve.outputs.should_run == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    timeout-minutes: 30
     env:
       RID: ${{ needs.resolve.outputs.release_id }}
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
     steps:
       - name: Checkout dashboard
         uses: actions/checkout@v4
-
-      - name: Checkout populace (producer)
-        uses: actions/checkout@v4
-        with:
-          repository: PolicyEngine/populace
-          path: populace
-
-      - name: Read exact build package versions
-        id: ver
-        run: |
-          set -euo pipefail
-          curl -sL "$HF_BASE/releases/$RID/release_manifest.json" > /tmp/manifest.json
-          echo "peus=$(python3 -c "import json;print(json.load(open('/tmp/manifest.json'))['build']['built_with_model_package']['version'])")" >> "$GITHUB_OUTPUT"
-          echo "pecore=$(python3 -c "import json;print(json.load(open('/tmp/manifest.json'))['build']['built_with_core_package']['version'])")" >> "$GITHUB_OUTPUT"
-          echo "producer=$(git -C populace rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
-      - uses: oven-sh/setup-bun@v2
-
-      - name: Install producer deps (exact pe-us/pe-core from the release)
+      - name: Install Modal client
         run: |
-          python -m pip install -U pip
-          # CPU torch first: the default index resolves CUDA wheels (~4GB of
-          # nvidia-* packages) that waste the hosted runner's disk and memory.
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install \
-            "policyengine-us==${{ steps.ver.outputs.peus }}" \
-            "policyengine-core==${{ steps.ver.outputs.pecore }}" \
-            tables microdf-python h5py numpy pandas scipy scikit-learn tqdm
+          set -euo pipefail
+          if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ]; then
+            echo "::error::MODAL_TOKEN_ID / MODAL_TOKEN_SECRET repository secrets are not set — the simulation runs on Modal and cannot proceed without them."
+            exit 1
+          fi
+          python -m pip install --quiet modal
 
-      - name: Generate reform_validation.json
+      - name: Harvest artifact or spawn Modal run
+        id: harvest
         env:
-          PYTHONPATH: populace/packages/populace-build/src:populace/packages/populace-frame/src:populace/packages/populace-calibrate/src:populace/packages/populace-fit/src:populace/packages/populace-data/src
-          RV_PRODUCER_COMMIT: ${{ steps.ver.outputs.producer }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p /tmp/rv
-          python tools/reform_validation/backfill.py \
-            --release-id "$RID" --workdir /tmp/rv \
-            --producer-commit "${{ steps.ver.outputs.producer }}"
-          cp /tmp/rv/reform_validation.json \
-            "frontend/lib/populace/reform-overrides/$RID.json"
+          SHA8=$(python3 -c "import hashlib;print(hashlib.sha256('$RID'.encode()).hexdigest()[:8])")
+          if modal volume get "$MODAL_VOLUME" "reform_validation_$RID.json" /tmp/rv.json --force; then
+            echo "::notice::Artifact found on the Volume — committing the override."
+            echo "have_artifact=true" >> "$GITHUB_OUTPUT"
+            # The artifact stays on the Volume as the done-signal until the
+            # override merges; only the bulky workdir (H5 + partials) goes.
+            modal volume rm "$MODAL_VOLUME" "rv_$SHA8" -r || true
+            exit 0
+          fi
+          echo "have_artifact=false" >> "$GITHUB_OUTPUT"
+          DECISION=$(python3 tools/reform_validation/spawn_or_wait.py check "$RID")
+          if [ "$DECISION" = "WAIT" ]; then
+            echo "::notice::A Modal run for $RID is in flight — will harvest on a later tick."
+            exit 0
+          fi
+          PRODUCER_REF=$(gh api repos/PolicyEngine/populace/commits/main --jq .sha)
+          modal deploy tools/reform_validation/modal_backfill_app.py
+          python3 tools/reform_validation/spawn_or_wait.py spawn "$RID" "$PRODUCER_REF"
+          echo "::notice::Spawned Modal backfill for $RID at populace ${PRODUCER_REF:0:9} — a later tick harvests the artifact."
 
-      - name: Regenerate overrides map + typecheck
+      - uses: oven-sh/setup-bun@v2
+        if: steps.harvest.outputs.have_artifact == 'true'
+
+      - name: Commit override + typecheck
+        if: steps.harvest.outputs.have_artifact == 'true'
         run: |
           set -euo pipefail
+          cp /tmp/rv.json "frontend/lib/populace/reform-overrides/$RID.json"
           node scripts/gen-reform-overrides.mjs
           cd frontend && bun install --frozen-lockfile && bun run lint
 
       - name: Open auto-merge PR
+        if: steps.harvest.outputs.have_artifact == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -131,5 +152,5 @@ jobs:
           git push -u origin "$BR"
           gh pr create --base main --head "$BR" \
             --title "Backfill reform_validation.json for $RID" \
-            --body "Automated backfill by \`.github/workflows/reform-validation-backfill.yml\`. The producer was run on the released \`populace_us_2024.h5\` at the build's exact package versions; provenance is in the file's \`_backfill_note\`. Decoupled from the build pipeline so the slow simulation can't block a release."
+            --body "Automated backfill by \`.github/workflows/reform-validation-backfill.yml\`. The producer ran on Modal (\`tools/reform_validation/modal_backfill_app.py\`) against the released \`populace_us_2024.h5\` at the build's exact package versions; provenance is in the file's \`_backfill_note\`. The simulation is decoupled from both the build pipeline and the hosted runner, so it can neither block a release nor exhaust the runner."
           gh pr merge --squash --auto "$BR" || gh pr merge --squash "$BR"
