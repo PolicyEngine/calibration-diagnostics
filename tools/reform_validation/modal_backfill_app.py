@@ -44,7 +44,8 @@ from pathlib import Path
 
 import modal
 
-app = modal.App("cd-reform-validation-backfill")
+APP_NAME = "cd-reform-validation-backfill"
+app = modal.App(APP_NAME)
 
 VOLUME_NAME = "cd-reform-validation"
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
@@ -87,12 +88,15 @@ def backfill(release_id: str, producer_ref: str = "main") -> str:
     Writes, in order:
       /vol/rv_<sha8>/...                     durable workdir (H5, partials)
       /vol/reform_validation_<release_id>.json  the finished artifact
-    A ``started`` marker in the workdir lets the workflow avoid double-spawns.
+    The workdir's ``started`` marker (timestamped) plus the spawner-recorded
+    ``call_id`` let the workflow distinguish in-flight from dead runs
+    (spawn_or_wait.py) instead of trusting the marker alone.
     """
     import hashlib
     import json
     import os
     import subprocess
+    import time
     import urllib.request
 
     subprocess.run(
@@ -124,7 +128,10 @@ def backfill(release_id: str, producer_ref: str = "main") -> str:
     workdir = f"/vol/rv_{hashlib.sha256(release_id.encode()).hexdigest()[:8]}"
     os.makedirs(workdir, exist_ok=True)
     with open(f"{workdir}/started", "w") as f:
-        f.write(f"{release_id}\nproducer {producer_commit}\n")
+        f.write(
+            f"{release_id}\nproducer {producer_commit}\n"
+            f"started_at {int(time.time())}\n"
+        )
     volume.commit()
 
     env = {

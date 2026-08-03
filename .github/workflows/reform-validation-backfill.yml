@@ -12,10 +12,14 @@ name: Reform validation backfill
 #   tick N:   release lacks an override and the Volume has no artifact ->
 #             deploy + spawn the Modal run (fire-and-forget) and exit.
 #   tick N+1: artifact is on the Volume -> download, commit the override,
-#             open an auto-merging PR. (A `started` marker in the Modal
-#             workdir prevents double-spawns while a run is in flight; the
-#             Modal workdir checkpoints batch partials, so a re-spawn after
-#             any failure resumes rather than restarts.)
+#             open an auto-merging PR.
+#
+# Liveness (tools/reform_validation/spawn_or_wait.py): the spawner records
+# the Modal call id on the Volume next to the app's `started` marker, and
+# each tick checks that call's actual status — a failed or vanished run
+# re-spawns instead of waiting forever behind a stale marker (age fallback:
+# 24h, past the 8h function timeout). Re-spawns are cheap because the Modal
+# workdir checkpoints batch partials, so they resume rather than restart.
 #
 # Requires repository secrets MODAL_TOKEN_ID / MODAL_TOKEN_SECRET for the
 # PolicyEngine Modal workspace.
@@ -98,32 +102,29 @@ jobs:
 
       - name: Harvest artifact or spawn Modal run
         id: harvest
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          SHA8=$(python3 -c "import hashlib;print(hashlib.sha256('$RID'.encode()).hexdigest()[:8])")
           if modal volume get "$MODAL_VOLUME" "reform_validation_$RID.json" /tmp/rv.json --force; then
             echo "::notice::Artifact found on the Volume — committing the override."
             echo "have_artifact=true" >> "$GITHUB_OUTPUT"
+            # The artifact stays on the Volume as the done-signal until the
+            # override merges; only the bulky workdir (H5 + partials) goes.
+            modal volume rm "$MODAL_VOLUME" "rv_$SHA8" -r || true
             exit 0
           fi
           echo "have_artifact=false" >> "$GITHUB_OUTPUT"
-          SHA8=$(python3 -c "import hashlib;print(hashlib.sha256('$RID'.encode()).hexdigest()[:8])")
-          if modal volume ls "$MODAL_VOLUME" "rv_$SHA8" 2>/dev/null | grep -q started; then
-            echo "::notice::A Modal run for $RID is already in flight (rv_$SHA8/started) — will harvest on a later tick."
+          DECISION=$(python3 tools/reform_validation/spawn_or_wait.py check "$RID")
+          if [ "$DECISION" = "WAIT" ]; then
+            echo "::notice::A Modal run for $RID is in flight — will harvest on a later tick."
             exit 0
           fi
-          PRODUCER_REF=$(curl -sL https://api.github.com/repos/PolicyEngine/populace/commits/main \
-            | python3 -c "import sys,json;print(json.load(sys.stdin)['sha'])")
+          PRODUCER_REF=$(gh api repos/PolicyEngine/populace/commits/main --jq .sha)
           modal deploy tools/reform_validation/modal_backfill_app.py
-          python3 - "$RID" "$PRODUCER_REF" <<'EOF'
-          import sys
-          import modal
-
-          release_id, producer_ref = sys.argv[1], sys.argv[2]
-          fn = modal.Function.from_name("cd-reform-validation-backfill", "backfill")
-          call = fn.spawn(release_id, producer_ref)
-          print(f"::notice::Spawned Modal backfill {call.object_id} for {release_id} "
-                f"at populace {producer_ref[:9]} — a later tick harvests the artifact.")
-          EOF
+          python3 tools/reform_validation/spawn_or_wait.py spawn "$RID" "$PRODUCER_REF"
+          echo "::notice::Spawned Modal backfill for $RID at populace ${PRODUCER_REF:0:9} — a later tick harvests the artifact."
 
       - uses: oven-sh/setup-bun@v2
         if: steps.harvest.outputs.have_artifact == 'true'
