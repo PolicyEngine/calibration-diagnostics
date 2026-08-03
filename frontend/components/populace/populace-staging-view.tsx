@@ -17,7 +17,6 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import {
-  usePopulaceReforms,
   usePopulaceStagingCompare,
   usePopulaceStagingRun,
   usePopulaceStagingRuns,
@@ -189,23 +188,13 @@ function LossSparkline({ values }: { values: number[] }) {
   );
 }
 
-function ReformValidationTable({
-  rows,
-  publishedErrors,
-  publishedReleaseId,
-}: {
-  rows: ReformValidationRow[];
-  // |error| per check id in the currently published release, for side-by-side.
-  publishedErrors: Map<string, number | null>;
-  publishedReleaseId?: string | null;
-}) {
+function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
   const ordered = [...rows]
     .filter((row) => row.populace_estimate != null || row.jct_score != null)
     .sort((a, b) => Number(a.in_sample ?? false) - Number(b.in_sample ?? false));
   if (!ordered.length) {
     return <EmptyState title="No reform validation rows yet." variant="compact" />;
   }
-  const hasPublished = publishedErrors.size > 0;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -215,23 +204,10 @@ function ReformValidationTable({
             <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
             <th className="px-3 py-2 text-right font-semibold">Candidate</th>
             <th className="px-3 py-2 text-right font-semibold">Error</th>
-            {hasPublished && (
-              <>
-                <th className="px-3 py-2 text-right font-semibold">
-                  Published{publishedReleaseId ? ` (${releaseLabel(publishedReleaseId)})` : ""}
-                </th>
-                <th className="px-3 py-2 text-right font-semibold">Δ</th>
-              </>
-            )}
           </tr>
         </thead>
         <tbody>
           {ordered.map((row) => {
-            const published = publishedErrors.get(row.id) ?? null;
-            const delta =
-              published != null && row.abs_relative_error != null
-                ? row.abs_relative_error - published
-                : null;
             return (
               <tr key={row.id} className="border-b border-border/60 last:border-b-0">
                 <td className="px-3 py-2">
@@ -262,26 +238,6 @@ function ReformValidationTable({
                 >
                   {pct(row.abs_relative_error)}
                 </td>
-                {hasPublished && (
-                  <>
-                    <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      {pct(published)}
-                    </td>
-                    <td
-                      className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
-                        delta == null
-                          ? "text-muted-foreground"
-                          : delta < -1e-4
-                            ? "tone-pos"
-                            : delta > 1e-4
-                              ? "tone-neg"
-                              : "text-muted-foreground"
-                      }`}
-                    >
-                      {delta == null ? "—" : `${delta > 0 ? "+" : ""}${pct(delta)}`}
-                    </td>
-                  </>
-                )}
               </tr>
             );
           })}
@@ -374,17 +330,6 @@ export function PopulaceStagingView() {
   const { data: compareData, isLoading: compareLoading } = usePopulaceStagingCompare(
     runData?.has_calibration ? selectedRun : undefined,
     "latest",
-  );
-  // Published release's reform validation, for side-by-side with the candidate.
-  const { data: publishedReforms } = usePopulaceReforms();
-  const publishedErrors = useMemo(
-    () =>
-      new Map(
-        (publishedReforms?.rows ?? []).map(
-          (row) => [row.id, row.abs_relative_error ?? null] as const,
-        ),
-      ),
-    [publishedReforms],
   );
   // Fit stats on the targets both sides share — the honest better-or-worse basis.
   const commonStats = useMemo(() => {
@@ -572,10 +517,7 @@ export function PopulaceStagingView() {
                         <>
                           <ScoreRow
                             label="Reforms · out-of-sample mean |error|"
-                            published={
-                              publishedReforms?.summary?.out_of_sample_mean_abs_relative_error ??
-                              null
-                            }
+                            published={null}
                             candidate={
                               runData.reform_validation.summary
                                 ?.out_of_sample_mean_abs_relative_error ?? null
@@ -584,12 +526,7 @@ export function PopulaceStagingView() {
                           />
                           <ScoreRow
                             label="Reforms · out-of-sample within 10%"
-                            published={
-                              (publishedReforms?.summary?.n_out_of_sample_scored ?? 0) > 0
-                                ? (publishedReforms?.summary?.out_of_sample_within_10pct ?? 0) /
-                                  (publishedReforms?.summary?.n_out_of_sample_scored ?? 1)
-                                : null
-                            }
+                            published={null}
                             candidate={
                               (runData.reform_validation.summary?.n_out_of_sample_scored ?? 0) > 0
                                 ? (runData.reform_validation.summary?.out_of_sample_within_10pct ??
@@ -758,14 +695,10 @@ export function PopulaceStagingView() {
               {runData.reform_validation ? (
                 <SectionCard
                   title="External checks breakdown"
-                  description="Each score test the run uploaded, side by side with the published release. Out-of-sample rows are the main signal; in-sample rows were direct or near-direct calibration targets."
+                  description="Each score test the run uploaded. Out-of-sample rows are the main signal; in-sample rows were direct or near-direct calibration targets. Cross-release external comparisons live in the PolicyEngine scorecard."
                   padded={false}
                 >
-                  <ReformValidationTable
-                    rows={runData.reform_validation.rows ?? []}
-                    publishedErrors={publishedErrors}
-                    publishedReleaseId={publishedReforms?.release_id}
-                  />
+                  <ReformValidationTable rows={runData.reform_validation.rows ?? []} />
                 </SectionCard>
               ) : (
                 <SectionCard
