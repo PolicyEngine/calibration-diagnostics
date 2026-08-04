@@ -2,6 +2,11 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { releaseLabel } from "@/components/shared/format";
 import { useCountry } from "@/components/layout/country-context";
 import { withBasePath } from "@/lib/base-path";
+import {
+  serializeExplorerSearch,
+  type ExplorerState,
+} from "@/lib/microcosm/calibration-explorer";
+import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
 import { apiGet } from "../client";
 
 export interface MicrocosmGates {
@@ -700,6 +705,37 @@ export function useMicrocosmTargetTreemap(release?: string, breakdown?: "program
         breakdown: breakdown || undefined,
         country,
       }),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+function explorerApiParams(
+  state: ExplorerState,
+): Record<string, string | string[]> {
+  const params = serializeExplorerSearch(state);
+  const result: Record<string, string | string[]> = {};
+  for (const key of new Set(params.keys())) {
+    const values = params.getAll(key);
+    result[key] = values.length === 1 ? values[0] : values;
+  }
+  return result;
+}
+
+export function useMicrocosmCalibrationTree(
+  state: ExplorerState,
+  release?: string,
+) {
+  const { country } = useCountry();
+  const search = serializeExplorerSearch(state).toString();
+  return useQuery({
+    queryKey: ["microcosm", "target-tree", country, release ?? "latest", search],
+    queryFn: () =>
+      apiGet<CalibrationTreeResponse>("/microcosm/target-tree", {
+        ...explorerApiParams(state),
+        release: release || undefined,
+        country,
+      }),
+    placeholderData: keepPreviousData,
     staleTime: 5 * 60 * 1000,
   });
 }
