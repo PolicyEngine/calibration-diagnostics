@@ -38,7 +38,18 @@ test("maps an explorer scope onto the existing targets diagnostics contract", ()
 });
 
 test("does not invent a variable key before the measure level", () => {
-  expect(
-    explorerVariableKey({ source: "census", program: "population", dimensions: [] }),
-  ).toBeUndefined();
+  const programState: ExplorerState = {
+    path: { source: "census", program: "population", dimensions: [] },
+    filters: {
+      geographyLevels: [],
+      geographies: [],
+      fitBands: [],
+      calibrationStatuses: [],
+    },
+  };
+  expect(explorerVariableKey(programState.path)).toBeUndefined();
+  expect(targetDiagnosticsParamsFromExplorer(programState)).toEqual({
+    source: "census",
+    program: "population",
+  });
 });

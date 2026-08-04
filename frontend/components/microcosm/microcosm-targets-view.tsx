@@ -12,6 +12,14 @@ import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { withBasePath } from "@/lib/base-path";
+import type {
+  ExplorerFilters,
+  ExplorerState,
+} from "@/lib/microcosm/calibration-explorer";
+import {
+  explorerVariableKey,
+  targetDiagnosticsParamsFromExplorer,
+} from "@/lib/microcosm/calibration-targets-handoff";
 import {
   releaseSelectOptions,
   useMicrocosmStagingRuns,
@@ -55,6 +63,29 @@ interface VariableGroup {
 }
 
 type TargetScope = "all" | "healthcare";
+
+function emptyExplorerFilters(): ExplorerFilters {
+  return {
+    geographyLevels: [],
+    geographies: [],
+    fitBands: [],
+    calibrationStatuses: [],
+  };
+}
+
+const EMPTY_EXPLORER_STATE: ExplorerState = {
+  path: { dimensions: [] },
+  filters: emptyExplorerFilters(),
+};
+
+const EXPLORER_FIT_LABELS: Record<string, string> = {
+  "0_5": "0–5%",
+  "5_10": "5–10%",
+  "10_20": "10–20%",
+  "20_40": "20–40%",
+  "40_plus": "40%+",
+  unscored: "Unscored",
+};
 
 interface HealthcareSummary {
   nTargets: number;
@@ -557,25 +588,57 @@ export function MicrocosmTargetsView({
   initialScope = "all",
   initialSource = "",
   initialLevel = "",
+  initialRelease = "",
+  initialExplorerState = EMPTY_EXPLORER_STATE,
 }: {
   initialScope?: TargetScope;
   initialSource?: string;
   initialLevel?: string;
+  initialRelease?: string;
+  initialExplorerState?: ExplorerState;
 }) {
-  const [release, setRelease] = useState("");
+  const initialHandoff = targetDiagnosticsParamsFromExplorer(initialExplorerState);
+  const initialVariable = explorerVariableKey(initialExplorerState.path) ?? "";
+  const initialProgram = initialHandoff.program ?? "";
+  const initialFacets = Object.fromEntries(
+    initialExplorerState.path.dimensions.map((dimension) => [dimension.key, dimension.value]),
+  );
+  const initialMapScope = Boolean(
+    initialVariable ||
+      initialProgram ||
+      initialExplorerState.path.dimensions.length ||
+      initialHandoff.geography_level?.length ||
+      initialHandoff.geography?.length ||
+      initialHandoff.fit_band?.length ||
+      initialHandoff.status?.length,
+  );
+
+  const [release, setRelease] = useState(initialRelease);
   const [scope, setScope] = useState<TargetScope>(initialScope);
-  const [variable, setVariable] = useState("");
-  const [source, setSource] = useState(initialSource);
+  const [variable, setVariable] = useState(initialVariable);
+  const [program, setProgram] = useState(initialProgram);
+  const [source, setSource] = useState(
+    initialVariable ? "" : initialHandoff.source ?? initialSource,
+  );
   const [level, setLevel] = useState(initialLevel);
   const [geography, setGeography] = useState("");
   const [direction, setDirection] = useState("");
   const [withinTolerance, setWithinTolerance] = useState("");
   const [search, setSearch] = useState("");
-  const [facetFilters, setFacetFilters] = useState<Record<string, string>>({});
+  const [facetFilters, setFacetFilters] = useState<Record<string, string>>(initialFacets);
+  const [explorerFilters, setExplorerFilters] = useState<ExplorerFilters>({
+    geographyLevels: [...initialExplorerState.filters.geographyLevels],
+    geographies: [...initialExplorerState.filters.geographies],
+    fitBands: [...initialExplorerState.filters.fitBands],
+    calibrationStatuses: [...initialExplorerState.filters.calibrationStatuses],
+  });
+  const [mapScopeActive, setMapScopeActive] = useState(initialMapScope);
   const [selected, setSelected] = useState<MicrocosmTargetRow | null>(null);
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<SortState>({ by: "abs_relative_error", dir: "desc" });
-  const [step, setStep] = useState<WizardStep>(initialSource ? "results" : "home");
+  const [step, setStep] = useState<WizardStep>(
+    initialVariable || initialProgram || initialSource ? "results" : "home",
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [refineIndex, setRefineIndex] = useState(0);
 
@@ -600,18 +663,22 @@ export function MicrocosmTargetsView({
     // A different release is a different surface — reset everything below it.
     setRelease(value);
     setVariable("");
+    setProgram("");
     setFacetFilters({});
     setSource("");
     setLevel("");
     setGeography("");
     setDirection("");
     setWithinTolerance("");
+    setExplorerFilters(emptyExplorerFilters());
+    setMapScopeActive(false);
     setSelected(null);
     setPage(0);
   }
 
   function resetFilters() {
     setVariable("");
+    setProgram("");
     setFacetFilters({});
     setSource("");
     setLevel("");
@@ -619,6 +686,8 @@ export function MicrocosmTargetsView({
     setDirection("");
     setWithinTolerance("");
     setSearch("");
+    setExplorerFilters(emptyExplorerFilters());
+    setMapScopeActive(false);
     setScope("all");
     setSelected(null);
     setShowAdvanced(false);
@@ -676,9 +745,19 @@ export function MicrocosmTargetsView({
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
       variable: variable || undefined,
+      program: program || undefined,
       source: source || undefined,
       level: level || undefined,
-      geography: geography || undefined,
+      geography_level: explorerFilters.geographyLevels.length
+        ? explorerFilters.geographyLevels
+        : undefined,
+      geography: explorerFilters.geographies.length
+        ? explorerFilters.geographies
+        : geography || undefined,
+      fit_band: explorerFilters.fitBands.length ? explorerFilters.fitBands : undefined,
+      status: explorerFilters.calibrationStatuses.length
+        ? explorerFilters.calibrationStatuses
+        : undefined,
       direction: direction || undefined,
       within_tolerance: withinTolerance || undefined,
       search: debouncedSearch || undefined,
@@ -690,9 +769,11 @@ export function MicrocosmTargetsView({
       release,
       scope,
       variable,
+      program,
       source,
       level,
       geography,
+      explorerFilters,
       direction,
       withinTolerance,
       debouncedSearch,
@@ -765,7 +846,10 @@ export function MicrocosmTargetsView({
 
   function pickVariable(key: string) {
     setVariable(key);
+    setProgram("");
     setFacetFilters({});
+    setExplorerFilters(emptyExplorerFilters());
+    setMapScopeActive(false);
     if (key) {
       setSource("");
       setLevel("");
@@ -1047,6 +1131,21 @@ export function MicrocosmTargetsView({
     </div>
   );
 
+  const mapScopeLabels = [
+    ...(activeVariable
+      ? [`${sourceLabel(activeVariable.source)} · ${humanizeName(activeVariable.variable)} · ${measureLabel(activeVariable.measure)}`]
+      : []),
+    ...(!activeVariable && program ? [`${sourceLabel(source)} · ${humanizeName(program)}`] : []),
+    ...Object.entries(facetFilters).map(([key, value]) => {
+      const label = dimensions.find((dimension) => dimension.key === key)?.label ?? humanizeName(key);
+      return `${label}: ${value === "__missing__" ? "Not specified" : value}`;
+    }),
+    ...explorerFilters.geographyLevels.map((value) => `Level: ${humanizeName(value)}`),
+    ...explorerFilters.geographies.map((value) => `Geography: ${value === "__missing__" ? "Not specified" : value}`),
+    ...explorerFilters.fitBands.map((value) => `Fit: ${EXPLORER_FIT_LABELS[value] ?? value}`),
+    ...explorerFilters.calibrationStatuses.map((value) => `Status: ${humanizeName(value)}`),
+  ];
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -1071,6 +1170,29 @@ export function MicrocosmTargetsView({
           />
         }
       />
+
+      {mapScopeActive && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/[0.04] px-4 py-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+            Calibration map scope
+          </span>
+          {mapScopeLabels.map((label) => (
+            <span key={label} className="rounded-full border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground">
+              {label}
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              resetFilters();
+              setStep("results");
+            }}
+            className="ml-auto text-xs font-medium text-primary hover:underline"
+          >
+            Clear map scope
+          </button>
+        </div>
+      )}
 
       {step === "home" && (
         <div className="flex flex-col gap-4">

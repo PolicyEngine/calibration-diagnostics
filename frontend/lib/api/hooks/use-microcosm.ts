@@ -751,9 +751,12 @@ export function useMicrocosmTargetDiagnostics(params: {
   program?: string;
   source?: string;
   level?: string;
-  geography?: string;
+  geography_level?: string[];
+  geography?: string | string[];
   missing_geography?: string;
   state?: string;
+  fit_band?: string[];
+  status?: string[];
   direction?: string;
   within_tolerance?: string;
   search?: string;
