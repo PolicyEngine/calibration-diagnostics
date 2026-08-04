@@ -2,6 +2,7 @@ import type {
   CalibrationStatus,
   ExplorerNodeSelection,
   ExplorerState,
+  FitBand,
 } from "./calibration-explorer";
 
 const LOSS_ERROR_CAP = 2;
@@ -82,6 +83,34 @@ export type CalibrationTreeSizeMode = "targets" | "loss" | "error_intensity";
 function finiteError(row: CalibrationTreeTarget): number | null {
   const value = row.abs_relative_error;
   return typeof value === "number" && Number.isFinite(value) ? Math.abs(value) : null;
+}
+
+export function fitBandForTarget(row: CalibrationTreeTarget): FitBand {
+  const error = finiteError(row);
+  if (error == null) return "unscored";
+  if (error <= 0.05) return "0_5";
+  if (error <= 0.1) return "5_10";
+  if (error <= 0.2) return "10_20";
+  if (error <= 0.4) return "20_40";
+  return "40_plus";
+}
+
+export function applyExplorerFilters(
+  rows: CalibrationTreeTarget[],
+  filters: ExplorerState["filters"],
+): CalibrationTreeTarget[] {
+  return rows.filter((row) => {
+    const geographyLevel = String(row.level ?? "").trim() || MISSING_VALUE;
+    const geography = String(row.geography ?? "").trim() || MISSING_VALUE;
+    const status = row.calibration_status ?? null;
+    return (
+      (!filters.geographyLevels.length || filters.geographyLevels.includes(geographyLevel)) &&
+      (!filters.geographies.length || filters.geographies.includes(geography)) &&
+      (!filters.fitBands.length || filters.fitBands.includes(fitBandForTarget(row))) &&
+      (!filters.calibrationStatuses.length ||
+        (status != null && filters.calibrationStatuses.includes(status)))
+    );
+  });
 }
 
 function median(values: number[]): number | null {
@@ -197,7 +226,10 @@ function sortNodes(nodes: CalibrationTreeNode[]): CalibrationTreeNode[] {
 
 function filterOptions(rows: CalibrationTreeTarget[]) {
   const unique = (values: Array<string | null | undefined>) =>
-    [...new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean))].sort();
+    [...new Set(values.map((value) => String(value ?? "").trim() || MISSING_VALUE))].sort(
+      (left, right) =>
+        left === MISSING_VALUE ? 1 : right === MISSING_VALUE ? -1 : left.localeCompare(right),
+    );
   return {
     geographyLevels: unique(rows.map((row) => row.level)),
     geographies: unique(rows.map((row) => row.geography)),
@@ -213,9 +245,10 @@ export function buildCalibrationTree(
 ): CalibrationTreeResponse {
   const { path } = state;
   const options = filterOptions(allRows);
+  const filteredRows = applyExplorerFilters(allRows, state.filters);
 
   if (!path.source || !path.program) {
-    const bySource = groupRows(allRows, (row) => String(row.source ?? "other") || "other");
+    const bySource = groupRows(filteredRows, (row) => String(row.source ?? "other") || "other");
     const groups = [...bySource.entries()]
       .map(([source, sourceRows]) => {
         const byProgram = groupRows(sourceRows, programId);
@@ -248,16 +281,17 @@ export function buildCalibrationTree(
       groups,
       dimensionOrder: [],
       filterOptions: options,
-      filteredMetrics: calibrationTreeMetrics(allRows),
+      filteredMetrics: calibrationTreeMetrics(filteredRows),
     };
   }
 
   const programRows = allRows.filter(
     (row) => String(row.source ?? "other") === path.source && programId(row) === path.program,
   );
+  const filteredProgramRows = applyExplorerFilters(programRows, state.filters);
   if (!path.measure) {
     const byMeasure = groupRows(
-      programRows,
+      filteredProgramRows,
       (row) => String(row.measure ?? "").trim() || MISSING_VALUE,
     );
     const nodes = [...byMeasure.entries()]
@@ -278,10 +312,10 @@ export function buildCalibrationTree(
       releaseId,
       path,
       currentLevel: { kind: "measure", label: "Measure" },
-      groups: [{ id: path.program, label: path.program, nodes, metrics: calibrationTreeMetrics(programRows) }],
+      groups: [{ id: path.program, label: path.program, nodes, metrics: calibrationTreeMetrics(filteredProgramRows) }],
       dimensionOrder: [],
       filterOptions: options,
-      filteredMetrics: calibrationTreeMetrics(programRows),
+      filteredMetrics: calibrationTreeMetrics(filteredProgramRows),
     };
   }
 
@@ -295,6 +329,7 @@ export function buildCalibrationTree(
       (row) => rowDimensionValue(row, selection.key) === selection.value,
     );
   }
+  scopedRows = applyExplorerFilters(scopedRows, state.filters);
 
   const nextDimension = dimensionOrder[path.dimensions.length];
   if (nextDimension) {
