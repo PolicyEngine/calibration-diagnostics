@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import type { ExplorerState } from "./calibration-explorer";
 import {
+  applyExplorerFilters,
   buildCalibrationTree,
   effectiveNodeMetric,
+  fitBandForTarget,
   type CalibrationTreeTarget,
 } from "./calibration-tree";
 
@@ -179,5 +181,88 @@ describe("fixed calibration tree aggregation", () => {
 
     expect(effectiveNodeMetric(nodes, "loss")).toEqual([1]);
     expect(effectiveNodeMetric(nodes, "error_intensity")).toEqual([1]);
+  });
+});
+
+describe("orthogonal calibration tree filters", () => {
+  test("classifies fit bands on the legend boundaries", () => {
+    const band = (abs_relative_error: number | null) =>
+      fitBandForTarget({ abs_relative_error });
+
+    expect([
+      band(0),
+      band(0.05),
+      band(0.050001),
+      band(0.1),
+      band(0.100001),
+      band(0.2),
+      band(0.200001),
+      band(0.4),
+      band(0.400001),
+      band(null),
+    ]).toEqual([
+      "0_5",
+      "0_5",
+      "5_10",
+      "5_10",
+      "10_20",
+      "10_20",
+      "20_40",
+      "20_40",
+      "40_plus",
+      "unscored",
+    ]);
+  });
+
+  test("ORs values within filters and ANDs across filter categories", () => {
+    const filtered = applyExplorerFilters(rows, {
+      geographyLevels: ["state"],
+      geographies: ["CA", "NY"],
+      fitBands: ["0_5", "10_20"],
+      calibrationStatuses: ["included", "skipped"],
+    });
+
+    expect(filtered.map((row) => row.name)).toEqual([
+      "population/count/adult/female/CA",
+      "population/count/senior/female/NY",
+    ]);
+  });
+
+  test("applies filters to nodes and metrics without changing dimension order", () => {
+    const tree = buildCalibrationTree(rows, {
+      path: {
+        source: "census",
+        program: "population",
+        measure: "count",
+        dimensions: [],
+      },
+      filters: {
+        geographyLevels: ["state"],
+        geographies: ["CA"],
+        fitBands: [],
+        calibrationStatuses: ["included"],
+      },
+    });
+
+    expect(tree.dimensionOrder).toEqual([
+      { key: "bd_age", label: "Age" },
+      { key: "bd_sex", label: "Sex" },
+    ]);
+    expect(tree.groups[0].nodes.map((node) => node.label)).toEqual(["Adult"]);
+    expect(tree.filteredMetrics.nTargets).toBe(1);
+  });
+
+  test("supports missing geography as an explicit filter value", () => {
+    const missing = applyExplorerFilters(
+      [...rows, { name: "missing-place", source: "other", variable: "unknown" }],
+      {
+        geographyLevels: [],
+        geographies: ["__missing__"],
+        fitBands: [],
+        calibrationStatuses: [],
+      },
+    );
+
+    expect(missing.map((row) => row.name)).toEqual(["missing-place"]);
   });
 });
