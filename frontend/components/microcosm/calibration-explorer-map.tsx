@@ -344,39 +344,46 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   }));
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <nav aria-label="Calibration map location" className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-          {breadcrumbs.map((crumb, index) => (
-            <span key={`${crumb}:${index}`}>
-              {index > 0 && <span className="mx-1">/</span>}
-              <span className={index === breadcrumbs.length - 1 ? "font-medium text-foreground" : ""}>{crumb}</span>
-            </span>
-          ))}
-        </nav>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {upLabel && (
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "up" })}
-              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
-            >
-              ← {upLabel}
-            </button>
-          )}
-          <span className="text-xs text-muted-foreground">{fmt(data.filteredMetrics.nTargets, { digits: 0 })} targets</span>
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+        <div className="shrink-0">
+          <SizeControl value={sizeMode} onChange={setSizeMode} />
+        </div>
+        <div className="max-w-full flex-[1_0_34rem]">
+          <FilterBar
+            data={data}
+            state={state}
+            onFilters={(filters) => dispatch({ type: "filters", filters })}
+          />
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SizeControl value={sizeMode} onChange={setSizeMode} />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        {(breadcrumbs.length > 0 || upLabel) && (
+          <div>
+            {breadcrumbs.length > 0 && (
+              <nav aria-label="Calibration map location" className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                {breadcrumbs.map((crumb, index) => (
+                  <span key={`${crumb}:${index}`}>
+                    {index > 0 && <span className="mx-1">/</span>}
+                    <span className={index === breadcrumbs.length - 1 ? "font-medium text-foreground" : ""}>{crumb}</span>
+                  </span>
+                ))}
+              </nav>
+            )}
+            {upLabel && (
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "up" })}
+                className={`${breadcrumbs.length > 0 ? "mt-2 " : ""}rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40`}
+              >
+                ← {upLabel}
+              </button>
+            )}
+          </div>
+        )}
+        <div className="ml-auto">
           <FitLegend />
         </div>
-        <FilterBar
-          data={data}
-          state={state}
-          onFilters={(filters) => dispatch({ type: "filters", filters })}
-        />
       </div>
 
       <div ref={containerRef} className="relative w-full" style={{ height }}>

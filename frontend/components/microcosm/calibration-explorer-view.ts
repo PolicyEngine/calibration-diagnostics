@@ -16,7 +16,7 @@ export function explorerUpLabel(state: ExplorerState): string | null {
 }
 
 export function explorerBreadcrumbs(state: ExplorerState): string[] {
-  const crumbs = ["All programs"];
+  const crumbs: string[] = [];
   if (state.path.source && state.path.program) {
     crumbs.push(humanize(state.path.source));
     crumbs.push(humanize(state.path.program));

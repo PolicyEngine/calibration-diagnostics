@@ -55,6 +55,7 @@ describe("calibration explorer presentation model", () => {
   });
 
   test("builds orientation breadcrumbs from the semantic path", () => {
+    expect(explorerBreadcrumbs(state({ dimensions: [] }))).toEqual([]);
     expect(
       explorerBreadcrumbs(
         state({
@@ -64,7 +65,7 @@ describe("calibration explorer presentation model", () => {
           dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
         }),
       ),
-    ).toEqual(["All programs", "Census", "Population", "CA", "Adult"]);
+    ).toEqual(["Census", "Population", "CA", "Adult"]);
   });
 
   test("distinguishes an empty filtered result from an invalid hierarchy scope", () => {
