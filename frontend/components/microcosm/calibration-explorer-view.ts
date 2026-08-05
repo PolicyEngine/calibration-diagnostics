@@ -1,4 +1,5 @@
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
+import type { CalibrationTreeSizeMode } from "@/lib/microcosm/calibration-tree";
 
 function humanize(value: string): string {
   return value.replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -40,4 +41,10 @@ export function explorerEmptyMessage(state: ExplorerState): string {
   return hasExplorerFilters(state)
     ? "No calibration targets match the active filters at this level."
     : "No calibration targets match this hierarchy selection in the selected release.";
+}
+
+export function explorerSizePhrase(mode: CalibrationTreeSizeMode): string {
+  if (mode === "targets") return "how many targets it covers";
+  if (mode === "loss") return "its share of the calibration loss";
+  return "its Huberized error intensity";
 }

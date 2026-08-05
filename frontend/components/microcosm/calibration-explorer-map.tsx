@@ -5,6 +5,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import {
   explorerBreadcrumbs,
   explorerEmptyMessage,
+  explorerSizePhrase,
   explorerUpLabel,
   hasExplorerFilters,
 } from "@/components/microcosm/calibration-explorer-view";
@@ -452,8 +453,16 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         )}
       </div>
 
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        Click a tile to move deeper through program, measure, and its declared breakdown dimensions. Area reflects the selected size metric; color reflects median absolute relative error. Geography and diagnostic filters narrow the current tree without becoming navigation levels.
+      <p className="text-[12px] leading-relaxed text-muted-foreground">
+        Each tile is a group of calibration targets. Area shows{" "}
+        <span className="font-medium text-foreground">
+          {explorerSizePhrase(sizeMode)}
+        </span>
+        ; color shows the median gap between the weighted data and the official
+        figure. Error intensity is a Huberized per-target relative error: it
+        behaves like RMSE for ordinary misses, then grows linearly for extreme
+        outliers so one pathological target does not dominate the map. Hover for
+        detail, click a tile to pop out its targets.
       </p>
 
       {selectedTarget && (
