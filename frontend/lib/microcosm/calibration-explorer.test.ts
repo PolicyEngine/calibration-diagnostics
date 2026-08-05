@@ -100,6 +100,46 @@ describe("calibration explorer semantic navigation", () => {
     expect(explorerReducer(program, { type: "up" })).toEqual(root);
   });
 
+  test("breadcrumb navigation jumps to an ancestor without clearing filters", () => {
+    const filters = {
+      geographyLevels: ["state"],
+      geographies: ["CA"],
+      fitBands: ["10_20" as const],
+      calibrationStatuses: ["included" as const],
+    };
+    const deep = state({
+      path: {
+        source: "census",
+        program: "population",
+        geography: "CA",
+        dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
+        target: "population/adult/CA",
+      },
+      filters,
+    });
+
+    const geography = explorerReducer(deep, {
+      type: "navigate",
+      path: {
+        source: "census",
+        program: "population",
+        geography: "CA",
+        dimensions: [],
+      },
+    });
+    expect(geography.path).toEqual({
+      source: "census",
+      program: "population",
+      geography: "CA",
+      dimensions: [],
+    });
+    expect(geography.filters).toEqual(filters);
+
+    expect(
+      explorerReducer(deep, { type: "navigate", path: { dimensions: [] } }),
+    ).toEqual(state({ filters }));
+  });
+
   test("requires geography before declared dimensions or targets", () => {
     const program = selectExplorerNode(state(), {
       kind: "program",

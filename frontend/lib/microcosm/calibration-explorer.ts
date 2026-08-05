@@ -44,6 +44,7 @@ export type ExplorerNodeSelection =
 
 export type ExplorerAction =
   | { type: "select"; selection: ExplorerNodeSelection }
+  | { type: "navigate"; path: ExplorerPath }
   | { type: "up" }
   | { type: "filters"; filters: ExplorerFilters }
   | { type: "clear_target" };
@@ -112,6 +113,14 @@ export function explorerReducer(
 ): ExplorerState {
   if (action.type === "select") {
     return selectExplorerNode(state, action.selection);
+  }
+  if (action.type === "navigate") {
+    const path = {
+      ...action.path,
+      dimensions: [...action.path.dimensions],
+    };
+    delete path.target;
+    return { ...state, path };
   }
   if (action.type === "up") return parentExplorerState(state);
   if (action.type === "filters") {

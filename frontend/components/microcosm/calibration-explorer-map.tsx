@@ -344,7 +344,25 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   }));
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+      <div className="flex h-12 items-center gap-3">
+        <div className="min-w-0 flex-1">
+          {upLabel && (
+            <button
+              type="button"
+              title={upLabel}
+              onClick={() => dispatch({ type: "up" })}
+              className="block max-w-full truncate whitespace-nowrap rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+            >
+              ← {upLabel}
+            </button>
+          )}
+        </div>
+        <div className="shrink-0">
+          <FitLegend />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="shrink-0">
           <SizeControl value={sizeMode} onChange={setSizeMode} />
         </div>
@@ -357,34 +375,21 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        {(breadcrumbs.length > 0 || upLabel) && (
-          <div>
-            {breadcrumbs.length > 0 && (
-              <nav aria-label="Calibration map location" className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                {breadcrumbs.map((crumb, index) => (
-                  <span key={`${crumb}:${index}`}>
-                    {index > 0 && <span className="mx-1">/</span>}
-                    <span className={index === breadcrumbs.length - 1 ? "font-medium text-foreground" : ""}>{crumb}</span>
-                  </span>
-                ))}
-              </nav>
-            )}
-            {upLabel && (
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "up" })}
-                className={`${breadcrumbs.length > 0 ? "mt-2 " : ""}rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40`}
-              >
-                ← {upLabel}
-              </button>
-            )}
-          </div>
-        )}
-        <div className="ml-auto">
-          <FitLegend />
-        </div>
-      </div>
+      <nav aria-label="Calibration map location" className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+        {breadcrumbs.map((crumb, index) => (
+          <span key={`${crumb.label}:${index}`}>
+            {index > 0 && <span className="mx-1">/</span>}
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "navigate", path: crumb.path })}
+              aria-current={index === breadcrumbs.length - 1 ? "page" : undefined}
+              className={`${index === breadcrumbs.length - 1 ? "font-medium text-foreground" : "hover:text-foreground hover:underline"}`}
+            >
+              {crumb.label}
+            </button>
+          </span>
+        ))}
+      </nav>
 
       <div ref={containerRef} className="relative w-full" style={{ height }}>
         {laidGroups.length === 0 ? (

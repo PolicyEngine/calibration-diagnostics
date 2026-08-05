@@ -1,4 +1,7 @@
-import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
+import type {
+  ExplorerPath,
+  ExplorerState,
+} from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeSizeMode } from "@/lib/microcosm/calibration-tree";
 
 function humanize(value: string): string {
@@ -15,14 +18,51 @@ export function explorerUpLabel(state: ExplorerState): string | null {
   return null;
 }
 
-export function explorerBreadcrumbs(state: ExplorerState): string[] {
-  const crumbs: string[] = [];
+export interface ExplorerBreadcrumb {
+  label: string;
+  path: ExplorerPath;
+}
+
+export function explorerBreadcrumbs(state: ExplorerState): ExplorerBreadcrumb[] {
+  const crumbs: ExplorerBreadcrumb[] = [
+    { label: "All targets", path: { dimensions: [] } },
+  ];
   if (state.path.source && state.path.program) {
-    crumbs.push(humanize(state.path.source));
-    crumbs.push(humanize(state.path.program));
+    crumbs.push({
+      label: humanize(state.path.source),
+      path: { dimensions: [] },
+    });
+    crumbs.push({
+      label: humanize(state.path.program),
+      path: {
+        source: state.path.source,
+        program: state.path.program,
+        dimensions: [],
+      },
+    });
   }
-  if (state.path.geography) crumbs.push(humanize(state.path.geography));
-  crumbs.push(...state.path.dimensions.map((dimension) => humanize(dimension.value)));
+  if (state.path.source && state.path.program && state.path.geography) {
+    crumbs.push({
+      label: humanize(state.path.geography),
+      path: {
+        source: state.path.source,
+        program: state.path.program,
+        geography: state.path.geography,
+        dimensions: [],
+      },
+    });
+    state.path.dimensions.forEach((dimension, index) => {
+      crumbs.push({
+        label: humanize(dimension.value),
+        path: {
+          source: state.path.source,
+          program: state.path.program,
+          geography: state.path.geography,
+          dimensions: state.path.dimensions.slice(0, index + 1),
+        },
+      });
+    });
+  }
   return crumbs;
 }
 
