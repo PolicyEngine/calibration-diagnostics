@@ -40,7 +40,7 @@ describe("calibration explorer semantic navigation", () => {
     });
   });
 
-  test("up removes dimensions, then measure, then source and program together", () => {
+  test("up removes dimensions, then geography, then source and program together", () => {
     const filters = {
       geographyLevels: ["state"],
       geographies: ["CA"],
@@ -51,7 +51,7 @@ describe("calibration explorer semantic navigation", () => {
       path: {
         source: "census",
         program: "population",
-        measure: "count",
+        geography: "CA",
         dimensions: [
           { key: "bd_age", value: "65_plus" },
           { key: "bd_sex", value: "female" },
@@ -68,10 +68,10 @@ describe("calibration explorer semantic navigation", () => {
 
     const two = parentExplorerState(one);
     expect(two.path.dimensions).toEqual([]);
-    expect(two.path.measure).toBe("count");
+    expect(two.path.geography).toBe("CA");
 
     const three = parentExplorerState(two);
-    expect(three.path.measure).toBeUndefined();
+    expect(three.path.geography).toBeUndefined();
     expect(three.path.program).toBe("population");
 
     const root = parentExplorerState(three);
@@ -85,18 +85,38 @@ describe("calibration explorer semantic navigation", () => {
       type: "select",
       selection: { kind: "program", source: "census", value: "population" },
     });
-    const measure = explorerReducer(program, {
+    const geography = explorerReducer(program, {
       type: "select",
-      selection: { kind: "measure", value: "count" },
+      selection: { kind: "geography", value: "CA" },
     });
 
-    expect(measure.path).toEqual({
+    expect(geography.path).toEqual({
       source: "census",
       program: "population",
-      measure: "count",
+      geography: "CA",
       dimensions: [],
     });
-    expect(explorerReducer(measure, { type: "up" }).path.measure).toBeUndefined();
+    expect(explorerReducer(geography, { type: "up" }).path.geography).toBeUndefined();
     expect(explorerReducer(program, { type: "up" })).toEqual(root);
+  });
+
+  test("requires geography before declared dimensions or targets", () => {
+    const program = selectExplorerNode(state(), {
+      kind: "program",
+      source: "irs_soi",
+      value: "ctc",
+    });
+
+    expect(
+      selectExplorerNode(program, {
+        kind: "dimension_value",
+        key: "bd_income_band",
+        label: "Income band",
+        value: "All",
+      }),
+    ).toEqual(program);
+    expect(
+      selectExplorerNode(program, { kind: "target", value: "ctc/al/count" }),
+    ).toEqual(program);
   });
 });

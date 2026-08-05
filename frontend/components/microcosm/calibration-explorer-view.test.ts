@@ -37,17 +37,17 @@ describe("calibration explorer presentation model", () => {
         state({
           source: "census",
           program: "population",
-          measure: "count",
+          geography: "CA",
           dimensions: [],
         }),
       ),
-    ).toBe("Up to Measure");
+    ).toBe("Up to all geographies");
     expect(
       explorerUpLabel(
         state({
           source: "census",
           program: "population",
-          measure: "count",
+          geography: "CA",
           dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
         }),
       ),
@@ -60,11 +60,11 @@ describe("calibration explorer presentation model", () => {
         state({
           source: "census",
           program: "population",
-          measure: "count",
+          geography: "CA",
           dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
         }),
       ),
-    ).toEqual(["All programs", "Census", "Population", "Count", "Adult"]);
+    ).toEqual(["All programs", "Census", "Population", "CA", "Adult"]);
   });
 
   test("distinguishes an empty filtered result from an invalid hierarchy scope", () => {
