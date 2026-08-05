@@ -19,7 +19,7 @@ export interface ExplorerDimensionSelection {
 export interface ExplorerPath {
   source?: string;
   program?: string;
-  measure?: string;
+  geography?: string;
   dimensions: ExplorerDimensionSelection[];
   target?: string;
 }
@@ -38,7 +38,7 @@ export interface ExplorerState {
 
 export type ExplorerNodeSelection =
   | { kind: "program"; source: string; value: string }
-  | { kind: "measure"; value: string }
+  | { kind: "geography"; value: string }
   | { kind: "dimension_value"; key: string; label: string; value: string }
   | { kind: "target"; value: string };
 
@@ -69,14 +69,14 @@ export function selectExplorerNode(
   if (selection.kind === "program") {
     path.source = selection.source;
     path.program = selection.value;
-    delete path.measure;
+    delete path.geography;
     path.dimensions = [];
-  } else if (selection.kind === "measure") {
+  } else if (selection.kind === "geography") {
     if (!path.source || !path.program) return state;
-    path.measure = selection.value;
+    path.geography = selection.value;
     path.dimensions = [];
   } else if (selection.kind === "dimension_value") {
-    if (!path.measure) return state;
+    if (!path.geography) return state;
     path.dimensions = [
       ...path.dimensions.filter((dimension) => dimension.key !== selection.key),
       {
@@ -86,7 +86,7 @@ export function selectExplorerNode(
       },
     ];
   } else {
-    if (!path.measure) return state;
+    if (!path.geography) return state;
     path.target = selection.value;
   }
   return { ...state, path };
@@ -97,8 +97,8 @@ export function parentExplorerState(state: ExplorerState): ExplorerState {
   delete path.target;
   if (path.dimensions.length) {
     path.dimensions.pop();
-  } else if (path.measure) {
-    delete path.measure;
+  } else if (path.geography) {
+    delete path.geography;
   } else if (path.program || path.source) {
     delete path.program;
     delete path.source;

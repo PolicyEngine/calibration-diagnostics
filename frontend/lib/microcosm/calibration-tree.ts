@@ -24,6 +24,7 @@ export interface CalibrationTreeTarget {
   variable?: string | null;
   variable_key?: string | null;
   measure?: string | null;
+  source_measure_id?: string | null;
   level?: string | null;
   geography?: string | null;
   abs_relative_error?: number | null;
@@ -64,8 +65,9 @@ export interface CalibrationTreeResponse {
   path: ExplorerState["path"];
   currentLevel:
     | { kind: "overview"; label: string }
-    | { kind: "measure"; label: string }
+    | { kind: "geography"; label: string }
     | { kind: "dimension"; key: string; label: string }
+    | { kind: "mixed"; label: string }
     | { kind: "target"; label: string };
   groups: CalibrationTreeGroup[];
   dimensionOrder: Array<{ key: string; label: string }>;
@@ -172,23 +174,104 @@ function programId(row: CalibrationTreeTarget): string {
   return String(row.name ?? row.base_name ?? "unknown");
 }
 
-function rowDimensionValue(row: CalibrationTreeTarget, key: string): string {
-  return row.target_dimensions?.find((dimension) => dimension.key === key)?.value || MISSING_VALUE;
+export const CALIBRATION_BREAKDOWN_DIMENSIONS = [
+  { key: "bd_age", label: "Age" },
+  { key: "bd_income_band", label: "Income band" },
+  { key: "bd_income_percentile_range", label: "Income Percentile Range" },
+  { key: "bd_filing_status", label: "Filing status" },
+  { key: "bd_qualifying_children", label: "Qualifying children" },
+  {
+    key: "bd_earned_income_credit_qualifying_children",
+    label: "Earned Income Credit Qualifying Children",
+  },
+  { key: "bd_program", label: "Program" },
+  { key: "bd_program_payment_type", label: "Program Payment Type" },
+  { key: "bd_income_source", label: "Income Source" },
+  { key: "bd_tax_expenditure", label: "Tax Expenditure" },
+  { key: "bd_ssi_category", label: "SSI Category" },
+  { key: "bd_source_measure_detail", label: "Source measure detail" },
+  { key: "bd_item", label: "Item" },
+  { key: "bd_spending_category", label: "Spending category" },
+  { key: "bd_filing_season_line", label: "Filing Season Line" },
+  { key: "bd_form_w2_item", label: "Form W2 Item" },
+  { key: "bd_summary_scope", label: "Summary Scope" },
+  { key: "bd_administering_entity", label: "Administering Entity" },
+  { key: "bd_amount_basis", label: "Amount Basis" },
+  { key: "bd_financing_component", label: "Financing Component" },
+  { key: "bd_part", label: "Part" },
+  { key: "bd_series_code", label: "Series Code" },
+  { key: "bd_z1_series_code", label: "Z1 Series Code" },
+  { key: "bd_state_table_measure", label: "State Table Measure" },
+] as const;
+
+type BreakdownDimension = (typeof CALIBRATION_BREAKDOWN_DIMENSIONS)[number];
+
+function rowDimensionValue(
+  row: CalibrationTreeTarget,
+  key: string,
+): string | null {
+  const values = [
+    ...new Set(
+      (row.target_dimensions ?? [])
+        .filter((dimension) => dimension.key === key)
+        .map((dimension) => String(dimension.value ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  return values.length === 1 ? values[0] : null;
 }
 
 export function orderedBreakdownDimensions(
   rows: CalibrationTreeTarget[],
 ): Array<{ key: string; label: string }> {
-  const dimensions: Array<{ key: string; label: string }> = [];
-  const seen = new Set<string>();
-  for (const row of rows) {
-    for (const dimension of row.target_dimensions ?? []) {
-      if (seen.has(dimension.key)) continue;
-      seen.add(dimension.key);
-      dimensions.push({ key: dimension.key, label: dimension.label });
-    }
+  const presentKeys = new Set(
+    rows.flatMap((row) => (row.target_dimensions ?? []).map((dimension) => dimension.key)),
+  );
+  return CALIBRATION_BREAKDOWN_DIMENSIONS.filter((dimension) =>
+    presentKeys.has(dimension.key),
+  );
+}
+
+function geographyId(row: CalibrationTreeTarget): string {
+  return String(row.geography ?? "").trim() || MISSING_VALUE;
+}
+
+function targetLabel(row: CalibrationTreeTarget): string {
+  const sourceMeasureId = String(row.source_measure_id ?? "").trim();
+  if (sourceMeasureId) return humanize(sourceMeasureId);
+  const id = String(row.name ?? row.base_name ?? "Target");
+  const leaf = id.replace(/@[^@]+$/, "").split(/[./]/).filter(Boolean).at(-1);
+  return humanize(leaf ?? id);
+}
+
+interface DimensionPartition {
+  dimension: BreakdownDimension;
+  rows: CalibrationTreeTarget[];
+}
+
+function partitionRowsByDimension(
+  rows: CalibrationTreeTarget[],
+  selectedKeys: Set<string>,
+): { dimensions: DimensionPartition[]; targets: CalibrationTreeTarget[] } {
+  const remaining = new Set(rows);
+  const dimensions: DimensionPartition[] = [];
+
+  for (const dimension of CALIBRATION_BREAKDOWN_DIMENSIONS) {
+    if (selectedKeys.has(dimension.key)) continue;
+    const assigned = [...remaining].filter(
+      (row) => rowDimensionValue(row, dimension.key) != null,
+    );
+    const values = new Set(
+      assigned
+        .map((row) => rowDimensionValue(row, dimension.key))
+        .filter((value): value is string => value != null),
+    );
+    if (values.size <= 1) continue;
+    dimensions.push({ dimension, rows: assigned });
+    for (const row of assigned) remaining.delete(row);
   }
-  return dimensions;
+
+  return { dimensions, targets: [...remaining] };
 }
 
 function groupRows(
@@ -289,63 +372,15 @@ export function buildCalibrationTree(
     (row) => String(row.source ?? "other") === path.source && programId(row) === path.program,
   );
   const filteredProgramRows = applyExplorerFilters(programRows, state.filters);
-  if (!path.measure) {
-    const byMeasure = groupRows(
-      filteredProgramRows,
-      (row) => String(row.measure ?? "").trim() || MISSING_VALUE,
-    );
-    const nodes = [...byMeasure.entries()]
-      .map(([measure, rows]) =>
-        node(
-          measure,
-          measure === MISSING_VALUE ? "Not specified" : humanize(measure === "total" ? "amount" : measure),
-          "measure",
-          { kind: "measure", value: measure },
-          rows,
-        ),
-      )
-      .sort((left, right) => {
-        const rank = (value: string) => (value === "count" ? 0 : value === "total" ? 1 : 2);
-        return rank(left.id) - rank(right.id) || left.label.localeCompare(right.label);
-      });
-    return {
-      releaseId,
-      path,
-      currentLevel: { kind: "measure", label: "Measure" },
-      groups: [{ id: path.program, label: path.program, nodes, metrics: calibrationTreeMetrics(filteredProgramRows) }],
-      dimensionOrder: [],
-      filterOptions: options,
-      filteredMetrics: calibrationTreeMetrics(filteredProgramRows),
-    };
-  }
-
-  const measureRows = programRows.filter(
-    (row) => (String(row.measure ?? "").trim() || MISSING_VALUE) === path.measure,
-  );
-  const dimensionOrder = orderedBreakdownDimensions(measureRows);
-  let scopedRows = measureRows;
-  for (const selection of path.dimensions) {
-    scopedRows = scopedRows.filter(
-      (row) => rowDimensionValue(row, selection.key) === selection.value,
-    );
-  }
-  scopedRows = applyExplorerFilters(scopedRows, state.filters);
-
-  const nextDimension = dimensionOrder[path.dimensions.length];
-  if (nextDimension) {
-    const byValue = groupRows(scopedRows, (row) => rowDimensionValue(row, nextDimension.key));
+  if (!path.geography) {
+    const byGeography = groupRows(filteredProgramRows, geographyId);
     const nodes = sortNodes(
-      [...byValue.entries()].map(([value, rows]) =>
+      [...byGeography.entries()].map(([geography, rows]) =>
         node(
-          value,
-          value === MISSING_VALUE ? "Not specified" : value,
-          "dimension_value",
-          {
-            kind: "dimension_value",
-            key: nextDimension.key,
-            label: nextDimension.label,
-            value,
-          },
+          geography,
+          geography === MISSING_VALUE ? "Not specified" : geography,
+          "geography",
+          { kind: "geography", value: geography },
           rows,
         ),
       ),
@@ -353,35 +388,105 @@ export function buildCalibrationTree(
     return {
       releaseId,
       path,
-      currentLevel: { kind: "dimension", ...nextDimension },
-      groups: [{ id: nextDimension.key, label: nextDimension.label, nodes, metrics: calibrationTreeMetrics(scopedRows) }],
-      dimensionOrder,
+      currentLevel: { kind: "geography", label: "Geography" },
+      groups: [{ id: path.program, label: path.program, nodes, metrics: calibrationTreeMetrics(filteredProgramRows) }],
+      dimensionOrder: [],
       filterOptions: options,
-      filteredMetrics: calibrationTreeMetrics(scopedRows),
+      filteredMetrics: calibrationTreeMetrics(filteredProgramRows),
     };
   }
 
-  const nodes = scopedRows
+  const geographyRows = programRows.filter((row) => geographyId(row) === path.geography);
+  const dimensionOrder = orderedBreakdownDimensions(geographyRows);
+  let scopedRows = geographyRows;
+  const selectedKeys = new Set<string>();
+  for (const selection of path.dimensions) {
+    const selectedPartition = partitionRowsByDimension(scopedRows, selectedKeys).dimensions.find(
+      ({ dimension }) => dimension.key === selection.key,
+    );
+    if (!selectedPartition) {
+      scopedRows = [];
+      break;
+    }
+    scopedRows = selectedPartition.rows.filter(
+      (row) => rowDimensionValue(row, selection.key) === selection.value,
+    );
+    selectedKeys.add(selection.key);
+  }
+  const filteredScopedRows = applyExplorerFilters(scopedRows, state.filters);
+  const visibleRows = new Set(filteredScopedRows);
+  const partition = partitionRowsByDimension(scopedRows, selectedKeys);
+
+  const groups: CalibrationTreeGroup[] = partition.dimensions.flatMap(
+    ({ dimension, rows: dimensionRows }) => {
+      const visibleDimensionRows = dimensionRows.filter((row) => visibleRows.has(row));
+      if (!visibleDimensionRows.length) return [];
+      const byValue = groupRows(
+        visibleDimensionRows,
+        (row) => rowDimensionValue(row, dimension.key) ?? "",
+      );
+      const nodes = sortNodes(
+        [...byValue.entries()].map(([value, rows]) =>
+          node(
+            value,
+            value,
+            "dimension_value",
+            {
+              kind: "dimension_value",
+              key: dimension.key,
+              label: dimension.label,
+              value,
+            },
+            rows,
+          ),
+        ),
+      );
+      return [{
+        id: dimension.key,
+        label: dimension.label,
+        nodes,
+        metrics: calibrationTreeMetrics(visibleDimensionRows),
+      }];
+    },
+  );
+
+  const visibleTargets = partition.targets.filter((row) => visibleRows.has(row));
+  const targetNodes = visibleTargets
     .map((row, index) => {
       const id = String(row.name ?? row.base_name ?? `target-${index}`);
       return node(
         id,
-        String(row.breakdown ?? row.name ?? row.base_name ?? `Target ${index + 1}`),
+        targetLabel(row),
         "target",
         { kind: "target", value: id },
         [row],
         row,
       );
     })
-    .sort((left, right) => left.label.localeCompare(right.label));
+    .sort((left, right) => left.label.localeCompare(right.label) || left.id.localeCompare(right.id));
+  if (targetNodes.length) {
+    groups.push({
+      id: "targets",
+      label: "Targets",
+      nodes: targetNodes,
+      metrics: calibrationTreeMetrics(visibleTargets),
+    });
+  }
+
+  const currentLevel =
+    partition.dimensions.length === 1 && partition.targets.length === 0
+      ? { kind: "dimension" as const, ...partition.dimensions[0].dimension }
+      : partition.dimensions.length === 0
+        ? { kind: "target" as const, label: "Targets" }
+        : { kind: "mixed" as const, label: "Breakdowns and targets" };
   return {
     releaseId,
     path,
-    currentLevel: { kind: "target", label: "Targets" },
-    groups: [{ id: "targets", label: "Targets", nodes, metrics: calibrationTreeMetrics(scopedRows) }],
+    currentLevel,
+    groups,
     dimensionOrder,
     filterOptions: options,
-    filteredMetrics: calibrationTreeMetrics(scopedRows),
+    filteredMetrics: calibrationTreeMetrics(filteredScopedRows),
   };
 }
 

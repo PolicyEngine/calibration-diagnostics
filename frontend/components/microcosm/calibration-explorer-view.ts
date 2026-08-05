@@ -10,7 +10,7 @@ export function explorerUpLabel(state: ExplorerState): string | null {
   if (dimensions.length) {
     return `Up to ${dimensions.at(-1)?.label ?? humanize(dimensions.at(-1)?.key ?? "breakdown")}`;
   }
-  if (state.path.measure) return "Up to Measure";
+  if (state.path.geography) return "Up to all geographies";
   if (state.path.program || state.path.source) return "Up to all programs";
   return null;
 }
@@ -21,9 +21,7 @@ export function explorerBreadcrumbs(state: ExplorerState): string[] {
     crumbs.push(humanize(state.path.source));
     crumbs.push(humanize(state.path.program));
   }
-  if (state.path.measure) {
-    crumbs.push(humanize(state.path.measure === "total" ? "amount" : state.path.measure));
-  }
+  if (state.path.geography) crumbs.push(humanize(state.path.geography));
   crumbs.push(...state.path.dimensions.map((dimension) => humanize(dimension.value)));
   return crumbs;
 }

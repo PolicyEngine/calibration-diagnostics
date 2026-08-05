@@ -34,9 +34,9 @@ function requestState(params: URLSearchParams) {
   if (source && program) {
     state.path.source = source;
     state.path.program = program;
-    const measure = params.get("measure")?.trim();
-    if (measure) {
-      state.path.measure = measure;
+    const geography = params.get("path_geography")?.trim();
+    if (geography) {
+      state.path.geography = geography;
       for (const [key, value] of params.entries()) {
         if (key.startsWith("dim.") && value.trim()) {
           state.path.dimensions.push({ key: key.slice(4), value: value.trim() });

@@ -718,8 +718,8 @@ function explorerApiParams(
   if (state.path.source && state.path.program) {
     result.source = state.path.source;
     result.program = state.path.program;
-    if (state.path.measure) {
-      result.measure = state.path.measure;
+    if (state.path.geography) {
+      result.path_geography = state.path.geography;
       for (const dimension of state.path.dimensions) {
         result[`dim.${dimension.key}`] = dimension.value;
       }
