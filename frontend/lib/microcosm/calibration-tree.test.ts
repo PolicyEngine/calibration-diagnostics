@@ -210,13 +210,19 @@ describe("source, geography, and declared-dimension hierarchy", () => {
         source: "test",
         variable: "sparse",
         geography: "United States",
-        target_dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
+        target_dimensions: [
+          { key: "bd_age", label: "Age", value: "Adult" },
+          { key: "bd_program", label: "Program", value: "A" },
+        ],
       }),
       target("sparse/age/senior", {
         source: "test",
         variable: "sparse",
         geography: "United States",
-        target_dimensions: [{ key: "bd_age", label: "Age", value: "Senior" }],
+        target_dimensions: [
+          { key: "bd_age", label: "Age", value: "Senior" },
+          { key: "bd_program", label: "Program", value: "B" },
+        ],
       }),
       target("sparse/program/a", {
         source: "test",
@@ -262,6 +268,19 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     expect(tree.groups.find((group) => group.id === "targets")?.nodes.map((node) => node.id)).toEqual([
       "sparse/ambiguous-income",
       "sparse/no-dimensions",
+    ]);
+
+    const programA = buildCalibrationTree(
+      sparseRows,
+      state({
+        source: "test",
+        program: "sparse",
+        geography: "United States",
+        dimensions: [{ key: "bd_program", label: "Program", value: "A" }],
+      }),
+    );
+    expect(programA.groups.flatMap((group) => group.nodes).map((node) => node.id)).toEqual([
+      "sparse/program/a",
     ]);
   });
 });
