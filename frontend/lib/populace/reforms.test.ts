@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { buildReformHistory, buildReformValidation } from "./reforms";
-import { REFORM_OVERRIDES } from "./reform-overrides";
+import { buildReformValidation } from "./reforms";
 
 test("benchmark defaults to the full-year FY2027 figure; FY2026 kept for reference", () => {
   const built = buildReformValidation(
@@ -84,20 +83,6 @@ test("in-sample rows (no FY2027) fall back to their annual benchmark", () => {
   expect(built.rows[0].jct_score).toBe(21700000000);
 });
 
-test("committed reform overrides carry simulated out-of-sample estimates", () => {
-  const entries = Object.entries(REFORM_OVERRIDES);
-  expect(entries.length).toBeGreaterThan(0);
-  for (const [releaseId, payload] of entries) {
-    const built = buildReformValidation(payload as Record<string, unknown>, releaseId, null);
-    expect(built.available).toBe(true);
-    if (!built.available) continue;
-    const outOfSample = built.rows.filter((r) => !r.in_sample);
-    expect(outOfSample.length).toBeGreaterThan(0);
-    // The whole point of the backfill: every out-of-sample row is now scored.
-    expect(outOfSample.every((r) => r.populace_estimate !== null)).toBe(true);
-  }
-});
-
 function raw(reforms: object[], releaseId = "rel-a") {
   return { schema_version: 1, release_id: releaseId, scoring_window: "FY2025-2034", reforms };
 }
@@ -152,28 +137,6 @@ test("summary isolates the out-of-sample reforms from in-sample targets", () => 
   expect(v.summary.out_of_sample_within_10pct).toBe(2);
   // out-of-sample mean excludes the 100% in-sample miss.
   expect(v.summary.out_of_sample_mean_abs_relative_error).toBeCloseTo((0.1 + 0.05) / 2, 6);
-});
-
-test("run-over-run series is chronological with an improvement delta", () => {
-  const older = {
-    release_id: "r1",
-    date: "20260101",
-    validation: buildReformValidation(
-      raw([{ ...obbba, populace: { budget_effect: -3000 } }], "r1"),
-      "r1",
-    ), // |error| = 1000/4000 = 0.25
-  };
-  const newer = {
-    release_id: "r2",
-    date: "20260201",
-    validation: buildReformValidation(raw([obbba], "r2"), "r2"), // |error| = 0.10
-  };
-  const hist = buildReformHistory([newer, older]); // intentionally out of order
-  const series = hist.reforms.find((r) => r.id === "obbba")!;
-  expect(series.points.map((p) => p.release_id)).toEqual(["r1", "r2"]); // sorted oldest→newest
-  expect(series.latest_abs_relative_error).toBeCloseTo(0.1, 6);
-  expect(series.delta).toBeCloseTo(0.1 - 0.25, 6); // negative = improved
-  expect(hist.releases.map((r) => r.release_id)).toEqual(["r1", "r2"]);
 });
 
 test("zero JCT score leaves the row unscored, not a dollar delta as a ratio", () => {

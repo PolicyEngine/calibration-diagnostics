@@ -551,48 +551,6 @@ export interface ReformValidationResponse {
   source_artifact?: { name: string; path: string; url: string };
 }
 
-export interface ReformHistoryPoint {
-  release_id: string;
-  date: string;
-  populace_estimate: number | null;
-  relative_error: number | null;
-  abs_relative_error: number | null;
-}
-
-export interface ReformHistorySeries {
-  id: string;
-  name: string;
-  category?: string | null;
-  in_sample?: boolean;
-  jct_score?: number | null;
-  jct_source?: string | null;
-  points: ReformHistoryPoint[];
-  latest_abs_relative_error: number | null;
-  delta: number | null;
-}
-
-export interface ReformHistoryResponse {
-  releases: { release_id: string; date: string }[];
-  reforms: ReformHistorySeries[];
-}
-
-export function usePopulaceReforms(release?: string) {
-  return useQuery({
-    queryKey: ["populace", "reforms", release ?? "latest"],
-    queryFn: () =>
-      apiGet<ReformValidationResponse>("/populace/reforms", release ? { release } : undefined),
-    staleTime: 15 * 60 * 1000,
-  });
-}
-
-export function usePopulaceReformHistory() {
-  return useQuery({
-    queryKey: ["populace", "reforms", "history"],
-    queryFn: () => apiGet<ReformHistoryResponse>("/populace/reforms/history"),
-    staleTime: 15 * 60 * 1000,
-  });
-}
-
 export function usePopulaceCompare(a?: string, b?: string, enabled = true) {
   const { country } = useCountry();
   return useQuery({

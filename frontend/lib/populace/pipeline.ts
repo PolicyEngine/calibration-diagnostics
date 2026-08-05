@@ -288,7 +288,7 @@ export const PIPELINE_PHASES: PipelinePhase[] = [
         title: "Staging telemetry",
         code: "populace.build.staging.StagingTelemetry → policyengine/populace-us-staging",
         description:
-          "Progress, events, the calibration loss curve, and every artifact above upload live (best-effort, never fails a build). Candidates are reviewable on this dashboard — the Staging runs page, and as 'candidate' entries in Target diagnostics and Reform validation — before publishing.",
+          "Progress, events, the calibration loss curve, and every artifact above upload live (best-effort, never fails a build). Candidates are reviewable on this dashboard — the Staging runs page (including the candidate's reform-validation rows) and as 'candidate' entries in Target diagnostics — before publishing.",
       },
     ],
   },
