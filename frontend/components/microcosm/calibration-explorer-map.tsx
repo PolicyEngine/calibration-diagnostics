@@ -12,7 +12,6 @@ import {
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { fmt, humanizeName } from "@/components/shared/format";
-import { withBasePath } from "@/lib/base-path";
 import {
   useMicrocosmCalibrationTree,
   type MicrocosmTargetDimension,
@@ -238,7 +237,7 @@ function FilterBar({
   ];
 
   return (
-    <div className="rounded-lg border border-border/80 bg-muted/15 p-3">
+    <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Filters</span>
         <MultiSelectFilter
@@ -278,7 +277,7 @@ function FilterBar({
         )}
       </div>
       {active.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
+        <div className="flex flex-wrap gap-1.5">
           {active.map((item) => (
             <button
               type="button"
@@ -343,48 +342,41 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
     ...dimension,
     values: [],
   }));
-  const targetsHref = withBasePath("/microcosm/targets");
-
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <nav aria-label="Calibration map location" className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-            {breadcrumbs.map((crumb, index) => (
-              <span key={`${crumb}:${index}`}>
-                {index > 0 && <span className="mx-1">/</span>}
-                <span className={index === breadcrumbs.length - 1 ? "font-medium text-foreground" : ""}>{crumb}</span>
-              </span>
-            ))}
-          </nav>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {upLabel && (
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "up" })}
-                className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
-              >
-                ← {upLabel}
-              </button>
-            )}
-            <span className="text-sm font-semibold text-foreground">Explore by {data.currentLevel.label}</span>
-            <span className="text-xs text-muted-foreground">{fmt(data.filteredMetrics.nTargets, { digits: 0 })} targets</span>
-          </div>
+      <div>
+        <nav aria-label="Calibration map location" className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+          {breadcrumbs.map((crumb, index) => (
+            <span key={`${crumb}:${index}`}>
+              {index > 0 && <span className="mx-1">/</span>}
+              <span className={index === breadcrumbs.length - 1 ? "font-medium text-foreground" : ""}>{crumb}</span>
+            </span>
+          ))}
+        </nav>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {upLabel && (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "up" })}
+              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+            >
+              ← {upLabel}
+            </button>
+          )}
+          <span className="text-xs text-muted-foreground">{fmt(data.filteredMetrics.nTargets, { digits: 0 })} targets</span>
         </div>
-        <a href={targetsHref} className="text-sm font-medium text-primary hover:underline">
-          View in Calibration targets →
-        </a>
       </div>
 
-      <FilterBar
-        data={data}
-        state={state}
-        onFilters={(filters) => dispatch({ type: "filters", filters })}
-      />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SizeControl value={sizeMode} onChange={setSizeMode} />
-        <FitLegend />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SizeControl value={sizeMode} onChange={setSizeMode} />
+          <FitLegend />
+        </div>
+        <FilterBar
+          data={data}
+          state={state}
+          onFilters={(filters) => dispatch({ type: "filters", filters })}
+        />
       </div>
 
       <div ref={containerRef} className="relative w-full" style={{ height }}>
