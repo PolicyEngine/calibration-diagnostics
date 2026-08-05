@@ -155,24 +155,6 @@ test("program filter includes both count and amount targets", () => {
   expect(countOnly.filters?.measure).toBe("count");
 });
 
-test("semantic program and repeated explorer filters drive target diagnostics", () => {
-  const semanticProgram = latestMicrocosmTargetDiagnosticsPage(
-    "http://x/api/microcosm/target-diagnostics?source=irs&program=adjusted%20gross%20income&measure=total",
-    SAMPLE,
-  );
-  expect(semanticProgram.filtered_total).toBe(3);
-
-  const filtered = page(
-    "?geography=United%20States&geography=CA" +
-      "&fit_band=0_5&fit_band=20_40&status=included",
-  );
-  expect(filtered.filtered_total).toBe(2);
-  expect(filtered.targets.map((row) => row.geography).sort()).toEqual([
-    "CA",
-    "United States",
-  ]);
-});
-
 test("missing geography filter isolates targets without parsed geography", () => {
   const cal = calibration([
     {

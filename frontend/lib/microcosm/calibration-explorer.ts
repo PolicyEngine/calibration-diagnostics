@@ -42,18 +42,13 @@ export type ExplorerNodeSelection =
   | { kind: "dimension_value"; key: string; label: string; value: string }
   | { kind: "target"; value: string };
 
-const CALIBRATION_STATUSES = new Set<CalibrationStatus>([
-  "included",
-  "skipped",
-  "not_materialized",
-]);
-const FIT_BAND_SET = new Set<FitBand>(FIT_BANDS);
+export type ExplorerAction =
+  | { type: "select"; selection: ExplorerNodeSelection }
+  | { type: "up" }
+  | { type: "filters"; filters: ExplorerFilters }
+  | { type: "clear_target" };
 
-function unique(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))];
-}
-
-function emptyState(): ExplorerState {
+export function createExplorerState(): ExplorerState {
   return {
     path: { dimensions: [] },
     filters: {
@@ -63,82 +58,6 @@ function emptyState(): ExplorerState {
       calibrationStatuses: [],
     },
   };
-}
-
-export function parseExplorerSearch(params: URLSearchParams): ExplorerState {
-  const next = emptyState();
-  const source = params.get("source")?.trim();
-  const program = params.get("program")?.trim();
-
-  // The overview presents source and program in one visual level, so neither
-  // can form a valid path without the other.
-  if (source && program) {
-    next.path.source = source;
-    next.path.program = program;
-    const measure = params.get("measure")?.trim();
-    if (measure) {
-      next.path.measure = measure;
-      for (const [key, value] of params.entries()) {
-        if (!key.startsWith("dim.") || !value.trim()) continue;
-        next.path.dimensions.push({ key: key.slice(4), value: value.trim() });
-      }
-      const target = params.get("target")?.trim();
-      if (target) next.path.target = target;
-    }
-  }
-
-  next.filters.geographyLevels = unique(params.getAll("geography_level"));
-  next.filters.geographies = unique(params.getAll("geography"));
-  next.filters.fitBands = unique(params.getAll("fit_band")).filter(
-    (value): value is FitBand => FIT_BAND_SET.has(value as FitBand),
-  );
-  next.filters.calibrationStatuses = unique(params.getAll("status")).filter(
-    (value): value is CalibrationStatus =>
-      CALIBRATION_STATUSES.has(value as CalibrationStatus),
-  );
-  return next;
-}
-
-export function serializeExplorerSearch(
-  state: ExplorerState,
-  existing: URLSearchParams = new URLSearchParams(),
-): URLSearchParams {
-  const next = new URLSearchParams(existing);
-  for (const key of [...next.keys()]) {
-    if (
-      key === "source" ||
-      key === "program" ||
-      key === "measure" ||
-      key === "target" ||
-      key === "geography_level" ||
-      key === "geography" ||
-      key === "fit_band" ||
-      key === "status" ||
-      key === "drill" ||
-      key.startsWith("dim.")
-    ) {
-      next.delete(key);
-    }
-  }
-
-  if (state.path.source && state.path.program) {
-    next.set("source", state.path.source);
-    next.set("program", state.path.program);
-    if (state.path.measure) {
-      next.set("measure", state.path.measure);
-      for (const dimension of state.path.dimensions) {
-        next.set(`dim.${dimension.key}`, dimension.value);
-      }
-      if (state.path.target) next.set("target", state.path.target);
-    }
-  }
-  for (const value of state.filters.geographyLevels) {
-    next.append("geography_level", value);
-  }
-  for (const value of state.filters.geographies) next.append("geography", value);
-  for (const value of state.filters.fitBands) next.append("fit_band", value);
-  for (const value of state.filters.calibrationStatuses) next.append("status", value);
-  return next;
 }
 
 export function selectExplorerNode(
@@ -185,4 +104,25 @@ export function parentExplorerState(state: ExplorerState): ExplorerState {
     delete path.source;
   }
   return { ...state, path };
+}
+
+export function explorerReducer(
+  state: ExplorerState,
+  action: ExplorerAction,
+): ExplorerState {
+  if (action.type === "select") {
+    return selectExplorerNode(state, action.selection);
+  }
+  if (action.type === "up") return parentExplorerState(state);
+  if (action.type === "filters") {
+    return {
+      ...state,
+      filters: action.filters,
+      path: { ...state.path, dimensions: [...state.path.dimensions], target: undefined },
+    };
+  }
+  return {
+    ...state,
+    path: { ...state.path, dimensions: [...state.path.dimensions], target: undefined },
+  };
 }

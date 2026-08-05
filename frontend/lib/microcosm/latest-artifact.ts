@@ -1,5 +1,3 @@
-import { fitBandForTarget, MISSING_VALUE } from "./calibration-tree";
-
 // Pure-HF data layer for the microcosm-US dashboard. No committed snapshot:
 // every release's manifests and per-target calibration diagnostics are read
 // live from the policyengine/populace-us Hugging Face dataset, resolved through
@@ -2267,21 +2265,7 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
   const measure = stringParam(url.searchParams.get("measure"));
   const source = stringParam(url.searchParams.get("source"));
   const level = stringParam(url.searchParams.get("level"));
-  const geographyLevels = [
-    ...new Set([
-      ...url.searchParams.getAll("geography_level").map((value) => value.trim()).filter(Boolean),
-      ...(level ? [level] : []),
-    ]),
-  ];
-  const geographies = [
-    ...new Set(url.searchParams.getAll("geography").map((value) => value.trim()).filter(Boolean)),
-  ];
-  const fitBands = [
-    ...new Set(url.searchParams.getAll("fit_band").map((value) => value.trim()).filter(Boolean)),
-  ];
-  const calibrationStatuses = [
-    ...new Set(url.searchParams.getAll("status").map((value) => value.trim()).filter(Boolean)),
-  ];
+  const geography = stringParam(url.searchParams.get("geography"));
   const missingGeography = booleanParam(url.searchParams.get("missing_geography"));
   const state = stringParam(url.searchParams.get("state"));
   const direction = stringParam(url.searchParams.get("direction"));
@@ -2305,43 +2289,18 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
   let filtered = scopedRows;
   if (family) filtered = filtered.filter((row) => row.family === family);
   if (variable) filtered = filtered.filter((row) => row.variable_key === variable);
-  if (program) {
-    filtered = filtered.filter(
-      (row) =>
-        targetProgramKey(row) === program ||
-        Boolean(source && String(row.variable ?? "") === program),
-    );
-  }
+  if (program) filtered = filtered.filter((row) => targetProgramKey(row) === program);
   if (measure) filtered = filtered.filter((row) => row.measure === measure);
   if (source) filtered = filtered.filter((row) => row.source === source);
-  if (geographyLevels.length) {
-    filtered = filtered.filter((row) =>
-      geographyLevels.includes(String(row.level ?? "").trim() || MISSING_VALUE),
-    );
-  }
-  if (geographies.length) {
-    filtered = filtered.filter((row) =>
-      geographies.includes(String(row.geography ?? "").trim() || MISSING_VALUE),
-    );
-  }
+  if (level) filtered = filtered.filter((row) => row.level === level);
+  if (geography) filtered = filtered.filter((row) => row.geography === geography);
   if (missingGeography === true) {
     filtered = filtered.filter((row) => !String(row.geography ?? "").trim());
   }
   if (state) filtered = filtered.filter((row) => row.state === state);
   const dimensions = variable ? computeDimensions(filtered) : [];
   for (const [key, value] of facetFilters) {
-    filtered = filtered.filter((row) => {
-      const facetValue = rowFacetValue(row, key);
-      return value === MISSING_VALUE ? !facetValue : facetValue === value;
-    });
-  }
-  if (fitBands.length) {
-    filtered = filtered.filter((row) => fitBands.includes(fitBandForTarget(row)));
-  }
-  if (calibrationStatuses.length) {
-    filtered = filtered.filter((row) =>
-      calibrationStatuses.includes(String(row.calibration_status ?? "")),
-    );
+    filtered = filtered.filter((row) => rowFacetValue(row, key) === value);
   }
   if (direction) filtered = filtered.filter((row) => row.direction === direction);
   // The artifact does not populate row.within_tolerance, so derive the "within
@@ -2403,24 +2362,7 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
     has_next: offset + limit < filtered.length,
     display_limit: limit,
     targets: filtered.slice(offset, offset + limit).map(targetResponseRow),
-    filters: {
-      scope,
-      family,
-      variable,
-      program,
-      measure,
-      source,
-      geography_level: geographyLevels,
-      geography: geographies,
-      fit_band: fitBands,
-      status: calibrationStatuses,
-      state,
-      direction,
-      within_tolerance: within,
-      search,
-      sort_by: sortBy,
-      sort_dir: sortDir,
-    },
+    filters: { scope, family, variable, program, measure, source, level, geography, state, direction, within_tolerance: within, search, sort_by: sortBy, sort_dir: sortDir },
   };
 }
 

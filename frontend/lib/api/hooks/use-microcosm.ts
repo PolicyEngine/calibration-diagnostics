@@ -2,10 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { releaseLabel } from "@/components/shared/format";
 import { useCountry } from "@/components/layout/country-context";
 import { withBasePath } from "@/lib/base-path";
-import {
-  serializeExplorerSearch,
-  type ExplorerState,
-} from "@/lib/microcosm/calibration-explorer";
+import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
 import { apiGet } from "../client";
 
@@ -712,11 +709,22 @@ export function useMicrocosmTargetTreemap(release?: string, breakdown?: "program
 function explorerApiParams(
   state: ExplorerState,
 ): Record<string, string | string[]> {
-  const params = serializeExplorerSearch(state);
-  const result: Record<string, string | string[]> = {};
-  for (const key of new Set(params.keys())) {
-    const values = params.getAll(key);
-    result[key] = values.length === 1 ? values[0] : values;
+  const result: Record<string, string | string[]> = {
+    geography_level: state.filters.geographyLevels,
+    geography: state.filters.geographies,
+    fit_band: state.filters.fitBands,
+    status: state.filters.calibrationStatuses,
+  };
+  if (state.path.source && state.path.program) {
+    result.source = state.path.source;
+    result.program = state.path.program;
+    if (state.path.measure) {
+      result.measure = state.path.measure;
+      for (const dimension of state.path.dimensions) {
+        result[`dim.${dimension.key}`] = dimension.value;
+      }
+      if (state.path.target) result.target = state.path.target;
+    }
   }
   return result;
 }
@@ -726,9 +734,8 @@ export function useMicrocosmCalibrationTree(
   release?: string,
 ) {
   const { country } = useCountry();
-  const search = serializeExplorerSearch(state).toString();
   return useQuery({
-    queryKey: ["microcosm", "target-tree", country, release ?? "latest", search],
+    queryKey: ["microcosm", "target-tree", country, release ?? "latest", state],
     queryFn: () =>
       apiGet<CalibrationTreeResponse>("/microcosm/target-tree", {
         ...explorerApiParams(state),
@@ -751,12 +758,9 @@ export function useMicrocosmTargetDiagnostics(params: {
   program?: string;
   source?: string;
   level?: string;
-  geography_level?: string[];
-  geography?: string | string[];
+  geography?: string;
   missing_geography?: string;
   state?: string;
-  fit_band?: string[];
-  status?: string[];
   direction?: string;
   within_tolerance?: string;
   search?: string;

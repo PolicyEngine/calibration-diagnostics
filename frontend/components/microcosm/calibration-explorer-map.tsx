@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useReducer, useRef, useState } from "react";
 
 import {
   explorerBreadcrumbs,
@@ -19,10 +18,8 @@ import {
   type MicrocosmTargetRow,
 } from "@/lib/api/hooks/use-microcosm";
 import {
-  parentExplorerState,
-  parseExplorerSearch,
-  selectExplorerNode,
-  serializeExplorerSearch,
+  createExplorerState,
+  explorerReducer,
   type ExplorerFilters,
   type ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
@@ -304,12 +301,10 @@ function FilterBar({
 }
 
 export function CalibrationExplorerMap({ release }: { release?: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const state = useMemo(
-    () => parseExplorerSearch(new URLSearchParams(searchParams.toString())),
-    [searchParams],
+  const [state, dispatch] = useReducer(
+    explorerReducer,
+    undefined,
+    createExplorerState,
   );
   const { data, isLoading, error } = useMicrocosmCalibrationTree(state, release);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -326,13 +321,6 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-
-  function navigate(next: ExplorerState, replace = false) {
-    const params = serializeExplorerSearch(next, new URLSearchParams(searchParams.toString()));
-    const href = params.size ? `${pathname}?${params}` : pathname;
-    if (replace) router.replace(href, { scroll: false });
-    else router.push(href, { scroll: false });
-  }
 
   if (isLoading && !data) return <LoadingBlock label="Building calibration map…" />;
   if (error || !data) {
@@ -354,9 +342,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
     ...dimension,
     values: [],
   }));
-  const targetParams = serializeExplorerSearch(state);
-  if (release) targetParams.set("release", release);
-  const targetsHref = `${withBasePath("/microcosm/targets")}${targetParams.size ? `?${targetParams}` : ""}`;
+  const targetsHref = withBasePath("/microcosm/targets");
 
   return (
     <div className="flex flex-col gap-4">
@@ -374,7 +360,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
             {upLabel && (
               <button
                 type="button"
-                onClick={() => navigate(parentExplorerState(state))}
+                onClick={() => dispatch({ type: "up" })}
                 className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
               >
                 ← {upLabel}
@@ -392,7 +378,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
       <FilterBar
         data={data}
         state={state}
-        onFilters={(filters) => navigate({ ...state, filters, path: { ...state.path, target: undefined } }, true)}
+        onFilters={(filters) => dispatch({ type: "filters", filters })}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -407,7 +393,10 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
             {hasExplorerFilters(state) && (
               <button
                 type="button"
-                onClick={() => navigate({ ...state, filters: { geographyLevels: [], geographies: [], fitBands: [], calibrationStatuses: [] } }, true)}
+                onClick={() => dispatch({
+                  type: "filters",
+                  filters: { geographyLevels: [], geographies: [], fitBands: [], calibrationStatuses: [] },
+                })}
                 className="text-sm font-medium text-primary hover:underline"
               >
                 Clear filters
@@ -440,7 +429,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
                     title={`${item.label} · ${item.metrics.nTargets} targets`}
                     aria-label={`${item.label}, ${item.metrics.nTargets} targets`}
                     aria-pressed={selected}
-                    onClick={() => navigate(selectExplorerNode(state, item.selection))}
+                    onClick={() => dispatch({ type: "select", selection: item.selection })}
                     className="absolute overflow-hidden px-1.5 py-1.5 text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     style={{
                       left: placed.x + NODE_GAP / 2,
@@ -471,7 +460,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         <MicrocosmTargetDetail
           row={selectedTarget as MicrocosmTargetRow}
           dimensions={detailDimensions}
-          onClose={() => navigate({ ...state, path: { ...state.path, target: undefined } }, true)}
+          onClose={() => dispatch({ type: "clear_target" })}
         />
       )}
     </div>
