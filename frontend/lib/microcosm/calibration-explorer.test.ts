@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  createExplorerState,
+  explorerReducer,
   parentExplorerState,
-  parseExplorerSearch,
   selectExplorerNode,
-  serializeExplorerSearch,
   type ExplorerState,
 } from "./calibration-explorer";
 
@@ -22,29 +22,8 @@ function state(overrides: Partial<ExplorerState> = {}): ExplorerState {
 }
 
 describe("calibration explorer semantic navigation", () => {
-  test("parses and serializes a readable hierarchy with repeated filters", () => {
-    const params = new URLSearchParams(
-      "release=2026-07&source=census&program=population&measure=count" +
-        "&dim.bd_age=65_plus&geography_level=state&geography=CA&geography=NY" +
-        "&fit_band=5_10&status=included",
-    );
-
-    const parsed = parseExplorerSearch(params);
-
-    expect(parsed.path).toEqual({
-      source: "census",
-      program: "population",
-      measure: "count",
-      dimensions: [{ key: "bd_age", value: "65_plus" }],
-    });
-    expect(parsed.filters.geographies).toEqual(["CA", "NY"]);
-    expect(parsed.filters.fitBands).toEqual(["5_10"]);
-
-    const serialized = serializeExplorerSearch(parsed, params);
-    expect(serialized.get("release")).toBe("2026-07");
-    expect(serialized.getAll("geography")).toEqual(["CA", "NY"]);
-    expect(serialized.get("dim.bd_age")).toBe("65_plus");
-    expect(serialized.has("drill")).toBe(false);
+  test("starts at all programs with no inherited route state", () => {
+    expect(createExplorerState()).toEqual(state());
   });
 
   test("program selection atomically records source and program", () => {
@@ -100,16 +79,24 @@ describe("calibration explorer semantic navigation", () => {
     expect(root.filters).toEqual(filters);
   });
 
-  test("drops structurally impossible descendants while keeping independent filters", () => {
-    const parsed = parseExplorerSearch(
-      new URLSearchParams(
-        "measure=count&dim.bd_age=65_plus&geography=CA&fit_band=not-a-band&status=skipped",
-      ),
-    );
+  test("drills and moves up entirely through local reducer state", () => {
+    const root = createExplorerState();
+    const program = explorerReducer(root, {
+      type: "select",
+      selection: { kind: "program", source: "census", value: "population" },
+    });
+    const measure = explorerReducer(program, {
+      type: "select",
+      selection: { kind: "measure", value: "count" },
+    });
 
-    expect(parsed.path).toEqual({ dimensions: [] });
-    expect(parsed.filters.geographies).toEqual(["CA"]);
-    expect(parsed.filters.fitBands).toEqual([]);
-    expect(parsed.filters.calibrationStatuses).toEqual(["skipped"]);
+    expect(measure.path).toEqual({
+      source: "census",
+      program: "population",
+      measure: "count",
+      dimensions: [],
+    });
+    expect(explorerReducer(measure, { type: "up" }).path.measure).toBeUndefined();
+    expect(explorerReducer(program, { type: "up" })).toEqual(root);
   });
 });
