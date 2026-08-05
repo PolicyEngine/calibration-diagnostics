@@ -4,6 +4,7 @@ import type { ExplorerState } from "../../lib/microcosm/calibration-explorer";
 import {
   explorerBreadcrumbs,
   explorerEmptyMessage,
+  explorerSizePhrase,
   explorerUpLabel,
 } from "./calibration-explorer-view";
 
@@ -75,5 +76,13 @@ describe("calibration explorer presentation model", () => {
         state({ source: "census", program: "missing", dimensions: [] }),
       ),
     ).toContain("selection");
+  });
+
+  test("preserves the original explanation for each sizing view", () => {
+    expect(explorerSizePhrase("targets")).toBe("how many targets it covers");
+    expect(explorerSizePhrase("loss")).toBe("its share of the calibration loss");
+    expect(explorerSizePhrase("error_intensity")).toBe(
+      "its Huberized error intensity",
+    );
   });
 });
