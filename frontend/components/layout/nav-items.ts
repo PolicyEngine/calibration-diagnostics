@@ -23,6 +23,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       // comparisons; per-release history was ingested there (issue #15).
       { href: "https://www.policyengine.org/scorecard", label: "External checks ↗", usOnly: true },
       { href: "/populace/model-coverage", label: "Validation reach", usOnly: true },
+      { href: "/populace/datasets", label: "Cross-dataset", usOnly: true },
     ],
   },
   {
