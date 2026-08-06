@@ -119,3 +119,14 @@ export function explorerSizePhrase(mode: CalibrationTreeSizeMode): string {
   if (mode === "loss") return "its share of the calibration loss";
   return "its Huberized error intensity";
 }
+
+export function explorerMapHeight(
+  viewportHeight: number,
+  navbarHeight: number,
+  pageIntroductionHeight: number,
+): number {
+  return Math.max(
+    Math.round(viewportHeight - navbarHeight - pageIntroductionHeight),
+    320,
+  );
+}

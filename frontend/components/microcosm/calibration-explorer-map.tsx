@@ -5,6 +5,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import {
   explorerBreadcrumbs,
   explorerEmptyMessage,
+  explorerMapHeight,
   explorerSizePhrase,
   explorerUpLabel,
   hasExplorerFilters,
@@ -380,19 +381,49 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   const { data, isLoading, error } = useMicrocosmCalibrationTree(state, release);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(960);
+  const [height, setHeight] = useState(680);
   const [sizeMode, setSizeMode] = useState<CalibrationTreeSizeMode>("targets");
 
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
-    const initialWidth = element.getBoundingClientRect().width;
-    if (initialWidth) setWidth(Math.round(initialWidth));
-    const observer = new ResizeObserver((entries) => {
-      const nextWidth = entries[0]?.contentRect.width;
+    const navbar = document.querySelector<HTMLElement>(".site-nav");
+    const introductionParts = [
+      ...document.querySelectorAll<HTMLElement>(
+        "[data-page-introduction-part]",
+      ),
+    ];
+    const updateSize = () => {
+      const nextWidth = element.getBoundingClientRect().width;
       if (nextWidth) setWidth(Math.round(nextWidth));
-    });
+
+      const navbarHeight = navbar?.getBoundingClientRect().height ?? 0;
+      const introductionRects = introductionParts.map((part) =>
+        part.getBoundingClientRect(),
+      );
+      const introductionHeight = introductionRects.length
+        ? Math.max(...introductionRects.map((rect) => rect.bottom)) -
+          Math.min(...introductionRects.map((rect) => rect.top))
+        : 0;
+      setHeight(
+        explorerMapHeight(
+          window.innerHeight,
+          navbarHeight,
+          introductionHeight,
+        ),
+      );
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
     observer.observe(element);
-    return () => observer.disconnect();
+    if (navbar) observer.observe(navbar);
+    introductionParts.forEach((part) => observer.observe(part));
+    window.addEventListener("resize", updateSize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateSize);
+    };
   // The map container is not mounted during the initial loading state. Re-run
   // when query data arrives so the observer attaches to the real element.
   }, [data]);
@@ -406,7 +437,6 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
     );
   }
 
-  const height = Math.round(Math.min(Math.max(width * 0.58, 460), 680));
   const laidGroups = layoutTree(data.groups, sizeMode, width, height);
   const upLabel = explorerUpLabel(state);
   const breadcrumbs = explorerBreadcrumbs(state);

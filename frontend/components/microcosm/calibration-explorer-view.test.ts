@@ -4,6 +4,7 @@ import type { ExplorerState } from "../../lib/microcosm/calibration-explorer";
 import {
   explorerBreadcrumbs,
   explorerEmptyMessage,
+  explorerMapHeight,
   explorerSizePhrase,
   explorerUpLabel,
 } from "./calibration-explorer-view";
@@ -30,6 +31,12 @@ function state(
 }
 
 describe("calibration explorer presentation model", () => {
+  test("sizes the map from the viewport after navbar and page introduction", () => {
+    expect(explorerMapHeight(1080, 64, 156)).toBe(860);
+    expect(explorerMapHeight(1440, 64, 156)).toBe(1220);
+    expect(explorerMapHeight(480, 64, 156)).toBe(320);
+  });
+
   test("hides Up at the overview and labels each parent destination", () => {
     expect(explorerUpLabel(state({ dimensions: [] }))).toBeNull();
     expect(
