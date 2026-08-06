@@ -6,6 +6,7 @@ import {
   EXPLORER_MAP_VERTICAL_PADDING,
   explorerBreadcrumbs,
   explorerEmptyMessage,
+  explorerGeographyLevelLabel,
   explorerMapHeight,
   explorerNodeLabel,
   explorerSizePhrase,
@@ -275,7 +276,7 @@ function FilterBar({
   const filter = <K extends keyof ExplorerFilters>(key: K, values: ExplorerFilters[K]) =>
     onFilters({ ...state.filters, [key]: values });
   const active = [
-    ...state.filters.geographyLevels.map((value) => ({ key: "geographyLevels" as const, value, label: `Level: ${displayValue(value)}` })),
+    ...state.filters.geographyLevels.map((value) => ({ key: "geographyLevels" as const, value, label: `Level: ${explorerGeographyLevelLabel(value)}` })),
     ...state.filters.geographies.map((value) => ({ key: "geographies" as const, value, label: `Place: ${displayValue(value)}` })),
     ...state.filters.fitBands.map((value) => ({ key: "fitBands" as const, value, label: `Fit: ${FIT_LABELS[value]}` })),
     ...state.filters.calibrationStatuses.map((value) => ({ key: "calibrationStatuses" as const, value, label: `Status: ${STATUS_LABELS[value]}` })),
@@ -288,6 +289,7 @@ function FilterBar({
           label="Geography level"
           options={data.filterOptions.geographyLevels}
           selected={state.filters.geographyLevels}
+          labelOf={explorerGeographyLevelLabel}
           onChange={(values) => filter("geographyLevels", values)}
         />
         <MultiSelectFilter
@@ -374,7 +376,13 @@ function FilterMenu({
   );
 }
 
-export function CalibrationExplorerMap({ release }: { release?: string }) {
+export function CalibrationExplorerMap({
+  release,
+  pageIntroHeight,
+}: {
+  release?: string;
+  pageIntroHeight: number;
+}) {
   const [state, dispatch] = useReducer(
     explorerReducer,
     undefined,
@@ -384,7 +392,6 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(960);
   const [height, setHeight] = useState(680);
-  const [viewportHeight, setViewportHeight] = useState(680);
   const [sizeMode, setSizeMode] = useState<CalibrationTreeSizeMode>("targets");
 
   useEffect(() => {
@@ -395,16 +402,13 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
       const nextWidth = elementRect.width;
       if (nextWidth) setWidth(Math.round(nextWidth));
       if (elementRect.height) setHeight(Math.round(elementRect.height));
-      setViewportHeight(explorerMapHeight(window.innerHeight));
     };
 
     updateSize();
     const observer = new ResizeObserver(updateSize);
     observer.observe(element);
-    window.addEventListener("resize", updateSize);
     return () => {
       observer.disconnect();
-      window.removeEventListener("resize", updateSize);
     };
   // The map container is not mounted during the initial loading state. Re-run
   // when query data arrives so the observer attaches to the real element.
@@ -452,7 +456,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
       <div
         className="flex min-h-0 flex-col gap-3"
         style={{
-          height: viewportHeight,
+          height: explorerMapHeight(pageIntroHeight),
           paddingBlock: EXPLORER_MAP_VERTICAL_PADDING,
         }}
       >
@@ -486,7 +490,10 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
           </div>
         </div>
 
-        <div ref={containerRef} className="relative min-h-0 w-full flex-1">
+        <div
+          ref={containerRef}
+          className="relative min-h-0 w-full flex-1"
+        >
         {laidGroups.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/10 px-6 text-center">
             <p className="text-sm text-muted-foreground">{explorerEmptyMessage(state)}</p>

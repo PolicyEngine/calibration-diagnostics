@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col text-foreground">
       <GlobalLoader />
       <SiteHeader />
-      <div className="flex h-[calc(100vh-4rem)]">
+      <div className="app-viewport flex">
         <aside className="w-56 shrink-0 overflow-y-auto border-r border-border-light bg-card/50 backdrop-blur-sm">
           <NavSidebar />
         </aside>

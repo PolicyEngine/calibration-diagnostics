@@ -119,16 +119,23 @@ export function explorerEmptyMessage(state: ExplorerState): string {
     : "No calibration targets match this hierarchy selection in the selected release.";
 }
 
+export function explorerGeographyLevelLabel(value: string): string {
+  if (value === "national") return "National";
+  if (value === "state") return "State";
+  return humanize(value);
+}
+
 export function explorerSizePhrase(mode: CalibrationTreeSizeMode): string {
   if (mode === "targets") return "how many targets it covers";
   if (mode === "loss") return "its share of the calibration loss";
   return "its Huberized error intensity";
 }
 
-export function explorerMapHeight(
-  viewportHeight: number,
-): number {
-  return Math.max(Math.round(viewportHeight), 0);
+export function explorerMapHeight(pageIntroHeight: number): string {
+  const safePageIntroHeight = Number.isFinite(pageIntroHeight)
+    ? Math.max(Math.round(pageIntroHeight), 0)
+    : 0;
+  return `max(0px, calc(100dvh - var(--site-header-height) - ${safePageIntroHeight}px))`;
 }
 
 export function explorerNodeLabel(

@@ -5,6 +5,7 @@ import {
   EXPLORER_MAP_VERTICAL_PADDING,
   explorerBreadcrumbs,
   explorerEmptyMessage,
+  explorerGeographyLevelLabel,
   explorerMapHeight,
   explorerNodeLabel,
   explorerSizePhrase,
@@ -33,11 +34,14 @@ function state(
 }
 
 describe("calibration explorer presentation model", () => {
-  test("gives the breadcrumb-and-map window the full viewport height", () => {
+  test("subtracts the measured navbar and page intro from the map window", () => {
     expect(EXPLORER_MAP_VERTICAL_PADDING).toBe(10);
-    expect(explorerMapHeight(1080)).toBe(1080);
-    expect(explorerMapHeight(1440)).toBe(1440);
-    expect(explorerMapHeight(480)).toBe(480);
+    expect(explorerMapHeight(136)).toBe(
+      "max(0px, calc(100dvh - var(--site-header-height) - 136px))",
+    );
+    expect(explorerMapHeight(188)).toBe(
+      "max(0px, calc(100dvh - var(--site-header-height) - 188px))",
+    );
   });
 
   test("resolves program labels at the final presentation boundary", () => {
@@ -62,6 +66,11 @@ describe("calibration explorer presentation model", () => {
         kind: "dimension_value",
       }),
     ).toBe("Adult");
+  });
+
+  test("capitalizes geography levels in filter labels", () => {
+    expect(explorerGeographyLevelLabel("national")).toBe("National");
+    expect(explorerGeographyLevelLabel("state")).toBe("State");
   });
 
   test("hides Up at the overview and labels each parent destination", () => {

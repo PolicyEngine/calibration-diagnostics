@@ -48,6 +48,7 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
 export function MicrocosmOverviewView() {
   const { country } = useCountry();
   const [release, setRelease] = useState("");
+  const [pageIntroHeight, setPageIntroHeight] = useState(0);
   const { data: releaseData } = useMicrocosmReleases();
   const { data, isLoading, error } = useMicrocosm(release || undefined);
 
@@ -105,6 +106,7 @@ export function MicrocosmOverviewView() {
             options={releaseOptions}
           />
         }
+        onHeightChange={setPageIntroHeight}
       />
 
       {isNonDefault ? (
@@ -179,7 +181,10 @@ export function MicrocosmOverviewView() {
       <GeographyCoverageSection coverage={cal.geography_coverage ?? null} />
 
       <SectionCard title="Calibration map">
-        <CalibrationExplorerMap release={release || undefined} />
+        <CalibrationExplorerMap
+          release={release || undefined}
+          pageIntroHeight={pageIntroHeight}
+        />
       </SectionCard>
 
       <details className="group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)]">

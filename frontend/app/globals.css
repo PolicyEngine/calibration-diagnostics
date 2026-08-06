@@ -18,6 +18,8 @@
  * ========================================================================== */
 
 :root {
+  --site-header-height: 4rem;
+
   /* ---------- Microcosm native tokens (light; verdigris + ink) ---------- */
   --canvas: #f6faf7;
   --section: #eaf3ec;
@@ -155,12 +157,16 @@ body::before {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 4rem;
+  height: var(--site-header-height);
   flex-shrink: 0;
   padding: 0 clamp(16px, 4vw, 32px);
   background: color-mix(in srgb, var(--ink) 82%, transparent);
   backdrop-filter: blur(7px);
   border-bottom: 1px solid var(--line-soft);
+}
+
+.app-viewport {
+  height: calc(100dvh - var(--site-header-height));
 }
 
 .site-brand {
@@ -386,4 +392,3 @@ body::before {
 .animate-loading-bar {
   animation: loading-bar 1.4s ease-in-out infinite;
 }
-
