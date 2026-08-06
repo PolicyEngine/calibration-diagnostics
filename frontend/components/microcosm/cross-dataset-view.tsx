@@ -15,7 +15,6 @@ import {
 } from "@/lib/populace/cross-dataset";
 
 import taxcalcNational from "@/lib/populace/external-datasets/taxcalc-cps-national-2024.json";
-import tmdNational from "@/lib/populace/external-datasets/tmd-national-2024.json";
 import yaleNational from "@/lib/populace/external-datasets/yale-national-2024.json";
 
 // ---------------------------------------------------------------------------
@@ -23,7 +22,7 @@ import yaleNational from "@/lib/populace/external-datasets/yale-national-2024.js
 // PolicyEngine's national calibration targets (official IRS/SOI/etc. actuals
 // the US microdata is built to match) — so the benchmark set isn't ours to
 // pick, it's what the model calibrates to. populace covers ~all of it; a
-// federal tax-unit engine (TMD, Tax-Calculator CPS) covers the SOI tax
+// federal Tax-Calculator CPS engine covers the SOI tax
 // concepts it can express, and that coverage gap is part of the comparison.
 // External columns are committed JSONs from scripts/score_external_dataset.py,
 // keyed by target name. Lead metric is the calibration's own capped-MAPE loss.
@@ -41,7 +40,6 @@ interface ExternalDataset {
 }
 
 const EXTERNAL_DATASETS: ExternalDataset[] = [
-  tmdNational as ExternalDataset,
   yaleNational as ExternalDataset,
   taxcalcNational as ExternalDataset,
 ];
@@ -108,7 +106,7 @@ export function CrossDatasetView() {
 
       <SectionCard
         title="Dataset scorecard"
-        description="Each dataset over the shared national target surface. Loss is the capped-MAPE the calibration minimizes (lower is better). populace is calibrated to these exact targets, so its loss is in-sample and is expected to be lowest — it is the objective, not an independent measurement; TMD, Yale and Tax-Calculator CPS are out-of-sample independent data. Coverage is how many targets the dataset can express — a federal tax engine cannot express SNAP/Medicaid/census targets, so it covers fewer than populace by design. The two PUF-based engines (TMD and Yale) are scored on an identical concept set. Note: the Yale column is a reconstruction (Yale's inputs are not published, so they were rebuilt from public sources); it runs ~5–10% high vs CBO's baseline, so its loss likely overstates Yale's true divergence — see the Yale card below."
+        description="Each dataset over the shared national target surface. Loss is the capped-MAPE the calibration minimizes (lower is better). populace is calibrated to these exact targets, so its loss is in-sample and is expected to be lowest — it is the objective, not an independent measurement; Yale and Tax-Calculator CPS are out-of-sample independent data. Coverage is how many targets the dataset can express — a federal tax engine cannot express SNAP/Medicaid/census targets, so it covers fewer than populace by design. Note: the Yale column is a reconstruction (Yale's inputs are not published, so they were rebuilt from public sources); it runs ~5–10% high vs CBO's baseline, so its loss likely overstates Yale's true divergence — see the Yale card below."
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

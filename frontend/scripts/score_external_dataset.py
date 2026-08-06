@@ -4,8 +4,8 @@ The Cross-dataset comparison scores every dataset (populace + external tax
 microdata) against the SAME surface: the model's own *national calibration
 targets* (official IRS/SOI/etc. actuals the US microdata is built to match). The
 benchmark set is therefore not hand-picked — it is exactly what the calibration
-optimizes toward. populace covers ~all targets; a federal tax-unit engine
-(Tax-Calculator public CPS, PSL TMD) covers the IRS-SOI tax concepts it can
+optimizes toward. populace covers ~all targets; the federal Tax-Calculator
+public-CPS engine covers the IRS-SOI tax concepts it can
 express, and that coverage gap is part of the comparison.
 
 Pipeline:
@@ -13,15 +13,14 @@ Pipeline:
      level=national) and writes a target-spec JSON: one row per target cell with
      its parsed AGI income-band edges, EITC qualifying-children group, filing
      status, official value and populace estimate.
-  2. `--score` runs Tax-Calculator (CPS and/or TMD) once, reproduces each cell's
+  2. `--score` runs Tax-Calculator with public CPS once, reproduces each cell's
      breakdown (AGI band + EITC children + subpopulation filter), and emits a
      committed JSON keyed by target `name` -> value. The frontend joins those to
      the live target surface.
 
 Run (a venv with taxcalc installed):
     python frontend/scripts/score_external_dataset.py --build-spec --spec /tmp/target_spec.json
-    python frontend/scripts/score_external_dataset.py --score --spec /tmp/target_spec.json \
-        --dataset cps --dataset tmd --tmd-dir /path/to/tmd/storage/output
+    python frontend/scripts/score_external_dataset.py --score --spec /tmp/target_spec.json
 
 Concept mapping (PolicyEngine variable -> taxcalc variable), verified against each
 concept's grand total vs BOTH the official IRS value and populace; a concept whose
@@ -84,7 +83,6 @@ CPS_DROP = COMMON_DROP | {
     "ordinary dividend income", "qualified business income deduction", "salt deduction",
     "tax exempt interest income",
 }
-TMD_DROP = COMMON_DROP | {"real estate taxes", "ctc"}
 
 
 # --- 1. build the target spec from the national target surface ----------------
@@ -168,75 +166,48 @@ def _cell(x, arr, calc, s, agi, eic):
     return float(s[m & (arr != 0)].sum())
 
 
-def _build_calc(kind: str, tmd_dir: str | None):
+def _build_calc():
     import taxcalc as tc
 
-    if kind == "cps":
-        rec, pol = tc.Records.cps_constructor(), tc.Policy()
-    else:
-        b = Path(tmd_dir)
-        rec = tc.Records.tmd_constructor(
-            data_path=b / "tmd.csv.gz", weights_path=b / "tmd_weights.csv.gz",
-            growfactors=b / "tmd_growfactors.csv", exact_calculations=True,
-        )
-        pol = tc.Policy()
-        pol.implement_reform({"soi_iitax": {2013: True}})  # PSL's SOI-replication policy
+    rec, pol = tc.Records.cps_constructor(), tc.Policy()
     calc = tc.Calculator(policy=pol, records=rec)
     calc.advance_to_year(2024)
     calc.calc_all()
     return calc
 
 
-def score(kind: str, spec, tmd_dir=None):
-    calc = _build_calc(kind, tmd_dir)
+def score(spec):
+    calc = _build_calc()
     A = calc.array
     concept_arr = {v: fn(A) for v, fn in CONCEPT_TO_TAXCALC.items()}
     s, agi, eic = A("s006"), A("c00100"), A("EIC")
-    drop = CPS_DROP if kind == "cps" else TMD_DROP
     rows = {}
     for x in spec:
         v = x["variable"]
-        if not x["expressible_source"] or v in drop or v not in concept_arr:
+        if not x["expressible_source"] or v in CPS_DROP or v not in concept_arr:
             continue
         rows[x["name"]] = _cell(x, concept_arr[v], calc, s, agi, eic)
     return rows
 
 
 METADATA = {
-    "cps": {
-        "file": "taxcalc-cps-national-2024.json", "dataset": "taxcalc_cps_national",
-        "label": "Tax-Calculator public CPS", "engine": "taxcalc 6.7.1", "year": 2024,
-        "source": "Tax-Calculator public CPS (Census CPS-derived)",
-        "source_url": "https://github.com/PSLmodels/Tax-Calculator",
-        "notes": (
-            "Public CPS reliably covers wages, AGI, taxable income, income tax "
-            "(before/after credits), EITC, refundable CTC, pensions, taxable Social "
-            "Security, unemployment, qualified dividends, charitable and medical "
-            "deductions, and taxable interest. Dropped concepts: capital gains and "
-            "partnership/S-corp income (structurally absent from the public CPS, i.e. "
-            "zero); SALT, interest, tax-exempt-interest, ordinary-dividend, "
-            "IRA-distribution, QBI and total-itemized deductions and combined CTC "
-            "(grand total >40% off BOTH the official IRS value and populace); real "
-            "estate taxes (taxcalc e18500 is an all-filer input while SOI counts only "
-            "itemizers' Schedule A). Itemizer subpopulation (SOI table 2.1) reproduced "
-            "via c04470>0; EITC-return AGI via c59660!=0."
-        ),
-    },
-    "tmd": {
-        "file": "tmd-national-2024.json", "dataset": "tmd_national",
-        "label": "PSL TMD", "engine": "taxcalc 6.7.1", "year": 2024,
-        "source": "PSL tax-microdata-benchmarking TMD (PUF+CPS, 2022 base extrapolated to 2024)",
-        "source_url": "https://github.com/PSLmodels/tax-microdata-benchmarking",
-        "notes": (
-            "TMD (PUF-derived) covers nearly all IRS SOI concepts including capital "
-            "gains, partnership/S-corp income, QBI deduction and itemized deductions, "
-            "all within ~30% of official grand totals. Dropped: combined CTC "
-            "(c07220+c11070+odc overshoots SOI ~59%) and real estate taxes (taxcalc "
-            "e18500 all-filer input vs SOI itemizer-only Schedule A). Built via "
-            "tmd_constructor with the soi_iitax reform, advanced to 2024. Itemizer "
-            "subpopulation (table 2.1) via c04470>0; EITC-return AGI via c59660!=0."
-        ),
-    },
+    "file": "taxcalc-cps-national-2024.json", "dataset": "taxcalc_cps_national",
+    "label": "Tax-Calculator public CPS", "engine": "taxcalc 6.7.1", "year": 2024,
+    "source": "Tax-Calculator public CPS (Census CPS-derived)",
+    "source_url": "https://github.com/PSLmodels/Tax-Calculator",
+    "notes": (
+        "Public CPS reliably covers wages, AGI, taxable income, income tax "
+        "(before/after credits), EITC, refundable CTC, pensions, taxable Social "
+        "Security, unemployment, qualified dividends, charitable and medical "
+        "deductions, and taxable interest. Dropped concepts: capital gains and "
+        "partnership/S-corp income (structurally absent from the public CPS, i.e. "
+        "zero); SALT, interest, tax-exempt-interest, ordinary-dividend, "
+        "IRA-distribution, QBI and total-itemized deductions and combined CTC "
+        "(grand total >40% off BOTH the official IRS value and populace); real "
+        "estate taxes (taxcalc e18500 is an all-filer input while SOI counts only "
+        "itemizers' Schedule A). Itemizer subpopulation (SOI table 2.1) reproduced "
+        "via c04470>0; EITC-return AGI via c59660!=0."
+    ),
 }
 
 
@@ -246,22 +217,19 @@ def main() -> None:
     ap.add_argument("--score", action="store_true")
     ap.add_argument("--spec", type=Path, required=True)
     ap.add_argument("--base-url", default="http://localhost:3000")
-    ap.add_argument("--dataset", action="append", choices=["cps", "tmd"], default=[])
-    ap.add_argument("--tmd-dir", default=None)
     args = ap.parse_args()
 
     if args.build_spec:
         build_spec(args.base_url, args.spec)
     if args.score:
         spec = json.loads(args.spec.read_text())
-        for kind in args.dataset:
-            meta = METADATA[kind]
-            rows = score(kind, spec, args.tmd_dir)
-            keys = ("dataset", "label", "engine", "year", "source", "source_url", "notes")
-            out = {k: meta[k] for k in keys}
-            out["rows"] = rows
-            (OUT_DIR / meta["file"]).write_text(json.dumps(out, indent=2))
-            print(f"{kind}: wrote {len(rows)} rows -> {meta['file']}")
+        meta = METADATA
+        rows = score(spec)
+        keys = ("dataset", "label", "engine", "year", "source", "source_url", "notes")
+        out = {k: meta[k] for k in keys}
+        out["rows"] = rows
+        (OUT_DIR / meta["file"]).write_text(json.dumps(out, indent=2))
+        print(f"cps: wrote {len(rows)} rows -> {meta['file']}")
 
 
 if __name__ == "__main__":
