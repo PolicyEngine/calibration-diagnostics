@@ -128,6 +128,25 @@ class CapabilityPlanner:
                 return f"unsupported constraint variable: {constraint.get('variable')}"
         return None
 
+    @staticmethod
+    def _query_constraint(constraint: dict) -> dict:
+        operator_aliases = {
+            "==": "eq",
+            "!=": "ne",
+            ">": "gt",
+            ">=": "gte",
+            "<": "lt",
+            "<=": "lte",
+        }
+        if "operator" not in constraint:
+            return dict(constraint)
+        return {
+            **constraint,
+            "operator": operator_aliases.get(
+                str(constraint["operator"]), str(constraint["operator"])
+            ),
+        }
+
     def classify(
         self,
         fact: FactContract,
@@ -217,8 +236,15 @@ class CapabilityPlanner:
             )
 
         constraints = tuple(
-            [{"dimension": key, "value": value} for key, value in sorted(fact.dimensions.items())]
-            + list(fact.universe_constraints)
+            [
+                {"dimension": "__geography__", "value": fact.geography_id},
+                *[
+                    {"dimension": key, "value": value}
+                    for key, value in sorted(fact.dimensions.items())
+                    if key not in mapping.descriptive_dimensions
+                ],
+            ]
+            + [self._query_constraint(constraint) for constraint in fact.universe_constraints]
         )
         query_type = ModelQuery if mapping.execution is ExecutionMethod.MODEL else AggregateQuery
         query_arguments = {

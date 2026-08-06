@@ -1,6 +1,6 @@
 # Populace / PolicyEngine-US integration overview
 
-Status: **awaiting approval before adapter implementation**  
+Status: **adapter implemented and verified against the pinned release**
 Reviewed release: `populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`  
 Ledger snapshot: `ledger-7917ea815df710fb20db076b`
 
@@ -19,7 +19,7 @@ This is a model/dataset pairing, not a raw-dataset adapter:
 - Weight entities: person, household, and tax unit.
 - Geography paths: national, state FIPS, and congressional-district GEOID.
 
-The adapter will download the release-pinned H5, verify its hash, construct one
+The adapter downloads the release-pinned H5, verifies its hash, constructs one
 cached `policyengine_us.Microsimulation`, calculate all required variables once,
 and expose entity-aligned arrays to the common harness aggregator. Direct
 microdata variables (for example `age` and `employment_income`) and calculated
@@ -157,9 +157,33 @@ annual model facts would erase a real period/stock-versus-flow question. They
 remain planned adapter coverage after that mapping is reviewed; they are not
 being used to make this checkpoint look broader than it is.
 
+## Actual ten-fact checkpoint
+
+The executable checkpoint was run against the checksum-verified 463 MB release
+artifact with the pinned model/core versions. It returned ten finite estimates
+and no unsupported or `N/A` cells. The resulting relative errors are:
+
+| Fact | Relative error |
+|---|---:|
+| US resident population | 0.010% |
+| Resident population age 0–4 | 0.019% |
+| California resident population | 0.011% |
+| California population age 0–4 (ACS) | 0.206% |
+| Alabama CD-01 household count (ACS holdout) | 17.992% |
+| Returns with EITC | 0.636% |
+| Total EITC | 3.291% |
+| BEA wages and salaries | 13.333% |
+| Returns with EITC, AGI $10k–$15k | 0.370% |
+| EITC, AGI $10k–$15k | 0.006% |
+
+These are performance results, not adapter failures. Populace's own release
+diagnostics report the same 13.333% final error for the BEA wage target. The
+congressional-district row is an external holdout. The verifier in
+`scripts/verify_populace_adapter.py` recomputes all ten from the H5 and model.
+
 ## Tests required before the adapter is accepted
 
-After approval, adapter implementation starts with failing tests for:
+Adapter implementation was written after failing tests covering:
 
 1. release pin and H5 hash verification;
 2. a single cached microsimulation and batched variable calculation;
