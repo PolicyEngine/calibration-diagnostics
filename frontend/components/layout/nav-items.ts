@@ -6,6 +6,7 @@ export interface NavItem {
   href: string;
   label: string;
   usOnly?: boolean;
+  external?: boolean;
   // Extra path prefixes that keep this item highlighted (drill-down views).
   also?: string[];
 }
@@ -18,11 +19,16 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/populace", label: "Calibration fit" },
       { href: "/populace/targets", label: "Calibration targets" },
+      { href: "/populace/model-coverage", label: "Validation reach", usOnly: true },
       // External checks (reform scores vs JCT/fiscal notes/admin actuals)
       // moved to the PolicyEngine scorecard, which owns all external
       // comparisons; per-release history was ingested there (issue #15).
-      { href: "https://www.policyengine.org/scorecard", label: "External checks ↗", usOnly: true },
-      { href: "/populace/model-coverage", label: "Validation reach", usOnly: true },
+      {
+        href: "https://www.policyengine.org/scorecard",
+        label: "External checks",
+        usOnly: true,
+        external: true,
+      },
     ],
   },
   {

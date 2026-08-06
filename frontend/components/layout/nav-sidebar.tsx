@@ -68,13 +68,18 @@ export function NavSidebar() {
                     key={item.href}
                     href={item.href}
                     {...navLinkAttributes(item)}
-                    className={`block rounded-md px-3 py-1.5 text-sm leading-tight transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm leading-tight transition-colors ${
                       active
                         ? "bg-primary/10 font-medium text-primary"
                         : "text-foreground/80 hover:bg-muted/60 hover:text-foreground"
                     }`}
                   >
                     {item.label}
+                    {item.external ? (
+                      <span aria-hidden="true" className="shrink-0 text-muted-foreground">
+                        ↗
+                      </span>
+                    ) : null}
                   </Link>
                 );
               })}
