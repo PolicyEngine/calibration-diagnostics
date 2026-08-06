@@ -11,6 +11,7 @@ populace = [
   "policyengine-us==1.764.6",
   "tables>=3.10,<4",
 ]
+taxcalc-cps = ["taxcalc==6.7.1"]
 
 [project.scripts]
 evaluation-harness = "evaluation_harness.cli:main"
