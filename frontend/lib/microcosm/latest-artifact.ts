@@ -3,6 +3,8 @@
 // live from the policyengine/populace-us Hugging Face dataset, resolved through
 // latest.json (current release) or by id (any release, for version compare).
 
+import { sourceLabel } from "./source-label";
+
 type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
 export type CalibrationLossKind = "normalized_target_loss" | "raw_optimizer_objective";
@@ -1286,29 +1288,6 @@ function familyFitSummary(rows: TargetRow[]) {
 }
 
 // --- calibration map (treemap) ----------------------------------------------
-// Human labels for the source authorities behind each target group.
-const SOURCE_LABELS: Record<string, string> = {
-  cbo: "CBO",
-  census_population: "Census population",
-  cms_aca: "CMS · ACA marketplace",
-  cms_medicaid: "CMS · Medicaid / CHIP",
-  cms_medicare: "CMS · Medicare",
-  hhs_acf_tanf: "HHS · TANF",
-  irs_soi: "IRS Statistics of Income",
-  jct: "JCT",
-  ssa: "SSA",
-  state_income_tax: "State income tax",
-  usda_snap: "USDA · SNAP",
-};
-
-function sourceLabel(source: string): string {
-  if (SOURCE_LABELS[source]) return SOURCE_LABELS[source];
-  return source
-    .split("_")
-    .map((word) => (word.length <= 3 ? word.toUpperCase() : word[0].toUpperCase() + word.slice(1)))
-    .join(" ");
-}
-
 // A few IRS targets sit near zero and blow up the relative error (the same
 // "extreme outliers" the diagnostics lists exclude). Winsorize the per-target
 // error before squaring so the loss map shows where error broadly concentrates

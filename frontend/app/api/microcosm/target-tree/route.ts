@@ -29,14 +29,15 @@ const CALIBRATION_STATUSES = new Set<CalibrationStatus>([
 
 function requestState(params: URLSearchParams) {
   const state = createExplorerState();
+  state.breakdown = params.get("breakdown") === "geography" ? "geography" : "program";
   const source = params.get("source")?.trim();
   const program = params.get("program")?.trim();
+  const geography = params.get("path_geography")?.trim();
+  if (geography) state.path.geography = geography;
   if (source && program) {
     state.path.source = source;
     state.path.program = program;
-    const geography = params.get("path_geography")?.trim();
     if (geography) {
-      state.path.geography = geography;
       for (const [key, value] of params.entries()) {
         if (key.startsWith("dim.") && value.trim()) {
           state.path.dimensions.push({ key: key.slice(4), value: value.trim() });

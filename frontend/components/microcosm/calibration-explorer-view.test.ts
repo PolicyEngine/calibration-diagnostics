@@ -15,8 +15,13 @@ const EMPTY_FILTERS = {
   calibrationStatuses: [],
 };
 
-function state(path: ExplorerState["path"], filtered = false): ExplorerState {
+function state(
+  path: ExplorerState["path"],
+  filtered = false,
+  breakdown: ExplorerState["breakdown"] = "program",
+): ExplorerState {
   return {
+    breakdown,
     path,
     filters: filtered
       ? { ...EMPTY_FILTERS, geographies: ["CA"] }
@@ -90,6 +95,44 @@ describe("calibration explorer presentation model", () => {
           program: "population",
           geography: "CA",
           dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
+        },
+      },
+    ]);
+  });
+
+  test("orders navigation for a geography-first journey", () => {
+    const geography = state(
+      { geography: "CA", dimensions: [] },
+      false,
+      "geography",
+    );
+    const program = state(
+      {
+        source: "irs_soi",
+        program: "ctc",
+        geography: "CA",
+        dimensions: [],
+      },
+      false,
+      "geography",
+    );
+
+    expect(explorerUpLabel(geography)).toBe("Up to all geographies");
+    expect(explorerUpLabel(program)).toBe("Up to all programs");
+    expect(explorerBreadcrumbs(program)).toEqual([
+      { label: "All targets", path: { dimensions: [] } },
+      { label: "CA", path: { geography: "CA", dimensions: [] } },
+      {
+        label: "IRS Statistics of Income",
+        path: { geography: "CA", dimensions: [] },
+      },
+      {
+        label: "CTC",
+        path: {
+          source: "irs_soi",
+          program: "ctc",
+          geography: "CA",
+          dimensions: [],
         },
       },
     ]);

@@ -10,6 +10,7 @@ import {
 
 function state(overrides: Partial<ExplorerState> = {}): ExplorerState {
   return {
+    breakdown: "program",
     path: { dimensions: [] },
     filters: {
       geographyLevels: [],
@@ -98,6 +99,48 @@ describe("calibration explorer semantic navigation", () => {
     });
     expect(explorerReducer(geography, { type: "up" }).path.geography).toBeUndefined();
     expect(explorerReducer(program, { type: "up" })).toEqual(root);
+  });
+
+  test("drills geography first when geography is the primary breakdown", () => {
+    const root = state({ breakdown: "geography" });
+    const geography = explorerReducer(root, {
+      type: "select",
+      selection: { kind: "geography", value: "CA" },
+    });
+    const program = explorerReducer(geography, {
+      type: "select",
+      selection: { kind: "program", source: "irs_soi", value: "ctc" },
+    });
+
+    expect(geography.path).toEqual({ geography: "CA", dimensions: [] });
+    expect(program.path).toEqual({
+      source: "irs_soi",
+      program: "ctc",
+      geography: "CA",
+      dimensions: [],
+    });
+    expect(explorerReducer(program, { type: "up" }).path).toEqual({
+      geography: "CA",
+      dimensions: [],
+    });
+    expect(explorerReducer(geography, { type: "up" })).toEqual(root);
+  });
+
+  test("changing the primary breakdown resets navigation but preserves filters", () => {
+    const filters = {
+      geographyLevels: ["state"],
+      geographies: ["CA"],
+      fitBands: ["10_20" as const],
+      calibrationStatuses: ["included" as const],
+    };
+    const selected = state({
+      path: { source: "census", program: "population", dimensions: [] },
+      filters,
+    });
+
+    expect(
+      explorerReducer(selected, { type: "breakdown", breakdown: "geography" }),
+    ).toEqual(state({ breakdown: "geography", filters }));
   });
 
   test("breadcrumb navigation jumps to an ancestor without clearing filters", () => {

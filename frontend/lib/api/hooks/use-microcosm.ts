@@ -710,6 +710,7 @@ function explorerApiParams(
   state: ExplorerState,
 ): Record<string, string | string[]> {
   const result: Record<string, string | string[]> = {
+    breakdown: state.breakdown,
     geography_level: state.filters.geographyLevels,
     geography: state.filters.geographies,
     fit_band: state.filters.fitBands,
@@ -718,8 +719,10 @@ function explorerApiParams(
   if (state.path.source && state.path.program) {
     result.source = state.path.source;
     result.program = state.path.program;
-    if (state.path.geography) {
-      result.path_geography = state.path.geography;
+  }
+  if (state.path.geography) {
+    result.path_geography = state.path.geography;
+    if (state.path.source && state.path.program) {
       for (const dimension of state.path.dimensions) {
         result[`dim.${dimension.key}`] = dimension.value;
       }

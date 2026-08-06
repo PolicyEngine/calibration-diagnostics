@@ -9,6 +9,7 @@ export const FIT_BANDS = [
 
 export type FitBand = (typeof FIT_BANDS)[number];
 export type CalibrationStatus = "included" | "skipped" | "not_materialized";
+export type ExplorerBreakdown = "program" | "geography";
 
 export interface ExplorerDimensionSelection {
   key: string;
@@ -32,6 +33,7 @@ export interface ExplorerFilters {
 }
 
 export interface ExplorerState {
+  breakdown: ExplorerBreakdown;
   path: ExplorerPath;
   filters: ExplorerFilters;
 }
@@ -46,11 +48,13 @@ export type ExplorerAction =
   | { type: "select"; selection: ExplorerNodeSelection }
   | { type: "navigate"; path: ExplorerPath }
   | { type: "up" }
+  | { type: "breakdown"; breakdown: ExplorerBreakdown }
   | { type: "filters"; filters: ExplorerFilters }
   | { type: "clear_target" };
 
 export function createExplorerState(): ExplorerState {
   return {
+    breakdown: "program",
     path: { dimensions: [] },
     filters: {
       geographyLevels: [],
@@ -68,12 +72,19 @@ export function selectExplorerNode(
   const path = { ...state.path, dimensions: [...state.path.dimensions] };
   delete path.target;
   if (selection.kind === "program") {
+    if (state.breakdown === "geography" && !path.geography) return state;
     path.source = selection.source;
     path.program = selection.value;
-    delete path.geography;
+    if (state.breakdown === "program") delete path.geography;
     path.dimensions = [];
   } else if (selection.kind === "geography") {
-    if (!path.source || !path.program) return state;
+    if (state.breakdown === "program" && (!path.source || !path.program)) {
+      return state;
+    }
+    if (state.breakdown === "geography") {
+      delete path.source;
+      delete path.program;
+    }
     path.geography = selection.value;
     path.dimensions = [];
   } else if (selection.kind === "dimension_value") {
@@ -98,6 +109,13 @@ export function parentExplorerState(state: ExplorerState): ExplorerState {
   delete path.target;
   if (path.dimensions.length) {
     path.dimensions.pop();
+  } else if (path.geography && path.source && path.program) {
+    if (state.breakdown === "program") {
+      delete path.geography;
+    } else {
+      delete path.program;
+      delete path.source;
+    }
   } else if (path.geography) {
     delete path.geography;
   } else if (path.program || path.source) {
@@ -123,6 +141,13 @@ export function explorerReducer(
     return { ...state, path };
   }
   if (action.type === "up") return parentExplorerState(state);
+  if (action.type === "breakdown") {
+    return {
+      ...state,
+      breakdown: action.breakdown,
+      path: { dimensions: [] },
+    };
+  }
   if (action.type === "filters") {
     return {
       ...state,

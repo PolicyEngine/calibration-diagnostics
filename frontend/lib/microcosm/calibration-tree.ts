@@ -4,6 +4,7 @@ import type {
   ExplorerState,
   FitBand,
 } from "./calibration-explorer";
+import { sourceLabel } from "./source-label";
 
 const LOSS_ERROR_CAP = 2;
 const HUBER_DELTA = 2;
@@ -321,6 +322,54 @@ function filterOptions(rows: CalibrationTreeTarget[]) {
   };
 }
 
+function programGroups(rows: CalibrationTreeTarget[]): CalibrationTreeGroup[] {
+  const bySource = groupRows(
+    rows,
+    (row) => String(row.source ?? "other") || "other",
+  );
+  return [...bySource.entries()]
+    .map(([source, sourceRows]) => {
+      const byProgram = groupRows(sourceRows, programId);
+      const nodes = sortNodes(
+        [...byProgram.entries()].map(([program, programRows]) =>
+          node(
+            program,
+            program,
+            "program",
+            { kind: "program", source, value: program },
+            programRows,
+          ),
+        ),
+      );
+      return {
+        id: source,
+        label: sourceLabel(source),
+        nodes,
+        metrics: calibrationTreeMetrics(sourceRows),
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.metrics.nTargets - left.metrics.nTargets ||
+        left.id.localeCompare(right.id),
+    );
+}
+
+function geographyNodes(rows: CalibrationTreeTarget[]): CalibrationTreeNode[] {
+  const byGeography = groupRows(rows, geographyId);
+  return sortNodes(
+    [...byGeography.entries()].map(([geography, geographyRows]) =>
+      node(
+        geography,
+        geography === MISSING_VALUE ? "Not specified" : geography,
+        "geography",
+        { kind: "geography", value: geography },
+        geographyRows,
+      ),
+    ),
+  );
+}
+
 export function buildCalibrationTree(
   allRows: CalibrationTreeTarget[],
   state: ExplorerState,
@@ -330,38 +379,49 @@ export function buildCalibrationTree(
   const options = filterOptions(allRows);
   const filteredRows = applyExplorerFilters(allRows, state.filters);
 
-  if (!path.source || !path.program) {
-    const bySource = groupRows(filteredRows, (row) => String(row.source ?? "other") || "other");
-    const groups = [...bySource.entries()]
-      .map(([source, sourceRows]) => {
-        const byProgram = groupRows(sourceRows, programId);
-        const nodes = sortNodes(
-          [...byProgram.entries()].map(([program, rows]) =>
-            node(
-              program,
-              program,
-              "program",
-              { kind: "program", source, value: program },
-              rows,
-            ),
-          ),
-        );
-        return {
-          id: source,
-          label: humanize(source),
-          nodes,
-          metrics: calibrationTreeMetrics(sourceRows),
-        };
-      })
-      .sort(
-        (left, right) =>
-          right.metrics.nTargets - left.metrics.nTargets || left.id.localeCompare(right.id),
-      );
+  if (state.breakdown === "geography" && !path.geography) {
+    const nodes = geographyNodes(filteredRows);
+    return {
+      releaseId,
+      path,
+      currentLevel: { kind: "geography", label: "Geography" },
+      groups: [{
+        id: "geography",
+        label: "Geography",
+        nodes,
+        metrics: calibrationTreeMetrics(filteredRows),
+      }],
+      dimensionOrder: [],
+      filterOptions: options,
+      filteredMetrics: calibrationTreeMetrics(filteredRows),
+    };
+  }
+
+  if (state.breakdown === "geography" && (!path.source || !path.program)) {
+    const geographyRows = allRows.filter(
+      (row) => geographyId(row) === path.geography,
+    );
+    const filteredGeographyRows = applyExplorerFilters(
+      geographyRows,
+      state.filters,
+    );
     return {
       releaseId,
       path,
       currentLevel: { kind: "overview", label: "Programs" },
-      groups,
+      groups: programGroups(filteredGeographyRows),
+      dimensionOrder: [],
+      filterOptions: options,
+      filteredMetrics: calibrationTreeMetrics(filteredGeographyRows),
+    };
+  }
+
+  if (!path.source || !path.program) {
+    return {
+      releaseId,
+      path,
+      currentLevel: { kind: "overview", label: "Programs" },
+      groups: programGroups(filteredRows),
       dimensionOrder: [],
       filterOptions: options,
       filteredMetrics: calibrationTreeMetrics(filteredRows),
@@ -369,27 +429,23 @@ export function buildCalibrationTree(
   }
 
   const programRows = allRows.filter(
-    (row) => String(row.source ?? "other") === path.source && programId(row) === path.program,
+    (row) =>
+      String(row.source ?? "other") === path.source &&
+      programId(row) === path.program,
   );
   const filteredProgramRows = applyExplorerFilters(programRows, state.filters);
   if (!path.geography) {
-    const byGeography = groupRows(filteredProgramRows, geographyId);
-    const nodes = sortNodes(
-      [...byGeography.entries()].map(([geography, rows]) =>
-        node(
-          geography,
-          geography === MISSING_VALUE ? "Not specified" : geography,
-          "geography",
-          { kind: "geography", value: geography },
-          rows,
-        ),
-      ),
-    );
+    const nodes = geographyNodes(filteredProgramRows);
     return {
       releaseId,
       path,
       currentLevel: { kind: "geography", label: "Geography" },
-      groups: [{ id: path.program, label: path.program, nodes, metrics: calibrationTreeMetrics(filteredProgramRows) }],
+      groups: [{
+        id: path.program,
+        label: path.program,
+        nodes,
+        metrics: calibrationTreeMetrics(filteredProgramRows),
+      }],
       dimensionOrder: [],
       filterOptions: options,
       filteredMetrics: calibrationTreeMetrics(filteredProgramRows),

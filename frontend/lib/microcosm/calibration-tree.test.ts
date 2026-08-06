@@ -16,8 +16,11 @@ const EMPTY_FILTERS = {
   calibrationStatuses: [],
 };
 
-function state(path: ExplorerState["path"]): ExplorerState {
-  return { path, filters: EMPTY_FILTERS };
+function state(
+  path: ExplorerState["path"],
+  breakdown: ExplorerState["breakdown"] = "program",
+): ExplorerState {
+  return { breakdown, path, filters: EMPTY_FILTERS };
 }
 
 function target(
@@ -110,6 +113,7 @@ describe("source, geography, and declared-dimension hierarchy", () => {
 
     expect(tree.currentLevel).toEqual({ kind: "overview", label: "Programs" });
     expect(tree.groups.map((group) => group.id)).toEqual(["irs_soi", "census"]);
+    expect(tree.groups[0].label).toBe("IRS Statistics of Income");
     expect(tree.groups.flatMap((group) => group.nodes)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -125,6 +129,32 @@ describe("source, geography, and declared-dimension hierarchy", () => {
         }),
       ]),
     );
+  });
+
+  test("renders geography first, then programs grouped by their source", () => {
+    const overview = buildCalibrationTree(
+      rows,
+      state({ dimensions: [] }, "geography"),
+    );
+
+    expect(overview.currentLevel).toEqual({ kind: "geography", label: "Geography" });
+    expect(overview.groups).toHaveLength(1);
+    expect(overview.groups[0].label).toBe("Geography");
+    expect(overview.groups[0].nodes.map((node) => [node.id, node.metrics.nTargets])).toEqual([
+      ["CA", 8],
+      ["United States", 2],
+      ["NY", 1],
+    ]);
+
+    const programs = buildCalibrationTree(
+      rows,
+      state({ geography: "CA", dimensions: [] }, "geography"),
+    );
+    expect(programs.currentLevel).toEqual({ kind: "overview", label: "Programs" });
+    expect(programs.groups.map((group) => [group.label, group.nodes.map((node) => node.id)])).toEqual([
+      ["IRS Statistics of Income", ["taxable interest income", "ctc"]],
+      ["Census", ["population"]],
+    ]);
   });
 
   test("descends directly from a statistic to geography without a measure level", () => {
@@ -324,6 +354,7 @@ describe("calibration tree metrics and filters", () => {
 
   test("keeps branch dimensions stable when filters leave only one visible value", () => {
     const tree = buildCalibrationTree(rows, {
+      breakdown: "program",
       path: {
         source: "census",
         program: "population",

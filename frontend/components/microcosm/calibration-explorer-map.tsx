@@ -20,6 +20,7 @@ import {
 import {
   createExplorerState,
   explorerReducer,
+  type ExplorerBreakdown,
   type ExplorerFilters,
   type ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
@@ -121,6 +122,64 @@ function layoutTree(
   });
 }
 
+function SegmentedControl<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <div role="tablist" aria-label={label} className="flex rounded-lg border border-border bg-muted/40 p-1">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={value === option.value}
+            onClick={() => onChange(option.value)}
+            className={`h-8 rounded-md px-3 text-[13px] font-medium ${
+              value === option.value
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BreakdownControl({
+  value,
+  onChange,
+}: {
+  value: ExplorerBreakdown;
+  onChange: (value: ExplorerBreakdown) => void;
+}) {
+  return (
+    <SegmentedControl
+      label="Breakdown"
+      value={value}
+      onChange={onChange}
+      options={[
+        { value: "program", label: "Program" },
+        { value: "geography", label: "Geography" },
+      ]}
+    />
+  );
+}
+
 function SizeControl({
   value,
   onChange,
@@ -129,33 +188,16 @@ function SizeControl({
   onChange: (value: CalibrationTreeSizeMode) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Size boxes by
-      </span>
-      <div role="tablist" aria-label="Size boxes by" className="flex rounded-lg border border-border bg-muted/40 p-1">
-        {[
-          ["targets", "Target count"],
-          ["loss", "Loss sources"],
-          ["error_intensity", "Error intensity"],
-        ].map(([mode, label]) => (
-          <button
-            key={mode}
-            type="button"
-            role="tab"
-            aria-selected={value === mode}
-            onClick={() => onChange(mode as CalibrationTreeSizeMode)}
-            className={`h-8 rounded-md px-3 text-[13px] font-medium ${
-              value === mode
-                ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <SegmentedControl
+      label="Size boxes by"
+      value={value}
+      onChange={onChange}
+      options={[
+        { value: "targets", label: "Target count" },
+        { value: "loss", label: "Loss sources" },
+        { value: "error_intensity", label: "Error intensity" },
+      ]}
+    />
   );
 }
 
@@ -237,9 +279,8 @@ function FilterBar({
   ];
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Filter by</span>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <MultiSelectFilter
           label="Geography level"
           options={data.filterOptions.geographyLevels}
@@ -277,7 +318,7 @@ function FilterBar({
         )}
       </div>
       {active.length > 0 && (
-        <div className="flex flex-wrap justify-end gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {active.map((item) => (
             <button
               type="button"
@@ -297,6 +338,36 @@ function FilterBar({
         </div>
       )}
     </div>
+  );
+}
+
+function FilterMenu({
+  data,
+  state,
+  onFilters,
+}: {
+  data: CalibrationTreeResponse;
+  state: ExplorerState;
+  onFilters: (filters: ExplorerFilters) => void;
+}) {
+  const activeCount =
+    state.filters.geographyLevels.length +
+    state.filters.geographies.length +
+    state.filters.fitBands.length +
+    state.filters.calibrationStatuses.length;
+
+  return (
+    <details className="group relative shrink-0">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted/40 hover:text-foreground [&::-webkit-details-marker]:hidden">
+        <span>Filters{activeCount ? ` · ${activeCount}` : ""}</span>
+        <span aria-hidden="true" className="text-xs transition-transform group-open:rotate-180">
+          ▾
+        </span>
+      </summary>
+      <div className="absolute right-0 top-full z-50 mt-2 w-[min(42rem,calc(100vw-2rem))] rounded-lg border border-border bg-card p-3 shadow-xl">
+        <FilterBar data={data} state={state} onFilters={onFilters} />
+      </div>
+    </details>
   );
 }
 
@@ -345,15 +416,15 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <div className="shrink-0">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <BreakdownControl
+            value={state.breakdown}
+            onChange={(breakdown) => dispatch({ type: "breakdown", breakdown })}
+          />
           <SizeControl value={sizeMode} onChange={setSizeMode} />
         </div>
-        <div className="ml-auto max-w-full flex-none">
-          <FilterBar
-            data={data}
-            state={state}
-            onFilters={(filters) => dispatch({ type: "filters", filters })}
-          />
+        <div className="ml-auto shrink-0">
+          <FitLegend />
         </div>
       </div>
 
@@ -385,9 +456,11 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
             ))}
           </nav>
         </div>
-        <div className="shrink-0">
-          <FitLegend />
-        </div>
+        <FilterMenu
+          data={data}
+          state={state}
+          onFilters={(filters) => dispatch({ type: "filters", filters })}
+        />
       </div>
 
       <div ref={containerRef} className="relative w-full" style={{ height }}>
