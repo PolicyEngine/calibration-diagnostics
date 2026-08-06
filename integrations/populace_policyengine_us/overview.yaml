@@ -2,6 +2,15 @@ schema_version: evaluation_harness.integration_overview.v1
 integration_id: populace_policyengine_us_2024
 ledger_snapshot_id: ledger-7917ea815df710fb20db076b
 verification_facts_file: ledger_snapshot_fixture/facts.jsonl
+alignment_policy:
+  model_id: cbo_growth_factor_aging
+  model_version: 1.2.0
+  populace_commit: cae8640f9e65e274aea65c7916cb37b956978e32
+  source_module: packages/populace-build/src/populace/build/us_runtime/target_aging.py
+  source_years: [2023]
+  build_year: 2024
+  evaluate_transformed_facts: true
+  display_observed_and_transformed_values: true
 source:
   source_id: populace_us_policyengine_us_2024
   source_type: model_dataset_pair

@@ -25,6 +25,7 @@ class IntegrationOverview:
     ledger_snapshot_id: str
     source: EvaluationSourceManifest
     verification_facts: tuple[FactContract, ...]
+    alignment_policy: dict[str, Any]
     overview_path: Path
 
 
@@ -97,6 +98,7 @@ def load_integration_overview(path: str | Path) -> IntegrationOverview:
         ledger_snapshot_id=_required(payload, "ledger_snapshot_id", "integration overview"),
         source=_source_manifest(_required(payload, "source", "integration overview")),
         verification_facts=facts,
+        alignment_policy=dict(payload.get("alignment_policy", {})),
         overview_path=overview_path,
     )
 

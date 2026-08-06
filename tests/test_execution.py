@@ -7,6 +7,7 @@ import pytest
 
 from evaluation_harness.contracts import (
     AggregateQuery,
+    AlignedFact,
     AlignmentQuality,
     CalibrationExposure,
     CapabilityResult,
@@ -217,5 +218,45 @@ def test_publish_run_is_immutable_and_writes_json_and_parquet(tmp_path: Path) ->
     assert (output / "estimates.jsonl").exists()
     assert pq.read_table(output / "capabilities.parquet").num_rows == 1
     assert pq.read_table(output / "estimates.parquet").num_rows == 1
+    assert (output / "alignments.jsonl").read_text() == ""
     with pytest.raises(FileExistsError):
         publish_run(output, [cap], [result])
+
+
+def test_publish_run_carries_the_observed_and_aged_benchmarks(tmp_path: Path) -> None:
+    cap = replace(
+        capability("aged", "income"),
+        status=CapabilityStatus.PROJECTED,
+        fact_period=TypedPeriod.parse("tax_year:2023"),
+        period_treatment=PeriodTreatment.ALIGNED_FACT,
+        alignment_id="cbo_growth_factor_aging@1.2.0:aged",
+        alignment_quality=AlignmentQuality.VALIDATED,
+        score_eligible=False,
+    )
+    result = EvaluationResult.from_capability(
+        cap,
+        estimate=Decimal("115"),
+        dataset_version="data-v1",
+        model_version="model-v1",
+    )
+    alignment = AlignedFact(
+        alignment_id=cap.alignment_id,
+        source_fact_key=cap.fact_key,
+        observed_period=TypedPeriod.parse("tax_year:2023"),
+        observed_value=Decimal("100"),
+        target_period=TypedPeriod.parse("tax_year:2024"),
+        aligned_value=Decimal("110"),
+        alignment_model="cbo_growth_factor_aging",
+        alignment_version="1.2.0",
+        factor_sources=("cbo.ty2024.agi",),
+        method_quality=AlignmentQuality.VALIDATED,
+        backtest_error=None,
+        metadata={"aging_factor": "1.1", "note": "Aged using Populace logic."},
+    )
+    output = tmp_path / "aged-run"
+    manifest = publish_run(output, [cap], [result], [alignment])
+    row = __import__("json").loads((output / "alignments.jsonl").read_text())
+    assert manifest["alignment_count"] == 1
+    assert row["observed_value"] == "100"
+    assert row["aligned_value"] == "110"
+    assert row["metadata"]["note"] == "Aged using Populace logic."

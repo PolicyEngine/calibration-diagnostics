@@ -103,8 +103,9 @@ hide a bad result after execution.
 
 This adapter will **not** claim that the 2024 Populace population natively
 represents 2023. The source manifest therefore declares only `calendar_year:2024`
-and `tax_year:2024` as native fact periods. The test suite takes a valid 2024
-population fact, changes it to 2023, and requires `unsupported_period`.
+and `tax_year:2024` as native fact periods. Instead, it automatically compiles
+fact-specific 2023-to-2024 alignments and evaluates the resulting 2024 targets.
+Without that alignment, the same fact still receives `unsupported_period`.
 
 Some targets used while building Populace originate in older Ledger observations
 and are transformed to 2024. In that case the build compares its 2024 estimate
@@ -113,19 +114,41 @@ For example, current release diagnostics carry fields such as `source_period`,
 `target_period`, `aged_to`, `aging_factor`, `aging_factor_source`,
 `alignment_model_id`, and `alignment_model_version` for transformed targets.
 
-The evaluation harness keeps those two propositions separate:
+The evaluation harness keeps those two propositions separate while still
+scoring the transformed comparison:
 
-1. A raw `tax_year:2023` or `calendar_year:2023` Ledger fact remains a 2023
-   fact and is not directly scored against the 2024 Populace population.
-2. It becomes comparable only through a reviewed `AlignmentDeclaration` that
-   creates a derived target with a pinned factor, source, model/version, and
-   preferably a backtest error. That result is labeled `projected`, retains the
-   original fact key and both periods, and is excluded from headline scores by
-   default.
+1. A raw `tax_year:2023` or `calendar_year:2023` Ledger fact remains preserved
+   as the observed value.
+2. The harness applies Populace's `cbo_growth_factor_aging` version `1.2.0`,
+   from Populace commit `cae8640f9e65e274aea65c7916cb37b956978e32`, to
+   create the benchmark actually compared with the 2024 estimate.
+3. The result is labeled `projected` and publishes the original value and
+   period, transformed value and period, factor, factor source, model/version,
+   Populace commit, and a human-readable note.
+4. The Cross-dataset page will score these facts in their transformed group and
+   visibly distinguish that score from native-2024 and calibration-fit scores.
 
-There is no blanket “age every 2023 dollar by CPI” behavior. Different concepts
-require different projection sources, and count facts may require population or
-program-specific projections rather than monetary uprating.
+There is no blanket “age every 2023 dollar by CPI” behavior. The implementation
+matches Populace's source module
+`packages/populace-build/src/populace/build/us_runtime/target_aging.py`:
+
+- USD sums use their matching CBO income-by-source series when one is declared.
+- Other USD sums fall back to the CBO AGI series.
+- A source year before the CBO projection surface chains observed national SOI
+  growth to the first CBO year and CBO growth from there to the build year.
+- Counts and non-USD facts use an explicit identity factor and remain raw.
+- Publisher projections are not projected a second time.
+- Missing or conflicting factor facts fail explicitly; no generic substitute is
+  invented.
+
+Parity is tested against an actual current-release row: the 2023 Federal
+Reserve household/net-worth observation of $156.0807 trillion transforms to
+$169,693,039,350,639.20, exactly matching the current Populace diagnostics.
+Across the locally compiled current Ledger source-year snapshot, the same pass
+classified all 28,914 US 2023 facts: 14,437 dollar facts were aged, 14,471
+count/non-USD facts received Populace's identity treatment, and six publisher
+projections remained at their published level. All 28,914 had a valid explicit
+outcome; a future missing factor will remain visible as `unavailable`.
 
 The same caution is why this first ten-fact gate does not yet use December 2024
 Medicaid enrollment or fiscal-year 2024 SNAP averages. Both are present in the
@@ -147,7 +170,7 @@ After approval, adapter implementation starts with failing tests for:
 7. entity alignment and rejection of mismatched array lengths;
 8. deterministic aggregation and cache keys;
 9. all ten facts producing finite estimates and scored results; and
-10. 2023 remaining unsupported without an explicit alignment declaration.
+10. 2023 facts executing only through the pinned, visibly published alignment.
 
 The adapter checkpoint passes only when the ten real facts execute end to end;
 ten unsupported or `N/A` cells cannot satisfy it.
