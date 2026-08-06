@@ -2,6 +2,7 @@
 name = "calibration-diagnostics-harness"
 version = "0.1.0"
 requires-python = ">=3.11"
+dependencies = ["pyyaml>=6,<7"]
 
 [project.scripts]
 evaluation-harness = "evaluation_harness.cli:main"
