@@ -74,6 +74,7 @@ mappings:
     required_variables: [eitc, adjusted_gross_income]
     mapping_quality: exact
     supported_dimensions: [income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
     supported_constraint_variables:
       - us:statutes/26/62#adjusted_gross_income
@@ -91,6 +92,7 @@ mappings:
     required_variables: [eitc, adjusted_gross_income]
     mapping_quality: exact
     supported_dimensions: [income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
     supported_constraint_variables:
       - us:statutes/26/62#adjusted_gross_income
@@ -108,6 +110,7 @@ mappings:
     required_variables: [employment_income]
     mapping_quality: exact
     supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
     supported_constraint_domains: [compensation_of_employees]
     supported_constraint_variables: [bea_nipa.series_code]
     calibration_exposure: direct_calibration_target

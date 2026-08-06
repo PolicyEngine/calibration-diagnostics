@@ -4,6 +4,14 @@ version = "0.1.0"
 requires-python = ">=3.11,<3.14"
 dependencies = ["numpy>=1.26,<3", "pyarrow>=18,<24", "pyyaml>=6,<7"]
 
+[project.optional-dependencies]
+populace = [
+  "pandas>=2.2,<3",
+  "policyengine-core==3.26.11",
+  "policyengine-us==1.764.6",
+  "tables>=3.10,<4",
+]
+
 [project.scripts]
 evaluation-harness = "evaluation_harness.cli:main"
 

@@ -99,6 +99,51 @@ def test_planner_compiles_an_exact_direct_query() -> None:
     assert result.query.value_expression == "adjusted_gross_income"
     assert result.query.weight == "tax_unit_weight"
     assert result.score_eligible
+    assert {"dimension": "__geography__", "value": "0100000US"} in (
+        result.query.constraints
+    )
+
+
+def test_planner_normalizes_ledger_comparison_operators() -> None:
+    constrained = fact(
+        universe_constraints=(
+            {"domain": "all_individual_income_tax_returns"},
+            {
+                "variable": "adjusted_gross_income",
+                "operator": ">=",
+                "value": 10_000,
+            },
+            {
+                "variable": "adjusted_gross_income",
+                "operator": "<",
+                "value": 15_000,
+            },
+        )
+    )
+    data = registry().to_data()
+    data["mappings"][0]["supported_constraint_variables"] = [
+        "adjusted_gross_income"
+    ]
+    result = CapabilityPlanner(MappingRegistry.from_data(data)).classify(
+        constrained, source()
+    )
+    operators = {
+        constraint.get("operator")
+        for constraint in result.query.constraints
+        if "operator" in constraint
+    }
+    assert operators == {"gte", "lt"}
+
+
+def test_descriptive_dimensions_do_not_create_duplicate_row_filters() -> None:
+    data = registry().to_data()
+    data["mappings"][0]["descriptive_dimensions"] = ["income_range"]
+    result = CapabilityPlanner(MappingRegistry.from_data(data)).classify(
+        fact(), source()
+    )
+    assert {"dimension": "income_range", "value": "all"} not in (
+        result.query.constraints
+    )
 
 
 def test_planner_compiles_model_query_for_established_pair() -> None:

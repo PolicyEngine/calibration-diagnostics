@@ -42,6 +42,7 @@ class MappingRule:
     required_variables: tuple[str, ...]
     mapping_quality: MappingQuality
     supported_dimensions: frozenset[str]
+    descriptive_dimensions: frozenset[str]
     supported_constraint_domains: frozenset[str]
     supported_constraint_variables: frozenset[str]
     calibration_exposure: CalibrationExposure
@@ -67,6 +68,9 @@ class MappingRule:
             required_variables=tuple(payload.get("required_variables", ())),
             mapping_quality=MappingQuality(payload.get("mapping_quality", "exact")),
             supported_dimensions=frozenset(payload.get("supported_dimensions", ())),
+            descriptive_dimensions=frozenset(
+                payload.get("descriptive_dimensions", ())
+            ),
             supported_constraint_domains=frozenset(
                 payload.get("supported_constraint_domains", ())
             ),
@@ -98,6 +102,7 @@ class MappingRule:
             "required_variables": list(self.required_variables),
             "mapping_quality": self.mapping_quality.value,
             "supported_dimensions": sorted(self.supported_dimensions),
+            "descriptive_dimensions": sorted(self.descriptive_dimensions),
             "supported_constraint_domains": sorted(self.supported_constraint_domains),
             "supported_constraint_variables": sorted(self.supported_constraint_variables),
             "calibration_exposure": self.calibration_exposure.value,
