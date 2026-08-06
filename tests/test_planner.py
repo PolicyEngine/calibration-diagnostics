@@ -146,6 +146,17 @@ def test_descriptive_dimensions_do_not_create_duplicate_row_filters() -> None:
     )
 
 
+def test_all_dimension_is_a_total_label_not_a_row_filter() -> None:
+    data = registry().to_data()
+    data["mappings"][0]["descriptive_dimensions"] = []
+    result = CapabilityPlanner(MappingRegistry.from_data(data)).classify(
+        fact(), source()
+    )
+    assert {"dimension": "income_range", "value": "all"} not in (
+        result.query.constraints
+    )
+
+
 def test_planner_compiles_model_query_for_established_pair() -> None:
     result = CapabilityPlanner(registry(execution="model")).classify(fact(), source())
     assert result.status is CapabilityStatus.MODEL

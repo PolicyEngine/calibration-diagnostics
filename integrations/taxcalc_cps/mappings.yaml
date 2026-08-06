@@ -7,13 +7,53 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: iitax
+    source_expression: positive_iitax
     operation: weighted_count
-    required_variables: [iitax]
+    required_variables: [positive_iitax]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
-    descriptive_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-eitc-by-children
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.earned_income_credit]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c59660
+    operation: weighted_sum
+    required_variables: [c59660, EIC]
+    mapping_quality: exact
+    supported_dimensions: [eitc_child_count, filing_status, income_range]
+    descriptive_dimensions: [eitc_child_count, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us.tax.earned_income_credit_qualifying_children
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-eitc-return-count-by-children
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_earned_income_credit]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c59660
+    operation: weighted_count
+    required_variables: [c59660, EIC]
+    mapping_quality: exact
+    supported_dimensions: [eitc_child_count, filing_status, income_range]
+    descriptive_dimensions: [eitc_child_count, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us.tax.earned_income_credit_qualifying_children
+      - us:statutes/26/62#adjusted_gross_income
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-adjusted-gross-income
@@ -29,7 +69,7 @@ mappings:
     required_variables: [c00100]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
-    descriptive_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
     calibration_exposure: external_validation
 
@@ -59,7 +99,7 @@ mappings:
     required_variables: [e00300]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
-    descriptive_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
     calibration_exposure: external_validation
 
@@ -75,7 +115,7 @@ mappings:
     required_variables: [e00600]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
-    descriptive_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
     calibration_exposure: external_validation
 
@@ -91,7 +131,7 @@ mappings:
     required_variables: [e01700]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
-    descriptive_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
     calibration_exposure: external_validation
 
@@ -107,7 +147,7 @@ mappings:
     required_variables: [c02500]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
-    descriptive_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
     calibration_exposure: external_validation
 
@@ -123,7 +163,7 @@ mappings:
     required_variables: [e02300]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
-    descriptive_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
     calibration_exposure: external_validation
 
@@ -139,7 +179,7 @@ mappings:
     required_variables: [iitax]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
-    descriptive_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
     calibration_exposure: external_validation
 
@@ -157,4 +197,6 @@ mappings:
     supported_dimensions: [income_range]
     descriptive_dimensions: [income_range]
     supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us:statutes/26/62#adjusted_gross_income
     calibration_exposure: external_validation

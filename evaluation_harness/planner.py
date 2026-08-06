@@ -242,6 +242,7 @@ class CapabilityPlanner:
                     {"dimension": key, "value": value}
                     for key, value in sorted(fact.dimensions.items())
                     if key not in mapping.descriptive_dimensions
+                    and str(value).lower() not in {"all", "total"}
                 ],
             ]
             + [self._query_constraint(constraint) for constraint in fact.universe_constraints]

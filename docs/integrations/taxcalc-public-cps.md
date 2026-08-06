@@ -1,6 +1,6 @@
 # Tax-Calculator / public CPS integration overview
 
-Status: **awaiting confirmation before adapter implementation**
+Status: **adapter implemented and verified against Tax-Calculator 6.7.1**
 
 This pairing uses Tax-Calculator 6.7.1's bundled public CPS records. The CPS
 microdata are a 2014 base that Tax-Calculator advances to 2024 using its growth
@@ -8,7 +8,7 @@ factors and year-specific weights; therefore every checkpoint result is labeled
 `advanced_population`, not native 2024 data. Policy parameters and calculated
 variables are evaluated for tax year 2024.
 
-The adapter will construct `Records.cps_constructor()`, create one `Calculator`,
+The adapter constructs `Records.cps_constructor()`, creates one `Calculator`,
 call `advance_to_year(2024)` and `calc_all()` once, and expose Tax-Calculator
 arrays to the shared aggregator. Inputs such as `e00200`, `e00300`, `e00600`,
 `e01700`, and `e02300` are read directly after advancement. Derived concepts
@@ -35,6 +35,37 @@ These are ten exact numeric rows from Ledger snapshot
 `ledger-7917ea815df710fb20db076b`. They span ten concepts, include a count and
 dollar amounts, and all have concrete Tax-Calculator expressions. The adapter
 checkpoint will run all ten; unsupported results cannot pass it.
+
+The actual checkpoint returned ten finite estimates and no unsupported results:
+
+| Ledger fact | Relative error |
+|---|---:|
+| Returns with income-tax liability | 4.794% |
+| Adjusted gross income | 5.592% |
+| CBO wages and salaries projection | 2.914% |
+| Taxable interest | 6.860% |
+| Ordinary dividends | 79.308% |
+| Taxable pensions and annuities | 3.401% |
+| Taxable Social Security | 38.845% |
+| Unemployment compensation | 5.648% |
+| Income-tax liability after credits | 8.920% |
+| Earned income tax credit | 17.960% |
+
+The large dividend and Social Security errors remain visible results; they are
+not converted to missing coverage. `scripts/verify_taxcalc_cps_adapter.py`
+reproduces this gate directly from the bundled public CPS.
+
+## Breakdown coverage
+
+The ten-fact gate uses national totals, but the adapter is not limited to those
+totals. It exposes normalized filing status and EITC qualifying-child arrays,
+maps Ledger's canonical AGI and qualifying-child variables to `c00100` and
+`EIC`, and applies Ledger's explicit comparison operators for income bands and
+child groups. A full pass over the pinned snapshot produced 38 finite 2024
+results: the ten checkpoint totals plus all currently mapped EITC income-band
+and qualifying-child facts. Older-period facts remain explicit unsupported
+periods until a year-specific source run is declared; they are not silently
+evaluated with 2024 arrays.
 
 All ten comparisons are external validation, not calibration fit. A poor public
 CPS estimate remains a valid test result and must not be dropped after seeing
