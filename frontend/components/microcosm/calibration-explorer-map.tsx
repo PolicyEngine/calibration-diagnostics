@@ -400,7 +400,6 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   const { data, isLoading, error } = useMicrocosmCalibrationTree(state, release);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
-  const breadcrumbsRef = useRef<HTMLDivElement>(null);
   const explanationRef = useRef<HTMLParagraphElement>(null);
   const [width, setWidth] = useState(960);
   const [height, setHeight] = useState(680);
@@ -421,22 +420,15 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
 
       const navbarHeight = navbar?.getBoundingClientRect().height ?? 0;
       const introductionHeight = stackedElementHeight(introductionParts);
-      const chartChromeElements: HTMLElement[] = [];
-      if (controlsRef.current) chartChromeElements.push(controlsRef.current);
-      if (breadcrumbsRef.current) {
-        chartChromeElements.push(breadcrumbsRef.current);
-      }
-      if (explanationRef.current) {
-        chartChromeElements.push(explanationRef.current);
-      }
-      const excludedChartChromeHeight =
-        stackedElementHeight(chartChromeElements);
+      const reclaimedChartChromeHeight =
+        (controlsRef.current?.getBoundingClientRect().height ?? 0) +
+        (explanationRef.current?.getBoundingClientRect().height ?? 0);
       setHeight(
         explorerMapHeight(
           window.innerHeight,
           navbarHeight,
           introductionHeight,
-          excludedChartChromeHeight,
+          reclaimedChartChromeHeight,
         ),
       );
     };
@@ -447,7 +439,6 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
     if (navbar) observer.observe(navbar);
     introductionParts.forEach((part) => observer.observe(part));
     if (controlsRef.current) observer.observe(controlsRef.current);
-    if (breadcrumbsRef.current) observer.observe(breadcrumbsRef.current);
     if (explanationRef.current) observer.observe(explanationRef.current);
     window.addEventListener("resize", updateSize);
     return () => {
@@ -500,7 +491,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         </div>
       </div>
 
-      <div ref={breadcrumbsRef} className="flex items-center gap-4">
+      <div className="flex items-center gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {upLabel && (
             <button
