@@ -422,6 +422,11 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
             onChange={(breakdown) => dispatch({ type: "breakdown", breakdown })}
           />
           <SizeControl value={sizeMode} onChange={setSizeMode} />
+          <FilterMenu
+            data={data}
+            state={state}
+            onFilters={(filters) => dispatch({ type: "filters", filters })}
+          />
         </div>
         <div className="ml-auto shrink-0">
           <FitLegend />
@@ -435,7 +440,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
               type="button"
               title={upLabel}
               onClick={() => dispatch({ type: "up" })}
-              className="block max-w-[40%] shrink-0 truncate whitespace-nowrap rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+              className="block max-w-[40%] shrink-0 truncate whitespace-nowrap text-xs font-medium text-primary hover:underline"
             >
               ← {upLabel}
             </button>
@@ -456,11 +461,6 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
             ))}
           </nav>
         </div>
-        <FilterMenu
-          data={data}
-          state={state}
-          onFilters={(filters) => dispatch({ type: "filters", filters })}
-        />
       </div>
 
       <div ref={containerRef} className="relative w-full" style={{ height }}>
