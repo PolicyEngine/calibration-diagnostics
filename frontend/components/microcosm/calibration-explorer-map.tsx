@@ -399,6 +399,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   );
   const { data, isLoading, error } = useMicrocosmCalibrationTree(state, release);
   const containerRef = useRef<HTMLDivElement>(null);
+  const explanationRef = useRef<HTMLParagraphElement>(null);
   const [width, setWidth] = useState(960);
   const [height, setHeight] = useState(680);
   const [sizeMode, setSizeMode] = useState<CalibrationTreeSizeMode>("targets");
@@ -418,11 +419,14 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
 
       const navbarHeight = navbar?.getBoundingClientRect().height ?? 0;
       const introductionHeight = stackedElementHeight(introductionParts);
+      const explanationHeight =
+        explanationRef.current?.getBoundingClientRect().height ?? 0;
       setHeight(
         explorerMapHeight(
           window.innerHeight,
           navbarHeight,
           introductionHeight,
+          explanationHeight,
         ),
       );
     };
@@ -432,6 +436,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
     observer.observe(element);
     if (navbar) observer.observe(navbar);
     introductionParts.forEach((part) => observer.observe(part));
+    if (explanationRef.current) observer.observe(explanationRef.current);
     window.addEventListener("resize", updateSize);
     return () => {
       observer.disconnect();
@@ -577,7 +582,10 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         )}
       </div>
 
-      <p className="text-[12px] leading-relaxed text-muted-foreground">
+      <p
+        ref={explanationRef}
+        className="text-[12px] leading-relaxed text-muted-foreground"
+      >
         Each tile is a group of calibration targets. Area shows{" "}
         <span className="font-medium text-foreground">
           {explorerSizePhrase(sizeMode)}

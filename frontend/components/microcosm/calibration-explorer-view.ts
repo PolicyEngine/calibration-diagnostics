@@ -127,9 +127,15 @@ export function explorerMapHeight(
   viewportHeight: number,
   navbarHeight: number,
   pageIntroductionHeight: number,
+  chartExplanationHeight: number,
 ): number {
   return Math.max(
-    Math.round(viewportHeight - navbarHeight - pageIntroductionHeight),
+    Math.round(
+      viewportHeight -
+        navbarHeight -
+        pageIntroductionHeight -
+        chartExplanationHeight,
+    ),
     0,
   );
 }
