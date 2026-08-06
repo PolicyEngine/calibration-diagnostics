@@ -18,6 +18,7 @@ from evaluation_harness.full_run import (
     build_scored_results,
     load_snapshot_facts,
 )
+from evaluation_harness.frontend_bundle import publish_frontend_bundle
 from evaluation_harness.integration import load_integration_overview
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.populace_aging import (
@@ -176,8 +177,19 @@ def run(snapshot: Path, populace_dataset: Path, output: Path) -> dict:
         scores=scores,
         summary=summary,
     )
+    frontend_manifest = publish_frontend_bundle(
+        snapshot,
+        output,
+        output / "frontend",
+    )
     print(
         f"Published immutable run {manifest['run_id']} to {output}.",
+        flush=True,
+    )
+    print(
+        "Published Cross-dataset frontend bundle "
+        f"({frontend_manifest['page_count']} fact partitions) to "
+        f"{output / 'frontend'}.",
         flush=True,
     )
     print(json.dumps(summary, indent=2, sort_keys=True), flush=True)
