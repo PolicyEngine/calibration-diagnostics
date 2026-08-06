@@ -1,0 +1,33 @@
+schema_version: evaluation_harness.integration_overview.v1
+integration_id: populace_policyengine_us_2024
+ledger_snapshot_id: ledger-7917ea815df710fb20db076b
+verification_facts_file: ledger_snapshot_fixture/facts.jsonl
+source:
+  source_id: populace_us_policyengine_us_2024
+  source_type: model_dataset_pair
+  dataset_version: populace-us-2024@populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z
+  model_version: policyengine-us==1.764.6
+  jurisdictions: [US]
+  population_period: calendar_year:2024
+  policy_period: tax_year:2024
+  native_fact_periods:
+    - calendar_year:2024
+    - tax_year:2024
+  advanced_fact_periods: []
+  geographies:
+    - country
+    - state
+    - congressional_district
+  entities:
+    - person
+    - household
+    - tax_unit
+  weights:
+    person: person_weight
+    household: household_weight
+    tax_unit: tax_unit_weight
+  geography_methods:
+    country: fixed_country
+    state: state_fips
+    congressional_district: congressional_district_geoid
+  available: true

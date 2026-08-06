@@ -218,6 +218,16 @@ mappings:
     assert loaded.mappings[0].mapping_id == "us.soi.agi.v1"
 
 
+def test_mapping_registry_can_scope_a_mapping_to_reviewed_fact_keys() -> None:
+    data = registry().to_data()
+    data["mappings"][0]["ledger_selector"]["fact_keys"] = [fact().fact_key]
+    scoped = MappingRegistry.from_data(data)
+    assert scoped.match(fact()) is not None
+    assert scoped.match(
+        fact(fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")
+    ) is None
+
+
 def test_capability_classification_has_no_estimate_input() -> None:
     parameters = CapabilityPlanner.classify.__annotations__
     assert "estimate" not in parameters
