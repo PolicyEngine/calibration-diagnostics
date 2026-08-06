@@ -399,6 +399,8 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   );
   const { data, isLoading, error } = useMicrocosmCalibrationTree(state, release);
   const containerRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const breadcrumbsRef = useRef<HTMLDivElement>(null);
   const explanationRef = useRef<HTMLParagraphElement>(null);
   const [width, setWidth] = useState(960);
   const [height, setHeight] = useState(680);
@@ -419,14 +421,22 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
 
       const navbarHeight = navbar?.getBoundingClientRect().height ?? 0;
       const introductionHeight = stackedElementHeight(introductionParts);
-      const explanationHeight =
-        explanationRef.current?.getBoundingClientRect().height ?? 0;
+      const chartChromeElements: HTMLElement[] = [];
+      if (controlsRef.current) chartChromeElements.push(controlsRef.current);
+      if (breadcrumbsRef.current) {
+        chartChromeElements.push(breadcrumbsRef.current);
+      }
+      if (explanationRef.current) {
+        chartChromeElements.push(explanationRef.current);
+      }
+      const excludedChartChromeHeight =
+        stackedElementHeight(chartChromeElements);
       setHeight(
         explorerMapHeight(
           window.innerHeight,
           navbarHeight,
           introductionHeight,
-          explanationHeight,
+          excludedChartChromeHeight,
         ),
       );
     };
@@ -436,6 +446,8 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
     observer.observe(element);
     if (navbar) observer.observe(navbar);
     introductionParts.forEach((part) => observer.observe(part));
+    if (controlsRef.current) observer.observe(controlsRef.current);
+    if (breadcrumbsRef.current) observer.observe(breadcrumbsRef.current);
     if (explanationRef.current) observer.observe(explanationRef.current);
     window.addEventListener("resize", updateSize);
     return () => {
@@ -467,7 +479,10 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   }));
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+      <div
+        ref={controlsRef}
+        className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"
+      >
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
           <BreakdownControl
             value={state.breakdown}
@@ -485,7 +500,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div ref={breadcrumbsRef} className="flex items-center gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {upLabel && (
             <button
@@ -515,7 +530,11 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         </div>
       </div>
 
-      <div ref={containerRef} className="relative w-full" style={{ height }}>
+      <div
+        ref={containerRef}
+        className="relative w-full"
+        style={{ height }}
+      >
         {laidGroups.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/10 px-6 text-center">
             <p className="text-sm text-muted-foreground">{explorerEmptyMessage(state)}</p>

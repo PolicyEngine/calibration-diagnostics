@@ -33,9 +33,9 @@ function state(
 
 describe("calibration explorer presentation model", () => {
   test("sizes the map from the viewport after navbar and page introduction", () => {
-    expect(explorerMapHeight(1080, 64, 156, 48)).toBe(812);
-    expect(explorerMapHeight(1440, 64, 156, 48)).toBe(1172);
-    expect(explorerMapHeight(480, 64, 156, 48)).toBe(212);
+    expect(explorerMapHeight(1080, 64, 156, 140)).toBe(1000);
+    expect(explorerMapHeight(1440, 64, 156, 140)).toBe(1360);
+    expect(explorerMapHeight(480, 64, 156, 140)).toBe(400);
   });
 
   test("resolves program labels at the final presentation boundary", () => {
