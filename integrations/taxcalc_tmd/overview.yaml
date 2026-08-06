@@ -1,0 +1,20 @@
+schema_version: evaluation_harness.integration_overview.v1
+integration_id: taxcalc_tmd_2024
+ledger_snapshot_id: ledger-7917ea815df710fb20db076b
+verification_facts_file: ledger_snapshot_fixture/facts.jsonl
+alignment_policy: {}
+source:
+  source_id: taxcalc_tmd_2024
+  source_type: model_dataset_pair
+  dataset_version: tax-microdata-benchmarking==2.1.3
+  model_version: taxcalc==6.7.1
+  jurisdictions: [US]
+  population_period: tax_year:2024
+  policy_period: tax_year:2024
+  native_fact_periods: []
+  advanced_fact_periods: [tax_year:2024]
+  geographies: [country]
+  entities: [tax_unit]
+  weights: {tax_unit: s006}
+  geography_methods: {country: fixed_country}
+  available: true
