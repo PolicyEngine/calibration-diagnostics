@@ -187,6 +187,7 @@ class AggregateQuery:
     value_expression: str
     weight: str
     constraints: tuple[dict[str, Any], ...] = ()
+    denominator_expression: str | None = None
 
 
 @dataclass(frozen=True)
