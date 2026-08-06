@@ -658,10 +658,10 @@ export function CalibrationMap({
               : "its Huberized error intensity"}
         </span>
         ; color shows the median gap between the weighted data and the official
-        figure. Error intensity is a Huberized per-target relative error: it
-        behaves like RMSE for ordinary misses, then grows linearly for extreme
-        outliers so one pathological target does not dominate the map. Hover for
-        detail, click a tile to pop out its targets.
+        figure. Error intensity is a per-target Huberized relative error:
+        ordinary misses are scored by their squared size, but very large misses
+        are softened so one pathological target does not dominate the map. Hover
+        for detail, click a tile to pop out its targets.
       </p>
     </div>
   );
