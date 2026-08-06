@@ -1,5 +1,5 @@
-// These are exact, domain-approved labels—not guesses based on identifier length.
-const PROGRAM_LABEL_OVERRIDES: Readonly<Record<string, string>> = {
+// These are exact, domain-approved tokens—not guesses based on word length.
+const PROGRAM_ACRONYM_LABELS: Readonly<Record<string, string>> = {
   aca: "ACA",
   actc: "ACTC",
   agi: "AGI",
@@ -43,9 +43,12 @@ export function programLabel(
 
   if (!identifier?.trim()) return "";
   const key = canonicalProgramKey(identifier);
-  const override = PROGRAM_LABEL_OVERRIDES[key];
-  if (override) return override;
-
-  const phrase = key.replaceAll("_", " ");
-  return phrase[0].toUpperCase() + phrase.slice(1);
+  return key
+    .split("_")
+    .map((token, index) => {
+      const acronym = PROGRAM_ACRONYM_LABELS[token];
+      if (acronym) return acronym;
+      return index === 0 ? token[0].toUpperCase() + token.slice(1) : token;
+    })
+    .join(" ");
 }

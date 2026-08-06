@@ -9,6 +9,13 @@ describe("programLabel", () => {
     expect(programLabel("agi")).toBe("AGI");
   });
 
+  test("preserves curated acronyms inside multiword program identifiers", () => {
+    expect(programLabel("ira distributions")).toBe("IRA distributions");
+    expect(programLabel("salt deduction")).toBe("SALT deduction");
+    expect(programLabel("assigned aca ptc")).toBe("Assigned ACA PTC");
+    expect(programLabel("refundable ctc")).toBe("Refundable CTC");
+  });
+
   test("sentence-cases ordinary canonical identifiers", () => {
     expect(programLabel("taxable_interest_income")).toBe(
       "Taxable interest income",
