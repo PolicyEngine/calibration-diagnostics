@@ -20,10 +20,12 @@ class LedgerSelector:
     measures: frozenset[str]
     units: frozenset[str]
     entities: frozenset[str]
+    fact_keys: frozenset[str] = frozenset()
 
     def matches(self, fact: FactContract) -> bool:
         return (
-            fact.source in self.sources
+            (not self.fact_keys or fact.fact_key in self.fact_keys)
+            and fact.source in self.sources
             and fact.measure in self.measures
             and fact.unit in self.units
             and fact.entity in self.entities
@@ -57,6 +59,7 @@ class MappingRule:
                 measures=frozenset(selector["measures"]),
                 units=frozenset(selector["units"]),
                 entities=frozenset(selector["entities"]),
+                fact_keys=frozenset(selector.get("fact_keys", ())),
             ),
             execution=execution,
             source_expression=payload["source_expression"],
@@ -83,6 +86,11 @@ class MappingRule:
                 "measures": sorted(self.selector.measures),
                 "units": sorted(self.selector.units),
                 "entities": sorted(self.selector.entities),
+                **(
+                    {"fact_keys": sorted(self.selector.fact_keys)}
+                    if self.selector.fact_keys
+                    else {}
+                ),
             },
             "execution": self.execution.value,
             "source_expression": self.source_expression,
@@ -133,4 +141,3 @@ class MappingRegistry:
                 f"{[mapping.mapping_id for mapping in matches]}"
             )
         return matches[0] if matches else None
-

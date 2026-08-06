@@ -1,0 +1,113 @@
+mapping_release: populace-policyengine-us-2024-overview-v1
+mappings:
+  - mapping_id: census-pep-resident-population-calibration-target
+    ledger_selector:
+      sources: [census_pep]
+      measures: [census_pep.resident_population]
+      units: [count]
+      entities: [person]
+      fact_keys: [ledger.aggregate_fact.v2:caae1a32d55fddfc7562d21d]
+    execution: direct
+    source_expression: __ones__
+    operation: weighted_sum
+    required_variables: [age]
+    mapping_quality: exact
+    supported_constraint_domains: [resident_population]
+    supported_constraint_variables: [age]
+    calibration_exposure: direct_calibration_target
+
+  - mapping_id: census-pep-resident-population-holdouts
+    ledger_selector:
+      sources: [census_pep]
+      measures: [census_pep.resident_population]
+      units: [count]
+      entities: [person]
+      fact_keys:
+        - ledger.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52
+        - ledger.aggregate_fact.v2:5ca7aa68822556e9e9ad9c06
+    execution: direct
+    source_expression: __ones__
+    operation: weighted_sum
+    required_variables: []
+    mapping_quality: exact
+    supported_constraint_domains: [resident_population]
+    calibration_exposure: external_validation
+
+  - mapping_id: census-acs-person-count-holdout
+    ledger_selector:
+      sources: [census_acs]
+      measures: [census_acs.person_count]
+      units: [count]
+      entities: [person]
+    execution: direct
+    source_expression: __ones__
+    operation: weighted_sum
+    required_variables: [age]
+    mapping_quality: exact
+    supported_constraint_domains: [total_population]
+    supported_constraint_variables: [age]
+    calibration_exposure: external_validation
+
+  - mapping_id: census-acs-household-count-holdout
+    ledger_selector:
+      sources: [census_acs]
+      measures: [census_acs.household_count]
+      units: [count]
+      entities: [household]
+    execution: direct
+    source_expression: __ones__
+    operation: weighted_sum
+    required_variables: []
+    mapping_quality: exact
+    supported_constraint_domains: [households]
+    calibration_exposure: external_validation
+
+  - mapping_id: irs-soi-eitc-return-count
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_total_earned_income_credit]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: eitc
+    operation: weighted_count
+    required_variables: [eitc, adjusted_gross_income]
+    mapping_quality: exact
+    supported_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: direct_calibration_target
+
+  - mapping_id: irs-soi-eitc-amount
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.total_earned_income_credit]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: eitc
+    operation: weighted_sum
+    required_variables: [eitc, adjusted_gross_income]
+    mapping_quality: exact
+    supported_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: direct_calibration_target
+
+  - mapping_id: bea-nipa-wages-and-salaries
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.wages_and_salaries]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    source_expression: employment_income
+    operation: weighted_sum
+    required_variables: [employment_income]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [compensation_of_employees]
+    supported_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: direct_calibration_target
