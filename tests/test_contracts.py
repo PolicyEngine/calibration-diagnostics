@@ -59,9 +59,9 @@ def test_fact_contract_round_trips_deterministically() -> None:
     assert FactContract.from_dict(payload).to_json() == fact.to_json()
 
 
-def test_fact_contract_rejects_unknown_unit() -> None:
+def test_fact_contract_rejects_blank_unit() -> None:
     with pytest.raises(ValueError, match="unit"):
-        replace(national_income_fact(), unit="mystery")
+        replace(national_income_fact(), unit="")
 
 
 def test_raw_dataset_capability_cannot_run_a_model() -> None:
@@ -139,4 +139,3 @@ def test_cross_period_capability_requires_alignment() -> None:
             calibration_exposure=CalibrationExposure.DIRECT_CALIBRATION_TARGET,
             score_eligible=False,
         )
-
