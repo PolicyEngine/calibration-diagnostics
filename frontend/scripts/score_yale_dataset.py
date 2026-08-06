@@ -1,14 +1,14 @@
 """Score the Yale Budget Lab reconstruction against PolicyEngine's national
 calibration targets — the SAME surface and cell breakdown used for Tax-Calculator
-CPS and PSL TMD in score_external_dataset.py.
+CPS in score_external_dataset.py.
 
 Yale's federal tax model (Budget-Lab-Yale/Tax-Data + Tax-Simulator) is run,
 unmodified, on the 2015 SOI PUF reweighted to 2017 SOI and projected to 2024. Its
 Tax-Simulator writes per-record 2024 microdata (static/detail/2024.csv). This
 script reproduces each national IRS-SOI target cell (AGI income band + EITC
 qualifying-children group + subpopulation filter) from that detail and emits a
-committed JSON keyed by target `name` -> value, exactly like the taxcalc/TMD
-outputs the frontend already joins.
+committed JSON keyed by target `name` -> value, exactly like the Tax-Calculator
+CPS output the frontend already joins.
 
 Fairness (no over/underfit): identical target spec, identical per-cell logic
 (_cell/_subpop/_parse_band mirror score_external_dataset.py), identical raw units
@@ -36,7 +36,7 @@ OUT_DIR = Path(__file__).resolve().parents[1] / "lib" / "populace" / "external-d
 
 # PolicyEngine target `variable` label -> Yale detail column(s). A record's value
 # for the concept is the (weighted) sum of these columns. Yale is PUF-derived, so
-# it expresses nearly every IRS-SOI concept (like TMD).
+# it expresses nearly every IRS-SOI concept.
 CONCEPT_TO_YALE = {
     "adjusted gross income": ["agi"],
     "employment income": ["wages"],
@@ -67,17 +67,14 @@ CONCEPT_TO_YALE = {
     # "count" (number of returns) is handled specially via the `filer` flag.
 }
 
-# Dropped concepts. Kept IDENTICAL to PSL TMD's drop set so the two PUF-based
-# datasets are scored on exactly the same concept surface (apples-to-apples).
-# TMD_DROP = COMMON_DROP {rent, assigned aca ptc, count} | {real estate taxes, ctc}.
+# Dropped concepts inherited from the previously reviewed comparison surface.
 # This cuts both ways for Yale — it drops `ctc` (where Yale runs high) but also
 # `rent` (where Yale is actually accurate) — so it is a consistency choice, not
 # one tuned to lower Yale's loss. Rationale per concept:
-#   - rent and royalty net income / assigned aca ptc / count: COMMON_DROP (TMD+CPS)
+#   - rent and royalty net income / assigned aca ptc / count: common exclusions
 #   - real estate taxes: Yale reports only combined SALT (salt_item_ded), no
 #     separate SOI Schedule A real-estate-tax split
-#   - ctc: combined refundable+nonrefundable CTC overshoots the SOI line for both
-#     TMD and Yale (definitional mismatch), so both drop it
+#   - ctc: combined refundable+nonrefundable CTC overshoots the SOI line
 # Per-concept detail for the dropped/kept concepts is still visible in the
 # cross-dataset breakdown table, so nothing is hidden.
 YALE_DROP = {
@@ -257,10 +254,9 @@ def main():
             "actual model would probably score somewhat better. "
             "Methodology: PUF-derived tax-unit microdata scored against the identical "
             "national target surface and per-cell breakdown (AGI band + EITC "
-            "qualifying children + subpopulation) as Tax-Calculator CPS and TMD. EITC "
+            "qualifying children + subpopulation) as Tax-Calculator CPS. EITC "
             "children via n_dep_eitc; itemizer subpopulation (table 2.1) via "
-            "itemizing==1; EITC-return AGI (table 2.5) via eitc!=0. Drop set kept "
-            "identical to TMD (both PUF-based). Tax-law parameters indexed to 2024 via "
+            "itemizing==1; EITC-return AGI (table 2.5) via eitc!=0. Tax-law parameters indexed to 2024 via "
             "Yale's chained-CPI indexation."
         ),
         "rows": out,
