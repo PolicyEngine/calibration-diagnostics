@@ -4,6 +4,7 @@ import type {
   ExplorerState,
   FitBand,
 } from "./calibration-explorer";
+import { programLabel } from "./program-label";
 import { sourceLabel } from "./source-label";
 
 const LOSS_ERROR_CAP = 2;
@@ -334,7 +335,7 @@ function programGroups(rows: CalibrationTreeTarget[]): CalibrationTreeGroup[] {
         [...byProgram.entries()].map(([program, programRows]) =>
           node(
             program,
-            program,
+            programLabel(program),
             "program",
             { kind: "program", source, value: program },
             programRows,

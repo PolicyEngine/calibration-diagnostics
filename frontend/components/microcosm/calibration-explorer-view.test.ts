@@ -138,6 +138,26 @@ describe("calibration explorer presentation model", () => {
     ]);
   });
 
+  test("uses canonical program labels without changing navigation keys", () => {
+    expect(
+      explorerBreadcrumbs(
+        state({
+          source: "irs_soi",
+          program: "taxable interest income",
+          geography: "CA",
+          dimensions: [],
+        }),
+      ),
+    ).toContainEqual({
+      label: "Taxable interest income",
+      path: {
+        source: "irs_soi",
+        program: "taxable interest income",
+        dimensions: [],
+      },
+    });
+  });
+
   test("distinguishes an empty filtered result from an invalid hierarchy scope", () => {
     expect(explorerEmptyMessage(state({ dimensions: [] }, true))).toContain(
       "filters",

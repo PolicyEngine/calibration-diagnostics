@@ -118,13 +118,13 @@ describe("source, geography, and declared-dimension hierarchy", () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: "program",
-          label: "ctc",
+          label: "CTC",
           selection: { kind: "program", source: "irs_soi", value: "ctc" },
           metrics: expect.objectContaining({ nTargets: 4 }),
         }),
         expect.objectContaining({
           kind: "program",
-          label: "population",
+          label: "Population",
           metrics: expect.objectContaining({ nTargets: 3 }),
         }),
       ]),
@@ -151,9 +151,20 @@ describe("source, geography, and declared-dimension hierarchy", () => {
       state({ geography: "CA", dimensions: [] }, "geography"),
     );
     expect(programs.currentLevel).toEqual({ kind: "overview", label: "Programs" });
-    expect(programs.groups.map((group) => [group.label, group.nodes.map((node) => node.id)])).toEqual([
-      ["IRS Statistics of Income", ["taxable interest income", "ctc"]],
-      ["Census", ["population"]],
+    expect(
+      programs.groups.map((group) => [
+        group.label,
+        group.nodes.map((node) => [node.id, node.label]),
+      ]),
+    ).toEqual([
+      [
+        "IRS Statistics of Income",
+        [
+          ["taxable interest income", "Taxable interest income"],
+          ["ctc", "CTC"],
+        ],
+      ],
+      ["Census", [["population", "Population"]]],
     ]);
   });
 

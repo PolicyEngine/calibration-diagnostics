@@ -3,6 +3,7 @@ import type {
   ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeSizeMode } from "@/lib/microcosm/calibration-tree";
+import { programLabel } from "@/lib/microcosm/program-label";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 
 function humanize(value: string): string {
@@ -55,7 +56,7 @@ export function explorerBreadcrumbs(state: ExplorerState): ExplorerBreadcrumb[] 
           : { dimensions: [] },
     });
     crumbs.push({
-      label: humanize(state.path.program),
+      label: programLabel(state.path.program),
       path: {
         source: state.path.source,
         program: state.path.program,
