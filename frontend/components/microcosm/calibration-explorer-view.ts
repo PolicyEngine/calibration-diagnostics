@@ -9,7 +9,7 @@ import type {
 import { programLabel } from "@/lib/microcosm/program-label";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 
-const EXPLORER_MAP_VERTICAL_PADDING = 20;
+export const EXPLORER_MAP_VERTICAL_PADDING = 10;
 
 function humanize(value: string): string {
   const acronyms = new Set(["agi", "ctc", "eitc", "irs", "jct", "ssi"]);
@@ -129,16 +129,9 @@ export function explorerMapHeight(
   viewportHeight: number,
   navbarHeight: number,
   pageIntroductionHeight: number,
-  reclaimedChartChromeHeight: number,
 ): number {
   return Math.max(
-    Math.round(
-      viewportHeight -
-        navbarHeight -
-        pageIntroductionHeight +
-        reclaimedChartChromeHeight -
-        EXPLORER_MAP_VERTICAL_PADDING,
-    ),
+    Math.round(viewportHeight - navbarHeight - pageIntroductionHeight),
     0,
   );
 }

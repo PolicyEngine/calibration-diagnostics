@@ -3,6 +3,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 
 import {
+  EXPLORER_MAP_VERTICAL_PADDING,
   explorerBreadcrumbs,
   explorerEmptyMessage,
   explorerMapHeight,
@@ -399,10 +400,9 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   );
   const { data, isLoading, error } = useMicrocosmCalibrationTree(state, release);
   const containerRef = useRef<HTMLDivElement>(null);
-  const controlsRef = useRef<HTMLDivElement>(null);
-  const explanationRef = useRef<HTMLParagraphElement>(null);
   const [width, setWidth] = useState(960);
   const [height, setHeight] = useState(680);
+  const [viewportHeight, setViewportHeight] = useState(680);
   const [sizeMode, setSizeMode] = useState<CalibrationTreeSizeMode>("targets");
 
   useEffect(() => {
@@ -415,20 +415,18 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
       ),
     ];
     const updateSize = () => {
-      const nextWidth = element.getBoundingClientRect().width;
+      const elementRect = element.getBoundingClientRect();
+      const nextWidth = elementRect.width;
       if (nextWidth) setWidth(Math.round(nextWidth));
+      if (elementRect.height) setHeight(Math.round(elementRect.height));
 
       const navbarHeight = navbar?.getBoundingClientRect().height ?? 0;
       const introductionHeight = stackedElementHeight(introductionParts);
-      const reclaimedChartChromeHeight =
-        (controlsRef.current?.getBoundingClientRect().height ?? 0) +
-        (explanationRef.current?.getBoundingClientRect().height ?? 0);
-      setHeight(
+      setViewportHeight(
         explorerMapHeight(
           window.innerHeight,
           navbarHeight,
           introductionHeight,
-          reclaimedChartChromeHeight,
         ),
       );
     };
@@ -438,8 +436,6 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
     observer.observe(element);
     if (navbar) observer.observe(navbar);
     introductionParts.forEach((part) => observer.observe(part));
-    if (controlsRef.current) observer.observe(controlsRef.current);
-    if (explanationRef.current) observer.observe(explanationRef.current);
     window.addEventListener("resize", updateSize);
     return () => {
       observer.disconnect();
@@ -470,10 +466,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   }));
   return (
     <div className="flex flex-col gap-3">
-      <div
-        ref={controlsRef}
-        className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3"
-      >
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
           <BreakdownControl
             value={state.breakdown}
@@ -491,41 +484,44 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          {upLabel && (
-            <button
-              type="button"
-              title={upLabel}
-              onClick={() => dispatch({ type: "up" })}
-              className="block max-w-[40%] shrink-0 truncate whitespace-nowrap text-xs font-medium text-primary hover:underline"
-            >
-              ← {upLabel}
-            </button>
-          )}
-          <nav aria-label="Calibration map location" className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted-foreground">
-            {breadcrumbs.map((crumb, index) => (
-              <span key={`${crumb.label}:${index}`}>
-                {index > 0 && <span className="mx-1">/</span>}
-                <button
-                  type="button"
-                  onClick={() => dispatch({ type: "navigate", path: crumb.path })}
-                  aria-current={index === breadcrumbs.length - 1 ? "page" : undefined}
-                  className={`${index === breadcrumbs.length - 1 ? "font-medium text-foreground" : "hover:text-foreground hover:underline"}`}
-                >
-                  {crumb.label}
-                </button>
-              </span>
-            ))}
-          </nav>
-        </div>
-      </div>
-
       <div
-        ref={containerRef}
-        className="relative w-full"
-        style={{ height }}
+        className="flex min-h-0 flex-col gap-3"
+        style={{
+          height: viewportHeight,
+          paddingBlock: EXPLORER_MAP_VERTICAL_PADDING,
+        }}
       >
+        <div className="flex shrink-0 items-center gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {upLabel && (
+              <button
+                type="button"
+                title={upLabel}
+                onClick={() => dispatch({ type: "up" })}
+                className="block max-w-[40%] shrink-0 truncate whitespace-nowrap text-xs font-medium text-primary hover:underline"
+              >
+                ← {upLabel}
+              </button>
+            )}
+            <nav aria-label="Calibration map location" className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted-foreground">
+              {breadcrumbs.map((crumb, index) => (
+                <span key={`${crumb.label}:${index}`}>
+                  {index > 0 && <span className="mx-1">/</span>}
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "navigate", path: crumb.path })}
+                    aria-current={index === breadcrumbs.length - 1 ? "page" : undefined}
+                    className={`${index === breadcrumbs.length - 1 ? "font-medium text-foreground" : "hover:text-foreground hover:underline"}`}
+                  >
+                    {crumb.label}
+                  </button>
+                </span>
+              ))}
+            </nav>
+          </div>
+        </div>
+
+        <div ref={containerRef} className="relative min-h-0 w-full flex-1">
         {laidGroups.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/10 px-6 text-center">
             <p className="text-sm text-muted-foreground">{explorerEmptyMessage(state)}</p>
@@ -590,12 +586,10 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
             </div>
           ))
         )}
+        </div>
       </div>
 
-      <p
-        ref={explanationRef}
-        className="text-[12px] leading-relaxed text-muted-foreground"
-      >
+      <p className="text-[12px] leading-relaxed text-muted-foreground">
         Each tile is a group of calibration targets. Area shows{" "}
         <span className="font-medium text-foreground">
           {explorerSizePhrase(sizeMode)}
