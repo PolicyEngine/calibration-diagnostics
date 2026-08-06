@@ -67,6 +67,12 @@ and qualifying-child facts. Older-period facts remain explicit unsupported
 periods until a year-specific source run is declared; they are not silently
 evaluated with 2024 arrays.
 
+The combined full Ledger run classified all 48,313 facts for public CPS and
+executed those 38 mapped national 2024 cells. The remaining facts are present
+in the capability matrix with explicit jurisdiction, geography, entity,
+period, or concept reason codes; most are subnational facts, which this CPS
+adapter does not claim to represent.
+
 All ten comparisons are external validation, not calibration fit. A poor public
 CPS estimate remains a valid test result and must not be dropped after seeing
 its error. In particular, ordinary dividends remain in this transparent

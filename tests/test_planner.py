@@ -224,6 +224,32 @@ def test_reviewed_alignment_produces_projected_non_headline_capability() -> None
     assert not result.score_eligible
 
 
+def test_fact_specific_alignment_lookup_does_not_scan_unrelated_facts() -> None:
+    old_fact = fact(period=TypedPeriod.parse("tax_year:2023"))
+    alignments = [
+        AlignmentDeclaration(
+            alignment_id=f"aging:{index}",
+            source_id=source().source_id,
+            measure=old_fact.measure,
+            source_period=old_fact.period,
+            target_period=TypedPeriod.parse("tax_year:2024"),
+            quality=AlignmentQuality.VALIDATED,
+            fact_key=(
+                old_fact.fact_key
+                if index == 999
+                else f"ledger.aggregate_fact.v2:{index:024d}"
+            ),
+            score_eligible=True,
+        )
+        for index in range(1_000)
+    ]
+    result = CapabilityPlanner(registry(), alignments=alignments).classify(
+        old_fact, source()
+    )
+    assert result.alignment_id == "aging:999"
+    assert result.score_eligible
+
+
 def test_approximate_mapping_is_visible_and_not_headline_eligible() -> None:
     result = CapabilityPlanner(registry(quality="approximate")).classify(fact(), source())
     assert result.status is CapabilityStatus.APPROXIMATE

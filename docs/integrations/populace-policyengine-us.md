@@ -144,11 +144,12 @@ matches Populace's source module
 Parity is tested against an actual current-release row: the 2023 Federal
 Reserve household/net-worth observation of $156.0807 trillion transforms to
 $169,693,039,350,639.20, exactly matching the current Populace diagnostics.
-Across the locally compiled current Ledger source-year snapshot, the same pass
-classified all 28,914 US 2023 facts: 14,437 dollar facts were aged, 14,471
-count/non-USD facts received Populace's identity treatment, and six publisher
-projections remained at their published level. All 28,914 had a valid explicit
-outcome; a future missing factor will remain visible as `unavailable`.
+The immutable 48,313-row Ledger snapshot used for the full comparison contains
+235 US facts from 2023. The same pass gave 116 count facts Populace's identity
+treatment and published them as aligned 2024 benchmarks. The other 119 are USD
+sums for which that snapshot does not contain the CBO/SOI factor chain required
+by the exact Populace algorithm; they remain explicitly `unavailable`. The
+harness does not invent a CPI or generic fallback to turn those into results.
 
 The same caution is why this first ten-fact gate does not yet use December 2024
 Medicaid enrollment or fiscal-year 2024 SNAP averages. Both are present in the
@@ -180,6 +181,35 @@ These are performance results, not adapter failures. Populace's own release
 diagnostics report the same 13.333% final error for the BEA wage target. The
 congressional-district row is an external holdout. The verifier in
 `scripts/verify_populace_adapter.py` recomputes all ten from the H5 and model.
+
+## Full Ledger run
+
+`scripts/run_full_ledger_evaluation.py` loads and hash-verifies the complete
+pinned Ledger snapshot, creates exactly one capability row for every
+fact/source pair, runs every executable query in batches, attaches the correct
+observed or aligned benchmark, and publishes JSONL and Parquet artifacts.
+
+The current full run classified all 48,313 facts for this source. It executed
+9,411 finite Populace/PolicyEngine-US estimates:
+
+- 9,295 native-2024 comparisons; and
+- 116 EITC count comparisons observed in 2023 and evaluated against their
+  explicitly recorded, identity-aged 2024 benchmarks.
+
+The 116 aligned rows support Ledger's EITC-return universe, AGI filters, and
+qualifying-child filters through the model-backed `eitc`,
+`adjusted_gross_income`, and `eitc_child_count` arrays. Unsupported rows stay in
+the capability output with a reason code; they are not omitted from the run.
+
+The reproducible command is:
+
+```bash
+uv run --extra populace --extra taxcalc-cps python \
+  scripts/run_full_ledger_evaluation.py \
+  --snapshot /path/to/ledger-snapshot \
+  --populace-dataset /path/to/populace_us_2024.h5 \
+  --output .artifacts/evaluations/<immutable-run-directory>
+```
 
 ## Tests required before the adapter is accepted
 

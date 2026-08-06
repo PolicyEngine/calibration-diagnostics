@@ -13,6 +13,7 @@ from evaluation_harness.contracts import (
     CapabilityResult,
     CapabilityStatus,
     ExecutionMethod,
+    FactContract,
     MappingQuality,
     PeriodTreatment,
     SourceType,
@@ -29,6 +30,7 @@ from evaluation_harness.execution import (
     validate_results,
 )
 from evaluation_harness.publisher import publish_run
+from evaluation_harness.full_run import build_scored_results, build_run_summary
 
 
 def capability(
@@ -212,12 +214,41 @@ def test_publish_run_is_immutable_and_writes_json_and_parquet(tmp_path: Path) ->
         model_version="model-v1",
     )
     output = tmp_path / "run"
-    manifest = publish_run(output, [cap], [result])
+    facts = [
+        FactContract(
+            fact_key="a",
+            source="fixture",
+            jurisdiction="US",
+            period=TypedPeriod.parse("tax_year:2024"),
+            geography_level="country",
+            geography_id="0100000US",
+            entity="tax_unit",
+            measure="fixture.income",
+            unit="usd",
+            value=Decimal("80"),
+            dimensions={},
+            universe_constraints=(),
+            provenance_class="fixture",
+        )
+    ]
+    scores = build_scored_results(facts, [cap], [result], [])
+    summary = build_run_summary(facts, [cap], [result], scores)
+    manifest = publish_run(
+        output,
+        [cap],
+        [result],
+        scores=scores,
+        summary=summary,
+    )
     assert manifest["result_count"] == 1
+    assert manifest["score_count"] == 1
     assert (output / "capabilities.jsonl").exists()
     assert (output / "estimates.jsonl").exists()
+    assert (output / "scores.jsonl").exists()
+    assert (output / "summary.json").exists()
     assert pq.read_table(output / "capabilities.parquet").num_rows == 1
     assert pq.read_table(output / "estimates.parquet").num_rows == 1
+    assert pq.read_table(output / "scores.parquet").num_rows == 1
     assert (output / "alignments.jsonl").read_text() == ""
     with pytest.raises(FileExistsError):
         publish_run(output, [cap], [result])

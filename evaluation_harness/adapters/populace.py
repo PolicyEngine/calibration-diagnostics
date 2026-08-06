@@ -103,6 +103,7 @@ def _default_simulation_factory(dataset_path: Path) -> Any:
 
 VARIABLE_ALIASES = {
     "us:statutes/26/62#adjusted_gross_income": "adjusted_gross_income",
+    "us.tax.earned_income_credit_qualifying_children": "eitc_child_count",
 }
 
 ENTITY_DOMAINS = {
@@ -273,6 +274,10 @@ class PopulacePolicyEngineRunner:
             domain: np.ones(length, dtype=bool)
             for domain in ENTITY_DOMAINS[group.entity]
         }
+        if group.entity == "tax_unit":
+            masks["individual_income_tax_returns_with_earned_income_credit"] = (
+                self._model_array("eitc", group.entity, policy_period) != 0
+            )
         return ArrayBundle(
             arrays=arrays,
             dataset_version=self.release.release_id,

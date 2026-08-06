@@ -75,9 +75,12 @@ mappings:
     mapping_quality: exact
     supported_dimensions: [income_range]
     descriptive_dimensions: [income_range]
-    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_domains:
+      - all_individual_income_tax_returns
+      - individual_income_tax_returns_with_earned_income_credit
     supported_constraint_variables:
       - us:statutes/26/62#adjusted_gross_income
+      - us.tax.earned_income_credit_qualifying_children
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-eitc-amount
@@ -93,9 +96,12 @@ mappings:
     mapping_quality: exact
     supported_dimensions: [income_range]
     descriptive_dimensions: [income_range]
-    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_domains:
+      - all_individual_income_tax_returns
+      - individual_income_tax_returns_with_earned_income_credit
     supported_constraint_variables:
       - us:statutes/26/62#adjusted_gross_income
+      - us.tax.earned_income_credit_qualifying_children
     calibration_exposure: direct_calibration_target
 
   - mapping_id: bea-nipa-wages-and-salaries
