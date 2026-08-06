@@ -19,6 +19,22 @@ test("shows calibration targets directly under calibration fit", () => {
   expect(items[calibrationTargetsIndex]?.href).toBe("/populace/targets");
 });
 
+test("places external checks at the bottom of dataset accuracy", () => {
+  const items = datasetAccuracyItems();
+
+  expect(items.at(-1)?.href).toBe("https://www.policyengine.org/scorecard");
+  expect(items.at(-1)?.label).toBe("External checks");
+});
+
+test("models the external checks icon separately from its label", () => {
+  const externalChecks = datasetAccuracyItems().find(
+    (item) => item.href === "https://www.policyengine.org/scorecard",
+  );
+
+  expect(externalChecks?.label).toBe("External checks");
+  expect(externalChecks?.external).toBe(true);
+});
+
 test("targets path activates calibration targets instead of calibration fit", () => {
   const items = datasetAccuracyItems();
   const calibrationFit = items.find((item) => item.label === "Calibration fit");
