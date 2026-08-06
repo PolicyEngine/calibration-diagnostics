@@ -418,7 +418,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
     values: [],
   }));
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
           <BreakdownControl
@@ -437,7 +437,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         </div>
       </div>
 
-      <div className="flex h-12 items-center gap-4">
+      <div className="flex items-center gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {upLabel && (
             <button
