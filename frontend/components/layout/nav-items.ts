@@ -53,3 +53,10 @@ export function isActive(pathname: string, item: NavItem): boolean {
     href === "/populace" ? pathname === "/populace" : pathname.startsWith(href);
   return matches(item.href) || (item.also ?? []).some((href) => pathname.startsWith(href));
 }
+
+export function navLinkAttributes(
+  item: NavItem,
+): { target?: "_blank"; rel?: "noopener noreferrer" } {
+  const external = item.href.startsWith("https://") || item.href.startsWith("http://");
+  return external ? { target: "_blank", rel: "noopener noreferrer" } : {};
+}
