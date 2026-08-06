@@ -33,11 +33,11 @@ function state(
 }
 
 describe("calibration explorer presentation model", () => {
-  test("sizes the breadcrumb-and-map window with 10px vertical padding", () => {
+  test("gives the breadcrumb-and-map window the full viewport height", () => {
     expect(EXPLORER_MAP_VERTICAL_PADDING).toBe(10);
-    expect(explorerMapHeight(1080, 64, 156)).toBe(860);
-    expect(explorerMapHeight(1440, 64, 156)).toBe(1220);
-    expect(explorerMapHeight(480, 64, 156)).toBe(260);
+    expect(explorerMapHeight(1080)).toBe(1080);
+    expect(explorerMapHeight(1440)).toBe(1440);
+    expect(explorerMapHeight(480)).toBe(480);
   });
 
   test("resolves program labels at the final presentation boundary", () => {

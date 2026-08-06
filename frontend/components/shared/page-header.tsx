@@ -24,10 +24,7 @@ export function PageHeader({
   // to the top through the whole scroll.
   return (
     <>
-      <div
-        data-page-introduction-part=""
-        className="sticky top-0 z-20 -mx-6 flex flex-wrap items-start justify-between gap-4 border-b border-border bg-background/85 px-6 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/75"
-      >
+      <div className="sticky top-0 z-20 -mx-6 flex flex-wrap items-start justify-between gap-4 border-b border-border bg-background/85 px-6 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/75">
         <div className="min-w-0 flex-1">
           <div className="site-eyebrow mb-1">{eyebrow}</div>
           <div className="flex flex-wrap items-center gap-3">
@@ -38,12 +35,7 @@ export function PageHeader({
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
       {description && (
-        <Text
-          data-page-introduction-part=""
-          c="dimmed"
-          size="sm"
-          className="-mt-1 max-w-3xl"
-        >
+        <Text c="dimmed" size="sm" className="-mt-1 max-w-3xl">
           {description}
         </Text>
       )}

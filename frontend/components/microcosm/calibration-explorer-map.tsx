@@ -57,24 +57,6 @@ const STATUS_LABELS: Record<string, string> = {
   not_materialized: "Not materialized",
 };
 
-function stackedElementHeight(elements: HTMLElement[]): number {
-  return elements.reduce((height, element, index) => {
-    const elementHeight = element.getBoundingClientRect().height;
-    if (index === 0) return elementHeight;
-
-    const previous = elements[index - 1];
-    const sameParent = previous.parentElement === element.parentElement;
-    const gap = sameParent && element.parentElement
-      ? Number.parseFloat(getComputedStyle(element.parentElement).rowGap) || 0
-      : 0;
-    const previousMargin =
-      Number.parseFloat(getComputedStyle(previous).marginBottom) || 0;
-    const nextMargin =
-      Number.parseFloat(getComputedStyle(element).marginTop) || 0;
-    return height + gap + previousMargin + nextMargin + elementHeight;
-  }, 0);
-}
-
 function displayValue(value: string): string {
   if (value === MISSING_VALUE) return "Not specified";
   return humanizeName(value) || value;
@@ -408,34 +390,17 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
-    const navbar = document.querySelector<HTMLElement>(".site-nav");
-    const introductionParts = [
-      ...document.querySelectorAll<HTMLElement>(
-        "[data-page-introduction-part]",
-      ),
-    ];
     const updateSize = () => {
       const elementRect = element.getBoundingClientRect();
       const nextWidth = elementRect.width;
       if (nextWidth) setWidth(Math.round(nextWidth));
       if (elementRect.height) setHeight(Math.round(elementRect.height));
-
-      const navbarHeight = navbar?.getBoundingClientRect().height ?? 0;
-      const introductionHeight = stackedElementHeight(introductionParts);
-      setViewportHeight(
-        explorerMapHeight(
-          window.innerHeight,
-          navbarHeight,
-          introductionHeight,
-        ),
-      );
+      setViewportHeight(explorerMapHeight(window.innerHeight));
     };
 
     updateSize();
     const observer = new ResizeObserver(updateSize);
     observer.observe(element);
-    if (navbar) observer.observe(navbar);
-    introductionParts.forEach((part) => observer.observe(part));
     window.addEventListener("resize", updateSize);
     return () => {
       observer.disconnect();

@@ -127,13 +127,8 @@ export function explorerSizePhrase(mode: CalibrationTreeSizeMode): string {
 
 export function explorerMapHeight(
   viewportHeight: number,
-  navbarHeight: number,
-  pageIntroductionHeight: number,
 ): number {
-  return Math.max(
-    Math.round(viewportHeight - navbarHeight - pageIntroductionHeight),
-    0,
-  );
+  return Math.max(Math.round(viewportHeight), 0);
 }
 
 export function explorerNodeLabel(
