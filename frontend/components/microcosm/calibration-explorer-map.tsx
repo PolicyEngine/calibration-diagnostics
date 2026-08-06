@@ -237,9 +237,9 @@ function FilterBar({
   ];
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Filters</span>
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Filter by</span>
         <MultiSelectFilter
           label="Geography level"
           options={data.filterOptions.geographyLevels}
@@ -277,7 +277,7 @@ function FilterBar({
         )}
       </div>
       {active.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap justify-end gap-1.5">
           {active.map((item) => (
             <button
               type="button"
@@ -344,29 +344,11 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   }));
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex h-12 items-center gap-3">
-        <div className="min-w-0 flex-1">
-          {upLabel && (
-            <button
-              type="button"
-              title={upLabel}
-              onClick={() => dispatch({ type: "up" })}
-              className="block max-w-full truncate whitespace-nowrap rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
-            >
-              ← {upLabel}
-            </button>
-          )}
-        </div>
-        <div className="shrink-0">
-          <FitLegend />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div className="shrink-0">
           <SizeControl value={sizeMode} onChange={setSizeMode} />
         </div>
-        <div className="max-w-full flex-[1_0_34rem]">
+        <div className="ml-auto max-w-full flex-none">
           <FilterBar
             data={data}
             state={state}
@@ -375,21 +357,38 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
         </div>
       </div>
 
-      <nav aria-label="Calibration map location" className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-        {breadcrumbs.map((crumb, index) => (
-          <span key={`${crumb.label}:${index}`}>
-            {index > 0 && <span className="mx-1">/</span>}
+      <div className="flex h-12 items-center gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          {upLabel && (
             <button
               type="button"
-              onClick={() => dispatch({ type: "navigate", path: crumb.path })}
-              aria-current={index === breadcrumbs.length - 1 ? "page" : undefined}
-              className={`${index === breadcrumbs.length - 1 ? "font-medium text-foreground" : "hover:text-foreground hover:underline"}`}
+              title={upLabel}
+              onClick={() => dispatch({ type: "up" })}
+              className="block max-w-[40%] shrink-0 truncate whitespace-nowrap rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
             >
-              {crumb.label}
+              ← {upLabel}
             </button>
-          </span>
-        ))}
-      </nav>
+          )}
+          <nav aria-label="Calibration map location" className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted-foreground">
+            {breadcrumbs.map((crumb, index) => (
+              <span key={`${crumb.label}:${index}`}>
+                {index > 0 && <span className="mx-1">/</span>}
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: "navigate", path: crumb.path })}
+                  aria-current={index === breadcrumbs.length - 1 ? "page" : undefined}
+                  className={`${index === breadcrumbs.length - 1 ? "font-medium text-foreground" : "hover:text-foreground hover:underline"}`}
+                >
+                  {crumb.label}
+                </button>
+              </span>
+            ))}
+          </nav>
+        </div>
+        <div className="shrink-0">
+          <FitLegend />
+        </div>
+      </div>
 
       <div ref={containerRef} className="relative w-full" style={{ height }}>
         {laidGroups.length === 0 ? (
