@@ -4,7 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useCountry, type Country } from "@/components/layout/country-context";
-import { isActive, navGroupsForCountry } from "@/components/layout/nav-items";
+import {
+  isActive,
+  navGroupsForCountry,
+  navLinkAttributes,
+} from "@/components/layout/nav-items";
 
 const DATASET: Record<Country, { label: string; repo: string }> = {
   us: { label: "Populace US", repo: "policyengine/populace-us" },
@@ -63,6 +67,7 @@ export function NavSidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    {...navLinkAttributes(item)}
                     className={`block rounded-md px-3 py-1.5 text-sm leading-tight transition-colors ${
                       active
                         ? "bg-primary/10 font-medium text-primary"

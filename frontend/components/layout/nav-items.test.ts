@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { isActive, NAV_GROUPS } from "./nav-items";
+import { isActive, navLinkAttributes, NAV_GROUPS } from "./nav-items";
 
 function datasetAccuracyItems() {
   const group = NAV_GROUPS.find((item) => item.label === "Dataset accuracy");
@@ -39,4 +39,22 @@ test("does not expose the retired cross-dataset evaluation", () => {
 
   expect(items.some((item) => item.label === "Cross-dataset")).toBe(false);
   expect(items.some((item) => item.href === "/populace/datasets")).toBe(false);
+});
+
+test("opens external navigation in a new tab without changing internal navigation", () => {
+  const items = datasetAccuracyItems();
+  const externalChecks = items.find(
+    (item) => item.href === "https://www.policyengine.org/scorecard",
+  );
+  const calibrationFit = items.find((item) => item.href === "/populace");
+
+  if (!externalChecks || !calibrationFit) {
+    throw new Error("Expected navigation items not found");
+  }
+
+  expect(navLinkAttributes(externalChecks)).toEqual({
+    target: "_blank",
+    rel: "noopener noreferrer",
+  });
+  expect(navLinkAttributes(calibrationFit)).toEqual({});
 });
