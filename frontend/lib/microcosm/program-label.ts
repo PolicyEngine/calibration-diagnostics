@@ -4,6 +4,7 @@ const CANONICAL_ACRONYM_LABELS: Readonly<Record<string, string>> = {
   actc: "ACTC",
   agi: "AGI",
   amt: "AMT",
+  cdcc: "CDCC",
   ctc: "CTC",
   eitc: "EITC",
   fica: "FICA",

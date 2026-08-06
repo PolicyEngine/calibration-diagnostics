@@ -5,6 +5,7 @@ import { canonicalLabel, programLabel } from "./program-label";
 describe("programLabel", () => {
   test("uses exact, curated labels for known program identifiers", () => {
     expect(programLabel("eitc")).toBe("EITC");
+    expect(programLabel("cdcc")).toBe("CDCC");
     expect(programLabel("ctc")).toBe("CTC");
     expect(programLabel("agi")).toBe("AGI");
   });
@@ -43,6 +44,9 @@ describe("canonicalLabel", () => {
   test("formats dimension values with sentence case and curated acronyms", () => {
     expect(canonicalLabel("traditional ira deduction")).toBe(
       "Traditional IRA deduction",
+    );
+    expect(canonicalLabel("refundable cdcc amount")).toBe(
+      "Refundable CDCC amount",
     );
     expect(canonicalLabel("self_employed_pension_contribution_deduction")).toBe(
       "Self employed pension contribution deduction",
