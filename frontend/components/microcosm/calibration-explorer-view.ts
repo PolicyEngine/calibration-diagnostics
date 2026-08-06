@@ -6,7 +6,7 @@ import type {
   CalibrationTreeNode,
   CalibrationTreeSizeMode,
 } from "@/lib/microcosm/calibration-tree";
-import { programLabel } from "@/lib/microcosm/program-label";
+import { canonicalLabel, programLabel } from "@/lib/microcosm/program-label";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 
 export const EXPLORER_MAP_VERTICAL_PADDING = 10;
@@ -91,7 +91,7 @@ export function explorerBreadcrumbs(state: ExplorerState): ExplorerBreadcrumb[] 
   if (state.path.source && state.path.program && state.path.geography) {
     state.path.dimensions.forEach((dimension, index) => {
       crumbs.push({
-        label: humanize(dimension.value),
+        label: canonicalLabel(dimension.value),
         path: {
           source: state.path.source,
           program: state.path.program,
@@ -141,5 +141,7 @@ export function explorerMapHeight(pageIntroHeight: number): string {
 export function explorerNodeLabel(
   node: Pick<CalibrationTreeNode, "id" | "kind" | "label">,
 ): string {
-  return node.kind === "program" ? programLabel(node.id) : node.label;
+  if (node.kind === "program") return programLabel(node.id);
+  if (node.kind === "dimension_value") return canonicalLabel(node.label);
+  return node.label;
 }

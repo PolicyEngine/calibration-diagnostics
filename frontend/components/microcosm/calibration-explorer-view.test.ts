@@ -61,11 +61,18 @@ describe("calibration explorer presentation model", () => {
     ).toBe("Refundable CTC");
     expect(
       explorerNodeLabel({
-        id: "adult",
-        label: "Adult",
+        id: "traditional ira deduction",
+        label: "traditional ira deduction",
         kind: "dimension_value",
       }),
-    ).toBe("Adult");
+    ).toBe("Traditional IRA deduction");
+    expect(
+      explorerNodeLabel({
+        id: "target-1",
+        label: "Published target label",
+        kind: "target",
+      }),
+    ).toBe("Published target label");
   });
 
   test("capitalizes geography levels in filter labels", () => {

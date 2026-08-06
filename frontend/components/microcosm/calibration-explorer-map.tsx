@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
+import { Spinner } from "@policyengine/ui-kit";
 
 import {
   EXPLORER_MAP_VERTICAL_PADDING,
@@ -14,7 +15,6 @@ import {
   hasExplorerFilters,
 } from "@/components/microcosm/calibration-explorer-view";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
-import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { fmt, humanizeName } from "@/components/shared/format";
 import {
   useMicrocosmCalibrationTree,
@@ -376,6 +376,34 @@ function FilterMenu({
   );
 }
 
+function CalibrationMapLoadingSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Building calibration map"
+      className="absolute inset-0 z-30 overflow-hidden rounded-lg border border-border bg-card"
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-3 grid animate-pulse grid-cols-4 grid-rows-3 gap-2 opacity-70"
+      >
+        <div className="col-span-2 row-span-3 rounded-md bg-muted" />
+        <div className="row-span-2 rounded-md bg-muted" />
+        <div className="rounded-md bg-muted" />
+        <div className="rounded-md bg-muted" />
+        <div className="row-span-2 rounded-md bg-muted" />
+        <div className="rounded-md bg-muted" />
+      </div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-card/55 backdrop-blur-[1px]">
+        <Spinner size="md" />
+        <span className="text-xs font-medium text-muted-foreground">
+          Building calibration map…
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function CalibrationExplorerMap({
   release,
   pageIntroHeight,
@@ -388,7 +416,7 @@ export function CalibrationExplorerMap({
     undefined,
     createExplorerState,
   );
-  const { data, isLoading, error } = useMicrocosmCalibrationTree(state, release);
+  const { data, isFetching, error } = useMicrocosmCalibrationTree(state, release);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(960);
   const [height, setHeight] = useState(680);
@@ -414,8 +442,20 @@ export function CalibrationExplorerMap({
   // when query data arrives so the observer attaches to the real element.
   }, [data]);
 
-  if (isLoading && !data) return <LoadingBlock label="Building calibration map…" />;
   if (error || !data) {
+    if (!error) {
+      return (
+        <div className="flex flex-col gap-3">
+          <div
+            className="relative min-h-0"
+            style={{ height: explorerMapHeight(pageIntroHeight) }}
+            aria-busy="true"
+          >
+            <CalibrationMapLoadingSkeleton />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="rounded-lg border border-border p-6 text-sm text-muted-foreground">
         {error instanceof Error ? error.message : "Calibration map unavailable."}
@@ -454,11 +494,12 @@ export function CalibrationExplorerMap({
       </div>
 
       <div
-        className="flex min-h-0 flex-col gap-3"
+        className="relative flex min-h-0 flex-col gap-3"
         style={{
           height: explorerMapHeight(pageIntroHeight),
           paddingBlock: EXPLORER_MAP_VERTICAL_PADDING,
         }}
+        aria-busy={isFetching}
       >
         <div className="flex shrink-0 items-center gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -559,6 +600,8 @@ export function CalibrationExplorerMap({
           ))
         )}
         </div>
+
+        {isFetching && <CalibrationMapLoadingSkeleton />}
       </div>
 
       <p className="text-[12px] leading-relaxed text-muted-foreground">
