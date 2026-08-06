@@ -1,0 +1,160 @@
+mapping_release: taxcalc-public-cps-2024-overview-v1
+mappings:
+  - mapping_id: taxcalc-cps-returns-with-income-tax
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_income_tax_liability_after_credits]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: iitax
+    operation: weighted_count
+    required_variables: [iitax]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-adjusted-gross-income
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [us:statutes/26/62#adjusted_gross_income]
+      units: [usd]
+      entities: [tax_unit]
+      fact_keys: [ledger.aggregate_fact.v2:6c9a00df8068b3a63563654f]
+    execution: model
+    source_expression: c00100
+    operation: weighted_sum
+    required_variables: [c00100]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-wages
+    ledger_selector:
+      sources: [cbo]
+      measures: [cbo.wages_and_salaries_projection]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00200
+    operation: weighted_sum
+    required_variables: [e00200]
+    mapping_quality: exact
+    supported_constraint_domains: [individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-interest
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.taxable_interest]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00300
+    operation: weighted_sum
+    required_variables: [e00300]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-ordinary-dividends
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.ordinary_dividends]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00600
+    operation: weighted_sum
+    required_variables: [e00600]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-pensions
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.taxable_pensions_and_annuities]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01700
+    operation: weighted_sum
+    required_variables: [e01700]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-social-security
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.taxable_social_security_benefits]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c02500
+    operation: weighted_sum
+    required_variables: [c02500]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-unemployment-compensation
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.unemployment_compensation]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e02300
+    operation: weighted_sum
+    required_variables: [e02300]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-income-tax
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.income_tax_liability_after_credits]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: iitax
+    operation: weighted_sum
+    required_variables: [iitax]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-earned-income-tax-credit
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.total_earned_income_credit]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c59660
+    operation: weighted_sum
+    required_variables: [c59660]
+    mapping_quality: exact
+    supported_dimensions: [income_range]
+    descriptive_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation

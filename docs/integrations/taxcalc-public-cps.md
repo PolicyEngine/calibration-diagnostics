@@ -1,0 +1,60 @@
+# Tax-Calculator / public CPS integration overview
+
+Status: **awaiting confirmation before adapter implementation**
+
+This pairing uses Tax-Calculator 6.7.1's bundled public CPS records. The CPS
+microdata are a 2014 base that Tax-Calculator advances to 2024 using its growth
+factors and year-specific weights; therefore every checkpoint result is labeled
+`advanced_population`, not native 2024 data. Policy parameters and calculated
+variables are evaluated for tax year 2024.
+
+The adapter will construct `Records.cps_constructor()`, create one `Calculator`,
+call `advance_to_year(2024)` and `calc_all()` once, and expose Tax-Calculator
+arrays to the shared aggregator. Inputs such as `e00200`, `e00300`, `e00600`,
+`e01700`, and `e02300` are read directly after advancement. Derived concepts
+such as `c00100`, `c02500`, `iitax`, and `c59660` come from the model. Every
+aggregate uses `s006`. The public CPS supports only national comparisons here;
+no state or local geography is inferred.
+
+## Proposed ten-fact checkpoint
+
+| Ledger fact | Tax-Calculator expression | Method |
+|---|---|---|
+| Returns with income-tax liability | weighted count where `iitax != 0` | Model |
+| Adjusted gross income | weighted sum of `c00100` | Model |
+| CBO wages and salaries projection | weighted sum of `e00200` | Direct advanced input |
+| Taxable interest | weighted sum of `e00300` | Direct advanced input |
+| Ordinary dividends | weighted sum of `e00600` | Direct advanced input |
+| Taxable pensions and annuities | weighted sum of `e01700` | Direct advanced input |
+| Taxable Social Security | weighted sum of `c02500` | Model |
+| Unemployment compensation | weighted sum of `e02300` | Direct advanced input |
+| Income-tax liability after credits | weighted sum of `iitax` | Model |
+| Earned income tax credit | weighted sum of `c59660` | Model |
+
+These are ten exact numeric rows from Ledger snapshot
+`ledger-7917ea815df710fb20db076b`. They span ten concepts, include a count and
+dollar amounts, and all have concrete Tax-Calculator expressions. The adapter
+checkpoint will run all ten; unsupported results cannot pass it.
+
+All ten comparisons are external validation, not calibration fit. A poor public
+CPS estimate remains a valid test result and must not be dropped after seeing
+its error. In particular, ordinary dividends remain in this transparent
+checkpoint even though the existing Cross-dataset implementation excluded that
+concept after observing a large discrepancy.
+
+## Important semantic boundaries
+
+- The total IRS return count is not used because public CPS contains constructed
+  tax units but does not supply an observed filing-decision flag. The count gate
+  instead uses the directly testable IRS count of returns with nonzero final
+  income-tax liability.
+- The wage benchmark is the CBO individual-income-tax projection, whose tax-unit
+  entity and tax-year basis match `e00200`; the BEA employee/NIPA observation is
+  not silently relabeled as a tax-unit fact.
+- Ledger dimensions `filing_status=all` and `income_range=all` are descriptive
+  total labels and do not become fictitious Tax-Calculator columns.
+- The overview deliberately covers only total national cells. Income bands,
+  itemizers, and EITC-child slices will require their explicit masks in the
+  adapter, rather than parsing labels.
+- Public CPS is a model-specific dataset shipped with Tax-Calculator, so this is
+  a model/dataset pairing—not a standalone raw-CPS score.
