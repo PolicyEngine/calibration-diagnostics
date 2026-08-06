@@ -15,7 +15,7 @@ from .contracts import AlignedFact, CapabilityResult, PeriodTreatment, TypedPeri
 from .execution import EvaluationResult, validate_results
 
 
-RUN_SCHEMA = "evaluation_harness.run.v1"
+RUN_SCHEMA = "evaluation_harness.run.v2"
 
 
 def _json_value(value: Any) -> Any:
@@ -61,6 +61,9 @@ def publish_run(
     capabilities: Iterable[CapabilityResult],
     results: Iterable[EvaluationResult],
     aligned_facts: Iterable[AlignedFact] = (),
+    *,
+    scores: Iterable[Any] = (),
+    summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     output = Path(output_path)
     if output.exists():
@@ -68,6 +71,7 @@ def publish_run(
     capability_values = tuple(capabilities)
     result_values = tuple(results)
     alignment_values = tuple(aligned_facts)
+    score_values = tuple(scores)
     validate_results(capability_values, result_values)
     alignment_ids = [alignment.alignment_id for alignment in alignment_values]
     if len(alignment_ids) != len(set(alignment_ids)):
@@ -84,14 +88,20 @@ def publish_run(
     capability_rows = _rows(capability_values)
     result_rows = _rows(result_values)
     alignment_rows = _rows(alignment_values)
+    score_rows = _rows(score_values)
     capability_jsonl = _jsonl(capability_rows)
     result_jsonl = _jsonl(result_rows)
     alignment_jsonl = _jsonl(alignment_rows)
+    score_jsonl = _jsonl(score_rows)
+    summary_value = _json_value(summary or {})
+    summary_json = json.dumps(summary_value, indent=2, sort_keys=True) + "\n"
     capability_sha = hashlib.sha256(capability_jsonl.encode()).hexdigest()
     result_sha = hashlib.sha256(result_jsonl.encode()).hexdigest()
     alignment_sha = hashlib.sha256(alignment_jsonl.encode()).hexdigest()
+    score_sha = hashlib.sha256(score_jsonl.encode()).hexdigest()
+    summary_sha = hashlib.sha256(summary_json.encode()).hexdigest()
     run_id = "evaluation-" + hashlib.sha256(
-        f"{capability_sha}:{result_sha}:{alignment_sha}".encode()
+        f"{capability_sha}:{result_sha}:{alignment_sha}:{score_sha}:{summary_sha}".encode()
     ).hexdigest()[:24]
     manifest = {
         "schema_version": RUN_SCHEMA,
@@ -101,20 +111,30 @@ def publish_run(
         "capability_count": len(capability_rows),
         "result_count": len(result_rows),
         "alignment_count": len(alignment_rows),
+        "score_count": len(score_rows),
         "capabilities_sha256": capability_sha,
         "estimates_sha256": result_sha,
         "alignments_sha256": alignment_sha,
+        "scores_sha256": score_sha,
+        "summary_sha256": summary_sha,
     }
     output.mkdir(parents=True)
     (output / "capabilities.jsonl").write_text(capability_jsonl)
     (output / "estimates.jsonl").write_text(result_jsonl)
     (output / "alignments.jsonl").write_text(alignment_jsonl)
+    (output / "scores.jsonl").write_text(score_jsonl)
+    (output / "summary.json").write_text(summary_json)
     pq.write_table(pa.Table.from_pylist(_parquet_rows(capability_rows)), output / "capabilities.parquet")
     pq.write_table(pa.Table.from_pylist(_parquet_rows(result_rows)), output / "estimates.parquet")
     if alignment_rows:
         pq.write_table(
             pa.Table.from_pylist(_parquet_rows(alignment_rows)),
             output / "alignments.parquet",
+        )
+    if score_rows:
+        pq.write_table(
+            pa.Table.from_pylist(_parquet_rows(score_rows)),
+            output / "scores.parquet",
         )
     (output / "run_manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n"

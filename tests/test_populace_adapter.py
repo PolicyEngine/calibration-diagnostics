@@ -33,13 +33,18 @@ class FakeSimulation:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, bool]] = []
         self.tax_benefit_system = FakeSystem(
-            {"eitc": "tax_unit", "adjusted_gross_income": "tax_unit"}
+            {
+                "eitc": "tax_unit",
+                "eitc_child_count": "tax_unit",
+                "adjusted_gross_income": "tax_unit",
+            }
         )
 
     def calculate(self, name: str, period: str, use_weights: bool = False) -> np.ndarray:
         self.calls.append((name, period, use_weights))
         values = {
             "eitc": np.array([0.0, 1_000.0]),
+            "eitc_child_count": np.array([0, 2]),
             "adjusted_gross_income": np.array([5_000.0, 25_000.0]),
         }
         return values[name]
@@ -182,6 +187,22 @@ def test_supported_populace_domains_are_explicit_masks(tables) -> None:
         "compensation_of_employees",
     }
     assert bundle.domain_masks["resident_population"].all()
+
+
+def test_eitc_return_domain_and_ledger_child_constraint_are_model_backed(tables) -> None:
+    bundle = runner(tables).prepare(
+        group(
+            "tax_unit",
+            "tax_unit_weight",
+            "us.tax.earned_income_credit_qualifying_children",
+        )
+    )
+    assert bundle.arrays[
+        "us.tax.earned_income_credit_qualifying_children"
+    ].tolist() == [0, 2]
+    assert bundle.domain_masks[
+        "individual_income_tax_returns_with_earned_income_credit"
+    ].tolist() == [False, True]
 
 
 def test_all_ten_reviewed_ledger_facts_execute_numerically() -> None:

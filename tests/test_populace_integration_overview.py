@@ -2,6 +2,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from evaluation_harness.contracts import (
+    AlignmentQuality,
     CalibrationExposure,
     CapabilityStatus,
     TypedPeriod,
@@ -12,6 +13,7 @@ from evaluation_harness.integration import (
 )
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.planner import CapabilityPlanner
+from evaluation_harness.planner import AlignmentDeclaration
 
 
 ROOT = Path(__file__).parents[1]
@@ -94,6 +96,45 @@ def test_populace_overview_does_not_claim_native_2023_population() -> None:
     )
     result = CapabilityPlanner(mappings).classify(old_fact, overview.source)
     assert result.status is CapabilityStatus.UNSUPPORTED_PERIOD
+
+
+def test_aligned_2023_eitc_count_with_child_slice_is_directly_testable() -> None:
+    overview = load_integration_overview(INTEGRATION / "overview.yaml")
+    mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
+    template = next(
+        fact
+        for fact in overview.verification_facts
+        if fact.measure == "irs_soi.returns_with_total_earned_income_credit"
+    )
+    old_fact = replace(
+        template,
+        fact_key="ledger.aggregate_fact.v2:000000000000000000000001",
+        period=TypedPeriod.parse("tax_year:2023"),
+        universe_constraints=(
+            {"domain": "individual_income_tax_returns_with_earned_income_credit"},
+            {
+                "variable": "us.tax.earned_income_credit_qualifying_children",
+                "operator": "==",
+                "value": 2,
+            },
+        ),
+    )
+    alignment = AlignmentDeclaration(
+        alignment_id="populace-aging:eic-count-2023-2024",
+        source_id=overview.source.source_id,
+        measure=old_fact.measure,
+        source_period=old_fact.period,
+        target_period=TypedPeriod.parse("tax_year:2024"),
+        quality=AlignmentQuality.VALIDATED,
+        fact_key=old_fact.fact_key,
+        score_eligible=True,
+    )
+    result = CapabilityPlanner(mappings, alignments=[alignment]).classify(
+        old_fact, overview.source
+    )
+    assert result.status is CapabilityStatus.PROJECTED
+    assert result.score_eligible
+    assert result.query is not None
 
 
 def test_populace_verification_facts_match_committed_snapshot_fixture() -> None:

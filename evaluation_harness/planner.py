@@ -73,6 +73,20 @@ class CapabilityPlanner:
         self.mappings = mappings
         self.alignments = tuple(alignments)
         self.snapshot_id = snapshot_id
+        self._exact_alignments: dict[tuple[str, str], list[AlignmentDeclaration]] = {}
+        self._measure_alignments: dict[
+            tuple[str, str, TypedPeriod], list[AlignmentDeclaration]
+        ] = {}
+        for alignment in self.alignments:
+            if alignment.fact_key is not None:
+                self._exact_alignments.setdefault(
+                    (alignment.source_id, alignment.fact_key), []
+                ).append(alignment)
+            else:
+                self._measure_alignments.setdefault(
+                    (alignment.source_id, alignment.measure, alignment.source_period),
+                    [],
+                ).append(alignment)
 
     def _unsupported(
         self,
@@ -99,12 +113,10 @@ class CapabilityPlanner:
         source: EvaluationSourceManifest,
     ) -> AlignmentDeclaration | None:
         matches = [
-            alignment
-            for alignment in self.alignments
-            if alignment.source_id == source.source_id
-            and alignment.measure == fact.measure
-            and alignment.source_period == fact.period
-            and (alignment.fact_key is None or alignment.fact_key == fact.fact_key)
+            *self._exact_alignments.get((source.source_id, fact.fact_key), ()),
+            *self._measure_alignments.get(
+                (source.source_id, fact.measure, fact.period), ()
+            ),
         ]
         if len(matches) > 1:
             raise ValueError(
