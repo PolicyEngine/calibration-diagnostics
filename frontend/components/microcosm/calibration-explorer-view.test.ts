@@ -5,6 +5,7 @@ import {
   explorerBreadcrumbs,
   explorerEmptyMessage,
   explorerMapHeight,
+  explorerNodeLabel,
   explorerSizePhrase,
   explorerUpLabel,
 } from "./calibration-explorer-view";
@@ -34,7 +35,31 @@ describe("calibration explorer presentation model", () => {
   test("sizes the map from the viewport after navbar and page introduction", () => {
     expect(explorerMapHeight(1080, 64, 156)).toBe(860);
     expect(explorerMapHeight(1440, 64, 156)).toBe(1220);
-    expect(explorerMapHeight(480, 64, 156)).toBe(320);
+    expect(explorerMapHeight(480, 64, 156)).toBe(260);
+  });
+
+  test("resolves program labels at the final presentation boundary", () => {
+    expect(
+      explorerNodeLabel({
+        id: "taxable interest income",
+        label: "taxable interest income",
+        kind: "program",
+      }),
+    ).toBe("Taxable interest income");
+    expect(
+      explorerNodeLabel({
+        id: "refundable ctc",
+        label: "refundable ctc",
+        kind: "program",
+      }),
+    ).toBe("Refundable CTC");
+    expect(
+      explorerNodeLabel({
+        id: "adult",
+        label: "Adult",
+        kind: "dimension_value",
+      }),
+    ).toBe("Adult");
   });
 
   test("hides Up at the overview and labels each parent destination", () => {

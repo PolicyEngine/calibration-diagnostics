@@ -6,6 +6,7 @@ import {
   explorerBreadcrumbs,
   explorerEmptyMessage,
   explorerMapHeight,
+  explorerNodeLabel,
   explorerSizePhrase,
   explorerUpLabel,
   hasExplorerFilters,
@@ -54,6 +55,24 @@ const STATUS_LABELS: Record<string, string> = {
   skipped: "Skipped",
   not_materialized: "Not materialized",
 };
+
+function stackedElementHeight(elements: HTMLElement[]): number {
+  return elements.reduce((height, element, index) => {
+    const elementHeight = element.getBoundingClientRect().height;
+    if (index === 0) return elementHeight;
+
+    const previous = elements[index - 1];
+    const sameParent = previous.parentElement === element.parentElement;
+    const gap = sameParent && element.parentElement
+      ? Number.parseFloat(getComputedStyle(element.parentElement).rowGap) || 0
+      : 0;
+    const previousMargin =
+      Number.parseFloat(getComputedStyle(previous).marginBottom) || 0;
+    const nextMargin =
+      Number.parseFloat(getComputedStyle(element).marginTop) || 0;
+    return height + gap + previousMargin + nextMargin + elementHeight;
+  }, 0);
+}
 
 function displayValue(value: string): string {
   if (value === MISSING_VALUE) return "Not specified";
@@ -398,13 +417,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
       if (nextWidth) setWidth(Math.round(nextWidth));
 
       const navbarHeight = navbar?.getBoundingClientRect().height ?? 0;
-      const introductionRects = introductionParts.map((part) =>
-        part.getBoundingClientRect(),
-      );
-      const introductionHeight = introductionRects.length
-        ? Math.max(...introductionRects.map((rect) => rect.bottom)) -
-          Math.min(...introductionRects.map((rect) => rect.top))
-        : 0;
+      const introductionHeight = stackedElementHeight(introductionParts);
       setHeight(
         explorerMapHeight(
           window.innerHeight,
@@ -525,6 +538,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
               )}
               {nodes.map((placed) => {
                 const item = placed.data;
+                const itemLabel = explorerNodeLabel(item);
                 const tileWidth = Math.max(placed.w - NODE_GAP, 0);
                 const tileHeight = Math.max(placed.h - NODE_GAP, 0);
                 if (tileWidth < 2 || tileHeight < 2) return null;
@@ -537,8 +551,8 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
                   <button
                     key={`${group.id}:${item.id}`}
                     type="button"
-                    title={`${item.label} · ${item.metrics.nTargets} targets`}
-                    aria-label={`${item.label}, ${item.metrics.nTargets} targets`}
+                    title={`${itemLabel} · ${item.metrics.nTargets} targets`}
+                    aria-label={`${itemLabel}, ${item.metrics.nTargets} targets`}
                     aria-pressed={selected}
                     onClick={() => dispatch({ type: "select", selection: item.selection })}
                     className="absolute overflow-hidden px-1.5 py-1.5 text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
@@ -553,7 +567,7 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
                       boxShadow: selected ? "0 0 0 2px var(--card), 0 0 0 4px var(--chart-1)" : "inset 0 0 0 1px color-mix(in srgb, var(--background) 6%, transparent)",
                     }}
                   >
-                    {showText && <span className="line-clamp-3 text-[11px] font-semibold leading-tight">{item.label}</span>}
+                    {showText && <span className="line-clamp-3 text-[11px] font-semibold leading-tight">{itemLabel}</span>}
                     {showSub && <span className="mt-1 block truncate text-[10px] opacity-75">{fmt(item.metrics.nTargets, { digits: 0 })} targets</span>}
                   </button>
                 );

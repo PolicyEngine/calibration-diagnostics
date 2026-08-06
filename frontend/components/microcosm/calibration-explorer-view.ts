@@ -2,7 +2,10 @@ import type {
   ExplorerPath,
   ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
-import type { CalibrationTreeSizeMode } from "@/lib/microcosm/calibration-tree";
+import type {
+  CalibrationTreeNode,
+  CalibrationTreeSizeMode,
+} from "@/lib/microcosm/calibration-tree";
 import { programLabel } from "@/lib/microcosm/program-label";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 
@@ -127,6 +130,12 @@ export function explorerMapHeight(
 ): number {
   return Math.max(
     Math.round(viewportHeight - navbarHeight - pageIntroductionHeight),
-    320,
+    0,
   );
+}
+
+export function explorerNodeLabel(
+  node: Pick<CalibrationTreeNode, "id" | "kind" | "label">,
+): string {
+  return node.kind === "program" ? programLabel(node.id) : node.label;
 }
