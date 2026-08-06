@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Literal
@@ -97,21 +97,6 @@ class TypedPeriod:
         return f"{self.kind}:{self.value}"
 
 
-SUPPORTED_UNITS = frozenset(
-    {
-        "USD",
-        "USD_per_year",
-        "count",
-        "people",
-        "households",
-        "tax_units",
-        "returns",
-        "percent",
-        "ratio",
-    }
-)
-
-
 @dataclass(frozen=True)
 class FactContract:
     fact_key: str
@@ -127,12 +112,19 @@ class FactContract:
     dimensions: dict[str, Any]
     universe_constraints: tuple[Any, ...]
     provenance_class: str
+    semantic_fact_key: str | None = None
+    assertion: str = "observation"
+    aggregation: dict[str, Any] = field(default_factory=dict)
+    observed_measure: dict[str, Any] = field(default_factory=dict)
+    source_metadata: dict[str, Any] = field(default_factory=dict)
+    lineage: dict[str, Any] = field(default_factory=dict)
+    label: str | None = None
 
     def __post_init__(self) -> None:
         if not self.fact_key:
             raise ValueError("fact_key must not be empty")
-        if self.unit not in SUPPORTED_UNITS:
-            raise ValueError(f"unsupported fact unit: {self.unit!r}")
+        if not self.unit or not self.unit.strip():
+            raise ValueError("fact unit must not be blank")
         if not isinstance(self.value, Decimal):
             object.__setattr__(self, "value", Decimal(str(self.value)))
 
@@ -151,6 +143,13 @@ class FactContract:
             "dimensions": self.dimensions,
             "universe_constraints": list(self.universe_constraints),
             "provenance_class": self.provenance_class,
+            "semantic_fact_key": self.semantic_fact_key,
+            "assertion": self.assertion,
+            "aggregation": self.aggregation,
+            "observed_measure": self.observed_measure,
+            "source_metadata": self.source_metadata,
+            "lineage": self.lineage,
+            "label": self.label,
         }
 
     @classmethod
@@ -169,6 +168,13 @@ class FactContract:
             dimensions=dict(payload.get("dimensions", {})),
             universe_constraints=tuple(payload.get("universe_constraints", ())),
             provenance_class=payload["provenance_class"],
+            semantic_fact_key=payload.get("semantic_fact_key"),
+            assertion=payload.get("assertion", "observation"),
+            aggregation=dict(payload.get("aggregation", {})),
+            observed_measure=dict(payload.get("observed_measure", {})),
+            source_metadata=dict(payload.get("source_metadata", {})),
+            lineage=dict(payload.get("lineage", {})),
+            label=payload.get("label"),
         )
 
     def to_json(self) -> str:
@@ -353,4 +359,3 @@ class AlignedFact:
             raise ValueError("aligned fact target period must differ from its observed period")
         if self.method_quality is AlignmentQuality.NONE:
             raise ValueError("aligned fact requires a reviewed alignment quality")
-

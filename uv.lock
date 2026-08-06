@@ -5,7 +5,7 @@ requires-python = ">=3.11"
 [[package]]
 name = "calibration-diagnostics-harness"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 
 [package.dev-dependencies]
 dev = [
