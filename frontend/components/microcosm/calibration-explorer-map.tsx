@@ -385,13 +385,17 @@ export function CalibrationExplorerMap({ release }: { release?: string }) {
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
+    const initialWidth = element.getBoundingClientRect().width;
+    if (initialWidth) setWidth(Math.round(initialWidth));
     const observer = new ResizeObserver((entries) => {
       const nextWidth = entries[0]?.contentRect.width;
       if (nextWidth) setWidth(Math.round(nextWidth));
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  // The map container is not mounted during the initial loading state. Re-run
+  // when query data arrives so the observer attaches to the real element.
+  }, [data]);
 
   if (isLoading && !data) return <LoadingBlock label="Building calibration map…" />;
   if (error || !data) {
