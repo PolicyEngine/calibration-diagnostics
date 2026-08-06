@@ -94,3 +94,22 @@ def test_calibration_fit_and_holdout_are_separate_surfaces() -> None:
     assert holdout.loss == Decimal("0.5")
     assert calibration.loss == Decimal("0")
 
+
+def test_populace_aligned_facts_can_be_scored_as_a_separate_group() -> None:
+    rows = [
+        observation("native", "100", "100", "income"),
+        observation(
+            "aged-2023",
+            "110",
+            "121",
+            "income",
+            treatment=PeriodTreatment.ALIGNED_FACT,
+            eligible=True,
+        ),
+    ]
+    projected = build_group_score(
+        rows, period_treatment=PeriodTreatment.ALIGNED_FACT
+    )
+    native = build_group_score(rows, period_treatment=PeriodTreatment.NATIVE)
+    assert projected.loss == Decimal("0.1")
+    assert native.loss == Decimal("0")

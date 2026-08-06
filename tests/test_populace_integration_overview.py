@@ -24,6 +24,18 @@ def test_populace_overview_pins_current_dataset_and_model() -> None:
     assert overview.source.dataset_version.endswith("20260728T011454Z")
     assert overview.source.model_version == "policyengine-us==1.764.6"
     assert overview.ledger_snapshot_id == "ledger-7917ea815df710fb20db076b"
+    assert overview.alignment_policy == {
+        "model_id": "cbo_growth_factor_aging",
+        "model_version": "1.2.0",
+        "populace_commit": "cae8640f9e65e274aea65c7916cb37b956978e32",
+        "source_module": (
+            "packages/populace-build/src/populace/build/us_runtime/target_aging.py"
+        ),
+        "source_years": [2023],
+        "build_year": 2024,
+        "evaluate_transformed_facts": True,
+        "display_observed_and_transformed_values": True,
+    }
 
 
 def test_populace_overview_has_ten_real_numeric_verification_facts() -> None:

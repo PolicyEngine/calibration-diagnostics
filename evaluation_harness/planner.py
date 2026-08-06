@@ -52,6 +52,8 @@ class AlignmentDeclaration:
     source_period: TypedPeriod
     target_period: TypedPeriod
     quality: AlignmentQuality
+    fact_key: str | None = None
+    score_eligible: bool = False
 
     def __post_init__(self) -> None:
         if not self.alignment_id:
@@ -102,7 +104,7 @@ class CapabilityPlanner:
             if alignment.source_id == source.source_id
             and alignment.measure == fact.measure
             and alignment.source_period == fact.period
-            and alignment.target_period.canonical in source.native_fact_periods
+            and (alignment.fact_key is None or alignment.fact_key == fact.fact_key)
         ]
         if len(matches) > 1:
             raise ValueError(
@@ -246,7 +248,15 @@ class CapabilityPlanner:
 
         score_eligible = (
             mapping.mapping_quality is MappingQuality.EXACT
-            and treatment in {PeriodTreatment.NATIVE, PeriodTreatment.ADVANCED_POPULATION}
+            and (
+                treatment
+                in {PeriodTreatment.NATIVE, PeriodTreatment.ADVANCED_POPULATION}
+                or (
+                    treatment is PeriodTreatment.ALIGNED_FACT
+                    and alignment is not None
+                    and alignment.score_eligible
+                )
+            )
         )
         return CapabilityResult(
             snapshot_id=self.snapshot_id,
@@ -289,4 +299,3 @@ class CapabilityPlanner:
         if len(keys) != len(results):
             raise ValueError("capability matrix contains duplicate fact/source cells")
         return results
-

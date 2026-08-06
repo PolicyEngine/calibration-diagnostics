@@ -344,6 +344,7 @@ class CapabilityResult:
 
 @dataclass(frozen=True)
 class AlignedFact:
+    alignment_id: str
     source_fact_key: str
     observed_period: TypedPeriod
     observed_value: Decimal
@@ -354,9 +355,12 @@ class AlignedFact:
     factor_sources: tuple[str, ...]
     method_quality: AlignmentQuality
     backtest_error: Decimal | None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.observed_period == self.target_period:
             raise ValueError("aligned fact target period must differ from its observed period")
+        if not self.alignment_id:
+            raise ValueError("aligned fact requires an alignment ID")
         if self.method_quality is AlignmentQuality.NONE:
             raise ValueError("aligned fact requires a reviewed alignment quality")
