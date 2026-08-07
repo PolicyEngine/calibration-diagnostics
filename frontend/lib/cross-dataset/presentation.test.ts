@@ -249,7 +249,7 @@ test("source scorecards identify aligned, advanced, and in-sample comparisons", 
 
   expect(populace.periodTreatments).toContainEqual({
     key: "aligned_fact",
-    label: "2023 facts aligned to 2024",
+    label: "2022–2023 facts aligned to 2024",
     count: 116,
   });
   expect(populace.calibrationExposures).toContainEqual({

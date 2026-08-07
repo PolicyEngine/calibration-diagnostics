@@ -146,6 +146,31 @@ def test_descriptive_dimensions_do_not_create_duplicate_row_filters() -> None:
     )
 
 
+def test_descriptive_constraint_variables_are_reviewed_but_not_executed() -> None:
+    constrained = fact(
+        universe_constraints=(
+            {"domain": "all_individual_income_tax_returns"},
+            {
+                "variable": "source.table_code",
+                "operator": "==",
+                "value": "A00100",
+            },
+        )
+    )
+    data = registry().to_data()
+    data["mappings"][0]["supported_constraint_variables"] = ["source.table_code"]
+    data["mappings"][0]["descriptive_constraint_variables"] = [
+        "source.table_code"
+    ]
+    result = CapabilityPlanner(MappingRegistry.from_data(data)).classify(
+        constrained, source()
+    )
+    assert all(
+        constraint.get("variable") != "source.table_code"
+        for constraint in result.query.constraints
+    )
+
+
 def test_all_dimension_is_a_total_label_not_a_row_filter() -> None:
     data = registry().to_data()
     data["mappings"][0]["descriptive_dimensions"] = []
@@ -162,6 +187,33 @@ def test_planner_compiles_model_query_for_established_pair() -> None:
     assert result.status is CapabilityStatus.MODEL
     assert result.execution_method is ExecutionMethod.MODEL
     assert result.query.policy_variable == "adjusted_gross_income"
+
+
+def test_mapping_can_bridge_observed_entity_to_execution_entity() -> None:
+    data = registry(execution="model").to_data()
+    data["mappings"][0]["ledger_selector"]["entities"] = ["government"]
+    data["mappings"][0]["execution_entity"] = "person"
+    bridged_source = source(
+        weights={"tax_unit": "tax_unit_weight", "person": "person_weight"}
+    )
+    result = CapabilityPlanner(MappingRegistry.from_data(data)).classify(
+        fact(entity="government"), bridged_source
+    )
+
+    assert result.status is CapabilityStatus.MODEL
+    assert result.entity == "person"
+    assert result.query.weight == "person_weight"
+
+
+def test_ratio_mapping_carries_a_reviewed_denominator_expression() -> None:
+    data = registry(execution="model").to_data()
+    data["mappings"][0]["operation"] = "ratio"
+    data["mappings"][0]["denominator_expression"] = "recipient_indicator"
+    result = CapabilityPlanner(MappingRegistry.from_data(data)).classify(
+        fact(), source()
+    )
+
+    assert result.query.denominator_expression == "recipient_indicator"
 
 
 def test_mapping_registry_rejects_model_execution_for_raw_dataset() -> None:
@@ -203,6 +255,39 @@ def test_cross_period_fact_is_unsupported_without_alignment() -> None:
         fact(period=TypedPeriod.parse("tax_year:2023")), source()
     )
     assert result.status is CapabilityStatus.UNSUPPORTED_PERIOD
+
+
+def test_mapping_can_declare_a_populace_build_target_period_proxy() -> None:
+    data = registry(execution="model").to_data()
+    data["mappings"][0]["build_target_periods"] = ["fiscal_year:2024"]
+    result = CapabilityPlanner(MappingRegistry.from_data(data)).classify(
+        fact(period=TypedPeriod.parse("fiscal_year:2024")), source()
+    )
+
+    assert result.status is CapabilityStatus.MODEL
+    assert result.period_treatment is PeriodTreatment.BUILD_TARGET_REPRODUCTION
+    assert result.score_eligible
+
+
+def test_geography_vintage_prefix_must_match_source_population() -> None:
+    district_fact = fact(
+        geography_level="congressional_district",
+        geography_id="5001700US0601",
+    )
+    district_source = source(
+        geographies=frozenset({"country", "state", "congressional_district"}),
+        geography_methods={
+            "country": "national",
+            "state": "state_fips",
+            "congressional_district": "congressional_district_geoid",
+        },
+        geography_id_prefixes={"congressional_district": ("5001900US",)},
+    )
+    result = CapabilityPlanner(registry()).classify(
+        district_fact, district_source
+    )
+    assert result.status is CapabilityStatus.UNSUPPORTED_GEOGRAPHY
+    assert result.reason_code == "geography_vintage_not_supported"
 
 
 def test_reviewed_alignment_produces_projected_non_headline_capability() -> None:
@@ -308,6 +393,18 @@ def test_mapping_registry_can_scope_a_mapping_to_reviewed_fact_keys() -> None:
     assert scoped.match(
         fact(fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")
     ) is None
+
+
+def test_mapping_registry_can_exclude_previously_reviewed_fact_keys() -> None:
+    data = registry().to_data()
+    data["mappings"][0]["ledger_selector"]["excluded_fact_keys"] = [
+        fact().fact_key
+    ]
+    scoped = MappingRegistry.from_data(data)
+    assert scoped.match(fact()) is None
+    assert scoped.match(
+        fact(fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")
+    ) is not None
 
 
 def test_capability_classification_has_no_estimate_input() -> None:

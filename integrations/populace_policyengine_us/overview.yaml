@@ -7,7 +7,7 @@ alignment_policy:
   model_version: 1.2.0
   populace_commit: cae8640f9e65e274aea65c7916cb37b956978e32
   source_module: packages/populace-build/src/populace/build/us_runtime/target_aging.py
-  source_years: [2023]
+  source_years: [2022, 2023]
   build_year: 2024
   evaluate_transformed_facts: true
   display_observed_and_transformed_values: true
@@ -30,13 +30,19 @@ source:
   entities:
     - person
     - household
+    - spm_unit
     - tax_unit
   weights:
     person: person_weight
     household: household_weight
+    spm_unit: spm_unit_weight
     tax_unit: tax_unit_weight
   geography_methods:
     country: fixed_country
     state: state_fips
     congressional_district: congressional_district_geoid
+  geography_id_prefixes:
+    country: [0100000US]
+    state: [0400000US]
+    congressional_district: [5001900US]
   available: true

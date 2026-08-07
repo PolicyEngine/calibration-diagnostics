@@ -341,6 +341,31 @@ def transform_ledger_facts_to_populace_year(
     return tuple(sorted(results, key=lambda result: result.source_fact.fact_key))
 
 
+def transform_ledger_facts_to_populace_years(
+    facts: Iterable[FactContract],
+    policy: PopulaceAgingPolicy,
+    *,
+    source_years: Iterable[int],
+    build_year: int = 2024,
+) -> tuple[PopulaceAgingResult, ...]:
+    """Apply the same Populace aging policy to each declared source year."""
+
+    years = tuple(source_years)
+    if len(years) != len(set(years)):
+        raise ValueError("Populace aging source years must be unique")
+    results = tuple(
+        result
+        for source_year in years
+        for result in transform_ledger_facts_to_populace_year(
+            facts,
+            policy,
+            source_year=source_year,
+            build_year=build_year,
+        )
+    )
+    return tuple(sorted(results, key=lambda result: result.source_fact.fact_key))
+
+
 def _period_year(period: TypedPeriod) -> int | None:
     head = period.value.split("-", 1)[0]
     return int(head) if len(head) == 4 and head.isdigit() else None

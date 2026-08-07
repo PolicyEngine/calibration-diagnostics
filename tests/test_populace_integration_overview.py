@@ -33,7 +33,7 @@ def test_populace_overview_pins_current_dataset_and_model() -> None:
         "source_module": (
             "packages/populace-build/src/populace/build/us_runtime/target_aging.py"
         ),
-        "source_years": [2023],
+        "source_years": [2022, 2023],
         "build_year": 2024,
         "evaluate_transformed_facts": True,
         "display_observed_and_transformed_values": True,

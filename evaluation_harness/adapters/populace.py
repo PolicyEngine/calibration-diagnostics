@@ -85,7 +85,7 @@ def _default_table_loader(dataset_path: Path) -> Tables:
     tables: dict[str, dict[str, np.ndarray]] = {}
     with pd.HDFStore(dataset_path, mode="r") as store:
         available = {key.lstrip("/"): key for key in store.keys()}
-        for entity in ("person", "household", "tax_unit"):
+        for entity in ("person", "household", "tax_unit", "spm_unit"):
             if entity not in available:
                 raise ValueError(f"Populace dataset has no {entity!r} table")
             frame = store[available[entity]]
@@ -107,9 +107,34 @@ VARIABLE_ALIASES = {
 }
 
 ENTITY_DOMAINS = {
-    "person": ("resident_population", "total_population", "compensation_of_employees"),
-    "household": ("households",),
-    "tax_unit": ("all_individual_income_tax_returns",),
+    "person": (
+        "aca_marketplace_effectuated_enrollment",
+        "aca_marketplace_qhp_selections",
+        "medicaid_chip_enrollment",
+        "medicare_financing",
+        "national_health_expenditures",
+        "resident_population",
+        "total_population",
+        "population_projection",
+        "compensation_of_employees",
+        "personal_income",
+        "personal_current_transfer_receipts",
+        "social_security_and_ssi_payments",
+    ),
+    "household": ("household_balance_sheet", "households"),
+    "spm_unit": (
+        "liheap_state_programs",
+        "supplemental_nutrition_assistance_program",
+        "tanf_cash_assistance",
+        "tanf_caseload",
+    ),
+    "tax_unit": (
+        "all_individual_income_tax_returns",
+        "individual_income_tax_returns",
+        "form_w2_items",
+        "individual_retirement_arrangement_contributions",
+        "state_government_tax_collections",
+    ),
 }
 
 
@@ -194,6 +219,17 @@ class PopulacePolicyEngineRunner:
                 self._lookup(household_ids, values, person_households, "person-household join")
                 for values in (country, states, districts)
             )
+        if entity == "spm_unit":
+            spm_households = self._spm_unit_households()
+            return tuple(
+                self._lookup(
+                    household_ids,
+                    values,
+                    spm_households,
+                    "SPM-unit household join",
+                )
+                for values in (country, states, districts)
+            )
         if entity != "tax_unit":
             raise ValueError(f"unsupported Populace entity {entity!r}")
 
@@ -219,20 +255,162 @@ class PopulacePolicyEngineRunner:
         )
 
     def _model_array(self, requested_name: str, entity: str, period: str) -> np.ndarray:
+        if requested_name.startswith("tax_unit_sum_person:"):
+            expression = requested_name.split(":", 1)[1]
+            values = sum(
+                (
+                    self._native_model_array(name, period, expected_entity="person")
+                    for name in expression.split("+")
+                ),
+                start=np.zeros(len(self.tables["person"]["person_id"])),
+            )
+            return self._person_values_to_tax_units(values)
+        if requested_name.startswith("tax_unit_count_person:"):
+            model_name = requested_name.split(":", 1)[1]
+            values = self._native_model_array(
+                model_name, period, expected_entity="person"
+            )
+            return self._person_values_to_tax_units((values != 0).astype(np.int64))
+        if requested_name == "snap_receipt_status" and entity == "household":
+            snap = self._native_model_array("snap", period, expected_entity="spm_unit")
+            receives = self._spm_values_to_households(snap > 0)
+            return np.where(
+                receives,
+                "receiving_food_stamps_snap",
+                "not_receiving_food_stamps_snap",
+            )
+        if requested_name == "person_assigned_aca_ptc_per_month" and entity == "person":
+            receives = self._native_model_array(
+                "person_receives_aca", period, expected_entity="person"
+            ).astype(bool)
+            assigned = self._native_model_array(
+                "assigned_aca_ptc", period, expected_entity="tax_unit"
+            )
+            recipient_counts = self._person_values_to_tax_units(
+                receives.astype(np.int64)
+            )
+            assigned_by_person = self._tax_unit_values_to_people(assigned)
+            counts_by_person = self._tax_unit_values_to_people(recipient_counts)
+            denominator = counts_by_person * 12
+            return np.divide(
+                assigned_by_person,
+                denominator,
+                out=np.zeros_like(assigned_by_person, dtype=float),
+                where=receives & (denominator > 0),
+            )
+        if requested_name == "medicaid_or_chip_enrolled" and entity == "person":
+            return self._native_model_array(
+                "medicaid_enrolled", period, expected_entity="person"
+            ).astype(bool) | self._native_model_array(
+                "chip_enrolled", period, expected_entity="person"
+            ).astype(bool)
+
         model_name = VARIABLE_ALIASES.get(requested_name, requested_name)
+        values = self._native_model_array(model_name, period, expected_entity=entity)
+        if requested_name == "ssi_category":
+            return np.char.lower(values.astype(str))
+        return values
+
+    def _native_model_array(
+        self,
+        model_name: str,
+        period: str,
+        *,
+        expected_entity: str,
+    ) -> np.ndarray:
         cache_key = (model_name, period)
         if cache_key not in self._calculation_cache:
             variable = self.simulation.tax_benefit_system.get_variable(model_name)
             variable_entity = variable.entity.key
-            if variable_entity != entity:
+            if variable_entity != expected_entity:
                 raise ValueError(
                     f"PolicyEngine variable {model_name!r} belongs to entity "
-                    f"{variable_entity!r}, not {entity!r}"
+                    f"{variable_entity!r}, not {expected_entity!r}"
                 )
             self._calculation_cache[cache_key] = np.asarray(
                 self.simulation.calculate(model_name, period, use_weights=False)
             )
         return self._calculation_cache[cache_key]
+
+    def _person_values_to_tax_units(self, values: np.ndarray) -> np.ndarray:
+        person = self.tables["person"]
+        person_tax_units = self._column(person, "person_tax_unit_id")
+        if len(values) != len(person_tax_units):
+            raise ValueError("person-to-tax-unit values do not align with people")
+        tax_unit_ids = self._column(self.tables["tax_unit"], "tax_unit_id")
+        positions = {value: index for index, value in enumerate(tax_unit_ids.tolist())}
+        try:
+            indices = np.asarray(
+                [positions[value] for value in person_tax_units.tolist()], dtype=int
+            )
+        except KeyError as error:
+            raise ValueError(
+                f"person references unknown tax unit: {error.args[0]}"
+            ) from error
+        result = np.zeros(len(tax_unit_ids), dtype=np.asarray(values).dtype)
+        np.add.at(result, indices, values)
+        return result
+
+    def _tax_unit_values_to_people(self, values: np.ndarray) -> np.ndarray:
+        tax_unit_ids = self._column(self.tables["tax_unit"], "tax_unit_id")
+        if len(values) != len(tax_unit_ids):
+            raise ValueError("tax-unit-to-person values do not align with tax units")
+        positions = {value: index for index, value in enumerate(tax_unit_ids.tolist())}
+        person_tax_units = self._column(
+            self.tables["person"], "person_tax_unit_id"
+        )
+        try:
+            indices = np.asarray(
+                [positions[value] for value in person_tax_units.tolist()], dtype=int
+            )
+        except KeyError as error:
+            raise ValueError(
+                f"person references unknown tax unit: {error.args[0]}"
+            ) from error
+        return np.asarray(values)[indices]
+
+    def _spm_values_to_households(self, values: np.ndarray) -> np.ndarray:
+        spm_unit_ids = self._column(self.tables["spm_unit"], "spm_unit_id")
+        if len(values) != len(spm_unit_ids):
+            raise ValueError("SPM-to-household values do not align with SPM units")
+        spm_households = self._spm_unit_households()
+        household_ids = self._column(self.tables["household"], "household_id")
+        positions = {value: index for index, value in enumerate(household_ids.tolist())}
+        result = np.zeros(len(household_ids), dtype=bool)
+        for household_id, value in zip(
+            spm_households.tolist(), values.tolist(), strict=True
+        ):
+            try:
+                position = positions[household_id]
+            except KeyError as error:
+                raise ValueError(
+                    f"SPM unit references unknown household: {error.args[0]}"
+                ) from error
+            result[position] |= bool(value)
+        return result
+
+    def _spm_unit_households(self) -> np.ndarray:
+        person = self.tables["person"]
+        spm_to_household: dict[Any, Any] = {}
+        for spm_unit_id, household_id in zip(
+            self._column(person, "person_spm_unit_id").tolist(),
+            self._column(person, "person_household_id").tolist(),
+            strict=True,
+        ):
+            previous = spm_to_household.setdefault(spm_unit_id, household_id)
+            if previous != household_id:
+                raise ValueError(
+                    f"SPM unit {spm_unit_id} belongs to multiple households"
+                )
+        spm_unit_ids = self._column(self.tables["spm_unit"], "spm_unit_id")
+        try:
+            return np.asarray(
+                [spm_to_household[spm_unit_id] for spm_unit_id in spm_unit_ids]
+            )
+        except KeyError as error:
+            raise ValueError(
+                f"SPM unit has no household link: {error.args[0]}"
+            ) from error
 
     def prepare(self, group: RunGroup) -> ArrayBundle:
         if group.source_id != "populace_us_policyengine_us_2024":
@@ -260,7 +438,15 @@ class PopulacePolicyEngineRunner:
         for name in group.required_variables:
             if name in arrays:
                 continue
-            if name == "bea_nipa.series_code":
+            if name == "spm_unit_weight" and group.entity == "spm_unit":
+                household = self.tables["household"]
+                arrays[name] = self._lookup(
+                    self._column(household, "household_id"),
+                    self._column(household, "household_weight"),
+                    self._spm_unit_households(),
+                    "SPM-unit weight join",
+                )
+            elif name == "bea_nipa.series_code":
                 arrays[name] = np.full(length, "A034RC", dtype=object)
             elif name in table:
                 arrays[name] = np.asarray(table[name])
@@ -275,6 +461,9 @@ class PopulacePolicyEngineRunner:
             for domain in ENTITY_DOMAINS[group.entity]
         }
         if group.entity == "tax_unit":
+            filer = self._model_array("tax_unit_is_filer", group.entity, policy_period)
+            masks["all_individual_income_tax_returns"] = filer
+            masks["individual_income_tax_returns"] = filer
             masks["individual_income_tax_returns_with_earned_income_credit"] = (
                 self._model_array("eitc", group.entity, policy_period) != 0
             )

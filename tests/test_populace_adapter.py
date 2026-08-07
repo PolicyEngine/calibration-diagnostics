@@ -37,6 +37,15 @@ class FakeSimulation:
                 "eitc": "tax_unit",
                 "eitc_child_count": "tax_unit",
                 "adjusted_gross_income": "tax_unit",
+                "assigned_aca_ptc": "tax_unit",
+                "chip_enrolled": "person",
+                "medicaid_enrolled": "person",
+                "ordinary_dividend_income": "person",
+                "person_receives_aca": "person",
+                "roth_ira_contributions": "person",
+                "snap": "spm_unit",
+                "ssi_category": "person",
+                "tax_unit_is_filer": "tax_unit",
             }
         )
 
@@ -46,6 +55,15 @@ class FakeSimulation:
             "eitc": np.array([0.0, 1_000.0]),
             "eitc_child_count": np.array([0, 2]),
             "adjusted_gross_income": np.array([5_000.0, 25_000.0]),
+            "assigned_aca_ptc": np.array([1_200.0, 3_600.0]),
+            "chip_enrolled": np.array([False, True, False]),
+            "medicaid_enrolled": np.array([True, False, False]),
+            "ordinary_dividend_income": np.array([10.0, 20.0, 30.0]),
+            "person_receives_aca": np.array([True, True, True]),
+            "roth_ira_contributions": np.array([0.0, 100.0, 200.0]),
+            "snap": np.array([0.0, 500.0]),
+            "ssi_category": np.array(["AGED", "BLIND", "DISABLED"]),
+            "tax_unit_is_filer": np.array([False, True]),
         }
         return values[name]
 
@@ -63,6 +81,7 @@ def tables() -> dict[str, dict[str, np.ndarray]]:
             "person_id": np.array([1, 2, 3]),
             "person_household_id": np.array([10, 20, 20]),
             "person_tax_unit_id": np.array([100, 200, 200]),
+            "person_spm_unit_id": np.array([1_000, 2_000, 2_000]),
             "person_weight": np.array([1.0, 1.5, 1.5]),
             "age": np.array([4, 10, 30]),
             "employment_income": np.array([0.0, 10_000.0, 40_000.0]),
@@ -70,6 +89,9 @@ def tables() -> dict[str, dict[str, np.ndarray]]:
         "tax_unit": {
             "tax_unit_id": np.array([100, 200]),
             "tax_unit_weight": np.array([1.0, 2.0]),
+        },
+        "spm_unit": {
+            "spm_unit_id": np.array([1_000, 2_000]),
         },
     }
 
@@ -124,6 +146,7 @@ def test_runner_builds_entity_specific_geographies(tables) -> None:
     person = adapter.prepare(group("person", "person_weight", "__geography__"))
     household = adapter.prepare(group("household", "household_weight", "__geography__"))
     tax_unit = adapter.prepare(group("tax_unit", "tax_unit_weight", "__geography__"))
+    spm_unit = adapter.prepare(group("spm_unit", "spm_unit_weight", "__geography__"))
     assert person.arrays["__geography__"].tolist() == [
         "0100000US", "0100000US", "0100000US"
     ]
@@ -136,6 +159,10 @@ def test_runner_builds_entity_specific_geographies(tables) -> None:
     assert tax_unit.arrays["__state_geography__"].tolist() == [
         "0400000US01", "0400000US06"
     ]
+    assert spm_unit.arrays["__state_geography__"].tolist() == [
+        "0400000US01", "0400000US06"
+    ]
+    assert spm_unit.arrays["spm_unit_weight"].tolist() == [2.0, 3.0]
 
 
 def test_requested_geography_method_selects_the_query_geography(tables) -> None:
@@ -164,7 +191,64 @@ def test_policy_variables_are_aliased_and_cached(tables) -> None:
     assert simulation.calls == [
         ("eitc", "2024", False),
         ("adjusted_gross_income", "2024", False),
+        ("tax_unit_is_filer", "2024", False),
     ]
+
+
+def test_person_variables_can_be_explicitly_aggregated_to_tax_units(tables) -> None:
+    simulation = FakeSimulation()
+    bundle = runner(tables, simulation).prepare(
+        group(
+            "tax_unit",
+            "tax_unit_sum_person:ordinary_dividend_income",
+            "tax_unit_count_person:roth_ira_contributions",
+        )
+    )
+    assert bundle.arrays[
+        "tax_unit_sum_person:ordinary_dividend_income"
+    ].tolist() == [10.0, 50.0]
+    assert bundle.arrays[
+        "tax_unit_count_person:roth_ira_contributions"
+    ].tolist() == [0, 2]
+
+
+def test_tax_unit_aca_credit_is_allocated_to_recipient_people_per_month(tables) -> None:
+    bundle = runner(tables).prepare(
+        group(
+            "person",
+            "person_assigned_aca_ptc_per_month",
+            "person_receives_aca",
+        )
+    )
+    assert bundle.arrays["person_assigned_aca_ptc_per_month"].tolist() == [
+        100.0,
+        150.0,
+        150.0,
+    ]
+
+
+def test_medicaid_or_chip_enrollment_is_a_person_level_union(tables) -> None:
+    bundle = runner(tables).prepare(
+        group("person", "medicaid_or_chip_enrolled")
+    )
+    assert bundle.arrays["medicaid_or_chip_enrolled"].tolist() == [
+        True,
+        True,
+        False,
+    ]
+
+
+def test_household_snap_receipt_bridge_uses_positive_spm_benefits(tables) -> None:
+    bundle = runner(tables).prepare(group("household", "snap_receipt_status"))
+    assert bundle.arrays["snap_receipt_status"].tolist() == [
+        "not_receiving_food_stamps_snap",
+        "receiving_food_stamps_snap",
+    ]
+
+
+def test_policyengine_enum_values_are_normalized_for_chronicle_constraints(tables) -> None:
+    bundle = runner(tables).prepare(group("person", "ssi_category"))
+    assert bundle.arrays["ssi_category"].tolist() == ["aged", "blind", "disabled"]
 
 
 def test_model_entity_mismatch_and_ambiguous_tax_unit_join_are_rejected(tables) -> None:
@@ -182,11 +266,41 @@ def test_model_entity_mismatch_and_ambiguous_tax_unit_join_are_rejected(tables) 
 def test_supported_populace_domains_are_explicit_masks(tables) -> None:
     bundle = runner(tables).prepare(group("person", "person_weight"))
     assert set(bundle.domain_masks) == {
+        "aca_marketplace_effectuated_enrollment",
+        "aca_marketplace_qhp_selections",
+        "medicaid_chip_enrollment",
+        "medicare_financing",
+        "national_health_expenditures",
         "resident_population",
         "total_population",
+        "population_projection",
         "compensation_of_employees",
+        "personal_income",
+        "personal_current_transfer_receipts",
+        "social_security_and_ssi_payments",
     }
     assert bundle.domain_masks["resident_population"].all()
+
+    households = runner(tables).prepare(group("household", "household_weight"))
+    assert set(households.domain_masks) == {
+        "household_balance_sheet",
+        "households",
+    }
+
+    tax_units = runner(tables).prepare(group("tax_unit", "tax_unit_weight"))
+    assert tax_units.domain_masks["all_individual_income_tax_returns"].tolist() == [
+        False,
+        True,
+    ]
+
+    spm_units = runner(tables).prepare(group("spm_unit", "spm_unit_weight"))
+    assert set(spm_units.domain_masks) == {
+        "liheap_state_programs",
+        "supplemental_nutrition_assistance_program",
+        "tanf_cash_assistance",
+        "tanf_caseload",
+    }
+    assert "state_government_tax_collections" in tax_units.domain_masks
 
 
 def test_eitc_return_domain_and_ledger_child_constraint_are_model_backed(tables) -> None:
@@ -245,6 +359,7 @@ def test_all_ten_reviewed_ledger_facts_execute_numerically() -> None:
                 "employment_income": "person",
                 "eitc": "tax_unit",
                 "adjusted_gross_income": "tax_unit",
+                "tax_unit_is_filer": "tax_unit",
             }
         )
 
@@ -256,7 +371,10 @@ def test_all_ten_reviewed_ledger_facts_execute_numerically() -> None:
                     [0.0, 0.0, 0.0, 12_387_929_000_000.0 / person_weights[3]]
                 ),
                 "eitc": np.array([bracket_eitc, other_eitc, 0.0, 0.0]),
-                "adjusted_gross_income": np.array([12_000.0, 25_000.0, 0.0, 0.0]),
+                "adjusted_gross_income": np.array(
+                    [12_000.0, 25_000.0, 0.0, 0.0]
+                ),
+                "tax_unit_is_filer": np.array([True, True, True, True]),
             }[name]
 
     adapter = PopulacePolicyEngineRunner(
