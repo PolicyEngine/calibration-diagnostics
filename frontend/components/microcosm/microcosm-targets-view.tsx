@@ -12,6 +12,7 @@ import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { withBasePath } from "@/lib/base-path";
+import { sourceLabel } from "@/lib/microcosm/source-label";
 import {
   releaseSelectOptions,
   useMicrocosmStagingRuns,
@@ -310,31 +311,6 @@ function healthcareSummary(variables: MicrocosmVariableRow[]): HealthcareSummary
       ? weightedAbsError / weightedAbsErrorTargets
       : null,
   };
-}
-
-
-const SOURCE_LABELS: Record<string, string> = {
-  irs_soi: "IRS — income & taxes",
-  census_population: "Census — population",
-  cms_aca: "CMS — ACA marketplace",
-  cms_medicaid: "CMS — Medicaid & CHIP",
-  cms_medicare: "CMS — Medicare",
-  hhs_acf_tanf: "HHS — TANF",
-  usda_snap: "USDA — SNAP",
-  ssa: "Social Security",
-  cbo: "CBO projections",
-  jct: "JCT scores",
-  state_income_tax: "State income tax",
-};
-
-function sourceLabel(source: string): string {
-  return (
-    SOURCE_LABELS[source] ??
-    source
-      .split("_")
-      .map((w) => (w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)))
-      .join(" ")
-  );
 }
 
 // Friendlier statistic picker: statistics grouped under plain-English source
