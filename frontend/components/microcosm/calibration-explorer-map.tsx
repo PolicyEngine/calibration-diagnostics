@@ -27,11 +27,11 @@ import {
 import {
   createExplorerState,
   explorerReducer,
-  nextLevelExplorerStates,
   type ExplorerBreakdown,
   type ExplorerFilters,
   type ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
+import { prefetchCalibrationDescendants } from "@/lib/microcosm/calibration-prefetch";
 import {
   MISSING_VALUE,
   type CalibrationTreeGroup,
@@ -51,6 +51,9 @@ import { squarify, type Placed } from "@/lib/treemap/squarify";
 const GROUP_GAP = 8;
 const NODE_GAP = 3;
 const HEADER_HEIGHT = 24;
+const PAGE_LOAD_PREFETCH_DEPTH = 3;
+const ACTIVE_VIEW_PREFETCH_DEPTH = 1;
+const PREFETCH_CONCURRENCY = 6;
 
 const FIT_LABELS: Record<string, string> = {
   "0_5": "0–5%",
@@ -419,32 +422,40 @@ function CalibrationMapLoadingSkeleton() {
   );
 }
 
-function usePrefetchNextCalibrationLevels({
+function usePrefetchCalibrationLevels({
   state,
   data,
   release,
   isPlaceholderData,
+  depth,
 }: {
   state: ExplorerState;
   data: CalibrationTreeResponse | undefined;
   release?: string;
   isPlaceholderData: boolean;
+  depth: number;
 }) {
   const { country } = useCountry();
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!data || isPlaceholderData) return;
-    const childStates = nextLevelExplorerStates(
+    let cancelled = false;
+    void prefetchCalibrationDescendants({
       state,
-      data.groups.flatMap((group) => group.nodes.map((item) => item.selection)),
-    );
-    for (const childState of childStates) {
-      void queryClient.prefetchQuery(
-        microcosmCalibrationTreeQueryOptions(childState, release, country),
-      );
-    }
-  }, [country, data, isPlaceholderData, queryClient, release, state]);
+      data,
+      depth,
+      concurrency: PREFETCH_CONCURRENCY,
+      fetchTree: async (childState) =>
+        queryClient.fetchQuery(
+          microcosmCalibrationTreeQueryOptions(childState, release, country),
+        ),
+      isCancelled: () => cancelled,
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [country, data, depth, isPlaceholderData, queryClient, release, state]);
 }
 
 export function CalibrationExplorerDataPrefetch({
@@ -454,11 +465,12 @@ export function CalibrationExplorerDataPrefetch({
 }) {
   const [state] = useState(createExplorerState);
   const { data, isPlaceholderData } = useMicrocosmCalibrationTree(state, release);
-  usePrefetchNextCalibrationLevels({
+  usePrefetchCalibrationLevels({
     state,
     data,
     release,
     isPlaceholderData,
+    depth: PAGE_LOAD_PREFETCH_DEPTH,
   });
   return null;
 }
@@ -487,11 +499,12 @@ export function CalibrationExplorerMap({
     groups: CalibrationTreeGroup[];
   } | null>(null);
 
-  usePrefetchNextCalibrationLevels({
+  usePrefetchCalibrationLevels({
     state,
     data,
     release,
     isPlaceholderData,
+    depth: ACTIVE_VIEW_PREFETCH_DEPTH,
   });
 
   useEffect(() => {
@@ -725,7 +738,6 @@ export function CalibrationExplorerMap({
           </div>
         </div>
 
-        {isFetching && <CalibrationMapLoadingSkeleton />}
       </div>
 
       <p className="text-[12px] leading-relaxed text-muted-foreground">

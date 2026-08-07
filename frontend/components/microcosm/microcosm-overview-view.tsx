@@ -83,6 +83,7 @@ export function MicrocosmOverviewView() {
 
   return (
     <div className="flex flex-col gap-5">
+      <CalibrationExplorerDataPrefetch release={release || undefined} />
       <PageHeader
         eyebrow="Microcosm · calibration fit"
         title="What the data is anchored to"
