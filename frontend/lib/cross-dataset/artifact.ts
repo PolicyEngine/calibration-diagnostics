@@ -114,6 +114,8 @@ export interface FactSourceCell {
   dataset_version?: string;
   model_version?: string;
   estimate?: string;
+  standard_error?: string;
+  margin_of_error_90?: string;
   benchmark_value?: string;
   benchmark_period?: string;
   benchmark_basis?: string;

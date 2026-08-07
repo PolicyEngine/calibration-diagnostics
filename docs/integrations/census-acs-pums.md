@@ -1,6 +1,6 @@
 # Raw ACS PUMS integration overview
 
-Status: **integration surface confirmed; adapter implementation pending**
+Status: **adapter implemented and verified against the official 2024 files**
 
 This source is the Census Bureau's 2024 ACS 1-year Public Use Microdata
 Sample person file. It is a standalone dataset, not a model/dataset pair. The
@@ -11,6 +11,15 @@ The pinned release is `census-acs-pums-2024-1y-person@2025-09-17`. Execution
 uses the national `csv_pus.zip` file plus `csv_ppr.zip` for Puerto Rico. The
 input SHA-256 hashes and the hash of the derived aggregate file are recorded by
 the preprocessor rather than treating a mutable download URL as a version.
+
+The executed inputs contain 3,422,888 U.S. and 25,905 Puerto Rico person
+records. Their pinned SHA-256 values are:
+
+- `csv_pus.zip`: `afdc6d90c6e2f0bab365ed32d95ba4c4d8ac651162f46ac7861295b2dc469894`
+- `csv_ppr.zip`: `c9cff0bf3f488f379570c8ff70ed86ac55cbdbb107428da9a445dce103694e35`
+
+The 4,881-row derived sufficient statistic has SHA-256
+`2c3ef941f83b25dc9ffe01c26272f89073483fb8b6e4a23c5e990394c372326f`.
 
 ## Current Ledger coverage
 
@@ -88,3 +97,45 @@ results rather than suppressed.
 Completion requires ten finite direct estimates, ten scored results, and
 replicate-weight diagnostics for every row. Unsupported or `N/A` rows cannot
 pass the checkpoint.
+
+The actual gate passed all ten:
+
+| Geography and age | PUMS estimate | Relative error | 90% PUMS MOE |
+|---|---:|---:|---:|
+| United States, 0-4 | 18,305,390 | 0.325% | 31,755 |
+| United States, 20-24 | 22,277,920 | 0.204% | 53,910 |
+| United States, 40-44 | 22,757,678 | 0.250% | 96,084 |
+| United States, 65-69 | 19,354,445 | 0.013% | 63,948 |
+| United States, 85+ | 6,333,041 | 0.159% | 44,760 |
+| Alabama, 60-64 | 338,634 | 0.164% | 8,700 |
+| California, 0-4 | 2,075,077 | 0.388% | 5,708 |
+| New York, 25-29 | 1,360,632 | 0.356% | 7,860 |
+| Texas, 15-19 | 2,267,401 | 0.083% | 13,298 |
+| Wyoming, 85+ | 11,025 | 12.477% | 1,932 |
+
+`integrations/census_acs_pums/verification_results.json` retains the exact
+unrounded diagnostics and input manifest.
+
+## Full Ledger run
+
+The full pass classified all 48,313 facts for raw ACS PUMS and executed all 954
+supported cells. Every executed row has an estimate, standard error, and 90%
+margin of error in both the immutable run and the frontend fact artifact. The
+source scored 99.427 on the current display scale. That high result must be
+read with the related-weighting caveat above, not as independent validation.
+
+The combined three-source artifact is run
+`evaluation-94fc97cc315f20a50de892a3`: 144,939 capability cells, 10,403
+estimates, and a complete frontend bundle.
+
+Rebuild and verify with:
+
+```bash
+uv run python scripts/build_acs_pums_aggregates.py \
+  --us-person-zip /path/to/csv_pus.zip \
+  --puerto-rico-person-zip /path/to/csv_ppr.zip \
+  --output .artifacts/acs-pums-2024/person-age.parquet
+
+uv run python scripts/verify_acs_pums_adapter.py \
+  --aggregates .artifacts/acs-pums-2024/person-age.parquet
+```

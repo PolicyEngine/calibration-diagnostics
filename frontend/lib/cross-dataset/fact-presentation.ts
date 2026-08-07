@@ -60,6 +60,8 @@ export interface FactSourceDetailView extends FactSourceRowView {
   alignment: DisplayField[];
   datasetVersion: string;
   modelVersion: string;
+  standardErrorLabel: string;
+  marginOfError90Label: string;
 }
 
 export interface FactDetailView {
@@ -335,10 +337,14 @@ function sourceDetailView(
       alignment: [],
       datasetVersion: source.dataset_version ?? "Not recorded",
       modelVersion: source.model_version ?? "Not applicable",
+      standardErrorLabel: "Not available",
+      marginOfError90Label: "Not available",
     };
   }
   const exposureLabels: Record<string, string> = {
     direct_calibration_target: "Direct calibration target (in-sample)",
+    used_in_imputation_or_reweighting:
+      "Used in source weighting/reweighting (not independent)",
     external_validation: "External validation",
     unknown_exposure: "Not evaluated",
   };
@@ -368,6 +374,8 @@ function sourceDetailView(
     alignment: fields(cell.alignment),
     datasetVersion: cell.dataset_version ?? source.dataset_version ?? "Not recorded",
     modelVersion: cell.model_version ?? source.model_version ?? "Not applicable",
+    standardErrorLabel: formatFactValue(cell.standard_error, fact.unit),
+    marginOfError90Label: formatFactValue(cell.margin_of_error_90, fact.unit),
   };
 }
 

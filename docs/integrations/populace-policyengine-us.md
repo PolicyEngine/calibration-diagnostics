@@ -208,6 +208,7 @@ uv run --extra populace --extra taxcalc-cps python \
   scripts/run_full_ledger_evaluation.py \
   --snapshot /path/to/ledger-snapshot \
   --populace-dataset /path/to/populace_us_2024.h5 \
+  --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet \
   --output .artifacts/evaluations/<immutable-run-directory>
 ```
 

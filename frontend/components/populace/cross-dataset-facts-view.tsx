@@ -614,7 +614,7 @@ export function CrossDatasetFactDetailView({
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div className="rounded-md border border-border p-3">
                         <div className="font-mono text-[11px] text-muted-foreground">
-                          Model estimate
+                          Source estimate
                         </div>
                         <div className="mt-1 text-lg font-semibold tabular-nums">
                           {cell.estimateLabel}
@@ -652,6 +652,15 @@ export function CrossDatasetFactDetailView({
                       </div>
                     )}
 
+                    {cell.standardErrorLabel !== "Not available" && (
+                      <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                        Sampling uncertainty: standard error{" "}
+                        <strong>{cell.standardErrorLabel}</strong> · 90% margin of error ±
+                        <strong>{cell.marginOfError90Label}</strong>. The score still uses the
+                        point estimate above.
+                      </div>
+                    )}
+
                     <div className="grid gap-5 sm:grid-cols-2">
                       <div>
                         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide">
@@ -665,6 +674,8 @@ export function CrossDatasetFactDetailView({
                             { label: "Calibration exposure", value: cell.calibrationExposureLabel },
                             { label: "Dataset version", value: cell.datasetVersion },
                             { label: "Model version", value: cell.modelVersion },
+                            { label: "Standard error", value: cell.standardErrorLabel },
+                            { label: "90% margin of error", value: cell.marginOfError90Label },
                             {
                               label: "Required variables",
                               value: cell.requiredVariables.length

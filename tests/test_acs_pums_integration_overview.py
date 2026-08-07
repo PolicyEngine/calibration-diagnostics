@@ -13,6 +13,7 @@ from evaluation_harness.integration import (
     load_integration_overview,
     validate_overview_against_snapshot,
 )
+from evaluation_harness.frontend_bundle import DEFAULT_SOURCE_LABELS
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.planner import CapabilityPlanner
 
@@ -35,6 +36,7 @@ def test_acs_pums_overview_pins_a_standalone_native_2024_dataset() -> None:
     assert overview.source.geographies == frozenset({"country", "state"})
     assert overview.source.entities == frozenset({"person"})
     assert overview.source.weights == {"person": "PWGTP"}
+    assert DEFAULT_SOURCE_LABELS[overview.source.source_id] == "Raw ACS PUMS"
 
 
 def test_acs_pums_has_ten_real_national_and_state_verification_facts() -> None:

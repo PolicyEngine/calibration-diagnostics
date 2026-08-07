@@ -2,9 +2,10 @@
 
 The Cross-dataset API serves immutable evaluation artifacts; an HTTP request
 never imports or runs PolicyEngine or Tax-Calculator. The current approved run
-contains Populace + PolicyEngine-US and Tax-Calculator + public CPS. Yale is
-deferred pending a reproducible reconstruction, and the API is source-agnostic
-so it can be added later without changing the response contract.
+contains Populace + PolicyEngine-US, Tax-Calculator + public CPS, and raw 2024
+ACS PUMS. Yale is deferred pending a reproducible reconstruction, and the API
+is source-agnostic so it can be added later without changing the response
+contract.
 
 ## Publish frontend partitions
 
@@ -56,7 +57,8 @@ bundle returns HTTP 503 rather than serving mixed results.
   `source`.
 - `view=fact&fact_key=...`: one Ledger observation and its sparse source cells,
   including capability, mapping, estimate, benchmark, error, period treatment,
-  calibration exposure, and alignment provenance where applicable.
+  calibration exposure, alignment provenance, and dataset uncertainty where
+  applicable.
 
 Fact filters use the bundle's page index to fetch only candidate partitions.
 The API never sends the entire Ledger catalog to the browser.

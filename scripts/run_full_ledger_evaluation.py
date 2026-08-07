@@ -8,6 +8,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from evaluation_harness.adapters.acs_pums import ACSPUMSRunner, execute_acs_pums
 from evaluation_harness.adapters.populace import PopulacePolicyEngineRunner
 from evaluation_harness.adapters.taxcalc_cps import TaxCalcCPSRunner
 from evaluation_harness.execution import build_run_groups, execute_groups
@@ -31,6 +32,7 @@ from evaluation_harness.publisher import publish_run
 ROOT = Path(__file__).resolve().parents[1]
 POPULACE_INTEGRATION = ROOT / "integrations" / "populace_policyengine_us"
 CPS_INTEGRATION = ROOT / "integrations" / "taxcalc_cps"
+ACS_PUMS_INTEGRATION = ROOT / "integrations" / "census_acs_pums"
 
 
 def _source_counts(capabilities, source_id: str) -> dict[str, int]:
@@ -45,7 +47,12 @@ def _source_counts(capabilities, source_id: str) -> dict[str, int]:
     )
 
 
-def run(snapshot: Path, populace_dataset: Path, output: Path) -> dict:
+def run(
+    snapshot: Path,
+    populace_dataset: Path,
+    acs_pums_aggregates: Path,
+    output: Path,
+) -> dict:
     facts, snapshot_manifest = load_snapshot_facts(snapshot)
     snapshot_id = snapshot_manifest["snapshot_id"]
     print(
@@ -57,7 +64,10 @@ def run(snapshot: Path, populace_dataset: Path, output: Path) -> dict:
         POPULACE_INTEGRATION / "overview.yaml"
     )
     cps_overview = load_integration_overview(CPS_INTEGRATION / "overview.yaml")
-    for overview in (populace_overview, cps_overview):
+    acs_pums_overview = load_integration_overview(
+        ACS_PUMS_INTEGRATION / "overview.yaml"
+    )
+    for overview in (populace_overview, cps_overview, acs_pums_overview):
         if overview.ledger_snapshot_id != snapshot_id:
             raise ValueError(
                 f"integration {overview.integration_id} was reviewed against "
@@ -85,12 +95,18 @@ def run(snapshot: Path, populace_dataset: Path, output: Path) -> dict:
         source=cps_overview.source,
         mappings=MappingRegistry.from_yaml(CPS_INTEGRATION / "mappings.yaml"),
     )
+    acs_pums_plan = SourcePlan(
+        source=acs_pums_overview.source,
+        mappings=MappingRegistry.from_yaml(
+            ACS_PUMS_INTEGRATION / "mappings.yaml"
+        ),
+    )
     capabilities = build_full_capability_matrix(
         facts,
-        [populace_plan, cps_plan],
+        [populace_plan, cps_plan, acs_pums_plan],
         snapshot_id=snapshot_id,
     )
-    expected_capabilities = len(facts) * 2
+    expected_capabilities = len(facts) * 3
     if len(capabilities) != expected_capabilities:
         raise RuntimeError(
             f"classification produced {len(capabilities)} cells, "
@@ -105,6 +121,9 @@ def run(snapshot: Path, populace_dataset: Path, output: Path) -> dict:
                 ),
                 cps_plan.source.source_id: _source_counts(
                     capabilities, cps_plan.source.source_id
+                ),
+                acs_pums_plan.source.source_id: _source_counts(
+                    capabilities, acs_pums_plan.source.source_id
                 ),
             },
             sort_keys=True,
@@ -152,7 +171,29 @@ def run(snapshot: Path, populace_dataset: Path, output: Path) -> dict:
     gc.collect()
     print(f"Completed {len(cps_results):,} CPS estimates.", flush=True)
 
-    results = tuple([*populace_results, *cps_results])
+    acs_pums_capabilities = tuple(
+        row
+        for row in capabilities
+        if row.source_id == acs_pums_plan.source.source_id
+    )
+    acs_pums_groups = build_run_groups(acs_pums_capabilities)
+    print(
+        f"Executing {sum(len(group.fact_keys) for group in acs_pums_groups):,} "
+        f"raw ACS PUMS capability cells in {len(acs_pums_groups)} groups.",
+        flush=True,
+    )
+    acs_pums_runner = ACSPUMSRunner(acs_pums_aggregates)
+    acs_pums_input_manifest = acs_pums_runner.input_manifest
+    acs_pums_results = execute_acs_pums(
+        acs_pums_groups,
+        acs_pums_capabilities,
+        acs_pums_runner,
+    )
+    del acs_pums_runner
+    gc.collect()
+    print(f"Completed {len(acs_pums_results):,} raw ACS estimates.", flush=True)
+
+    results = tuple([*populace_results, *cps_results, *acs_pums_results])
     scores = build_scored_results(facts, capabilities, results, aligned_facts)
     summary = build_run_summary(facts, capabilities, results, scores)
     summary["populace_2023_to_2024_alignment"] = {
@@ -167,6 +208,17 @@ def run(snapshot: Path, populace_dataset: Path, output: Path) -> dict:
         "benchmark_basis": (
             "Executable aligned rows compare the 2024 model estimate with the "
             "published 2024 transformation, while retaining the observed 2023 value."
+        ),
+    }
+    summary["acs_pums_2024_inputs"] = {
+        **acs_pums_input_manifest,
+        "interpretation": (
+            "Native 2024 public-use ACS subsample compared with published "
+            "full-sample ACS facts; not independent external validation."
+        ),
+        "uncertainty": (
+            "Every estimate carries SDR standard error and 90 percent margin "
+            "of error from all 80 PUMS replicate weights."
         ),
     }
     manifest = publish_run(
@@ -200,9 +252,15 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot", required=True, type=Path)
     parser.add_argument("--populace-dataset", required=True, type=Path)
+    parser.add_argument("--acs-pums-aggregates", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     arguments = parser.parse_args()
-    run(arguments.snapshot, arguments.populace_dataset, arguments.output)
+    run(
+        arguments.snapshot,
+        arguments.populace_dataset,
+        arguments.acs_pums_aggregates,
+        arguments.output,
+    )
 
 
 if __name__ == "__main__":

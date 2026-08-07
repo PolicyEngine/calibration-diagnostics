@@ -25,6 +25,7 @@ uv run evaluation-harness ledger review \
   --to .artifacts/ledger/<candidate-snapshot> \
   --integration integrations/populace_policyengine_us \
   --integration integrations/taxcalc_cps \
+  --integration integrations/census_acs_pums \
   --out .artifacts/ledger-reviews/<review-id>
 ```
 
@@ -67,19 +68,28 @@ uv run --extra populace --extra taxcalc-cps \
   python scripts/run_full_ledger_evaluation.py \
   --snapshot .artifacts/ledger/<candidate-snapshot> \
   --populace-dataset /path/to/pinned-populace.h5 \
+  --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet \
   --output .artifacts/evaluations/<new-run>
 ```
 
 The command refuses to use an integration reviewed against another snapshot.
-It classifies every fact for both active sources, runs Populace/PolicyEngine-US
-and Tax-Calculator/public CPS, scores the results, and publishes the frontend
-partitions.
+It classifies every fact for all three active sources, runs
+Populace/PolicyEngine-US, Tax-Calculator/public CPS, and raw ACS PUMS, scores
+the results, and publishes the frontend partitions.
 
 ## 4. Verification and CI
 
 CI runs the complete Python harness suite, all frontend tests, type checking,
 and the production build. It also executes Tax-Calculator/public CPS against
 its ten real Ledger facts and requires ten finite numerical results.
+
+Raw ACS PUMS has the same ten-result requirement, including uncertainty from
+all 80 replicate weights:
+
+```bash
+uv run python scripts/verify_acs_pums_adapter.py \
+  --aggregates /path/to/pinned-acs-pums-person-age.parquet
+```
 
 The Populace ten-fact contract is checked in CI for exact snapshot membership,
 mapping, executability, and score eligibility. Its numerical gate requires the

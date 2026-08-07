@@ -1,5 +1,6 @@
 import hashlib
 import json
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
@@ -183,7 +184,11 @@ def published_inputs(tmp_path: Path) -> tuple[Path, Path]:
     )
     results = (
         result(populace_a, "101"),
-        result(populace_b, "198"),
+        replace(
+            result(populace_b, "198"),
+            standard_error=Decimal("3"),
+            margin_of_error_90=Decimal("4.935"),
+        ),
         result(cps_a, "90"),
     )
     scores = build_scored_results(facts, capabilities, results, ())
@@ -221,6 +226,8 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
     assert [row["fact_key"] for row in first_page["rows"]] == ["fact-a", "fact-b"]
     state = first_page["rows"][1]
     assert state["sources"]["populace"]["estimate"] == "198"
+    assert state["sources"]["populace"]["standard_error"] == "3"
+    assert state["sources"]["populace"]["margin_of_error_90"] == "4.935"
     assert state["sources"]["cps"] == {
         "status": "unsupported_geography",
         "reason_code": "geography_not_supported",
