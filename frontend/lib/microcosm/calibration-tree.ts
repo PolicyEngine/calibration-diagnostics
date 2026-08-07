@@ -206,7 +206,36 @@ export const CALIBRATION_BREAKDOWN_DIMENSIONS = [
   { key: "bd_state_table_measure", label: "State Table Measure" },
 ] as const;
 
-type BreakdownDimension = (typeof CALIBRATION_BREAKDOWN_DIMENSIONS)[number];
+interface BreakdownDimension {
+  key: string;
+  label: string;
+}
+
+// These concepts are already represented elsewhere in the explorer or were
+// explicitly rejected as navigation levels. Match exact semantic keys so a
+// legitimate dimension such as `bd_amount_basis` remains explorable.
+const NON_NAVIGABLE_BREAKDOWN_DIMENSIONS = new Set([
+  "bd_amount",
+  "bd_count",
+  "bd_geography",
+  "bd_geography_level",
+  "bd_level",
+  "bd_measure",
+  "bd_state",
+  "bd_state_abbreviation",
+]);
+
+const KNOWN_DIMENSION_ORDER = new Map<string, number>(
+  CALIBRATION_BREAKDOWN_DIMENSIONS.map((dimension, index) => [dimension.key, index]),
+);
+
+const KNOWN_DIMENSION_LABELS = new Map<string, string>(
+  CALIBRATION_BREAKDOWN_DIMENSIONS.map((dimension) => [dimension.key, dimension.label]),
+);
+
+function isNavigableBreakdownDimension(key: string): boolean {
+  return /^bd_[a-z0-9_]+$/.test(key) && !NON_NAVIGABLE_BREAKDOWN_DIMENSIONS.has(key);
+}
 
 function rowDimensionValue(
   row: CalibrationTreeTarget,
@@ -226,12 +255,34 @@ function rowDimensionValue(
 export function orderedBreakdownDimensions(
   rows: CalibrationTreeTarget[],
 ): Array<{ key: string; label: string }> {
-  const presentKeys = new Set(
-    rows.flatMap((row) => (row.target_dimensions ?? []).map((dimension) => dimension.key)),
-  );
-  return CALIBRATION_BREAKDOWN_DIMENSIONS.filter((dimension) =>
-    presentKeys.has(dimension.key),
-  );
+  const labelsByKey = new Map<string, Set<string>>();
+  for (const row of rows) {
+    for (const dimension of row.target_dimensions ?? []) {
+      if (!isNavigableBreakdownDimension(dimension.key)) continue;
+      const labels = labelsByKey.get(dimension.key) ?? new Set<string>();
+      const label = String(dimension.label ?? "").trim();
+      if (label) labels.add(label);
+      labelsByKey.set(dimension.key, labels);
+    }
+  }
+
+  return [...labelsByKey.entries()]
+    .map(([key, labels]) => ({
+      key,
+      label:
+        KNOWN_DIMENSION_LABELS.get(key) ??
+        [...labels].sort((left, right) => left.localeCompare(right))[0] ??
+        humanize(key.slice(3)),
+    }))
+    .sort((left, right) => {
+      const leftOrder = KNOWN_DIMENSION_ORDER.get(left.key) ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = KNOWN_DIMENSION_ORDER.get(right.key) ?? Number.MAX_SAFE_INTEGER;
+      return (
+        leftOrder - rightOrder ||
+        left.label.localeCompare(right.label) ||
+        left.key.localeCompare(right.key)
+      );
+    });
 }
 
 function geographyId(row: CalibrationTreeTarget): string {
@@ -258,7 +309,7 @@ function partitionRowsByDimension(
   const remaining = new Set(rows);
   const dimensions: DimensionPartition[] = [];
 
-  for (const dimension of CALIBRATION_BREAKDOWN_DIMENSIONS) {
+  for (const dimension of orderedBreakdownDimensions(rows)) {
     if (selectedKeys.has(dimension.key)) continue;
     const assigned = [...remaining].filter(
       (row) => rowDimensionValue(row, dimension.key) != null,

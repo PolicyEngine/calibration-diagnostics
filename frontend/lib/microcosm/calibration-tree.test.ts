@@ -234,7 +234,7 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     expect(targets.groups[0].nodes).toHaveLength(2);
   });
 
-  test("uses only the recognized varying dimensions present beneath a geography", () => {
+  test("uses only varying dimensions as breakdowns while retaining present dimension metadata", () => {
     const tree = buildCalibrationTree(
       rows,
       state({ source: "census", program: "population", geography: "CA", dimensions: [] }),
@@ -242,7 +242,113 @@ describe("source, geography, and declared-dimension hierarchy", () => {
 
     expect(tree.currentLevel).toEqual({ kind: "dimension", key: "bd_age", label: "Age" });
     expect(tree.groups[0].nodes.map((node) => node.label)).toEqual(["Adult", "Child"]);
-    expect(tree.dimensionOrder).toEqual([{ key: "bd_age", label: "Age" }]);
+    expect(tree.dimensionOrder).toEqual([
+      { key: "bd_age", label: "Age" },
+      { key: "bd_sex", label: "Sex" },
+    ]);
+  });
+
+  test("automatically uses a new semantic dimension when it varies", () => {
+    const dynamicRows = ["Employed", "Unemployed"].map((employmentStatus) =>
+      target(`dynamic/${employmentStatus}`, {
+        source: "test",
+        variable: "dynamic",
+        geography: "United States",
+        target_dimensions: [
+          {
+            key: "bd_employment_status",
+            label: "Employment status",
+            value: employmentStatus,
+          },
+        ],
+      }),
+    );
+
+    const tree = buildCalibrationTree(
+      dynamicRows,
+      state({
+        source: "test",
+        program: "dynamic",
+        geography: "United States",
+        dimensions: [],
+      }),
+    );
+
+    expect(tree.currentLevel).toEqual({
+      kind: "dimension",
+      key: "bd_employment_status",
+      label: "Employment status",
+    });
+    expect(tree.groups[0].nodes.map((node) => node.label)).toEqual([
+      "Employed",
+      "Unemployed",
+    ]);
+    expect(tree.dimensionOrder).toEqual([
+      { key: "bd_employment_status", label: "Employment status" },
+    ]);
+  });
+
+  test("keeps known dimensions first and orders new dimensions deterministically", () => {
+    const dynamicRows = ["Adult", "Child"].flatMap((age) =>
+      ["Employed", "Unemployed"].map((employmentStatus) =>
+        target(`dynamic/${age}/${employmentStatus}`, {
+          source: "test",
+          variable: "dynamic",
+          geography: "United States",
+          target_dimensions: [
+            { key: "bd_age", label: "Untrusted age label", value: age },
+            {
+              key: "bd_employment_status",
+              label: "Employment status",
+              value: employmentStatus,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const tree = buildCalibrationTree(
+      dynamicRows,
+      state({
+        source: "test",
+        program: "dynamic",
+        geography: "United States",
+        dimensions: [],
+      }),
+    );
+
+    expect(tree.dimensionOrder).toEqual([
+      { key: "bd_age", label: "Age" },
+      { key: "bd_employment_status", label: "Employment status" },
+    ]);
+  });
+
+  test("does not turn measurement concepts or anonymous legacy dimensions into breakdowns", () => {
+    const measurementRows = ["Amount", "Count"].map((measure, index) =>
+      target(`measurement/${index}`, {
+        source: "test",
+        variable: "measurement",
+        geography: "United States",
+        target_dimensions: [
+          { key: "bd_measure", label: "Measure", value: measure },
+          { key: "dim0", label: "Breakdown 1", value: measure },
+        ],
+      }),
+    );
+
+    const tree = buildCalibrationTree(
+      measurementRows,
+      state({
+        source: "test",
+        program: "measurement",
+        geography: "United States",
+        dimensions: [],
+      }),
+    );
+
+    expect(tree.currentLevel).toEqual({ kind: "target", label: "Targets" });
+    expect(tree.dimensionOrder).toEqual([]);
+    expect(tree.groups[0].nodes).toHaveLength(2);
   });
 
   test("partitions sparse and ambiguous dimensions without missing buckets or duplicate targets", () => {
