@@ -2,7 +2,10 @@
 
 import { useMemo, useState } from "react";
 
-import { CalibrationExplorerMap } from "@/components/microcosm/calibration-explorer-map";
+import {
+  CalibrationExplorerDataPrefetch,
+  CalibrationExplorerMap,
+} from "@/components/microcosm/calibration-explorer-map";
 import { useCountry } from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
@@ -54,7 +57,14 @@ export function MicrocosmOverviewView() {
 
   const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
 
-  if (isLoading) return <LoadingBlock label="Loading microcosm release…" />;
+  if (isLoading) {
+    return (
+      <>
+        <CalibrationExplorerDataPrefetch release={release || undefined} />
+        <LoadingBlock label="Loading microcosm release…" />
+      </>
+    );
+  }
   if (error || !data) {
     return (
       <EmptyState

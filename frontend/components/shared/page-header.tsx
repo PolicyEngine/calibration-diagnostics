@@ -3,8 +3,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { Text, Title } from "@policyengine/ui-kit";
 
-import { stackedLayoutHeight } from "@/components/shared/layout-measurement";
-
 interface PageHeaderProps {
   eyebrow: ReactNode;
   title: ReactNode;
@@ -22,36 +20,22 @@ export function PageHeader({
   actions,
   onHeightChange,
 }: PageHeaderProps) {
-  const titleRowRef = useRef<HTMLDivElement>(null);
-  const descriptionRowRef = useRef<HTMLParagraphElement>(null);
-  const hasDescription = Boolean(description);
+  const headerRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (!onHeightChange) return;
-    const rows = [titleRowRef.current, descriptionRowRef.current].filter(
-      (row): row is HTMLDivElement | HTMLParagraphElement => row !== null,
-    );
-    const firstRow = rows[0];
-    if (!firstRow) return;
+    const header = headerRef.current;
+    if (!header) return;
 
     const updateHeight = () => {
-      const parent = firstRow.parentElement;
-      const rowGap = parent
-        ? Number.parseFloat(window.getComputedStyle(parent).rowGap) || 0
-        : 0;
-      onHeightChange(
-        stackedLayoutHeight(
-          rows.map((row) => row.getBoundingClientRect().height),
-          rowGap,
-        ),
-      );
+      onHeightChange(Math.round(header.getBoundingClientRect().height));
     };
 
     updateHeight();
     const observer = new ResizeObserver(updateHeight);
-    rows.forEach((row) => observer.observe(row));
+    observer.observe(header);
     return () => observer.disconnect();
-  }, [hasDescription, onHeightChange]);
+  }, [onHeightChange]);
 
   // The title row + actions (e.g. the release selector) are rendered as a
   // sibling of the description rather than wrapped in a short <header>, so the
@@ -60,7 +44,7 @@ export function PageHeader({
   return (
     <>
       <div
-        ref={titleRowRef}
+        ref={headerRef}
         className="sticky top-0 z-20 -mx-6 flex flex-wrap items-start justify-between gap-4 border-b border-border bg-background/85 px-6 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/75"
       >
         <div className="min-w-0 flex-1">
@@ -74,7 +58,6 @@ export function PageHeader({
       </div>
       {description && (
         <Text
-          ref={descriptionRowRef}
           c="dimmed"
           size="sm"
           className="-mt-1 max-w-3xl"

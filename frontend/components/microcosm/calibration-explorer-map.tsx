@@ -2,7 +2,9 @@
 
 import { useEffect, useReducer, useRef, useState } from "react";
 import { Spinner } from "@policyengine/ui-kit";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { useCountry } from "@/components/layout/country-context";
 import {
   EXPLORER_MAP_VERTICAL_PADDING,
   explorerBreadcrumbs,
@@ -17,6 +19,7 @@ import {
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { fmt, humanizeName } from "@/components/shared/format";
 import {
+  microcosmCalibrationTreeQueryOptions,
   useMicrocosmCalibrationTree,
   type MicrocosmTargetDimension,
   type MicrocosmTargetRow,
@@ -24,6 +27,7 @@ import {
 import {
   createExplorerState,
   explorerReducer,
+  nextLevelExplorerStates,
   type ExplorerBreakdown,
   type ExplorerFilters,
   type ExplorerState,
@@ -404,6 +408,50 @@ function CalibrationMapLoadingSkeleton() {
   );
 }
 
+function usePrefetchNextCalibrationLevels({
+  state,
+  data,
+  release,
+  isPlaceholderData,
+}: {
+  state: ExplorerState;
+  data: CalibrationTreeResponse | undefined;
+  release?: string;
+  isPlaceholderData: boolean;
+}) {
+  const { country } = useCountry();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!data || isPlaceholderData) return;
+    const childStates = nextLevelExplorerStates(
+      state,
+      data.groups.flatMap((group) => group.nodes.map((item) => item.selection)),
+    );
+    for (const childState of childStates) {
+      void queryClient.prefetchQuery(
+        microcosmCalibrationTreeQueryOptions(childState, release, country),
+      );
+    }
+  }, [country, data, isPlaceholderData, queryClient, release, state]);
+}
+
+export function CalibrationExplorerDataPrefetch({
+  release,
+}: {
+  release?: string;
+}) {
+  const [state] = useState(createExplorerState);
+  const { data, isPlaceholderData } = useMicrocosmCalibrationTree(state, release);
+  usePrefetchNextCalibrationLevels({
+    state,
+    data,
+    release,
+    isPlaceholderData,
+  });
+  return null;
+}
+
 export function CalibrationExplorerMap({
   release,
   pageIntroHeight,
@@ -416,17 +464,29 @@ export function CalibrationExplorerMap({
     undefined,
     createExplorerState,
   );
-  const { data, isFetching, error } = useMicrocosmCalibrationTree(state, release);
+  const { data, isFetching, isPlaceholderData, error } =
+    useMicrocosmCalibrationTree(state, release);
+  const displayBoundsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(960);
   const [height, setHeight] = useState(680);
   const [sizeMode, setSizeMode] = useState<CalibrationTreeSizeMode>("targets");
 
+  usePrefetchNextCalibrationLevels({
+    state,
+    data,
+    release,
+    isPlaceholderData,
+  });
+
   useEffect(() => {
+    const displayBounds = displayBoundsRef.current;
     const element = containerRef.current;
-    if (!element) return;
+    if (!displayBounds || !element) return;
     const updateSize = () => {
+      const displayBoundsRect = displayBounds.getBoundingClientRect();
       const elementRect = element.getBoundingClientRect();
+      if (!displayBoundsRect.width || !displayBoundsRect.height) return;
       const nextWidth = elementRect.width;
       if (nextWidth) setWidth(Math.round(nextWidth));
       if (elementRect.height) setHeight(Math.round(elementRect.height));
@@ -434,6 +494,7 @@ export function CalibrationExplorerMap({
 
     updateSize();
     const observer = new ResizeObserver(updateSize);
+    observer.observe(displayBounds);
     observer.observe(element);
     return () => {
       observer.disconnect();
@@ -447,6 +508,7 @@ export function CalibrationExplorerMap({
       return (
         <div className="flex flex-col gap-3">
           <div
+            ref={displayBoundsRef}
             className="relative min-h-0"
             style={{ height: explorerMapHeight(pageIntroHeight) }}
             aria-busy="true"
@@ -475,92 +537,94 @@ export function CalibrationExplorerMap({
   }));
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <BreakdownControl
-            value={state.breakdown}
-            onChange={(breakdown) => dispatch({ type: "breakdown", breakdown })}
-          />
-          <SizeControl value={sizeMode} onChange={setSizeMode} />
-          <FilterMenu
-            data={data}
-            state={state}
-            onFilters={(filters) => dispatch({ type: "filters", filters })}
-          />
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            <BreakdownControl
+              value={state.breakdown}
+              onChange={(breakdown) => dispatch({ type: "breakdown", breakdown })}
+            />
+            <SizeControl value={sizeMode} onChange={setSizeMode} />
+            <FilterMenu
+              data={data}
+              state={state}
+              onFilters={(filters) => dispatch({ type: "filters", filters })}
+            />
+          </div>
+          <div className="ml-auto shrink-0">
+            <FitLegend />
+          </div>
         </div>
-        <div className="ml-auto shrink-0">
-          <FitLegend />
-        </div>
-      </div>
 
       <div
+        ref={displayBoundsRef}
         className="relative flex min-h-0 flex-col gap-3"
-        style={{
-          height: explorerMapHeight(pageIntroHeight),
-          paddingBlock: EXPLORER_MAP_VERTICAL_PADDING,
-        }}
+        style={{ height: explorerMapHeight(pageIntroHeight) }}
         aria-busy={isFetching}
       >
-        <div className="flex shrink-0 items-center gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            {upLabel && (
-              <button
-                type="button"
-                title={upLabel}
-                onClick={() => dispatch({ type: "up" })}
-                className="block max-w-[40%] shrink-0 truncate whitespace-nowrap text-xs font-medium text-primary hover:underline"
-              >
-                ← {upLabel}
-              </button>
-            )}
-            <nav aria-label="Calibration map location" className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted-foreground">
-              {breadcrumbs.map((crumb, index) => (
-                <span key={`${crumb.label}:${index}`}>
-                  {index > 0 && <span className="mx-1">/</span>}
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: "navigate", path: crumb.path })}
-                    aria-current={index === breadcrumbs.length - 1 ? "page" : undefined}
-                    className={`${index === breadcrumbs.length - 1 ? "font-medium text-foreground" : "hover:text-foreground hover:underline"}`}
-                  >
-                    {crumb.label}
-                  </button>
-                </span>
-              ))}
-            </nav>
-          </div>
-        </div>
-
         <div
-          ref={containerRef}
-          className="relative min-h-0 w-full flex-1"
+          className="flex min-h-0 flex-1 flex-col gap-3"
+          style={{ paddingBlock: EXPLORER_MAP_VERTICAL_PADDING }}
         >
-        {laidGroups.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/10 px-6 text-center">
-            <p className="text-sm text-muted-foreground">{explorerEmptyMessage(state)}</p>
-            {hasExplorerFilters(state) && (
-              <button
-                type="button"
-                onClick={() => dispatch({
-                  type: "filters",
-                  filters: { geographyLevels: [], geographies: [], fitBands: [], calibrationStatuses: [] },
-                })}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        ) : (
-          laidGroups.map(({ group, rect, headerHeight, nodes }) => (
-            <div key={group.id}>
-              {headerHeight > 0 && (
-                <div className="absolute flex items-baseline gap-2 overflow-hidden" style={{ left: rect.x, top: rect.y, width: rect.w, height: headerHeight }}>
-                  <span className="truncate text-xs font-semibold text-foreground">{group.label}</span>
-                  <span className="font-mono text-[10px] text-muted-foreground">{fmt(group.metrics.nTargets, { digits: 0 })}</span>
-                </div>
+          <div className="flex shrink-0 items-center gap-4">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              {upLabel && (
+                <button
+                  type="button"
+                  title={upLabel}
+                  onClick={() => dispatch({ type: "up" })}
+                  className="block max-w-[40%] shrink-0 truncate whitespace-nowrap text-xs font-medium text-primary hover:underline"
+                >
+                  ← {upLabel}
+                </button>
               )}
-              {nodes.map((placed) => {
+              <nav aria-label="Calibration map location" className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted-foreground">
+                {breadcrumbs.map((crumb, index) => (
+                  <span key={`${crumb.label}:${index}`}>
+                    {index > 0 && <span className="mx-1">/</span>}
+                    <button
+                      type="button"
+                      onClick={() => dispatch({ type: "navigate", path: crumb.path })}
+                      aria-current={index === breadcrumbs.length - 1 ? "page" : undefined}
+                      className={`${index === breadcrumbs.length - 1 ? "font-medium text-foreground" : "hover:text-foreground hover:underline"}`}
+                    >
+                      {crumb.label}
+                    </button>
+                  </span>
+                ))}
+              </nav>
+            </div>
+          </div>
+
+          <div
+            ref={containerRef}
+            className="relative min-h-0 w-full flex-1"
+          >
+          {laidGroups.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/10 px-6 text-center">
+              <p className="text-sm text-muted-foreground">{explorerEmptyMessage(state)}</p>
+              {hasExplorerFilters(state) && (
+                <button
+                  type="button"
+                  onClick={() => dispatch({
+                    type: "filters",
+                    filters: { geographyLevels: [], geographies: [], fitBands: [], calibrationStatuses: [] },
+                  })}
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          ) : (
+            laidGroups.map(({ group, rect, headerHeight, nodes }) => (
+              <div key={group.id}>
+                {headerHeight > 0 && (
+                  <div className="absolute flex items-baseline gap-2 overflow-hidden" style={{ left: rect.x, top: rect.y, width: rect.w, height: headerHeight }}>
+                    <span className="truncate text-xs font-semibold text-foreground">{group.label}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">{fmt(group.metrics.nTargets, { digits: 0 })}</span>
+                  </div>
+                )}
+                {nodes.map((placed) => {
                 const item = placed.data;
                 const itemLabel = explorerNodeLabel(item);
                 const tileWidth = Math.max(placed.w - NODE_GAP, 0);
@@ -595,10 +659,11 @@ export function CalibrationExplorerMap({
                     {showSub && <span className="mt-1 block truncate text-[10px] opacity-75">{fmt(item.metrics.nTargets, { digits: 0 })} targets</span>}
                   </button>
                 );
-              })}
-            </div>
-          ))
-        )}
+                })}
+              </div>
+            ))
+          )}
+          </div>
         </div>
 
         {isFetching && <CalibrationMapLoadingSkeleton />}

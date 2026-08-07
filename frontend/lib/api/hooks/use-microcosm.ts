@@ -1,6 +1,9 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { releaseLabel } from "@/components/shared/format";
-import { useCountry } from "@/components/layout/country-context";
+import {
+  useCountry,
+  type Country,
+} from "@/components/layout/country-context";
 import { withBasePath } from "@/lib/base-path";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
@@ -738,6 +741,17 @@ export function useMicrocosmCalibrationTree(
 ) {
   const { country } = useCountry();
   return useQuery({
+    ...microcosmCalibrationTreeQueryOptions(state, release, country),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function microcosmCalibrationTreeQueryOptions(
+  state: ExplorerState,
+  release: string | undefined,
+  country: Country,
+) {
+  return {
     queryKey: ["microcosm", "target-tree", country, release ?? "latest", state],
     queryFn: () =>
       apiGet<CalibrationTreeResponse>("/microcosm/target-tree", {
@@ -745,9 +759,8 @@ export function useMicrocosmCalibrationTree(
         release: release || undefined,
         country,
       }),
-    placeholderData: keepPreviousData,
     staleTime: 5 * 60 * 1000,
-  });
+  };
 }
 
 export function useMicrocosmTargetDiagnostics(params: {

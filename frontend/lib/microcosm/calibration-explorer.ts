@@ -104,6 +104,17 @@ export function selectExplorerNode(
   return { ...state, path };
 }
 
+export function nextLevelExplorerStates(
+  state: ExplorerState,
+  selections: ExplorerNodeSelection[],
+): ExplorerState[] {
+  return selections.flatMap((selection) =>
+    selection.kind === "target"
+      ? []
+      : [selectExplorerNode(state, selection)],
+  );
+}
+
 export function parentExplorerState(state: ExplorerState): ExplorerState {
   const path = { ...state.path, dimensions: [...state.path.dimensions] };
   delete path.target;

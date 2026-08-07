@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createExplorerState,
   explorerReducer,
+  nextLevelExplorerStates,
   parentExplorerState,
   selectExplorerNode,
   type ExplorerState,
@@ -39,6 +40,29 @@ describe("calibration explorer semantic navigation", () => {
       program: "population",
       dimensions: [],
     });
+  });
+
+  test("derives only the directly selectable child levels for prefetching", () => {
+    const current = state({
+      filters: {
+        geographyLevels: ["state"],
+        geographies: [],
+        fitBands: [],
+        calibrationStatuses: [],
+      },
+    });
+
+    const children = nextLevelExplorerStates(current, [
+      { kind: "program", source: "census", value: "population" },
+      { kind: "program", source: "irs_soi", value: "ctc" },
+      { kind: "target", value: "already-a-leaf" },
+    ]);
+
+    expect(children.map((child) => child.path)).toEqual([
+      { source: "census", program: "population", dimensions: [] },
+      { source: "irs_soi", program: "ctc", dimensions: [] },
+    ]);
+    expect(children.every((child) => child.filters === current.filters)).toBe(true);
   });
 
   test("up removes dimensions, then geography, then source and program together", () => {
