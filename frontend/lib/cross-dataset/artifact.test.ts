@@ -31,7 +31,7 @@ function fixture() {
     sources: [
       {
         source_id: "populace",
-        label: "Populace + PolicyEngine-US",
+        label: "Microcosm + PolicyEngine-US",
         source_type: "model_dataset_pair",
         capability_count: 3,
         result_count: 2,

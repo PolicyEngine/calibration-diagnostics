@@ -33,13 +33,13 @@ export async function postReleaseAlert(opts: {
     .join(" · ");
 
   const payload = {
-    text: `New Populace ${opts.country.toUpperCase()} release: ${opts.releaseId}`,
+    text: `New Microcosm ${opts.country.toUpperCase()} release: ${opts.releaseId}`,
     blocks: [
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `:rocket: *New Populace ${label} release*\n\`${opts.releaseId}\``,
+          text: `:rocket: *New Microcosm ${label} release*\n\`${opts.releaseId}\``,
         },
       },
       {

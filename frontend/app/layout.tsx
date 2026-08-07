@@ -20,14 +20,13 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  // Follows populace.dev's "… — populace" title convention (its /calibration
-  // page is "Calibration — populace").
+  // Follows the existing site's product-title convention.
   title: {
-    default: "Calibration diagnostics — populace",
-    template: "%s — populace",
+    default: "Calibration diagnostics — Microcosm",
+    template: "%s — Microcosm",
   },
   description:
-    "Interactive diagnostics for the populace weighted synthetic population — how closely the calibrated data matches official statistics, release over release.",
+    "Interactive diagnostics for the Microcosm weighted synthetic population — how closely the calibrated data matches official statistics, release over release.",
 };
 
 export default function RootLayout({

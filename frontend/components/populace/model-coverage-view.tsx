@@ -565,7 +565,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace · rules engine"
+        eyebrow="Microcosm · rules engine"
         title="Validation reach"
         description={
           <>

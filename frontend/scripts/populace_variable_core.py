@@ -374,10 +374,10 @@ def resolve_release_id(repo: str, revision: str, requested_release: str) -> str:
         with urlopen(request, timeout=20) as response:
             pointer = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise VariableCalculationError(f"Could not resolve latest Populace release: {exc}") from exc
+        raise VariableCalculationError(f"Could not resolve latest Microcosm release: {exc}") from exc
     release_id = str(pointer.get("release_id") or "").strip()
     if not release_id:
-        raise VariableCalculationError("Could not resolve latest Populace release.")
+        raise VariableCalculationError("Could not resolve latest Microcosm release.")
     return release_id
 
 

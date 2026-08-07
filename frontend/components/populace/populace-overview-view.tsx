@@ -91,7 +91,7 @@ export function PopulaceOverviewView() {
   if (error || !data) {
     return (
       <EmptyState
-        title="Populace release data unavailable"
+        title="Microcosm release data unavailable"
         description={error instanceof Error ? error.message : "Unknown error."}
       />
     );
@@ -107,11 +107,11 @@ export function PopulaceOverviewView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace · calibration fit"
+        eyebrow="Microcosm · calibration fit"
         title="What the data is anchored to"
         description={
           <>
-            Populace reweights survey microdata so it matches thousands of official
+            Microcosm reweights survey microdata so it matches thousands of official
             statistics from agencies like{" "}
             {country === "uk" ? "the ONS, OBR, and HMRC" : "the IRS, the Census Bureau, and CMS"}.
             Each tile below is one of those things we calibrate to, including{" "}

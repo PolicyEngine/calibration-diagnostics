@@ -22,9 +22,12 @@ import type {
 import {
   CROSS_DATASET_PAGE_TITLE,
   GROUP_DIMENSIONS,
+  buildChronicleSourceGapRows,
   buildGroupRows,
   buildSourceOverviews,
   crossDatasetUiState,
+  orderSourceSummaries,
+  sourceDisplayLabel,
   type GroupDimension,
   type LabeledCount,
 } from "@/lib/cross-dataset/presentation";
@@ -52,21 +55,12 @@ function useCrossDatasetOverview() {
   });
 }
 
-function formatPercent(value: number): string {
-  if (value === 0) return "0%";
-  if (value < 0.1) return value.toFixed(2) + "%";
-  if (value < 10) return value.toFixed(1) + "%";
-  return Math.round(value) + "%";
-}
-
 function PerformanceBar({
   value,
   label,
-  tone = "performance",
 }: {
   value: number | null;
   label: string;
-  tone?: "performance" | "coverage";
 }) {
   const width = value == null ? 0 : Math.max(0, Math.min(100, value));
   return (
@@ -80,29 +74,21 @@ function PerformanceBar({
       aria-valuetext={value == null ? "Not scored" : value.toFixed(1) + " percent"}
     >
       <div
-        className={
-          "h-full rounded-full " +
-          (tone === "performance" ? "bg-primary" : "bg-[var(--info)]")
-        }
+        className="h-full rounded-full bg-primary"
         style={{ width: String(width) + "%" }}
       />
     </div>
   );
 }
 
-function CountList({ values, empty }: { values: LabeledCount[]; empty: string }) {
-  if (!values.length) return <span className="text-xs text-muted-foreground">{empty}</span>;
+function InlineCounts({ values, empty }: { values: LabeledCount[]; empty: string }) {
+  if (!values.length) return <>{empty}</>;
   return (
-    <ul className="space-y-1.5">
-      {values.map((item) => (
-        <li key={item.key} className="flex items-baseline justify-between gap-3 text-xs">
-          <span className="text-muted-foreground">{item.label}</span>
-          <span className="font-mono tabular-nums text-foreground">
-            {item.count.toLocaleString("en-US")}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <>
+      {values
+        .map((item) => `${item.label}: ${item.count.toLocaleString("en-US")}`)
+        .join(" · ")}
+    </>
   );
 }
 
@@ -122,12 +108,26 @@ function CrossDatasetOverviewView() {
         : [],
     [query.data],
   );
+  const orderedSources = useMemo(
+    () => (query.data ? orderSourceSummaries(query.data.summary.sources) : []),
+    [query.data],
+  );
   const groupRows = useMemo(
     () =>
       query.data
-        ? buildGroupRows(query.data.groups.groups, dimension, query.data.summary.sources)
+        ? buildGroupRows(query.data.groups.groups, dimension, orderedSources)
         : [],
-    [dimension, query.data],
+    [dimension, orderedSources, query.data],
+  );
+  const microcosmSourceId = orderedSources.find((source) =>
+    source.source_id.toLowerCase().includes("populace"),
+  )?.source_id;
+  const microcosmGapRows = useMemo(
+    () =>
+      query.data && microcosmSourceId
+        ? buildChronicleSourceGapRows(query.data.groups.groups, microcosmSourceId)
+        : [],
+    [microcosmSourceId, query.data],
   );
 
   if (state === "loading") return <LoadingBlock label="Loading Cross-dataset results…" />;
@@ -166,14 +166,15 @@ function CrossDatasetOverviewView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace · cross-dataset"
+        eyebrow="Microcosm · cross-dataset"
         title={CROSS_DATASET_PAGE_TITLE}
         description={
           <>
-            Every model is classified against the complete Ledger fact catalog. Performance
-            measures closeness only among facts the source can evaluate; coverage shows how much
-            of Ledger that score represents. Higher performance is better, but a high score with
-            narrow coverage is not whole-Ledger accuracy.
+            Every model or standalone dataset is classified against the complete Chronicle fact
+            catalog. Performance measures closeness only among facts the source can evaluate;
+            evaluated and missing-fact counts show how much of Chronicle that score represents.
+            Higher performance is better, but a high score over few facts is not whole-Chronicle
+            accuracy.
           </>
         }
         status={
@@ -183,72 +184,45 @@ function CrossDatasetOverviewView() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-border bg-card p-4 shadow-[var(--elev-1)]">
-          <div className="font-mono text-xs text-muted-foreground">Ledger facts</div>
-          <div className="mt-2 text-2xl font-semibold tabular-nums">
-            {summary.fact_count.toLocaleString("en-US")}
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">Every fact has one cell per source.</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4 shadow-[var(--elev-1)]">
-          <div className="font-mono text-xs text-muted-foreground">Evaluation run</div>
-          <div className="mt-2 truncate font-mono text-sm font-semibold" title={summary.run_id}>
-            {summary.run_id}
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">Immutable result identity</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4 shadow-[var(--elev-1)]">
-          <div className="font-mono text-xs text-muted-foreground">Ledger snapshot</div>
-          <div
-            className="mt-2 truncate font-mono text-sm font-semibold"
-            title={summary.snapshot_id}
-          >
-            {summary.snapshot_id}
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">Pinned source facts</p>
-        </div>
-      </div>
-
       <div className="rounded-lg border border-[color-mix(in_srgb,var(--info)_35%,var(--border))] bg-[color-mix(in_srgb,var(--info)_6%,var(--card))] px-4 py-3 text-sm">
         <p className="font-medium text-foreground">How to read the comparison</p>
         <p className="mt-1 text-muted-foreground">
           The performance score is 100 × (1 − family-balanced capped mean absolute percentage
-          error ÷ 2). Populace results marked <strong>direct calibration target</strong> are
+          error ÷ 2). Microcosm results marked <strong>direct calibration target</strong> are
           in-sample calibration fit, not independent validation. Results marked{" "}
           <strong>2023 facts aligned to 2024</strong> compare against the 2024 transformation
-          produced by the same aging and uprating logic used in the Populace build—not a native
+          produced by the same aging and uprating logic used in the Microcosm build—not a native
           2023 society-wide run. Tax-Calculator’s public CPS rows use its population advanced to
           2024.
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {sourceOverviews.map((source) => (
-          <section
-            key={source.sourceId}
-            className="overflow-hidden rounded-lg border border-border bg-card shadow-[var(--elev-1)]"
-          >
-            <div className="border-b border-border bg-muted/20 px-5 py-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+      <SectionCard
+        title="Model and dataset performance"
+        description="Microcosm is listed first. Every row keeps its performance score next to the exact number of Chronicle facts that contributed to it."
+        padded={false}
+      >
+        <ol className="divide-y divide-border">
+          {sourceOverviews.map((source, index) => (
+            <li key={source.sourceId} className="px-5 py-5">
+              <div className="grid gap-5 lg:grid-cols-[minmax(250px,1.45fr)_minmax(190px,1fr)_minmax(180px,0.85fr)_minmax(160px,0.7fr)]">
                 <div>
-                  <h2 className="text-base font-semibold">{source.label}</h2>
-                  <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                    {source.sourceId}
-                  </p>
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[11px] text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    <div>
+                      <h2 className="text-base font-semibold">{source.label}</h2>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                        {source.sourceId}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <StatusPill tone={source.coveredCount ? "info" : "neutral"}>
-                  {formatPercent(source.coveragePercent)} coverage
-                </StatusPill>
-              </div>
-            </div>
-
-            <div className="space-y-5 p-5">
-              <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="font-mono text-xs text-muted-foreground">Performance</span>
-                    <span className="text-xl font-semibold tabular-nums">{source.scoreLabel}</span>
+                    <span className="text-lg font-semibold tabular-nums">{source.scoreLabel}</span>
                   </div>
                   <div className="mt-2">
                     <PerformanceBar
@@ -261,62 +235,113 @@ function CrossDatasetOverviewView() {
                   </p>
                 </div>
                 <div>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="font-mono text-xs text-muted-foreground">Ledger coverage</span>
-                    <span className="text-sm font-semibold tabular-nums">
-                      {formatPercent(source.coveragePercent)}
-                    </span>
-                  </div>
-                  <div className="mt-3">
-                    <PerformanceBar
-                      value={source.coveragePercent}
-                      label={source.label + " Ledger coverage"}
-                      tone="coverage"
-                    />
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">{source.coverageLabel}</p>
-                </div>
-              </div>
-
-              <div className="grid gap-5 border-t border-border pt-4 sm:grid-cols-3">
-                <div>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">
-                    Coverage gaps
-                  </h3>
-                  <p className="mb-2 text-xs text-muted-foreground">
-                    {source.unsupportedCount.toLocaleString("en-US")} facts not evaluated
+                  <p className="font-mono text-xs text-muted-foreground">
+                    Chronicle facts evaluated
                   </p>
-                  <CountList values={source.topUnsupportedReasons} empty="No recorded gaps" />
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {source.coverageLabel}
+                  </p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Coverage is retained as a fact count, not a percentage.
+                  </p>
                 </div>
                 <div>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">
-                    Period handling
-                  </h3>
-                  <CountList values={source.periodTreatments} empty="No period categories" />
-                </div>
-                <div>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">
-                    Benchmark relationship
-                  </h3>
-                  <CountList
-                    values={source.calibrationExposures}
-                    empty="No exposure categories"
-                  />
+                  <p className="font-mono text-xs text-muted-foreground">
+                    Chronicle facts missing
+                  </p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {source.unsupportedCount.toLocaleString("en-US")}
+                  </p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {source.unsupportedCount ? "Not evaluated" : "All represented"}
+                  </p>
                 </div>
               </div>
-            </div>
 
-            <div className="border-t border-border bg-muted/10 px-5 py-2 text-[11px] text-muted-foreground">
-              <span className="font-mono">Dataset:</span> {source.datasetVersion ?? "not recorded"}
-              <span className="mx-2">·</span>
-              <span className="font-mono">Model:</span> {source.modelVersion ?? "not applicable"}
+              <div className="mt-4 grid gap-2 border-t border-border pt-3 text-xs text-muted-foreground lg:grid-cols-3">
+                <p>
+                  <span className="font-medium text-foreground">Largest gaps:</span>{" "}
+                  <InlineCounts values={source.topUnsupportedReasons} empty="None recorded" />
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Period handling:</span>{" "}
+                  <InlineCounts values={source.periodTreatments} empty="None recorded" />
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Benchmark relationship:</span>{" "}
+                  <InlineCounts values={source.calibrationExposures} empty="None recorded" />
+                </p>
+              </div>
+
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                <span className="font-mono">Dataset:</span>{" "}
+                {source.datasetVersion ?? "not recorded"}
+                <span className="mx-2">·</span>
+                <span className="font-mono">Model:</span>{" "}
+                {source.modelVersion ?? "not applicable"}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </SectionCard>
+
+      {microcosmSourceId && (
+        <SectionCard
+          title="Microcosm gaps by Chronicle source"
+          description="Every Chronicle source with at least one fact Microcosm cannot currently evaluate. Counts come from the complete capability matrix, including unsupported facts that have no model result."
+          padded={false}
+        >
+          {microcosmGapRows.length ? (
+            <div className="max-h-[560px] overflow-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead className="sticky top-0 z-10 bg-card">
+                  <tr className="border-b border-border bg-muted/10 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-2.5">Chronicle source</th>
+                    <th className="px-4 py-2.5 text-right">Facts</th>
+                    <th className="px-4 py-2.5 text-right">Evaluated</th>
+                    <th className="px-4 py-2.5 text-right">Missing</th>
+                    <th className="px-4 py-2.5">Why facts are missing</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {microcosmGapRows.map((row) => (
+                    <tr key={row.key} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">
+                        <Link href={row.factHref} className="hover:text-primary hover:underline">
+                          {row.label}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                        {row.factCount.toLocaleString("en-US")}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-xs tabular-nums">
+                        {row.evaluatedCount.toLocaleString("en-US")}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-xs font-semibold tabular-nums">
+                        {row.missingCount.toLocaleString("en-US")}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        <InlineCounts values={row.missingReasons} empty="No reason recorded" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </section>
-        ))}
-      </div>
+          ) : (
+            <div className="p-5">
+              <EmptyState
+                variant="compact"
+                title="No Microcosm gaps"
+                description="Microcosm can evaluate every fact in this Chronicle snapshot."
+              />
+            </div>
+          )}
+        </SectionCard>
+      )}
 
       <SectionCard
-        title="Performance by Ledger group"
+        title="Performance by Chronicle group"
         description="Each cell keeps its performance score beside the number of facts it can evaluate. Select a grouping to inspect where a model performs well, where it has sparse support, and why facts are unavailable."
         actions={
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -343,10 +368,10 @@ function CrossDatasetOverviewView() {
               <thead>
                 <tr className="border-b border-border bg-muted/10 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-4 py-2.5">Group</th>
-                  <th className="px-4 py-2.5 text-right">Ledger facts</th>
-                  {summary.sources.map((source) => (
+                  <th className="px-4 py-2.5 text-right">Chronicle facts</th>
+                  {orderedSources.map((source) => (
                     <th key={source.source_id} className="min-w-[220px] px-4 py-2.5">
-                      {source.label}
+                      {sourceDisplayLabel(source)}
                     </th>
                   ))}
                 </tr>
@@ -358,14 +383,16 @@ function CrossDatasetOverviewView() {
                     <td className="px-4 py-3 text-right align-top font-mono text-xs tabular-nums text-muted-foreground">
                       {row.factCount.toLocaleString("en-US")}
                     </td>
-                    {summary.sources.map((source) => {
+                    {orderedSources.map((source) => {
                       const cell = row.sources[source.source_id];
                       return (
                         <td key={source.source_id} className="px-4 py-3 align-top">
                           <Link
                             href={cell.factHref}
                             className="group block rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            aria-label={"View " + row.label + " facts for " + source.label}
+                            aria-label={
+                              "View " + row.label + " facts for " + sourceDisplayLabel(source)
+                            }
                           >
                             <div className="flex items-baseline justify-between gap-3">
                               <span className="font-semibold tabular-nums group-hover:text-primary">
@@ -378,11 +405,12 @@ function CrossDatasetOverviewView() {
                             <div className="mt-1.5">
                               <PerformanceBar
                                 value={cell.performancePercent}
-                                label={source.label + " performance for " + row.label}
+                                label={
+                                  sourceDisplayLabel(source) + " performance for " + row.label
+                                }
                               />
                             </div>
-                            <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                              <span>{formatPercent(cell.coveragePercent)} covered</span>
+                            <div className="mt-1 flex justify-end text-[11px] text-muted-foreground">
                               <span>
                                 {cell.unsupportedCount
                                   ? cell.unsupportedCount.toLocaleString("en-US") + " unavailable"

@@ -15,7 +15,7 @@ export function PopulacePipelineView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace · data pipeline"
+        eyebrow="Microcosm · data pipeline"
         title="How the dataset is built"
         description={
           <>
@@ -37,7 +37,7 @@ export function PopulacePipelineView() {
 
       <SectionCard
         title="Flow"
-        description="Left to right: survey sources feed the base H5; Ledger facts and references compile the target surface; materialization and calibration produce the dataset and its diagnostics; staging streams live; publish ships to Hugging Face."
+        description="Left to right: survey sources feed the base H5; Chronicle facts and references compile the target surface; materialization and calibration produce the dataset and its diagnostics; staging streams live; publish ships to Hugging Face."
       >
         <PipelineDiagram />
       </SectionCard>

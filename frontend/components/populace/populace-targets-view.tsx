@@ -1050,7 +1050,7 @@ export function PopulaceTargetsView({
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace · calibration fit"
+        eyebrow="Microcosm · calibration fit"
         title="Target diagnostics"
         description={
           <>

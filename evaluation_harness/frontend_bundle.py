@@ -18,7 +18,7 @@ FRONTEND_BUNDLE_SCHEMA = "cross_dataset.frontend_bundle.v1"
 
 DEFAULT_SOURCE_LABELS = {
     "census_acs_pums_2024": "Raw ACS PUMS",
-    "populace_us_policyengine_us_2024": "Populace + PolicyEngine-US",
+    "populace_us_policyengine_us_2024": "Microcosm + PolicyEngine-US",
     "taxcalc_public_cps_2024": "Tax-Calculator + public CPS",
 }
 
@@ -371,9 +371,9 @@ def publish_frontend_bundle(
     facts, snapshot_manifest = load_snapshot_facts(snapshot_path)
     snapshot_id = snapshot_manifest["snapshot_id"]
     if run_manifest.get("snapshot_ids") != [snapshot_id]:
-        raise ValueError("evaluation run and Ledger snapshot IDs do not match")
+        raise ValueError("evaluation run and Chronicle snapshot IDs do not match")
     if run_summary.get("fact_count") != len(facts):
-        raise ValueError("evaluation run and Ledger snapshot fact counts do not match")
+        raise ValueError("evaluation run and Chronicle snapshot fact counts do not match")
 
     capabilities = _read_jsonl(run / "capabilities.jsonl")
     results = _read_jsonl(run / "estimates.jsonl")

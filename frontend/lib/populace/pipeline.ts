@@ -112,17 +112,17 @@ export const PIPELINE_PHASES: PipelinePhase[] = [
       },
       {
         id: "ledger_facts",
-        title: "Ledger facts",
+        title: "Chronicle facts",
         code: "--ledger-facts consumer_facts.jsonl",
         description:
-          "Sourced official statistics (IRS SOI, Census PEP/STC, CMS, USDA, HHS, SSA, CBO, JCT) exported from the Ledger. These carry the target values.",
+          "Sourced official statistics (IRS SOI, Census PEP/STC, CMS, USDA, HHS, SSA, CBO, JCT) exported from Chronicle. These carry the target values.",
       },
       {
         id: "target_references",
         title: "Value-free target references",
         code: "populace/build/us/fiscal_target_references.json",
         description:
-          "Declares which target rows exist and how each maps to model variables; joined with Ledger facts to obtain values.",
+          "Declares which target rows exist and how each maps to model variables; joined with Chronicle facts to obtain values.",
       },
       {
         id: "validation_configs",
@@ -136,14 +136,14 @@ export const PIPELINE_PHASES: PipelinePhase[] = [
   {
     key: "targets",
     title: "Target compilation",
-    summary: "References × Ledger facts become the calibration target surface.",
+    summary: "References × Chronicle facts become the calibration target surface.",
     steps: [
       {
         id: "target_compilation",
         title: "Compile target registry",
         code: "populace.build.us_runtime.fiscal_targets.compile_us_fiscal_target_registry",
         description:
-          "Joins the value-free references with Ledger fact values into ~6,900 TargetSpecs across 11 source families (national, state, and congressional-district levels).",
+          "Joins the value-free references with Chronicle fact values into ~6,900 TargetSpecs across 11 source families (national, state, and congressional-district levels).",
       },
       {
         id: "target_profile_gate",

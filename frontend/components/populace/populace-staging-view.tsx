@@ -125,7 +125,7 @@ function RunList({
     return (
       <EmptyState
         title="No staging runs found."
-        description="Run Populace with staging telemetry enabled to publish progress here."
+        description="Run Microcosm with staging telemetry enabled to publish progress here."
         variant="compact"
       />
     );
@@ -371,9 +371,9 @@ export function PopulaceStagingView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Populace · staging"
+        eyebrow="Microcosm · staging"
         title="Staging candidates"
-        description="Monitor Populace build candidates before they are promoted to the published Hugging Face release channel."
+        description="Monitor Microcosm build candidates before they are promoted to the published Hugging Face release channel."
       />
 
       <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
@@ -727,7 +727,7 @@ export function PopulaceStagingView() {
                 <div className="flex flex-col gap-5 border-t border-border p-4">
               <SectionCard
                 title="Calibration progress"
-                description="Loss points emitted by the Populace calibrator while the staging build runs."
+                description="Loss points emitted by the Microcosm calibrator while the staging build runs."
               >
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
                   <LossSparkline values={lossValues} />

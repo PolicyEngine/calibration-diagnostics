@@ -3,6 +3,7 @@ import type {
   FactSort,
   SourceSummary,
 } from "./artifact";
+import { sourceDisplayLabel } from "./presentation";
 
 export interface FactCatalogParams {
   source: string;
@@ -242,6 +243,7 @@ function sourceRowView(
   fact: CrossDatasetFact,
   source: SourceSummary,
 ): FactSourceRowView {
+  const sourceLabel = sourceDisplayLabel(source);
   const cell = fact.sources[source.source_id];
   if (!cell) {
     return {
@@ -249,7 +251,7 @@ function sourceRowView(
       estimateLabel: "Not evaluated",
       errorLabel: "",
       reasonLabel: "No result was published",
-      ariaLabel: source.label + ": Missing capability cell",
+      ariaLabel: sourceLabel + ": Missing capability cell",
       supported: false,
     };
   }
@@ -266,13 +268,13 @@ function sourceRowView(
   const reason = reasonLabel(cell.reason_code);
   const spokenStatus = displayStatus.replaceAll(" · ", ", ");
   const aria = supported
-    ? source.label +
+    ? sourceLabel +
       ": " +
       spokenStatus +
       "; estimate " +
       estimate +
       (displayError ? "; " + displayError : "")
-    : source.label + ": " + spokenStatus + (reason ? "; " + reason : "");
+    : sourceLabel + ": " + spokenStatus + (reason ? "; " + reason : "");
   return {
     statusLabel: displayStatus,
     estimateLabel: estimate,
@@ -297,7 +299,7 @@ export function buildFactRowView(
     observedPeriod: formatPeriod(fact.observed_period),
     geography: humanizeIdentifier(fact.geography_level),
     detailHref: factDetailHref(fact.fact_key, current),
-    detailAriaLabel: "View Ledger fact " + fact.label,
+    detailAriaLabel: "View Chronicle fact " + fact.label,
     sourceCells: Object.fromEntries(
       sources.map((source) => [source.source_id, sourceRowView(fact, source)]),
     ),

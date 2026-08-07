@@ -6,10 +6,13 @@ import type {
 } from "./artifact";
 import {
   CROSS_DATASET_PAGE_TITLE,
+  GROUP_DIMENSIONS,
+  buildChronicleSourceGapRows,
   buildGroupRows,
   buildSourceOverviews,
   crossDatasetUiState,
   groupFactsHref,
+  orderSourceSummaries,
 } from "./presentation";
 
 const summary: CrossDatasetSummary = {
@@ -186,6 +189,10 @@ const groups: CrossDatasetGroup[] = [
 
 test("keeps the existing page title", () => {
   expect(CROSS_DATASET_PAGE_TITLE).toBe("Cross-dataset comparison");
+  expect(GROUP_DIMENSIONS[0]).toEqual({
+    key: "ledger_source",
+    label: "Chronicle source",
+  });
 });
 
 test("classifies loading, error, empty, and ready overview states", () => {
@@ -199,27 +206,41 @@ test("classifies loading, error, empty, and ready overview states", () => {
   expect(crossDatasetUiState({ summary })).toBe("ready");
 });
 
-test("source scorecards keep performance inseparable from Ledger coverage", () => {
+test("source metric rows keep performance inseparable from Chronicle coverage counts", () => {
   const cards = buildSourceOverviews(summary, groups);
   const populace = cards[0];
   const cps = cards[1];
 
   expect(populace.scoreLabel).toBe("92.4 / 100");
+  expect(populace.label).toBe("Microcosm + PolicyEngine-US");
   expect(populace.coverageLabel).toBe("9,411 of 48,313 facts");
   expect(populace.scoreScopeLabel).toBe("Performance among 9,411 scored facts");
   expect(populace.performancePercent).toBeCloseTo(92.4339, 3);
-  expect(populace.coveragePercent).toBeCloseTo(19.4792, 3);
+  expect("coveragePercent" in populace).toBe(false);
 
   expect(cps.scoreLabel).toBe("91.2 / 100");
   expect(cps.coverageLabel).toBe("38 of 48,313 facts");
   expect(cps.scoreScopeLabel).toBe("Performance among 38 scored facts");
-  expect(cps.coveragePercent).toBeCloseTo(0.07865, 4);
   expect(cps.unsupportedCount).toBe(48_275);
   expect(cps.topUnsupportedReasons[0]).toEqual({
     key: "geography_not_supported",
     label: "Geography not supported",
     count: 44_844,
   });
+});
+
+test("Microcosm is ordered before every other model or standalone dataset", () => {
+  const reversedSources = [...summary.sources].reverse();
+
+  expect(orderSourceSummaries(reversedSources).map((source) => source.source_id)).toEqual([
+    "populace",
+    "cps",
+  ]);
+  expect(
+    buildSourceOverviews({ ...summary, sources: reversedSources }, groups).map(
+      (source) => source.sourceId,
+    ),
+  ).toEqual(["populace", "cps"]);
 });
 
 test("source scorecards identify aligned, advanced, and in-sample comparisons", () => {
@@ -265,6 +286,27 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
   expect(rows[0].sources.cps.factHref).toBe(
     "/populace/datasets?view=facts&source=cps&ledger_source=irs_soi",
   );
+  expect("coveragePercent" in rows[0].sources.populace).toBe(false);
+});
+
+test("Chronicle-source gap rows identify every fact Microcosm cannot evaluate", () => {
+  const rows = buildChronicleSourceGapRows(groups, "populace");
+
+  expect(rows).toEqual([
+    {
+      key: "irs_soi",
+      label: "IRS SOI",
+      factCount: 33_045,
+      evaluatedCount: 150,
+      missingCount: 32_895,
+      missingReasons: [
+        { key: "mapping_not_found", label: "Mapping not found", count: 26_893 },
+        { key: "period_not_supported", label: "Period not supported", count: 6_002 },
+      ],
+      factHref:
+        "/populace/datasets?view=facts&source=populace&ledger_source=irs_soi",
+    },
+  ]);
 });
 
 test("every supported grouping maps to a stable fact-catalog URL", () => {

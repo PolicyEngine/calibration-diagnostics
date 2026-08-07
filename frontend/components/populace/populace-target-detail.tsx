@@ -229,7 +229,7 @@ export function PopulaceTargetDetail({
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 px-5 py-3">
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-            Ledger target
+            Chronicle target
           </div>
           <div className="text-base font-semibold leading-tight text-foreground">
             {measureText(row) || row.name}

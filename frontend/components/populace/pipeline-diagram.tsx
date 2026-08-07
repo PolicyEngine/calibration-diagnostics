@@ -34,7 +34,7 @@ const NODES: Node[] = [
 
   // Column 1 — build inputs
   { id: "base", x: 235, y: 118, w: 170, h: 52, title: "Prior release H5", sub: "populace_us_2024.h5", kind: "input" },
-  { id: "ledger", x: 235, y: 330, w: 170, h: 46, title: "Ledger facts", sub: "IRS · Census · CMS · JCT…", kind: "input" },
+  { id: "ledger", x: 235, y: 330, w: 170, h: 46, title: "Chronicle facts", sub: "IRS · Census · CMS · JCT…", kind: "input" },
   { id: "refs", x: 235, y: 388, w: 170, h: 46, title: "Target references", sub: "fiscal_target_references.json", kind: "input" },
   { id: "valcfg", x: 235, y: 446, w: 170, h: 46, title: "Validation configs", sub: "OBBBA · tax-exp · SOI levels", kind: "input" },
 
