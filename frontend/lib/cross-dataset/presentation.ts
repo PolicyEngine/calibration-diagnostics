@@ -81,6 +81,8 @@ const PERIOD_TREATMENT_LABELS: Record<string, string> = {
 
 const CALIBRATION_EXPOSURE_LABELS: Record<string, string> = {
   direct_calibration_target: "Direct calibration targets (in-sample)",
+  used_in_imputation_or_reweighting:
+    "Used in source weighting/reweighting (not independent)",
   external_validation: "External validation",
   unknown_exposure: "Not evaluated",
 };

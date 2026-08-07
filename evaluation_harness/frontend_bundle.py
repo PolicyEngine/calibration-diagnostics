@@ -17,6 +17,7 @@ from .scoring import ScoreObservation, build_group_score
 FRONTEND_BUNDLE_SCHEMA = "cross_dataset.frontend_bundle.v1"
 
 DEFAULT_SOURCE_LABELS = {
+    "census_acs_pums_2024": "Raw ACS PUMS",
     "populace_us_policyengine_us_2024": "Populace + PolicyEngine-US",
     "taxcalc_public_cps_2024": "Tax-Calculator + public CPS",
 }
@@ -124,6 +125,8 @@ def _source_cell(
                 "estimate": result["estimate"],
                 "dataset_version": result.get("dataset_version"),
                 "model_version": result.get("model_version"),
+                "standard_error": result.get("standard_error"),
+                "margin_of_error_90": result.get("margin_of_error_90"),
             }
         )
     if score is not None:

@@ -75,6 +75,8 @@ const fact: CrossDatasetFact = {
       benchmark_period: "tax_year:2024",
       benchmark_basis: "aligned_fact",
       absolute_relative_error: "0.0285714286",
+      standard_error: "2500000",
+      margin_of_error_90: "4112500",
       alignment: {
         source_period: "tax_year:2023",
         target_period: "tax_year:2024",
@@ -181,6 +183,8 @@ test("fact detail separates original observation, aligned benchmark, and estimat
     populationPeriodLabel: "Calendar year 2024",
     policyPeriodLabel: "Tax year 2024",
     calibrationExposureLabel: "Direct calibration target (in-sample)",
+    standardErrorLabel: "$2.50M",
+    marginOfError90Label: "$4.11M",
   });
   expect(detail.sourceCells.populace.alignment).toContainEqual({
     label: "Method",

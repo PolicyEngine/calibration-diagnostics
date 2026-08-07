@@ -46,6 +46,8 @@ class EvaluationResult:
     calibration_exposure: str
     mapping_id: str | None
     execution_method: str
+    standard_error: Decimal | None = None
+    margin_of_error_90: Decimal | None = None
 
     @classmethod
     def from_capability(
@@ -55,6 +57,8 @@ class EvaluationResult:
         estimate: Decimal,
         dataset_version: str,
         model_version: str | None,
+        standard_error: Decimal | None = None,
+        margin_of_error_90: Decimal | None = None,
     ) -> "EvaluationResult":
         return cls(
             snapshot_id=capability.snapshot_id,
@@ -77,6 +81,8 @@ class EvaluationResult:
             calibration_exposure=capability.calibration_exposure.value,
             mapping_id=capability.mapping_id,
             execution_method=capability.execution_method.value,
+            standard_error=standard_error,
+            margin_of_error_90=margin_of_error_90,
         )
 
 
@@ -302,4 +308,8 @@ def validate_results(
             raise ValueError(f"result snapshot does not match capability: {key}")
         if result.mapping_release != capability.mapping_release:
             raise ValueError(f"result mapping release does not match capability: {key}")
-
+        uncertainty = (result.standard_error, result.margin_of_error_90)
+        if (uncertainty[0] is None) != (uncertainty[1] is None):
+            raise ValueError(f"result has incomplete uncertainty diagnostics: {key}")
+        if any(value is not None and value < 0 for value in uncertainty):
+            raise ValueError(f"result has negative uncertainty diagnostics: {key}")
