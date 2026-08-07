@@ -715,7 +715,7 @@ export function CalibrationExplorerMap({
                         dispatch({ type: "select", selection: item.selection });
                       }
                     }}
-                    className="absolute overflow-hidden px-1.5 py-1.5 text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                    className="absolute cursor-pointer overflow-hidden px-1.5 py-1.5 text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     style={{
                       left: placed.x + NODE_GAP / 2,
                       top: placed.y + NODE_GAP / 2,
