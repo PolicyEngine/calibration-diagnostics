@@ -192,6 +192,7 @@ def test_snapshot_diff_reports_values_additions_removals_and_key_churn(tmp_path:
     new_snapshot = compile_snapshot(new, tmp_path / "new-snapshot")
     result = diff_snapshots(old_snapshot.output_path, new_snapshot.output_path)
     assert result.changed_values == (old_a["aggregate_fact_key"],)
+    assert result.changed_definitions == ()
     assert result.key_churn == (
         (
             old_b["semantic_fact_key"],
@@ -202,3 +203,36 @@ def test_snapshot_diff_reports_values_additions_removals_and_key_churn(tmp_path:
     assert added["aggregate_fact_key"] in result.added
     assert old_b["aggregate_fact_key"] not in result.removed
 
+
+def test_snapshot_diff_disambiguates_repeated_semantic_keys_for_key_churn(
+    tmp_path: Path,
+) -> None:
+    semantic = "ledger.semantic_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa"
+    old_state = consumer_row(
+        "ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+        semantic_key=semantic,
+        geography_level="state",
+        geography_id="0400000US06",
+    )
+    country = consumer_row(
+        "ledger.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+        semantic_key=semantic,
+    )
+    new_state = deepcopy(old_state)
+    new_state["aggregate_fact_key"] = "ledger.aggregate_fact.v2:cccccccccccccccccccccccc"
+    old = compile_snapshot(
+        write_bundle(tmp_path / "old-duplicate", [old_state, country], with_manifest=False),
+        tmp_path / "old-duplicate-snapshot",
+    )
+    new = compile_snapshot(
+        write_bundle(tmp_path / "new-duplicate", [country, new_state], with_manifest=False),
+        tmp_path / "new-duplicate-snapshot",
+    )
+    result = diff_snapshots(old.output_path, new.output_path)
+    assert result.key_churn == (
+        (
+            semantic,
+            old_state["aggregate_fact_key"],
+            new_state["aggregate_fact_key"],
+        ),
+    )

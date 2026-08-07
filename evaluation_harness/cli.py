@@ -4,6 +4,7 @@ import argparse
 import json
 
 from .snapshot import compile_snapshot, diff_snapshots
+from .update_review import compile_update_review, publish_update_review
 
 
 def main() -> None:
@@ -20,15 +21,40 @@ def main() -> None:
     diff.add_argument("--from", dest="from_path", required=True)
     diff.add_argument("--to", dest="to_path", required=True)
 
+    review = ledger_commands.add_parser("review")
+    review.add_argument("--from", dest="from_path", required=True)
+    review.add_argument("--to", dest="to_path", required=True)
+    review.add_argument(
+        "--integration",
+        dest="integrations",
+        required=True,
+        action="append",
+        help="Integration directory or overview.yaml; repeat for every active source.",
+    )
+    review.add_argument("--out", required=True)
+
     args = parser.parse_args()
     if args.ledger_command == "snapshot":
         result = compile_snapshot(args.bundle, args.out)
         print(json.dumps(result.manifest, indent=2, sort_keys=True))
-    else:
+    elif args.ledger_command == "diff":
         result = diff_snapshots(args.from_path, args.to_path)
         print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    else:
+        document = compile_update_review(
+            args.from_path,
+            args.to_path,
+            args.integrations,
+        )
+        manifest = publish_update_review(document, args.out)
+        print(
+            json.dumps(
+                {"manifest": manifest, "review": document},
+                indent=2,
+                sort_keys=True,
+            )
+        )
 
 
 if __name__ == "__main__":
     main()
-
