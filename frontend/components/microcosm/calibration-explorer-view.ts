@@ -2,9 +2,10 @@ import type {
   ExplorerPath,
   ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
-import type {
-  CalibrationTreeNode,
-  CalibrationTreeSizeMode,
+import {
+  MISSING_VALUE,
+  type CalibrationTreeNode,
+  type CalibrationTreeSizeMode,
 } from "@/lib/microcosm/calibration-tree";
 import { canonicalLabel, programLabel } from "@/lib/microcosm/program-label";
 import { sourceLabel } from "@/lib/microcosm/source-label";
@@ -20,6 +21,10 @@ function humanize(value: string): string {
         ? word.toUpperCase()
         : word[0].toUpperCase() + word.slice(1),
     );
+}
+
+function geographyLabel(value: string): string {
+  return value === MISSING_VALUE ? "Not specified" : humanize(value);
 }
 
 export function explorerUpLabel(state: ExplorerState): string | null {
@@ -48,7 +53,7 @@ export function explorerBreadcrumbs(state: ExplorerState): ExplorerBreadcrumb[] 
   ];
   if (state.breakdown === "geography" && state.path.geography) {
     crumbs.push({
-      label: humanize(state.path.geography),
+      label: geographyLabel(state.path.geography),
       path: { geography: state.path.geography, dimensions: [] },
     });
   }
@@ -79,7 +84,7 @@ export function explorerBreadcrumbs(state: ExplorerState): ExplorerBreadcrumb[] 
     state.path.geography
   ) {
     crumbs.push({
-      label: humanize(state.path.geography),
+      label: geographyLabel(state.path.geography),
       path: {
         source: state.path.source,
         program: state.path.program,
@@ -88,14 +93,16 @@ export function explorerBreadcrumbs(state: ExplorerState): ExplorerBreadcrumb[] 
       },
     });
   }
-  if (state.path.source && state.path.program && state.path.geography) {
+  if (state.path.source && state.path.program) {
     state.path.dimensions.forEach((dimension, index) => {
       crumbs.push({
         label: canonicalLabel(dimension.value),
         path: {
           source: state.path.source,
           program: state.path.program,
-          geography: state.path.geography,
+          ...(state.path.geography
+            ? { geography: state.path.geography }
+            : {}),
           dimensions: state.path.dimensions.slice(0, index + 1),
         },
       });

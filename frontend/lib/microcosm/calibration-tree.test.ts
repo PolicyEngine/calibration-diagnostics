@@ -108,6 +108,38 @@ const rows: CalibrationTreeTarget[] = [
 ];
 
 describe("source, geography, and declared-dimension hierarchy", () => {
+  test("skips a meaningless singleton missing-geography tier", () => {
+    const geographylessRows = ["Adult", "Child"].map((age) =>
+      target(`geographyless/${age}`, {
+        source: "test",
+        variable: "geographyless program",
+        target_dimensions: [{ key: "bd_age", label: "Age", value: age }],
+      }),
+    );
+    const programPath = {
+      source: "test",
+      program: "geographyless program",
+      dimensions: [],
+    };
+    const tree = buildCalibrationTree(geographylessRows, state(programPath));
+
+    expect(tree.currentLevel).toEqual({ kind: "dimension", key: "bd_age", label: "Age" });
+    expect(tree.groups.map((group) => group.id)).toEqual(["bd_age"]);
+    expect(tree.groups[0].nodes.map((node) => node.label)).toEqual(["Adult", "Child"]);
+
+    const adult = buildCalibrationTree(
+      geographylessRows,
+      state({
+        ...programPath,
+        dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
+      }),
+    );
+    expect(adult.currentLevel).toEqual({ kind: "target", label: "Targets" });
+    expect(adult.groups[0].nodes.map((node) => node.id)).toEqual([
+      "geographyless/Adult",
+    ]);
+  });
+
   test("renders statistics inside source groups at the overview", () => {
     const tree = buildCalibrationTree(rows, state({ dimensions: [] }), "release-1");
 

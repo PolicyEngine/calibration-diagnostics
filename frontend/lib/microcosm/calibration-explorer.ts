@@ -88,7 +88,7 @@ export function selectExplorerNode(
     path.geography = selection.value;
     path.dimensions = [];
   } else if (selection.kind === "dimension_value") {
-    if (!path.geography) return state;
+    if (!path.geography && (!path.source || !path.program)) return state;
     path.dimensions = [
       ...path.dimensions.filter((dimension) => dimension.key !== selection.key),
       {
@@ -98,7 +98,7 @@ export function selectExplorerNode(
       },
     ];
   } else {
-    if (!path.geography) return state;
+    if (!path.geography && (!path.source || !path.program)) return state;
     path.target = selection.value;
   }
   return { ...state, path };

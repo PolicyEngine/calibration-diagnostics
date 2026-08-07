@@ -150,6 +150,38 @@ describe("calibration explorer presentation model", () => {
     ]);
   });
 
+  test("labels the missing sentinel consistently and supports geography-less dimensions", () => {
+    expect(
+      explorerBreadcrumbs(
+        state({
+          source: "irs_soi",
+          program: "ctc",
+          geography: "__missing__",
+          dimensions: [],
+        }),
+      ),
+    ).toContainEqual(
+      expect.objectContaining({ label: "Not specified" }),
+    );
+
+    expect(
+      explorerBreadcrumbs(
+        state({
+          source: "test",
+          program: "geographyless program",
+          dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
+        }),
+      ).at(-1),
+    ).toEqual({
+      label: "Adult",
+      path: {
+        source: "test",
+        program: "geographyless program",
+        dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
+      },
+    });
+  });
+
   test("orders navigation for a geography-first journey", () => {
     const geography = state(
       { geography: "CA", dimensions: [] },

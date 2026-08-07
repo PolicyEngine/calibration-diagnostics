@@ -489,24 +489,32 @@ export function buildCalibrationTree(
   );
   const filteredProgramRows = applyExplorerFilters(programRows, state.filters);
   if (!path.geography) {
-    const nodes = geographyNodes(filteredProgramRows);
-    return {
-      releaseId,
-      path,
-      currentLevel: { kind: "geography", label: "Geography" },
-      groups: [{
-        id: path.program,
-        label: path.program,
-        nodes,
-        metrics: calibrationTreeMetrics(filteredProgramRows),
-      }],
-      dimensionOrder: [],
-      filterOptions: options,
-      filteredMetrics: calibrationTreeMetrics(filteredProgramRows),
-    };
+    const allGeographyNodes = geographyNodes(programRows);
+    const onlyMissingGeography =
+      allGeographyNodes.length === 1 &&
+      allGeographyNodes[0].id === MISSING_VALUE;
+    if (!onlyMissingGeography) {
+      const nodes = geographyNodes(filteredProgramRows);
+      return {
+        releaseId,
+        path,
+        currentLevel: { kind: "geography", label: "Geography" },
+        groups: [{
+          id: path.program,
+          label: path.program,
+          nodes,
+          metrics: calibrationTreeMetrics(filteredProgramRows),
+        }],
+        dimensionOrder: [],
+        filterOptions: options,
+        filteredMetrics: calibrationTreeMetrics(filteredProgramRows),
+      };
+    }
   }
 
-  const geographyRows = programRows.filter((row) => geographyId(row) === path.geography);
+  const geographyRows = path.geography
+    ? programRows.filter((row) => geographyId(row) === path.geography)
+    : programRows;
   const dimensionOrder = orderedBreakdownDimensions(geographyRows);
   let scopedRows = geographyRows;
   const selectedKeys = new Set<string>();

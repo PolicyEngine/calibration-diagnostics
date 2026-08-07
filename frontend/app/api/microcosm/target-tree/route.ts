@@ -37,14 +37,12 @@ function requestState(params: URLSearchParams) {
   if (source && program) {
     state.path.source = source;
     state.path.program = program;
-    if (geography) {
-      for (const [key, value] of params.entries()) {
-        if (key.startsWith("dim.") && value.trim()) {
-          state.path.dimensions.push({ key: key.slice(4), value: value.trim() });
-        }
+    for (const [key, value] of params.entries()) {
+      if (key.startsWith("dim.") && value.trim()) {
+        state.path.dimensions.push({ key: key.slice(4), value: value.trim() });
       }
-      state.path.target = params.get("target")?.trim() || undefined;
     }
+    state.path.target = params.get("target")?.trim() || undefined;
   }
   state.filters.geographyLevels = params.getAll("geography_level");
   state.filters.geographies = params.getAll("geography");

@@ -722,15 +722,13 @@ function explorerApiParams(
   if (state.path.source && state.path.program) {
     result.source = state.path.source;
     result.program = state.path.program;
+    for (const dimension of state.path.dimensions) {
+      result[`dim.${dimension.key}`] = dimension.value;
+    }
+    if (state.path.target) result.target = state.path.target;
   }
   if (state.path.geography) {
     result.path_geography = state.path.geography;
-    if (state.path.source && state.path.program) {
-      for (const dimension of state.path.dimensions) {
-        result[`dim.${dimension.key}`] = dimension.value;
-      }
-      if (state.path.target) result.target = state.path.target;
-    }
   }
   return result;
 }

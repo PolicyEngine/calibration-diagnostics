@@ -10,6 +10,7 @@ import {
   releaseRole,
   type Calibration,
 } from "./latest-artifact";
+import { buildCalibrationTree } from "./calibration-tree";
 
 // A v2-shaped target: AGI bracket × return type × filing status, with @period.
 function agiTarget(band: string, ret: string, filing: string, rel: number) {
@@ -53,6 +54,160 @@ test("v2 metadata and parsing survive enrichment", () => {
   expect(row.aggregation).toBe("sum");
   expect(row.period).toBe(2024);
   expect(row.source_citation).toBe("IRS SOI Table 1.1");
+});
+
+test("legacy Ledger metadata populates the complete Chronicle contract", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_agi.ak.1_to_10k.taxable_interest_amount@2024",
+      target_name: "irs_soi.ty2022.historic_table_2.state_agi.ak.1_to_10k.taxable_interest_amount",
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 99,
+      registry: { family: "irs_soi" },
+      metadata: {
+        ledger_fact_key: "fact-key",
+        ledger_source_record_id: "source-record",
+        ledger_semantic_fact_key: "semantic-key",
+        ledger_aggregate_fact_key: "aggregate-key",
+        ledger_legacy_fact_key: "legacy-key",
+        ledger_period_type: "tax_year",
+        source_period: "2022",
+        target_period: "2024",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US02",
+        ledger_geography_vintage: "2020_census",
+        ledger_domain: "all_returns",
+        ledger_entity_name: "tax_unit",
+        ledger_entity_role: "filing_unit",
+        ledger_measure_concept: "irs_soi.taxable_interest",
+        ledger_source_concept: "irs_soi.taxable_interest",
+        ledger_concept_relation: "identical",
+        ledger_concept_authority: "IRS",
+        ledger_measure_unit: "usd",
+        ledger_value_operation: "identity",
+        ledger_layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_agi.ak",
+        ledger_layout_groupby_dimension: "us:statutes/26/62#adjusted_gross_income",
+        ledger_layout_groupby_value_id: "1_to_10k",
+        ledger_layout_measure_id: "taxable_interest_amount",
+        ledger_dimension_set_key: "dimension-set",
+        ledger_universe_constraint_set_key: "universe-set",
+        ledger_universe_constraint_count: 2,
+        ledger_filter_income_range: "1_to_10k",
+        ledger_filter_filing_status: "all",
+        source_measure_id: "taxable_interest_amount",
+        variable: "taxable_interest_income",
+        filing_status: "All",
+      },
+    },
+  ]);
+  const row = cal.rows[0];
+
+  expect(row.geography).toBe("AK");
+  expect(row.level).toBe("state");
+  expect(row.state).toBe("AK");
+  expect(row.measure).toBe("total");
+  expect(row.target_dimensions).toEqual([
+    expect.objectContaining({ label: "Income band", value: "1 to 10k" }),
+    expect.objectContaining({ label: "Filing status", value: "All" }),
+  ]);
+  expect(row.chronicle).toMatchObject({
+    fact_key: "fact-key",
+    source_record_id: "source-record",
+    semantic_fact_key: "semantic-key",
+    aggregate_fact_key: "aggregate-key",
+    legacy_fact_key: "legacy-key",
+    period_type: "tax_year",
+    source_period: "2022",
+    target_period: "2024",
+    geography_level: "state",
+    geography_id: "0400000US02",
+    geography_vintage: "2020_census",
+    domain: "all_returns",
+    entity_name: "tax_unit",
+    entity_role: "filing_unit",
+    measure_concept: "irs_soi.taxable_interest",
+    source_concept: "irs_soi.taxable_interest",
+    concept_relation: "identical",
+    concept_authority: "IRS",
+    measure_unit: "usd",
+    value_operation: "identity",
+    layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_agi.ak",
+    layout_groupby_dimension: "us:statutes/26/62#adjusted_gross_income",
+    layout_groupby_value_id: "1_to_10k",
+    layout_measure_id: "taxable_interest_amount",
+    dimension_set_key: "dimension-set",
+    universe_constraint_set_key: "universe-set",
+    universe_constraint_count: 2,
+    filters: expect.arrayContaining([
+      expect.objectContaining({ label: "Income band", value: "1 to 10k" }),
+      expect.objectContaining({ label: "Filing status", value: "All" }),
+    ]),
+  });
+});
+
+test("legacy geography and income metadata drive the explorer hierarchy", () => {
+  const legacyTarget = (state: "ak" | "ca", geoId: string, band: string) => ({
+    name: `irs_soi.ty2022.historic_table_2.state_agi.${state}.${band}.taxable_interest_amount@2024`,
+    target: 100,
+    initial_estimate: 100,
+    final_estimate: 100,
+    registry: { family: "irs_soi" },
+    metadata: {
+      ledger_geography_level: "state",
+      ledger_geography_id: geoId,
+      ledger_layout_groupby_dimension: "us:statutes/26/62#adjusted_gross_income",
+      ledger_layout_groupby_value_id: band,
+      ledger_filter_income_range: band,
+      ledger_filter_filing_status: "all",
+      source_measure_id: "taxable_interest_amount",
+      variable: "taxable_interest_income",
+      filing_status: "All",
+    },
+  });
+  const cal = calibration([
+    legacyTarget("ak", "0400000US02", "1_to_10k"),
+    legacyTarget("ak", "0400000US02", "10k_to_25k"),
+    legacyTarget("ca", "0400000US06", "1_to_10k"),
+  ]);
+  const filters = {
+    geographyLevels: [],
+    geographies: [],
+    fitBands: [],
+    calibrationStatuses: [],
+  };
+  const program = buildCalibrationTree(cal.rows, {
+    breakdown: "program",
+    path: {
+      source: "irs_soi",
+      program: "taxable interest income",
+      dimensions: [],
+    },
+    filters,
+  });
+
+  expect(program.currentLevel).toEqual({ kind: "geography", label: "Geography" });
+  expect(program.groups[0].nodes.map((node) => node.id)).toEqual(["AK", "CA"]);
+
+  const alaska = buildCalibrationTree(cal.rows, {
+    breakdown: "program",
+    path: {
+      source: "irs_soi",
+      program: "taxable interest income",
+      geography: "AK",
+      dimensions: [],
+    },
+    filters,
+  });
+  expect(alaska.currentLevel).toEqual({
+    kind: "dimension",
+    key: "bd_income_band",
+    label: "Income band",
+  });
+  expect(alaska.groups[0].nodes.map((node) => node.label)).toEqual([
+    "1 to 10k",
+    "10k to 25k",
+  ]);
 });
 
 test("release publish date prefers the release manifest commit date", () => {

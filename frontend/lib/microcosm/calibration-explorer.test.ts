@@ -207,7 +207,7 @@ describe("calibration explorer semantic navigation", () => {
     ).toEqual(state({ filters }));
   });
 
-  test("requires geography before declared dimensions or targets", () => {
+  test("allows geography-less programs to select dimensions and targets", () => {
     const program = selectExplorerNode(state(), {
       kind: "program",
       source: "irs_soi",
@@ -220,10 +220,27 @@ describe("calibration explorer semantic navigation", () => {
         key: "bd_income_band",
         label: "Income band",
         value: "All",
-      }),
-    ).toEqual(program);
+      }).path,
+    ).toEqual({
+      source: "irs_soi",
+      program: "ctc",
+      dimensions: [{ key: "bd_income_band", label: "Income band", value: "All" }],
+    });
     expect(
-      selectExplorerNode(program, { kind: "target", value: "ctc/al/count" }),
-    ).toEqual(program);
+      selectExplorerNode(program, { kind: "target", value: "ctc/all/count" }).path,
+    ).toEqual({
+      source: "irs_soi",
+      program: "ctc",
+      dimensions: [],
+      target: "ctc/all/count",
+    });
+    expect(
+      selectExplorerNode(state(), {
+        kind: "dimension_value",
+        key: "bd_age",
+        label: "Age",
+        value: "Adult",
+      }),
+    ).toEqual(state());
   });
 });

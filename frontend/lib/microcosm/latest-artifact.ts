@@ -3,6 +3,7 @@
 // live from the policyengine/populace-us Hugging Face dataset, resolved through
 // latest.json (current release) or by id (any release, for version compare).
 
+import { normalizeChronicleMetadata } from "./chronicle-metadata";
 import { sourceLabel } from "./source-label";
 
 type JsonObject = Record<string, unknown>;
@@ -862,10 +863,12 @@ function calibrationStatus(
 // the parsed geography/source/variable/breakdown for navigation and surface the
 // published metadata alongside. v1 rows simply lack those extra fields.
 function enrichTargetRow(
-  row: TargetRow,
+  rawRow: TargetRow,
   skippedByName: Map<string, string> = new Map(),
   droppedTargetNames: Set<string> = new Set(),
 ): TargetRow {
+  const metadata = normalizeChronicleMetadata(rawRow.metadata);
+  const row: TargetRow = { ...rawRow, metadata };
   const fullName = String(row.name ?? "");
   // v2 carries target_name (no @period); else strip any @period from the name.
   const baseName = String(row.target_name ?? fullName.split("@")[0]);
@@ -904,7 +907,6 @@ function enrichTargetRow(
       : Math.abs(initialError) - Math.abs(finalError);
   const parsed = parseDottedTarget(baseName, row) ?? parseTarget(baseName);
   const measureCol = asObject(row.measure);
-  const metadata = asObject(row.metadata);
   const metadataTargetDimensions = metadataDimensions(row);
   const targetDimensions =
     metadataTargetDimensions ??
