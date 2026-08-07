@@ -1,20 +1,20 @@
 ---
 name: policyengine-model-auditor
-description: Audits PolicyEngine model variables and aggregate expressions used by a Populace target
+description: Audits PolicyEngine model variables and aggregate expressions used by a Microcosm target
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 ---
 
 # PolicyEngine Model Auditor
 
-Audit whether the model-side estimate is measuring the same thing as the ledger target.
+Audit whether the model-side estimate is measuring the same thing as the chronicle target.
 
 ## Inputs
 
 Read the target packet JSON. Focus on:
 - `target.variable`
 - `target.measure`
-- `target.ledger.measure_concept`
-- `target.ledger.source_concept`
+- `target.chronicle.measure_concept`
+- `target.chronicle.source_concept`
 - `source_metadata.variable`
 - `source_metadata.source_measure_id`
 
@@ -28,10 +28,10 @@ Read the target packet JSON. Focus on:
 ## Checks
 
 - Variable/entity matches the target population.
-- Unit matches the ledger unit.
+- Unit matches the chronicle unit.
 - Period and annualization match the target period.
 - Whether the model variable is law/parameter sensitive across source and target periods.
-- Sign convention matches the ledger value operation.
+- Sign convention matches the chronicle value operation.
 - Amount/count variants map to the right model expression.
 - Federal/state geography handling is correct.
 

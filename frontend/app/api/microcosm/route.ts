@@ -1,0 +1,64 @@
+import { NextResponse } from "next/server";
+
+import {
+  POPULACE_HF_REVISION,
+  asObject,
+  classifyApiError,
+  hfResolveUrl,
+  latestMicrocosmCalibrationHighlights,
+  latestMicrocosmCalibrationSummary,
+  loadRelease,
+  parseCountry,
+  microcosmRepo,
+  scrub,
+} from "@/lib/microcosm/latest-artifact";
+
+export const revalidate = 300;
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
+export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
+  const release = params.get("release") ?? "latest";
+  const isLatestRequest = release === "latest" || release === "";
+  const country = parseCountry(params.get("country"));
+  try {
+    const cal = await loadRelease(release, revalidate, country);
+    const calibration = latestMicrocosmCalibrationSummary(cal);
+    const highlights = latestMicrocosmCalibrationHighlights(cal, 15);
+    const prefix = `releases/${cal.release_id}`;
+    return NextResponse.json(
+      scrub({
+        source_repo: microcosmRepo(country),
+        repo_type: "dataset",
+        revision: POPULACE_HF_REVISION,
+        source: "huggingface_live",
+        release_id: cal.release_id,
+        updated_at: cal.updated_at,
+        source_artifacts: [
+          ...(isLatestRequest
+            ? [{ name: "latest_pointer", path: "latest.json", url: hfResolveUrl("latest.json", country) }]
+            : []),
+          { name: "build_manifest", path: `${prefix}/build_manifest.json`, url: hfResolveUrl(`${prefix}/build_manifest.json`, country) },
+          { name: "release_manifest", path: `${prefix}/release_manifest.json`, url: hfResolveUrl(`${prefix}/release_manifest.json`, country) },
+          { name: "calibration_diagnostics", path: `${prefix}/calibration_diagnostics.json`, url: hfResolveUrl(`${prefix}/calibration_diagnostics.json`, country) },
+          { name: "demographics", path: `${prefix}/demographics.json`, url: hfResolveUrl(`${prefix}/demographics.json`, country) },
+        ],
+        limitations: [
+          isLatestRequest
+            ? `Everything on this page is read live from the ${microcosmRepo(country)} Hugging Face dataset; the current release is resolved through latest.json.`
+            : `Everything on this page is read live from the ${microcosmRepo(country)} Hugging Face dataset for the selected release id.`,
+          "Loss values are the calibrator's own metric for this release; their scale is not comparable across releases that calibrate to different target surfaces.",
+        ],
+        build_manifest: cal.build_manifest,
+        release_manifest: cal.release_manifest,
+        gates: asObject(cal.build_manifest.gates),
+        calibration,
+        highlights,
+      }),
+    );
+  } catch (error) {
+    const { status, body } = classifyApiError(error);
+    return NextResponse.json(body, { status });
+  }
+}

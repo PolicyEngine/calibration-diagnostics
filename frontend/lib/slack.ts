@@ -1,13 +1,13 @@
-import type { PopulaceCountry } from "@/lib/populace/latest-artifact";
+import type { MicrocosmCountry } from "@/lib/microcosm/latest-artifact";
 
-const DASHBOARD_URL = "https://populace.dev/calibration/dashboard/populace";
+const DASHBOARD_URL = "https://microcosm.institute/calibration/dashboard/microcosm";
 
-const COUNTRY_LABEL: Record<PopulaceCountry, string> = {
+const COUNTRY_LABEL: Record<MicrocosmCountry, string> = {
   us: "🇺🇸 US",
   uk: "🇬🇧 UK",
 };
 
-const WEBHOOK_ENV: Record<PopulaceCountry, string> = {
+const WEBHOOK_ENV: Record<MicrocosmCountry, string> = {
   us: "SLACK_WEBHOOK_POPULACE_US",
   uk: "SLACK_WEBHOOK_POPULACE_UK",
 };
@@ -15,7 +15,7 @@ const WEBHOOK_ENV: Record<PopulaceCountry, string> = {
 // Post a "new release" alert to the country's Slack incoming webhook.
 // No-op (returns false) when that channel's webhook env var is unset.
 export async function postReleaseAlert(opts: {
-  country: PopulaceCountry;
+  country: MicrocosmCountry;
   releaseId: string;
   repo: string;
   updatedAt?: string | null;
@@ -33,13 +33,13 @@ export async function postReleaseAlert(opts: {
     .join(" · ");
 
   const payload = {
-    text: `New Populace ${opts.country.toUpperCase()} release: ${opts.releaseId}`,
+    text: `New Microcosm ${opts.country.toUpperCase()} release: ${opts.releaseId}`,
     blocks: [
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `:rocket: *New Populace ${label} release*\n\`${opts.releaseId}\``,
+          text: `:rocket: *New Microcosm ${label} release*\n\`${opts.releaseId}\``,
         },
       },
       {

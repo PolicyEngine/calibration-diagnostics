@@ -1,4 +1,4 @@
-# Pinned to the policyengine-us version the current populace release was built
+# Pinned to the policyengine-us version the current microcosm release was built
 # with (build_manifest -> 1.752.2). A mismatch silently shifts weighted totals
 # (uprating/weighting logic changes between versions), which would make the
 # hosted variable lookup disagree with the calibration for the same release.

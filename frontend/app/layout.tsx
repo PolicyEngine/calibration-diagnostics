@@ -3,7 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
-// The two families populace.dev vendors — self-hosted here via next/font so the
+// The two families microcosm.institute vendors — self-hosted here via next/font so the
 // dashboard renders in the same faces with no external request. Exposed as CSS
 // variables that globals.css points --font-sans / --font-mono at.
 const inter = Inter({
@@ -20,14 +20,14 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  // Follows populace.dev's "… — populace" title convention (its /calibration
-  // page is "Calibration — populace").
+  // Follows microcosm.institute's "… — microcosm" title convention (its /calibration
+  // page is "Calibration — microcosm").
   title: {
-    default: "Calibration diagnostics — populace",
-    template: "%s — populace",
+    default: "Calibration diagnostics — microcosm",
+    template: "%s — microcosm",
   },
   description:
-    "Interactive diagnostics for the populace weighted synthetic population — how closely the calibrated data matches official statistics, release over release.",
+    "Interactive diagnostics for the microcosm weighted synthetic population — how closely the calibrated data matches official statistics, release over release.",
 };
 
 export default function RootLayout({

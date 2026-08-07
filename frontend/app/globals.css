@@ -2,12 +2,12 @@
 @import "@policyengine/ui-kit/theme.css";
 
 /* ============================================================================
- * populace.dev continuity layer
+ * microcosm.institute continuity layer
  *
- * The dashboard mounts at populace.dev/calibration/dashboard and must read as
+ * The dashboard mounts at microcosm.institute/calibration/dashboard and must read as
  * part of the site — not a hard context switch out of it. Both surfaces consume
- * @policyengine/ui-kit tokens, so this file re-creates populace.dev's own alias
- * layer (mirrors PolicyEngine/populace.dev/style.css :root) on top of the ui-kit
+ * @policyengine/ui-kit tokens, so this file re-creates microcosm.institute's own alias
+ * layer (mirrors PolicyEngine/microcosm.institute/style.css :root) on top of the ui-kit
  * theme. One palette, one type system, one chrome, shared by both pages.
  *
  * Rule of the house: components never hardcode a palette value. Every colour
@@ -17,7 +17,7 @@
 
 :root {
   /* Fonts — Inter (display + body) and JetBrains Mono (labels), the exact two
-     families populace.dev vendors. Loaded self-hosted via next/font in
+     families microcosm.institute vendors. Loaded self-hosted via next/font in
      app/layout.tsx, exposed as --font-inter / --font-jetbrains, and pointed at
      here so every ui-kit component renders in the same faces as the site. */
   --font-sans:
@@ -25,7 +25,7 @@
     sans-serif;
   --font-mono: var(--font-jetbrains), "Fira Code", Consolas, monospace;
 
-  /* populace.dev semantic aliases (verbatim mapping from populace.dev/style.css).
+  /* microcosm.institute semantic aliases (verbatim mapping from microcosm.institute/style.css).
      "amber" is the site's accent name; on the shared design system it resolves
      to PolicyEngine teal. */
   --ink: var(--background); /* page background — paper white */
@@ -41,21 +41,21 @@
   --mono: var(--font-mono);
   --max: 1140px;
 
-  /* Data tones. populace's "good" is a deep teal-green, not emerald; "bad" is
+  /* Data tones. microcosm's "good" is a deep teal-green, not emerald; "bad" is
      the ui-kit red. KPI deltas, status pills and table cells read from these. */
   --pos: var(--text-success); /* #285E61 */
   --neg: var(--text-error); /* #B91C1C */
   --warn: var(--text-warning); /* #c2410c */
   --info: var(--chart-4); /* #026AA2 accessible blue */
 
-  /* Neutral elevation — populace.dev leans on hairline borders, not heavy
+  /* Neutral elevation — microcosm.institute leans on hairline borders, not heavy
      shadows. Tokenised so components stop inlining slate-tinted rgba(). */
   --elev-1: 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
   --elev-2: 0 1px 2px color-mix(in srgb, var(--foreground) 5%, transparent);
   --scrim: color-mix(in srgb, var(--foreground) 20%, transparent);
 }
 
-/* ---------- page atmosphere: paper wash + grain (from populace.dev) --------- */
+/* ---------- page atmosphere: paper wash + grain (from microcosm.institute) --------- */
 body {
   position: relative;
   min-height: 100vh;
@@ -64,7 +64,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* deep radial teal wash behind everything — the populace.dev ambient signal */
+/* deep radial teal wash behind everything — the microcosm.institute ambient signal */
 body::before {
   content: "";
   position: fixed;
@@ -94,7 +94,7 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ---------- header / nav (populace.dev .nav voice, app-bar height) ---------- */
+/* ---------- header / nav (microcosm.institute .nav voice, app-bar height) ---------- */
 .site-nav {
   display: flex;
   align-items: center;
@@ -190,7 +190,7 @@ body::before {
   height: 18px;
   display: block;
 }
-/* editorial links collapse on narrow app widths (populace.dev does the same) */
+/* editorial links collapse on narrow app widths (microcosm.institute does the same) */
 .site-nav-editorial {
   display: none;
 }
@@ -200,7 +200,7 @@ body::before {
   }
 }
 
-/* ---------- eyebrow / kicker (teal mono, populace.dev .eyebrow) ------------- */
+/* ---------- eyebrow / kicker (teal mono, microcosm.institute .eyebrow) ------------- */
 .site-eyebrow {
   font-family: var(--mono);
   font-size: 12px;
@@ -209,7 +209,7 @@ body::before {
   color: var(--amber);
 }
 
-/* ---------- footer (populace.dev .foot) ------------------------------------ */
+/* ---------- footer (microcosm.institute .foot) ------------------------------------ */
 .site-foot {
   border-top: 1px solid var(--line-soft);
   margin-top: 40px;
@@ -248,7 +248,7 @@ body::before {
  *
  * Components map their good / bad / warn / info / neutral signals onto these
  * instead of Tailwind's default emerald/rose/amber/sky/slate ramps, so every
- * surface reads from the same ui-kit family populace.dev uses. Kept unlayered
+ * surface reads from the same ui-kit family microcosm.institute uses. Kept unlayered
  * so they reliably win over the utility they replace.
  * ========================================================================== */
 
@@ -267,7 +267,7 @@ body::before {
 }
 
 /* pill fills (colour only — geometry stays on the element's own classes),
-   echoing populace.dev's .tag-* treatment: tinted wash + token ink + soft edge */
+   echoing microcosm.institute's .tag-* treatment: tinted wash + token ink + soft edge */
 .pill-pos {
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--pos);

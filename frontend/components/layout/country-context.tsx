@@ -10,7 +10,7 @@ import {
 
 export type Country = "us" | "uk";
 
-const STORAGE_KEY = "populace-country";
+const STORAGE_KEY = "microcosm-country";
 
 interface CountryContextValue {
   country: Country;

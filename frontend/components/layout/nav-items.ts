@@ -17,9 +17,9 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Dataset accuracy",
     items: [
-      { href: "/populace", label: "Calibration fit" },
-      { href: "/populace/targets", label: "Calibration targets" },
-      { href: "/populace/model-coverage", label: "Validation reach", usOnly: true },
+      { href: "/microcosm", label: "Calibration fit" },
+      { href: "/microcosm/targets", label: "Calibration targets" },
+      { href: "/microcosm/model-coverage", label: "Validation reach", usOnly: true },
       // External checks (reform scores vs JCT/fiscal notes/admin actuals)
       // moved to the PolicyEngine scorecard, which owns all external
       // comparisons; per-release history was ingested there (issue #15).
@@ -34,15 +34,15 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Releases",
     items: [
-      { href: "/populace/compare", label: "Compare versions" },
-      { href: "/populace/staging", label: "Staging candidates", usOnly: true },
+      { href: "/microcosm/compare", label: "Compare versions" },
+      { href: "/microcosm/staging", label: "Staging candidates", usOnly: true },
     ],
   },
   {
     label: "Reference",
     items: [
-      { href: "/populace/pipeline", label: "Pipeline", usOnly: true },
-      { href: "/populace/variables", label: "Variable lookup", usOnly: true },
+      { href: "/microcosm/pipeline", label: "Pipeline", usOnly: true },
+      { href: "/microcosm/variables", label: "Variable lookup", usOnly: true },
     ],
   },
 ];
@@ -56,7 +56,7 @@ export function navGroupsForCountry(country: Country) {
 
 export function isActive(pathname: string, item: NavItem): boolean {
   const matches = (href: string) =>
-    href === "/populace" ? pathname === "/populace" : pathname.startsWith(href);
+    href === "/microcosm" ? pathname === "/microcosm" : pathname.startsWith(href);
   return matches(item.href) || (item.also ?? []).some((href) => pathname.startsWith(href));
 }
 

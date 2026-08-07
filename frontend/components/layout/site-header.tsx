@@ -1,15 +1,15 @@
 import { withBasePath } from "@/lib/base-path";
 
-// populace.dev-style top bar for the mounted dashboard.
+// microcosm.institute-style top bar for the mounted dashboard.
 //
 // Replaces the ui-kit <Header>, which read as a hard context switch out of
-// populace.dev (issue #99). Carries a breadcrumb back up to the calibration
+// microcosm.institute (issue #99). Carries a breadcrumb back up to the calibration
 // strategy essay and the site home, plus the site's editorial nav voice.
 //
-// Links that point back into populace.dev (home, /calibration, /papers, hash
+// Links that point back into microcosm.institute (home, /calibration, /papers, hash
 // anchors) are ROOT-relative and must NOT carry the dashboard basePath — the
 // dashboard is mounted under the same domain, so a raw <a href="/calibration">
-// resolves to populace.dev/calibration. next/link / withBasePath are reserved
+// resolves to microcosm.institute/calibration. next/link / withBasePath are reserved
 // for in-app routes (the dashboard's own pages).
 const REPO = "https://github.com/PolicyEngine/calibration-diagnostics";
 
@@ -24,10 +24,10 @@ export function SiteHeader() {
   return (
     <header className="site-nav">
       <div className="site-crumb">
-        {/* brand → populace.dev home */}
+        {/* brand → microcosm.institute home */}
         <a className="site-brand" href="/">
           <span className="site-brand-dot" aria-hidden="true" />
-          populace
+          microcosm
         </a>
         <span className="site-crumb-sep" aria-hidden="true">
           /
@@ -38,12 +38,12 @@ export function SiteHeader() {
           /
         </span>
         {/* current surface → dashboard landing */}
-        <a className="site-crumb-current" href={withBasePath("/populace")}>
+        <a className="site-crumb-current" href={withBasePath("/microcosm")}>
           dashboard
         </a>
       </div>
 
-      <nav className="site-nav-links" aria-label="populace">
+      <nav className="site-nav-links" aria-label="microcosm">
         {EDITORIAL_LINKS.map((link) => (
           <a key={link.href} className="site-nav-editorial" href={link.href}>
             {link.label}
