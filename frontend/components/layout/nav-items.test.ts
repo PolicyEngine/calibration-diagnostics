@@ -73,3 +73,13 @@ test("exposes the restored cross-dataset evaluation", () => {
   expect(items.some((item) => item.label === "Cross-dataset")).toBe(true);
   expect(items.some((item) => item.href === "/microcosm/datasets")).toBe(true);
 });
+
+test("preserves the Cross-dataset navigation label and route", () => {
+  const item = datasetAccuracyItems().find((candidate) => candidate.label === "Cross-dataset");
+  expect(item).toEqual({
+    href: "/populace/datasets",
+    label: "Cross-dataset",
+    usOnly: true,
+  });
+  expect(isActive("/populace/datasets", item!)).toBe(true);
+});
