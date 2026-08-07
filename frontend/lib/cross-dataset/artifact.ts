@@ -79,6 +79,7 @@ export interface GroupSourceSummary {
   evaluable: number;
   scored: number;
   display_score: string | null;
+  loss?: string | null;
   reason_codes: Record<string, number>;
 }
 
@@ -90,7 +91,7 @@ export interface CrossDatasetGroup {
   sources: Record<string, GroupSourceSummary>;
 }
 
-interface GroupsDocument {
+export interface CrossDatasetGroupsDocument {
   schema_version: typeof CROSS_DATASET_BUNDLE_SCHEMA;
   run_id: string;
   snapshot_id: string;
@@ -388,7 +389,7 @@ export class CrossDatasetArtifactReader {
     return value as unknown as CrossDatasetSummary;
   }
 
-  async groups(options: { dimension?: string; source?: string } = {}): Promise<GroupsDocument> {
+  async groups(options: { dimension?: string; source?: string } = {}): Promise<CrossDatasetGroupsDocument> {
     const manifest = await this.manifest();
     if (options.source && !manifest.source_ids.includes(options.source)) {
       return { schema_version: CROSS_DATASET_BUNDLE_SCHEMA, run_id: manifest.run_id, snapshot_id: manifest.snapshot_id, groups: [] };

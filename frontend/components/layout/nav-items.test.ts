@@ -33,3 +33,13 @@ test("targets path activates calibration targets instead of calibration fit", ()
   expect(isActive("/populace/targets", calibrationFit)).toBe(false);
   expect(isActive("/populace/targets", calibrationTargets)).toBe(true);
 });
+
+test("preserves the Cross-dataset navigation label and route", () => {
+  const item = datasetAccuracyItems().find((candidate) => candidate.label === "Cross-dataset");
+  expect(item).toEqual({
+    href: "/populace/datasets",
+    label: "Cross-dataset",
+    usOnly: true,
+  });
+  expect(isActive("/populace/datasets", item!)).toBe(true);
+});
