@@ -10,8 +10,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  harness:
+    name: harness · adapter gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --extra taxcalc-cps
+      - run: uv run pytest
+      - name: Tax-Calculator/public CPS · 10 numerical Ledger facts
+        run: uv run --extra taxcalc-cps python scripts/verify_taxcalc_cps_adapter.py
+
   frontend:
-    name: typecheck · build
+    name: test · typecheck · build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -20,5 +33,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - run: bun test
       - run: bun run lint
       - run: bun run build

@@ -66,6 +66,7 @@ class SnapshotDiff:
     added: tuple[str, ...]
     removed: tuple[str, ...]
     changed_values: tuple[str, ...]
+    changed_definitions: tuple[str, ...]
     key_churn: tuple[tuple[str, str, str], ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -75,6 +76,7 @@ class SnapshotDiff:
             "added": list(self.added),
             "removed": list(self.removed),
             "changed_values": list(self.changed_values),
+            "changed_definitions": list(self.changed_definitions),
             "key_churn": [
                 {"semantic_fact_key": semantic, "from": old, "to": new}
                 for semantic, old, new in self.key_churn
@@ -285,24 +287,60 @@ def _load_snapshot(path: Path) -> tuple[dict[str, Any], dict[str, FactContract]]
 def diff_snapshots(from_path: str | Path, to_path: str | Path) -> SnapshotDiff:
     old_manifest, old = _load_snapshot(Path(from_path))
     new_manifest, new = _load_snapshot(Path(to_path))
-    old_semantic = {fact.semantic_fact_key: key for key, fact in old.items()}
-    new_semantic = {fact.semantic_fact_key: key for key, fact in new.items()}
-    churn = tuple(
-        sorted(
-            (semantic, old_semantic[semantic], new_semantic[semantic])
-            for semantic in old_semantic.keys() & new_semantic.keys()
-            if old_semantic[semantic] != new_semantic[semantic]
+    removed_candidates = old.keys() - new.keys()
+    added_candidates = new.keys() - old.keys()
+
+    def churn_fingerprint(fact: FactContract) -> str:
+        return _canonical_json(
+            {
+                "semantic_fact_key": fact.semantic_fact_key,
+                "source": fact.source,
+                "jurisdiction": fact.jurisdiction,
+                "period": fact.period.canonical,
+                "geography_level": fact.geography_level,
+                "geography_id": fact.geography_id,
+                "entity": fact.entity,
+                "measure": fact.measure,
+                "unit": fact.unit,
+                "dimensions": fact.dimensions,
+                "universe_constraints": list(fact.universe_constraints),
+                "aggregation": fact.aggregation,
+            }
         )
-    )
+
+    old_fingerprints: dict[str, list[str]] = {}
+    new_fingerprints: dict[str, list[str]] = {}
+    for key in removed_candidates:
+        old_fingerprints.setdefault(churn_fingerprint(old[key]), []).append(key)
+    for key in added_candidates:
+        new_fingerprints.setdefault(churn_fingerprint(new[key]), []).append(key)
+    churn_values: list[tuple[str, str, str]] = []
+    for fingerprint in old_fingerprints.keys() & new_fingerprints.keys():
+        old_keys = old_fingerprints[fingerprint]
+        new_keys = new_fingerprints[fingerprint]
+        if len(old_keys) == 1 and len(new_keys) == 1:
+            old_key = old_keys[0]
+            new_key = new_keys[0]
+            semantic = old[old_key].semantic_fact_key or fingerprint
+            churn_values.append((semantic, old_key, new_key))
+    churn = tuple(sorted(churn_values))
     churn_old = {old_key for _, old_key, _ in churn}
     churn_new = {new_key for _, _, new_key in churn}
     common = old.keys() & new.keys()
+
+    def definition(fact: FactContract) -> dict[str, Any]:
+        value = fact.to_dict()
+        value.pop("value", None)
+        return value
+
     return SnapshotDiff(
         from_snapshot=old_manifest["snapshot_id"],
         to_snapshot=new_manifest["snapshot_id"],
         added=tuple(sorted((new.keys() - old.keys()) - churn_new)),
         removed=tuple(sorted((old.keys() - new.keys()) - churn_old)),
         changed_values=tuple(sorted(key for key in common if old[key].value != new[key].value)),
+        changed_definitions=tuple(
+            sorted(key for key in common if definition(old[key]) != definition(new[key]))
+        ),
         key_churn=churn,
     )
-
