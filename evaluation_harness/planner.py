@@ -37,6 +37,7 @@ class EvaluationSourceManifest:
     geography_methods: dict[str, str]
     available: bool
     geography_id_prefixes: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    geography_id_methods: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.source_type is SourceType.MODEL_DATASET_PAIR and not self.model_version:
@@ -55,6 +56,7 @@ class AlignmentDeclaration:
     quality: AlignmentQuality
     fact_key: str | None = None
     score_eligible: bool = False
+    calibration_exposure: CalibrationExposure | None = None
 
     def __post_init__(self) -> None:
         if not self.alignment_id:
@@ -69,10 +71,12 @@ class CapabilityPlanner:
         mappings: MappingRegistry,
         *,
         alignments: Iterable[AlignmentDeclaration] = (),
+        calibration_exposures: dict[str, CalibrationExposure] | None = None,
         snapshot_id: str = "unversioned-snapshot",
     ) -> None:
         self.mappings = mappings
         self.alignments = tuple(alignments)
+        self.calibration_exposures = dict(calibration_exposures or {})
         self.snapshot_id = snapshot_id
         self._exact_alignments: dict[tuple[str, str], list[AlignmentDeclaration]] = {}
         self._measure_alignments: dict[
@@ -300,11 +304,19 @@ class CapabilityPlanner:
         else:
             query = AggregateQuery(**query_arguments)
 
+        calibration_exposure = self.calibration_exposures.get(fact.fact_key)
+        if calibration_exposure is None:
+            calibration_exposure = (
+                alignment.calibration_exposure
+                if alignment is not None
+                and alignment.calibration_exposure is not None
+                else mapping.calibration_exposure
+            )
         if treatment is PeriodTreatment.ALIGNED_FACT:
             status = CapabilityStatus.PROJECTED
         elif mapping.mapping_quality is MappingQuality.APPROXIMATE:
             status = CapabilityStatus.APPROXIMATE
-        elif mapping.calibration_exposure is CalibrationExposure.DIRECT_CALIBRATION_TARGET:
+        elif calibration_exposure is CalibrationExposure.DIRECT_CALIBRATION_TARGET:
             status = CapabilityStatus.CALIBRATION_TARGET
         elif mapping.execution is ExecutionMethod.MODEL:
             status = CapabilityStatus.MODEL
@@ -327,6 +339,11 @@ class CapabilityPlanner:
                 )
             )
         )
+        geography_method = source.geography_methods[fact.geography_level]
+        for prefix, method in source.geography_id_methods.items():
+            if fact.geography_id.startswith(prefix):
+                geography_method = method
+                break
         return CapabilityResult(
             snapshot_id=self.snapshot_id,
             fact_key=fact.fact_key,
@@ -348,9 +365,9 @@ class CapabilityPlanner:
             entity=execution_entity,
             weight_variable=weight,
             required_variables=mapping.required_variables,
-            geography_method=source.geography_methods[fact.geography_level],
+            geography_method=geography_method,
             query=query,
-            calibration_exposure=mapping.calibration_exposure,
+            calibration_exposure=calibration_exposure,
             score_eligible=score_eligible,
         )
 

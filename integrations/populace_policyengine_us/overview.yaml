@@ -44,5 +44,7 @@ source:
   geography_id_prefixes:
     country: [0100000US]
     state: [0400000US]
-    congressional_district: [5001900US]
+    congressional_district: [5001700US, 5001900US]
+  geography_id_methods:
+    5001700US: congressional_district_geoid_117th
   available: true

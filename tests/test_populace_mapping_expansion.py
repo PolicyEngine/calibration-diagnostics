@@ -61,6 +61,60 @@ def _planner():
 
 
 @pytest.mark.parametrize(
+    ("measure", "mapping_id"),
+    [
+        ("irs_soi.real_estate_taxes", "irs-soi-2022-real-estate-taxes-amount"),
+        ("us:statutes/26/62#input.wages", "irs-soi-2022-wages-amount"),
+        ("irs_soi.child_tax_credit", "irs-soi-2022-child-tax-credit-amount"),
+        ("irs_soi.taxable_pension_income", "irs-soi-taxable-pensions-amount"),
+        ("irs_soi.schedule_c_income", "irs-soi-business-profession-income-amount"),
+        ("irs_soi.partnership_scorp_income", "irs-soi-partnership-s-corp-amount"),
+        ("irs_soi.rental_royalty_income", "irs-soi-rental-royalty-net-income"),
+        ("irs_soi.taxable_income", "irs-soi-2022-taxable-income-amount"),
+        ("irs_soi.total_income_tax", "irs-soi-2022-total-income-tax-amount"),
+        (
+            "irs_soi.taxable_net_capital_gains",
+            "irs-soi-2022-taxable-net-capital-gains-amount",
+        ),
+    ],
+)
+def test_pinned_build_target_concepts_have_model_expressions(
+    measure: str, mapping_id: str
+) -> None:
+    registry = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
+    mapping = registry.match(
+        _fact(
+            "irs_soi",
+            measure,
+            "usd",
+            "tax_unit",
+            "all_individual_income_tax_returns",
+            dimensions={"filing_status": "all", "income_range": "all"},
+            period="tax_year:2022",
+        )
+    )
+
+    assert mapping is not None
+    assert mapping.mapping_id == mapping_id
+
+
+def test_pinned_eitc_targets_accept_the_individual_return_universe() -> None:
+    planner, source = _planner()
+    result = planner.classify(
+        _fact(
+            "irs_soi",
+            "irs_soi.earned_income_credit",
+            "usd",
+            "tax_unit",
+            "individual_income_tax_returns",
+        ),
+        source,
+    )
+
+    assert result.status is CapabilityStatus.CALIBRATION_TARGET
+
+
+@pytest.mark.parametrize(
     ("fact", "mapping_id"),
     [
         (

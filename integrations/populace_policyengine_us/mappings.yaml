@@ -1,4 +1,4 @@
-mapping_release: populace-policyengine-us-2024-chronicle-expansion-v4
+mapping_release: populace-policyengine-us-2024-chronicle-expansion-v5
 mappings:
   - mapping_id: census-pep-resident-population-calibration-target
     ledger_selector:
@@ -139,6 +139,7 @@ mappings:
     descriptive_dimensions: [eitc_child_count, filing_status, income_range]
     supported_constraint_domains:
       - all_individual_income_tax_returns
+      - individual_income_tax_returns
       - individual_income_tax_returns_with_earned_income_credit
     supported_constraint_variables:
       - us:statutes/26/62#adjusted_gross_income
@@ -180,7 +181,9 @@ mappings:
   - mapping_id: irs-soi-business-profession-income-amount
     ledger_selector:
       sources: [irs_soi]
-      measures: [irs_soi.business_or_profession_net_income]
+      measures:
+        - irs_soi.business_or_profession_net_income
+        - irs_soi.schedule_c_income
       units: [usd]
       entities: [tax_unit]
     execution: model
@@ -468,7 +471,9 @@ mappings:
   - mapping_id: irs-soi-partnership-s-corp-amount
     ledger_selector:
       sources: [irs_soi]
-      measures: [irs_soi.partnership_s_corporation_net_income]
+      measures:
+        - irs_soi.partnership_s_corporation_net_income
+        - irs_soi.partnership_scorp_income
       units: [usd]
       entities: [tax_unit]
     execution: model
@@ -692,7 +697,9 @@ mappings:
   - mapping_id: irs-soi-taxable-pensions-amount
     ledger_selector:
       sources: [irs_soi]
-      measures: [irs_soi.taxable_pensions_and_annuities]
+      measures:
+        - irs_soi.taxable_pensions_and_annuities
+        - irs_soi.taxable_pension_income
       units: [usd]
       entities: [tax_unit]
     execution: model
@@ -1473,6 +1480,138 @@ mappings:
     required_variables: [tax_unit_sum_person:tip_income]
     mapping_quality: exact
     supported_constraint_domains: [form_w2_items]
+    calibration_exposure: direct_calibration_target
+
+  - mapping_id: irs-soi-rental-royalty-net-income
+    ledger_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.rental_and_royalty_net_income
+        - irs_soi.rental_royalty_income
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: tax_unit_sum_person:rental_income+farm_rent_income
+    operation: weighted_sum
+    required_variables: [tax_unit_sum_person:rental_income+farm_rent_income]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: irs-soi-rental-royalty-return-count
+    ledger_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.returns_with_rental_and_royalty_net_income
+        - irs_soi.returns_with_rental_royalty_income
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: tax_unit_sum_person:rental_income+farm_rent_income
+    operation: weighted_count
+    required_variables: [tax_unit_sum_person:rental_income+farm_rent_income]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: irs-soi-2022-real-estate-taxes-amount
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.real_estate_taxes]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: tax_unit_sum_person:real_estate_taxes
+    operation: weighted_sum
+    required_variables: [tax_unit_sum_person:real_estate_taxes]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: direct_calibration_target
+
+  - mapping_id: irs-soi-2022-wages-amount
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [us:statutes/26/62#input.wages]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: tax_unit_sum_person:employment_income
+    operation: weighted_sum
+    required_variables: [tax_unit_sum_person:employment_income]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: direct_calibration_target
+
+  - mapping_id: irs-soi-2022-child-tax-credit-amount
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.child_tax_credit]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: ctc
+    operation: weighted_sum
+    required_variables: [ctc, ctc_limiting_tax_liability]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: direct_calibration_target
+
+  - mapping_id: irs-soi-2022-taxable-income-amount
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.taxable_income]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: taxable_income
+    operation: weighted_sum
+    required_variables: [taxable_income]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: direct_calibration_target
+
+  - mapping_id: irs-soi-2022-total-income-tax-amount
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.total_income_tax]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: income_tax
+    operation: weighted_sum
+    required_variables: [income_tax]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: direct_calibration_target
+
+  - mapping_id: irs-soi-2022-taxable-net-capital-gains-amount
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.taxable_net_capital_gains]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: tax_unit_sum_person:capital_gains
+    operation: weighted_sum
+    required_variables: [tax_unit_sum_person:capital_gains]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-schedule-c-returns

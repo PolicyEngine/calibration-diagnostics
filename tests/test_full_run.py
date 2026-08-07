@@ -175,6 +175,24 @@ def test_full_matrix_contains_one_cell_for_every_fact_source_pair() -> None:
     }
 
 
+def test_source_plan_propagates_fact_specific_calibration_exposure() -> None:
+    ledger_fact = fact("ledger.aggregate_fact.v2:exposure")
+    plan = SourcePlan(
+        source("populace"),
+        registry("populace-v1"),
+        calibration_exposures={
+            ledger_fact.fact_key: CalibrationExposure.DIRECT_CALIBRATION_TARGET
+        },
+    )
+
+    cell = build_full_capability_matrix(
+        [ledger_fact], [plan], snapshot_id="ledger-test"
+    )[0]
+
+    assert cell.status is CapabilityStatus.CALIBRATION_TARGET
+    assert cell.calibration_exposure is CalibrationExposure.DIRECT_CALIBRATION_TARGET
+
+
 def test_native_result_is_scored_against_observed_ledger_value() -> None:
     ledger_fact = fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
     cell = capability(ledger_fact)
