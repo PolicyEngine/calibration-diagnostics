@@ -34,12 +34,17 @@ import {
 } from "@/lib/microcosm/calibration-explorer";
 import {
   MISSING_VALUE,
-  effectiveNodeMetric,
   type CalibrationTreeGroup,
   type CalibrationTreeNode,
   type CalibrationTreeResponse,
   type CalibrationTreeSizeMode,
 } from "@/lib/microcosm/calibration-tree";
+import {
+  condenseCalibrationTreemap,
+  expandedGroupsForNode,
+  type CalibrationTreemapGroup,
+  type CalibrationTreemapNode,
+} from "@/lib/microcosm/calibration-treemap-layout";
 import { FIT_LEGEND, fitColor, readableInk } from "@/lib/treemap/fit-scale";
 import { squarify, type Placed } from "@/lib/treemap/squarify";
 
@@ -77,14 +82,14 @@ function metricValue(
 }
 
 interface LaidGroup {
-  group: CalibrationTreeGroup;
-  rect: Placed<CalibrationTreeGroup>;
+  group: CalibrationTreemapGroup;
+  rect: Placed<CalibrationTreemapGroup>;
   headerHeight: number;
-  nodes: Placed<CalibrationTreeNode>[];
+  nodes: Placed<CalibrationTreemapNode>[];
 }
 
 function layoutTree(
-  groups: CalibrationTreeGroup[],
+  groups: CalibrationTreemapGroup[],
   mode: CalibrationTreeSizeMode,
   width: number,
   height: number,
@@ -107,14 +112,20 @@ function layoutTree(
       w: Math.max(rect.w - GROUP_GAP, 0),
       h: Math.max(rect.h - GROUP_GAP, 0),
     };
-    const headerHeight = inset.h >= 64 && inset.w >= 90 ? HEADER_HEIGHT : 0;
+    const headerHeight =
+      !rect.data.synthetic && inset.h >= 64 && inset.w >= 90
+        ? HEADER_HEIGHT
+        : 0;
     const inner = {
       x: inset.x,
       y: inset.y + headerHeight,
       w: inset.w,
       h: Math.max(inset.h - headerHeight, 0),
     };
-    const weights = effectiveNodeMetric(rect.data.nodes, mode);
+    let weights = rect.data.nodes.map((item) => metricValue(item.metrics, mode));
+    if (!weights.some((value) => value > 0)) {
+      weights = rect.data.nodes.map((item) => item.metrics.nTargets);
+    }
     const nodes = squarify(
       rect.data.nodes
         .map((item, index) => ({ value: weights[index], data: item }))
@@ -471,6 +482,10 @@ export function CalibrationExplorerMap({
   const [width, setWidth] = useState(960);
   const [height, setHeight] = useState(680);
   const [sizeMode, setSizeMode] = useState<CalibrationTreeSizeMode>("targets");
+  const [expandedView, setExpandedView] = useState<{
+    label: string;
+    groups: CalibrationTreeGroup[];
+  } | null>(null);
 
   usePrefetchNextCalibrationLevels({
     state,
@@ -525,8 +540,13 @@ export function CalibrationExplorerMap({
     );
   }
 
-  const laidGroups = layoutTree(data.groups, sizeMode, width, height);
-  const upLabel = explorerUpLabel(state);
+  const displayGroups: CalibrationTreemapGroup[] = expandedView
+    ? expandedView.groups
+    : condenseCalibrationTreemap(data.groups, sizeMode, width, height);
+  const laidGroups = layoutTree(displayGroups, sizeMode, width, height);
+  const upLabel = expandedView
+    ? `Up to all ${data.currentLevel.label.toLowerCase()}`
+    : explorerUpLabel(state);
   const breadcrumbs = explorerBreadcrumbs(state);
   const selectedTarget = data.groups
     .flatMap((group) => group.nodes)
@@ -541,13 +561,19 @@ export function CalibrationExplorerMap({
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <BreakdownControl
               value={state.breakdown}
-              onChange={(breakdown) => dispatch({ type: "breakdown", breakdown })}
+              onChange={(breakdown) => {
+                setExpandedView(null);
+                dispatch({ type: "breakdown", breakdown });
+              }}
             />
             <SizeControl value={sizeMode} onChange={setSizeMode} />
             <FilterMenu
               data={data}
               state={state}
-              onFilters={(filters) => dispatch({ type: "filters", filters })}
+              onFilters={(filters) => {
+                setExpandedView(null);
+                dispatch({ type: "filters", filters });
+              }}
             />
           </div>
           <div className="ml-auto shrink-0">
@@ -571,26 +597,42 @@ export function CalibrationExplorerMap({
                 <button
                   type="button"
                   title={upLabel}
-                  onClick={() => dispatch({ type: "up" })}
+                  onClick={() => {
+                    if (expandedView) setExpandedView(null);
+                    else dispatch({ type: "up" });
+                  }}
                   className="block max-w-[40%] shrink-0 truncate whitespace-nowrap text-xs font-medium text-primary hover:underline"
                 >
                   ← {upLabel}
                 </button>
               )}
               <nav aria-label="Calibration map location" className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap text-xs text-muted-foreground">
-                {breadcrumbs.map((crumb, index) => (
+                {breadcrumbs.map((crumb, index) => {
+                  const isCurrent =
+                    !expandedView && index === breadcrumbs.length - 1;
+                  return (
                   <span key={`${crumb.label}:${index}`}>
                     {index > 0 && <span className="mx-1">/</span>}
                     <button
                       type="button"
-                      onClick={() => dispatch({ type: "navigate", path: crumb.path })}
-                      aria-current={index === breadcrumbs.length - 1 ? "page" : undefined}
-                      className={`${index === breadcrumbs.length - 1 ? "font-medium text-foreground" : "hover:text-foreground hover:underline"}`}
+                      onClick={() => {
+                        setExpandedView(null);
+                        dispatch({ type: "navigate", path: crumb.path });
+                      }}
+                      aria-current={isCurrent ? "page" : undefined}
+                      className={`${isCurrent ? "font-medium text-foreground" : "hover:text-foreground hover:underline"}`}
                     >
                       {crumb.label}
                     </button>
                   </span>
-                ))}
+                  );
+                })}
+                {expandedView && (
+                  <span aria-current="page" className="font-medium text-foreground">
+                    <span className="mx-1">/</span>
+                    {expandedView.label}
+                  </span>
+                )}
               </nav>
             </div>
           </div>
@@ -626,7 +668,14 @@ export function CalibrationExplorerMap({
                 )}
                 {nodes.map((placed) => {
                 const item = placed.data;
-                const itemLabel = explorerNodeLabel(item);
+                const itemLabel =
+                  item.kind === "grouped"
+                    ? item.label
+                    : explorerNodeLabel({
+                        id: item.id,
+                        kind: item.kind,
+                        label: item.label,
+                      });
                 const tileWidth = Math.max(placed.w - NODE_GAP, 0);
                 const tileHeight = Math.max(placed.h - NODE_GAP, 0);
                 if (tileWidth < 2 || tileHeight < 2) return null;
@@ -642,7 +691,17 @@ export function CalibrationExplorerMap({
                     title={`${itemLabel} · ${item.metrics.nTargets} targets`}
                     aria-label={`${itemLabel}, ${item.metrics.nTargets} targets`}
                     aria-pressed={selected}
-                    onClick={() => dispatch({ type: "select", selection: item.selection })}
+                    onClick={() => {
+                      const expandedGroups = expandedGroupsForNode(item);
+                      if (expandedGroups) {
+                        setExpandedView({ label: item.label, groups: expandedGroups });
+                        return;
+                      }
+                      if (item.selection) {
+                        setExpandedView(null);
+                        dispatch({ type: "select", selection: item.selection });
+                      }
+                    }}
                     className="absolute overflow-hidden px-1.5 py-1.5 text-left outline-none transition-transform focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     style={{
                       left: placed.x + NODE_GAP / 2,
