@@ -1,6 +1,6 @@
 import { withBasePath } from "@/lib/base-path";
 
-// Mirrors populace.dev's footer (.foot) so the dashboard closes the same way
+// Mirrors microcosm.institute's footer (.foot) so the dashboard closes the same way
 // every site page does: brand on the left, PolicyEngine wordmark on the right,
 // and the shared one-line provenance note.
 export function SiteFooter() {
@@ -9,7 +9,7 @@ export function SiteFooter() {
       <div className="site-foot-row">
         <a className="site-brand" href="/">
           <span className="site-brand-dot" aria-hidden="true" />
-          populace
+          microcosm
         </a>
         <a
           className="site-foot-pe"

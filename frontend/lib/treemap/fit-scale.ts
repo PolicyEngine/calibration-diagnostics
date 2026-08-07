@@ -1,5 +1,5 @@
 // Fit heat scale: maps a mean absolute relative error to a color. The ramp is
-// anchored to the ui-kit / populace.dev palette so the map reads as part of the
+// anchored to the ui-kit / microcosm.institute palette so the map reads as part of the
 // same design system — on-target cells carry the site's PolicyEngine teal, the
 // far-off end lands on the ui-kit error red, and unscored cells use ui-kit gray.
 // The warm midpoints keep the surface reading as a calm good → bad heat map

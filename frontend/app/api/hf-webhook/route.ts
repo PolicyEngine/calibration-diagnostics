@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import type { PopulaceCountry } from "@/lib/populace/latest-artifact";
+import type { MicrocosmCountry } from "@/lib/microcosm/latest-artifact";
 import { postReleaseAlert } from "@/lib/slack";
 
 export const runtime = "nodejs";
@@ -29,12 +29,12 @@ const TAG_PREFIX = "refs/tags/";
 // Only these repos may trigger a release alert. The webhook secret is shared
 // across US and UK, so without an allowlist a valid caller could spoof an
 // arbitrary repo name into either Slack channel.
-const ALLOWED_REPOS: Record<string, PopulaceCountry> = {
+const ALLOWED_REPOS: Record<string, MicrocosmCountry> = {
   "policyengine/populace-us": "us",
   "policyengine/populace-uk": "uk",
 };
 
-function countryForRepo(repoName: string): PopulaceCountry | null {
+function countryForRepo(repoName: string): MicrocosmCountry | null {
   return ALLOWED_REPOS[repoName.toLowerCase()] ?? null;
 }
 

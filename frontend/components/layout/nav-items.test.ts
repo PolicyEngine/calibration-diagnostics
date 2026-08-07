@@ -16,7 +16,7 @@ test("shows calibration targets directly under calibration fit", () => {
 
   expect(calibrationFitIndex).toBeGreaterThanOrEqual(0);
   expect(calibrationTargetsIndex).toBe(calibrationFitIndex + 1);
-  expect(items[calibrationTargetsIndex]?.href).toBe("/populace/targets");
+  expect(items[calibrationTargetsIndex]?.href).toBe("/microcosm/targets");
 });
 
 test("places external checks at the bottom of dataset accuracy", () => {
@@ -44,17 +44,17 @@ test("targets path activates calibration targets instead of calibration fit", ()
     throw new Error("Calibration nav items not found");
   }
 
-  expect(calibrationFit.also ?? []).not.toContain("/populace/targets");
-  expect(isActive("/populace", calibrationFit)).toBe(true);
-  expect(isActive("/populace/targets", calibrationFit)).toBe(false);
-  expect(isActive("/populace/targets", calibrationTargets)).toBe(true);
+  expect(calibrationFit.also ?? []).not.toContain("/microcosm/targets");
+  expect(isActive("/microcosm", calibrationFit)).toBe(true);
+  expect(isActive("/microcosm/targets", calibrationFit)).toBe(false);
+  expect(isActive("/microcosm/targets", calibrationTargets)).toBe(true);
 });
 
 test("does not expose the retired cross-dataset evaluation", () => {
   const items = datasetAccuracyItems();
 
   expect(items.some((item) => item.label === "Cross-dataset")).toBe(false);
-  expect(items.some((item) => item.href === "/populace/datasets")).toBe(false);
+  expect(items.some((item) => item.href === "/microcosm/datasets")).toBe(false);
 });
 
 test("opens external navigation in a new tab without changing internal navigation", () => {
@@ -62,7 +62,7 @@ test("opens external navigation in a new tab without changing internal navigatio
   const externalChecks = items.find(
     (item) => item.href === "https://www.policyengine.org/scorecard",
   );
-  const calibrationFit = items.find((item) => item.href === "/populace");
+  const calibrationFit = items.find((item) => item.href === "/microcosm");
 
   if (!externalChecks || !calibrationFit) {
     throw new Error("Expected navigation items not found");

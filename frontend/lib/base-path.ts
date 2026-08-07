@@ -1,7 +1,7 @@
 // Single source of truth for the dashboard's mount path.
 //
-// The dashboard is mounted under populace.dev at `/calibration/dashboard` via a
-// Vercel multi-zone rewrite (see the PolicyEngine/populace.dev repo). The Next
+// The dashboard is mounted under microcosm.institute at `/calibration/dashboard` via a
+// Vercel multi-zone rewrite (see the PolicyEngine/microcosm.institute repo). The Next
 // app therefore runs with `basePath = /calibration/dashboard`, and every
 // hand-built absolute URL — API calls, static-asset fetches, raw <a> hrefs, and
 // props passed to non-Next link components — must include the basePath.

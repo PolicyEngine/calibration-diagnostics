@@ -2,15 +2,31 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "fluid": true,
   "functions": {
-    "api/populace_variable.py": {
+    "api/microcosm_variable.py": {
       "maxDuration": 800,
       "memory": 3009
     }
   },
   "rewrites": [
     {
+      "source": "/calibration/dashboard/api/microcosm_variable",
+      "destination": "/api/microcosm_variable"
+    },
+    {
+      "source": "/api/populace_variable",
+      "destination": "/api/microcosm_variable"
+    },
+    {
       "source": "/calibration/dashboard/api/populace_variable",
-      "destination": "/api/populace_variable"
+      "destination": "/api/microcosm_variable"
+    },
+    {
+      "source": "/api/populace/:path*",
+      "destination": "/api/microcosm/:path*"
+    },
+    {
+      "source": "/calibration/dashboard/api/populace/:path*",
+      "destination": "/calibration/dashboard/api/microcosm/:path*"
     }
   ]
 }

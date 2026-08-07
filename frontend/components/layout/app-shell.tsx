@@ -5,12 +5,12 @@ import { NavSidebar } from "./nav-sidebar";
 import { SiteHeader } from "./site-header";
 import { SiteFooter } from "./site-footer";
 
-// The dashboard chrome, skinned to populace.dev. We deliberately do NOT use
+// The dashboard chrome, skinned to microcosm.institute. We deliberately do NOT use
 // ui-kit's <DashboardShell>/<Header> here: the shell paints an opaque bg-muted
 // that would hide the body's paper wash + grain, and the header read as a hard
-// exit from populace.dev. The shell stays transparent so the site atmosphere
+// exit from microcosm.institute. The shell stays transparent so the site atmosphere
 // (app/globals.css body::before + .site-grain) shows through, and the header /
-// footer come from the populace.dev-style components.
+// footer come from the microcosm.institute-style components.
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col text-foreground">
