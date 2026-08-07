@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     template: "%s — microcosm",
   },
   description:
-    "Interactive diagnostics for the microcosm weighted synthetic population — how closely the calibrated data matches official statistics, release over release.",
+    "Interactive diagnostics for microcosm's calibrated synthetic microdata — how closely the weighted data matches official statistics, release over release.",
 };
 
 export default function RootLayout({

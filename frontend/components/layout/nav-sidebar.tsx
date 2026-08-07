@@ -23,7 +23,9 @@ export function NavSidebar() {
   return (
     <div className="flex flex-col gap-5 py-5">
       <div className="px-3">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {/* Labels and nav speak in the identity's mono voice (like the site's
+            nav links and kickers); the serif stays for display and content. */}
+        <div className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Dataset
         </div>
         <div
@@ -40,7 +42,7 @@ export function NavSidebar() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setCountry(value)}
-                className={`h-7 rounded-md px-3 text-xs font-semibold transition-colors ${
+                className={`h-7 rounded-md px-3 font-mono text-xs font-medium transition-colors ${
                   active
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -52,12 +54,12 @@ export function NavSidebar() {
           })}
         </div>
         <div className="mt-1.5 text-sm font-semibold text-foreground">{dataset.label}</div>
-        <div className="text-xs text-muted-foreground">{dataset.repo}</div>
+        <div className="font-mono text-xs text-muted-foreground">{dataset.repo}</div>
       </div>
       <nav className="flex flex-col gap-4 px-3">
         {groups.map((group) => (
           <div key={group.label}>
-            <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+            <div className="px-3 pb-1 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
               {group.label}
             </div>
             <div className="flex flex-col gap-0.5">
@@ -68,7 +70,7 @@ export function NavSidebar() {
                     key={item.href}
                     href={item.href}
                     {...navLinkAttributes(item)}
-                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm leading-tight transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-[13px] leading-tight transition-colors ${
                       active
                         ? "bg-primary/10 font-medium text-primary"
                         : "text-foreground/80 hover:bg-muted/60 hover:text-foreground"
