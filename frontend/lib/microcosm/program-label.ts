@@ -21,6 +21,8 @@ const CANONICAL_ACRONYM_LABELS: Readonly<Record<string, string>> = {
   ssi: "SSI",
   tanf: "TANF",
   ui: "UI",
+  w2: "W2",
+  z1: "Z1",
 };
 
 function canonicalLabelKey(identifier: string): string {

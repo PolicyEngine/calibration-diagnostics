@@ -4,7 +4,7 @@ import type {
   ExplorerState,
   FitBand,
 } from "./calibration-explorer";
-import { programLabel } from "./program-label";
+import { canonicalLabel, programLabel } from "./program-label";
 import { sourceLabel } from "./source-label";
 
 const LOSS_ERROR_CAP = 2;
@@ -176,36 +176,6 @@ function programId(row: CalibrationTreeTarget): string {
   return String(row.name ?? row.base_name ?? "unknown");
 }
 
-export const CALIBRATION_BREAKDOWN_DIMENSIONS = [
-  { key: "bd_age", label: "Age" },
-  { key: "bd_income_band", label: "Income band" },
-  { key: "bd_income_percentile_range", label: "Income Percentile Range" },
-  { key: "bd_filing_status", label: "Filing status" },
-  { key: "bd_qualifying_children", label: "Qualifying children" },
-  {
-    key: "bd_earned_income_credit_qualifying_children",
-    label: "Earned Income Credit Qualifying Children",
-  },
-  { key: "bd_program", label: "Program" },
-  { key: "bd_program_payment_type", label: "Program Payment Type" },
-  { key: "bd_income_source", label: "Income Source" },
-  { key: "bd_tax_expenditure", label: "Tax Expenditure" },
-  { key: "bd_ssi_category", label: "SSI Category" },
-  { key: "bd_source_measure_detail", label: "Source measure detail" },
-  { key: "bd_item", label: "Item" },
-  { key: "bd_spending_category", label: "Spending category" },
-  { key: "bd_filing_season_line", label: "Filing Season Line" },
-  { key: "bd_form_w2_item", label: "Form W2 Item" },
-  { key: "bd_summary_scope", label: "Summary Scope" },
-  { key: "bd_administering_entity", label: "Administering Entity" },
-  { key: "bd_amount_basis", label: "Amount Basis" },
-  { key: "bd_financing_component", label: "Financing Component" },
-  { key: "bd_part", label: "Part" },
-  { key: "bd_series_code", label: "Series Code" },
-  { key: "bd_z1_series_code", label: "Z1 Series Code" },
-  { key: "bd_state_table_measure", label: "State Table Measure" },
-] as const;
-
 interface BreakdownDimension {
   key: string;
   label: string;
@@ -224,14 +194,6 @@ const NON_NAVIGABLE_BREAKDOWN_DIMENSIONS = new Set([
   "bd_state",
   "bd_state_abbreviation",
 ]);
-
-const KNOWN_DIMENSION_ORDER = new Map<string, number>(
-  CALIBRATION_BREAKDOWN_DIMENSIONS.map((dimension, index) => [dimension.key, index]),
-);
-
-const KNOWN_DIMENSION_LABELS = new Map<string, string>(
-  CALIBRATION_BREAKDOWN_DIMENSIONS.map((dimension) => [dimension.key, dimension.label]),
-);
 
 function isNavigableBreakdownDimension(key: string): boolean {
   return /^bd_[a-z0-9_]+$/.test(key) && !NON_NAVIGABLE_BREAKDOWN_DIMENSIONS.has(key);
@@ -255,13 +217,13 @@ function rowDimensionValue(
 export function orderedBreakdownDimensions(
   rows: CalibrationTreeTarget[],
 ): Array<{ key: string; label: string }> {
-  const labelsByKey = new Map<string, Set<string>>();
+  const labelsByKey = new Map<string, Map<string, number>>();
   for (const row of rows) {
     for (const dimension of row.target_dimensions ?? []) {
       if (!isNavigableBreakdownDimension(dimension.key)) continue;
-      const labels = labelsByKey.get(dimension.key) ?? new Set<string>();
+      const labels = labelsByKey.get(dimension.key) ?? new Map<string, number>();
       const label = String(dimension.label ?? "").trim();
-      if (label) labels.add(label);
+      if (label) labels.set(label, (labels.get(label) ?? 0) + 1);
       labelsByKey.set(dimension.key, labels);
     }
   }
@@ -269,20 +231,29 @@ export function orderedBreakdownDimensions(
   return [...labelsByKey.entries()]
     .map(([key, labels]) => ({
       key,
-      label:
-        KNOWN_DIMENSION_LABELS.get(key) ??
-        [...labels].sort((left, right) => left.localeCompare(right))[0] ??
-        humanize(key.slice(3)),
+      label: canonicalLabel(
+        [...labels.entries()].sort(
+          ([leftLabel, leftCount], [rightLabel, rightCount]) =>
+            rightCount - leftCount || leftLabel.localeCompare(rightLabel),
+        )[0]?.[0] ?? key.slice(3),
+      ),
+      coverage: rows.filter((row) => rowDimensionValue(row, key) != null).length,
+      distinctValues: new Set(
+        rows
+          .map((row) => rowDimensionValue(row, key))
+          .filter((value): value is string => value != null),
+      ).size,
     }))
     .sort((left, right) => {
-      const leftOrder = KNOWN_DIMENSION_ORDER.get(left.key) ?? Number.MAX_SAFE_INTEGER;
-      const rightOrder = KNOWN_DIMENSION_ORDER.get(right.key) ?? Number.MAX_SAFE_INTEGER;
       return (
-        leftOrder - rightOrder ||
+        Number(right.distinctValues > 1) - Number(left.distinctValues > 1) ||
+        right.coverage - left.coverage ||
+        left.distinctValues - right.distinctValues ||
         left.label.localeCompare(right.label) ||
         left.key.localeCompare(right.key)
       );
-    });
+    })
+    .map(({ key, label }) => ({ key, label }));
 }
 
 function geographyId(row: CalibrationTreeTarget): string {
@@ -307,24 +278,55 @@ function partitionRowsByDimension(
   selectedKeys: Set<string>,
 ): { dimensions: DimensionPartition[]; targets: CalibrationTreeTarget[] } {
   const remaining = new Set(rows);
-  const dimensions: DimensionPartition[] = [];
-
-  for (const dimension of orderedBreakdownDimensions(rows)) {
-    if (selectedKeys.has(dimension.key)) continue;
-    const assigned = [...remaining].filter(
+  const rankedDimensions = orderedBreakdownDimensions(rows).filter(
+    (dimension) => !selectedKeys.has(dimension.key),
+  );
+  const displayRank = new Map(
+    rankedDimensions.map((dimension, index) => [dimension.key, index]),
+  );
+  const candidates = rankedDimensions.flatMap((dimension) => {
+    const eligibleRows = rows.filter(
       (row) => rowDimensionValue(row, dimension.key) != null,
     );
     const values = new Set(
-      assigned
+      eligibleRows
         .map((row) => rowDimensionValue(row, dimension.key))
         .filter((value): value is string => value != null),
     );
+    return values.size > 1 ? [{ dimension, rows: eligibleRows }] : [];
+  });
+
+  // Allocate narrower sparse dimensions first so a broader overlapping
+  // dimension cannot consume every one of their rows. Display order remains
+  // independently ranked by branch coverage and cardinality.
+  const partitionsByKey = new Map<string, DimensionPartition>();
+  for (const candidate of [...candidates].sort(
+    (left, right) =>
+      left.rows.length - right.rows.length ||
+      (displayRank.get(left.dimension.key) ?? 0) -
+        (displayRank.get(right.dimension.key) ?? 0),
+  )) {
+    const assigned = candidate.rows.filter((row) => remaining.has(row));
+    const values = new Set(
+      assigned
+        .map((row) => rowDimensionValue(row, candidate.dimension.key))
+        .filter((value): value is string => value != null),
+    );
     if (values.size <= 1) continue;
-    dimensions.push({ dimension, rows: assigned });
+    partitionsByKey.set(candidate.dimension.key, {
+      dimension: candidate.dimension,
+      rows: assigned,
+    });
     for (const row of assigned) remaining.delete(row);
   }
 
-  return { dimensions, targets: [...remaining] };
+  return {
+    dimensions: rankedDimensions.flatMap((dimension) => {
+      const partition = partitionsByKey.get(dimension.key);
+      return partition ? [partition] : [];
+    }),
+    targets: [...remaining],
+  };
 }
 
 function groupRows(

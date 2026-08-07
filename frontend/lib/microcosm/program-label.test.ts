@@ -51,5 +51,8 @@ describe("canonicalLabel", () => {
     expect(canonicalLabel("self_employed_pension_contribution_deduction")).toBe(
       "Self employed pension contribution deduction",
     );
+    expect(canonicalLabel("SSI Category")).toBe("SSI category");
+    expect(canonicalLabel("Form W2 Item")).toBe("Form W2 item");
+    expect(canonicalLabel("Z1 Series Code")).toBe("Z1 series code");
   });
 });

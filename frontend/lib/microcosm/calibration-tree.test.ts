@@ -195,8 +195,8 @@ describe("source, geography, and declared-dimension hierarchy", () => {
       ["target", "ctc/CA/count", "Ctc Claims"],
     ]);
     expect(tree.dimensionOrder).toEqual([
-      { key: "bd_income_band", label: "Income band" },
       { key: "bd_filing_status", label: "Filing status" },
+      { key: "bd_income_band", label: "Income band" },
     ]);
   });
 
@@ -257,7 +257,7 @@ describe("source, geography, and declared-dimension hierarchy", () => {
         target_dimensions: [
           {
             key: "bd_employment_status",
-            label: "Employment status",
+            label: "Employment Status",
             value: employmentStatus,
           },
         ],
@@ -288,18 +288,18 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     ]);
   });
 
-  test("keeps known dimensions first and orders new dimensions deterministically", () => {
-    const dynamicRows = ["Adult", "Child"].flatMap((age) =>
+  test("lets a new lower-cardinality dimension move ahead of an existing dimension", () => {
+    const dynamicRows = ["Adult", "Child", "Senior"].flatMap((age) =>
       ["Employed", "Unemployed"].map((employmentStatus) =>
         target(`dynamic/${age}/${employmentStatus}`, {
           source: "test",
           variable: "dynamic",
           geography: "United States",
           target_dimensions: [
-            { key: "bd_age", label: "Untrusted age label", value: age },
+            { key: "bd_age", label: "Age Group", value: age },
             {
               key: "bd_employment_status",
-              label: "Employment status",
+              label: "Employment Status",
               value: employmentStatus,
             },
           ],
@@ -318,22 +318,53 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     );
 
     expect(tree.dimensionOrder).toEqual([
-      { key: "bd_age", label: "Age" },
       { key: "bd_employment_status", label: "Employment status" },
+      { key: "bd_age", label: "Age group" },
     ]);
+    expect(tree.currentLevel).toEqual({
+      kind: "dimension",
+      key: "bd_employment_status",
+      label: "Employment status",
+    });
+
+    const employed = buildCalibrationTree(
+      dynamicRows,
+      state({
+        source: "test",
+        program: "dynamic",
+        geography: "United States",
+        dimensions: [
+          {
+            key: "bd_employment_status",
+            label: "Employment status",
+            value: "Employed",
+          },
+        ],
+      }),
+    );
+
+    expect(employed.currentLevel).toEqual({
+      kind: "dimension",
+      key: "bd_age",
+      label: "Age group",
+    });
   });
 
   test("does not turn measurement concepts or anonymous legacy dimensions into breakdowns", () => {
-    const measurementRows = ["Amount", "Count"].map((measure, index) =>
-      target(`measurement/${index}`, {
-        source: "test",
-        variable: "measurement",
-        geography: "United States",
-        target_dimensions: [
-          { key: "bd_measure", label: "Measure", value: measure },
-          { key: "dim0", label: "Breakdown 1", value: measure },
-        ],
-      }),
+    const measurementRows = [
+      ["bd_measure", "Measure"],
+      ["bd_amount", "Amount"],
+      ["bd_count", "Count"],
+      ["dim0", "Breakdown 1"],
+    ].flatMap(([key, label]) =>
+      ["First", "Second"].map((value) =>
+        target(`measurement/${key}/${value}`, {
+          source: "test",
+          variable: "measurement",
+          geography: "United States",
+          target_dimensions: [{ key, label, value }],
+        }),
+      ),
     );
 
     const tree = buildCalibrationTree(
@@ -348,7 +379,7 @@ describe("source, geography, and declared-dimension hierarchy", () => {
 
     expect(tree.currentLevel).toEqual({ kind: "target", label: "Targets" });
     expect(tree.dimensionOrder).toEqual([]);
-    expect(tree.groups[0].nodes).toHaveLength(2);
+    expect(tree.groups[0].nodes).toHaveLength(8);
   });
 
   test("partitions sparse and ambiguous dimensions without missing buckets or duplicate targets", () => {
@@ -406,8 +437,8 @@ describe("source, geography, and declared-dimension hierarchy", () => {
 
     expect(tree.currentLevel).toEqual({ kind: "mixed", label: "Breakdowns and targets" });
     expect(tree.groups.map((group) => [group.id, group.nodes.length, group.metrics.nTargets])).toEqual([
-      ["bd_age", 2, 2],
       ["bd_program", 2, 2],
+      ["bd_age", 2, 2],
       ["targets", 2, 2],
     ]);
     expect(tree.groups.flatMap((group) => group.nodes).some((node) => node.id === "__missing__")).toBe(false);
