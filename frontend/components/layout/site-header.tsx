@@ -1,4 +1,5 @@
 import { withBasePath } from "@/lib/base-path";
+import { Wordmark } from "./wordmark";
 
 // microcosm.institute-style top bar for the mounted dashboard.
 //
@@ -26,8 +27,7 @@ export function SiteHeader() {
       <div className="site-crumb">
         {/* brand → microcosm.institute home */}
         <a className="site-brand" href="/">
-          <span className="site-brand-dot" aria-hidden="true" />
-          microcosm
+          <Wordmark />
         </a>
         <span className="site-crumb-sep" aria-hidden="true">
           /

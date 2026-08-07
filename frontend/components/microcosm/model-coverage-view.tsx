@@ -149,7 +149,7 @@ function squarify<T>(items: Sized<T>[], rect: Rect): Placed<T>[] {
 
 // --- coverage color ----------------------------------------------------------
 
-// Same fit-scale ramp as the calibration map (teal-green → sage → amber →
+// Same fit-scale ramp as the calibration map (verdigris → sage → amber →
 // rose). Reached share is mapped onto the scale's error axis so both maps
 // share one visual language: green = validated, warm = blind spots.
 const SHARE_TO_ERROR: [number, number][] = [

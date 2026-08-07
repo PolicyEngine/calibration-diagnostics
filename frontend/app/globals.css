@@ -2,51 +2,106 @@
 @import "@policyengine/ui-kit/theme.css";
 
 /* ============================================================================
- * microcosm.institute continuity layer
+ * Microcosm identity layer
  *
  * The dashboard mounts at microcosm.institute/calibration/dashboard and must read as
- * part of the site — not a hard context switch out of it. Both surfaces consume
- * @policyengine/ui-kit tokens, so this file re-creates microcosm.institute's own alias
- * layer (mirrors PolicyEngine/microcosm.institute/style.css :root) on top of the ui-kit
- * theme. One palette, one type system, one chrome, shared by both pages.
+ * part of the site — not a hard context switch out of it. The site wears the
+ * Microcosm identity (constellation-design/identities/microcosm; tokens
+ * mirrored from microcosm.institute/vendor/microcosm-tokens.css), so this file
+ * defines the same native tokens and revalues the ui-kit semantic names the
+ * components still reference, then re-creates the site's alias layer on top.
+ * One palette, one type system, one chrome, shared by both surfaces.
  *
  * Rule of the house: components never hardcode a palette value. Every colour
- * resolves through a ui-kit token or one of the semantic aliases / utilities
- * defined here.
+ * resolves through a token or one of the semantic aliases / utilities defined
+ * here.
  * ========================================================================== */
 
 :root {
-  /* Fonts — Inter (display + body) and JetBrains Mono (labels), the exact two
-     families microcosm.institute vendors. Loaded self-hosted via next/font in
-     app/layout.tsx, exposed as --font-inter / --font-jetbrains, and pointed at
-     here so every ui-kit component renders in the same faces as the site. */
-  --font-sans:
-    var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
-  --font-mono: var(--font-jetbrains), "Fira Code", Consolas, monospace;
+  /* ---------- Microcosm native tokens (light; verdigris + ink) ---------- */
+  --canvas: #f6faf7;
+  --section: #eaf3ec;
+  --border-soft: #d5e4da;
+  --border-strong: #b5ccbe;
+  --text-primary: #17251d;
+  --text-secondary: #44584c;
+  --text-tertiary: #6e7f74;
+  --accent: #3e7a5e;
+  --accent-strong: #2c5a45;
+  --accent-subtle: #e4f0e9;
+
+  /* ---------- ui-kit compat: same names, Microcosm palette ----------
+     (mirrors the site's vendor/microcosm-tokens.css compat block; ui-kit
+     names not listed here — e.g. --color-warning — keep their theme.css
+     values, which are functional rather than brand.) */
+  --background: var(--canvas);
+  --background-secondary: var(--section);
+  --background-tertiary: var(--section);
+  --foreground: var(--text-primary);
+  --card: #fcfefc;
+  --card-foreground: var(--text-primary);
+  --popover: #fcfefc;
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent);
+  --primary-foreground: #fcfefc;
+  --primary-alpha-40: rgba(62, 122, 94, 0.4);
+  --primary-alpha-50: rgba(62, 122, 94, 0.5);
+  --primary-alpha-60: rgba(62, 122, 94, 0.6);
+  --secondary: var(--section);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--section);
+  --muted-foreground: var(--text-secondary);
+  --accent-foreground: #fcfefc;
+  --destructive: #dc2626; /* functional, not brand */
+  --destructive-foreground: #ffffff;
+  --border: var(--border-soft);
+  --border-light: color-mix(in srgb, var(--border-soft) 55%, var(--canvas));
+  --border-medium: var(--border-soft);
+  --border-dark: var(--border-strong);
+  --input: var(--border-soft);
+  --ring: var(--accent);
+  /* one hue: chart series differ by tone, never a second color */
+  --chart-1: var(--accent);
+  --chart-2: #44584c;
+  --chart-3: #6fa58c;
+  --chart-4: #98c0ac;
+  --chart-5: #6e7f74;
+  --text-error: #b91c1c; /* functional */
+  --text-success: #2c5a45;
+  --text-warning: #c2410c; /* functional */
+
+  /* Fonts — the Microcosm faces: STIX Two Text (display + body), IBM Plex
+     Mono (labels), Urbanist (wordmark only). Loaded self-hosted via next/font
+     in app/layout.tsx, exposed as --font-stix / --font-plex / --font-urbanist,
+     and pointed at here so every component renders in the same faces as the
+     site. */
+  --font-sans: var(--font-stix), Georgia, serif;
+  --font-mono: var(--font-plex), ui-monospace, Menlo, monospace;
+  --font-wordmark:
+    var(--font-urbanist), "Avenir Next", "Century Gothic", Futura, sans-serif;
 
   /* microcosm.institute semantic aliases (verbatim mapping from microcosm.institute/style.css).
-     "amber" is the site's accent name; on the shared design system it resolves
-     to PolicyEngine teal. */
-  --ink: var(--background); /* page background — paper white */
-  --ink-2: var(--muted); /* raised surface */
-  --paper: var(--foreground); /* primary text */
-  --paper-dim: var(--muted-foreground);
+     "amber" is the site's historical accent name; it resolves to verdigris. */
+  --ink: var(--canvas); /* page background */
+  --ink-2: var(--section); /* raised/inset surface */
+  --paper: var(--text-primary); /* primary text */
+  --paper-dim: var(--text-secondary);
   --paper-faint: var(--text-tertiary);
-  --amber: var(--primary); /* accent → PolicyEngine teal #2C7A7B */
-  --amber-soft: var(--chart-1); /* brighter teal #319795 for emphasis/hover */
-  --line: var(--border);
+  --amber: var(--accent); /* accent → verdigris */
+  --amber-soft: var(--accent-strong); /* deeper verdigris for emphasis/hover */
+  --line: var(--border-soft);
   --line-soft: var(--border-light);
   --display: var(--font-sans);
   --mono: var(--font-mono);
   --max: 1140px;
 
-  /* Data tones. microcosm's "good" is a deep teal-green, not emerald; "bad" is
-     the ui-kit red. KPI deltas, status pills and table cells read from these. */
-  --pos: var(--text-success); /* #285E61 */
+  /* Data tones. Microcosm's "good" is the deep verdigris; "bad" is the
+     functional red. KPI deltas, status pills and table cells read from these.
+     "info" is the slate-green chart tone — in-family, distinct from "good". */
+  --pos: var(--text-success); /* #2C5A45 */
   --neg: var(--text-error); /* #B91C1C */
-  --warn: var(--text-warning); /* #c2410c */
-  --info: var(--chart-4); /* #026AA2 accessible blue */
+  --warn: var(--text-warning); /* #C2410C */
+  --info: var(--chart-2); /* #44584C slate-green */
 
   /* Neutral elevation — microcosm.institute leans on hairline borders, not heavy
      shadows. Tokenised so components stop inlining slate-tinted rgba(). */
@@ -64,7 +119,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* deep radial teal wash behind everything — the microcosm.institute ambient signal */
+/* deep radial verdigris wash behind everything — the microcosm.institute ambient signal */
 body::before {
   content: "";
   position: fixed;
@@ -109,33 +164,20 @@ body::before {
 }
 
 .site-brand {
-  font-family: var(--mono);
-  font-size: 15px;
-  letter-spacing: 0.02em;
   color: var(--paper);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
   white-space: nowrap;
 }
 
-.site-brand-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--amber);
-  box-shadow: 0 0 8px 1px color-mix(in srgb, var(--primary) 55%, transparent);
-  animation: sitePulse 3.4s ease-in-out infinite;
-}
-@keyframes sitePulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.45;
-  }
+/* The wordmark (components/layout/wordmark.tsx); ink rides currentColor, the
+   world-point reads var(--accent). 145 px wide here — comfortably above the
+   identity's 96 px floor where the wordmark yields to the operator. */
+.site-brand .wm {
+  height: 20px;
+  width: auto;
+  display: block;
 }
 
 .site-crumb {
@@ -228,19 +270,12 @@ body::before {
   font-size: 13px;
   color: var(--paper-faint);
 }
-.site-foot-pe {
-  display: inline-flex;
-  align-items: center;
+.site-foot-fine a {
+  color: inherit;
+  text-underline-offset: 0.18em;
 }
-.site-foot-pe img {
-  height: 20px;
-  width: auto;
-  display: block;
-  opacity: 0.82;
-  transition: opacity 0.2s;
-}
-.site-foot-pe:hover img {
-  opacity: 1;
+.site-foot-fine a:hover {
+  color: var(--amber-soft);
 }
 
 /* ============================================================================
@@ -352,8 +387,3 @@ body::before {
   animation: loading-bar 1.4s ease-in-out infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .site-brand-dot {
-    animation: none;
-  }
-}
