@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterable
@@ -28,6 +28,9 @@ class SourcePlan:
     source: EvaluationSourceManifest
     mappings: MappingRegistry
     alignments: tuple[AlignmentDeclaration, ...] = ()
+    calibration_exposures: dict[str, CalibrationExposure] = field(
+        default_factory=dict
+    )
 
 
 @dataclass(frozen=True)
@@ -114,6 +117,7 @@ def build_full_capability_matrix(
         for capability in CapabilityPlanner(
             plan.mappings,
             alignments=plan.alignments,
+            calibration_exposures=plan.calibration_exposures,
             snapshot_id=snapshot_id,
         ).classify_all(fact_values, [plan.source])
     )

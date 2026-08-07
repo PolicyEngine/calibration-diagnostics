@@ -290,6 +290,33 @@ def test_geography_vintage_prefix_must_match_source_population() -> None:
     assert result.reason_code == "geography_vintage_not_supported"
 
 
+def test_geography_vintage_can_select_a_prefix_specific_execution_method() -> None:
+    district_fact = fact(
+        geography_level="congressional_district",
+        geography_id="5001700US0601",
+    )
+    district_source = source(
+        geographies=frozenset({"country", "state", "congressional_district"}),
+        geography_methods={
+            "country": "national",
+            "state": "state_fips",
+            "congressional_district": "congressional_district_geoid",
+        },
+        geography_id_prefixes={
+            "congressional_district": ("5001700US", "5001900US")
+        },
+        geography_id_methods={
+            "5001700US": "congressional_district_geoid_117th"
+        },
+    )
+
+    result = CapabilityPlanner(registry()).classify(
+        district_fact, district_source
+    )
+
+    assert result.geography_method == "congressional_district_geoid_117th"
+
+
 def test_reviewed_alignment_produces_projected_non_headline_capability() -> None:
     old_fact = fact(period=TypedPeriod.parse("tax_year:2023"))
     alignment = AlignmentDeclaration(
@@ -307,6 +334,47 @@ def test_reviewed_alignment_produces_projected_non_headline_capability() -> None
     assert result.period_treatment is PeriodTreatment.ALIGNED_FACT
     assert result.alignment_id == alignment.alignment_id
     assert not result.score_eligible
+
+
+def test_alignment_can_identify_an_exact_build_calibration_target() -> None:
+    old_fact = fact(period=TypedPeriod.parse("tax_year:2023"))
+    alignment = AlignmentDeclaration(
+        alignment_id="pinned-release:compiled-target",
+        source_id=source().source_id,
+        measure=old_fact.measure,
+        source_period=old_fact.period,
+        target_period=TypedPeriod.parse("tax_year:2024"),
+        quality=AlignmentQuality.VALIDATED,
+        fact_key=old_fact.fact_key,
+        score_eligible=True,
+        calibration_exposure=CalibrationExposure.DIRECT_CALIBRATION_TARGET,
+    )
+
+    result = CapabilityPlanner(registry(), alignments=[alignment]).classify(
+        old_fact, source()
+    )
+
+    assert result.status is CapabilityStatus.PROJECTED
+    assert result.calibration_exposure is CalibrationExposure.DIRECT_CALIBRATION_TARGET
+    assert result.score_eligible
+
+
+def test_fact_specific_exposure_overrides_a_broad_mapping_classification() -> None:
+    native_fact = fact()
+    direct_registry = registry().to_data()
+    direct_registry["mappings"][0][
+        "calibration_exposure"
+    ] = "direct_calibration_target"
+
+    result = CapabilityPlanner(
+        MappingRegistry.from_data(direct_registry),
+        calibration_exposures={
+            native_fact.fact_key: CalibrationExposure.EXTERNAL_VALIDATION
+        },
+    ).classify(native_fact, source())
+
+    assert result.status is CapabilityStatus.DIRECT
+    assert result.calibration_exposure is CalibrationExposure.EXTERNAL_VALIDATION
 
 
 def test_fact_specific_alignment_lookup_does_not_scan_unrelated_facts() -> None:

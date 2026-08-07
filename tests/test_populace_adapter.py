@@ -7,6 +7,7 @@ from evaluation_harness.adapters.populace import (
     POPULACE_RELEASE,
     PopulacePolicyEngineRunner,
     PopulaceRelease,
+    resolve_release_calibration_diagnostics,
     resolve_release_dataset,
 )
 from evaluation_harness.execution import RunGroup
@@ -42,6 +43,8 @@ class FakeSimulation:
                 "medicaid_enrolled": "person",
                 "ordinary_dividend_income": "person",
                 "person_receives_aca": "person",
+                "rental_income": "person",
+                "farm_rent_income": "person",
                 "roth_ira_contributions": "person",
                 "snap": "spm_unit",
                 "ssi_category": "person",
@@ -60,6 +63,8 @@ class FakeSimulation:
             "medicaid_enrolled": np.array([True, False, False]),
             "ordinary_dividend_income": np.array([10.0, 20.0, 30.0]),
             "person_receives_aca": np.array([True, True, True]),
+            "rental_income": np.array([0.0, 100.0, -25.0]),
+            "farm_rent_income": np.array([0.0, 0.0, 25.0]),
             "roth_ira_contributions": np.array([0.0, 100.0, 200.0]),
             "snap": np.array([0.0, 500.0]),
             "ssi_category": np.array(["AGED", "BLIND", "DISABLED"]),
@@ -73,6 +78,7 @@ def tables() -> dict[str, dict[str, np.ndarray]]:
     return {
         "household": {
             "household_id": np.array([10, 20]),
+            "block_geoid": np.array(["010010201001000", "060014001001000"]),
             "state_fips": np.array([1, 6]),
             "congressional_district_geoid": np.array([101, 612]),
             "household_weight": np.array([2.0, 3.0]),
@@ -133,6 +139,27 @@ def test_release_dataset_is_checksum_verified(tmp_path: Path) -> None:
         resolve_release_dataset(bad, tmp_path, lambda _, target: target.write_bytes(payload))
 
 
+def test_release_calibration_diagnostics_are_independently_pinned(tmp_path: Path) -> None:
+    payload = b'{"targets": []}'
+    checksum = __import__("hashlib").sha256(payload).hexdigest()
+    release = PopulaceRelease(
+        release_id="fixture",
+        dataset_filename="fixture.h5",
+        dataset_sha256="0" * 64,
+        model_version="1.0",
+        calibration_diagnostics_filename="release/calibration_diagnostics.json",
+        calibration_diagnostics_sha256=checksum,
+    )
+
+    path = resolve_release_calibration_diagnostics(
+        release,
+        tmp_path,
+        lambda _, target: target.write_bytes(payload),
+    )
+
+    assert path.read_bytes() == payload
+
+
 def test_release_url_uses_the_immutable_hugging_face_revision() -> None:
     assert POPULACE_RELEASE.download_url == (
         "https://huggingface.co/datasets/policyengine/populace-us/resolve/"
@@ -163,6 +190,63 @@ def test_runner_builds_entity_specific_geographies(tables) -> None:
         "0400000US01", "0400000US06"
     ]
     assert spm_unit.arrays["spm_unit_weight"].tolist() == [2.0, 3.0]
+
+
+def test_runner_can_use_exact_old_districts_derived_from_household_blocks(tables) -> None:
+    adapter = PopulacePolicyEngineRunner(
+        dataset_path=Path("fixture.h5"),
+        table_loader=lambda _: tables,
+        simulation_factory=lambda _: FakeSimulation(),
+        old_congressional_district_assignments={
+            "010010201001000": "5001700US0102",
+            "060014001001000": "5001700US0613",
+        },
+    )
+    old_group = RunGroup(
+        source_id="populace_us_policyengine_us_2024",
+        population_period="calendar_year:2024",
+        policy_period="tax_year:2024",
+        geography_method="congressional_district_geoid_117th",
+        entity="person",
+        fact_keys=("fact",),
+        required_variables=("person_weight",),
+    )
+
+    bundle = adapter.prepare(old_group)
+
+    assert bundle.arrays["__geography__"].tolist() == [
+        "5001700US0102",
+        "5001700US0613",
+        "5001700US0613",
+    ]
+    assert bundle.arrays["__district_geography__"].tolist() == [
+        "5001900US0101",
+        "5001900US0612",
+        "5001900US0612",
+    ]
+
+
+def test_old_district_evaluation_rejects_unassigned_household_blocks(tables) -> None:
+    adapter = PopulacePolicyEngineRunner(
+        dataset_path=Path("fixture.h5"),
+        table_loader=lambda _: tables,
+        simulation_factory=lambda _: FakeSimulation(),
+        old_congressional_district_assignments={
+            "010010201001000": "5001700US0102"
+        },
+    )
+    old_group = RunGroup(
+        source_id="populace_us_policyengine_us_2024",
+        population_period="calendar_year:2024",
+        policy_period="tax_year:2024",
+        geography_method="congressional_district_geoid_117th",
+        entity="household",
+        fact_keys=("fact",),
+        required_variables=("household_weight",),
+    )
+
+    with pytest.raises(ValueError, match="old congressional district assignment"):
+        adapter.prepare(old_group)
 
 
 def test_requested_geography_method_selects_the_query_geography(tables) -> None:
@@ -210,6 +294,19 @@ def test_person_variables_can_be_explicitly_aggregated_to_tax_units(tables) -> N
     assert bundle.arrays[
         "tax_unit_count_person:roth_ira_contributions"
     ].tolist() == [0, 2]
+
+
+def test_rental_royalty_build_concept_combines_the_same_base_variables(tables) -> None:
+    bundle = runner(tables).prepare(
+        group(
+            "tax_unit",
+            "tax_unit_sum_person:rental_income+farm_rent_income",
+        )
+    )
+
+    assert bundle.arrays[
+        "tax_unit_sum_person:rental_income+farm_rent_income"
+    ].tolist() == [0.0, 100.0]
 
 
 def test_tax_unit_aca_credit_is_allocated_to_recipient_people_per_month(tables) -> None:

@@ -21,12 +21,17 @@ class PopulaceRelease:
     dataset_sha256: str
     model_version: str
     repository: str = POPULACE_REPOSITORY
+    calibration_diagnostics_filename: str | None = None
+    calibration_diagnostics_sha256: str | None = None
 
     @property
     def download_url(self) -> str:
+        return self.file_download_url(self.dataset_filename)
+
+    def file_download_url(self, filename: str) -> str:
         return (
             f"https://huggingface.co/datasets/{self.repository}/resolve/"
-            f"{self.release_id}/{self.dataset_filename}"
+            f"{self.release_id}/{filename}"
         )
 
 
@@ -35,6 +40,14 @@ POPULACE_RELEASE = PopulaceRelease(
     dataset_filename="populace_us_2024.h5",
     dataset_sha256="48b9d479fb4fd1c3537f9383ce4697d130b6f618658409d74f6233c43b994c7e",
     model_version="1.764.6",
+    calibration_diagnostics_filename=(
+        "releases/"
+        "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
+        "calibration_diagnostics.json"
+    ),
+    calibration_diagnostics_sha256=(
+        "870449b44e86b13b25bcea1a57f0e7af37f4d4db18be815eea3acdf9fe6eb40e"
+    ),
 )
 
 
@@ -55,6 +68,16 @@ def _download(release: PopulaceRelease, target: Path) -> None:
     urllib.request.urlretrieve(release.download_url, target)
 
 
+def _download_calibration_diagnostics(
+    release: PopulaceRelease, target: Path
+) -> None:
+    if release.calibration_diagnostics_filename is None:
+        raise ValueError("Populace release does not pin calibration diagnostics")
+    urllib.request.urlretrieve(
+        release.file_download_url(release.calibration_diagnostics_filename), target
+    )
+
+
 def resolve_release_dataset(
     release: PopulaceRelease,
     directory: str | Path,
@@ -73,6 +96,32 @@ def resolve_release_dataset(
         raise ValueError(
             "Populace dataset checksum mismatch: "
             f"expected {release.dataset_sha256}, found {actual}"
+        )
+    return destination
+
+
+def resolve_release_calibration_diagnostics(
+    release: PopulaceRelease,
+    directory: str | Path,
+    downloader: Downloader = _download_calibration_diagnostics,
+) -> Path:
+    """Resolve the exact compiled target registry shipped with a release."""
+
+    filename = release.calibration_diagnostics_filename
+    expected = release.calibration_diagnostics_sha256
+    if filename is None or expected is None:
+        raise ValueError("Populace release does not pin calibration diagnostics")
+    destination = Path(directory) / Path(filename).name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if not destination.exists():
+        downloader(release, destination)
+    if not destination.is_file():
+        raise ValueError(f"Populace downloader did not create {destination}")
+    actual = _sha256(destination)
+    if actual != expected:
+        raise ValueError(
+            "Populace calibration diagnostics checksum mismatch: "
+            f"expected {expected}, found {actual}"
         )
     return destination
 
@@ -148,11 +197,17 @@ class PopulacePolicyEngineRunner:
         release: PopulaceRelease = POPULACE_RELEASE,
         table_loader: Callable[[Path], Tables] = _default_table_loader,
         simulation_factory: Callable[[Path], Any] = _default_simulation_factory,
+        old_congressional_district_assignments: Mapping[str, str] | None = None,
     ) -> None:
         self.dataset_path = Path(dataset_path)
         self.release = release
         self._table_loader = table_loader
         self._simulation_factory = simulation_factory
+        self._old_congressional_district_assignments = (
+            dict(old_congressional_district_assignments)
+            if old_congressional_district_assignments is not None
+            else None
+        )
         self._tables: Tables | None = None
         self._simulation: Any | None = None
         self._calculation_cache: dict[tuple[str, str], np.ndarray] = {}
@@ -208,27 +263,31 @@ class PopulacePolicyEngineRunner:
 
     def _entity_geographies(self, entity: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         country, states, districts = self._household_geographies()
+        return tuple(
+            self._household_values_for_entity(entity, values)
+            for values in (country, states, districts)
+        )
+
+    def _household_values_for_entity(
+        self, entity: str, values: np.ndarray
+    ) -> np.ndarray:
         household = self.tables["household"]
         household_ids = self._column(household, "household_id")
         if entity == "household":
-            return country, states, districts
+            return values
         person = self.tables["person"]
         person_households = self._column(person, "person_household_id")
         if entity == "person":
-            return tuple(
-                self._lookup(household_ids, values, person_households, "person-household join")
-                for values in (country, states, districts)
+            return self._lookup(
+                household_ids, values, person_households, "person-household join"
             )
         if entity == "spm_unit":
             spm_households = self._spm_unit_households()
-            return tuple(
-                self._lookup(
-                    household_ids,
-                    values,
-                    spm_households,
-                    "SPM-unit household join",
-                )
-                for values in (country, states, districts)
+            return self._lookup(
+                household_ids,
+                values,
+                spm_households,
+                "SPM-unit household join",
             )
         if entity != "tax_unit":
             raise ValueError(f"unsupported Populace entity {entity!r}")
@@ -249,10 +308,27 @@ class PopulacePolicyEngineRunner:
             )
         except KeyError as error:
             raise ValueError(f"tax unit has no person-household link: {error.args[0]}") from error
-        return tuple(
-            self._lookup(household_ids, values, assigned_households, "tax-unit household join")
-            for values in (country, states, districts)
+        return self._lookup(
+            household_ids, values, assigned_households, "tax-unit household join"
         )
+
+    def _entity_old_congressional_districts(self, entity: str) -> np.ndarray:
+        assignments = self._old_congressional_district_assignments
+        if assignments is None:
+            raise ValueError(
+                "old congressional district assignment artifact was not supplied"
+            )
+        blocks = self._column(self.tables["household"], "block_geoid").astype(str)
+        missing = sorted(set(blocks.tolist()) - set(assignments))
+        if missing:
+            raise ValueError(
+                "old congressional district assignment is missing household blocks: "
+                f"{missing[:3]}"
+            )
+        household_districts = np.asarray(
+            [assignments[block] for block in blocks.tolist()], dtype=object
+        )
+        return self._household_values_for_entity(entity, household_districts)
 
     def _model_array(self, requested_name: str, entity: str, period: str) -> np.ndarray:
         if requested_name.startswith("tax_unit_sum_person:"):
@@ -426,6 +502,10 @@ class PopulacePolicyEngineRunner:
             "state_fips": state,
             "congressional_district_geoid": district,
         }
+        if group.geography_method == "congressional_district_geoid_117th":
+            geography_by_method[group.geography_method] = (
+                self._entity_old_congressional_districts(group.entity)
+            )
         if group.geography_method not in geography_by_method:
             raise ValueError(f"unsupported geography method {group.geography_method!r}")
         arrays: dict[str, np.ndarray] = {
