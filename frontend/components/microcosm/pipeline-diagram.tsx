@@ -92,9 +92,11 @@ const EDGES: Edge[] = [
 // var() resolves reliably across browsers.
 const KIND_STYLE: Record<Node["kind"], { fill: string; stroke: string; text: string }> = {
   source: {
-    fill: "var(--color-blue-50)",
-    stroke: "var(--color-blue-300)",
-    text: "var(--color-blue-800)",
+    // external sources read in-family (one hue): a pale verdigris wash rather
+    // than the old ui-kit blue register.
+    fill: "var(--accent-subtle)",
+    stroke: "var(--chart-3)",
+    text: "var(--accent-strong)",
   },
   input: {
     fill: "var(--background-secondary)",
@@ -233,7 +235,7 @@ export function PipelineDiagram() {
                       style={{
                         color:
                           n.kind === "publish"
-                            ? "var(--color-teal-50)"
+                            ? "var(--accent-subtle)"
                             : "var(--paper-faint)",
                       }}
                     >
