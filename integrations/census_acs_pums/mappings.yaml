@@ -1,0 +1,17 @@
+mapping_release: census-acs-pums-2024-overview-v1
+mappings:
+  - mapping_id: census-acs-pums-person-age-count
+    ledger_selector:
+      sources: [census_acs]
+      measures: [census_acs.person_count]
+      units: [count]
+      entities: [person]
+    execution: direct
+    source_expression: __ones__
+    operation: weighted_sum
+    required_variables: [age]
+    mapping_quality: exact
+    supported_dimensions: []
+    supported_constraint_domains: [total_population]
+    supported_constraint_variables: [age]
+    calibration_exposure: used_in_imputation_or_reweighting
