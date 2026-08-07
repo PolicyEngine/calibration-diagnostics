@@ -25,6 +25,7 @@ from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.populace_aging import (
     PopulaceAgingPolicy,
     transform_ledger_facts_to_populace_year,
+    transform_ledger_facts_to_populace_years,
 )
 from evaluation_harness.publisher import publish_run
 
@@ -75,11 +76,15 @@ def run(
             )
 
     aging_policy = PopulaceAgingPolicy.from_facts(facts)
-    aging_results = transform_ledger_facts_to_populace_year(
+    source_years = tuple(
+        int(year) for year in populace_overview.alignment_policy["source_years"]
+    )
+    build_year = int(populace_overview.alignment_policy["build_year"])
+    aging_results = transform_ledger_facts_to_populace_years(
         facts,
         aging_policy,
-        source_year=2023,
-        build_year=2024,
+        source_years=source_years,
+        build_year=build_year,
     )
     comparable_aging = tuple(row for row in aging_results if row.comparable)
     aligned_facts = tuple(row.to_aligned_fact() for row in comparable_aging)
@@ -196,14 +201,36 @@ def run(
     results = tuple([*populace_results, *cps_results, *acs_pums_results])
     scores = build_scored_results(facts, capabilities, results, aligned_facts)
     summary = build_run_summary(facts, capabilities, results, scores)
-    summary["populace_2023_to_2024_alignment"] = {
+    summary["populace_prior_years_to_2024_alignment"] = {
         "policy": "Exact Populace cbo_growth_factor_aging@1.2.0 semantics",
-        "observed_year": 2023,
-        "evaluation_year": 2024,
+        "observed_years": list(source_years),
+        "evaluation_year": build_year,
         "fact_count": len(aging_results),
         "comparable_count": len(comparable_aging),
         "status_counts": dict(
             sorted(Counter(row.status.value for row in aging_results).items())
+        ),
+        "benchmark_basis": (
+            "Executable aligned rows compare the 2024 model estimate with the "
+            "published 2024 transformation, while retaining each prior-year "
+            "observed value."
+        ),
+    }
+    aging_2023 = transform_ledger_facts_to_populace_year(
+        facts,
+        aging_policy,
+        source_year=2023,
+        build_year=build_year,
+    )
+    comparable_2023 = tuple(row for row in aging_2023 if row.comparable)
+    summary["populace_2023_to_2024_alignment"] = {
+        "policy": "Exact Populace cbo_growth_factor_aging@1.2.0 semantics",
+        "observed_year": 2023,
+        "evaluation_year": build_year,
+        "fact_count": len(aging_2023),
+        "comparable_count": len(comparable_2023),
+        "status_counts": dict(
+            sorted(Counter(row.status.value for row in aging_2023).items())
         ),
         "benchmark_basis": (
             "Executable aligned rows compare the 2024 model estimate with the "

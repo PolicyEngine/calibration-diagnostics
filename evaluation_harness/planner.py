@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
 
 from .contracts import (
@@ -36,6 +36,7 @@ class EvaluationSourceManifest:
     weights: dict[str, str]
     geography_methods: dict[str, str]
     available: bool
+    geography_id_prefixes: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.source_type is SourceType.MODEL_DATASET_PAIR and not self.model_version:
@@ -188,13 +189,31 @@ class CapabilityPlanner:
                 "geography_not_supported",
                 f"{source.source_id} does not support {fact.geography_level}",
             )
-        if fact.entity not in source.entities:
+        allowed_geography_prefixes = source.geography_id_prefixes.get(
+            fact.geography_level, ()
+        )
+        if allowed_geography_prefixes and not fact.geography_id.startswith(
+            allowed_geography_prefixes
+        ):
+            return self._unsupported(
+                fact,
+                source,
+                CapabilityStatus.UNSUPPORTED_GEOGRAPHY,
+                "geography_vintage_not_supported",
+                f"{fact.geography_id} does not match the reviewed "
+                f"{fact.geography_level} prefixes {allowed_geography_prefixes}",
+            )
+        mapping = self.mappings.match(fact)
+        execution_entity = (
+            mapping.execution_entity if mapping and mapping.execution_entity else fact.entity
+        )
+        if execution_entity not in source.entities:
             return self._unsupported(
                 fact,
                 source,
                 CapabilityStatus.UNSUPPORTED_ENTITY,
                 "entity_not_supported",
-                f"{source.source_id} does not represent {fact.entity}",
+                f"{source.source_id} does not represent {execution_entity}",
             )
 
         period = fact.period.canonical
@@ -203,6 +222,8 @@ class CapabilityPlanner:
             treatment = PeriodTreatment.NATIVE
         elif period in source.advanced_fact_periods:
             treatment = PeriodTreatment.ADVANCED_POPULATION
+        elif mapping is not None and period in mapping.build_target_periods:
+            treatment = PeriodTreatment.BUILD_TARGET_REPRODUCTION
         else:
             alignment = self._alignment(fact, source)
             if alignment is None:
@@ -215,7 +236,6 @@ class CapabilityPlanner:
                 )
             treatment = PeriodTreatment.ALIGNED_FACT
 
-        mapping = self.mappings.match(fact)
         if mapping is None:
             return self._unsupported(
                 fact,
@@ -237,14 +257,14 @@ class CapabilityPlanner:
                 "slice_semantics_not_supported",
                 semantic_issue,
             )
-        weight = source.weights.get(fact.entity)
+        weight = source.weights.get(execution_entity)
         if not weight:
             return self._unsupported(
                 fact,
                 source,
                 CapabilityStatus.UNSUPPORTED_ENTITY,
                 "weight_not_available",
-                f"no {fact.entity} weight is configured",
+                f"no {execution_entity} weight is configured",
             )
 
         constraints = tuple(
@@ -257,7 +277,12 @@ class CapabilityPlanner:
                     and str(value).lower() not in {"all", "total"}
                 ],
             ]
-            + [self._query_constraint(constraint) for constraint in fact.universe_constraints]
+            + [
+                self._query_constraint(constraint)
+                for constraint in fact.universe_constraints
+                if constraint.get("variable")
+                not in mapping.descriptive_constraint_variables
+            ]
         )
         query_type = ModelQuery if mapping.execution is ExecutionMethod.MODEL else AggregateQuery
         query_arguments = {
@@ -265,6 +290,7 @@ class CapabilityPlanner:
             "value_expression": mapping.source_expression,
             "weight": weight,
             "constraints": constraints,
+            "denominator_expression": mapping.denominator_expression,
         }
         if query_type is ModelQuery:
             query = ModelQuery(
@@ -289,7 +315,11 @@ class CapabilityPlanner:
             mapping.mapping_quality is MappingQuality.EXACT
             and (
                 treatment
-                in {PeriodTreatment.NATIVE, PeriodTreatment.ADVANCED_POPULATION}
+                in {
+                    PeriodTreatment.NATIVE,
+                    PeriodTreatment.ADVANCED_POPULATION,
+                    PeriodTreatment.BUILD_TARGET_REPRODUCTION,
+                }
                 or (
                     treatment is PeriodTreatment.ALIGNED_FACT
                     and alignment is not None
@@ -315,7 +345,7 @@ class CapabilityPlanner:
             period_treatment=treatment,
             alignment_id=alignment.alignment_id if alignment else None,
             alignment_quality=alignment.quality if alignment else AlignmentQuality.NONE,
-            entity=fact.entity,
+            entity=execution_entity,
             weight_variable=weight,
             required_variables=mapping.required_variables,
             geography_method=source.geography_methods[fact.geography_level],

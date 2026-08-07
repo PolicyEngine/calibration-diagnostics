@@ -57,6 +57,10 @@ def _source_manifest(payload: dict[str, Any]) -> EvaluationSourceManifest:
         weights=dict(payload.get("weights", {})),
         geography_methods=dict(payload.get("geography_methods", {})),
         available=bool(payload.get("available", False)),
+        geography_id_prefixes={
+            level: tuple(prefixes)
+            for level, prefixes in payload.get("geography_id_prefixes", {}).items()
+        },
     )
 
 

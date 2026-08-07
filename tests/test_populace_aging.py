@@ -10,6 +10,7 @@ from evaluation_harness.populace_aging import (
     AgingStatus,
     PopulaceAgingPolicy,
     transform_ledger_facts_to_populace_year,
+    transform_ledger_facts_to_populace_years,
 )
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.planner import CapabilityPlanner
@@ -244,6 +245,23 @@ def test_bulk_alignment_transforms_only_us_2023_and_preserves_period_kind() -> N
     assert len(results) == 1
     assert results[0].target_period == TypedPeriod.parse("tax_year:2024")
     assert results[0].status is AgingStatus.NOT_DOLLAR_AMOUNT
+
+
+def test_bulk_alignment_can_apply_the_populace_policy_to_2022_and_2023() -> None:
+    us_2023 = fact(unit="count", aggregation={"method": "sum"})
+    us_2022 = replace(
+        us_2023,
+        fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc",
+        period=TypedPeriod.parse("tax_year:2022"),
+    )
+    us_2024 = replace(us_2023, period=TypedPeriod.parse("tax_year:2024"))
+    results = transform_ledger_facts_to_populace_years(
+        [us_2024, us_2023, us_2022],
+        PopulaceAgingPolicy.from_facts([]),
+        source_years=(2022, 2023),
+    )
+    assert [row.source_fact.period.value for row in results] == ["2023", "2022"]
+    assert all(row.target_period == TypedPeriod.parse("tax_year:2024") for row in results)
 
 
 def test_real_release_target_matches_populace_diagnostics_byte_for_byte() -> None:

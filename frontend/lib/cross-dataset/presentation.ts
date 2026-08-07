@@ -72,8 +72,9 @@ export function crossDatasetUiState(input: {
 
 const PERIOD_TREATMENT_LABELS: Record<string, string> = {
   native: "Native-period comparisons",
-  aligned_fact: "2023 facts aligned to 2024",
+  aligned_fact: "2022–2023 facts aligned to 2024",
   advanced_population: "CPS population advanced to 2024",
+  build_target_reproduction: "Administrative-period targets used by the 2024 build",
   unsupported: "Period treatment unavailable",
 };
 
