@@ -2,8 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
+import {
+  CrossDatasetFactDetailView,
+  CrossDatasetFactsView,
+} from "@/components/populace/cross-dataset-facts-view";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -101,7 +106,7 @@ function CountList({ values, empty }: { values: LabeledCount[]; empty: string })
   );
 }
 
-export function CrossDatasetView() {
+function CrossDatasetOverviewView() {
   const query = useCrossDatasetOverview();
   const [dimension, setDimension] = useState<GroupDimension>("ledger_source");
   const state = crossDatasetUiState({
@@ -415,4 +420,20 @@ export function CrossDatasetView() {
       </SectionCard>
     </div>
   );
+}
+
+export function CrossDatasetView() {
+  const searchParams = useSearchParams();
+  const view = searchParams.get("view");
+  const search = searchParams.toString();
+  if (view === "facts") return <CrossDatasetFactsView search={search} />;
+  if (view === "fact") {
+    return (
+      <CrossDatasetFactDetailView
+        factKey={searchParams.get("fact_key")?.trim() ?? ""}
+        search={search}
+      />
+    );
+  }
+  return <CrossDatasetOverviewView />;
 }

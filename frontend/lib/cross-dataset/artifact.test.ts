@@ -119,7 +119,7 @@ function fixture() {
           entity: "person",
           dimensions: {},
           sources: {
-            populace: { status: "evaluable_direct", estimate: "198", absolute_relative_error: "0.01" },
+            populace: { status: "evaluable_direct", estimate: "198", absolute_relative_error: "0.02" },
             cps: { status: "unsupported_geography", reason_code: "geography_not_supported" },
           },
         },
@@ -271,6 +271,38 @@ test("facts paginate and support source/status and catalog filters", async () =>
   expect(body.total).toBe(1);
   expect(body.rows[0].fact_key).toBe("fact-a");
   expect(reads).not.toContain("facts/00002.json");
+});
+
+test("source selection alone keeps direct partition pagination", async () => {
+  const { reader, reads } = fixture();
+  const page = await reader.facts({ source: "cps", page: 1, pageSize: 2 });
+  expect(page.total).toBe(3);
+  expect(page.rows).toHaveLength(2);
+  expect(reads).toContain("facts/00001.json");
+  expect(reads).not.toContain("fact-index.json");
+  expect(reads).not.toContain("facts/00002.json");
+});
+
+test("fact catalog sorting is stable and invalid sort values fail closed", async () => {
+  const sorted = fixture();
+  const response = await crossDatasetApiResponse(
+    "http://example.test/api?view=facts&source=populace&status=evaluable_direct&sort=error_desc",
+    sorted.reader,
+  );
+  expect(response.status).toBe(200);
+  expect(
+    (response.body as { rows: { fact_key: string }[] }).rows.map((row) => row.fact_key),
+  ).toEqual(["fact-b", "fact-a"]);
+
+  const invalid = fixture();
+  expect(
+    (
+      await crossDatasetApiResponse(
+        "http://example.test/api?view=facts&sort=drop_table",
+        invalid.reader,
+      )
+    ).status,
+  ).toBe(400);
 });
 
 test("fact detail reads only its indexed partition and preserves sparse cells", async () => {

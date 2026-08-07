@@ -1,4 +1,5 @@
 import { ArtifactError, CrossDatasetArtifactReader } from "./artifact";
+import type { FactSort } from "./artifact";
 
 export interface ApiResponse {
   status: number;
@@ -46,6 +47,13 @@ export async function crossDatasetApiResponse(
       if (pageSize == null || pageSize > 250) {
         return clientError("page_size must be between 1 and 250.");
       }
+      const sort = params.get("sort") || "fact_key";
+      if (!["fact_key", "label", "error_desc"].includes(sort)) {
+        return clientError("sort must be fact_key, label, or error_desc.");
+      }
+      if (sort === "error_desc" && !params.get("source")) {
+        return clientError("error_desc sorting requires ?source=.");
+      }
       if (
         (params.get("status") || params.get("period_treatment") || params.get("calibration_exposure")) &&
         !params.get("source")
@@ -68,6 +76,7 @@ export async function crossDatasetApiResponse(
           periodTreatment: params.get("period_treatment") || undefined,
           calibrationExposure: params.get("calibration_exposure") || undefined,
           search: params.get("search") || undefined,
+          sort: sort as FactSort,
         }),
       };
     }

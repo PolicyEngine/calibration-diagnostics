@@ -111,6 +111,8 @@ export interface FactSourceCell {
   population_period?: string;
   policy_period?: string;
   required_variables?: string[];
+  dataset_version?: string;
+  model_version?: string;
   estimate?: string;
   benchmark_value?: string;
   benchmark_period?: string;
@@ -174,7 +176,10 @@ export interface FactsQuery {
   periodTreatment?: string;
   calibrationExposure?: string;
   search?: string;
+  sort?: FactSort;
 }
+
+export type FactSort = "fact_key" | "label" | "error_desc";
 
 export interface FactsPage {
   schema_version: typeof CROSS_DATASET_BUNDLE_SCHEMA;
@@ -511,9 +516,10 @@ export class CrossDatasetArtifactReader {
       throw new RangeError("page_size must be between 1 and 250");
     }
     const filtered = Boolean(
-      query.source || query.status || query.ledgerSource || query.measure || query.period || query.geography || query.periodTreatment || query.calibrationExposure || query.search,
+      query.status || query.ledgerSource || query.measure || query.period || query.geography || query.periodTreatment || query.calibrationExposure || query.search,
     );
-    if (!filtered && pageSize === manifest.page_size) {
+    const sort = query.sort ?? "fact_key";
+    if (!filtered && sort === "fact_key" && pageSize === manifest.page_size) {
       const direct = await this.factPage(page);
       return {
         ...direct,
@@ -539,6 +545,22 @@ export class CrossDatasetArtifactReader {
         (!search || `${row.fact_key} ${row.label} ${row.measure}`.toLowerCase().includes(search))
       );
     });
+    if (sort === "label") {
+      rows.sort(
+        (left, right) =>
+          left.label.localeCompare(right.label) || left.fact_key.localeCompare(right.fact_key),
+      );
+    } else if (sort === "error_desc") {
+      if (!query.source) throw new RangeError("error_desc sorting requires a source");
+      const source = query.source;
+      rows.sort((left, right) => {
+        const leftValue = Number(left.sources[source]?.absolute_relative_error);
+        const rightValue = Number(right.sources[source]?.absolute_relative_error);
+        const leftError = Number.isFinite(leftValue) ? leftValue : Number.NEGATIVE_INFINITY;
+        const rightError = Number.isFinite(rightValue) ? rightValue : Number.NEGATIVE_INFINITY;
+        return rightError - leftError || left.fact_key.localeCompare(right.fact_key);
+      });
+    }
     const total = rows.length;
     const start = (page - 1) * pageSize;
     return {
