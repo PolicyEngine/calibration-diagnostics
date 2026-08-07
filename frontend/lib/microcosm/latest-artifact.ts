@@ -2080,17 +2080,17 @@ function investigationSignals(row: TargetRow): InvestigationSignal[] {
 
 function investigationNextSteps(row: TargetRow): string[] {
   const steps = [
-    "Verify the chronicle fact: source period, target period, geography, unit, measure concept, and every filter/group-by value.",
-    "Verify target materialization: confirm the Populus compiler creates a model selector for the exact chronicle dimensions, not a broader aggregate.",
+    "Verify the Chronicle fact: source period, target period, geography, unit, measure concept, and every filter/group-by value.",
+    "Verify target materialization: confirm the Populus compiler creates a model selector for the exact Chronicle dimensions, not a broader aggregate.",
     "Verify model aggregate mapping: confirm the PolicyEngine variable or aggregate used for the estimate has the same unit, tax unit/person entity, sign convention, and period.",
     "Compare initial versus final miss: if both are badly off in the same direction, inspect source/model scope before tuning calibration weights.",
     "Inspect competing constraints for the same population slice if calibration improved one target while worsening another.",
   ];
   if (row.estimate_warning) {
-    steps.unshift("Start with target materialization: the published diagnostics already indicate this estimate may be broader than the chronicle slice.");
+    steps.unshift("Start with target materialization: the published diagnostics already indicate this estimate may be broader than the Chronicle slice.");
   }
   if (numberOrNull(row.target) === 0) {
-    steps.unshift("Start with the chronicle target value: confirm whether zero means a real zero, suppressed/missing source data, or a target intentionally dropped to zero.");
+    steps.unshift("Start with the Chronicle target value: confirm whether zero means a real zero, suppressed/missing source data, or a target intentionally dropped to zero.");
   }
   if (row.calibration_status !== "included") {
     steps.unshift("Start with the calibration status: the target was not included as an active calibration constraint.");
@@ -2120,7 +2120,7 @@ function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
     next_steps: investigationNextSteps(row),
     repo_searches: investigationSearches(row),
     limits: [
-      "The dashboard can prove what is in the release artifacts and chronicle metadata.",
+      "The dashboard can prove what is in the release artifacts and Chronicle metadata.",
       "It cannot prove the generated per-record model filter or expression unless Populus exports that compiler trace for the target.",
       "When the artifact warns about scope, treat the estimate as provisional until the Populus materialized target is inspected.",
     ],

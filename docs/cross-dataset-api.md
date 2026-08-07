@@ -2,7 +2,7 @@
 
 The Cross-dataset API serves immutable evaluation artifacts; an HTTP request
 never imports or runs PolicyEngine or Tax-Calculator. The current approved run
-contains Populace + PolicyEngine-US, Tax-Calculator + public CPS, and raw 2024
+contains Microcosm + PolicyEngine-US, Tax-Calculator + public CPS, and raw 2024
 ACS PUMS. Yale is deferred pending a reproducible reconstruction, and the API
 is source-agnostic so it can be added later without changing the response
 contract.
@@ -10,7 +10,7 @@ contract.
 ## Publish frontend partitions
 
 After a full evaluation run, publish the web partitions from the same pinned
-Ledger snapshot and content-addressed evaluation artifact:
+Chronicle snapshot and content-addressed evaluation artifact:
 
 ```bash
 uv run python scripts/publish_cross_dataset_frontend_bundle.py \
@@ -55,10 +55,10 @@ bundle returns HTTP 503 rather than serving mixed results.
   `ledger_source`, `measure`, `period`, `geography`, `period_treatment`,
   `calibration_exposure`, and `search` filters. Source-specific filters require
   `source`.
-- `view=fact&fact_key=...`: one Ledger observation and its sparse source cells,
+- `view=fact&fact_key=...`: one Chronicle observation and its sparse source cells,
   including capability, mapping, estimate, benchmark, error, period treatment,
   calibration exposure, alignment provenance, and dataset uncertainty where
   applicable.
 
 Fact filters use the bundle's page index to fetch only candidate partitions.
-The API never sends the entire Ledger catalog to the browser.
+The API never sends the entire Chronicle catalog to the browser.

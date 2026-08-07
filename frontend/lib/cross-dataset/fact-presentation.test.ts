@@ -150,7 +150,7 @@ test("fact rows show sparse supported and unsupported cells accessibly", () => {
     estimateLabel: "$1.08B",
     errorLabel: "2.9% error",
     ariaLabel:
-      "Populace + PolicyEngine-US: Evaluable, projected; estimate $1.08B; 2.9% error",
+      "Microcosm + PolicyEngine-US: Evaluable, projected; estimate $1.08B; 2.9% error",
   });
   expect(row.sourceCells.cps).toMatchObject({
     statusLabel: "Unsupported · geography",

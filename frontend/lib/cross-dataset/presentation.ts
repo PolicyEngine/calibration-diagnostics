@@ -7,7 +7,7 @@ import type {
 export const CROSS_DATASET_PAGE_TITLE = "Cross-dataset comparison";
 
 export const GROUP_DIMENSIONS = [
-  { key: "ledger_source", label: "Ledger source" },
+  { key: "ledger_source", label: "Chronicle source" },
   { key: "concept", label: "Concept" },
   { key: "period", label: "Period" },
   { key: "geography", label: "Geography" },
@@ -32,7 +32,6 @@ export interface SourceOverview {
   scoreScopeLabel: string;
   performancePercent: number | null;
   coverageLabel: string;
-  coveragePercent: number;
   coveredCount: number;
   unsupportedCount: number;
   topUnsupportedReasons: LabeledCount[];
@@ -44,7 +43,6 @@ export interface GroupSourceView {
   scoreLabel: string;
   performancePercent: number | null;
   coverageLabel: string;
-  coveragePercent: number;
   evaluableCount: number;
   scoredCount: number;
   unsupportedCount: number;
@@ -58,6 +56,16 @@ export interface GroupRowView {
   label: string;
   factCount: number;
   sources: Record<string, GroupSourceView>;
+}
+
+export interface ChronicleSourceGapRow {
+  key: string;
+  label: string;
+  factCount: number;
+  evaluatedCount: number;
+  missingCount: number;
+  missingReasons: LabeledCount[];
+  factHref: string;
 }
 
 export type CrossDatasetUiState = "loading" | "error" | "empty" | "ready";
@@ -96,10 +104,6 @@ function number(value: string | null | undefined): number | null {
   if (value == null) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function percent(value: number, total: number): number {
-  return total > 0 ? (value / total) * 100 : 0;
 }
 
 function scorePercent(value: string | null | undefined): number | null {
@@ -156,19 +160,18 @@ export function buildSourceOverviews(
   summary: CrossDatasetSummary,
   groups: CrossDatasetGroup[],
 ): SourceOverview[] {
-  return summary.sources.map((source) => {
+  return orderSourceSummaries(summary.sources).map((source) => {
     const covered = source.score.covered;
     const scored = source.score.scored;
     return {
       sourceId: source.source_id,
-      label: source.label,
+      label: sourceDisplayLabel(source),
       datasetVersion: source.dataset_version,
       modelVersion: source.model_version,
       scoreLabel: formatScore(source.score.display_score, " / 100"),
       scoreScopeLabel: `Performance among ${scored.toLocaleString("en-US")} scored facts`,
       performancePercent: scorePercent(source.score.display_score),
       coverageLabel: `${covered.toLocaleString("en-US")} of ${summary.fact_count.toLocaleString("en-US")} facts`,
-      coveragePercent: percent(covered, summary.fact_count),
       coveredCount: covered,
       unsupportedCount: Math.max(0, source.capability_count - source.result_count),
       topUnsupportedReasons: labeledCounts(source.reason_codes).slice(0, 3),
@@ -180,6 +183,22 @@ export function buildSourceOverviews(
       ),
     };
   });
+}
+
+export function sourceDisplayLabel(source: SourceSummary): string {
+  return source.label.replaceAll("Populace", "Microcosm").replaceAll("Ledger", "Chronicle");
+}
+
+export function orderSourceSummaries(sources: SourceSummary[]): SourceSummary[] {
+  return sources
+    .map((source, index) => ({ source, index }))
+    .sort((left, right) => {
+      const leftIsMicrocosm = left.source.source_id.toLowerCase().includes("populace");
+      const rightIsMicrocosm = right.source.source_id.toLowerCase().includes("populace");
+      if (leftIsMicrocosm !== rightIsMicrocosm) return leftIsMicrocosm ? -1 : 1;
+      return left.index - right.index;
+    })
+    .map(({ source }) => source);
 }
 
 const DIMENSION_QUERY_KEYS: Record<GroupDimension, string> = {
@@ -222,7 +241,6 @@ function sourceGroupView(
     scoreLabel: formatScore(cell.display_score),
     performancePercent: scorePercent(cell.display_score),
     coverageLabel: `${cell.evaluable.toLocaleString("en-US")} / ${total.toLocaleString("en-US")}`,
-    coveragePercent: percent(cell.evaluable, total),
     evaluableCount: cell.evaluable,
     scoredCount: cell.scored,
     unsupportedCount: unsupported,
@@ -251,4 +269,34 @@ export function buildGroupRows(
       ),
     }))
     .sort((left, right) => right.factCount - left.factCount || left.label.localeCompare(right.label));
+}
+
+export function buildChronicleSourceGapRows(
+  groups: CrossDatasetGroup[],
+  sourceId: string,
+): ChronicleSourceGapRow[] {
+  return groups
+    .filter((group) => group.dimension === "ledger_source")
+    .map((group) => {
+      const cell = group.sources[sourceId] ?? {
+        evaluable: 0,
+        scored: 0,
+        display_score: null,
+        reason_codes: {},
+      };
+      return {
+        key: group.key,
+        label: group.label,
+        factCount: group.fact_count,
+        evaluatedCount: cell.evaluable,
+        missingCount: Math.max(0, group.fact_count - cell.evaluable),
+        missingReasons: labeledCounts(cell.reason_codes),
+        factHref: groupFactsHref("ledger_source", group.key, sourceId),
+      };
+    })
+    .filter((row) => row.missingCount > 0)
+    .sort(
+      (left, right) =>
+        right.missingCount - left.missingCount || left.label.localeCompare(right.label),
+    );
 }

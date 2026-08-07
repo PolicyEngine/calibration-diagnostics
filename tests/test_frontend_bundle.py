@@ -207,7 +207,7 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
         output,
         page_size=2,
         source_labels={
-            "populace": "Populace + PolicyEngine-US",
+            "populace": "Microcosm + PolicyEngine-US",
             "cps": "Tax-Calculator + public CPS",
         },
     )
@@ -219,7 +219,7 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
 
     summary = json.loads((output / "summary.json").read_text())
     assert summary["matrix_complete"] is True
-    assert summary["sources"][1]["label"] == "Populace + PolicyEngine-US"
+    assert summary["sources"][1]["label"] == "Microcosm + PolicyEngine-US"
     assert summary["sources"][0]["result_count"] == 1
 
     first_page = json.loads((output / "facts" / "00001.json").read_text())

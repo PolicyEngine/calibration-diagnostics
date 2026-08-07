@@ -24,6 +24,7 @@ import {
   type DisplayField,
   type FactCatalogParams,
 } from "@/lib/cross-dataset/fact-presentation";
+import { sourceDisplayLabel } from "@/lib/cross-dataset/presentation";
 
 interface CatalogResponse {
   summary: CrossDatasetSummary;
@@ -170,12 +171,12 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
   };
 
   if (query.isLoading && !query.data) {
-    return <LoadingBlock label="Loading Ledger fact catalog…" />;
+    return <LoadingBlock label="Loading Chronicle fact catalog…" />;
   }
   if (query.error || !query.data) {
     return (
       <EmptyState
-        title="Ledger fact catalog unavailable"
+        title="Chronicle fact catalog unavailable"
         description={query.error instanceof Error ? query.error.message : "Unknown error."}
         actions={
           <button
@@ -194,17 +195,18 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
   const selectedSources = params.source
     ? summary.sources.filter((source) => source.source_id === params.source)
     : summary.sources;
+  const activeSource = summary.sources.find((source) => source.source_id === params.source);
   const rows = page.rows.map((fact) => buildFactRowView(fact, selectedSources, params));
   const sourceOptions: readonly (readonly [string, string])[] = [
     ["", "All sources"] as const,
-    ...summary.sources.map((source) => [source.source_id, source.label] as const),
+    ...summary.sources.map((source) => [source.source_id, sourceDisplayLabel(source)] as const),
   ];
   const filterValues: {
     key: keyof FactCatalogParams;
     label: string;
     value: string;
   }[] = [
-    { key: "ledgerSource", label: "Ledger source", value: params.ledgerSource },
+    { key: "ledgerSource", label: "Chronicle source", value: params.ledgerSource },
     { key: "measure", label: "Concept", value: params.measure },
     { key: "period", label: "Period", value: params.period },
     { key: "geography", label: "Geography", value: params.geography },
@@ -220,9 +222,9 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Cross-dataset · Ledger facts"
-        title="Ledger fact catalog"
-        description="Browse every Ledger observation and the corresponding capability cell for each model. Unsupported cells remain visible with a specific reason."
+        eyebrow="Cross-dataset · Chronicle facts"
+        title="Chronicle fact catalog"
+        description="Browse every Chronicle observation and the corresponding capability cell for each model. Unsupported cells remain visible with a specific reason."
         actions={
           <Link
             href="/populace/datasets"
@@ -298,10 +300,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
             {params.source && (
               <ActiveFilter
                 label="Source"
-                value={
-                  summary.sources.find((source) => source.source_id === params.source)?.label ??
-                  params.source
-                }
+                value={activeSource ? sourceDisplayLabel(activeSource) : params.source}
                 onRemove={() => navigate({ source: "", status: "", sort: "fact_key" })}
               />
             )}
@@ -356,7 +355,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
               <thead>
                 <tr className="border-b border-border bg-muted/10 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th scope="col" className="min-w-[280px] px-4 py-2.5">
-                    Ledger fact
+                    Chronicle fact
                   </th>
                   <th scope="col" className="min-w-[150px] px-4 py-2.5">
                     Observation
@@ -367,7 +366,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
                       key={source.source_id}
                       className="min-w-[220px] px-4 py-2.5"
                     >
-                      {source.label}
+                      {sourceDisplayLabel(source)}
                     </th>
                   ))}
                 </tr>
@@ -439,7 +438,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
 
       <nav
         className="flex items-center justify-between gap-3"
-        aria-label="Ledger fact catalog pagination"
+        aria-label="Chronicle fact catalog pagination"
       >
         {page.page > 1 ? (
           <Link
@@ -517,7 +516,7 @@ export function CrossDatasetFactDetailView({
   if (!factKey) {
     return (
       <EmptyState
-        title="No Ledger fact selected"
+        title="No Chronicle fact selected"
         description="Choose a fact from the catalog."
         actions={
           <Link className="text-xs text-primary underline" href={factCatalogHref(context)}>
@@ -527,11 +526,11 @@ export function CrossDatasetFactDetailView({
       />
     );
   }
-  if (query.isLoading) return <LoadingBlock label="Loading Ledger fact…" />;
+  if (query.isLoading) return <LoadingBlock label="Loading Chronicle fact…" />;
   if (query.error || !query.data) {
     return (
       <EmptyState
-        title="Ledger fact unavailable"
+        title="Chronicle fact unavailable"
         description={query.error instanceof Error ? query.error.message : "Unknown error."}
         actions={
           <Link className="text-xs text-primary underline" href={factCatalogHref(context)}>
@@ -564,14 +563,14 @@ export function CrossDatasetFactDetailView({
       />
 
       <SectionCard
-        title="Original Ledger observation"
-        description="This is the published fact as stored in the pinned Ledger snapshot. Any aligned comparison value appears separately below."
+        title="Original Chronicle observation"
+        description="This is the published fact as stored in the pinned Chronicle snapshot. Any aligned comparison value appears separately below."
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             ["Observed value", detail.observation.valueLabel],
             ["Observed period", detail.observation.periodLabel],
-            ["Ledger source", detail.observation.sourceLabel],
+            ["Chronicle source", detail.observation.sourceLabel],
             ["Geography", detail.observation.geographyLabel],
           ].map(([label, value]) => (
             <div key={label}>
@@ -597,7 +596,7 @@ export function CrossDatasetFactDetailView({
               <div className="border-b border-border bg-muted/20 px-5 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2 className="font-semibold">{source.label}</h2>
+                    <h2 className="font-semibold">{sourceDisplayLabel(source)}</h2>
                     <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                       {source.source_id}
                     </p>
@@ -743,7 +742,7 @@ export function CrossDatasetFactDetailView({
           <FieldList fields={detail.universe} empty="No universe constraints" />
         </SectionCard>
         <SectionCard
-          title="Ledger provenance"
+          title="Chronicle provenance"
           actions={
             typeof provenanceUrl === "string" && provenanceUrl.startsWith("http") ? (
               <a
