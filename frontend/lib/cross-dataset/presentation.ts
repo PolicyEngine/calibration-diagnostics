@@ -58,16 +58,6 @@ export interface GroupRowView {
   sources: Record<string, GroupSourceView>;
 }
 
-export interface ChronicleSourceGapRow {
-  key: string;
-  label: string;
-  factCount: number;
-  evaluatedCount: number;
-  missingCount: number;
-  missingReasons: LabeledCount[];
-  factHref: string;
-}
-
 export type CrossDatasetUiState = "loading" | "error" | "empty" | "ready";
 
 export function crossDatasetUiState(input: {
@@ -269,34 +259,4 @@ export function buildGroupRows(
       ),
     }))
     .sort((left, right) => right.factCount - left.factCount || left.label.localeCompare(right.label));
-}
-
-export function buildChronicleSourceGapRows(
-  groups: CrossDatasetGroup[],
-  sourceId: string,
-): ChronicleSourceGapRow[] {
-  return groups
-    .filter((group) => group.dimension === "ledger_source")
-    .map((group) => {
-      const cell = group.sources[sourceId] ?? {
-        evaluable: 0,
-        scored: 0,
-        display_score: null,
-        reason_codes: {},
-      };
-      return {
-        key: group.key,
-        label: group.label,
-        factCount: group.fact_count,
-        evaluatedCount: cell.evaluable,
-        missingCount: Math.max(0, group.fact_count - cell.evaluable),
-        missingReasons: labeledCounts(cell.reason_codes),
-        factHref: groupFactsHref("ledger_source", group.key, sourceId),
-      };
-    })
-    .filter((row) => row.missingCount > 0)
-    .sort(
-      (left, right) =>
-        right.missingCount - left.missingCount || left.label.localeCompare(right.label),
-    );
 }

@@ -7,7 +7,6 @@ import type {
 import {
   CROSS_DATASET_PAGE_TITLE,
   GROUP_DIMENSIONS,
-  buildChronicleSourceGapRows,
   buildGroupRows,
   buildSourceOverviews,
   crossDatasetUiState,
@@ -287,26 +286,6 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
     "/populace/datasets?view=facts&source=cps&ledger_source=irs_soi",
   );
   expect("coveragePercent" in rows[0].sources.populace).toBe(false);
-});
-
-test("Chronicle-source gap rows identify every fact Microcosm cannot evaluate", () => {
-  const rows = buildChronicleSourceGapRows(groups, "populace");
-
-  expect(rows).toEqual([
-    {
-      key: "irs_soi",
-      label: "IRS SOI",
-      factCount: 33_045,
-      evaluatedCount: 150,
-      missingCount: 32_895,
-      missingReasons: [
-        { key: "mapping_not_found", label: "Mapping not found", count: 26_893 },
-        { key: "period_not_supported", label: "Period not supported", count: 6_002 },
-      ],
-      factHref:
-        "/populace/datasets?view=facts&source=populace&ledger_source=irs_soi",
-    },
-  ]);
 });
 
 test("every supported grouping maps to a stable fact-catalog URL", () => {

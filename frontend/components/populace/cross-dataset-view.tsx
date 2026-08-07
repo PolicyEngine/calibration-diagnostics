@@ -22,7 +22,6 @@ import type {
 import {
   CROSS_DATASET_PAGE_TITLE,
   GROUP_DIMENSIONS,
-  buildChronicleSourceGapRows,
   buildGroupRows,
   buildSourceOverviews,
   crossDatasetUiState,
@@ -119,16 +118,6 @@ function CrossDatasetOverviewView() {
         : [],
     [dimension, orderedSources, query.data],
   );
-  const microcosmSourceId = orderedSources.find((source) =>
-    source.source_id.toLowerCase().includes("populace"),
-  )?.source_id;
-  const microcosmGapRows = useMemo(
-    () =>
-      query.data && microcosmSourceId
-        ? buildChronicleSourceGapRows(query.data.groups.groups, microcosmSourceId)
-        : [],
-    [microcosmSourceId, query.data],
-  );
 
   if (state === "loading") return <LoadingBlock label="Loading Cross-dataset results…" />;
   if (state === "error") {
@@ -171,10 +160,9 @@ function CrossDatasetOverviewView() {
         description={
           <>
             Every model or standalone dataset is classified against the complete Chronicle fact
-            catalog. Performance measures closeness only among facts the source can evaluate;
-            evaluated and missing-fact counts show how much of Chronicle that score represents.
-            Higher performance is better, but a high score over few facts is not whole-Chronicle
-            accuracy.
+            catalog. Performance measures closeness only among facts executed by the current
+            adapter. Evaluated-fact counts describe the scope of that score, not the theoretical
+            capability of the underlying dataset or model.
           </>
         }
         status={
@@ -205,7 +193,7 @@ function CrossDatasetOverviewView() {
         <ol className="divide-y divide-border">
           {sourceOverviews.map((source, index) => (
             <li key={source.sourceId} className="px-5 py-5">
-              <div className="grid gap-5 lg:grid-cols-[minmax(250px,1.45fr)_minmax(190px,1fr)_minmax(180px,0.85fr)_minmax(160px,0.7fr)]">
+              <div className="grid gap-5 lg:grid-cols-[minmax(250px,1.45fr)_minmax(190px,1fr)_minmax(220px,0.9fr)]">
                 <div>
                   <div className="flex items-start gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[11px] text-muted-foreground">
@@ -236,33 +224,18 @@ function CrossDatasetOverviewView() {
                 </div>
                 <div>
                   <p className="font-mono text-xs text-muted-foreground">
-                    Chronicle facts evaluated
+                    Facts evaluated in this run
                   </p>
                   <p className="mt-2 text-lg font-semibold tabular-nums">
                     {source.coverageLabel}
                   </p>
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    Coverage is retained as a fact count, not a percentage.
-                  </p>
-                </div>
-                <div>
-                  <p className="font-mono text-xs text-muted-foreground">
-                    Chronicle facts missing
-                  </p>
-                  <p className="mt-2 text-lg font-semibold tabular-nums">
-                    {source.unsupportedCount.toLocaleString("en-US")}
-                  </p>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    {source.unsupportedCount ? "Not evaluated" : "All represented"}
+                    Current adapter results, not a model-capability ceiling.
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-2 border-t border-border pt-3 text-xs text-muted-foreground lg:grid-cols-3">
-                <p>
-                  <span className="font-medium text-foreground">Largest gaps:</span>{" "}
-                  <InlineCounts values={source.topUnsupportedReasons} empty="None recorded" />
-                </p>
+              <div className="mt-4 grid gap-2 border-t border-border pt-3 text-xs text-muted-foreground lg:grid-cols-2">
                 <p>
                   <span className="font-medium text-foreground">Period handling:</span>{" "}
                   <InlineCounts values={source.periodTreatments} empty="None recorded" />
@@ -285,64 +258,9 @@ function CrossDatasetOverviewView() {
         </ol>
       </SectionCard>
 
-      {microcosmSourceId && (
-        <SectionCard
-          title="Microcosm gaps by Chronicle source"
-          description="Every Chronicle source with at least one fact Microcosm cannot currently evaluate. Counts come from the complete capability matrix, including unsupported facts that have no model result."
-          padded={false}
-        >
-          {microcosmGapRows.length ? (
-            <div className="max-h-[560px] overflow-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead className="sticky top-0 z-10 bg-card">
-                  <tr className="border-b border-border bg-muted/10 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="px-4 py-2.5">Chronicle source</th>
-                    <th className="px-4 py-2.5 text-right">Facts</th>
-                    <th className="px-4 py-2.5 text-right">Evaluated</th>
-                    <th className="px-4 py-2.5 text-right">Missing</th>
-                    <th className="px-4 py-2.5">Why facts are missing</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {microcosmGapRows.map((row) => (
-                    <tr key={row.key} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium">
-                        <Link href={row.factHref} className="hover:text-primary hover:underline">
-                          {row.label}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-muted-foreground">
-                        {row.factCount.toLocaleString("en-US")}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs tabular-nums">
-                        {row.evaluatedCount.toLocaleString("en-US")}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs font-semibold tabular-nums">
-                        {row.missingCount.toLocaleString("en-US")}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        <InlineCounts values={row.missingReasons} empty="No reason recorded" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-5">
-              <EmptyState
-                variant="compact"
-                title="No Microcosm gaps"
-                description="Microcosm can evaluate every fact in this Chronicle snapshot."
-              />
-            </div>
-          )}
-        </SectionCard>
-      )}
-
       <SectionCard
         title="Performance by Chronicle group"
-        description="Each cell keeps its performance score beside the number of facts it can evaluate. Select a grouping to inspect where a model performs well, where it has sparse support, and why facts are unavailable."
+        description="Each cell keeps its performance score beside the number of facts executed by the current adapter. Select a grouping to inspect performance and why other facts were not evaluated in this run."
         actions={
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             Group by
@@ -413,7 +331,7 @@ function CrossDatasetOverviewView() {
                             <div className="mt-1 flex justify-end text-[11px] text-muted-foreground">
                               <span>
                                 {cell.unsupportedCount
-                                  ? cell.unsupportedCount.toLocaleString("en-US") + " unavailable"
+                                  ? cell.unsupportedCount.toLocaleString("en-US") + " not evaluated"
                                   : "All represented"}
                               </span>
                             </div>
