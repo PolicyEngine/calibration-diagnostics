@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 
-import { CalibrationMap } from "@/components/microcosm/calibration-map";
+import {
+  CalibrationExplorerDataPrefetch,
+  CalibrationExplorerMap,
+} from "@/components/microcosm/calibration-explorer-map";
 import { useCountry } from "@/components/layout/country-context";
-import { apiGet } from "@/lib/api/client";
-import { withBasePath } from "@/lib/base-path";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -20,12 +20,8 @@ import {
   releaseSelectOptions,
   useMicrocosm,
   useMicrocosmReleases,
-  useMicrocosmTargetTreemap,
 } from "@/lib/api/hooks/use-microcosm";
-import type {
-  GeographyCoverageBlock,
-  MicrocosmTreemapResponse,
-} from "@/lib/api/hooks/use-microcosm";
+import type { GeographyCoverageBlock } from "@/lib/api/hooks/use-microcosm";
 
 function formatPublishedAt(value: string | null | undefined): string {
   if (!value) return "—";
@@ -54,40 +50,21 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
 
 export function MicrocosmOverviewView() {
   const { country } = useCountry();
-  const queryClient = useQueryClient();
   const [release, setRelease] = useState("");
-  const [mapBreakdown, setMapBreakdown] = useState<"program" | "geography">("program");
+  const [pageIntroHeight, setPageIntroHeight] = useState(0);
   const { data: releaseData } = useMicrocosmReleases();
   const { data, isLoading, error } = useMicrocosm(release || undefined);
-  const { data: treemap } = useMicrocosmTargetTreemap(
-    release || undefined,
-    mapBreakdown,
-  );
 
   const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
-  const activeRelease = release || undefined;
 
-  useEffect(() => {
-    if (!treemap?.release_id || mapBreakdown !== "program") return;
-    void queryClient.prefetchQuery({
-      queryKey: [
-        "microcosm",
-        "target-treemap",
-        country,
-        activeRelease ?? "latest",
-        "geography",
-      ],
-      queryFn: () =>
-        apiGet<MicrocosmTreemapResponse>("/microcosm/target-treemap", {
-          release: activeRelease,
-          breakdown: "geography",
-          country,
-        }),
-      staleTime: 5 * 60 * 1000,
-    });
-  }, [activeRelease, country, mapBreakdown, queryClient, treemap?.release_id]);
-
-  if (isLoading) return <LoadingBlock label="Loading microcosm release…" />;
+  if (isLoading) {
+    return (
+      <>
+        <CalibrationExplorerDataPrefetch release={release || undefined} />
+        <LoadingBlock label="Loading microcosm release…" />
+      </>
+    );
+  }
   if (error || !data) {
     return (
       <EmptyState
@@ -106,6 +83,7 @@ export function MicrocosmOverviewView() {
 
   return (
     <div className="flex flex-col gap-5">
+      <CalibrationExplorerDataPrefetch release={release || undefined} />
       <PageHeader
         eyebrow="Microcosm · calibration fit"
         title="What the data is anchored to"
@@ -139,6 +117,7 @@ export function MicrocosmOverviewView() {
             options={releaseOptions}
           />
         }
+        onHeightChange={setPageIntroHeight}
       />
 
       {isNonDefault ? (
@@ -212,29 +191,11 @@ export function MicrocosmOverviewView() {
 
       <GeographyCoverageSection coverage={cal.geography_coverage ?? null} />
 
-      <SectionCard
-        title="Calibration map"
-        actions={
-          <div className="flex items-center gap-3">
-            <a
-              href={withBasePath("/microcosm/targets")}
-              className="whitespace-nowrap text-sm font-medium text-primary hover:underline"
-            >
-              All targets →
-            </a>
-          </div>
-        }
-      >
-        {treemap ? (
-          <CalibrationMap
-            data={treemap}
-            release={release || undefined}
-            breakdown={mapBreakdown}
-            onBreakdownChange={setMapBreakdown}
-          />
-        ) : (
-          <LoadingBlock label="Building calibration map…" />
-        )}
+      <SectionCard title="Calibration map">
+        <CalibrationExplorerMap
+          release={release || undefined}
+          pageIntroHeight={pageIntroHeight}
+        />
       </SectionCard>
 
       <details className="group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)]">
