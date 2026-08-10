@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 from decimal import Decimal
 
@@ -143,6 +144,205 @@ def test_missing_projection_pair_is_explicitly_not_comparable() -> None:
     assert result.transformed_value is None
     with pytest.raises(ValueError, match="not comparable"):
         result.to_aligned_fact()
+
+
+def test_pinned_release_factors_fill_missing_chronicle_projection_inputs(
+    tmp_path: Path,
+) -> None:
+    diagnostics = tmp_path / "calibration_diagnostics.json"
+    diagnostics.write_text(
+        json.dumps(
+            {
+                "targets": [
+                    {
+                        "period": 2024,
+                        "metadata": {
+                            "ledger_fact_period": "2022",
+                            "source_period": "2022",
+                            "aged_to": "2024",
+                            "source_measure_id": "adjusted_gross_income",
+                            "basis": "projection",
+                            "aging_factor": "1.12034597479376",
+                            "aging_factor_source": (
+                                "chained:irs_soi.ty2023.table_1_1.all."
+                                "adjusted_gross_income+cbo.revenue_projection."
+                                "ty2024.income_by_source.adjusted_gross_income."
+                                "projected_amount"
+                            ),
+                            "alignment_model_id": AGING_MODEL_ID,
+                            "alignment_model_version": AGING_MODEL_VERSION,
+                        },
+                    }
+                ]
+            }
+        )
+    )
+    target = fact(
+        period=TypedPeriod.parse("tax_year:2022"),
+        value=Decimal("250"),
+        measure="irs_soi.income_tax_liability_after_credits",
+        observed_measure={"source_measure_id": "income_tax_liability_amount"},
+    )
+
+    result = PopulaceAgingPolicy.from_facts(
+        [], release_diagnostics_path=diagnostics
+    ).transform(target, TypedPeriod.parse("tax_year:2024"))
+
+    assert result.status is AgingStatus.AGED
+    assert result.factor == Decimal("1.12034597479376")
+    assert float(result.transformed_value) == pytest.approx(280.08649369844)
+    assert result.factor_basis == "pinned_release_diagnostics"
+    assert result.factor_source.startswith("chained:")
+    assert result.to_aligned_fact().metadata["factor_basis"] == (
+        "pinned_release_diagnostics"
+    )
+
+
+def test_release_factors_keep_matching_series_priority(tmp_path: Path) -> None:
+    diagnostics = tmp_path / "calibration_diagnostics.json"
+    diagnostics.write_text(
+        json.dumps(
+            {
+                "targets": [
+                    {
+                        "period": 2024,
+                        "metadata": {
+                            "ledger_fact_period": "2022",
+                            "source_period": "2022",
+                            "aged_to": "2024",
+                            "source_measure_id": source_measure,
+                            "basis": "projection",
+                            "aging_factor": factor,
+                            "aging_factor_source": factor_source,
+                            "alignment_model_id": AGING_MODEL_ID,
+                            "alignment_model_version": AGING_MODEL_VERSION,
+                        },
+                    }
+                    for source_measure, factor, factor_source in (
+                        (
+                            "adjusted_gross_income",
+                            "1.12034597479376",
+                            "chained:soi-agi+cbo-agi",
+                        ),
+                        (
+                            "wages_salaries_amount",
+                            "1.10621361783409",
+                            "chained:soi-wages+cbo-wages",
+                        ),
+                    )
+                ]
+            }
+        )
+    )
+    target = fact(
+        period=TypedPeriod.parse("tax_year:2022"),
+        measure="irs_soi.wages_and_salaries",
+        observed_measure={"source_measure_id": "wages_salaries_amount"},
+    )
+
+    result = PopulaceAgingPolicy.from_facts(
+        [], release_diagnostics_path=diagnostics
+    ).transform(target, TypedPeriod.parse("tax_year:2024"))
+
+    assert result.factor == Decimal("1.10621361783409")
+    assert result.factor_source == "chained:soi-wages+cbo-wages"
+
+
+def test_release_factor_reconstructs_same_series_uprating_chain(
+    tmp_path: Path,
+) -> None:
+    diagnostics = tmp_path / "calibration_diagnostics.json"
+    diagnostics.write_text(
+        json.dumps(
+            {
+                "targets": [
+                    {
+                        "period": 2024,
+                        "metadata": {
+                            "ledger_fact_period": "2022",
+                            "source_period": "2023",
+                            "aged_to": "2024",
+                            "source_measure_id": "net_capital_gains_amount",
+                            "basis": "projection",
+                            "uprating_from_period": "2022",
+                            "uprating_to_period": "2023",
+                            "uprating_index": "total_net_capital_gains_amount",
+                            "uprating_index_source_record_id": (
+                                "irs_soi.ty2023.table_1_4.all."
+                                "net_capital_gains_amount"
+                            ),
+                            "uprating_factor": "0.771900044145164",
+                            "aging_factor": "1.31536580395354",
+                            "aging_factor_source": "cbo-net-capital-gain-2024",
+                            "alignment_model_id": AGING_MODEL_ID,
+                            "alignment_model_version": AGING_MODEL_VERSION,
+                        },
+                    }
+                ]
+            }
+        )
+    )
+    target = fact(
+        period=TypedPeriod.parse("tax_year:2022"),
+        measure="irs_soi.taxable_net_capital_gains",
+        observed_measure={"source_measure_id": "net_capital_gains_amount"},
+    )
+
+    result = PopulaceAgingPolicy.from_facts(
+        [], release_diagnostics_path=diagnostics
+    ).transform(target, TypedPeriod.parse("tax_year:2024"))
+
+    assert result.factor == (
+        Decimal("0.771900044145164") * Decimal("1.31536580395354")
+    )
+    assert result.factor_source.startswith(
+        "chained:irs_soi.ty2023.table_1_4.all.net_capital_gains_amount+"
+    )
+
+
+def test_release_factor_does_not_reuse_unrelated_surface_uprating(
+    tmp_path: Path,
+) -> None:
+    diagnostics = tmp_path / "calibration_diagnostics.json"
+    diagnostics.write_text(
+        json.dumps(
+            {
+                "targets": [
+                    {
+                        "period": 2024,
+                        "metadata": {
+                            "ledger_fact_period": "2022",
+                            "source_period": "2023",
+                            "aged_to": "2024",
+                            "source_measure_id": "taxable_interest_amount",
+                            "basis": "projection",
+                            "uprating_from_period": "2022",
+                            "uprating_to_period": "2023",
+                            "uprating_index": "total_taxable_interest_amount",
+                            "uprating_factor": "2.35213340844358",
+                            "aging_factor": "1.08721346938244",
+                            "aging_factor_source": "cbo-agi-2024",
+                            "alignment_model_id": AGING_MODEL_ID,
+                            "alignment_model_version": AGING_MODEL_VERSION,
+                        },
+                    }
+                ]
+            }
+        )
+    )
+
+    result = PopulaceAgingPolicy.from_facts(
+        [], release_diagnostics_path=diagnostics
+    ).transform(
+        fact(
+            period=TypedPeriod.parse("tax_year:2022"),
+            measure="irs_soi.taxable_interest",
+            observed_measure={"source_measure_id": "taxable_interest_amount"},
+        ),
+        TypedPeriod.parse("tax_year:2024"),
+    )
+
+    assert result.status is AgingStatus.UNAVAILABLE
 
 
 def test_chained_aging_uses_observed_soi_then_cbo_projection() -> None:

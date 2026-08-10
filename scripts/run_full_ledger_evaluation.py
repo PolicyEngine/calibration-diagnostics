@@ -93,7 +93,15 @@ def run(
                 f"{overview.ledger_snapshot_id}, not {snapshot_id}"
             )
 
-    aging_policy = PopulaceAgingPolicy.from_facts(facts)
+    diagnostics_path = populace_calibration_diagnostics
+    if diagnostics_path is None:
+        diagnostics_path = resolve_release_calibration_diagnostics(
+            POPULACE_RELEASE, populace_dataset.parent
+        )
+    aging_policy = PopulaceAgingPolicy.from_facts(
+        facts,
+        release_diagnostics_path=diagnostics_path,
+    )
     source_years = tuple(
         int(year) for year in populace_overview.alignment_policy["source_years"]
     )
@@ -104,11 +112,6 @@ def run(
         source_years=source_years,
         build_year=build_year,
     )
-    diagnostics_path = populace_calibration_diagnostics
-    if diagnostics_path is None:
-        diagnostics_path = resolve_release_calibration_diagnostics(
-            POPULACE_RELEASE, populace_dataset.parent
-        )
     release_target_alignments = compile_release_target_alignments(
         facts,
         diagnostics_path,
@@ -302,6 +305,15 @@ def run(
         "fallback_policy_status_counts": dict(
             sorted(Counter(row.status.value for row in aging_results).items())
         ),
+        "fallback_factor_basis_counts": dict(
+            sorted(
+                Counter(
+                    row.factor_basis
+                    for row in comparable_aging
+                    if row.factor_basis != "not_applicable"
+                ).items()
+            )
+        ),
         "benchmark_basis": (
             "Direct build targets use their exact compiled release values. Other "
             "executable rows use the pinned aging policy. Both retain each "
@@ -372,6 +384,15 @@ def run(
         "fallback_policy_count": len(comparable_2023),
         "fallback_policy_status_counts": dict(
             sorted(Counter(row.status.value for row in aging_2023).items())
+        ),
+        "fallback_factor_basis_counts": dict(
+            sorted(
+                Counter(
+                    row.factor_basis
+                    for row in comparable_2023
+                    if row.factor_basis != "not_applicable"
+                ).items()
+            )
         ),
         "benchmark_basis": (
             "Direct build targets use their exact compiled release values. Other "
