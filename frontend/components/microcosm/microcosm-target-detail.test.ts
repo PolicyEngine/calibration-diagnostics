@@ -1,0 +1,73 @@
+import { describe, expect, test } from "bun:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import type { MicrocosmTargetRow } from "@/lib/api/hooks/use-microcosm";
+import { MicrocosmTargetDetail } from "./microcosm-target-detail";
+
+const TARGET: MicrocosmTargetRow = {
+  name: "irs_soi.taxable_interest",
+  target: 100,
+  initial_estimate: 90,
+  final_estimate: 99,
+  initial_relative_error: -0.1,
+  relative_error: -0.01,
+  abs_relative_error: 0.01,
+  improvement: 0.09,
+  error_kind: "relative",
+  geography: "DC",
+  period: 2024,
+  source: "irs_soi",
+  source_citation:
+    "irs_soi | Publication 1304 Table 2.5 EITC by AGI and qualifying children | 23in25ic.xls",
+  policyengine_variables: ["taxable_interest_income"],
+  entity: "tax_unit",
+  aggregation: "sum",
+  calibration_status: "included",
+};
+
+function render(row: MicrocosmTargetRow = TARGET): string {
+  return renderToStaticMarkup(
+    createElement(MicrocosmTargetDetail, {
+      row,
+      dimensions: [],
+      onClose: () => undefined,
+    }),
+  );
+}
+
+describe("MicrocosmTargetDetail", () => {
+  test("keeps the three findings together and balances the wrapped fit-line spacing", () => {
+    const markup = render();
+
+    expect(markup).toContain("mt-4 grid md:grid-cols-2");
+    expect(markup).toContain("grid grid-cols-3 divide-x");
+    expect(markup).toContain("mx-2 my-6 md:my-0 md:self-center");
+    expect(markup).not.toContain("sm:grid-cols-3");
+  });
+
+  test("publishes both plot values and the resolved Chronicle entry in the markup", () => {
+    const markup = render();
+
+    expect(markup).toContain("aria-label=\"Before calibration:");
+    expect(markup).toContain("After calibration:");
+    expect(markup).toContain(
+      "href=\"https://chronicle.institute/sources/soi-table-2-5-eitc-agi-children-2023\"",
+    );
+    expect(markup).toContain(
+      "Chronicle source entry and model mapping used for the estimate",
+    );
+  });
+
+  test("renders explicit fallbacks when optional mapping metadata is absent", () => {
+    const markup = render({
+      ...TARGET,
+      source_citation: "ssa | SSI Monthly Statistics, December 2024, Table 1",
+      policyengine_variables: [],
+    });
+
+    expect(markup).toContain("No PolicyEngine variable mapping is published for this target.");
+    expect(markup).toContain("Chronicle entry</dt><dd");
+    expect(markup).toContain("Not available");
+  });
+});

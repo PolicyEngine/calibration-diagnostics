@@ -305,7 +305,7 @@ function ErrorComparison({
   const limit = niceAxisLimit(Math.max(Math.abs(initial ?? 0), Math.abs(final ?? 0)), minimum);
   const summary = improvementSummary(improvement, errorKind);
   return (
-    <div className="mx-2 mt-6 md:mt-0 md:self-center">
+    <div className="mx-2 my-6 md:my-0 md:self-center">
       <CombinedErrorTrack
         initial={initial}
         final={final}
@@ -437,7 +437,7 @@ export function MicrocosmTargetDetail({
   const sourceName = row.source ? sourceLabel(row.source) : "Source not specified";
   const measure = measureText(row) || titleFromIdentifier(row.name) || "Calibration target";
 
-  const rootRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLElement>(null);
   useEffect(() => {
     rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [row.name]);
@@ -527,7 +527,7 @@ export function MicrocosmTargetDetail({
           </div>
 
           <div className="mt-4 grid md:grid-cols-2">
-            <div className="mx-2 grid divide-y divide-border/70 border border-border/70 sm:grid-cols-3 sm:divide-x sm:divide-y-0 md:self-center">
+            <div className="mx-2 grid grid-cols-3 divide-x divide-border/70 border border-border/70 md:self-center">
               <Metric
                 label="Final estimate"
                 value={estimateText(final)}
@@ -619,7 +619,7 @@ export function MicrocosmTargetDetail({
 
         <Disclosure
           title="Source and calculation details"
-          description="Official citation and model mapping used for the estimate"
+          description="Chronicle source entry and model mapping used for the estimate"
         >
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
             <DefinitionItem label="Source" value={sourceName} />
