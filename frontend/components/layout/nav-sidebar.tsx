@@ -24,7 +24,7 @@ export function NavSidebar() {
     <div className="flex flex-col gap-5 py-5">
       <div className="px-3">
         {/* Labels and nav speak in the identity's mono voice (like the site's
-            nav links and kickers); the serif stays for display and content. */}
+            nav links and kickers); display and content inherit Inter. */}
         <div className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Dataset
         </div>

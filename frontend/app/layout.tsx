@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, STIX_Two_Text, Urbanist } from "next/font/google";
+import { IBM_Plex_Mono, Inter, Urbanist } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
-// The Microcosm faces (constellation-design/tokens/microcosm.css) — the same
-// three families microcosm.institute vendors — self-hosted here via next/font
-// so the dashboard renders identically with no external request. Exposed as
-// CSS variables that globals.css points --font-sans / --font-mono /
-// --font-wordmark at.
-const stixTwoText = STIX_Two_Text({
+// Keep dashboard content in the sans-serif face used before the Microcosm
+// rebrand while retaining the identity's mono labels and wordmark. All three
+// families are self-hosted via next/font and exposed as CSS variables that
+// globals.css points --font-sans / --font-mono / --font-wordmark at.
+const inter = Inter({
   subsets: ["latin"],
-  style: ["normal", "italic"],
-  variable: "--font-stix",
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -49,7 +47,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${stixTwoText.variable} ${ibmPlexMono.variable} ${urbanist.variable}`}
+      className={`${inter.variable} ${ibmPlexMono.variable} ${urbanist.variable}`}
     >
       <body>
         <div className="site-grain" aria-hidden="true" />
