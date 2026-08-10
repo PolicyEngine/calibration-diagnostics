@@ -40,10 +40,35 @@ describe("chronicleSourceEntryUrl", () => {
       "census-pep-2024-national-age-sex",
     ],
     ["Publication 1304 Table 1.1", "soi-table-1-1"],
+    ["IRS SOI Table 1.1", "soi-table-1-1"],
+    ["IRS SOI Publication 1304 Table 1.1", "soi-table-1-1"],
   ])("maps current source catalog entries to Chronicle (%s)", (citation, packageId) => {
     expect(chronicleSourceEntryUrl(citation)).toBe(
       `https://chronicle.institute/sources/${packageId}`,
     );
+  });
+
+  test.each([
+    [
+      "irs_soi | Publication 1304 Table 2.5 EITC by AGI and qualifying children | 22in25ic.xls | tax_year_2022",
+      "soi-table-2-5-eitc-agi-children-2022",
+    ],
+    [
+      "irs_soi | Publication 1304 Table 2.5 EITC by AGI and qualifying children | 23in25ic.xls | tax_year_2023",
+      "soi-table-2-5-eitc-agi-children-2023",
+    ],
+  ])("preserves the source vintage when resolving Chronicle (%s)", (citation, packageId) => {
+    expect(chronicleSourceEntryUrl(citation)).toBe(
+      `https://chronicle.institute/sources/${packageId}`,
+    );
+  });
+
+  test("does not guess a package when a versioned source omits its vintage", () => {
+    expect(
+      chronicleSourceEntryUrl(
+        "Publication 1304 Table 2.5 EITC by AGI and qualifying children",
+      ),
+    ).toBeNull();
   });
 
   test("does not invent a link for an unmapped source package", () => {

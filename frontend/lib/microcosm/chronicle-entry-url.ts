@@ -25,8 +25,6 @@ const PACKAGE_BY_SOURCE_TABLE: Readonly<Record<string, string>> = {
   "publication 1304 table 1.4": "soi-table-1-4",
   "publication 1304 table 2.1": "soi-table-2-1",
   "publication 1304 table 2.5": "soi-table-2-5",
-  "publication 1304 table 2.5 eitc by agi and qualifying children":
-    "soi-table-2-5-eitc-agi-children-2023",
   "publication 1304 table 4.3": "soi-table-4-3",
   "revenue projections, by category, february 2026, sheet 3.individual income tax details":
     "cbo-revenue-projections-income-by-source-2026-02",
@@ -43,6 +41,45 @@ const PACKAGE_BY_SOURCE_TABLE: Readonly<Record<string, string>> = {
     "federal-reserve-z1-household-net-worth",
 };
 
+const PACKAGE_BY_SOURCE_TABLE_AND_YEAR: Readonly<
+  Record<string, Readonly<Record<string, string>>>
+> = {
+  "publication 1304 table 2.5 eitc by agi and qualifying children": {
+    "2022": "soi-table-2-5-eitc-agi-children-2022",
+    "2023": "soi-table-2-5-eitc-agi-children-2023",
+  },
+};
+
+function canonicalSourceTable(sourceTable: string | undefined): string {
+  const normalized = sourceTable?.trim().toLowerCase().replace(/\s+/g, " ") ?? "";
+  return normalized
+    .replace(/^irs soi publication 1304 /, "publication 1304 ")
+    .replace(/^irs soi table /, "publication 1304 table ");
+}
+
+function sourceYear(sourceCitation: string | null | undefined): string | null {
+  const taxYear = sourceCitation?.match(/\btax_year[_\s-]*(20\d{2})\b/i)?.[1];
+  if (taxYear) return taxYear;
+
+  const irsFileYear = sourceCitation?.match(/\b(\d{2})in\d+[a-z]*\b/i)?.[1];
+  return irsFileYear ? `20${irsFileYear}` : null;
+}
+
+function packageFromSourceCitation(
+  sourceCitation: string | null | undefined,
+): string | null {
+  const citationParts = sourceCitation?.split("|") ?? [];
+  const sourceTable = canonicalSourceTable(
+    citationParts.length > 1 ? citationParts[1] : citationParts[0],
+  );
+  const versionedPackages = PACKAGE_BY_SOURCE_TABLE_AND_YEAR[sourceTable];
+  if (versionedPackages) {
+    const year = sourceYear(sourceCitation);
+    return year ? versionedPackages[year] ?? null : null;
+  }
+  return PACKAGE_BY_SOURCE_TABLE[sourceTable] ?? null;
+}
+
 function packageFromRecordSet(recordSet: string | null | undefined): string | null {
   const normalized = recordSet?.trim().toLowerCase() ?? "";
   if (normalized.includes("bea_nipa.cy2024.total_wages_salaries")) {
@@ -58,12 +95,8 @@ export function chronicleSourceEntryUrl(
   sourceCitation: string | null | undefined,
   recordSet?: string | null,
 ): string | null {
-  const citationParts = sourceCitation?.split("|") ?? [];
-  const sourceTable = (citationParts.length > 1 ? citationParts[1] : citationParts[0])
-    ?.trim()
-    .toLowerCase();
   const packageId =
     packageFromRecordSet(recordSet) ??
-    PACKAGE_BY_SOURCE_TABLE[sourceTable ?? ""];
+    packageFromSourceCitation(sourceCitation);
   return packageId ? `${CHRONICLE_SOURCES_BASE_URL}/${packageId}` : null;
 }
