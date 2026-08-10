@@ -72,12 +72,12 @@
   --text-success: #2c5a45;
   --text-warning: #c2410c; /* functional */
 
-  /* Fonts — the Microcosm faces: STIX Two Text (display + body), IBM Plex
-     Mono (labels), Urbanist (wordmark only). Loaded self-hosted via next/font
-     in app/layout.tsx, exposed as --font-stix / --font-plex / --font-urbanist,
-     and pointed at here so every component renders in the same faces as the
-     site. */
-  --font-sans: var(--font-stix), Georgia, serif;
+  /* Fonts — Inter (display + body), IBM Plex Mono (labels), and Urbanist
+     (wordmark only). Loaded self-hosted via next/font in app/layout.tsx and
+     exposed as --font-inter / --font-plex / --font-urbanist. */
+  --font-sans:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
   --font-mono: var(--font-plex), ui-monospace, Menlo, monospace;
   --font-wordmark:
     var(--font-urbanist), "Avenir Next", "Century Gothic", Futura, sans-serif;
