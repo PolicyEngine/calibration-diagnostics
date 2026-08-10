@@ -1,6 +1,7 @@
 import type {
   CrossDatasetGroup,
   CrossDatasetSummary,
+  PerformanceBuckets,
   SourceSummary,
 } from "./artifact";
 
@@ -23,14 +24,23 @@ export interface LabeledCount {
   count: number;
 }
 
+export interface TargetPerformanceBuckets {
+  withinBounds: number;
+  outsideBounds: number;
+  farOutsideBounds: number;
+  unavailable: number;
+  total: number;
+}
+
 export interface SourceOverview {
   sourceId: string;
   label: string;
   datasetVersion?: string;
   modelVersion?: string;
   scoreLabel: string;
+  coverageRateLabel: string;
   scoreScopeLabel: string;
-  performancePercent: number | null;
+  performanceBuckets: TargetPerformanceBuckets;
   coverageLabel: string;
   coveredCount: number;
   unsupportedCount: number;
@@ -39,9 +49,21 @@ export interface SourceOverview {
   calibrationExposures: LabeledCount[];
 }
 
+export type OverviewGeographyFilter =
+  | "all"
+  | "country"
+  | "state"
+  | "congressional_district";
+export type OverviewSampleFilter = "all" | "in_sample" | "out_of_sample";
+
+export interface SourceOverviewFilter {
+  geography: OverviewGeographyFilter;
+  sample: OverviewSampleFilter;
+}
+
 export interface GroupSourceView {
   scoreLabel: string;
-  performancePercent: number | null;
+  performanceBuckets: TargetPerformanceBuckets;
   coverageLabel: string;
   evaluableCount: number;
   scoredCount: number;
@@ -97,14 +119,27 @@ function number(value: string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function scorePercent(value: string | null | undefined): number | null {
+function formatError(value: string | null | undefined): string {
   const parsed = number(value);
-  return parsed == null ? null : Math.max(0, Math.min(100, parsed));
+  return parsed == null ? "Not scored" : `${(parsed * 100).toFixed(1)}% mean error`;
 }
 
-function formatScore(value: string | null | undefined, suffix = ""): string {
-  const parsed = number(value);
-  return parsed == null ? "Not scored" : `${parsed.toFixed(1)}${suffix}`;
+function formatCoverageRate(covered: number, total: number): string {
+  return total > 0
+    ? `${((covered / total) * 100).toFixed(1)}% coverage`
+    : "Coverage unavailable";
+}
+
+function performanceBuckets(
+  value: PerformanceBuckets,
+): TargetPerformanceBuckets {
+  return {
+    withinBounds: value.within_bounds,
+    outsideBounds: value.outside_bounds,
+    farOutsideBounds: value.far_outside_bounds,
+    unavailable: value.unavailable,
+    total: value.total,
+  };
 }
 
 function labeledCounts(
@@ -150,19 +185,73 @@ function sourceCategories(
 export function buildSourceOverviews(
   summary: CrossDatasetSummary,
   groups: CrossDatasetGroup[],
+  filters: Record<string, Partial<SourceOverviewFilter>> = {},
 ): SourceOverview[] {
   return orderSourceSummaries(summary.sources).map((source) => {
-    const covered = source.score.covered;
-    const scored = source.score.scored;
+    const filter = filters[source.source_id] ?? {};
+    const geography = filter.geography ?? "all";
+    const sample = filter.sample ?? "all";
+    const filterActive = geography !== "all" || sample !== "all";
+    const exposure =
+      sample === "in_sample"
+        ? "direct_calibration_target"
+        : sample === "out_of_sample"
+          ? "external_validation"
+          : null;
+    const filteredGroup =
+      geography === "all" && exposure == null
+        ? null
+        : groups.find((group) => {
+            if (geography !== "all" && exposure != null) {
+              return (
+                group.dimension === "geography_calibration_exposure" &&
+                group.key === `${geography}|${exposure}`
+              );
+            }
+            if (geography !== "all") {
+              return group.dimension === "geography" && group.key === geography;
+            }
+            return group.dimension === "calibration_exposure" && group.key === exposure;
+          });
+    const filteredCell =
+      filteredGroup?.sources[source.source_id] ??
+      (filterActive
+        ? {
+            evaluable: 0,
+            scored: 0,
+            relative_error_count: 0,
+            display_score: null,
+            loss: null,
+            performance_buckets: {
+              within_bounds: 0,
+              outside_bounds: 0,
+              far_outside_bounds: 0,
+              unavailable: 0,
+              total: 0,
+            },
+            reason_codes: {},
+          }
+        : undefined);
+    const score = filteredCell ?? source.score;
+    const buckets = filteredCell?.performance_buckets ?? source.performance_buckets;
+    const covered = filteredCell?.evaluable ?? source.score.covered;
+    const comparable = score.relative_error_count ?? score.scored;
+    const coverageUniverse =
+      geography === "all"
+        ? summary.fact_count
+        : (groups.find(
+            (group) => group.dimension === "geography" && group.key === geography,
+          )?.fact_count ?? summary.fact_count);
     return {
       sourceId: source.source_id,
       label: sourceDisplayLabel(source),
       datasetVersion: source.dataset_version,
       modelVersion: source.model_version,
-      scoreLabel: formatScore(source.score.display_score, " / 100"),
-      scoreScopeLabel: `Performance among ${scored.toLocaleString("en-US")} scored facts`,
-      performancePercent: scorePercent(source.score.display_score),
-      coverageLabel: `${covered.toLocaleString("en-US")} of ${summary.fact_count.toLocaleString("en-US")} facts`,
+      scoreLabel: formatError(score.loss),
+      coverageRateLabel: formatCoverageRate(covered, coverageUniverse),
+      scoreScopeLabel: `Mean capped error across ${comparable.toLocaleString("en-US")} comparable facts`,
+      performanceBuckets: performanceBuckets(buckets),
+      coverageLabel: `${covered.toLocaleString("en-US")} of ${coverageUniverse.toLocaleString("en-US")} facts`,
       coveredCount: covered,
       unsupportedCount: Math.max(0, source.capability_count - source.result_count),
       topUnsupportedReasons: labeledCounts(source.reason_codes).slice(0, 3),
@@ -221,7 +310,16 @@ function sourceGroupView(
   const cell = group.sources[source.source_id] ?? {
     evaluable: 0,
     scored: 0,
+    relative_error_count: 0,
     display_score: null,
+    loss: null,
+    performance_buckets: {
+      within_bounds: 0,
+      outside_bounds: 0,
+      far_outside_bounds: 0,
+      unavailable: 0,
+      total: 0,
+    },
     reason_codes: {},
   };
   const sourceSpecific =
@@ -229,8 +327,8 @@ function sourceGroupView(
   const total = sourceSpecific ? groupCellCount(group, source.source_id) : group.fact_count;
   const unsupported = Math.max(0, total - cell.evaluable);
   return {
-    scoreLabel: formatScore(cell.display_score),
-    performancePercent: scorePercent(cell.display_score),
+    scoreLabel: formatError(cell.loss),
+    performanceBuckets: performanceBuckets(cell.performance_buckets),
     coverageLabel: `${cell.evaluable.toLocaleString("en-US")} / ${total.toLocaleString("en-US")}`,
     evaluableCount: cell.evaluable,
     scoredCount: cell.scored,

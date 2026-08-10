@@ -97,6 +97,23 @@ def load_snapshot_facts(
     return tuple(facts), manifest
 
 
+def scope_facts_to_jurisdictions(
+    facts: Iterable[FactContract], jurisdictions: Iterable[str]
+) -> tuple[FactContract, ...]:
+    """Select an explicit jurisdiction scope before building a capability matrix."""
+
+    allowed = frozenset(jurisdictions)
+    if not allowed or any(not value for value in allowed):
+        raise ValueError("evaluation jurisdiction scope must be non-empty")
+    scoped = tuple(fact for fact in facts if fact.jurisdiction in allowed)
+    if not scoped:
+        raise ValueError(
+            "Chronicle snapshot contains no facts for jurisdictions "
+            f"{sorted(allowed)}"
+        )
+    return scoped
+
+
 def build_full_capability_matrix(
     facts: Iterable[FactContract],
     source_plans: Iterable[SourcePlan],

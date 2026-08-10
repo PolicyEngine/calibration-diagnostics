@@ -118,14 +118,15 @@ unrounded diagnostics and input manifest.
 
 ## Full Ledger run
 
-The full pass classified all 48,313 facts for raw ACS PUMS and executed all 954
-supported cells. Every executed row has an estimate, standard error, and 90%
+The full pass excludes 2,064 non-US source facts, classifies all 46,249 US facts
+for raw ACS PUMS, and executes all 954 supported cells. Every executed row has
+an estimate, standard error, and 90%
 margin of error in both the immutable run and the frontend fact artifact. The
 source scored 99.427 on the current display scale. That high result must be
 read with the related-weighting caveat above, not as independent validation.
 
 The combined three-source artifact is run
-`evaluation-94fc97cc315f20a50de892a3`: 144,939 capability cells, 10,403
+`evaluation-a2a9671d0aa804d700fe37a2`: 138,747 capability cells, 45,338
 estimates, and a complete frontend bundle.
 
 Rebuild and verify with:

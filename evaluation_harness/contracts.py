@@ -35,6 +35,7 @@ class CapabilityStatus(StringEnum):
 class ExecutionMethod(StringEnum):
     DIRECT = "direct"
     MODEL = "model"
+    PRECOMPUTED = "precomputed"
     NONE = "none"
 
 
@@ -226,13 +227,17 @@ class CapabilityResult:
     score_eligible: bool
 
     def __post_init__(self) -> None:
-        executable = self.execution_method is not ExecutionMethod.NONE
+        query_executable = self.execution_method in {
+            ExecutionMethod.DIRECT,
+            ExecutionMethod.MODEL,
+        }
+        evaluated = self.execution_method is not ExecutionMethod.NONE
         if self.source_type is SourceType.AGGREGATE_DATASET and self.execution_method is ExecutionMethod.MODEL:
             raise ValueError("raw dataset capability cannot request model execution")
-        if executable and self.query is None:
+        if query_executable and self.query is None:
             raise ValueError("executable capability requires a query")
-        if not executable and self.query is not None:
-            raise ValueError("unsupported capability cannot contain an executable query")
+        if not query_executable and self.query is not None:
+            raise ValueError("non-query capability cannot contain an executable query")
         if self.period_treatment is PeriodTreatment.ALIGNED_FACT:
             if not self.alignment_id or self.alignment_quality is AlignmentQuality.NONE:
                 raise ValueError("aligned fact capability requires alignment provenance")
@@ -244,7 +249,7 @@ class CapabilityResult:
             CapabilityStatus.UNSUPPORTED_CONSTRAINT,
             CapabilityStatus.PRIVATE_INPUT,
             CapabilityStatus.NOT_APPLICABLE,
-        } and executable:
+        } and evaluated:
             raise ValueError("unsupported capability cannot be executable")
 
     @classmethod

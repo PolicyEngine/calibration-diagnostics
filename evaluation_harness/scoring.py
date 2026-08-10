@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Iterable
@@ -8,7 +7,7 @@ from typing import Iterable
 from .contracts import CalibrationExposure, PeriodTreatment
 
 
-LOSS_CAP = Decimal("2")
+LOSS_CAP = Decimal("1")
 
 
 @dataclass(frozen=True)
@@ -54,13 +53,13 @@ def build_group_score(
         and (period_treatment is None or row.period_treatment is period_treatment)
     ]
     eligible = [row for row in selected if row.score_eligible]
-    family_errors: dict[str, list[Decimal]] = defaultdict(list)
+    errors: list[Decimal] = []
     for row in eligible:
         error = absolute_relative_error(row.estimate, row.benchmark)
         if error is not None:
-            family_errors[row.family].append(min(error, LOSS_CAP))
+            errors.append(min(error, LOSS_CAP))
 
-    if not family_errors:
+    if not errors:
         return GroupScore(
             covered=len(selected),
             scored=len(eligible),
@@ -69,14 +68,14 @@ def build_group_score(
             display_score=None,
         )
 
-    family_losses = [_mean(errors) for errors in family_errors.values()]
-    loss = _mean(family_losses)
-    display_score = max(Decimal(0), Decimal(100) * (Decimal(1) - loss / LOSS_CAP))
+    loss = _mean(errors)
+    # Kept in the artifact for backwards compatibility. The page reports ``loss``
+    # directly as a percentage error; it no longer presents this inverse score.
+    display_score = Decimal(100) * (Decimal(1) - loss)
     return GroupScore(
         covered=len(selected),
         scored=len(eligible),
-        relative_error_count=sum(len(errors) for errors in family_errors.values()),
+        relative_error_count=len(errors),
         loss=loss,
         display_score=display_score,
     )
-

@@ -9,12 +9,14 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .contracts import CalibrationExposure, PeriodTreatment
-from .full_run import load_snapshot_facts
+from .full_run import load_snapshot_facts, scope_facts_to_jurisdictions
 from .publisher import RUN_SCHEMA
 from .scoring import ScoreObservation, build_group_score
 
 
 FRONTEND_BUNDLE_SCHEMA = "cross_dataset.frontend_bundle.v1"
+WITHIN_BOUNDS_RELATIVE_ERROR = Decimal("0.10")
+FAR_OUTSIDE_BOUNDS_RELATIVE_ERROR = Decimal("0.25")
 
 DEFAULT_SOURCE_LABELS = {
     "census_acs_pums_2024": "Raw ACS PUMS",
@@ -72,6 +74,31 @@ def _verify_run_artifact(run_path: Path) -> tuple[dict[str, Any], dict[str, Any]
     return manifest, summary
 
 
+def _facts_in_run_scope(
+    facts: tuple[Any, ...], run_summary: dict[str, Any]
+) -> tuple[Any, ...]:
+    scope = run_summary.get("evaluation_scope")
+    if scope is None:
+        return facts
+    if not isinstance(scope, dict):
+        raise ValueError("evaluation run has a malformed evaluation_scope")
+    jurisdictions = scope.get("jurisdictions")
+    if (
+        not isinstance(jurisdictions, list)
+        or not jurisdictions
+        or any(not isinstance(value, str) or not value for value in jurisdictions)
+    ):
+        raise ValueError("evaluation run has no explicit jurisdiction scope")
+    if scope.get("source_snapshot_fact_count") != len(facts):
+        raise ValueError("evaluation scope source fact count does not match snapshot")
+    scoped = scope_facts_to_jurisdictions(facts, jurisdictions)
+    if scope.get("included_fact_count") != len(scoped):
+        raise ValueError("evaluation scope included fact count does not reconcile")
+    if scope.get("excluded_fact_count") != len(facts) - len(scoped):
+        raise ValueError("evaluation scope excluded fact count does not reconcile")
+    return scoped
+
+
 def _canonical_period(value: Any) -> str | None:
     if value is None:
         return None
@@ -127,6 +154,7 @@ def _source_cell(
                 "model_version": result.get("model_version"),
                 "standard_error": result.get("standard_error"),
                 "margin_of_error_90": result.get("margin_of_error_90"),
+                "estimate_basis": result.get("estimate_basis"),
             }
         )
     if score is not None:
@@ -206,7 +234,7 @@ def _display_label(value: str) -> str:
 
 def _score_for_group(
     source_scores: list[dict[str, Any]], fact_keys: set[str]
-) -> tuple[int, str | None, str | None]:
+) -> tuple[int, int, str | None, str | None]:
     observations = [
         ScoreObservation(
             fact_key=row["fact_key"],
@@ -223,9 +251,53 @@ def _score_for_group(
     score = build_group_score(observations)
     return (
         score.scored,
+        score.relative_error_count,
         str(score.display_score) if score.display_score is not None else None,
         str(score.loss) if score.loss is not None else None,
     )
+
+
+def _performance_buckets(
+    source_scores: list[dict[str, Any]],
+    fact_keys: set[str],
+    *,
+    total: int,
+) -> dict[str, int]:
+    """Classify every target into stable relative-error display bands."""
+
+    counts = {
+        "within_bounds": 0,
+        "outside_bounds": 0,
+        "far_outside_bounds": 0,
+    }
+    seen: set[str] = set()
+    for row in source_scores:
+        fact_key = str(row["fact_key"])
+        if fact_key not in fact_keys or not row.get("score_eligible"):
+            continue
+        value = row.get("absolute_relative_error")
+        if value is None:
+            continue
+        if fact_key in seen:
+            raise ValueError(f"duplicate score row for performance bucket: {fact_key}")
+        seen.add(fact_key)
+        error = Decimal(str(value))
+        if not error.is_finite() or error < 0:
+            raise ValueError(f"invalid absolute relative error for {fact_key}: {value}")
+        if error <= WITHIN_BOUNDS_RELATIVE_ERROR:
+            counts["within_bounds"] += 1
+        elif error <= FAR_OUTSIDE_BOUNDS_RELATIVE_ERROR:
+            counts["outside_bounds"] += 1
+        else:
+            counts["far_outside_bounds"] += 1
+    classified = sum(counts.values())
+    if classified > total:
+        raise ValueError("performance bucket counts exceed the target total")
+    return {
+        **counts,
+        "unavailable": total - classified,
+        "total": total,
+    }
 
 
 def _build_groups(
@@ -262,14 +334,20 @@ def _build_groups(
                     for row in capabilities_by_source[source_id]
                     if row["fact_key"] in fact_keys
                 ]
-                scored, display_score, loss = _score_for_group(
+                scored, relative_error_count, display_score, loss = _score_for_group(
                     scores_by_source[source_id], fact_keys
                 )
                 source_values[source_id] = {
                     "evaluable": sum(row["execution_method"] != "none" for row in cells),
                     "scored": scored,
+                    "relative_error_count": relative_error_count,
                     "display_score": display_score,
                     "loss": loss,
+                    "performance_buckets": _performance_buckets(
+                        scores_by_source[source_id],
+                        fact_keys,
+                        total=len(fact_keys),
+                    ),
                     "reason_codes": dict(
                         sorted(
                             Counter(
@@ -314,14 +392,20 @@ def _build_groups(
                     if row.get(capability_field) == key
                 ]
                 source_fact_keys = {row["fact_key"] for row in cells}
-                scored, display_score, loss = _score_for_group(
+                scored, relative_error_count, display_score, loss = _score_for_group(
                     scores_by_source[source_id], source_fact_keys
                 )
                 source_values[source_id] = {
                     "evaluable": sum(row["execution_method"] != "none" for row in cells),
                     "scored": scored,
+                    "relative_error_count": relative_error_count,
                     "display_score": display_score,
                     "loss": loss,
+                    "performance_buckets": _performance_buckets(
+                        scores_by_source[source_id],
+                        source_fact_keys,
+                        total=len(cells),
+                    ),
                     "reason_codes": dict(
                         sorted(
                             Counter(
@@ -338,6 +422,68 @@ def _build_groups(
                     "key": key,
                     "label": _display_label(key),
                     "fact_count": len(fact_keys),
+                    "sources": source_values,
+                }
+            )
+    geography_by_fact_key = {
+        fact.fact_key: fact.geography_level for fact in fact_values
+    }
+    geographies = sorted(set(geography_by_fact_key.values()))
+    exposures = sorted(
+        {
+            str(row["calibration_exposure"])
+            for row in capabilities
+            if row.get("calibration_exposure")
+        }
+    )
+    for geography in geographies:
+        for exposure in exposures:
+            source_values: dict[str, Any] = {}
+            group_fact_keys: set[str] = set()
+            for source_id in source_ids:
+                cells = [
+                    row
+                    for row in capabilities_by_source[source_id]
+                    if geography_by_fact_key[row["fact_key"]] == geography
+                    and row.get("calibration_exposure") == exposure
+                ]
+                source_fact_keys = {row["fact_key"] for row in cells}
+                group_fact_keys.update(source_fact_keys)
+                scored, relative_error_count, display_score, loss = _score_for_group(
+                    scores_by_source[source_id], source_fact_keys
+                )
+                source_values[source_id] = {
+                    "evaluable": sum(
+                        row["execution_method"] != "none" for row in cells
+                    ),
+                    "scored": scored,
+                    "relative_error_count": relative_error_count,
+                    "display_score": display_score,
+                    "loss": loss,
+                    "performance_buckets": _performance_buckets(
+                        scores_by_source[source_id],
+                        source_fact_keys,
+                        total=len(cells),
+                    ),
+                    "reason_codes": dict(
+                        sorted(
+                            Counter(
+                                row["reason_code"]
+                                for row in cells
+                                if row.get("reason_code")
+                            ).items()
+                        )
+                    ),
+                }
+            groups.append(
+                {
+                    "dimension": "geography_calibration_exposure",
+                    "key": f"{geography}|{exposure}",
+                    "label": (
+                        f"{_display_label(geography)} / "
+                        f"{_display_label(exposure)}"
+                    ),
+                    "fact_count": len(group_fact_keys),
                     "sources": source_values,
                 }
             )
@@ -368,7 +514,8 @@ def publish_frontend_bundle(
         raise FileExistsError(f"frontend bundle already exists: {output}")
     run = Path(run_path)
     run_manifest, run_summary = _verify_run_artifact(run)
-    facts, snapshot_manifest = load_snapshot_facts(snapshot_path)
+    snapshot_facts, snapshot_manifest = load_snapshot_facts(snapshot_path)
+    facts = _facts_in_run_scope(snapshot_facts, run_summary)
     snapshot_id = snapshot_manifest["snapshot_id"]
     if run_manifest.get("snapshot_ids") != [snapshot_id]:
         raise ValueError("evaluation run and Chronicle snapshot IDs do not match")
@@ -412,6 +559,11 @@ def publish_frontend_bundle(
                 "capability_count": value["capability_count"],
                 "result_count": value["result_count"],
                 "score": value["score"],
+                "performance_buckets": _performance_buckets(
+                    [row for row in scores_values if row["source_id"] == source_id],
+                    {row["fact_key"] for row in source_capabilities},
+                    total=len(source_capabilities),
+                ),
                 "capability_statuses": value["capability_statuses"],
                 "reason_codes": value["reason_codes"],
                 "period_treatments": value["period_treatments"],
@@ -423,6 +575,7 @@ def publish_frontend_bundle(
         "schema_version": FRONTEND_BUNDLE_SCHEMA,
         "run_id": run_manifest["run_id"],
         "snapshot_id": snapshot_id,
+        "jurisdictions": sorted({fact.jurisdiction for fact in facts}),
     }
     summary_document = {
         **common,

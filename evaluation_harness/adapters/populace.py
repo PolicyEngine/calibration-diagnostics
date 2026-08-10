@@ -331,6 +331,38 @@ class PopulacePolicyEngineRunner:
         return self._household_values_for_entity(entity, household_districts)
 
     def _model_array(self, requested_name: str, entity: str, period: str) -> np.ndarray:
+        if requested_name.startswith("soi_positive:"):
+            if entity != "tax_unit":
+                raise ValueError("SOI positive-part expressions require tax-unit grain")
+            expression = requested_name.split(":", 1)[1]
+            return np.maximum(
+                np.asarray(self._model_array(expression, entity, period), dtype=float),
+                0.0,
+            )
+        if requested_name.startswith("soi_itemized:"):
+            if entity != "tax_unit":
+                raise ValueError("SOI itemized expressions require tax-unit grain")
+            expression = requested_name.split(":", 1)[1]
+            values = np.maximum(
+                np.asarray(self._model_array(expression, entity, period), dtype=float),
+                0.0,
+            )
+            itemizes = self._native_model_array(
+                "tax_unit_itemizes", period, expected_entity="tax_unit"
+            ).astype(bool)
+            return np.where(itemizes, values, 0.0)
+        if requested_name == "soi_capped_ctc":
+            if entity != "tax_unit":
+                raise ValueError("SOI CTC expressions require tax-unit grain")
+            ctc = self._native_model_array(
+                "ctc", period, expected_entity="tax_unit"
+            )
+            limiting_tax = self._native_model_array(
+                "ctc_limiting_tax_liability",
+                period,
+                expected_entity="tax_unit",
+            )
+            return np.maximum(np.minimum(ctc, limiting_tax), 0.0)
         if requested_name.startswith("tax_unit_sum_person:"):
             expression = requested_name.split(":", 1)[1]
             values = sum(

@@ -7,6 +7,11 @@ ACS PUMS. Yale is deferred pending a reproducible reconstruction, and the API
 is source-agnostic so it can be added later without changing the response
 contract.
 
+This page is explicitly US-only. The run records `jurisdictions: [US]` and
+filters the immutable Chronicle source snapshot before capability
+classification. Its current scope is 46,249 US facts; 2,064 non-US source facts
+are excluded rather than emitted as `not_applicable` cells.
+
 ## Publish frontend partitions
 
 After a full evaluation run, publish the web partitions from the same pinned
@@ -46,7 +51,7 @@ bundle returns HTTP 503 rather than serving mixed results.
 `GET /api/populace/cross-dataset` accepts these views:
 
 - `view=summary` (default): source-level score, coverage, capability statuses,
-  unsupported reasons, and period treatments.
+  unsupported reasons, period treatments, and target-performance buckets.
 - `view=groups`: groups by `ledger_source`, `concept`, observed `period`,
   `geography`, `period_treatment`, or `calibration_exposure`; optional
   `dimension` and `source` filters.
@@ -62,3 +67,17 @@ bundle returns HTTP 503 rather than serving mixed results.
 
 Fact filters use the bundle's page index to fetch only candidate partitions.
 The API never sends the entire Chronicle catalog to the browser.
+
+The page's headline error is `score.loss × 100`: the arithmetic mean across
+individual comparable facts of `min(abs(estimate / benchmark - 1), 1)`. Thus
+each fact contributes at most 100% error, facts are not first averaged into
+families, and lower is better. Zero-valued benchmarks remain evaluated but do
+not enter this relative-error mean; `relative_error_count` is the exact
+denominator shown by the page. The legacy inverse `display_score` remains in
+the artifact for compatibility but is not presented as a score out of 100.
+
+The performance bars are computed while publishing the immutable artifact,
+not inferred from the aggregate error in the browser. Every fact is assigned
+to exactly one display bucket: green for absolute relative error at or below
+10%, yellow for error above 10% through 25%, red for error above 25%, and dark
+gray when no comparable relative error exists (including unmapped facts).

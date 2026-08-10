@@ -45,7 +45,7 @@ def test_group_score_reports_zero_targets_without_inventing_percent_error() -> N
     assert score.display_score is None
 
 
-def test_group_score_macro_averages_families_instead_of_rows() -> None:
+def test_group_score_means_errors_across_facts_instead_of_families() -> None:
     rows = [
         observation("a1", "100", "100", "family_a"),
         observation("a2", "100", "100", "family_a"),
@@ -53,8 +53,22 @@ def test_group_score_macro_averages_families_instead_of_rows() -> None:
         observation("b1", "100", "200", "family_b"),
     ]
     score = build_group_score(rows)
-    assert score.loss == Decimal("0.5")
+    assert score.relative_error_count == 4
+    assert score.loss == Decimal("0.25")
     assert score.display_score == Decimal("75.0")
+
+
+def test_group_score_caps_each_fact_error_at_one_hundred_percent() -> None:
+    rows = [
+        observation("exact", "100", "100", "family_a"),
+        observation("one-hundred-percent", "100", "200", "family_a"),
+        observation("three-hundred-percent", "100", "400", "family_b"),
+    ]
+
+    score = build_group_score(rows)
+
+    assert score.loss == Decimal("0.6666666666666666666666666667")
+    assert score.display_score == Decimal("33.33333333333333333333333333")
 
 
 def test_ineligible_rows_count_as_coverage_but_not_score() -> None:

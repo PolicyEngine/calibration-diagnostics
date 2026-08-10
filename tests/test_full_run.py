@@ -27,6 +27,7 @@ from evaluation_harness.full_run import (
     build_scored_results,
     build_run_summary,
     load_snapshot_facts,
+    scope_facts_to_jurisdictions,
 )
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.planner import EvaluationSourceManifest
@@ -37,11 +38,12 @@ def fact(
     *,
     period: str = "tax_year:2024",
     value: str = "100",
+    jurisdiction: str = "US",
 ) -> FactContract:
     return FactContract(
         fact_key=fact_key,
         source="irs_soi",
-        jurisdiction="US",
+        jurisdiction=jurisdiction,
         period=TypedPeriod.parse(period),
         geography_level="country",
         geography_id="0100000US",
@@ -173,6 +175,18 @@ def test_full_matrix_contains_one_cell_for_every_fact_source_pair() -> None:
         for ledger_fact in facts
         for plan in plans
     }
+
+
+def test_us_scope_removes_non_us_chronicle_facts_before_classification() -> None:
+    us_fact = fact("ledger.aggregate_fact.v2:us")
+    uk_fact = replace(
+        fact("ledger.aggregate_fact.v2:uk", jurisdiction="UK"),
+        geography_id="K02000001",
+    )
+
+    scoped = scope_facts_to_jurisdictions((us_fact, uk_fact), {"US"})
+
+    assert scoped == (us_fact,)
 
 
 def test_source_plan_propagates_fact_specific_calibration_exposure() -> None:

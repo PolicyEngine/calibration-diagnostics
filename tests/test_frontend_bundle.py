@@ -22,6 +22,7 @@ from evaluation_harness.contracts import (
 from evaluation_harness.execution import EvaluationResult
 from evaluation_harness.frontend_bundle import (
     FRONTEND_BUNDLE_SCHEMA,
+    _performance_buckets,
     publish_frontend_bundle,
 )
 from evaluation_harness.full_run import build_run_summary, build_scored_results
@@ -40,11 +41,12 @@ def fact(
     entity: str = "tax_unit",
     unit: str = "usd",
     value: str = "100",
+    jurisdiction: str = "US",
 ) -> FactContract:
     return FactContract(
         fact_key=key,
         source=source,
-        jurisdiction="US",
+        jurisdiction=jurisdiction,
         period=TypedPeriod.parse(period),
         geography_level=geography_level,
         geography_id=geography_id,
@@ -126,7 +128,9 @@ def result(cell: CapabilityResult, estimate: str) -> EvaluationResult:
     )
 
 
-def published_inputs(tmp_path: Path) -> tuple[Path, Path]:
+def published_inputs(
+    tmp_path: Path, *, include_non_us_snapshot_fact: bool = False
+) -> tuple[Path, Path]:
     facts = (
         fact("fact-a"),
         fact(
@@ -141,22 +145,40 @@ def published_inputs(tmp_path: Path) -> tuple[Path, Path]:
         ),
         fact("fact-c", period="tax_year:2023", measure="irs_soi.ordinary_dividends"),
     )
+    snapshot_facts = facts
+    if include_non_us_snapshot_fact:
+        snapshot_facts = (
+            *facts,
+            fact(
+                "fact-be",
+                source="statbel",
+                measure="statbel.population",
+                geography_id="BE",
+                entity="person",
+                unit="count",
+                jurisdiction="BE",
+            ),
+        )
     snapshot = tmp_path / "snapshot"
     snapshot.mkdir(parents=True)
-    facts_text = "".join(f"{item.to_json()}\n" for item in facts)
+    facts_text = "".join(f"{item.to_json()}\n" for item in snapshot_facts)
     (snapshot / "facts.jsonl").write_text(facts_text)
     (snapshot / "snapshot_manifest.json").write_text(
         json.dumps(
             {
                 "schema_version": SNAPSHOT_SCHEMA,
                 "snapshot_id": "ledger-test",
-                "fact_count": len(facts),
+                "fact_count": len(snapshot_facts),
                 "normalized_facts_sha256": hashlib.sha256(facts_text.encode()).hexdigest(),
             }
         )
     )
 
-    populace_a = supported(facts[0], "populace")
+    populace_a = replace(
+        supported(facts[0], "populace"),
+        status=CapabilityStatus.CALIBRATION_TARGET,
+        calibration_exposure=CalibrationExposure.DIRECT_CALIBRATION_TARGET,
+    )
     populace_b = supported(facts[1], "populace")
     cps_a = supported(facts[0], "cps")
     capabilities = (
@@ -185,17 +207,64 @@ def published_inputs(tmp_path: Path) -> tuple[Path, Path]:
     results = (
         result(populace_a, "101"),
         replace(
-            result(populace_b, "198"),
+            result(populace_b, "140"),
             standard_error=Decimal("3"),
             margin_of_error_90=Decimal("4.935"),
         ),
-        result(cps_a, "90"),
+        result(cps_a, "80"),
     )
     scores = build_scored_results(facts, capabilities, results, ())
     summary = build_run_summary(facts, capabilities, results, scores)
+    if include_non_us_snapshot_fact:
+        summary["evaluation_scope"] = {
+            "jurisdictions": ["US"],
+            "source_snapshot_fact_count": len(snapshot_facts),
+            "included_fact_count": len(facts),
+            "excluded_fact_count": len(snapshot_facts) - len(facts),
+        }
     run = tmp_path / "run"
     publish_run(run, capabilities, results, scores=scores, summary=summary)
     return snapshot, run
+
+
+def test_performance_buckets_use_ten_and_twenty_five_percent_boundaries() -> None:
+    rows = [
+        {
+            "fact_key": "green",
+            "score_eligible": True,
+            "absolute_relative_error": "0.10",
+        },
+        {
+            "fact_key": "yellow-low",
+            "score_eligible": True,
+            "absolute_relative_error": "0.10001",
+        },
+        {
+            "fact_key": "yellow-high",
+            "score_eligible": True,
+            "absolute_relative_error": "0.25",
+        },
+        {
+            "fact_key": "red",
+            "score_eligible": True,
+            "absolute_relative_error": "0.25001",
+        },
+        {
+            "fact_key": "unavailable",
+            "score_eligible": False,
+            "absolute_relative_error": None,
+        },
+    ]
+
+    assert _performance_buckets(
+        rows, {row["fact_key"] for row in rows}, total=5
+    ) == {
+        "within_bounds": 1,
+        "outside_bounds": 2,
+        "far_outside_bounds": 1,
+        "unavailable": 1,
+        "total": 5,
+    }
 
 
 def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> None:
@@ -221,11 +290,25 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
     assert summary["matrix_complete"] is True
     assert summary["sources"][1]["label"] == "Microcosm + PolicyEngine-US"
     assert summary["sources"][0]["result_count"] == 1
+    assert summary["sources"][0]["performance_buckets"] == {
+        "within_bounds": 0,
+        "outside_bounds": 1,
+        "far_outside_bounds": 0,
+        "unavailable": 2,
+        "total": 3,
+    }
+    assert summary["sources"][1]["performance_buckets"] == {
+        "within_bounds": 1,
+        "outside_bounds": 0,
+        "far_outside_bounds": 1,
+        "unavailable": 1,
+        "total": 3,
+    }
 
     first_page = json.loads((output / "facts" / "00001.json").read_text())
     assert [row["fact_key"] for row in first_page["rows"]] == ["fact-a", "fact-b"]
     state = first_page["rows"][1]
-    assert state["sources"]["populace"]["estimate"] == "198"
+    assert state["sources"]["populace"]["estimate"] == "140"
     assert state["sources"]["populace"]["standard_error"] == "3"
     assert state["sources"]["populace"]["margin_of_error_90"] == "4.935"
     assert state["sources"]["cps"] == {
@@ -247,6 +330,13 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
         row for row in groups if row["dimension"] == "geography" and row["key"] == "state"
     )
     assert state_group["sources"]["populace"]["evaluable"] == 1
+    assert state_group["sources"]["populace"]["performance_buckets"] == {
+        "within_bounds": 0,
+        "outside_bounds": 0,
+        "far_outside_bounds": 1,
+        "unavailable": 0,
+        "total": 1,
+    }
     assert state_group["sources"]["cps"]["reason_codes"] == {
         "geography_not_supported": 1
     }
@@ -257,12 +347,50 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
         and row["key"] == "external_validation"
     )
     assert exposure_group["sources"]["cps"]["scored"] == 1
+    state_external = next(
+        row
+        for row in groups
+        if row["dimension"] == "geography_calibration_exposure"
+        and row["key"] == "state|external_validation"
+    )
+    assert state_external["sources"]["populace"]["evaluable"] == 1
+    assert state_external["sources"]["populace"]["relative_error_count"] == 1
+    assert state_external["sources"]["populace"]["loss"] == "0.3"
+    empty_state_direct = next(
+        row
+        for row in groups
+        if row["dimension"] == "geography_calibration_exposure"
+        and row["key"] == "state|direct_calibration_target"
+    )
+    assert empty_state_direct["fact_count"] == 0
+    assert empty_state_direct["sources"]["populace"]["evaluable"] == 0
+    assert empty_state_direct["sources"]["populace"]["loss"] is None
+    assert empty_state_direct["sources"]["populace"]["performance_buckets"] == {
+        "within_bounds": 0,
+        "outside_bounds": 0,
+        "far_outside_bounds": 0,
+        "unavailable": 0,
+        "total": 0,
+    }
     unsupported_period = next(
         row
         for row in groups
         if row["dimension"] == "period_treatment" and row["key"] == "unsupported"
     )
     assert unsupported_period["sources"]["cps"]["evaluable"] == 0
+
+
+def test_frontend_bundle_applies_the_runs_explicit_us_scope(tmp_path: Path) -> None:
+    snapshot, run = published_inputs(tmp_path, include_non_us_snapshot_fact=True)
+    output = tmp_path / "frontend"
+
+    manifest = publish_frontend_bundle(snapshot, run, output)
+
+    assert manifest["fact_count"] == 3
+    summary = json.loads((output / "summary.json").read_text())
+    assert summary["jurisdictions"] == ["US"]
+    index = json.loads((output / "fact-index.json").read_text())
+    assert "fact-be" not in index["facts"]
 
 
 def test_frontend_bundle_verifies_source_hashes_and_is_immutable(tmp_path: Path) -> None:
