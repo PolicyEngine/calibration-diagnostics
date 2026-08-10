@@ -22,6 +22,7 @@ from evaluation_harness.full_run import (
     build_full_capability_matrix,
     build_run_summary,
     build_scored_results,
+    exclude_facts_with_geography_ids,
     load_snapshot_facts,
     scope_facts_to_jurisdictions,
 )
@@ -32,6 +33,12 @@ from evaluation_harness.populace_aging import (
     PopulaceAgingPolicy,
     transform_ledger_facts_to_populace_year,
     transform_ledger_facts_to_populace_years,
+)
+from evaluation_harness.populace_age_topcodes import (
+    build_cps_asec_age_topcode_comparisons,
+)
+from evaluation_harness.populace_bea_wages import (
+    transform_chronicle_bea_wage_facts,
 )
 from evaluation_harness.populace_old_cd import load_old_cd_assignments
 from evaluation_harness.populace_release_targets import (
@@ -46,6 +53,15 @@ POPULACE_INTEGRATION = ROOT / "integrations" / "populace_policyengine_us"
 CPS_INTEGRATION = ROOT / "integrations" / "taxcalc_cps"
 ACS_PUMS_INTEGRATION = ROOT / "integrations" / "census_acs_pums"
 EVALUATION_JURISDICTIONS = frozenset({"US"})
+EVALUATION_EXCLUDED_GEOGRAPHY_IDS = frozenset(
+    {
+        # The pinned Microcosm population has no Guam or US Virgin Islands
+        # households. Chronicle labels these SNAP rows with jurisdiction=US,
+        # so geography IDs are the authoritative scope boundary.
+        "0400000US66",
+        "0400000US78",
+    }
+)
 
 
 def _source_counts(capabilities, source_id: str) -> dict[str, int]:
@@ -69,13 +85,18 @@ def run(
     populace_old_cd_assignments: Path | None = None,
 ) -> dict:
     snapshot_facts, snapshot_manifest = load_snapshot_facts(snapshot)
-    facts = scope_facts_to_jurisdictions(
+    jurisdiction_facts = scope_facts_to_jurisdictions(
         snapshot_facts, EVALUATION_JURISDICTIONS
+    )
+    facts = exclude_facts_with_geography_ids(
+        jurisdiction_facts, EVALUATION_EXCLUDED_GEOGRAPHY_IDS
     )
     snapshot_id = snapshot_manifest["snapshot_id"]
     print(
         f"Loaded {len(facts):,} US facts from immutable snapshot {snapshot_id}; "
-        f"excluded {len(snapshot_facts) - len(facts):,} non-US facts.",
+        f"excluded {len(snapshot_facts) - len(jurisdiction_facts):,} non-US facts "
+        f"and {len(jurisdiction_facts) - len(facts):,} explicitly out-of-scope "
+        "territory facts.",
         flush=True,
     )
 
@@ -118,6 +139,14 @@ def run(
         source_id=populace_overview.source.source_id,
         release_id=POPULACE_RELEASE.release_id,
     )
+    bea_wage_transformations = transform_chronicle_bea_wage_facts(
+        facts,
+        source_id=populace_overview.source.source_id,
+    )
+    age_topcode_comparisons = build_cps_asec_age_topcode_comparisons(
+        facts,
+        source_id=populace_overview.source.source_id,
+    )
     exact_release_fact_keys = {
         row.source_fact_key for row in release_target_alignments.aligned_facts
     }
@@ -133,6 +162,14 @@ def run(
             for fact_key in release_target_fact_keys
         }
     )
+    calibration_exposures.update(
+        {
+            declaration.fact_key: declaration.calibration_exposure
+            for declaration in bea_wage_transformations.declarations
+            if declaration.fact_key is not None
+            and declaration.calibration_exposure is not None
+        }
+    )
     comparable_aging = tuple(
         row
         for row in aging_results
@@ -142,6 +179,8 @@ def run(
         [
             *release_target_alignments.aligned_facts,
             *(row.to_aligned_fact() for row in comparable_aging),
+            *bea_wage_transformations.aligned_facts,
+            *age_topcode_comparisons.aligned_facts,
         ]
     )
     populace_plan = SourcePlan(
@@ -150,6 +189,8 @@ def run(
         alignments=tuple(
             [
                 *release_target_alignments.declarations,
+                *bea_wage_transformations.declarations,
+                *age_topcode_comparisons.declarations,
                 *(
                     row.to_alignment_declaration(populace_overview.source.source_id)
                     for row in comparable_aging
@@ -248,7 +289,7 @@ def run(
     cps_groups = build_run_groups(cps_capabilities)
     print(
         f"Executing {sum(len(group.fact_keys) for group in cps_groups):,} "
-        f"Tax-Calculator/public-CPS capability cells in {len(cps_groups)} groups.",
+        f"Public CPS + Tax-Calculator capability cells in {len(cps_groups)} groups.",
         flush=True,
     )
     cps_runner = TaxCalcCPSRunner()
@@ -291,13 +332,19 @@ def run(
         "source_snapshot_fact_count": len(snapshot_facts),
         "included_fact_count": len(facts),
         "excluded_fact_count": len(snapshot_facts) - len(facts),
+        "excluded_non_us_fact_count": len(snapshot_facts) - len(jurisdiction_facts),
+        "excluded_geography_ids": sorted(EVALUATION_EXCLUDED_GEOGRAPHY_IDS),
+        "excluded_geography_fact_count": len(jurisdiction_facts) - len(facts),
     }
     summary["populace_prior_years_to_2024_alignment"] = {
         "policy": "Exact Populace cbo_growth_factor_aging@1.2.0 semantics",
         "observed_years": list(source_years),
         "evaluation_year": build_year,
         "fact_count": len(aging_results),
-        "comparable_count": len(aligned_facts),
+        "comparable_count": (
+            len(release_target_alignments.aligned_facts)
+            + len(comparable_aging)
+        ),
         "exact_release_target_count": len(
             release_target_alignments.aligned_facts
         ),
@@ -343,6 +390,49 @@ def run(
             "Direct targets use the exact post-calibration final_estimate stored "
             "in the pinned release diagnostics. Chronicle holdouts are still "
             "executed from the HDF5 population and PolicyEngine-US model."
+        ),
+    }
+    summary["microcosm_bea_wage_benchmarks"] = {
+        "transformation": "BEA state wages residence-adjusted and scaled to NIPA",
+        "archived_policyengine_us_data_pr": 1034,
+        "archived_policyengine_us_data_commit": (
+            "af806026d0885e15275593f5ea42aa74937ff9af"
+        ),
+        "state_fact_count": bea_wage_transformations.state_count,
+        "national_fact_count": 1,
+        "transformed_fact_count": len(
+            bea_wage_transformations.aligned_facts
+        ),
+        "input_fact_count": len(bea_wage_transformations.input_fact_keys),
+        "national_wage_total": str(bea_wage_transformations.national_total),
+        "national_scaling_factor": str(
+            bea_wage_transformations.scale_factor
+        ),
+        "state_calibration_exposure": "external_validation",
+        "national_calibration_exposure": "direct_calibration_target",
+        "benchmark_basis": (
+            "Chronicle place-of-work wages transformed to residence basis using "
+            "Chronicle supplements, social-insurance contributions, and residence "
+            "adjustments; state values are then scaled to the archived 2024 BEA "
+            "NIPA national wage target."
+        ),
+    }
+    summary["microcosm_cps_asec_age_topcodes"] = {
+        "source_variable": "A_AGE",
+        "age_80_code_represents": "80-84",
+        "age_80_84_input_fact_count": 5,
+        "age_80_84_independent_score_count": 1,
+        "age_80_84_benchmark": str(
+            age_topcode_comparisons.age_80_84_benchmark
+        ),
+        "age_85_code_represents": "85+",
+        "age_85_plus_fact_key": (
+            age_topcode_comparisons.age_85_plus_fact_key
+        ),
+        "benchmark_basis": (
+            "CPS ASEC public-use code 80 is compared once with the sum of "
+            "Chronicle single-year ages 80 through 84. Code 85 is compared "
+            "with Chronicle's existing age-85-plus fact."
         ),
     }
     summary["microcosm_old_congressional_district_geography"] = {

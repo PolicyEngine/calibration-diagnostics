@@ -35,7 +35,7 @@ const sources: SourceSummary[] = [
   },
   {
     source_id: "cps",
-    label: "Tax-Calculator + public CPS",
+    label: "Public CPS + Tax-Calculator",
     source_type: "model_dataset_pair",
     capability_count: 2,
     result_count: 0,
@@ -171,7 +171,7 @@ test("fact rows show sparse supported and unsupported cells accessibly", () => {
     estimateLabel: "Not evaluated",
     reasonLabel: "Geography not supported",
     ariaLabel:
-      "Tax-Calculator + public CPS: Unsupported, geography; Geography not supported",
+      "Public CPS + Tax-Calculator: Unsupported, geography; Geography not supported",
   });
 });
 

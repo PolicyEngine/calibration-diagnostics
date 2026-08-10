@@ -114,6 +114,23 @@ def scope_facts_to_jurisdictions(
     return scoped
 
 
+def exclude_facts_with_geography_ids(
+    facts: Iterable[FactContract], geography_ids: Iterable[str]
+) -> tuple[FactContract, ...]:
+    """Remove explicitly out-of-scope geographies before classification.
+
+    Chronicle uses the US jurisdiction for some territory rows. A jurisdiction
+    filter alone therefore cannot express a model surface limited to the 50
+    states and DC. Keeping this as an explicit, auditable second scope step
+    prevents those rows from becoming misleading ``mapping_not_found`` cells.
+    """
+
+    excluded = frozenset(geography_ids)
+    if any(not value for value in excluded):
+        raise ValueError("excluded geography IDs must not be blank")
+    return tuple(fact for fact in facts if fact.geography_id not in excluded)
+
+
 def build_full_capability_matrix(
     facts: Iterable[FactContract],
     source_plans: Iterable[SourcePlan],
@@ -204,7 +221,11 @@ def build_scored_results(
                 )
             benchmark_period = alignment.target_period
             benchmark_value = alignment.aligned_value
-            benchmark_basis = "populace_aligned_fact"
+            benchmark_basis = str(
+                alignment.metadata.get(
+                    "benchmark_basis", "populace_aligned_fact"
+                )
+            )
         else:
             benchmark_period = fact.period
             benchmark_value = fact.value

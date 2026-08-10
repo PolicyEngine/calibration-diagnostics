@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +22,18 @@ class LedgerSelector:
     entities: frozenset[str]
     fact_keys: frozenset[str] = frozenset()
     excluded_fact_keys: frozenset[str] = frozenset()
+    dimension_values: dict[str, frozenset[Any]] = field(default_factory=dict)
+    absent_dimensions: frozenset[str] = frozenset()
 
     def matches(self, fact: FactContract) -> bool:
         return (
             (not self.fact_keys or fact.fact_key in self.fact_keys)
             and fact.fact_key not in self.excluded_fact_keys
+            and all(
+                fact.dimensions.get(dimension) in values
+                for dimension, values in self.dimension_values.items()
+            )
+            and not (self.absent_dimensions & set(fact.dimensions))
             and fact.source in self.sources
             and fact.measure in self.measures
             and fact.unit in self.units
@@ -52,6 +59,7 @@ class MappingRule:
     supported_constraint_domains: frozenset[str]
     supported_constraint_variables: frozenset[str]
     calibration_exposure: CalibrationExposure
+    unscored_fact_keys: frozenset[str]
 
     @classmethod
     def from_data(cls, payload: dict[str, Any]) -> "MappingRule":
@@ -83,6 +91,15 @@ class MappingRule:
                 excluded_fact_keys=frozenset(
                     selector.get("excluded_fact_keys", ())
                 ),
+                dimension_values={
+                    dimension: frozenset(values)
+                    for dimension, values in selector.get(
+                        "dimension_values", {}
+                    ).items()
+                },
+                absent_dimensions=frozenset(
+                    selector.get("absent_dimensions", ())
+                ),
             ),
             execution=execution,
             source_expression=payload["source_expression"],
@@ -110,6 +127,7 @@ class MappingRule:
             calibration_exposure=CalibrationExposure(
                 payload.get("calibration_exposure", "unknown_exposure")
             ),
+            unscored_fact_keys=frozenset(payload.get("unscored_fact_keys", ())),
         )
 
     def to_data(self) -> dict[str, Any]:
@@ -132,6 +150,27 @@ class MappingRule:
                         )
                     }
                     if self.selector.excluded_fact_keys
+                    else {}
+                ),
+                **(
+                    {
+                        "dimension_values": {
+                            dimension: sorted(values, key=str)
+                            for dimension, values in sorted(
+                                self.selector.dimension_values.items()
+                            )
+                        }
+                    }
+                    if self.selector.dimension_values
+                    else {}
+                ),
+                **(
+                    {
+                        "absent_dimensions": sorted(
+                            self.selector.absent_dimensions
+                        )
+                    }
+                    if self.selector.absent_dimensions
                     else {}
                 ),
             },
@@ -163,6 +202,11 @@ class MappingRule:
             "supported_constraint_domains": sorted(self.supported_constraint_domains),
             "supported_constraint_variables": sorted(self.supported_constraint_variables),
             "calibration_exposure": self.calibration_exposure.value,
+            **(
+                {"unscored_fact_keys": sorted(self.unscored_fact_keys)}
+                if self.unscored_fact_keys
+                else {}
+            ),
         }
 
 

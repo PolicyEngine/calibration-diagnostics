@@ -646,7 +646,7 @@ test("new target loss weighting metadata marks loss as normalized", () => {
   expect(buildComparison(raw, normalized).summary.loss_kind).toBe("mixed");
 });
 
-test("dotted chronicle target names use metadata for readable fields", () => {
+test("dotted chronicle zero targets use structural-zero percentage errors", () => {
   const cal = calibration([
     {
       name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount@2024",
@@ -671,11 +671,52 @@ test("dotted chronicle target names use metadata for readable fields", () => {
   expect(cal.rows[0].measure).toBe("total");
   expect(cal.rows[0].geography).toBe("United States");
   expect(cal.rows[0].breakdown).toBe("under 1 · All");
-  expect(cal.rows[0].error_kind).toBe("absolute");
-  expect(cal.rows[0].initial_error).toBe(100);
-  expect(cal.rows[0].final_error).toBe(90);
-  expect(cal.rows[0].initial_relative_error).toBe(null);
-  expect(cal.rows[0].abs_relative_error).toBe(null);
+  expect(cal.rows[0].error_kind).toBe("relative");
+  expect(cal.rows[0].initial_error).toBe(1);
+  expect(cal.rows[0].final_error).toBe(1);
+  expect(cal.rows[0].initial_relative_error).toBe(1);
+  expect(cal.rows[0].abs_relative_error).toBe(1);
+});
+
+test("dotted ledger zero targets accept numerical zero noise", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.zero_target@2024",
+      target: 0,
+      initial_estimate: 0,
+      final_estimate: 1e-4,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "zero_target",
+        source_measure_id: "zero_target_amount",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+      },
+    },
+  ]);
+  expect(cal.rows[0].error_kind).toBe("relative");
+  expect(cal.rows[0].initial_relative_error).toBe(0);
+  expect(cal.rows[0].abs_relative_error).toBe(0);
+});
+
+test("dotted ledger zero targets reject values above the structural-zero tolerance", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.zero_target@2024",
+      target: 0,
+      initial_estimate: 0,
+      final_estimate: 1.0001e-4,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "zero_target",
+        source_measure_id: "zero_target_amount",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+      },
+    },
+  ]);
+  expect(cal.rows[0].error_kind).toBe("relative");
+  expect(cal.rows[0].abs_relative_error).toBe(1);
 });
 
 test("source measure details become breakdown dimensions", () => {
@@ -873,7 +914,7 @@ test("repeated unfiltered sibling estimates get generic scope warnings", () => {
   expect(cal.rows[1].estimate_warning).toContain("sibling slices share the same estimate");
 });
 
-test("zero targets compare as absolute misses, not relative-error movers", () => {
+test("zero targets compare as structural-zero relative-error movers", () => {
   const target = {
     name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount@2024",
     target_name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount",
@@ -889,13 +930,13 @@ test("zero targets compare as absolute misses, not relative-error movers", () =>
     },
   };
   const a = calibration([{ ...target, final_estimate: 100, relative_error: 100 }], "a");
-  const b = calibration([{ ...target, final_estimate: 90, relative_error: 90 }], "b");
+  const b = calibration([{ ...target, final_estimate: 0, relative_error: 0 }], "b");
   const cmp = buildComparison(a, b);
-  expect(cmp.summary.improved).toBe(0);
-  expect(cmp.rows[0].error_kind).toBe("absolute");
-  expect(cmp.rows[0].a_error).toBe(100);
-  expect(cmp.rows[0].b_error).toBe(90);
-  expect(cmp.rows[0].abs_rel_delta).toBe(null);
+  expect(cmp.summary.improved).toBe(1);
+  expect(cmp.rows[0].error_kind).toBe("relative");
+  expect(cmp.rows[0].a_error).toBe(1);
+  expect(cmp.rows[0].b_error).toBe(0);
+  expect(cmp.rows[0].abs_rel_delta).toBe(-1);
 });
 
 test("count and total measures split into distinct variables", () => {

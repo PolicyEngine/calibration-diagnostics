@@ -42,7 +42,7 @@ function fixture() {
       },
       {
         source_id: "cps",
-        label: "Tax-Calculator + public CPS",
+        label: "Public CPS + Tax-Calculator",
         source_type: "model_dataset_pair",
         capability_count: 3,
         result_count: 1,
@@ -228,7 +228,7 @@ test("summary validates immutable IDs and keeps score beside coverage", async ()
   const summary = await reader.summary();
   expect(summary.run_id).toBe(RUN_ID);
   expect(summary.fact_count).toBe(3);
-  expect(summary.sources[1].label).toBe("Tax-Calculator + public CPS");
+  expect(summary.sources[1].label).toBe("Public CPS + Tax-Calculator");
   expect(summary.sources[1].result_count).toBe(1);
   expect(summary.sources[1].score.display_score).toBe("90");
 });

@@ -50,20 +50,47 @@ class TaxCalcCPSRunner:
         self._array_cache: dict[str, np.ndarray] = {}
 
     def _calculator_for(self, year: int) -> Any:
-        if self._calculator is None:
+        if self._calculator is None or self._year != year:
             self._calculator = self._calculator_factory(year)
             self._year = year
-        elif self._year != year:
-            raise ValueError(
-                f"Tax-Calculator runner is pinned to {self._year}, not requested {year}"
-            )
+            self._array_cache = {}
         return self._calculator
 
     def _array(self, name: str, year: int) -> np.ndarray:
+        self._calculator_for(year)
         if name not in self._array_cache:
             self._array_cache[name] = np.asarray(
                 self._calculator_for(year).array(name)
             )
+        return self._array_cache[name]
+
+    def _expression(self, name: str, year: int) -> np.ndarray:
+        if name in self._array_cache:
+            return self._array_cache[name]
+        if name == "taxable_interest_and_nonqualified_dividends":
+            values = (
+                self._array("e00300", year)
+                + self._array("e00600", year)
+                - self._array("e00650", year)
+            )
+        elif name == "total_income":
+            values = self._array("c00100", year) + self._array("c02900", year)
+        elif name == "income_tax_after_nonrefundable_credits":
+            values = np.maximum(
+                self._array("c05800", year) - self._array("c07100", year),
+                0,
+            )
+        elif name == "itemized_real_estate_taxes":
+            values = np.where(
+                self._array("c04470", year) != 0,
+                self._array("e18500", year),
+                0,
+            )
+        elif name == "positive_schedule_c_income":
+            values = np.maximum(self._array("e00900", year), 0)
+        else:
+            return self._array(VARIABLE_ALIASES.get(name, name), year)
+        self._array_cache[name] = np.asarray(values)
         return self._array_cache[name]
 
     def prepare(self, group: RunGroup) -> ArrayBundle:
@@ -71,18 +98,25 @@ class TaxCalcCPSRunner:
             raise ValueError(f"Tax-Calculator CPS runner cannot execute {group.source_id!r}")
         if group.entity != "tax_unit":
             raise ValueError(
-                f"Tax-Calculator public CPS exposes tax_unit entity, not {group.entity!r}"
+                f"Public CPS + Tax-Calculator exposes tax_unit entity, not {group.entity!r}"
             )
-        if group.geography_method != "fixed_country":
+        if group.geography_method not in {"fixed_country", "state_fips"}:
             raise ValueError(
-                "Tax-Calculator public CPS supports only country geography, "
+                "Public CPS + Tax-Calculator supports country and state geography, "
                 f"not {group.geography_method!r}"
             )
         year = int((group.policy_period or group.population_period).split(":", 1)[-1])
         weights = self._array("s006", year)
         length = len(weights)
+        if group.geography_method == "fixed_country":
+            geography = np.full(length, "0100000US", dtype=object)
+        else:
+            geography = np.asarray(
+                [f"0400000US{int(value):02d}" for value in self._array("fips", year)],
+                dtype=object,
+            )
         arrays: dict[str, np.ndarray] = {
-            "__geography__": np.full(length, "0100000US", dtype=object),
+            "__geography__": geography,
             "s006": weights,
         }
         for name in group.required_variables:
@@ -90,7 +124,7 @@ class TaxCalcCPSRunner:
                 if name == "positive_iitax":
                     arrays[name] = self._array("iitax", year) > 0
                 else:
-                    arrays[name] = self._array(VARIABLE_ALIASES.get(name, name), year)
+                    arrays[name] = self._expression(name, year)
 
         mars = self._array("MARS", year)
         try:
@@ -113,7 +147,12 @@ class TaxCalcCPSRunner:
         domains = {
             "all_individual_income_tax_returns": np.ones(length, dtype=bool),
             "individual_income_tax_returns": np.ones(length, dtype=bool),
+            "social_security_and_ssi_payments": np.ones(length, dtype=bool),
         }
+        if "c59660" in arrays:
+            domains["individual_income_tax_returns_with_earned_income_credit"] = (
+                np.asarray(arrays["c59660"]) != 0
+            )
         return ArrayBundle(
             arrays=arrays,
             dataset_version=DATASET_VERSION,

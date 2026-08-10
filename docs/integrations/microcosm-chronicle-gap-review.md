@@ -1,132 +1,174 @@
-# Microcosm–Chronicle gap review
+# Microcosm–Chronicle gap audit
 
-This review classifies every Chronicle fact against the pinned 2024 Microcosm
-release. A model expression is added only when the Chronicle concept and the
-Microcosm variable or build target are a direct match with at least 90%
-confidence. Zero remains a real scored estimate, not an unsupported result.
+This audit classifies every U.S. Chronicle fact against the pinned 2024
+Microcosm release. A scored mapping is added only when the Chronicle concept
+and the Microcosm dataset or PolicyEngine-US output are a direct match with at
+least 90% confidence. A similar variable name is not enough: accounting basis,
+population, period, and entity must also agree.
 
-## Final evaluation outcome
+## Current evaluation outcome
 
 The immutable artifact is
-`chronicle-7917ea815df710fb20db076b-microcosm-expanded-v9`, with run ID
-`evaluation-c1fbcdd72da02ae43aeccdda`.
+`chronicle-7917ea815df710fb20db076b-full-audit-v18`, with run ID
+`evaluation-ba3388c22230d3eb3bd56838`.
 
-| Treatment | Executable facts |
+| Result | Fact count |
 | --- | ---: |
-| Native-period evaluation | 38,825 |
-| Exact Microcosm-aligned prior-year evaluation | 5,159 |
-| Reproduction of a Microcosm build target | 362 |
-| **Total** | **44,346** |
+| U.S. Chronicle facts | 46,241 |
+| Microcosm results | 45,633 |
+| Scored Microcosm results | 45,625 |
+| Unsupported | 608 |
+| Intentionally held-out December 2025 CMS facts | 255 |
+| **Non-held-out audit remainder** | **353** |
 
-Microcosm's display score is 74.17. Native facts score 69.54, aligned facts
-score 77.77, and build-target reproductions score 92.12. Coverage and fit are
-separate: adding a directly comparable fact can lower fit when Microcosm misses
-it.
+Microcosm coverage is 98.69%. Its fact-level mean capped error is 43.69%.
+Coverage and fit remain separate: adding a valid but poorly fit comparison can
+increase coverage while increasing mean error.
 
-## Old congressional districts
+## Additions from this audit
 
-All 23,968 Chronicle facts using `5001700US` now execute. The harness joins the
-57,240 Microcosm households' 55,736 unique 2020 block GEOIDs to the official
-Census 2020 Block Assignment Files and constructs their exact 117th-Congress
-district. The 116th district layer in those files has the same boundaries as
-the 117th Congress.
+The audit added 54 directly executable, scored facts.
 
-This preserves a one-to-one comparison with each original Chronicle fact. It
-does not invert Microcosm's many-to-many 117th-to-119th population crosswalk.
-The lookup artifact records the URL and SHA-256 of every state BAF, matches all
-55,736 requested blocks, and has assignment SHA-256
-`f710c1d5404ff2ab7540135ebe6be5ce7f34a326cc5f9569f870f6aa54cdc618`.
+### TANF average monthly families: 52 facts
 
-These facts are out-of-sample validation. The pinned release knew how to
-translate old district target support to the current district surface, but
-`gate_congressional_district_targets=false` meant that it did not make the
-district facts hard targets.
+Chronicle's national and state average-monthly TANF family caseloads now run as
+weighted counts of SPM units with a positive modeled `tanf` value. The mapping
+uses `execution_entity: spm_unit`; it does not pretend that Chronicle's `family`
+entity is a native Microcosm table.
 
-## Prior-year facts: use the actual build targets
+These are external validation facts, not Microcosm calibration targets. The
+pinned build calibrates TANF benefit dollars, while PolicyEngine's positive
+`tanf` result supplies the model's family-caseload prediction.
 
-The previous remainder contained 2,966 tax-year 2022/2023 IRS dollar facts,
-excluding rental/royalty. The exact pinned release answers whether Microcosm
-used them:
+| TANF family result | Value |
+| --- | ---: |
+| Chronicle national benchmark | 841,208.7 |
+| Microcosm national estimate | 894,135.9 |
+| National error | 6.29% |
+| Mean capped error across national and state facts | 69.76% |
 
-- 2,017 are direct targets in the release. The harness now compares against the
-  exact compiled build values, including the release's chained SOI/CBO aging,
-  any within-surface uprating, and recorded factor provenance.
-- 949 are not targets in that release. The harness does not invent factors for
-  them; they remain unsupported unless Microcosm's own target contract can
-  transform them.
+The high state error is real model evidence: several published-release state
+estimates are zero or far from the administrative caseload even though the
+national total is close.
 
-Across all concepts and units, 4,086 cross-period Chronicle facts match direct
-targets in the pinned release. Every one now has an executable adapter path.
-Another 1,463 Chronicle facts match native-period release targets. The join uses
-stable Chronicle source-record IDs because the pinned build used `arch.*` fact
-keys while the current snapshot uses `ledger.*` keys.
+### Employer contributions for government social insurance: 1 fact
 
-The harness pins and verifies the release's
-`calibration_diagnostics.json` at SHA-256
-`870449b44e86b13b25bcea1a57f0e7af37f4d4db18be815eea3acdf9fe6eb40e`.
-This is more faithful than reconstructing factors from the current Chronicle
-snapshot, which does not contain every intermediate control fact used by the
-build.
+The BEA NIPA employer-contribution total now runs as the person-level sum of:
 
-## Does Microcosm calibrate on the other remainder families?
+- `employer_social_security_tax`
+- `employer_medicare_tax`
+- `employer_federal_unemployment_tax`
+- `employer_state_payroll_tax`
 
-“Yes” below means the exact pinned release used the Chronicle record as a hard
-weight target. “Related only” means Microcosm targets a sibling measure or an
-older source record, not the remaining Chronicle value itself.
+This matches the employer-side social-insurance scope without adding local
+occupational payroll taxes. Chronicle's benchmark is $866.444 billion;
+Microcosm estimates $778.822 billion, for 10.11% error.
 
-| Remainder family | Calibration status in the pinned release | How Microcosm treats it |
-| --- | --- | --- |
-| 2024 child/adult Medicaid enrollment | **No** | The release has 135 hard Medicaid rows: total Medicaid, total CHIP, and their union for available national/state rows. It does not target the child/adult breakouts. |
-| TANF caseload and recipient composition | **No** | The 23 TANF targets are `all_funds` cash-assistance expenditures, materialized as weighted sums of `tanf`. Average families/recipients are explicit reviewed exclusions because no receipt indicator/assistance-unit reconstruction is wired. |
-| Private-employer premium spending | **No** | It is a reviewed exclusion. The required premium producer is absent from the hermetic input lineage, so the modeled column is structurally zero; targeting it would be invalid. |
-| Remaining BEA concepts | **No** | Only national wages and national proprietors' income are direct BEA targets (two rows). The remaining NIPA totals are macro cross-checks; regional state wages are deferred because BEA is place-of-work while the model is residence-based. |
-| IRS rental/royalty | **Yes for Historic Table 2; no for the old-CD records** | The release has 104 national/state Historic Table 2 targets. It deliberately materializes both amount and return count from `rental_income` plus `farm_rent_income`; the harness now uses the same recipe. The old-CD source package was excluded from hard targets, so its 960 current-period comparisons are holdouts. |
-| SNAP average persons and per-person benefits | **No** | The 104 SNAP hard targets are total benefits and average participating households for 52 geographic rows. Person counts are reviewed exclusions because counting all people in recipient SPM units materially overstates administrative participants. |
-| Social Security tips counts | **Related only** | The release targets the 2020 W-2 tip amount and return count using `tip_income` (sum and nonzero indicator). It does not target the current 2024 source records, and never targets the taxpayer-count measure. |
-| CBO federal receipts | **No** | The five CBO targets are AGI, wages, qualified dividends, net capital gains, and net business income projections. Fiscal-year total receipts are an explicit macro-control exclusion, not household tax liability. |
-| JCT tax expenditures | **Yes—all 11** | Each is a `reform_minus_baseline_income_tax` row. Microcosm neutralizes the named deduction/credit variable, runs the counterfactual, and targets the weighted income-tax difference to JCT's revenue-loss value. Some rows are documented as broad-fit anchors where JCT's concept is wider than the single neutralized variable. |
-| ICI paid/reinvested capital-gain distributions | **No** | The source and paid-versus-reinvested split do not appear in the target registry. |
-| Tennessee individual-income-tax collections | **No** | The release has 44 state-income-tax targets, but not Tennessee. The remaining Tennessee collections have no modeled support after repeal of the Hall tax. |
-| December 2025 Medicaid enrollment | **No** | This is a 2024 society-wide artifact and its Medicaid target surface is the December 2024 release (with one national Medicaid total sourced from November). A 2025 value requires a genuine 2025 population/model contract. |
+### Gross Medicare benefits: 1 fact
 
-## Current remainder accounting
+BEA records Medicare program benefits gross and records beneficiary premiums
+separately as government-social-insurance contributions. PolicyEngine's
+`medicare_cost` is explicitly net of Part A and Part B premiums. The harness
+therefore reproduces PolicyEngine's gross benefit representation as:
 
-After applying the explicit US scope, 1,903 Microcosm cells remain
-non-executable. The 2,064 non-US facts in the source Chronicle snapshot are
-excluded before classification and do not appear in this accounting. The US
-remainders are:
+```text
+medicare_cost + base_part_a_premium + gross_medicare_part_b_premium
+```
 
-| Chronicle source | Period | Concept | Entity | Total |
-| --- | ---: | ---: | ---: | ---: |
-| IRS SOI | 959 | 2 | 0 | 961 |
-| BEA | 2 | 383 | 2 | 387 |
-| CMS Medicaid | 359 | 0 | 0 | 359 |
-| USDA SNAP | 110 | 0 | 2 | 112 |
-| TANF | 3 | 0 | 55 | 58 |
-| Investment Company Institute | 0 | 0 | 12 | 12 |
-| JCT | 0 | 11 | 0 | 11 |
-| CBO | 0 | 0 | 1 | 1 |
-| Census state tax collections | 0 | 0 | 1 | 1 |
-| CMS National Health Expenditure Accounts | 0 | 1 | 0 | 1 |
-| **Total** | **1,433** | **397** | **73** | **1,903** |
+Chronicle's benchmark is $1.102358 trillion; Microcosm estimates $667.074
+billion, for 39.49% error.
 
-The remaining 959 IRS period gaps are not direct targets in the pinned release;
-all direct cross-period target matches execute. The two remaining IRS concept
-gaps are the current W-2 tip return and taxpayer counts described above.
+## Complete remaining gap accounting
 
-## Code and release evidence
+The 608 unsupported facts contain 255 December 2025 CMS enrollment facts. They
+remain deliberately held out because the pinned release is a 2024 society and
+does not have a reviewed 2025 population contract. The other 353 facts are:
 
-- Exact target compilation and base-variable choices:
-  `packages/populace-build/src/populace/build/us_runtime/fiscal_targets.py` at
-  Populace commit `cae8640f9e65e274aea65c7916cb37b956978e32`.
-- Exact dollar aging policy:
-  `packages/populace-build/src/populace/build/us_runtime/target_aging.py`.
-- Reviewed inclusions and exclusions:
-  `packages/populace-build/src/populace/build/us/target_parity_manifest.json`.
-- District translation:
-  `congressional_district_vintage.py` and
-  `congressional_district_vintage_crosswalk.py` in the same runtime package.
-- Harness implementations:
-  `evaluation_harness/populace_release_targets.py`,
-  `evaluation_harness/populace_old_cd.py`, and
+| Family | Count | Why no scored direct mapping exists |
+| --- | ---: | --- |
+| Six BEA regional macro series | 312 | The model has micro-level components, but the BEA lines include national-account imputations and coverage adjustments that are not present in Microcosm. |
+| Other national BEA facts | 20 | Seventeen are non-equivalent macro aggregates, two require a pension-plan entity and employer pension contributions, and one is a 2018 wage fact with no reviewed 2018-to-2024 build transformation. |
+| TANF recipient and family-type breakouts | 6 | Microcosm can count positive-benefit SPM units, but it cannot identify administrative recipients or no-/one-/two-parent cases exactly. |
+| ICI mutual-fund capital-gain distributions | 12 | Microcosm has taxpayer capital gains, not the institutional-sector paid-versus-reinvested mutual-fund distribution split. |
+| CBO federal individual-income-tax receipts | 1 | Fiscal-year cash receipts are not the same quantity as tax-year household income-tax liability. |
+| Tennessee state income-tax collections | 1 | The Hall tax was repealed; the residual fiscal collection has no corresponding current-law liability in PolicyEngine-US. |
+| Private-employer ESI premium contribution | 1 | The pinned release lacks the employer-sector split and its employer-premium producer is structurally zero. |
+| **Non-held-out remainder** | **353** | |
+
+### The 312 BEA regional macro facts
+
+Each of these six measures has one national row and 51 state rows:
+
+| Chronicle measure | Count | Blocking mismatch |
+| --- | ---: | --- |
+| Contributions for government social insurance | 52 | Includes employer, employee, self-employed, Medicare-premium, railroad-retirement, veterans-insurance, and temporary-disability flows. A payroll-tax-only proxy is incomplete. |
+| Dividends, interest, and rent | 52 | Includes imputed interest, trust and pension flows, and imputed owner-occupied rent absent from the corresponding tax/CPS variables. |
+| Personal current transfer receipts | 52 | Includes cash and in-kind national-account benefits; `household_benefits` is not the same program or accounting universe. |
+| Personal income | 52 | Inherits all component differences and subtracts the broader social-insurance contribution concept. |
+| Residence adjustment | 52 | A BEA place-of-work-to-residence balancing item, not a person-level income variable. |
+| Supplements to wages and salaries | 52 | Includes pension, insurance, and social-insurance employer contributions; the published release lacks a complete employer pension/insurance producer. |
+
+### The 20 other BEA facts
+
+The two defined-contribution rows need employer pension contributions and a
+pension-plan entity that Microcosm does not represent. The 2018 wage row cannot
+be evaluated against a 2024 society without a reviewed transformation.
+
+The remaining 17 are disposable personal income; employer pension and
+insurance contributions; farm and nonfarm proprietors' income separately;
+government benefits and other transfers; personal taxes; personal transfer
+receipts; dividend, interest, rental, and total personal income; personal
+outlays; personal saving and its rate; and total supplements. These are BEA
+national-account aggregates. PolicyEngine can produce tempting partial proxies,
+but those proxies omit imputed flows, institutions serving households,
+consumption, employer pension accruals, or other required components.
+
+Farm and nonfarm proprietors' income could be summed, but that would only
+duplicate the already scored total proprietors' income target; it would not add
+an independent validation observation.
+
+### The six TANF composition facts
+
+The three recipient facts are total, adult, and child recipients. PolicyEngine's
+`tanf_person` divides the SPM-unit benefit across every SPM-unit member. Federal
+TANF reporting distinguishes people receiving assistance from other people
+whose income or relationship makes them part of the reported TANF family.
+Therefore nonzero `tanf_person` is not an exact recipient indicator.
+
+The no-parent, one-parent, and two-parent facts require administrative parent
+and recipient roles. `spm_unit_count_adults` is not equivalent: a child-only
+case may contain an adult caretaker who is not a recipient.
+
+## Closest possible proxies, in descending confidence
+
+These remain deliberately unscored:
+
+1. CBO individual-income-tax receipts could be compared with aggregate
+   `income_tax`, but only as a labeled fiscal-cash-versus-tax-liability proxy.
+2. TANF total/adult/child recipients could use nonzero `tanf_person`, but it
+   would count all SPM-unit members rather than administrative recipients.
+3. BEA regional social-insurance contributions could use payroll-tax
+   components, but would omit several BEA contribution programs and premiums.
+4. BEA transfer receipts and personal income could use constructed benefit and
+   income totals, but the national-account universe materially differs.
+5. The private-employer ESI fact cannot be isolated until Microcosm has both a
+   nonzero employer-premium producer and private/public employer lineage.
+
+## Evidence
+
+- Pinned Microcosm release:
+  `populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`.
+- Pinned PolicyEngine-US version: `1.764.6`.
+- Reviewed Microcosm target inclusions and exclusions:
+  `packages/populace-build/src/populace/build/us/target_parity_manifest.json`
+  at commit `cae8640f9e65e274aea65c7916cb37b956978e32`.
+- TANF model result: PolicyEngine-US `tanf` on SPM units; the federal TANF
+  reporting family definition is documented in ACF's `InstructionsFed.pdf`.
+- BEA personal-income composition and residence basis:
+  <https://www.bea.gov/help/glossary/local-area-personal-income>.
+- BEA Medicare benefit and contribution accounting:
+  <https://www.bea.gov/help/faq/170>.
+- Harness mappings:
+  `integrations/populace_policyengine_us/mappings.yaml` release v10.
+- Adapter expressions:
   `evaluation_harness/adapters/populace.py`.

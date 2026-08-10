@@ -363,8 +363,13 @@ class AlignedFact:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.observed_period == self.target_period:
-            raise ValueError("aligned fact target period must differ from its observed period")
+        if (
+            self.observed_period == self.target_period
+            and self.metadata.get("alignment_kind") != "semantic"
+        ):
+            raise ValueError(
+                "same-period aligned facts must declare alignment_kind=semantic"
+            )
         if not self.alignment_id:
             raise ValueError("aligned fact requires an alignment ID")
         if self.method_quality is AlignmentQuality.NONE:

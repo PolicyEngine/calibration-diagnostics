@@ -2,7 +2,7 @@
 
 The Cross-dataset API serves immutable evaluation artifacts; an HTTP request
 never imports or runs PolicyEngine or Tax-Calculator. The current approved run
-contains Microcosm + PolicyEngine-US, Tax-Calculator + public CPS, and raw 2024
+contains Microcosm + PolicyEngine-US, Public CPS + Tax-Calculator, and raw 2024
 ACS PUMS. Yale is deferred pending a reproducible reconstruction, and the API
 is source-agnostic so it can be added later without changing the response
 contract.

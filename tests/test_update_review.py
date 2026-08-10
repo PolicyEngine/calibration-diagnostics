@@ -195,8 +195,8 @@ def test_verification_gate_rejects_a_ten_na_completion() -> None:
     unsupported = tuple(
         replace(
             item,
-            geography_level="state",
-            geography_id="0400000US06",
+            geography_level="congressional_district",
+            geography_id="5001700US0601",
         )
         for item in overview.verification_facts
     )

@@ -39,9 +39,17 @@ class FakeSimulation:
                 "eitc_child_count": "tax_unit",
                 "adjusted_gross_income": "tax_unit",
                 "assigned_aca_ptc": "tax_unit",
+                "age": "person",
+                "base_part_a_premium": "person",
                 "chip_enrolled": "person",
                 "ctc": "tax_unit",
                 "ctc_limiting_tax_liability": "tax_unit",
+                "employer_federal_unemployment_tax": "person",
+                "employer_medicare_tax": "person",
+                "employer_social_security_tax": "person",
+                "employer_state_payroll_tax": "person",
+                "gross_medicare_part_b_premium": "person",
+                "medicare_cost": "person",
                 "medicaid_enrolled": "person",
                 "medical_expense_deduction": "tax_unit",
                 "ordinary_dividend_income": "person",
@@ -50,8 +58,10 @@ class FakeSimulation:
                 "farm_rent_income": "person",
                 "roth_ira_contributions": "person",
                 "snap": "spm_unit",
+                "snap_unit_size": "spm_unit",
                 "ssi_category": "person",
                 "self_employment_income": "person",
+                "tanf": "spm_unit",
                 "tax_unit_is_filer": "tax_unit",
                 "tax_unit_itemizes": "tax_unit",
             }
@@ -64,9 +74,17 @@ class FakeSimulation:
             "eitc_child_count": np.array([0, 2]),
             "adjusted_gross_income": np.array([5_000.0, 25_000.0]),
             "assigned_aca_ptc": np.array([1_200.0, 3_600.0]),
+            "age": np.array([4, 10, 30]),
+            "base_part_a_premium": np.array([0.0, 100.0, 200.0]),
             "chip_enrolled": np.array([False, True, False]),
             "ctc": np.array([500.0, 3_000.0]),
             "ctc_limiting_tax_liability": np.array([400.0, 2_200.0]),
+            "employer_federal_unemployment_tax": np.array([1.0, 2.0, 3.0]),
+            "employer_medicare_tax": np.array([4.0, 5.0, 6.0]),
+            "employer_social_security_tax": np.array([7.0, 8.0, 9.0]),
+            "employer_state_payroll_tax": np.array([10.0, 20.0, 30.0]),
+            "gross_medicare_part_b_premium": np.array([0.0, 300.0, 400.0]),
+            "medicare_cost": np.array([0.0, 8_000.0, 9_000.0]),
             "medicaid_enrolled": np.array([True, False, False]),
             "medical_expense_deduction": np.array([40.0, 70.0]),
             "ordinary_dividend_income": np.array([10.0, 20.0, 30.0]),
@@ -75,8 +93,10 @@ class FakeSimulation:
             "farm_rent_income": np.array([0.0, 0.0, 25.0]),
             "roth_ira_contributions": np.array([0.0, 100.0, 200.0]),
             "snap": np.array([0.0, 500.0]),
+            "snap_unit_size": np.array([1, 2]),
             "ssi_category": np.array(["AGED", "BLIND", "DISABLED"]),
             "self_employment_income": np.array([100.0, -200.0, 50.0]),
+            "tanf": np.array([0.0, 500.0]),
             "tax_unit_is_filer": np.array([False, True]),
             "tax_unit_itemizes": np.array([False, True]),
         }
@@ -132,6 +152,49 @@ def runner(tables, simulation=None) -> PopulacePolicyEngineRunner:
         table_loader=lambda _: tables,
         simulation_factory=lambda _: simulation,
     )
+
+
+def test_runner_interprets_cps_asec_age_topcodes_as_group_indicators(tables) -> None:
+    class TopcodedAgeSimulation(FakeSimulation):
+        def calculate(
+            self, name: str, period: str, use_weights: bool = False
+        ) -> np.ndarray:
+            if name == "age":
+                return np.array([79, 80, 81, 84, 85, 90])
+            return super().calculate(name, period, use_weights)
+
+    adapter = runner(tables, TopcodedAgeSimulation())
+
+    assert adapter._model_array(  # noqa: SLF001 - adapter expression contract
+        "cps_asec_age_80_84_population", "person", "2024"
+    ).tolist() == [False, True, False, False, False, False]
+    assert adapter._model_array(  # noqa: SLF001 - adapter expression contract
+        "cps_asec_age_85_plus_population", "person", "2024"
+    ).tolist() == [False, False, False, False, True, False]
+
+
+def test_runner_materializes_audited_bea_macro_expressions(tables) -> None:
+    adapter = runner(tables)
+
+    employer_contributions = adapter._model_array(  # noqa: SLF001
+        "bea_nipa_employer_government_social_insurance_contributions",
+        "person",
+        "2024",
+    )
+    gross_medicare = adapter._model_array(  # noqa: SLF001
+        "bea_nipa_gross_medicare_benefits",
+        "person",
+        "2024",
+    )
+
+    assert employer_contributions.tolist() == [22.0, 35.0, 48.0]
+    assert gross_medicare.tolist() == [0.0, 8_400.0, 9_600.0]
+
+
+def test_runner_exposes_modeled_tanf_receiving_units_for_caseload_counts(tables) -> None:
+    bundle = runner(tables).prepare(group("spm_unit", "tanf"))
+
+    assert bundle.arrays["tanf"].tolist() == [0.0, 500.0]
 
 
 def test_release_dataset_is_checksum_verified(tmp_path: Path) -> None:
@@ -373,6 +436,40 @@ def test_medicaid_or_chip_enrollment_is_a_person_level_union(tables) -> None:
         True,
         False,
     ]
+
+
+def test_medicaid_age_groups_match_cms_child_and_adult_definitions(tables) -> None:
+    bundle = runner(tables).prepare(
+        group(
+            "person",
+            "adult_medicaid_enrolled",
+            "child_medicaid_or_chip_enrolled",
+        )
+    )
+
+    assert bundle.arrays["adult_medicaid_enrolled"].tolist() == [
+        False,
+        False,
+        False,
+    ]
+    assert bundle.arrays["child_medicaid_or_chip_enrolled"].tolist() == [
+        True,
+        True,
+        False,
+    ]
+
+
+def test_snap_administrative_person_measures_use_snap_unit_membership(tables) -> None:
+    bundle = runner(tables).prepare(
+        group(
+            "spm_unit",
+            "snap_recipient_count",
+            "snap_recipient_person_months",
+        )
+    )
+
+    assert bundle.arrays["snap_recipient_count"].tolist() == [0, 2]
+    assert bundle.arrays["snap_recipient_person_months"].tolist() == [0, 24]
 
 
 def test_household_snap_receipt_bridge_uses_positive_spm_benefits(tables) -> None:

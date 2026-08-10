@@ -189,6 +189,24 @@ def test_planner_compiles_model_query_for_established_pair() -> None:
     assert result.query.policy_variable == "adjusted_gross_income"
 
 
+def test_source_can_execute_an_advanced_fact_with_that_facts_year() -> None:
+    prior_year = fact(period=TypedPeriod.parse("tax_year:2022"))
+    result = CapabilityPlanner(registry(execution="model")).classify(
+        prior_year,
+        source(
+            population_period=TypedPeriod.parse("tax_year:2024"),
+            policy_period=TypedPeriod.parse("tax_year:2024"),
+            native_fact_periods=frozenset(),
+            advanced_fact_periods=frozenset({"tax_year:2022"}),
+            execution_year_from_fact=True,
+        ),
+    )
+
+    assert result.period_treatment is PeriodTreatment.ADVANCED_POPULATION
+    assert result.population_period == TypedPeriod.parse("tax_year:2022")
+    assert result.policy_period == TypedPeriod.parse("tax_year:2022")
+
+
 def test_mapping_can_bridge_observed_entity_to_execution_entity() -> None:
     data = registry(execution="model").to_data()
     data["mappings"][0]["ledger_selector"]["entities"] = ["government"]
@@ -359,6 +377,31 @@ def test_alignment_can_identify_an_exact_build_calibration_target() -> None:
     assert result.score_eligible
 
 
+def test_semantic_alignment_overrides_native_period_benchmark() -> None:
+    native_fact = fact()
+    alignment = AlignmentDeclaration(
+        alignment_id="bea-state-wage:residence-adjusted",
+        source_id=source().source_id,
+        measure=native_fact.measure,
+        source_period=native_fact.period,
+        target_period=native_fact.period,
+        quality=AlignmentQuality.VALIDATED,
+        fact_key=native_fact.fact_key,
+        score_eligible=True,
+        calibration_exposure=CalibrationExposure.EXTERNAL_VALIDATION,
+        semantic=True,
+    )
+
+    result = CapabilityPlanner(registry(), alignments=[alignment]).classify(
+        native_fact, source()
+    )
+
+    assert result.status is CapabilityStatus.PROJECTED
+    assert result.period_treatment is PeriodTreatment.ALIGNED_FACT
+    assert result.alignment_id == alignment.alignment_id
+    assert result.score_eligible
+
+
 def test_fact_specific_exposure_overrides_a_broad_mapping_classification() -> None:
     native_fact = fact()
     direct_registry = registry().to_data()
@@ -407,6 +450,16 @@ def test_approximate_mapping_is_visible_and_not_headline_eligible() -> None:
     result = CapabilityPlanner(registry(quality="approximate")).classify(fact(), source())
     assert result.status is CapabilityStatus.APPROXIMATE
     assert result.mapping_quality is MappingQuality.APPROXIMATE
+    assert not result.score_eligible
+
+
+def test_reviewed_missing_observation_executes_but_is_not_score_eligible() -> None:
+    data = registry().to_data()
+    data["mappings"][0]["unscored_fact_keys"] = [fact().fact_key]
+    result = CapabilityPlanner(MappingRegistry.from_data(data)).classify(
+        fact(), source()
+    )
+    assert result.query is not None
     assert not result.score_eligible
 
 
@@ -473,6 +526,28 @@ def test_mapping_registry_can_exclude_previously_reviewed_fact_keys() -> None:
     assert scoped.match(
         fact(fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")
     ) is not None
+
+
+def test_mapping_registry_can_select_and_exclude_dimension_values() -> None:
+    data = registry().to_data()
+    selector = data["mappings"][0]["ledger_selector"]
+    selector["dimension_values"] = {"program": ["social_security"]}
+    selector["absent_dimensions"] = ["subprogram"]
+    scoped = MappingRegistry.from_data(data)
+
+    assert scoped.match(fact(dimensions={"program": "social_security"})) is not None
+    assert scoped.match(fact(dimensions={"program": "ssi"})) is None
+    assert (
+        scoped.match(
+            fact(
+                dimensions={
+                    "program": "social_security",
+                    "subprogram": "retirement",
+                }
+            )
+        )
+        is None
+    )
 
 
 def test_capability_classification_has_no_estimate_input() -> None:

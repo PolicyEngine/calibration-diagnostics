@@ -8,6 +8,10 @@ from .contracts import CalibrationExposure, PeriodTreatment
 
 
 LOSS_CAP = Decimal("1")
+# This is only a floating-point noise allowance. It is deliberately much
+# smaller than the resolution of any Chronicle count or dollar benchmark and
+# must not be used as a replacement denominator.
+ZERO_BENCHMARK_ABSOLUTE_TOLERANCE = Decimal("1e-4")
 
 
 @dataclass(frozen=True)
@@ -30,9 +34,13 @@ class GroupScore:
     display_score: Decimal | None
 
 
-def absolute_relative_error(estimate: Decimal, benchmark: Decimal) -> Decimal | None:
+def absolute_relative_error(estimate: Decimal, benchmark: Decimal) -> Decimal:
     if benchmark == 0:
-        return None
+        return (
+            Decimal(0)
+            if abs(estimate) <= ZERO_BENCHMARK_ABSOLUTE_TOLERANCE
+            else LOSS_CAP
+        )
     return abs(estimate - benchmark) / abs(benchmark)
 
 

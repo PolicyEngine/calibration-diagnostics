@@ -141,9 +141,18 @@ function calibrationLossKind(
   return "raw_optimizer_objective";
 }
 
+// A zero benchmark is a structural zero, not an epsilon denominator. Numerical
+// noise at or below this tolerance is an exact fit; any substantive nonzero
+// estimate is the maximum 100% error used by the Chronicle harness.
+const ZERO_BENCHMARK_ABSOLUTE_TOLERANCE = 1e-4;
+
 function relativeError(estimate: number | null, target: number | null): number | null {
   if (estimate == null || target == null) return null;
-  return target === 0 ? estimate - target : (estimate - target) / Math.abs(target);
+  if (target === 0) {
+    if (Math.abs(estimate) <= ZERO_BENCHMARK_ABSOLUTE_TOLERANCE) return 0;
+    return estimate < 0 ? -1 : 1;
+  }
+  return (estimate - target) / Math.abs(target);
 }
 
 interface ParsedTarget {
@@ -881,8 +890,13 @@ function enrichTargetRow(
   const target = numberOrNull(row.target);
   const initial = numberOrNull(row.initial_estimate);
   const final = numberOrNull(row.final_estimate);
-  const errorKind = target === 0 ? "absolute" : "relative";
-  const rawFinalError = numberOrNull(row.relative_error) ?? relativeError(final, target);
+  const errorKind = "relative";
+  // Published diagnostics may carry a raw absolute miss in `relative_error`
+  // for a zero target. Recompute that case so all releases use the structural-
+  // zero rule consistently.
+  const rawFinalError = target === 0
+    ? relativeError(final, target)
+    : numberOrNull(row.relative_error) ?? relativeError(final, target);
   const rawInitialError = relativeError(initial, target);
   const initialMiss = initial != null && target != null ? initial - target : null;
   const finalMiss = final != null && target != null ? final - target : null;
@@ -892,14 +906,8 @@ function enrichTargetRow(
     absInitialMiss == null || absFinalMiss == null
       ? null
       : absInitialMiss - absFinalMiss;
-  const initialError =
-    errorKind === "absolute" && initial != null && target != null
-      ? initialMiss
-      : rawInitialError;
-  const finalError =
-    errorKind === "absolute" && final != null && target != null
-      ? finalMiss
-      : rawFinalError;
+  const initialError = rawInitialError;
+  const finalError = rawFinalError;
   const absFinalError = finalError == null ? null : Math.abs(finalError);
   const improvement =
     initialError == null || finalError == null
@@ -968,8 +976,9 @@ function enrichTargetRow(
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
     period: numberOrNull(row.period),
     chronicle: chronicleFactFields(metadata),
-    initial_relative_error: errorKind === "relative" ? initialError : null,
-    abs_relative_error: errorKind === "relative" ? absFinalError : null,
+    relative_error: finalError,
+    initial_relative_error: initialError,
+    abs_relative_error: absFinalError,
     improvement,
     direction: finalError == null ? null : finalError > 0 ? "over" : finalError < 0 ? "under" : "exact",
     ...status,
@@ -1417,9 +1426,9 @@ function treemapRows(
 // Build the source → variable hierarchy that powers the calibration map.
 // Each leaf carries both "how much we calibrate to it" (n_targets) and "how
 // much of the calibration loss lands here" (loss = sum of squared relative
-// errors, the per-target term of the normalized target loss). Targets with no
-// relative error (absolute targets where the target value is zero) still count
-// toward n_targets but contribute nothing to loss or fit.
+// errors, the per-target term of the normalized target loss). Structural-zero
+// targets contribute 0% when matched within numerical tolerance and 100% when
+// the estimate is substantively nonzero.
 export function microcosmTargetTreemap(
   rows: TargetRow[],
   releaseId: string,
@@ -2030,7 +2039,7 @@ function investigationSignals(row: TargetRow): InvestigationSignal[] {
     signals.push({
       tone: "warning",
       label: "Zero target has non-zero estimate",
-      detail: "The dashboard reports absolute miss instead of relative error because the target value is zero.",
+      detail: "The dashboard treats a substantive non-zero estimate against a structural-zero target as 100% error.",
     });
   }
   if (absRel != null) {
@@ -2387,8 +2396,7 @@ function absRel(row: TargetRow | undefined): number | null {
 }
 
 function comparableRelative(row: TargetRow | undefined): number | null {
-  if (!row || numberOrNull(row.target) === 0) return null;
-  return numberOrNull(row.relative_error);
+  return row ? numberOrNull(row.final_error) : null;
 }
 
 function absoluteMiss(row: TargetRow | undefined): number | null {
@@ -2473,8 +2481,8 @@ export function buildComparison(a: Calibration, b: Calibration) {
     const ar = aByName.get(name);
     const br = bByName.get(name);
     if (ar && br) {
-      const aAbs = numberOrNull(ar.target) === 0 ? null : absRel(ar);
-      const bAbs = numberOrNull(br.target) === 0 ? null : absRel(br);
+      const aAbs = absRel(ar);
+      const bAbs = absRel(br);
       const delta = aAbs != null && bAbs != null ? bAbs - aAbs : null;
       if (delta != null && delta < -1e-9) improved += 1;
       else if (delta != null && delta > 1e-9) regressed += 1;

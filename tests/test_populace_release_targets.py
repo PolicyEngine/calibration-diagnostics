@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from evaluation_harness.contracts import (
     CapabilityStatus,
     ExecutionMethod,
     FactContract,
+    MappingQuality,
     SourceType,
     TypedPeriod,
 )
@@ -233,6 +235,45 @@ def test_release_diagnostic_materializes_target_without_a_generic_query(
     assert capability.score_eligible
     assert results[0].estimate == Decimal("109.5")
     assert results[0].estimate_basis == "microcosm_release_final_estimate"
+
+
+def test_release_diagnostic_preserves_a_reviewed_unscored_mapping(
+    tmp_path: Path,
+) -> None:
+    diagnostics = tmp_path / "calibration_diagnostics.json"
+    write_diagnostics(diagnostics)
+    release = compile_release_target_alignments(
+        [fact()],
+        diagnostics,
+        source_id="populace_us_policyengine_us_2024",
+        release_id="pinned-release",
+    )
+    reviewed_missing = replace(
+        CapabilityResult.unsupported(
+            snapshot_id="ledger-test",
+            fact=fact(),
+            source_id="populace_us_policyengine_us_2024",
+            source_type=SourceType.MODEL_DATASET_PAIR,
+            mapping_release="mapping-v1",
+            status=CapabilityStatus.UNSUPPORTED_PERIOD,
+            reason_code="period_not_supported",
+            reason_detail="Reviewed source observation is not scoreable.",
+        ),
+        mapping_id="reviewed-missing-observation",
+        mapping_quality=MappingQuality.EXACT,
+    )
+
+    capabilities, _ = materialize_release_target_results(
+        (reviewed_missing,),
+        release,
+        source_id="populace_us_policyengine_us_2024",
+        dataset_version="pinned-release",
+        model_version="policyengine-us==1",
+        population_period=TypedPeriod.parse("calendar_year:2024"),
+        policy_period=TypedPeriod.parse("tax_year:2024"),
+    )
+
+    assert not capabilities[0].score_eligible
 
 
 def test_release_target_without_a_final_estimate_is_rejected(tmp_path: Path) -> None:

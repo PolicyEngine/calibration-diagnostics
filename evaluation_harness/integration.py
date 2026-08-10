@@ -62,6 +62,7 @@ def _source_manifest(payload: dict[str, Any]) -> EvaluationSourceManifest:
             for level, prefixes in payload.get("geography_id_prefixes", {}).items()
         },
         geography_id_methods=dict(payload.get("geography_id_methods", {})),
+        execution_year_from_fact=bool(payload.get("execution_year_from_fact", False)),
     )
 
 

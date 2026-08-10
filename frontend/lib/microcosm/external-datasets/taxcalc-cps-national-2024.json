@@ -1,11 +1,11 @@
 {
   "dataset": "taxcalc_cps_national",
-  "label": "Tax-Calculator public CPS",
+  "label": "Public CPS + Tax-Calculator",
   "engine": "taxcalc 6.7.1",
   "year": 2024,
-  "source": "Tax-Calculator public CPS (Census CPS-derived)",
+  "source": "Public CPS + Tax-Calculator (Census CPS-derived)",
   "source_url": "https://github.com/PSLmodels/Tax-Calculator",
-  "notes": "Public CPS reliably covers wages, AGI, taxable income, income tax (before/after credits), EITC, refundable CTC, pensions, taxable Social Security, unemployment, qualified dividends, charitable and medical deductions, and taxable interest. Dropped concepts: capital gains and partnership/S-corp income (structurally absent from the public CPS, i.e. zero); SALT, interest, tax-exempt-interest, ordinary-dividend, IRA-distribution, QBI and total-itemized deductions and combined CTC (grand total >40% off BOTH the official IRS value and populace); real estate taxes (taxcalc e18500 is an all-filer input while SOI counts only itemizers' Schedule A). Itemizer subpopulation (SOI table 2.1) reproduced via c04470>0; EITC-return AGI via c59660!=0.",
+  "notes": "The full Chronicle harness now evaluates 7,525 national and state facts using same-year 2022-2024 public-CPS advancement. Covered concepts include wages, AGI, taxable income, income tax, EITC, CTC/ACTC, pensions, taxable Social Security, unemployment, dividends, interest, Schedule C income, QBI, and itemized-deduction components. Public CPS state FIPS supports state aggregation. Congressional districts remain unsupported. Capital gains, Schedule E partnership/rental income, premium tax credit, filer-status counts, and pension-contribution splits remain unavailable in the public CPS.",
   "rows": {
     "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.1k_to_2k.eitc_returns@2024": 16459.75,
     "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.1k_to_2k.eitc_total@2024": 10485432.161235407,
