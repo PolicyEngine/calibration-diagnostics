@@ -13,12 +13,16 @@ source:
   policy_period: tax_year:2024
   native_fact_periods: []
   advanced_fact_periods:
+    - tax_year:2022
+    - tax_year:2023
     - calendar_year:2024
     - tax_year:2024
-  geographies: [country]
+  execution_year_from_fact: true
+  geographies: [country, state]
   entities: [tax_unit]
   weights:
     tax_unit: s006
   geography_methods:
     country: fixed_country
+    state: state_fips
   available: true

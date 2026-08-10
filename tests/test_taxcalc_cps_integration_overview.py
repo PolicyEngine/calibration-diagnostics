@@ -16,8 +16,15 @@ def test_taxcalc_cps_overview_pins_public_dataset_and_model() -> None:
     assert overview.source.source_id == "taxcalc_public_cps_2024"
     assert overview.source.dataset_version == "taxcalc-cps-2014@6.7.1"
     assert overview.source.model_version == "taxcalc==6.7.1"
-    assert overview.source.geographies == frozenset({"country"})
+    assert overview.source.geographies == frozenset({"country", "state"})
+    assert overview.source.geography_methods["state"] == "state_fips"
     assert overview.source.entities == frozenset({"tax_unit"})
+    assert overview.source.execution_year_from_fact
+    assert overview.source.advanced_fact_periods >= {
+        "tax_year:2022",
+        "tax_year:2023",
+        "tax_year:2024",
+    }
 
 
 def test_taxcalc_cps_has_ten_real_numeric_verification_facts() -> None:

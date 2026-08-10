@@ -38,6 +38,7 @@ class EvaluationSourceManifest:
     available: bool
     geography_id_prefixes: dict[str, tuple[str, ...]] = field(default_factory=dict)
     geography_id_methods: dict[str, str] = field(default_factory=dict)
+    execution_year_from_fact: bool = False
 
     def __post_init__(self) -> None:
         if self.source_type is SourceType.MODEL_DATASET_PAIR and not self.model_version:
@@ -57,12 +58,17 @@ class AlignmentDeclaration:
     fact_key: str | None = None
     score_eligible: bool = False
     calibration_exposure: CalibrationExposure | None = None
+    semantic: bool = False
 
     def __post_init__(self) -> None:
         if not self.alignment_id:
             raise ValueError("alignment declaration requires an ID")
         if self.quality is AlignmentQuality.NONE:
             raise ValueError("alignment declaration requires a reviewed quality")
+        if self.source_period == self.target_period and not self.semantic:
+            raise ValueError(
+                "same-period alignment declarations must be semantic"
+            )
 
 
 class CapabilityPlanner:
@@ -221,15 +227,16 @@ class CapabilityPlanner:
             )
 
         period = fact.period.canonical
-        alignment: AlignmentDeclaration | None = None
-        if period in source.native_fact_periods:
+        alignment = self._alignment(fact, source)
+        if alignment is not None and alignment.semantic:
+            treatment = PeriodTreatment.ALIGNED_FACT
+        elif period in source.native_fact_periods:
             treatment = PeriodTreatment.NATIVE
         elif period in source.advanced_fact_periods:
             treatment = PeriodTreatment.ADVANCED_POPULATION
         elif mapping is not None and period in mapping.build_target_periods:
             treatment = PeriodTreatment.BUILD_TARGET_REPRODUCTION
         else:
-            alignment = self._alignment(fact, source)
             if alignment is None:
                 return self._unsupported(
                     fact,
@@ -325,6 +332,7 @@ class CapabilityPlanner:
 
         score_eligible = (
             mapping.mapping_quality is MappingQuality.EXACT
+            and fact.fact_key not in mapping.unscored_fact_keys
             and (
                 treatment
                 in {
@@ -344,6 +352,20 @@ class CapabilityPlanner:
             if fact.geography_id.startswith(prefix):
                 geography_method = method
                 break
+        population_period = source.population_period
+        policy_period = source.policy_period
+        if source.execution_year_from_fact:
+            execution_year = fact.period.value[:4]
+            population_period = TypedPeriod(
+                kind=source.population_period.kind,
+                value=execution_year,
+            )
+            if source.policy_period is not None:
+                policy_period = TypedPeriod(
+                    kind=source.policy_period.kind,
+                    value=execution_year,
+                )
+
         return CapabilityResult(
             snapshot_id=self.snapshot_id,
             fact_key=fact.fact_key,
@@ -357,8 +379,8 @@ class CapabilityPlanner:
             mapping_id=mapping.mapping_id,
             mapping_quality=mapping.mapping_quality,
             fact_period=fact.period,
-            population_period=source.population_period,
-            policy_period=source.policy_period,
+            population_period=population_period,
+            policy_period=policy_period,
             period_treatment=treatment,
             alignment_id=alignment.alignment_id if alignment else None,
             alignment_quality=alignment.quality if alignment else AlignmentQuality.NONE,

@@ -94,7 +94,7 @@ export function crossDatasetUiState(input: {
 
 const PERIOD_TREATMENT_LABELS: Record<string, string> = {
   native: "Native-period comparisons",
-  aligned_fact: "2022–2023 facts aligned to 2024",
+  aligned_fact: "Chronicle facts transformed to model-comparable benchmarks",
   advanced_population: "CPS population advanced to 2024",
   build_target_reproduction: "Administrative-period targets used by the 2024 build",
   unsupported: "Period treatment unavailable",
@@ -266,16 +266,27 @@ export function buildSourceOverviews(
 }
 
 export function sourceDisplayLabel(source: SourceSummary): string {
+  if (
+    source.source_id === "taxcalc_public_cps_2024" ||
+    source.source_id === "cps"
+  ) {
+    return "Public CPS + Tax-Calculator";
+  }
   return source.label.replaceAll("Populace", "Microcosm").replaceAll("Ledger", "Chronicle");
 }
 
 export function orderSourceSummaries(sources: SourceSummary[]): SourceSummary[] {
+  const sourcePriority = (source: SourceSummary): number => {
+    const sourceId = source.source_id.toLowerCase();
+    if (sourceId.includes("populace")) return 0;
+    if (sourceId === "taxcalc_public_cps_2024" || sourceId === "cps") return 1;
+    return 2;
+  };
   return sources
     .map((source, index) => ({ source, index }))
     .sort((left, right) => {
-      const leftIsMicrocosm = left.source.source_id.toLowerCase().includes("populace");
-      const rightIsMicrocosm = right.source.source_id.toLowerCase().includes("populace");
-      if (leftIsMicrocosm !== rightIsMicrocosm) return leftIsMicrocosm ? -1 : 1;
+      const priorityDifference = sourcePriority(left.source) - sourcePriority(right.source);
+      if (priorityDifference !== 0) return priorityDifference;
       return left.index - right.index;
     })
     .map(({ source }) => source);

@@ -1,4 +1,4 @@
-mapping_release: populace-policyengine-us-2024-chronicle-expansion-v6
+mapping_release: populace-policyengine-us-2024-chronicle-expansion-v10
 mappings:
   - mapping_id: census-pep-resident-population-calibration-target
     ledger_selector:
@@ -59,15 +59,16 @@ mappings:
       measures: [census.population_projection]
       units: [count]
       entities: [person]
-      # Microcosm topcodes ages 80–84 to age=80, so these five single-year
-      # Chronicle projections cannot be recovered as exact slices. Age 85+
-      # remains directly comparable to Microcosm's age=85 topcode.
+      # The pinned release inherits CPS ASEC public-use codes: 80 means ages
+      # 80–84 and 85 means ages 85+. Dedicated mappings below keep those codes
+      # out of literal single-year queries.
       excluded_fact_keys:
         - ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
         - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
         - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
         - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
         - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
+        - ledger.aggregate_fact.v2:4270254d5042b64d0d41e551
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -75,6 +76,52 @@ mappings:
     mapping_quality: exact
     supported_constraint_domains: [population_projection]
     supported_constraint_variables: [age]
+    calibration_exposure: external_validation
+
+  - mapping_id: census-population-projection-cps-age-80-84
+    ledger_selector:
+      sources: [census_population_projections]
+      measures: [census.population_projection]
+      units: [count]
+      entities: [person]
+      fact_keys:
+        - ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
+        - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
+        - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
+        - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
+        - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
+    execution: direct
+    source_expression: cps_asec_age_80_84_population
+    operation: weighted_sum
+    required_variables: [age]
+    mapping_quality: exact
+    supported_constraint_domains: [population_projection]
+    supported_constraint_variables: [age]
+    descriptive_constraint_variables: [age]
+    # All five facts retain traceability to the grouped benchmark, but only
+    # the age-80 anchor contributes the one independent comparison.
+    unscored_fact_keys:
+      - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
+      - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
+      - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
+      - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
+    calibration_exposure: external_validation
+
+  - mapping_id: census-population-projection-cps-age-85-plus
+    ledger_selector:
+      sources: [census_population_projections]
+      measures: [census.population_projection]
+      units: [count]
+      entities: [person]
+      fact_keys: [ledger.aggregate_fact.v2:4270254d5042b64d0d41e551]
+    execution: direct
+    source_expression: cps_asec_age_85_plus_population
+    operation: weighted_sum
+    required_variables: [age]
+    mapping_quality: exact
+    supported_constraint_domains: [population_projection]
+    supported_constraint_variables: [age]
+    descriptive_constraint_variables: [age]
     calibration_exposure: external_validation
 
   - mapping_id: census-acs-person-count-holdout
@@ -1198,6 +1245,72 @@ mappings:
     supported_constraint_variables: [bea_nipa.series_code]
     calibration_exposure: direct_calibration_target
 
+  - mapping_id: bea-nipa-employer-government-social-insurance-contributions
+    ledger_selector:
+      sources: [bea]
+      measures:
+        [bea_nipa.employer_contributions_for_government_social_insurance]
+      units: [usd]
+      entities: [person]
+    execution: model
+    source_expression: bea_nipa_employer_government_social_insurance_contributions
+    operation: weighted_sum
+    required_variables:
+      [bea_nipa_employer_government_social_insurance_contributions]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [compensation_of_employees]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: bea-nipa-gross-medicare-benefits
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.medicare_benefits]
+      units: [usd]
+      entities: [person]
+    execution: model
+    # BEA records gross program benefits and records beneficiary premiums
+    # separately as social-insurance contributions. PolicyEngine's
+    # medicare_cost is net of Part A/B premiums, so add those premiums back.
+    source_expression: bea_nipa_gross_medicare_benefits
+    operation: weighted_sum
+    required_variables: [bea_nipa_gross_medicare_benefits]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: bea-regional-residence-adjusted-wages
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_regional.wages_and_salaries]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    source_expression: employment_income_before_lsr
+    operation: weighted_sum
+    required_variables: [employment_income_before_lsr]
+    mapping_quality: exact
+    supported_dimensions:
+      [bea_regional.geo_name, bea_regional.line_code, bea_regional.table_name]
+    descriptive_dimensions:
+      [bea_regional.geo_name, bea_regional.line_code, bea_regional.table_name]
+    supported_constraint_domains: [personal_income]
+    supported_constraint_variables:
+      [bea_regional.geo_name, bea_regional.line_code, bea_regional.table_name]
+    descriptive_constraint_variables:
+      [bea_regional.geo_name, bea_regional.line_code, bea_regional.table_name]
+    # The national NIPA wage total is a direct target in the pinned release;
+    # state rows are overridden to external-validation exposure by their
+    # semantic benchmark declarations.
+    calibration_exposure: direct_calibration_target
+
   - mapping_id: cms-nhe-medicaid-title-xix-expenditures
     ledger_selector:
       sources: [cms_nhe]
@@ -1362,6 +1475,39 @@ mappings:
     supported_constraint_domains: [supplemental_nutrition_assistance_program]
     calibration_exposure: related_calibration_family
 
+  - mapping_id: usda-snap-average-monthly-persons
+    ledger_selector:
+      sources: [usda_snap]
+      measures: [usda_snap.average_monthly_persons]
+      units: [count]
+      entities: [person]
+    execution: model
+    execution_entity: spm_unit
+    build_target_periods: [fiscal_year:2024]
+    source_expression: snap_recipient_count
+    operation: weighted_sum
+    required_variables: [snap_recipient_count]
+    mapping_quality: exact
+    supported_constraint_domains: [supplemental_nutrition_assistance_program]
+    calibration_exposure: related_calibration_family
+
+  - mapping_id: usda-snap-average-monthly-benefit-per-person
+    ledger_selector:
+      sources: [usda_snap]
+      measures: [usda_snap.average_monthly_benefit_per_person]
+      units: [usd_per_month]
+      entities: [person]
+    execution: model
+    execution_entity: spm_unit
+    build_target_periods: [fiscal_year:2024]
+    source_expression: snap
+    denominator_expression: snap_recipient_person_months
+    operation: ratio
+    required_variables: [snap, snap_recipient_person_months]
+    mapping_quality: exact
+    supported_constraint_domains: [supplemental_nutrition_assistance_program]
+    calibration_exposure: related_calibration_family
+
   - mapping_id: liheap-households-served
     ledger_selector:
       sources: [hhs_acf_liheap]
@@ -1398,6 +1544,22 @@ mappings:
     supported_constraint_domains: [tanf_cash_assistance]
     calibration_exposure: related_calibration_family
 
+  - mapping_id: tanf-average-monthly-total-families
+    ledger_selector:
+      sources: [hhs_acf_tanf]
+      measures: [hhs_acf_tanf.average_monthly_tanf_total_families]
+      units: [count]
+      entities: [family]
+    execution: model
+    execution_entity: spm_unit
+    build_target_periods: [fiscal_year:2024]
+    source_expression: tanf
+    operation: weighted_count
+    required_variables: [tanf]
+    mapping_quality: exact
+    supported_constraint_domains: [tanf_caseload]
+    calibration_exposure: external_validation
+
   - mapping_id: census-stc-individual-income-tax-collections
     ledger_selector:
       sources: [census_stc]
@@ -1430,6 +1592,12 @@ mappings:
     mapping_quality: exact
     supported_constraint_domains: [medicaid_chip_enrollment]
     calibration_exposure: direct_calibration_target
+    # CMS reports Rhode Island's December 2024 row as zero with an "Unable to
+    # Provide Data" status. Microcosm substitutes November rather than treating
+    # this as a structural zero, so retain the estimate for inspection but do
+    # not score it against the missing observation.
+    unscored_fact_keys:
+      - ledger.aggregate_fact.v2:fa4459772a62b4eada33ba30
 
   - mapping_id: cms-medicaid-total-chip-enrollment
     ledger_selector:
@@ -1460,6 +1628,45 @@ mappings:
     mapping_quality: exact
     supported_constraint_domains: [medicaid_chip_enrollment]
     calibration_exposure: direct_calibration_target
+    unscored_fact_keys:
+      - ledger.aggregate_fact.v2:b153e34a3c3354a52fcd2e7e
+
+  - mapping_id: cms-medicaid-total-adult-enrollment
+    ledger_selector:
+      sources: [cms_medicaid]
+      measures: [cms_medicaid.total_adult_medicaid_enrollment]
+      units: [count]
+      entities: [person]
+    execution: model
+    build_target_periods: [month:2024-12]
+    source_expression: adult_medicaid_enrolled
+    operation: weighted_count
+    required_variables: [adult_medicaid_enrolled]
+    mapping_quality: exact
+    supported_constraint_domains: [medicaid_chip_enrollment]
+    calibration_exposure: related_calibration_family
+    # Rhode Island marks this row as zero because it was unable to provide
+    # December data. Execute the model counterpart for inspection, but do not
+    # score the administrative missing-value sentinel as a structural zero.
+    unscored_fact_keys:
+      - ledger.aggregate_fact.v2:09ae62cf32b2eddb8eda7adf
+
+  - mapping_id: cms-medicaid-child-enrollment
+    ledger_selector:
+      sources: [cms_medicaid]
+      measures: [cms_medicaid.medicaid_chip_child_enrollment]
+      units: [count]
+      entities: [person]
+    execution: model
+    build_target_periods: [month:2024-12]
+    source_expression: child_medicaid_or_chip_enrolled
+    operation: weighted_count
+    required_variables: [child_medicaid_or_chip_enrolled]
+    mapping_quality: exact
+    supported_constraint_domains: [medicaid_chip_enrollment]
+    calibration_exposure: related_calibration_family
+    unscored_fact_keys:
+      - ledger.aggregate_fact.v2:a30c1502ae98f22d936a27ad
 
   - mapping_id: ssa-ssi-federal-payment-recipients-by-age
     ledger_selector:
@@ -1490,6 +1697,34 @@ mappings:
     mapping_quality: exact
     supported_constraint_domains: [form_w2_items]
     calibration_exposure: direct_calibration_target
+
+  - mapping_id: irs-soi-form-w2-social-security-tip-returns
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.form_w2_social_security_tip_returns]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: tax_unit_sum_person:tip_income
+    operation: weighted_count
+    required_variables: [tax_unit_sum_person:tip_income]
+    mapping_quality: exact
+    supported_constraint_domains: [form_w2_items]
+    calibration_exposure: related_calibration_family
+
+  - mapping_id: irs-soi-form-w2-social-security-tip-taxpayers
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.form_w2_social_security_tip_taxpayers]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: tax_unit_count_person:tip_income
+    operation: weighted_sum
+    required_variables: [tax_unit_count_person:tip_income]
+    mapping_quality: exact
+    supported_constraint_domains: [form_w2_items]
+    calibration_exposure: related_calibration_family
 
   - mapping_id: irs-soi-rental-royalty-net-income
     ledger_selector:
@@ -1776,6 +2011,22 @@ mappings:
     execution: model
     source_expression: tax_unit_sum_person:irs_gross_income
     operation: weighted_count
+    required_variables: [tax_unit_sum_person:irs_gross_income]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: irs-soi-2022-total-income-amount
+    ledger_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.total_income]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: tax_unit_sum_person:irs_gross_income
+    operation: weighted_sum
     required_variables: [tax_unit_sum_person:irs_gross_income]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]

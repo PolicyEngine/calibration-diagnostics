@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .contracts import CalibrationExposure, PeriodTreatment
-from .full_run import load_snapshot_facts, scope_facts_to_jurisdictions
+from .full_run import (
+    exclude_facts_with_geography_ids,
+    load_snapshot_facts,
+    scope_facts_to_jurisdictions,
+)
 from .publisher import RUN_SCHEMA
 from .scoring import ScoreObservation, build_group_score
 
@@ -21,7 +25,7 @@ FAR_OUTSIDE_BOUNDS_RELATIVE_ERROR = Decimal("0.25")
 DEFAULT_SOURCE_LABELS = {
     "census_acs_pums_2024": "Raw ACS PUMS",
     "populace_us_policyengine_us_2024": "Microcosm + PolicyEngine-US",
-    "taxcalc_public_cps_2024": "Tax-Calculator + public CPS",
+    "taxcalc_public_cps_2024": "Public CPS + Tax-Calculator",
 }
 
 
@@ -91,7 +95,36 @@ def _facts_in_run_scope(
         raise ValueError("evaluation run has no explicit jurisdiction scope")
     if scope.get("source_snapshot_fact_count") != len(facts):
         raise ValueError("evaluation scope source fact count does not match snapshot")
-    scoped = scope_facts_to_jurisdictions(facts, jurisdictions)
+    jurisdiction_scoped = scope_facts_to_jurisdictions(facts, jurisdictions)
+    excluded_geography_ids = scope.get("excluded_geography_ids", [])
+    if (
+        not isinstance(excluded_geography_ids, list)
+        or any(
+            not isinstance(value, str) or not value
+            for value in excluded_geography_ids
+        )
+    ):
+        raise ValueError("evaluation run has malformed excluded geography IDs")
+    scoped = exclude_facts_with_geography_ids(
+        jurisdiction_scoped, excluded_geography_ids
+    )
+    excluded_geography_count = len(jurisdiction_scoped) - len(scoped)
+    declared_geography_count = scope.get("excluded_geography_fact_count")
+    if (
+        declared_geography_count is not None
+        and declared_geography_count != excluded_geography_count
+    ):
+        raise ValueError(
+            "evaluation scope excluded geography fact count does not reconcile"
+        )
+    declared_non_us_count = scope.get("excluded_non_us_fact_count")
+    if (
+        declared_non_us_count is not None
+        and declared_non_us_count != len(facts) - len(jurisdiction_scoped)
+    ):
+        raise ValueError(
+            "evaluation scope excluded non-US fact count does not reconcile"
+        )
     if scope.get("included_fact_count") != len(scoped):
         raise ValueError("evaluation scope included fact count does not reconcile")
     if scope.get("excluded_fact_count") != len(facts) - len(scoped):

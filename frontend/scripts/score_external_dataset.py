@@ -192,8 +192,8 @@ def score(spec):
 
 METADATA = {
     "file": "taxcalc-cps-national-2024.json", "dataset": "taxcalc_cps_national",
-    "label": "Tax-Calculator public CPS", "engine": "taxcalc 6.7.1", "year": 2024,
-    "source": "Tax-Calculator public CPS (Census CPS-derived)",
+    "label": "Public CPS + Tax-Calculator", "engine": "taxcalc 6.7.1", "year": 2024,
+    "source": "Public CPS + Tax-Calculator (Census CPS-derived)",
     "source_url": "https://github.com/PSLmodels/Tax-Calculator",
     "notes": (
         "Public CPS reliably covers wages, AGI, taxable income, income tax "

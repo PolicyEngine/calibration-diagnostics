@@ -765,14 +765,14 @@ export function PopulaceCompareView() {
           <div className="grid gap-5 lg:grid-cols-2">
             <SectionCard
               title="Most improved (B vs A)"
-              description="Common non-zero targets whose absolute relative error fell the most from A to B, excluding tiny-denominator extremes above 1000%."
+              description="Common targets whose absolute relative error fell the most from A to B, including structural-zero targets."
               padded={false}
             >
               <MoverList rows={improvements} />
             </SectionCard>
             <SectionCard
               title="Most regressed (B vs A)"
-              description="Common non-zero targets whose absolute relative error rose the most from A to B, excluding tiny-denominator extremes above 1000%."
+              description="Common targets whose absolute relative error rose the most from A to B, including structural-zero targets."
               padded={false}
             >
               <MoverList rows={regressions} />

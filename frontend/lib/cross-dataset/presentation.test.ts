@@ -12,6 +12,7 @@ import {
   crossDatasetUiState,
   groupFactsHref,
   orderSourceSummaries,
+  sourceDisplayLabel,
 } from "./presentation";
 
 const summary: CrossDatasetSummary = {
@@ -62,7 +63,7 @@ const summary: CrossDatasetSummary = {
     },
     {
       source_id: "cps",
-      label: "Tax-Calculator + public CPS",
+      label: "Public CPS + Tax-Calculator",
       source_type: "model_dataset_pair",
       capability_count: 48_313,
       result_count: 38,
@@ -418,18 +419,34 @@ test("source metric rows keep performance inseparable from Chronicle coverage co
   });
 });
 
-test("Microcosm is ordered before every other model or standalone dataset", () => {
-  const reversedSources = [...summary.sources].reverse();
+test("legacy Tax-Calculator artifacts display the current Public CPS label", () => {
+  expect(
+    sourceDisplayLabel({
+      ...summary.sources[1],
+      source_id: "taxcalc_public_cps_2024",
+      label: "Tax-Calculator + public CPS",
+    }),
+  ).toBe("Public CPS + Tax-Calculator");
+});
 
-  expect(orderSourceSummaries(reversedSources).map((source) => source.source_id)).toEqual([
+test("Microcosm is first and Public CPS + Tax-Calculator precedes Raw ACS PUMS", () => {
+  const rawAcs = {
+    ...summary.sources[1],
+    source_id: "census_acs_pums_2024",
+    label: "Raw ACS PUMS",
+  };
+  const mixedSources = [rawAcs, ...summary.sources];
+
+  expect(orderSourceSummaries(mixedSources).map((source) => source.source_id)).toEqual([
     "populace",
     "cps",
+    "census_acs_pums_2024",
   ]);
   expect(
-    buildSourceOverviews({ ...summary, sources: reversedSources }, groups).map(
+    buildSourceOverviews({ ...summary, sources: mixedSources }, groups).map(
       (source) => source.sourceId,
     ),
-  ).toEqual(["populace", "cps"]);
+  ).toEqual(["populace", "cps", "census_acs_pums_2024"]);
 });
 
 test("source metric filters select geography and Microcosm sample aggregates", () => {
@@ -474,7 +491,7 @@ test("source scorecards identify aligned, advanced, and in-sample comparisons", 
 
   expect(populace.periodTreatments).toContainEqual({
     key: "aligned_fact",
-    label: "2022–2023 facts aligned to 2024",
+    label: "Chronicle facts transformed to model-comparable benchmarks",
     count: 116,
   });
   expect(populace.calibrationExposures).toContainEqual({

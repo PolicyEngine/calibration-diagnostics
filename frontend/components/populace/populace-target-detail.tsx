@@ -198,7 +198,7 @@ export function PopulaceTargetDetail({
   const finalRel = typeof row.relative_error === "number" ? row.relative_error : null;
   const initialError = typeof row.initial_error === "number" ? row.initial_error : initialRel;
   const finalError = typeof row.final_error === "number" ? row.final_error : finalRel;
-  const errorKind = row.error_kind ?? (target === 0 ? "absolute" : "relative");
+  const errorKind = row.error_kind ?? "relative";
   const improvement = typeof row.improvement === "number" ? row.improvement : null;
   const within10 =
     typeof row.abs_relative_error === "number" ? row.abs_relative_error <= 0.1 : null;

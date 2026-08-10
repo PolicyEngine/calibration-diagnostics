@@ -6,8 +6,10 @@ import pytest
 
 from evaluation_harness.contracts import (
     AlignmentQuality,
+    CalibrationExposure,
     CapabilityStatus,
     FactContract,
+    PeriodTreatment,
     TypedPeriod,
 )
 from evaluation_harness.integration import load_integration_overview
@@ -59,6 +61,81 @@ def _planner():
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     registry = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     return CapabilityPlanner(registry), overview.source
+
+
+@pytest.mark.parametrize(
+    ("fact", "mapping_id", "source_expression"),
+    [
+        (
+            _fact(
+                "bea",
+                "bea_nipa.employer_contributions_for_government_social_insurance",
+                "usd",
+                "person",
+                "compensation_of_employees",
+                constraints=(
+                    {
+                        "variable": "bea_nipa.series_code",
+                        "operator": "==",
+                        "value": "B039RC",
+                    },
+                ),
+                dimensions={"bea_nipa.series_code": "B039RC"},
+            ),
+            "bea-nipa-employer-government-social-insurance-contributions",
+            "bea_nipa_employer_government_social_insurance_contributions",
+        ),
+        (
+            _fact(
+                "bea",
+                "bea_nipa.medicare_benefits",
+                "usd",
+                "person",
+                "personal_current_transfer_receipts",
+                constraints=(
+                    {
+                        "variable": "bea_nipa.series_code",
+                        "operator": "==",
+                        "value": "W824RC",
+                    },
+                ),
+                dimensions={"bea_nipa.series_code": "W824RC"},
+            ),
+            "bea-nipa-gross-medicare-benefits",
+            "bea_nipa_gross_medicare_benefits",
+        ),
+        (
+            _fact(
+                "hhs_acf_tanf",
+                "hhs_acf_tanf.average_monthly_tanf_total_families",
+                "count",
+                "family",
+                "tanf_caseload",
+                period="fiscal_year:2024",
+            ),
+            "tanf-average-monthly-total-families",
+            "tanf",
+        ),
+    ],
+)
+def test_audited_external_validation_facts_have_executable_exact_mappings(
+    fact: FactContract,
+    mapping_id: str,
+    source_expression: str,
+) -> None:
+    planner, source = _planner()
+
+    result = planner.classify(fact, source)
+
+    assert result.status is CapabilityStatus.MODEL
+    assert result.mapping_id == mapping_id
+    assert result.query is not None
+    assert result.query.value_expression == source_expression
+    assert result.calibration_exposure is CalibrationExposure.EXTERNAL_VALIDATION
+    assert result.score_eligible
+    if fact.entity == "family":
+        assert result.entity == "spm_unit"
+        assert result.period_treatment is PeriodTreatment.BUILD_TARGET_REPRODUCTION
 
 
 @pytest.mark.parametrize(
@@ -590,35 +667,6 @@ def test_high_confidence_gap_families_are_executable(fact, mapping_id) -> None:
     assert result.query is not None
 
 
-@pytest.mark.parametrize(
-    "fact_key",
-    [
-        "ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc",
-        "ledger.aggregate_fact.v2:24ef01329f771565b927bd3d",
-        "ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c",
-        "ledger.aggregate_fact.v2:ba9cae909127ad2764caec51",
-        "ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975",
-    ],
-)
-def test_single_year_ages_80_through_84_are_not_exactly_mapped(fact_key: str) -> None:
-    planner, source = _planner()
-    result = planner.classify(
-        _fact(
-            "census_population_projections",
-            "census.population_projection",
-            "count",
-            "person",
-            "population_projection",
-            constraints=({"variable": "age", "operator": "==", "value": 80},),
-            fact_key=fact_key,
-        ),
-        source,
-    )
-
-    assert result.status is CapabilityStatus.UNSUPPORTED_CONCEPT
-    assert result.reason_code == "mapping_not_found"
-
-
 def test_2024_irs_mapping_expansion_covers_reviewed_measure_families() -> None:
     registry = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     mapped_measures = {
@@ -747,6 +795,175 @@ def test_reviewed_2022_return_concepts_map_after_populace_aging(
     assert result.status is CapabilityStatus.PROJECTED
     assert result.mapping_id == mapping_id
     assert result.score_eligible
+
+
+def test_2022_total_income_amount_maps_after_populace_aging() -> None:
+    fact = replace(
+        _fact(
+            "irs_soi",
+            "irs_soi.total_income",
+            "usd",
+            "tax_unit",
+            "all_individual_income_tax_returns",
+            dimensions={"filing_status": "all", "income_range": "all"},
+        ),
+        period=TypedPeriod.parse("tax_year:2022"),
+    )
+
+    result = _classify_aligned_2022(fact)
+
+    assert result.status is CapabilityStatus.PROJECTED
+    assert result.mapping_id == "irs-soi-2022-total-income-amount"
+    assert result.query.value_expression == "tax_unit_sum_person:irs_gross_income"
+    assert result.query.operation == "weighted_sum"
+
+
+@pytest.mark.parametrize(
+    ("measure", "mapping_id", "source_expression", "operation"),
+    [
+        (
+            "irs_soi.form_w2_social_security_tip_returns",
+            "irs-soi-form-w2-social-security-tip-returns",
+            "tax_unit_sum_person:tip_income",
+            "weighted_count",
+        ),
+        (
+            "irs_soi.form_w2_social_security_tip_taxpayers",
+            "irs-soi-form-w2-social-security-tip-taxpayers",
+            "tax_unit_count_person:tip_income",
+            "weighted_sum",
+        ),
+    ],
+)
+def test_w2_tip_counts_use_the_correct_tax_unit_aggregation(
+    measure, mapping_id, source_expression, operation
+) -> None:
+    planner, source = _planner()
+    result = planner.classify(
+        _fact(
+            "irs_soi",
+            measure,
+            "count",
+            "tax_unit",
+            "form_w2_items",
+        ),
+        source,
+    )
+
+    assert result.mapping_id == mapping_id
+    assert result.query.value_expression == source_expression
+    assert result.query.operation == operation
+
+
+@pytest.mark.parametrize(
+    ("measure", "mapping_id", "source_expression"),
+    [
+        (
+            "cms_medicaid.total_adult_medicaid_enrollment",
+            "cms-medicaid-total-adult-enrollment",
+            "adult_medicaid_enrolled",
+        ),
+        (
+            "cms_medicaid.medicaid_chip_child_enrollment",
+            "cms-medicaid-child-enrollment",
+            "child_medicaid_or_chip_enrolled",
+        ),
+    ],
+)
+def test_cms_child_and_adult_enrollment_are_2024_build_period_mappings(
+    measure, mapping_id, source_expression
+) -> None:
+    planner, source = _planner()
+    result = planner.classify(
+        _fact(
+            "cms_medicaid",
+            measure,
+            "count",
+            "person",
+            "medicaid_chip_enrollment",
+            period="month:2024-12",
+        ),
+        source,
+    )
+
+    assert result.mapping_id == mapping_id
+    assert result.query.value_expression == source_expression
+    assert result.period_treatment.value == "build_target_reproduction"
+
+
+@pytest.mark.parametrize(
+    "fact_key",
+    [
+        "ledger.aggregate_fact.v2:09ae62cf32b2eddb8eda7adf",
+        "ledger.aggregate_fact.v2:a30c1502ae98f22d936a27ad",
+    ],
+)
+def test_rhode_island_missing_cms_age_rows_are_covered_but_unscored(
+    fact_key: str,
+) -> None:
+    measure = (
+        "cms_medicaid.total_adult_medicaid_enrollment"
+        if fact_key.endswith("7adf")
+        else "cms_medicaid.medicaid_chip_child_enrollment"
+    )
+    planner, source = _planner()
+    result = planner.classify(
+        _fact(
+            "cms_medicaid",
+            measure,
+            "count",
+            "person",
+            "medicaid_chip_enrollment",
+            period="month:2024-12",
+            fact_key=fact_key,
+        ),
+        source,
+    )
+
+    assert result.query is not None
+    assert not result.score_eligible
+
+
+@pytest.mark.parametrize(
+    ("measure", "unit", "mapping_id", "source_expression", "operation"),
+    [
+        (
+            "usda_snap.average_monthly_persons",
+            "count",
+            "usda-snap-average-monthly-persons",
+            "snap_recipient_count",
+            "weighted_sum",
+        ),
+        (
+            "usda_snap.average_monthly_benefit_per_person",
+            "usd_per_month",
+            "usda-snap-average-monthly-benefit-per-person",
+            "snap",
+            "ratio",
+        ),
+    ],
+)
+def test_snap_person_measures_use_reviewed_snap_unit_denominators(
+    measure, unit, mapping_id, source_expression, operation
+) -> None:
+    planner, source = _planner()
+    result = planner.classify(
+        _fact(
+            "usda_snap",
+            measure,
+            unit,
+            "person",
+            "supplemental_nutrition_assistance_program",
+            period="fiscal_year:2024",
+        ),
+        source,
+    )
+
+    assert result.mapping_id == mapping_id
+    assert result.query.value_expression == source_expression
+    assert result.query.operation == operation
+    if operation == "ratio":
+        assert result.query.denominator_expression == "snap_recipient_person_months"
 
 
 @pytest.mark.parametrize(

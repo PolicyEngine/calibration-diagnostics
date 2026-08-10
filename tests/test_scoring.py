@@ -33,16 +33,28 @@ def test_absolute_relative_error_handles_signed_benchmarks() -> None:
     assert absolute_relative_error(Decimal("-90"), Decimal("-100")) == Decimal("0.1")
 
 
-def test_zero_benchmark_has_no_relative_error() -> None:
-    assert absolute_relative_error(Decimal("4"), Decimal("0")) is None
+def test_zero_benchmark_is_scored_as_a_structural_zero() -> None:
+    assert absolute_relative_error(Decimal("0"), Decimal("0")) == Decimal("0")
+    assert absolute_relative_error(Decimal("0.0001"), Decimal("0")) == Decimal("0")
+    assert absolute_relative_error(Decimal("-0.0001"), Decimal("0")) == Decimal("0")
+    assert absolute_relative_error(Decimal("0.00010001"), Decimal("0")) == Decimal(
+        "1"
+    )
+    assert absolute_relative_error(Decimal("4"), Decimal("0")) == Decimal("1")
+    assert absolute_relative_error(Decimal("-4"), Decimal("0")) == Decimal("1")
 
 
-def test_group_score_reports_zero_targets_without_inventing_percent_error() -> None:
-    score = build_group_score([observation("zero", "0", "4", "income")])
-    assert score.covered == 1
-    assert score.relative_error_count == 0
-    assert score.loss is None
-    assert score.display_score is None
+def test_group_score_includes_structural_zero_results() -> None:
+    score = build_group_score(
+        [
+            observation("matched-zero", "0", "0", "income"),
+            observation("missed-zero", "0", "4", "income"),
+        ]
+    )
+    assert score.covered == 2
+    assert score.relative_error_count == 2
+    assert score.loss == Decimal("0.5")
+    assert score.display_score == Decimal("50.0")
 
 
 def test_group_score_means_errors_across_facts_instead_of_families() -> None:

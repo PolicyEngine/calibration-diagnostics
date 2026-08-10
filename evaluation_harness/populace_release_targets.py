@@ -273,7 +273,15 @@ def materialize_release_target_results(
             geography_method="microcosm_release_diagnostics",
             query=None,
             calibration_exposure=CalibrationExposure.DIRECT_CALIBRATION_TARGET,
-            score_eligible=True,
+            # A release diagnostic makes an otherwise unmapped build target
+            # scoreable (for example JCT counterfactuals). If a reviewed
+            # mapping exists, however, preserve its explicit eligibility
+            # decision so source-declared missing observations stay unscored.
+            score_eligible=(
+                capability.score_eligible
+                if capability.mapping_id is not None
+                else True
+            ),
         )
         materialized_capabilities.append(materialized)
         materialized_results.append(

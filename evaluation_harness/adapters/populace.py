@@ -412,6 +412,97 @@ class PopulacePolicyEngineRunner:
             ).astype(bool) | self._native_model_array(
                 "chip_enrolled", period, expected_entity="person"
             ).astype(bool)
+        if requested_name == "adult_medicaid_enrolled" and entity == "person":
+            age = self._native_model_array(
+                "age", period, expected_entity="person"
+            )
+            medicaid = self._native_model_array(
+                "medicaid_enrolled", period, expected_entity="person"
+            ).astype(bool)
+            return medicaid & (age >= 19)
+        if (
+            requested_name == "child_medicaid_or_chip_enrolled"
+            and entity == "person"
+        ):
+            age = self._native_model_array(
+                "age", period, expected_entity="person"
+            )
+            medicaid_or_chip = self._native_model_array(
+                "medicaid_enrolled", period, expected_entity="person"
+            ).astype(bool) | self._native_model_array(
+                "chip_enrolled", period, expected_entity="person"
+            ).astype(bool)
+            return medicaid_or_chip & (age < 19)
+        if requested_name in {
+            "snap_recipient_count",
+            "snap_recipient_person_months",
+        } and entity == "spm_unit":
+            snap = self._native_model_array(
+                "snap", period, expected_entity="spm_unit"
+            )
+            snap_unit_size = self._native_model_array(
+                "snap_unit_size", period, expected_entity="spm_unit"
+            )
+            recipient_count = np.where(snap > 0, snap_unit_size, 0)
+            if requested_name == "snap_recipient_person_months":
+                return recipient_count * 12
+            return recipient_count
+        if requested_name in {
+            "cps_asec_age_80_84_population",
+            "cps_asec_age_85_plus_population",
+        } and entity == "person":
+            age = self._native_model_array(
+                "age", period, expected_entity="person"
+            )
+            # These are public-use category codes, not literal single years:
+            # A_AGE=80 represents ages 80--84 and A_AGE=85 represents 85+.
+            code = (
+                80
+                if requested_name == "cps_asec_age_80_84_population"
+                else 85
+            )
+            return age == code
+        if (
+            requested_name
+            == "bea_nipa_employer_government_social_insurance_contributions"
+            and entity == "person"
+        ):
+            components = (
+                "employer_social_security_tax",
+                "employer_medicare_tax",
+                "employer_federal_unemployment_tax",
+                "employer_state_payroll_tax",
+            )
+            return sum(
+                (
+                    self._native_model_array(
+                        name, period, expected_entity="person"
+                    )
+                    for name in components
+                ),
+                start=np.zeros(len(self.tables["person"]["person_id"])),
+            )
+        if (
+            requested_name == "bea_nipa_gross_medicare_benefits"
+            and entity == "person"
+        ):
+            # PolicyEngine defines medicare_cost net of beneficiary Part A/B
+            # premiums. BEA records those premiums as contributions rather
+            # than netting them out of Medicare social benefits.
+            components = (
+                "medicare_cost",
+                "base_part_a_premium",
+                "gross_medicare_part_b_premium",
+            )
+            return sum(
+                (
+                    self._native_model_array(
+                        name, period, expected_entity="person"
+                    )
+                    for name in components
+                ),
+                start=np.zeros(len(self.tables["person"]["person_id"])),
+            )
 
         model_name = VARIABLE_ALIASES.get(requested_name, requested_name)
         values = self._native_model_array(model_name, period, expected_entity=entity)

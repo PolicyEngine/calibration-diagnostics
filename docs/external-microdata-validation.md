@@ -33,7 +33,8 @@ standing view.
 2. **Distribution by AGI bracket** — totals per SOI Pub 1304 AGI band for the
    concepts above (the same 16-bracket grid Yale's own target spec uses).
 3. **Coverage** — how many benchmark rows each dataset can express at all.
-   Tax-Calculator CPS is federal-only (no state income tax or benefit programs);
+   Tax-Calculator CPS is federal-tax-only, but its public records retain state
+   FIPS and therefore support state aggregation of the modeled federal concepts;
    Yale is federal tax units; populace covers the full surface. Coverage is a
    first-class metric, not a footnote.
 
@@ -50,7 +51,7 @@ per-dataset summary header, and a coverage strip. No changes to existing views.
 
 | dataset | availability | vintage | compute | asks |
 |---|---|---|---|---|
-| **Tax-Calculator public CPS** | fully public — ships in `pip install taxcalc` (`cps.csv.gz`, 280,005 records, weights WT2014–WT2036) | 2014 base, advanced to 2024 | verified: 2024 `calc_all()` ≈ 11 s / 1.8 GB; iitax 2024 = $1,867.8B | none |
+| **Public CPS + Tax-Calculator** | fully public — ships in `pip install taxcalc` (`cps.csv.gz`, 280,005 records, weights WT2014–WT2036) | 2014 base, advanced to 2024 | verified: 2024 `calc_all()` ≈ 11 s / 1.8 GB; iitax 2024 = $1,867.8B | none |
 | **Yale Tax-Data** | microdata **not shareable** (PUF-derived; their docs say so explicitly). Tax-law params + all reform scenarios + runscripts + variable guide + target spec **are public** | 2015 PUF base, files per year 2017–2097 (2024 exists) on Yale HPC only | their R pipeline; not reproducible without PUF + their internal Compiled-SOI-Tables | **ask Ricco for an aggregated export** — totals by variable × AGI bracket × filing status for 2024 (shareable; grid = their public `target_info/baseline.csv`, 165 rows, 16 AGI brackets) |
 
 Correction to the Slack thread: Yale's **tax parameter files are public**

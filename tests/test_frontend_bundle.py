@@ -129,7 +129,10 @@ def result(cell: CapabilityResult, estimate: str) -> EvaluationResult:
 
 
 def published_inputs(
-    tmp_path: Path, *, include_non_us_snapshot_fact: bool = False
+    tmp_path: Path,
+    *,
+    include_non_us_snapshot_fact: bool = False,
+    include_excluded_geography_fact: bool = False,
 ) -> tuple[Path, Path]:
     facts = (
         fact("fact-a"),
@@ -157,6 +160,19 @@ def published_inputs(
                 entity="person",
                 unit="count",
                 jurisdiction="BE",
+            ),
+        )
+    if include_excluded_geography_fact:
+        snapshot_facts = (
+            *snapshot_facts,
+            fact(
+                "fact-guam",
+                source="usda_snap",
+                measure="usda_snap.total_benefits",
+                geography_level="state",
+                geography_id="0400000US66",
+                entity="government",
+                unit="usd",
             ),
         )
     snapshot = tmp_path / "snapshot"
@@ -215,13 +231,20 @@ def published_inputs(
     )
     scores = build_scored_results(facts, capabilities, results, ())
     summary = build_run_summary(facts, capabilities, results, scores)
-    if include_non_us_snapshot_fact:
+    if include_non_us_snapshot_fact or include_excluded_geography_fact:
         summary["evaluation_scope"] = {
             "jurisdictions": ["US"],
             "source_snapshot_fact_count": len(snapshot_facts),
             "included_fact_count": len(facts),
             "excluded_fact_count": len(snapshot_facts) - len(facts),
         }
+        if include_excluded_geography_fact:
+            summary["evaluation_scope"].update(
+                {
+                    "excluded_geography_ids": ["0400000US66"],
+                    "excluded_geography_fact_count": 1,
+                }
+            )
     run = tmp_path / "run"
     publish_run(run, capabilities, results, scores=scores, summary=summary)
     return snapshot, run
@@ -277,7 +300,7 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
         page_size=2,
         source_labels={
             "populace": "Microcosm + PolicyEngine-US",
-            "cps": "Tax-Calculator + public CPS",
+            "cps": "Public CPS + Tax-Calculator",
         },
     )
 
@@ -391,6 +414,19 @@ def test_frontend_bundle_applies_the_runs_explicit_us_scope(tmp_path: Path) -> N
     assert summary["jurisdictions"] == ["US"]
     index = json.loads((output / "fact-index.json").read_text())
     assert "fact-be" not in index["facts"]
+
+
+def test_frontend_bundle_applies_explicit_geography_exclusions(tmp_path: Path) -> None:
+    snapshot, run = published_inputs(
+        tmp_path, include_excluded_geography_fact=True
+    )
+    output = tmp_path / "frontend"
+
+    manifest = publish_frontend_bundle(snapshot, run, output)
+
+    assert manifest["fact_count"] == 3
+    index = json.loads((output / "fact-index.json").read_text())
+    assert "fact-guam" not in index["facts"]
 
 
 def test_frontend_bundle_verifies_source_hashes_and_is_immutable(tmp_path: Path) -> None:

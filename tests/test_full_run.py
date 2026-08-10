@@ -26,6 +26,7 @@ from evaluation_harness.full_run import (
     build_full_capability_matrix,
     build_scored_results,
     build_run_summary,
+    exclude_facts_with_geography_ids,
     load_snapshot_facts,
     scope_facts_to_jurisdictions,
 )
@@ -189,6 +190,27 @@ def test_us_scope_removes_non_us_chronicle_facts_before_classification() -> None
     assert scoped == (us_fact,)
 
 
+def test_evaluation_geography_scope_removes_unrepresented_territories() -> None:
+    country = fact("ledger.aggregate_fact.v2:country")
+    guam = replace(
+        fact("ledger.aggregate_fact.v2:guam"),
+        geography_level="state",
+        geography_id="0400000US66",
+    )
+    virgin_islands = replace(
+        fact("ledger.aggregate_fact.v2:virgin-islands"),
+        geography_level="state",
+        geography_id="0400000US78",
+    )
+
+    scoped = exclude_facts_with_geography_ids(
+        (country, guam, virgin_islands),
+        {"0400000US66", "0400000US78"},
+    )
+
+    assert scoped == (country,)
+
+
 def test_source_plan_propagates_fact_specific_calibration_exposure() -> None:
     ledger_fact = fact("ledger.aggregate_fact.v2:exposure")
     plan = SourcePlan(
@@ -252,6 +274,44 @@ def test_aligned_result_is_scored_against_transformed_not_2023_value() -> None:
     assert scored.benchmark_period == TypedPeriod.parse("tax_year:2024")
     assert scored.benchmark_basis == "populace_aligned_fact"
     assert scored.absolute_relative_error == Decimal("0.2")
+
+
+def test_same_period_semantic_alignment_uses_transformed_benchmark_basis() -> None:
+    ledger_fact = fact("ledger.aggregate_fact.v2:semantic", value="100")
+    alignment_id = "bea-state-wages:semantic"
+    cell = capability(
+        ledger_fact,
+        treatment=PeriodTreatment.ALIGNED_FACT,
+        alignment_id=alignment_id,
+    )
+    alignment = AlignedFact(
+        alignment_id=alignment_id,
+        source_fact_key=ledger_fact.fact_key,
+        observed_period=ledger_fact.period,
+        observed_value=ledger_fact.value,
+        target_period=ledger_fact.period,
+        aligned_value=Decimal("125"),
+        alignment_model="bea_state_wage_residence_adjustment",
+        alignment_version="test",
+        factor_sources=("bea",),
+        method_quality=AlignmentQuality.VALIDATED,
+        backtest_error=None,
+        metadata={
+            "alignment_kind": "semantic",
+            "benchmark_basis": "microcosm_bea_residence_adjusted_wage_target",
+        },
+    )
+
+    scored = build_scored_results(
+        [ledger_fact], [cell], [result(cell, "100")], [alignment]
+    )[0]
+
+    assert scored.benchmark_value == Decimal("125")
+    assert scored.benchmark_period == ledger_fact.period
+    assert (
+        scored.benchmark_basis
+        == "microcosm_bea_residence_adjusted_wage_target"
+    )
 
 
 def test_scoring_rejects_an_aligned_result_without_its_benchmark() -> None:

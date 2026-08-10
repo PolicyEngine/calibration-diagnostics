@@ -20,12 +20,16 @@ class FakeCalculator:
         return self.arrays[name]
 
 
-def group(*variables: str) -> RunGroup:
+def group(
+    *variables: str,
+    year: int = 2024,
+    geography_method: str = "fixed_country",
+) -> RunGroup:
     return RunGroup(
         source_id="taxcalc_public_cps_2024",
-        population_period="tax_year:2024",
-        policy_period="tax_year:2024",
-        geography_method="fixed_country",
+        population_period=f"tax_year:{year}",
+        policy_period=f"tax_year:{year}",
+        geography_method=geography_method,
         entity="tax_unit",
         fact_keys=("fact",),
         required_variables=variables,
@@ -56,16 +60,82 @@ def test_runner_constructs_one_calculator_and_caches_arrays() -> None:
     assert first.model_version == "taxcalc==6.7.1"
 
 
+def test_runner_rebuilds_for_each_requested_fact_year() -> None:
+    calculators = {
+        year: FakeCalculator(
+            {
+                "s006": np.ones(1),
+                "c00100": np.array([float(year)]),
+                "MARS": np.ones(1),
+                "EIC": np.zeros(1),
+            }
+        )
+        for year in (2022, 2023)
+    }
+    calls: list[int] = []
+
+    def factory(year: int):
+        calls.append(year)
+        return calculators[year]
+
+    runner = TaxCalcCPSRunner(calculator_factory=factory)
+    assert runner.prepare(group("c00100", year=2022)).arrays["c00100"] == [2022]
+    assert runner.prepare(group("c00100", year=2023)).arrays["c00100"] == [2023]
+    assert calls == [2022, 2023]
+
+
+def test_runner_builds_reviewed_composite_tax_expressions() -> None:
+    calculator = FakeCalculator(
+        {
+            "s006": np.ones(2),
+            "MARS": np.ones(2),
+            "EIC": np.zeros(2),
+            "e00300": np.array([10.0, 20.0]),
+            "e00600": np.array([5.0, 8.0]),
+            "e00650": np.array([2.0, 3.0]),
+            "c00100": np.array([100.0, 200.0]),
+            "c02900": np.array([4.0, 6.0]),
+            "c05800": np.array([30.0, 40.0]),
+            "c07100": np.array([7.0, 50.0]),
+            "c04470": np.array([1.0, 0.0]),
+            "e18500": np.array([9.0, 11.0]),
+            "e00900": np.array([12.0, -4.0]),
+        }
+    )
+    bundle = TaxCalcCPSRunner(calculator_factory=lambda _: calculator).prepare(
+        group(
+            "taxable_interest_and_nonqualified_dividends",
+            "total_income",
+            "income_tax_after_nonrefundable_credits",
+            "itemized_real_estate_taxes",
+            "positive_schedule_c_income",
+        )
+    )
+
+    assert bundle.arrays["taxable_interest_and_nonqualified_dividends"].tolist() == [
+        13.0,
+        25.0,
+    ]
+    assert bundle.arrays["total_income"].tolist() == [104.0, 206.0]
+    assert bundle.arrays["income_tax_after_nonrefundable_credits"].tolist() == [
+        23.0,
+        0.0,
+    ]
+    assert bundle.arrays["itemized_real_estate_taxes"].tolist() == [9.0, 0.0]
+    assert bundle.arrays["positive_schedule_c_income"].tolist() == [12.0, 0.0]
+
+
 def test_runner_exposes_geography_domains_and_breakdown_dimensions() -> None:
     calculator = FakeCalculator(
         {
             "s006": np.ones(5),
             "MARS": np.array([1, 2, 3, 4, 5]),
             "EIC": np.array([0, 1, 2, 3, 4]),
+            "c59660": np.ones(5),
         }
     )
     bundle = TaxCalcCPSRunner(calculator_factory=lambda _: calculator).prepare(
-        group("s006", "filing_status", "eitc_child_count")
+        group("s006", "filing_status", "eitc_child_count", "c59660")
     )
     assert bundle.arrays["__geography__"].tolist() == ["0100000US"] * 5
     assert bundle.arrays["filing_status"].tolist() == [
@@ -75,8 +145,30 @@ def test_runner_exposes_geography_domains_and_breakdown_dimensions() -> None:
     assert set(bundle.domain_masks) == {
         "all_individual_income_tax_returns",
         "individual_income_tax_returns",
+        "individual_income_tax_returns_with_earned_income_credit",
+        "social_security_and_ssi_payments",
     }
     assert all(mask.all() for mask in bundle.domain_masks.values())
+
+
+def test_runner_exposes_public_cps_state_fips_geography() -> None:
+    calculator = FakeCalculator(
+        {
+            "s006": np.ones(3),
+            "MARS": np.ones(3),
+            "EIC": np.zeros(3),
+            "fips": np.array([1, 6, 11]),
+        }
+    )
+    bundle = TaxCalcCPSRunner(calculator_factory=lambda _: calculator).prepare(
+        group("s006", geography_method="state_fips")
+    )
+
+    assert bundle.arrays["__geography__"].tolist() == [
+        "0400000US01",
+        "0400000US06",
+        "0400000US11",
+    ]
 
 
 def test_runner_rejects_wrong_entity_geography_and_array_lengths() -> None:
@@ -87,7 +179,9 @@ def test_runner_rejects_wrong_entity_geography_and_array_lengths() -> None:
     with pytest.raises(ValueError, match="entity"):
         runner.prepare(RunGroup(**{**group("s006").__dict__, "entity": "person"}))
     with pytest.raises(ValueError, match="geography"):
-        runner.prepare(RunGroup(**{**group("s006").__dict__, "geography_method": "state_fips"}))
+        runner.prepare(
+            RunGroup(**{**group("s006").__dict__, "geography_method": "district"})
+        )
     with pytest.raises(ValueError, match="length"):
         runner.prepare(group("s006", "c00100"))
 
