@@ -28,9 +28,10 @@ def _fact(
     constraints: tuple[dict, ...] = (),
     dimensions: dict | None = None,
     period: str | None = None,
+    fact_key: str = "ledger.aggregate_fact.v2:ffffffffffffffffffffffff",
 ) -> FactContract:
     return FactContract(
-        fact_key="ledger.aggregate_fact.v2:ffffffffffffffffffffffff",
+        fact_key=fact_key,
         source=source,
         jurisdiction="US",
         period=TypedPeriod.parse(
@@ -58,6 +59,88 @@ def _planner():
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     registry = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     return CapabilityPlanner(registry), overview.source
+
+
+@pytest.mark.parametrize(
+    ("mapping_id", "source_expression"),
+    [
+        (
+            "irs-soi-business-profession-income-amount",
+            "soi_positive:tax_unit_sum_person:self_employment_income",
+        ),
+        (
+            "irs-soi-business-profession-income-returns",
+            "soi_positive:tax_unit_sum_person:self_employment_income",
+        ),
+        (
+            "irs-soi-charitable-deduction-amount",
+            "soi_itemized:charitable_deduction",
+        ),
+        (
+            "irs-soi-interest-paid-deduction-amount",
+            "soi_itemized:interest_deduction",
+        ),
+        ("irs-soi-salt-deduction-amount", "soi_itemized:salt_deduction"),
+        (
+            "irs-soi-medical-deduction-amount",
+            "soi_itemized:medical_expense_deduction",
+        ),
+        (
+            "irs-soi-net-capital-gains-amount",
+            "soi_positive:tax_unit_sum_person:capital_gains",
+        ),
+        (
+            "irs-soi-partnership-s-corp-amount",
+            "soi_positive:tax_unit_partnership_s_corp_income",
+        ),
+        (
+            "irs-soi-premium-tax-credit-amount",
+            "soi_positive:assigned_aca_ptc",
+        ),
+        (
+            "irs-soi-itemized-deductions-amount",
+            "soi_itemized:itemized_taxable_income_deductions",
+        ),
+        (
+            "irs-soi-rental-royalty-return-count",
+            "soi_positive:tax_unit_sum_person:rental_income+farm_rent_income",
+        ),
+        (
+            "irs-soi-2022-real-estate-taxes-amount",
+            "soi_itemized:tax_unit_sum_person:real_estate_taxes",
+        ),
+        ("irs-soi-2022-child-tax-credit-amount", "soi_capped_ctc"),
+        (
+            "irs-soi-2022-taxable-net-capital-gains-amount",
+            "soi_positive:tax_unit_sum_person:capital_gains",
+        ),
+        (
+            "irs-soi-2022-schedule-c-returns",
+            "soi_positive:tax_unit_sum_person:self_employment_income",
+        ),
+        (
+            "irs-soi-2022-itemized-returns",
+            "soi_itemized:itemized_taxable_income_deductions",
+        ),
+        ("irs-soi-2022-ctc-returns", "soi_capped_ctc"),
+        (
+            "irs-soi-2022-real-estate-tax-returns",
+            "soi_itemized:tax_unit_sum_person:real_estate_taxes",
+        ),
+        (
+            "irs-soi-2022-partnership-s-corp-returns",
+            "soi_positive:tax_unit_partnership_s_corp_income",
+        ),
+    ],
+)
+def test_irs_soi_mappings_reproduce_pinned_microcosm_materialization(
+    mapping_id: str, source_expression: str
+) -> None:
+    registry = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
+    mapping = next(row for row in registry.mappings if row.mapping_id == mapping_id)
+
+    assert mapping.source_expression == source_expression
+    assert mapping.required_variables == (source_expression,)
 
 
 @pytest.mark.parametrize(
@@ -505,6 +588,35 @@ def test_high_confidence_gap_families_are_executable(fact, mapping_id) -> None:
     }
     assert result.mapping_id == mapping_id
     assert result.query is not None
+
+
+@pytest.mark.parametrize(
+    "fact_key",
+    [
+        "ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc",
+        "ledger.aggregate_fact.v2:24ef01329f771565b927bd3d",
+        "ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c",
+        "ledger.aggregate_fact.v2:ba9cae909127ad2764caec51",
+        "ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975",
+    ],
+)
+def test_single_year_ages_80_through_84_are_not_exactly_mapped(fact_key: str) -> None:
+    planner, source = _planner()
+    result = planner.classify(
+        _fact(
+            "census_population_projections",
+            "census.population_projection",
+            "count",
+            "person",
+            "population_projection",
+            constraints=({"variable": "age", "operator": "==", "value": 80},),
+            fact_key=fact_key,
+        ),
+        source,
+    )
+
+    assert result.status is CapabilityStatus.UNSUPPORTED_CONCEPT
+    assert result.reason_code == "mapping_not_found"
 
 
 def test_2024_irs_mapping_expansion_covers_reviewed_measure_families() -> None:

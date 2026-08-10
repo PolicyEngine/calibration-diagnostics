@@ -1,4 +1,4 @@
-mapping_release: populace-policyengine-us-2024-chronicle-expansion-v5
+mapping_release: populace-policyengine-us-2024-chronicle-expansion-v6
 mappings:
   - mapping_id: census-pep-resident-population-calibration-target
     ledger_selector:
@@ -59,6 +59,15 @@ mappings:
       measures: [census.population_projection]
       units: [count]
       entities: [person]
+      # Microcosm topcodes ages 80–84 to age=80, so these five single-year
+      # Chronicle projections cannot be recovered as exact slices. Age 85+
+      # remains directly comparable to Microcosm's age=85 topcode.
+      excluded_fact_keys:
+        - ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
+        - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
+        - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
+        - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
+        - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -187,9 +196,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:self_employment_income
+    source_expression: soi_positive:tax_unit_sum_person:self_employment_income
     operation: weighted_sum
-    required_variables: [tax_unit_sum_person:self_employment_income]
+    required_variables: [soi_positive:tax_unit_sum_person:self_employment_income]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -203,9 +212,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:self_employment_income
+    source_expression: soi_positive:tax_unit_sum_person:self_employment_income
     operation: weighted_count
-    required_variables: [tax_unit_sum_person:self_employment_income]
+    required_variables: [soi_positive:tax_unit_sum_person:self_employment_income]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -219,9 +228,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: charitable_deduction
+    source_expression: soi_itemized:charitable_deduction
     operation: weighted_sum
-    required_variables: [charitable_deduction]
+    required_variables: [soi_itemized:charitable_deduction]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -235,9 +244,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: charitable_deduction
+    source_expression: soi_itemized:charitable_deduction
     operation: weighted_count
-    required_variables: [charitable_deduction]
+    required_variables: [soi_itemized:charitable_deduction]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -315,9 +324,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:deductible_interest_expense
+    source_expression: soi_itemized:interest_deduction
     operation: weighted_sum
-    required_variables: [tax_unit_sum_person:deductible_interest_expense]
+    required_variables: [soi_itemized:interest_deduction]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -331,9 +340,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:deductible_interest_expense
+    source_expression: soi_itemized:interest_deduction
     operation: weighted_count
-    required_variables: [tax_unit_sum_person:deductible_interest_expense]
+    required_variables: [soi_itemized:interest_deduction]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -347,9 +356,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: salt_deduction
+    source_expression: soi_itemized:salt_deduction
     operation: weighted_sum
-    required_variables: [salt_deduction]
+    required_variables: [soi_itemized:salt_deduction]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -363,9 +372,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: salt_deduction
+    source_expression: soi_itemized:salt_deduction
     operation: weighted_count
-    required_variables: [salt_deduction]
+    required_variables: [soi_itemized:salt_deduction]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -379,9 +388,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: medical_expense_deduction
+    source_expression: soi_itemized:medical_expense_deduction
     operation: weighted_sum
-    required_variables: [medical_expense_deduction]
+    required_variables: [soi_itemized:medical_expense_deduction]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -395,9 +404,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: medical_expense_deduction
+    source_expression: soi_itemized:medical_expense_deduction
     operation: weighted_count
-    required_variables: [medical_expense_deduction]
+    required_variables: [soi_itemized:medical_expense_deduction]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -411,9 +420,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: net_capital_gains
+    source_expression: soi_positive:tax_unit_sum_person:capital_gains
     operation: weighted_sum
-    required_variables: [net_capital_gains]
+    required_variables: [soi_positive:tax_unit_sum_person:capital_gains]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -427,9 +436,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: net_capital_gains
+    source_expression: soi_positive:tax_unit_sum_person:capital_gains
     operation: weighted_count
-    required_variables: [net_capital_gains]
+    required_variables: [soi_positive:tax_unit_sum_person:capital_gains]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -477,9 +486,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_partnership_s_corp_income
+    source_expression: soi_positive:tax_unit_partnership_s_corp_income
     operation: weighted_sum
-    required_variables: [tax_unit_partnership_s_corp_income]
+    required_variables: [soi_positive:tax_unit_partnership_s_corp_income]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -493,9 +502,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_partnership_s_corp_income
+    source_expression: soi_positive:tax_unit_partnership_s_corp_income
     operation: weighted_count
-    required_variables: [tax_unit_partnership_s_corp_income]
+    required_variables: [soi_positive:tax_unit_partnership_s_corp_income]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -509,9 +518,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: aca_ptc
+    source_expression: soi_positive:assigned_aca_ptc
     operation: weighted_sum
-    required_variables: [aca_ptc]
+    required_variables: [soi_positive:assigned_aca_ptc]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -525,9 +534,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: aca_ptc
+    source_expression: soi_positive:assigned_aca_ptc
     operation: weighted_count
-    required_variables: [aca_ptc]
+    required_variables: [soi_positive:assigned_aca_ptc]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -767,9 +776,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: total_itemized_taxable_income_deductions
+    source_expression: soi_itemized:itemized_taxable_income_deductions
     operation: weighted_sum
-    required_variables: [total_itemized_taxable_income_deductions]
+    required_variables: [soi_itemized:itemized_taxable_income_deductions]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1509,9 +1518,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:rental_income+farm_rent_income
+    source_expression: soi_positive:tax_unit_sum_person:rental_income+farm_rent_income
     operation: weighted_count
-    required_variables: [tax_unit_sum_person:rental_income+farm_rent_income]
+    required_variables: [soi_positive:tax_unit_sum_person:rental_income+farm_rent_income]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1525,9 +1534,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:real_estate_taxes
+    source_expression: soi_itemized:tax_unit_sum_person:real_estate_taxes
     operation: weighted_sum
-    required_variables: [tax_unit_sum_person:real_estate_taxes]
+    required_variables: [soi_itemized:tax_unit_sum_person:real_estate_taxes]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1557,9 +1566,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: ctc
+    source_expression: soi_capped_ctc
     operation: weighted_sum
-    required_variables: [ctc, ctc_limiting_tax_liability]
+    required_variables: [soi_capped_ctc]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1605,9 +1614,9 @@ mappings:
       units: [usd]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:capital_gains
+    source_expression: soi_positive:tax_unit_sum_person:capital_gains
     operation: weighted_sum
-    required_variables: [tax_unit_sum_person:capital_gains]
+    required_variables: [soi_positive:tax_unit_sum_person:capital_gains]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1621,9 +1630,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:self_employment_income
+    source_expression: soi_positive:tax_unit_sum_person:self_employment_income
     operation: weighted_count
-    required_variables: [tax_unit_sum_person:self_employment_income]
+    required_variables: [soi_positive:tax_unit_sum_person:self_employment_income]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1669,9 +1678,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: itemized_taxable_income_deductions
+    source_expression: soi_itemized:itemized_taxable_income_deductions
     operation: weighted_count
-    required_variables: [itemized_taxable_income_deductions]
+    required_variables: [soi_itemized:itemized_taxable_income_deductions]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1685,9 +1694,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: ctc
+    source_expression: soi_capped_ctc
     operation: weighted_count
-    required_variables: [ctc]
+    required_variables: [soi_capped_ctc]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1701,9 +1710,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:capital_gains
+    source_expression: soi_positive:tax_unit_sum_person:capital_gains
     operation: weighted_count
-    required_variables: [tax_unit_sum_person:capital_gains]
+    required_variables: [soi_positive:tax_unit_sum_person:capital_gains]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1749,9 +1758,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_sum_person:real_estate_taxes
+    source_expression: soi_itemized:tax_unit_sum_person:real_estate_taxes
     operation: weighted_count
-    required_variables: [tax_unit_sum_person:real_estate_taxes]
+    required_variables: [soi_itemized:tax_unit_sum_person:real_estate_taxes]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]
@@ -1781,9 +1790,9 @@ mappings:
       units: [count]
       entities: [tax_unit]
     execution: model
-    source_expression: tax_unit_partnership_s_corp_income
+    source_expression: soi_positive:tax_unit_partnership_s_corp_income
     operation: weighted_count
-    required_variables: [tax_unit_partnership_s_corp_income]
+    required_variables: [soi_positive:tax_unit_partnership_s_corp_income]
     mapping_quality: exact
     supported_dimensions: [filing_status, income_range]
     descriptive_dimensions: [filing_status, income_range]

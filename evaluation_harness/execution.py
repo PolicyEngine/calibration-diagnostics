@@ -48,6 +48,7 @@ class EvaluationResult:
     execution_method: str
     standard_error: Decimal | None = None
     margin_of_error_90: Decimal | None = None
+    estimate_basis: str = "executed_query"
 
     @classmethod
     def from_capability(
@@ -59,6 +60,7 @@ class EvaluationResult:
         model_version: str | None,
         standard_error: Decimal | None = None,
         margin_of_error_90: Decimal | None = None,
+        estimate_basis: str = "executed_query",
     ) -> "EvaluationResult":
         return cls(
             snapshot_id=capability.snapshot_id,
@@ -83,6 +85,7 @@ class EvaluationResult:
             execution_method=capability.execution_method.value,
             standard_error=standard_error,
             margin_of_error_90=margin_of_error_90,
+            estimate_basis=estimate_basis,
         )
 
 

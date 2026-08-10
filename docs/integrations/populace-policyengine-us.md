@@ -185,21 +185,32 @@ congressional-district row is an external holdout. The verifier in
 ## Full Ledger run
 
 `scripts/run_full_ledger_evaluation.py` loads and hash-verifies the complete
-pinned Ledger snapshot, creates exactly one capability row for every
+pinned Chronicle source snapshot, then applies the run's explicit US scope
+before classification. It creates exactly one capability row for every scoped
 fact/source pair, runs every executable query in batches, attaches the correct
 observed or aligned benchmark, and publishes JSONL and Parquet artifacts.
 
-The current full run classified all 48,313 facts for this source. It executed
-9,411 finite Populace/PolicyEngine-US estimates:
+The current full run excludes 2,064 non-US source facts and classifies all
+46,249 US facts for this source. It executed
+44,346 finite Microcosm/PolicyEngine-US estimates:
 
-- 9,295 native-2024 comparisons; and
-- 116 EITC count comparisons observed in 2023 and evaluated against their
-  explicitly recorded, identity-aged 2024 benchmarks.
+- 38,825 native-period comparisons;
+- 5,159 prior-year facts evaluated against their explicit 2024 transformations;
+  and
+- 362 explicit build-target reproductions.
 
-The 116 aligned rows support Ledger's EITC-return universe, AGI filters, and
-qualifying-child filters through the model-backed `eitc`,
-`adjusted_gross_income`, and `eitc_child_count` arrays. Unsupported rows stay in
-the capability output with a reason code; they are not omitted from the run.
+For the 5,538 executable Chronicle facts that were direct calibration targets,
+the harness uses the pinned release diagnostics' `final_estimate`: this is the
+authoritative post-calibration estimate for the exact materialized target row.
+It does not substitute a generic aggregate query. The artifact records this as
+`estimate_basis=microcosm_release_final_estimate`.
+
+Chronicle holdouts are still computed from the released HDF5 population and
+PolicyEngine-US. IRS SOI queries reproduce the Microcosm build's materializer
+semantics: positive income components exclude net losses, Schedule A concepts
+apply `tax_unit_itemizes`, PTC uses `assigned_aca_ptc`, and CTC is capped at
+`ctc_limiting_tax_liability`. Unsupported rows stay in the capability output
+with a reason code; they are not omitted from the run.
 
 The reproducible command is:
 

@@ -23,6 +23,7 @@ from evaluation_harness.full_run import (
     build_run_summary,
     build_scored_results,
     load_snapshot_facts,
+    scope_facts_to_jurisdictions,
 )
 from evaluation_harness.frontend_bundle import publish_frontend_bundle
 from evaluation_harness.integration import load_integration_overview
@@ -35,6 +36,7 @@ from evaluation_harness.populace_aging import (
 from evaluation_harness.populace_old_cd import load_old_cd_assignments
 from evaluation_harness.populace_release_targets import (
     compile_release_target_alignments,
+    materialize_release_target_results,
 )
 from evaluation_harness.publisher import publish_run
 
@@ -43,6 +45,7 @@ ROOT = Path(__file__).resolve().parents[1]
 POPULACE_INTEGRATION = ROOT / "integrations" / "populace_policyengine_us"
 CPS_INTEGRATION = ROOT / "integrations" / "taxcalc_cps"
 ACS_PUMS_INTEGRATION = ROOT / "integrations" / "census_acs_pums"
+EVALUATION_JURISDICTIONS = frozenset({"US"})
 
 
 def _source_counts(capabilities, source_id: str) -> dict[str, int]:
@@ -65,10 +68,14 @@ def run(
     populace_calibration_diagnostics: Path | None = None,
     populace_old_cd_assignments: Path | None = None,
 ) -> dict:
-    facts, snapshot_manifest = load_snapshot_facts(snapshot)
+    snapshot_facts, snapshot_manifest = load_snapshot_facts(snapshot)
+    facts = scope_facts_to_jurisdictions(
+        snapshot_facts, EVALUATION_JURISDICTIONS
+    )
     snapshot_id = snapshot_manifest["snapshot_id"]
     print(
-        f"Loaded {len(facts):,} facts from immutable snapshot {snapshot_id}.",
+        f"Loaded {len(facts):,} US facts from immutable snapshot {snapshot_id}; "
+        f"excluded {len(snapshot_facts) - len(facts):,} non-US facts.",
         flush=True,
     )
 
@@ -163,6 +170,15 @@ def run(
         [populace_plan, cps_plan, acs_pums_plan],
         snapshot_id=snapshot_id,
     )
+    capabilities, release_target_results = materialize_release_target_results(
+        capabilities,
+        release_target_alignments,
+        source_id=populace_plan.source.source_id,
+        dataset_version=POPULACE_RELEASE.release_id,
+        model_version=f"policyengine-us=={POPULACE_RELEASE.model_version}",
+        population_period=populace_plan.source.population_period,
+        policy_period=populace_plan.source.policy_period,
+    )
     expected_capabilities = len(facts) * 3
     if len(capabilities) != expected_capabilities:
         raise RuntimeError(
@@ -209,10 +225,15 @@ def run(
         dataset_path=populace_dataset,
         old_congressional_district_assignments=old_cd_assignments,
     )
-    populace_results = execute_groups(
-        populace_groups,
-        populace_capabilities,
-        {populace_plan.source.source_id: populace_runner},
+    populace_results = tuple(
+        [
+            *release_target_results,
+            *execute_groups(
+                populace_groups,
+                populace_capabilities,
+                {populace_plan.source.source_id: populace_runner},
+            ),
+        ]
     )
     del populace_runner
     gc.collect()
@@ -262,6 +283,12 @@ def run(
     results = tuple([*populace_results, *cps_results, *acs_pums_results])
     scores = build_scored_results(facts, capabilities, results, aligned_facts)
     summary = build_run_summary(facts, capabilities, results, scores)
+    summary["evaluation_scope"] = {
+        "jurisdictions": sorted(EVALUATION_JURISDICTIONS),
+        "source_snapshot_fact_count": len(snapshot_facts),
+        "included_fact_count": len(facts),
+        "excluded_fact_count": len(snapshot_facts) - len(facts),
+    }
     summary["populace_prior_years_to_2024_alignment"] = {
         "policy": "Exact Populace cbo_growth_factor_aging@1.2.0 semantics",
         "observed_years": list(source_years),
@@ -290,10 +317,20 @@ def run(
             release_target_alignments.native_target_fact_keys
         ),
         "rejected_match_count": len(release_target_alignments.rejected_matches),
+        "final_estimate_result_count": sum(
+            row.estimate_basis == "microcosm_release_final_estimate"
+            for row in populace_results
+        ),
+        "estimate_basis": "microcosm_release_final_estimate",
         "benchmark_basis": (
             "Cross-period Chronicle facts that were direct targets in the pinned "
             "Microcosm build use the exact compiled target values and recorded "
             "aging/uprating lineage from that release."
+        ),
+        "estimate_interpretation": (
+            "Direct targets use the exact post-calibration final_estimate stored "
+            "in the pinned release diagnostics. Chronicle holdouts are still "
+            "executed from the HDF5 population and PolicyEngine-US model."
         ),
     }
     summary["microcosm_old_congressional_district_geography"] = {

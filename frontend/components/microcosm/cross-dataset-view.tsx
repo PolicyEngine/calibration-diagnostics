@@ -13,7 +13,6 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
-import { StatusPill } from "@/components/shared/status-pill";
 import { apiGet } from "@/lib/api/client";
 import type {
   CrossDatasetGroupsDocument,
@@ -28,7 +27,10 @@ import {
   orderSourceSummaries,
   sourceDisplayLabel,
   type GroupDimension,
-  type LabeledCount,
+  type OverviewGeographyFilter,
+  type OverviewSampleFilter,
+  type SourceOverviewFilter,
+  type TargetPerformanceBuckets,
 } from "@/lib/cross-dataset/presentation";
 
 interface OverviewResponse {
@@ -38,7 +40,7 @@ interface OverviewResponse {
 
 function useCrossDatasetOverview() {
   return useQuery({
-    queryKey: ["cross-dataset", "overview", "v1"],
+    queryKey: ["cross-dataset", "overview", "v3"],
     queryFn: async (): Promise<OverviewResponse> => {
       const [summary, groups] = await Promise.all([
         apiGet<CrossDatasetSummary>("/populace/cross-dataset", { view: "summary" }),
@@ -54,46 +56,87 @@ function useCrossDatasetOverview() {
   });
 }
 
-function PerformanceBar({
-  value,
+const PERFORMANCE_SEGMENTS = [
+  { key: "withinBounds", label: "Within 10%", className: "bg-emerald-500" },
+  { key: "outsideBounds", label: "10–25% error", className: "bg-amber-400" },
+  { key: "farOutsideBounds", label: "Over 25% error", className: "bg-red-500" },
+  {
+    key: "unavailable",
+    label: "No mapping / no comparable error",
+    className: "bg-zinc-700",
+  },
+] as const;
+
+function TargetPerformanceBar({
+  buckets,
   label,
 }: {
-  value: number | null;
+  buckets: TargetPerformanceBuckets;
   label: string;
 }) {
-  const width = value == null ? 0 : Math.max(0, Math.min(100, value));
+  const ariaText = PERFORMANCE_SEGMENTS.map(
+    (segment) =>
+      `${segment.label}: ${buckets[segment.key].toLocaleString("en-US")}`,
+  ).join("; ");
   return (
-    <div
-      className="h-2 overflow-hidden rounded-full bg-muted"
-      role="progressbar"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={value == null ? undefined : Number(value.toFixed(2))}
-      aria-valuetext={value == null ? "Not scored" : value.toFixed(1) + " percent"}
-    >
+    <div className="group/validation relative" tabIndex={0}>
       <div
-        className="h-full rounded-full bg-primary"
-        style={{ width: String(width) + "%" }}
-      />
+        className="flex h-2 cursor-help overflow-hidden rounded-full bg-muted"
+        role="img"
+        aria-label={label}
+        aria-description={buckets.total ? ariaText : "No targets in this group"}
+      >
+        {PERFORMANCE_SEGMENTS.map((segment) => {
+          const count = buckets[segment.key];
+          if (!count || !buckets.total) return null;
+          return (
+            <span
+              key={segment.key}
+              className={`h-full ${segment.className}`}
+              style={{ width: `${(count / buckets.total) * 100}%` }}
+            />
+          );
+        })}
+      </div>
+      <div
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-max max-w-[280px] -translate-x-1/2 rounded-md border border-border bg-popover px-3 py-2 text-[11px] text-popover-foreground opacity-0 shadow-lg transition-opacity group-hover/validation:opacity-100 group-focus/validation:opacity-100"
+      >
+        {PERFORMANCE_SEGMENTS.map((segment) => (
+          <div key={segment.key} className="flex items-center justify-between gap-6">
+            <span className="inline-flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-sm ${segment.className}`} aria-hidden="true" />
+              {segment.label}
+            </span>
+            <span className="font-mono tabular-nums">
+              {buckets[segment.key].toLocaleString("en-US")}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-function InlineCounts({ values, empty }: { values: LabeledCount[]; empty: string }) {
-  if (!values.length) return <>{empty}</>;
+function PerformanceLegend() {
   return (
-    <>
-      {values
-        .map((item) => `${item.label}: ${item.count.toLocaleString("en-US")}`)
-        .join(" · ")}
-    </>
+    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+      {PERFORMANCE_SEGMENTS.map((segment) => (
+        <span key={segment.key} className="inline-flex items-center gap-1.5">
+          <span className={`h-2.5 w-2.5 rounded-sm ${segment.className}`} aria-hidden="true" />
+          {segment.label}
+        </span>
+      ))}
+    </div>
   );
 }
 
 function CrossDatasetOverviewView() {
   const query = useCrossDatasetOverview();
   const [dimension, setDimension] = useState<GroupDimension>("ledger_source");
+  const [sourceFilters, setSourceFilters] = useState<
+    Record<string, SourceOverviewFilter>
+  >({});
   const state = crossDatasetUiState({
     isLoading: query.isLoading,
     error: query.error,
@@ -103,9 +146,13 @@ function CrossDatasetOverviewView() {
   const sourceOverviews = useMemo(
     () =>
       query.data
-        ? buildSourceOverviews(query.data.summary, query.data.groups.groups)
+        ? buildSourceOverviews(
+            query.data.summary,
+            query.data.groups.groups,
+            sourceFilters,
+          )
         : [],
-    [query.data],
+    [query.data, sourceFilters],
   );
   const orderedSources = useMemo(
     () => (query.data ? orderSourceSummaries(query.data.summary.sources) : []),
@@ -150,7 +197,20 @@ function CrossDatasetOverviewView() {
     );
   }
 
-  const { summary } = query.data;
+  const updateSourceFilter = <Key extends keyof SourceOverviewFilter>(
+    sourceId: string,
+    key: Key,
+    value: SourceOverviewFilter[Key],
+  ) => {
+    setSourceFilters((current) => ({
+      ...current,
+      [sourceId]: {
+        geography: current[sourceId]?.geography ?? "all",
+        sample: current[sourceId]?.sample ?? "all",
+        [key]: value,
+      },
+    }));
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -159,35 +219,31 @@ function CrossDatasetOverviewView() {
         title={CROSS_DATASET_PAGE_TITLE}
         description={
           <>
-            Every model or standalone dataset is classified against the complete Chronicle fact
-            catalog. Performance measures closeness only among facts executed by the current
-            adapter. Evaluated-fact counts describe the scope of that score, not the theoretical
-            capability of the underlying dataset or model.
+            Every model or standalone dataset is classified against the complete US Chronicle
+            fact catalog. Non-US facts are excluded before classification. Error measures
+            closeness only among comparable facts executed by the current adapter, using the
+            same fact-level 100%-capped approach as the calibration fit view.
           </>
-        }
-        status={
-          <StatusPill tone={summary.matrix_complete ? "success" : "danger"}>
-            {summary.matrix_complete ? "Complete capability matrix" : "Incomplete matrix"}
-          </StatusPill>
         }
       />
 
       <div className="rounded-lg border border-[color-mix(in_srgb,var(--info)_35%,var(--border))] bg-[color-mix(in_srgb,var(--info)_6%,var(--card))] px-4 py-3 text-sm">
         <p className="font-medium text-foreground">How to read the comparison</p>
         <p className="mt-1 text-muted-foreground">
-          The performance score is 100 × (1 − family-balanced capped mean absolute percentage
-          error ÷ 2). Microcosm results marked <strong>direct calibration target</strong> are
-          in-sample calibration fit, not independent validation. Results marked{" "}
+          The reported value is the fact-level mean absolute relative error, with each fact’s
+          error capped at 100% before averaging. Lower is better. Microcosm results marked{" "}
+          <strong>direct calibration target</strong> are in-sample calibration fit, not
+          independent validation. Results marked{" "}
           <strong>2023 facts aligned to 2024</strong> compare against the 2024 transformation
           produced by the same aging and uprating logic used in the Microcosm build—not a native
           2023 society-wide run. Tax-Calculator’s public CPS rows use its population advanced to
           2024.
         </p>
+        <PerformanceLegend />
       </div>
 
       <SectionCard
         title="Model and dataset performance"
-        description="Microcosm is listed first. Every row keeps its performance score next to the exact number of Chronicle facts that contributed to it."
         padded={false}
       >
         <ol className="divide-y divide-border">
@@ -199,68 +255,76 @@ function CrossDatasetOverviewView() {
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[11px] text-muted-foreground">
                       {index + 1}
                     </span>
-                    <div>
-                      <h2 className="text-base font-semibold">{source.label}</h2>
-                      <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                        {source.sourceId}
-                      </p>
-                    </div>
+                    <h2 className="text-base font-semibold">{source.label}</h2>
                   </div>
                 </div>
                 <div>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="font-mono text-xs text-muted-foreground">Performance</span>
-                    <span className="text-lg font-semibold tabular-nums">{source.scoreLabel}</span>
+                  <div className="flex items-baseline justify-end">
+                    <span className="flex items-baseline gap-2 text-base font-medium tabular-nums text-foreground/80">
+                      <span>{source.scoreLabel}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{source.coverageRateLabel}</span>
+                    </span>
                   </div>
                   <div className="mt-2">
-                    <PerformanceBar
-                      value={source.performancePercent}
-                      label={source.label + " performance"}
+                    <TargetPerformanceBar
+                      buckets={source.performanceBuckets}
+                      label={source.label + " target performance distribution"}
                     />
                   </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    {source.scoreScopeLabel}
-                  </p>
                 </div>
-                <div>
-                  <p className="font-mono text-xs text-muted-foreground">
-                    Facts evaluated in this run
-                  </p>
-                  <p className="mt-2 text-lg font-semibold tabular-nums">
-                    {source.coverageLabel}
-                  </p>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Current adapter results, not a model-capability ceiling.
-                  </p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  <label className="text-xs text-muted-foreground">
+                    Geography
+                    <select
+                      value={sourceFilters[source.sourceId]?.geography ?? "all"}
+                      onChange={(event) =>
+                        updateSourceFilter(
+                          source.sourceId,
+                          "geography",
+                          event.target.value as OverviewGeographyFilter,
+                        )
+                      }
+                      className="mt-1 block w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground"
+                      aria-label={`Filter ${source.label} by geography`}
+                    >
+                      <option value="all">All geographies</option>
+                      <option value="country">National</option>
+                      <option value="state">State</option>
+                      <option value="congressional_district">Congressional district</option>
+                    </select>
+                  </label>
+                  {source.sourceId.toLowerCase().includes("populace") && (
+                    <label className="text-xs text-muted-foreground">
+                      Sample
+                      <select
+                        value={sourceFilters[source.sourceId]?.sample ?? "all"}
+                        onChange={(event) =>
+                          updateSourceFilter(
+                            source.sourceId,
+                            "sample",
+                            event.target.value as OverviewSampleFilter,
+                          )
+                        }
+                        className="mt-1 block w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground"
+                        aria-label={`Filter ${source.label} by sample`}
+                      >
+                        <option value="all">All targets</option>
+                        <option value="in_sample">In sample</option>
+                        <option value="out_of_sample">Out of sample</option>
+                      </select>
+                    </label>
+                  )}
                 </div>
               </div>
-
-              <div className="mt-4 grid gap-2 border-t border-border pt-3 text-xs text-muted-foreground lg:grid-cols-2">
-                <p>
-                  <span className="font-medium text-foreground">Period handling:</span>{" "}
-                  <InlineCounts values={source.periodTreatments} empty="None recorded" />
-                </p>
-                <p>
-                  <span className="font-medium text-foreground">Benchmark relationship:</span>{" "}
-                  <InlineCounts values={source.calibrationExposures} empty="None recorded" />
-                </p>
-              </div>
-
-              <p className="mt-3 text-[11px] text-muted-foreground">
-                <span className="font-mono">Dataset:</span>{" "}
-                {source.datasetVersion ?? "not recorded"}
-                <span className="mx-2">·</span>
-                <span className="font-mono">Model:</span>{" "}
-                {source.modelVersion ?? "not applicable"}
-              </p>
             </li>
           ))}
         </ol>
       </SectionCard>
 
       <SectionCard
-        title="Performance by Chronicle group"
-        description="Each cell keeps its performance score beside the number of facts executed by the current adapter. Select a grouping to inspect performance and why other facts were not evaluated in this run."
+        title="Error by Chronicle group"
+        description="Each cell shows fact-level mean error after capping each comparable fact at 100%. Select a grouping to inspect the underlying facts and why others were not evaluated in this run."
         actions={
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             Group by
@@ -321,10 +385,12 @@ function CrossDatasetOverviewView() {
                               </span>
                             </div>
                             <div className="mt-1.5">
-                              <PerformanceBar
-                                value={cell.performancePercent}
+                              <TargetPerformanceBar
+                                buckets={cell.performanceBuckets}
                                 label={
-                                  sourceDisplayLabel(source) + " performance for " + row.label
+                                  sourceDisplayLabel(source) +
+                                  " target performance distribution for " +
+                                  row.label
                                 }
                               />
                             </div>

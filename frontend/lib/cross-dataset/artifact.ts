@@ -33,6 +33,7 @@ export interface CrossDatasetBundleManifest {
   schema_version: typeof CROSS_DATASET_BUNDLE_SCHEMA;
   run_id: string;
   snapshot_id: string;
+  jurisdictions?: string[];
   fact_count: number;
   source_ids: string[];
   page_size: number;
@@ -48,8 +49,17 @@ export interface CrossDatasetBundleManifest {
 export interface SourceScore {
   covered: number;
   scored: number;
+  relative_error_count?: number;
   display_score: string | null;
   loss: string | null;
+}
+
+export interface PerformanceBuckets {
+  within_bounds: number;
+  outside_bounds: number;
+  far_outside_bounds: number;
+  unavailable: number;
+  total: number;
 }
 
 export interface SourceSummary {
@@ -59,6 +69,7 @@ export interface SourceSummary {
   capability_count: number;
   result_count: number;
   score: SourceScore;
+  performance_buckets: PerformanceBuckets;
   capability_statuses: Record<string, number>;
   reason_codes: Record<string, number>;
   period_treatments: Record<string, number>;
@@ -70,6 +81,7 @@ export interface CrossDatasetSummary {
   schema_version: typeof CROSS_DATASET_BUNDLE_SCHEMA;
   run_id: string;
   snapshot_id: string;
+  jurisdictions?: string[];
   fact_count: number;
   matrix_complete: boolean;
   sources: SourceSummary[];
@@ -78,8 +90,10 @@ export interface CrossDatasetSummary {
 export interface GroupSourceSummary {
   evaluable: number;
   scored: number;
+  relative_error_count?: number;
   display_score: string | null;
   loss?: string | null;
+  performance_buckets: PerformanceBuckets;
   reason_codes: Record<string, number>;
 }
 
@@ -95,6 +109,7 @@ export interface CrossDatasetGroupsDocument {
   schema_version: typeof CROSS_DATASET_BUNDLE_SCHEMA;
   run_id: string;
   snapshot_id: string;
+  jurisdictions?: string[];
   groups: CrossDatasetGroup[];
 }
 
@@ -114,6 +129,7 @@ export interface FactSourceCell {
   dataset_version?: string;
   model_version?: string;
   estimate?: string;
+  estimate_basis?: string;
   standard_error?: string;
   margin_of_error_90?: string;
   benchmark_value?: string;

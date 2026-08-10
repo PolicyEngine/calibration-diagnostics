@@ -40,7 +40,10 @@ class FakeSimulation:
                 "adjusted_gross_income": "tax_unit",
                 "assigned_aca_ptc": "tax_unit",
                 "chip_enrolled": "person",
+                "ctc": "tax_unit",
+                "ctc_limiting_tax_liability": "tax_unit",
                 "medicaid_enrolled": "person",
+                "medical_expense_deduction": "tax_unit",
                 "ordinary_dividend_income": "person",
                 "person_receives_aca": "person",
                 "rental_income": "person",
@@ -48,7 +51,9 @@ class FakeSimulation:
                 "roth_ira_contributions": "person",
                 "snap": "spm_unit",
                 "ssi_category": "person",
+                "self_employment_income": "person",
                 "tax_unit_is_filer": "tax_unit",
+                "tax_unit_itemizes": "tax_unit",
             }
         )
 
@@ -60,7 +65,10 @@ class FakeSimulation:
             "adjusted_gross_income": np.array([5_000.0, 25_000.0]),
             "assigned_aca_ptc": np.array([1_200.0, 3_600.0]),
             "chip_enrolled": np.array([False, True, False]),
+            "ctc": np.array([500.0, 3_000.0]),
+            "ctc_limiting_tax_liability": np.array([400.0, 2_200.0]),
             "medicaid_enrolled": np.array([True, False, False]),
+            "medical_expense_deduction": np.array([40.0, 70.0]),
             "ordinary_dividend_income": np.array([10.0, 20.0, 30.0]),
             "person_receives_aca": np.array([True, True, True]),
             "rental_income": np.array([0.0, 100.0, -25.0]),
@@ -68,7 +76,9 @@ class FakeSimulation:
             "roth_ira_contributions": np.array([0.0, 100.0, 200.0]),
             "snap": np.array([0.0, 500.0]),
             "ssi_category": np.array(["AGED", "BLIND", "DISABLED"]),
+            "self_employment_income": np.array([100.0, -200.0, 50.0]),
             "tax_unit_is_filer": np.array([False, True]),
+            "tax_unit_itemizes": np.array([False, True]),
         }
         return values[name]
 
@@ -307,6 +317,36 @@ def test_rental_royalty_build_concept_combines_the_same_base_variables(tables) -
     assert bundle.arrays[
         "tax_unit_sum_person:rental_income+farm_rent_income"
     ].tolist() == [0.0, 100.0]
+
+
+def test_soi_income_components_use_the_builds_positive_part_semantics(tables) -> None:
+    bundle = runner(tables).prepare(
+        group(
+            "tax_unit",
+            "soi_positive:tax_unit_sum_person:self_employment_income",
+        )
+    )
+
+    assert bundle.arrays[
+        "soi_positive:tax_unit_sum_person:self_employment_income"
+    ].tolist() == [100.0, 0.0]
+
+
+def test_soi_itemized_components_apply_the_builds_itemizer_mask(tables) -> None:
+    bundle = runner(tables).prepare(
+        group("tax_unit", "soi_itemized:medical_expense_deduction")
+    )
+
+    assert bundle.arrays["soi_itemized:medical_expense_deduction"].tolist() == [
+        0.0,
+        70.0,
+    ]
+
+
+def test_soi_ctc_is_capped_by_limiting_tax_liability_like_the_build(tables) -> None:
+    bundle = runner(tables).prepare(group("tax_unit", "soi_capped_ctc"))
+
+    assert bundle.arrays["soi_capped_ctc"].tolist() == [400.0, 2_200.0]
 
 
 def test_tax_unit_aca_credit_is_allocated_to_recipient_people_per_month(tables) -> None:

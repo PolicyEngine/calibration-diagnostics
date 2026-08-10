@@ -57,7 +57,7 @@ class MappingRule:
     def from_data(cls, payload: dict[str, Any]) -> "MappingRule":
         selector = payload["ledger_selector"]
         execution = ExecutionMethod(payload["execution"])
-        if execution is ExecutionMethod.NONE:
+        if execution in {ExecutionMethod.NONE, ExecutionMethod.PRECOMPUTED}:
             raise ValueError("mapping execution must be direct or model")
         supported_dimensions = frozenset(payload.get("supported_dimensions", ()))
         supported_constraint_variables = set(

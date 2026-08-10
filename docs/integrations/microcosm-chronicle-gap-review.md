@@ -91,8 +91,9 @@ older source record, not the remaining Chronicle value itself.
 
 ## Current remainder accounting
 
-After the expansion, 3,967 Microcosm cells remain non-executable. Of these,
-2,064 are non-US facts and correctly remain not applicable. The 1,903 US
+After applying the explicit US scope, 1,903 Microcosm cells remain
+non-executable. The 2,064 non-US facts in the source Chronicle snapshot are
+excluded before classification and do not appear in this accounting. The US
 remainders are:
 
 | Chronicle source | Period | Concept | Entity | Total |

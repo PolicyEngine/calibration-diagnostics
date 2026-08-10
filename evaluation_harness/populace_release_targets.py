@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
@@ -12,9 +12,15 @@ from .contracts import (
     AlignedFact,
     AlignmentQuality,
     CalibrationExposure,
+    CapabilityResult,
+    CapabilityStatus,
+    ExecutionMethod,
     FactContract,
+    MappingQuality,
+    PeriodTreatment,
     TypedPeriod,
 )
+from .execution import EvaluationResult
 from .planner import AlignmentDeclaration
 
 
@@ -25,6 +31,7 @@ class ReleaseTargetAlignments:
     native_target_fact_keys: tuple[str, ...]
     rejected_matches: dict[str, str]
     target_count: int
+    final_estimates_by_fact_key: dict[str, Decimal]
 
     @property
     def matched_fact_count(self) -> int:
@@ -78,6 +85,7 @@ def compile_release_target_alignments(
     declarations: list[AlignmentDeclaration] = []
     native: list[str] = []
     rejected: dict[str, str] = {}
+    final_estimates: dict[str, Decimal] = {}
     for fact in facts:
         source_record_id = str(fact.lineage.get("source_record_id", ""))
         target = by_record.get(source_record_id)
@@ -107,6 +115,17 @@ def compile_release_target_alignments(
                 f"Chronicle period {fact.period.canonical}"
             )
             continue
+        if "final_estimate" not in target or target["final_estimate"] is None:
+            raise ValueError(
+                f"Microcosm release target {target.get('name')!r} has no final_estimate"
+            )
+        final_estimate = Decimal(str(target["final_estimate"]))
+        if not final_estimate.is_finite():
+            raise ValueError(
+                f"Microcosm release target {target.get('name')!r} has a non-finite "
+                "final_estimate"
+            )
+        final_estimates[fact.fact_key] = final_estimate
         target_period = _target_period(fact, target)
         if target_period == fact.period:
             native.append(fact.fact_key)
@@ -168,4 +187,105 @@ def compile_release_target_alignments(
         native_target_fact_keys=tuple(sorted(native)),
         rejected_matches=rejected,
         target_count=len(targets),
+        final_estimates_by_fact_key=final_estimates,
     )
+
+
+def apply_release_target_estimates(
+    results: Iterable[EvaluationResult],
+    release_targets: ReleaseTargetAlignments,
+) -> tuple[EvaluationResult, ...]:
+    """Use the pinned release's post-calibration estimates for direct targets.
+
+    Re-running a generic aggregate query is not authoritative for these rows: the
+    release diagnostics record the exact materialized target row and calibrated
+    weights used by the Microcosm build. Holdouts remain untouched.
+    """
+
+    return tuple(
+        replace(
+            result,
+            estimate=release_targets.final_estimates_by_fact_key[result.fact_key],
+            estimate_basis="microcosm_release_final_estimate",
+        )
+        if result.fact_key in release_targets.final_estimates_by_fact_key
+        else result
+        for result in results
+    )
+
+
+def materialize_release_target_results(
+    capabilities: Iterable[CapabilityResult],
+    release_targets: ReleaseTargetAlignments,
+    *,
+    source_id: str,
+    dataset_version: str,
+    model_version: str,
+    population_period: TypedPeriod,
+    policy_period: TypedPeriod,
+) -> tuple[tuple[CapabilityResult, ...], tuple[EvaluationResult, ...]]:
+    """Represent exact build diagnostics as evaluated capability cells.
+
+    Some build targets, notably JCT tax-expenditure targets, are materialized by
+    Microcosm's build pipeline but do not have a general-purpose household query
+    in this harness. The pinned release diagnostics are nevertheless the
+    authoritative post-calibration estimate for those exact Chronicle records.
+    """
+
+    aligned_by_fact_key = {
+        row.source_fact_key: row for row in release_targets.aligned_facts
+    }
+    target_fact_keys = set(release_targets.final_estimates_by_fact_key)
+    materialized_capabilities: list[CapabilityResult] = []
+    materialized_results: list[EvaluationResult] = []
+    for capability in capabilities:
+        if (
+            capability.source_id != source_id
+            or capability.fact_key not in target_fact_keys
+        ):
+            materialized_capabilities.append(capability)
+            continue
+
+        alignment = aligned_by_fact_key.get(capability.fact_key)
+        materialized = replace(
+            capability,
+            status=CapabilityStatus.CALIBRATION_TARGET,
+            reason_code=None,
+            reason_detail=None,
+            execution_method=ExecutionMethod.PRECOMPUTED,
+            mapping_id=capability.mapping_id or "microcosm-release-diagnostics",
+            mapping_quality=MappingQuality.EXACT,
+            population_period=population_period,
+            policy_period=policy_period,
+            period_treatment=(
+                PeriodTreatment.ALIGNED_FACT
+                if alignment is not None
+                else PeriodTreatment.NATIVE
+            ),
+            alignment_id=alignment.alignment_id if alignment is not None else None,
+            alignment_quality=(
+                alignment.method_quality
+                if alignment is not None
+                else AlignmentQuality.NONE
+            ),
+            weight_variable=None,
+            required_variables=(),
+            geography_method="microcosm_release_diagnostics",
+            query=None,
+            calibration_exposure=CalibrationExposure.DIRECT_CALIBRATION_TARGET,
+            score_eligible=True,
+        )
+        materialized_capabilities.append(materialized)
+        materialized_results.append(
+            EvaluationResult.from_capability(
+                materialized,
+                estimate=release_targets.final_estimates_by_fact_key[
+                    capability.fact_key
+                ],
+                dataset_version=dataset_version,
+                model_version=model_version,
+                estimate_basis="microcosm_release_final_estimate",
+            )
+        )
+
+    return tuple(materialized_capabilities), tuple(materialized_results)

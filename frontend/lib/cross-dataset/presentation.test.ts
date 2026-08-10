@@ -30,8 +30,16 @@ const summary: CrossDatasetSummary = {
       score: {
         covered: 9_411,
         scored: 9_411,
+        relative_error_count: 9_400,
         display_score: "92.4338661514",
         loss: "0.1513226769",
+      },
+      performance_buckets: {
+        within_bounds: 8_000,
+        outside_bounds: 900,
+        far_outside_bounds: 511,
+        unavailable: 38_902,
+        total: 48_313,
       },
       capability_statuses: {
         evaluable_direct: 9_259,
@@ -61,8 +69,16 @@ const summary: CrossDatasetSummary = {
       score: {
         covered: 38,
         scored: 38,
+        relative_error_count: 38,
         display_score: "91.2164300165",
         loss: "0.1756713997",
+      },
+      performance_buckets: {
+        within_bounds: 25,
+        outside_bounds: 8,
+        far_outside_bounds: 5,
+        unavailable: 48_275,
+        total: 48_313,
       },
       capability_statuses: {
         evaluable_direct: 5,
@@ -85,6 +101,82 @@ const summary: CrossDatasetSummary = {
 
 const groups: CrossDatasetGroup[] = [
   {
+    dimension: "geography",
+    key: "state",
+    label: "State",
+    fact_count: 12_000,
+    sources: {
+      populace: {
+        evaluable: 5_000,
+        scored: 5_000,
+        relative_error_count: 4_990,
+        display_score: "88",
+        loss: "0.12",
+        performance_buckets: {
+          within_bounds: 4_000,
+          outside_bounds: 600,
+          far_outside_bounds: 390,
+          unavailable: 7_010,
+          total: 12_000,
+        },
+        reason_codes: { mapping_not_found: 7_000 },
+      },
+      cps: {
+        evaluable: 0,
+        scored: 0,
+        relative_error_count: 0,
+        display_score: null,
+        loss: null,
+        performance_buckets: {
+          within_bounds: 0,
+          outside_bounds: 0,
+          far_outside_bounds: 0,
+          unavailable: 12_000,
+          total: 12_000,
+        },
+        reason_codes: { geography_not_supported: 12_000 },
+      },
+    },
+  },
+  {
+    dimension: "geography_calibration_exposure",
+    key: "state|direct_calibration_target",
+    label: "State / Direct calibration target",
+    fact_count: 2_000,
+    sources: {
+      populace: {
+        evaluable: 2_000,
+        scored: 2_000,
+        relative_error_count: 1_999,
+        display_score: "97",
+        loss: "0.03",
+        performance_buckets: {
+          within_bounds: 1_900,
+          outside_bounds: 80,
+          far_outside_bounds: 19,
+          unavailable: 1,
+          total: 2_000,
+        },
+        reason_codes: {},
+      },
+      cps: {
+        evaluable: 0,
+        scored: 0,
+        relative_error_count: 0,
+        display_score: null,
+        loss: null,
+        performance_buckets: {
+          within_bounds: 0,
+          outside_bounds: 0,
+          far_outside_bounds: 0,
+          unavailable: 0,
+          total: 0,
+        },
+        reason_codes: {},
+      },
+    },
+  },
+  {
     dimension: "ledger_source",
     key: "irs_soi",
     label: "IRS SOI",
@@ -93,13 +185,31 @@ const groups: CrossDatasetGroup[] = [
       populace: {
         evaluable: 150,
         scored: 150,
+        relative_error_count: 149,
         display_score: "96.4982",
+        loss: "0.070036",
+        performance_buckets: {
+          within_bounds: 100,
+          outside_bounds: 30,
+          far_outside_bounds: 20,
+          unavailable: 32_895,
+          total: 33_045,
+        },
         reason_codes: { mapping_not_found: 26_893, period_not_supported: 6_002 },
       },
       cps: {
         evaluable: 37,
         scored: 37,
+        relative_error_count: 37,
         display_score: "90.5504",
+        loss: "0.188992",
+        performance_buckets: {
+          within_bounds: 20,
+          outside_bounds: 10,
+          far_outside_bounds: 7,
+          unavailable: 33_008,
+          total: 33_045,
+        },
         reason_codes: { geography_not_supported: 31_873, period_not_supported: 1_069 },
       },
     },
@@ -113,13 +223,31 @@ const groups: CrossDatasetGroup[] = [
       populace: {
         evaluable: 116,
         scored: 116,
+        relative_error_count: 116,
         display_score: "94.0919",
+        loss: "0.118162",
+        performance_buckets: {
+          within_bounds: 100,
+          outside_bounds: 10,
+          far_outside_bounds: 6,
+          unavailable: 0,
+          total: 116,
+        },
         reason_codes: {},
       },
       cps: {
         evaluable: 0,
         scored: 0,
+        relative_error_count: 0,
         display_score: null,
+        loss: null,
+        performance_buckets: {
+          within_bounds: 0,
+          outside_bounds: 0,
+          far_outside_bounds: 0,
+          unavailable: 0,
+          total: 0,
+        },
         reason_codes: {},
       },
     },
@@ -133,13 +261,31 @@ const groups: CrossDatasetGroup[] = [
       populace: {
         evaluable: 0,
         scored: 0,
+        relative_error_count: 0,
         display_score: null,
+        loss: null,
+        performance_buckets: {
+          within_bounds: 0,
+          outside_bounds: 0,
+          far_outside_bounds: 0,
+          unavailable: 0,
+          total: 0,
+        },
         reason_codes: {},
       },
       cps: {
         evaluable: 38,
         scored: 38,
+        relative_error_count: 38,
         display_score: "91.2164",
+        loss: "0.175672",
+        performance_buckets: {
+          within_bounds: 25,
+          outside_bounds: 8,
+          far_outside_bounds: 5,
+          unavailable: 0,
+          total: 38,
+        },
         reason_codes: {},
       },
     },
@@ -153,13 +299,31 @@ const groups: CrossDatasetGroup[] = [
       populace: {
         evaluable: 152,
         scored: 152,
+        relative_error_count: 152,
         display_score: "96.5802",
+        loss: "0.068396",
+        performance_buckets: {
+          within_bounds: 120,
+          outside_bounds: 20,
+          far_outside_bounds: 12,
+          unavailable: 0,
+          total: 152,
+        },
         reason_codes: {},
       },
       cps: {
         evaluable: 0,
         scored: 0,
+        relative_error_count: 0,
         display_score: null,
+        loss: null,
+        performance_buckets: {
+          within_bounds: 0,
+          outside_bounds: 0,
+          far_outside_bounds: 0,
+          unavailable: 0,
+          total: 0,
+        },
         reason_codes: {},
       },
     },
@@ -173,13 +337,31 @@ const groups: CrossDatasetGroup[] = [
       populace: {
         evaluable: 9_259,
         scored: 9_259,
+        relative_error_count: 9_248,
         display_score: "89.4248",
+        loss: "0.211504",
+        performance_buckets: {
+          within_bounds: 8_000,
+          outside_bounds: 800,
+          far_outside_bounds: 459,
+          unavailable: 38,
+          total: 9_297,
+        },
         reason_codes: {},
       },
       cps: {
         evaluable: 38,
         scored: 38,
+        relative_error_count: 38,
         display_score: "91.2164",
+        loss: "0.175672",
+        performance_buckets: {
+          within_bounds: 25,
+          outside_bounds: 8,
+          far_outside_bounds: 5,
+          unavailable: 0,
+          total: 38,
+        },
         reason_codes: {},
       },
     },
@@ -210,16 +392,24 @@ test("source metric rows keep performance inseparable from Chronicle coverage co
   const populace = cards[0];
   const cps = cards[1];
 
-  expect(populace.scoreLabel).toBe("92.4 / 100");
+  expect(populace.scoreLabel).toBe("15.1% mean error");
+  expect(populace.coverageRateLabel).toBe("19.5% coverage");
   expect(populace.label).toBe("Microcosm + PolicyEngine-US");
   expect(populace.coverageLabel).toBe("9,411 of 48,313 facts");
-  expect(populace.scoreScopeLabel).toBe("Performance among 9,411 scored facts");
-  expect(populace.performancePercent).toBeCloseTo(92.4339, 3);
+  expect(populace.scoreScopeLabel).toBe("Mean capped error across 9,400 comparable facts");
+  expect(populace.performanceBuckets).toEqual({
+    withinBounds: 8_000,
+    outsideBounds: 900,
+    farOutsideBounds: 511,
+    unavailable: 38_902,
+    total: 48_313,
+  });
   expect("coveragePercent" in populace).toBe(false);
 
-  expect(cps.scoreLabel).toBe("91.2 / 100");
+  expect(cps.scoreLabel).toBe("17.6% mean error");
+  expect(cps.coverageRateLabel).toBe("0.1% coverage");
   expect(cps.coverageLabel).toBe("38 of 48,313 facts");
-  expect(cps.scoreScopeLabel).toBe("Performance among 38 scored facts");
+  expect(cps.scoreScopeLabel).toBe("Mean capped error across 38 comparable facts");
   expect(cps.unsupportedCount).toBe(48_275);
   expect(cps.topUnsupportedReasons[0]).toEqual({
     key: "geography_not_supported",
@@ -240,6 +430,41 @@ test("Microcosm is ordered before every other model or standalone dataset", () =
       (source) => source.sourceId,
     ),
   ).toEqual(["populace", "cps"]);
+});
+
+test("source metric filters select geography and Microcosm sample aggregates", () => {
+  const geography = buildSourceOverviews(summary, groups, {
+    populace: { geography: "state", sample: "all" },
+  })[0];
+  expect(geography.scoreLabel).toBe("12.0% mean error");
+  expect(geography.coverageRateLabel).toBe("41.7% coverage");
+  expect(geography.performanceBuckets.total).toBe(12_000);
+
+  const inSampleState = buildSourceOverviews(summary, groups, {
+    populace: { geography: "state", sample: "in_sample" },
+  })[0];
+  expect(inSampleState.scoreLabel).toBe("3.0% mean error");
+  expect(inSampleState.coverageRateLabel).toBe("16.7% coverage");
+  expect(inSampleState.performanceBuckets).toEqual({
+    withinBounds: 1_900,
+    outsideBounds: 80,
+    farOutsideBounds: 19,
+    unavailable: 1,
+    total: 2_000,
+  });
+
+  const emptyIntersection = buildSourceOverviews(summary, groups, {
+    populace: { geography: "congressional_district", sample: "in_sample" },
+  })[0];
+  expect(emptyIntersection.scoreLabel).toBe("Not scored");
+  expect(emptyIntersection.coverageRateLabel).toBe("0.0% coverage");
+  expect(emptyIntersection.performanceBuckets).toEqual({
+    withinBounds: 0,
+    outsideBounds: 0,
+    farOutsideBounds: 0,
+    unavailable: 0,
+    total: 0,
+  });
 });
 
 test("source scorecards identify aligned, advanced, and in-sample comparisons", () => {
@@ -273,12 +498,19 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
   const rows = buildGroupRows(groups, "ledger_source", summary.sources);
   expect(rows).toHaveLength(1);
   expect(rows[0].sources.populace).toMatchObject({
-    scoreLabel: "96.5",
+    scoreLabel: "7.0% mean error",
     coverageLabel: "150 / 33,045",
     unsupportedCount: 32_895,
+    performanceBuckets: {
+      withinBounds: 100,
+      outsideBounds: 30,
+      farOutsideBounds: 20,
+      unavailable: 32_895,
+      total: 33_045,
+    },
   });
   expect(rows[0].sources.cps).toMatchObject({
-    scoreLabel: "90.6",
+    scoreLabel: "18.9% mean error",
     coverageLabel: "37 / 33,045",
     unsupportedCount: 33_008,
   });
