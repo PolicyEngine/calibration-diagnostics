@@ -8,10 +8,12 @@ in parity with that source; parity tests cover the public contract here.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
+from pathlib import Path
 from typing import Iterable
 
 from .contracts import AlignedFact, AlignmentQuality, FactContract, TypedPeriod
@@ -36,10 +38,26 @@ _CANONICAL_MEASURE_TO_CBO_INCOME_SOURCE = {
         "net_business_income"
     ),
 }
+_TARGET_ROLE_TO_CBO_INCOME_SOURCE = {
+    "cbo_adjusted_gross_income": "adjusted_gross_income",
+    "cbo_wages_and_salaries": "wages_and_salaries",
+    "cbo_qualified_dividend_income": "qualified_dividend_income",
+    "cbo_net_capital_gain": "net_capital_gain",
+    "cbo_net_business_income": "net_business_income",
+    "nipa_wages_and_salaries": "wages_and_salaries",
+    "bea_state_wages": "wages_and_salaries",
+    "nipa_proprietors_income": "net_business_income",
+    "w2_social_security_tips_total": "wages_and_salaries",
+}
 _SOI_CHAIN_RECORD_TOKENS = {
     "adjusted_gross_income": ("table_1_1", "adjusted_gross_income"),
     "wages_and_salaries": ("table_1_4", "wages_salaries_amount"),
     "net_capital_gain": ("table_1_4", "net_capital_gains_amount"),
+}
+_SAME_SERIES_UPRATING_INDEX = {
+    "adjusted_gross_income": "total_adjusted_gross_income",
+    "wages_and_salaries": "total_wages_salaries_amount",
+    "net_capital_gain": "total_net_capital_gains_amount",
 }
 _CBO_RECORD = re.compile(
     r"^cbo\.revenue_projection\.ty(?P<year>\d{4})\.income_by_source\."
@@ -63,6 +81,7 @@ class PopulaceAgingResult:
     transformed_value: Decimal | None
     factor: Decimal | None
     factor_source: str
+    factor_basis: str
     alignment_model_id: str
     alignment_model_version: str
     populace_commit: str
@@ -108,6 +127,7 @@ class PopulaceAgingResult:
                     else None
                 ),
                 "aging_factor_source": self.factor_source,
+                "factor_basis": self.factor_basis,
                 "source_period": self.source_fact.period.canonical,
                 "aged_to": self.target_period.canonical,
                 "populace_commit": self.populace_commit,
@@ -141,11 +161,15 @@ class PopulaceAgingPolicy:
         self,
         projections: dict[str, dict[int, tuple[Decimal, str]]],
         chain_series: dict[str, dict[int, tuple[Decimal, str]]],
+        release_factors: dict[
+            tuple[str, int, int], tuple[Decimal, str]
+        ] | None = None,
         *,
         populace_commit: str = DEFAULT_POPULACE_COMMIT,
     ) -> None:
         self.projections = projections
         self.chain_series = chain_series
+        self.release_factors = release_factors or {}
         self.populace_commit = populace_commit
 
     @classmethod
@@ -154,6 +178,7 @@ class PopulaceAgingPolicy:
         facts: Iterable[FactContract],
         *,
         populace_commit: str = DEFAULT_POPULACE_COMMIT,
+        release_diagnostics_path: str | Path | None = None,
     ) -> "PopulaceAgingPolicy":
         projections: dict[str, dict[int, tuple[Decimal, str]]] = {}
         chains: dict[str, dict[int, tuple[Decimal, str]]] = {}
@@ -172,7 +197,17 @@ class PopulaceAgingPolicy:
             if chain_key is not None:
                 series, year = chain_key
                 _insert_unique(chains, series, year, fact, label="national SOI chain")
-        return cls(projections, chains, populace_commit=populace_commit)
+        release_factors = (
+            _load_release_factors(release_diagnostics_path)
+            if release_diagnostics_path is not None
+            else {}
+        )
+        return cls(
+            projections,
+            chains,
+            release_factors,
+            populace_commit=populace_commit,
+        )
 
     def transform(
         self,
@@ -215,14 +250,14 @@ class PopulaceAgingPolicy:
         if source_year is None or build_year is None:
             return self._unavailable(fact, target_period)
         income_source = _income_source(fact)
-        factor = self._projection_factor(income_source, source_year, build_year)
+        factor = self._factor(income_source, source_year, build_year)
         if factor is None and income_source != _CBO_AGI_INCOME_SOURCE:
-            factor = self._projection_factor(
+            factor = self._factor(
                 _CBO_AGI_INCOME_SOURCE, source_year, build_year
             )
         if factor is None:
             return self._unavailable(fact, target_period)
-        value, source = factor
+        value, source, basis = factor
         return self._result(
             fact,
             target_period,
@@ -233,8 +268,32 @@ class PopulaceAgingPolicy:
             Decimal(str(float(fact.value) * float(value))),
             value,
             source,
-            "Populace projected this USD sum to the build year.",
+            "Populace projected this USD sum to the build year."
+            + (
+                " The factor was recovered from the pinned release diagnostics."
+                if basis == "pinned_release_diagnostics"
+                else ""
+            ),
+            factor_basis=basis,
         )
+
+    def _factor(
+        self,
+        income_source: str,
+        source_year: int,
+        build_year: int,
+    ) -> tuple[Decimal, str, str] | None:
+        local = self._projection_factor(income_source, source_year, build_year)
+        if local is not None:
+            value, source = local
+            return value, source, "chronicle_projection_facts"
+        released = self.release_factors.get(
+            (income_source, source_year, build_year)
+        )
+        if released is None:
+            return None
+        value, source = released
+        return value, source, "pinned_release_diagnostics"
 
     def _projection_factor(
         self,
@@ -296,6 +355,7 @@ class PopulaceAgingPolicy:
         factor: Decimal | None,
         factor_source: str,
         note: str,
+        factor_basis: str = "not_applicable",
     ) -> PopulaceAgingResult:
         return PopulaceAgingResult(
             source_fact=fact,
@@ -304,6 +364,7 @@ class PopulaceAgingPolicy:
             transformed_value=transformed_value,
             factor=factor,
             factor_source=factor_source,
+            factor_basis=factor_basis,
             alignment_model_id=AGING_MODEL_ID,
             alignment_model_version=AGING_MODEL_VERSION,
             populace_commit=self.populace_commit,
@@ -424,6 +485,110 @@ def _insert_unique(
             f"{existing[1]!r} vs {value[1]!r}"
         )
     index[series][year] = value
+
+
+def _load_release_factors(
+    diagnostics_path: str | Path,
+) -> dict[tuple[str, int, int], tuple[Decimal, str]]:
+    """Recover factors emitted by the exact pinned Microcosm aging pass.
+
+    A newer Chronicle snapshot need not retain the CBO and SOI records that
+    fed an older Microcosm release. The release diagnostics preserve the
+    resulting factor and its lineage. Only factors produced by the same named
+    aging model are accepted here. Surface-specific uprating is ignored unless
+    it is exactly the same-series SOI bridge used by the aging model.
+    """
+
+    payload = json.loads(Path(diagnostics_path).read_text())
+    factors: dict[tuple[str, int, int], tuple[Decimal, str]] = {}
+    for target in payload.get("targets", ()):
+        metadata = target.get("metadata", {})
+        if (
+            metadata.get("basis") != "projection"
+            or metadata.get("alignment_model_id") != AGING_MODEL_ID
+            or metadata.get("alignment_model_version") != AGING_MODEL_VERSION
+        ):
+            continue
+        source_year = _metadata_year(metadata.get("ledger_fact_period"))
+        effective_source_year = _metadata_year(
+            metadata.get("source_period", metadata.get("ledger_fact_period"))
+        )
+        build_year = _metadata_year(
+            metadata.get("aged_to", target.get("period"))
+        )
+        if (
+            source_year is None
+            or effective_source_year is None
+            or build_year is None
+            or source_year == build_year
+        ):
+            continue
+        try:
+            factor = Decimal(str(metadata["aging_factor"]))
+        except (KeyError, ValueError):
+            continue
+        factor_source = str(metadata.get("aging_factor_source", ""))
+        if not factor.is_finite() or factor <= 0 or not factor_source:
+            continue
+
+        income_source = _metadata_income_source(metadata)
+        if effective_source_year != source_year:
+            expected_index = _SAME_SERIES_UPRATING_INDEX.get(income_source)
+            if (
+                metadata.get("uprating_index") != expected_index
+                or _metadata_year(metadata.get("uprating_from_period"))
+                != source_year
+                or _metadata_year(metadata.get("uprating_to_period"))
+                != effective_source_year
+            ):
+                # For example, taxable-interest distributions are rebased to
+                # an active total and return-universe before aging. That is a
+                # calibration-surface transformation, not a time-growth factor
+                # suitable for an arbitrary external-validation fact.
+                continue
+            try:
+                uprating_factor = Decimal(str(metadata["uprating_factor"]))
+            except (KeyError, ValueError):
+                continue
+            if not uprating_factor.is_finite() or uprating_factor <= 0:
+                continue
+            factor *= uprating_factor
+            chain_record = str(
+                metadata.get("uprating_index_source_record_id", "")
+            )
+            if not chain_record:
+                continue
+            factor_source = f"chained:{chain_record}+{factor_source}"
+
+        key = (income_source, source_year, build_year)
+        value = (factor, factor_source)
+        existing = factors.get(key)
+        if existing is not None and existing != value:
+            raise ValueError(
+                "Conflicting pinned Microcosm release factors for "
+                f"{income_source!r} {source_year}->{build_year}: "
+                f"{existing!r} vs {value!r}"
+            )
+        factors[key] = value
+    return factors
+
+
+def _metadata_year(value: object) -> int | None:
+    if value is None:
+        return None
+    head = str(value).split("-", 1)[0]
+    return int(head) if len(head) == 4 and head.isdigit() else None
+
+
+def _metadata_income_source(metadata: dict) -> str:
+    target_role = str(metadata.get("target_role", ""))
+    direct = _TARGET_ROLE_TO_CBO_INCOME_SOURCE.get(target_role)
+    if direct is not None:
+        return direct
+    measure_id = str(metadata.get("source_measure_id", ""))
+    return _SOI_MEASURE_TO_CBO_INCOME_SOURCE.get(
+        measure_id, _CBO_AGI_INCOME_SOURCE
+    )
 
 
 def _income_source(fact: FactContract) -> str:
