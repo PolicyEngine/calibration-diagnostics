@@ -150,6 +150,13 @@ def run(
             CalibrationExposure.EXTERNAL_VALIDATION
         ),
     )
+    acs_pums_bea_wage_transformations = transform_chronicle_bea_wage_facts(
+        facts,
+        source_id=acs_pums_overview.source.source_id,
+        national_calibration_exposure=(
+            CalibrationExposure.EXTERNAL_VALIDATION
+        ),
+    )
     age_topcode_comparisons = build_cps_asec_age_topcode_comparisons(
         facts,
         source_id=populace_overview.source.source_id,
@@ -188,6 +195,7 @@ def run(
             *(row.to_aligned_fact() for row in comparable_aging),
             *bea_wage_transformations.aligned_facts,
             *taxcalc_bea_wage_transformations.aligned_facts,
+            *acs_pums_bea_wage_transformations.aligned_facts,
             *age_topcode_comparisons.aligned_facts,
         ]
     )
@@ -217,6 +225,7 @@ def run(
         mappings=MappingRegistry.from_yaml(
             ACS_PUMS_INTEGRATION / "mappings.yaml"
         ),
+        alignments=acs_pums_bea_wage_transformations.declarations,
     )
     capabilities = build_full_capability_matrix(
         facts,
@@ -502,13 +511,32 @@ def run(
     summary["acs_pums_2024_inputs"] = {
         **acs_pums_input_manifest,
         "interpretation": (
-            "Native 2024 public-use ACS subsample compared with published "
-            "full-sample ACS facts; not independent external validation."
+            "Native 2024 public-use ACS PUMS. Published ACS and Population "
+            "Estimates comparisons are related to the survey weighting "
+            "surface; population projections and BEA wages are external "
+            "validation."
         ),
         "uncertainty": (
             "Every estimate carries SDR standard error and 90 percent margin "
             "of error from all 80 PUMS replicate weights."
         ),
+        "bea_wage_benchmarks": {
+            "transformation": (
+                "BEA state wages residence-adjusted and scaled to NIPA"
+            ),
+            "state_fact_count": (
+                acs_pums_bea_wage_transformations.state_count
+            ),
+            "national_regional_fact_count": 1,
+            "national_nipa_fact_count": 1,
+            "calibration_exposure": "external_validation",
+            "national_wage_total": str(
+                acs_pums_bea_wage_transformations.national_total
+            ),
+            "national_scaling_factor": str(
+                acs_pums_bea_wage_transformations.scale_factor
+            ),
+        },
     }
     manifest = publish_run(
         output,

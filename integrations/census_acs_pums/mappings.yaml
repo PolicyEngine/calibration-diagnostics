@@ -1,4 +1,4 @@
-mapping_release: census-acs-pums-2024-overview-v1
+mapping_release: census-acs-pums-2024-chronicle-expansion-v2
 mappings:
   - mapping_id: census-acs-pums-person-age-count
     ledger_selector:
@@ -15,3 +15,83 @@ mappings:
     supported_constraint_domains: [total_population]
     supported_constraint_variables: [age]
     calibration_exposure: used_in_imputation_or_reweighting
+
+  - mapping_id: census-acs-pums-pep-resident-population
+    ledger_selector:
+      sources: [census_pep]
+      measures: [census_pep.resident_population]
+      units: [count]
+      entities: [person]
+    execution: direct
+    source_expression: __ones__
+    operation: weighted_sum
+    required_variables: [age]
+    mapping_quality: exact
+    supported_dimensions: []
+    supported_constraint_domains: [resident_population]
+    supported_constraint_variables: [age]
+    calibration_exposure: used_in_imputation_or_reweighting
+
+  - mapping_id: census-acs-pums-national-population-projection
+    ledger_selector:
+      sources: [census_population_projections]
+      measures: [census.population_projection]
+      units: [count]
+      entities: [person]
+    execution: direct
+    source_expression: __ones__
+    operation: weighted_sum
+    required_variables: [age]
+    mapping_quality: exact
+    supported_dimensions: []
+    supported_constraint_domains: [population_projection]
+    supported_constraint_variables: [age]
+    calibration_exposure: external_validation
+
+  - mapping_id: census-acs-pums-bea-regional-wages
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_regional.wages_and_salaries]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    source_expression: WAGP
+    operation: weighted_sum
+    required_variables: [WAGP]
+    mapping_quality: exact
+    supported_dimensions:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    descriptive_dimensions:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    supported_constraint_domains: [personal_income]
+    supported_constraint_variables:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    descriptive_constraint_variables:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    calibration_exposure: external_validation
+
+  - mapping_id: census-acs-pums-bea-nipa-wages
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.wages_and_salaries]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    source_expression: WAGP
+    operation: weighted_sum
+    required_variables: [WAGP]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [compensation_of_employees]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
