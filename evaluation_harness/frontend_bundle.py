@@ -26,6 +26,9 @@ DEFAULT_SOURCE_LABELS = {
     "census_acs_pums_2024": "Raw ACS PUMS",
     "populace_us_policyengine_us_2024": "Microcosm + PolicyEngine-US",
     "taxcalc_public_cps_2024": "Public CPS + Tax-Calculator",
+    "yale_reconstruction_2024": (
+        "Yale Tax-Data + Tax-Simulator (reconstruction)"
+    ),
 }
 
 
@@ -354,6 +357,43 @@ def _build_groups(
         source_id: [row for row in scores if row["source_id"] == source_id]
         for source_id in source_ids
     }
+
+    def common_fact_set_sources(fact_keys: set[str]) -> dict[str, Any]:
+        """Score every source on one shared, source-independent fact set."""
+
+        source_values: dict[str, Any] = {}
+        for source_id in source_ids:
+            cells = [
+                row
+                for row in capabilities_by_source[source_id]
+                if row["fact_key"] in fact_keys
+            ]
+            scored, relative_error_count, display_score, loss = _score_for_group(
+                scores_by_source[source_id], fact_keys
+            )
+            source_values[source_id] = {
+                "evaluable": sum(row["execution_method"] != "none" for row in cells),
+                "scored": scored,
+                "relative_error_count": relative_error_count,
+                "display_score": display_score,
+                "loss": loss,
+                "performance_buckets": _performance_buckets(
+                    scores_by_source[source_id],
+                    fact_keys,
+                    total=len(fact_keys),
+                ),
+                "reason_codes": dict(
+                    sorted(
+                        Counter(
+                            row["reason_code"]
+                            for row in cells
+                            if row.get("reason_code")
+                        ).items()
+                    )
+                ),
+            }
+        return source_values
+
     groups: list[dict[str, Any]] = []
     for dimension, key_for in definitions.items():
         grouped: dict[str, set[str]] = {}
@@ -400,6 +440,35 @@ def _build_groups(
                     "sources": source_values,
                 }
             )
+    populace_source_ids = [
+        source_id for source_id in source_ids if "populace" in source_id.lower()
+    ]
+    if len(populace_source_ids) != 1:
+        raise ValueError(
+            "frontend bundle requires exactly one Populace source to define the "
+            "shared calibration sample"
+        )
+    populace_source_id = populace_source_ids[0]
+    all_fact_keys = {fact.fact_key for fact in fact_values}
+    in_sample_fact_keys = {
+        row["fact_key"]
+        for row in capabilities_by_source[populace_source_id]
+        if row.get("calibration_exposure") == "direct_calibration_target"
+    }
+    sample_fact_keys = {
+        "in_sample": in_sample_fact_keys,
+        "out_of_sample": all_fact_keys - in_sample_fact_keys,
+    }
+    for sample, fact_keys in sample_fact_keys.items():
+        groups.append(
+            {
+                "dimension": "populace_calibration_sample",
+                "key": sample,
+                "label": _display_label(sample),
+                "fact_count": len(fact_keys),
+                "sources": common_fact_set_sources(fact_keys),
+            }
+        )
     for dimension, capability_field in (
         ("period_treatment", "period_treatment"),
         ("calibration_exposure", "calibration_exposure"),
@@ -462,6 +531,26 @@ def _build_groups(
         fact.fact_key: fact.geography_level for fact in fact_values
     }
     geographies = sorted(set(geography_by_fact_key.values()))
+    for geography in geographies:
+        geography_fact_keys = {
+            fact_key
+            for fact_key, level in geography_by_fact_key.items()
+            if level == geography
+        }
+        for sample, fact_keys in sample_fact_keys.items():
+            intersection = geography_fact_keys & fact_keys
+            groups.append(
+                {
+                    "dimension": "geography_populace_calibration_sample",
+                    "key": f"{geography}|{sample}",
+                    "label": (
+                        f"{_display_label(geography)} / "
+                        f"{_display_label(sample)}"
+                    ),
+                    "fact_count": len(intersection),
+                    "sources": common_fact_set_sources(intersection),
+                }
+            )
     exposures = sorted(
         {
             str(row["calibration_exposure"])

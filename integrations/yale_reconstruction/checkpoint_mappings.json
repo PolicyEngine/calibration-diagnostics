@@ -1,0 +1,2251 @@
+{
+  "evaluated_mapping_count": 318,
+  "held_out_2022_row_count": 58,
+  "ledger_snapshot_id": "ledger-7917ea815df710fb20db076b",
+  "mappings": [
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:00f17281feb90e3707a9d271",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.limited_state_local_taxes_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:02ac7578b709e86c5b13ee4f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.3k_to_4k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:03b9a629fdb734607a8e2712",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.interest_paid_deduction_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:043c7d30eab219fb6c793e2a",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_one_child_claims@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:04dc7b00e46e2f5346fb5895",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.taxable_ira_distributions_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:05508e2caa3c97cc34ce46dd",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.20k_to_25k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:063eb76749e17151bd610924",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.income_tax_before_credits_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:07d446fbbc8d4292f51d9183",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.17k_to_18k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:0875b684c880c9f43d4c7ff0",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.11k_to_12k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:08d8955d4be127ae1ed37849",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.under_1.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:0a2bb487e4509a3c2d14d238",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_three_or_more_children_claims@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:0ae89fe1cc0f409cf7f1b59d",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.total.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:0b3fb6e5fa84b0112d332f1e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.11k_to_12k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:0b6ee669d70e70dcc898358c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.40k_to_45k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:0cf6b02964e9db06880bf882",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.medical_dental_expense_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:0dd68570ac5c97a999f57f2e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.18k_to_19k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:0ec6eb86d8f4deeb6442b097",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_all_returns.earned_income_credit.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:0f1aa82aa3a6205d310090f3",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.40k_to_45k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:0f77428d4e33fd74416f7f58",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.50k_to_75k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:105f7b972e62ebbbd254e9a5",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.11k_to_12k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:106e70b1ec6752451b3fb207",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.15k_to_16k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:12ce04997968853277e4959d",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.20k_to_25k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:167c8e61921aca1846f59b11",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.14k_to_15k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:16f8b3bbe8a5ce67862ba2b3",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.total.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:183030273852298b2a3b68f6",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.19k_to_20k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:1902d0a5c8e35bc4cb3d1f16",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.25k_to_30k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:19457623889221e6134124f1",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.5k_to_6k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:1a539f46090e1e9840311e20",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.15k_to_16k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:1a777455f793d410b1550a8b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.9k_to_10k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:1a836f3914fdb9d480cc515b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.11k_to_12k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:1ade98ab56ed72122835311c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.9k_to_10k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:1bd89eba3bca1a1bb99952bc",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.40k_to_45k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:1d6d436883df857dbb6ca909",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.itemized_deductions_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:1f07ac15504bd236d46eff47",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.40k_to_45k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:215c2270278e4cff39852c5e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.11k_to_12k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:21adef58f817531985d197f5",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.8k_to_9k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:21c5b737509338444ae38801",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.9k_to_10k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:226f2cb84900df2709ca979a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.6k_to_7k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:22e8bc398cf5596ecd275ddd",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.200k_to_250k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2441806ac87f95becba10d14",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.7k_to_8k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:24a8cf565952cd46a3e02781",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.3k_to_4k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:24be9fefbdd72c1236ebaa9e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.20k_to_25k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:267195f7257ac38ced0612dd",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.taxable_ira_distributions_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:26b8afd36fb1bf9ebd894275",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.10k_to_11k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:285a13f8114c70445c50279e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.40k_to_50k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:29371a2981e93cd838dfd20a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.500k_to_1m.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:29d5dfc0664c7dce41050bb5",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.13k_to_14k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2a657f67ad08e4fecbe8b1a9",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.40k_to_45k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2b13b50af1a1c0bea6124ae4",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.30k_to_35k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2b20015c02bb9c384b1893fc",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.14k_to_15k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2c64603575dd2db91abbee47",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.1_to_1k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2cb84b6c035ab77b8bdc704c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.20k_to_25k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2d3f0b6e52c70e248ada905c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.35k_to_40k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2dfd6460b13868a367264dbd",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.25k_to_30k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2e6b12e54c96cac5b6a0ed6b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.1_to_1k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:2fd062e3dfb7733d0069f748",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.16k_to_17k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:30c3b9434146230f25a3693a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.total.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:30e7780f690416c472c91554",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.16k_to_17k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:325e873f80265e1fc2695961",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.15k_to_16k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:32915030563b67b7500a7707",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.12k_to_13k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:334815e6fed5a6176738d73e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.40k_to_45k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:33aa774153be2308dfce235d",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.45k_to_50k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:33fdf208eace7309c41e7dfb",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.13k_to_14k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:34a20f7da3af7f808c722990",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.under_1.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:364bf4f1131980b9ade62f81",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.under_1.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3717d62171a68c0d5951646a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.19k_to_20k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3a2eed0ca65cd5b1596c9b30",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.35k_to_40k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:3aaf0834923303286b29ef0d",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.actc_claims@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3ab87d7aed8946aae5e29b14",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.19k_to_20k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3aca48d2019d185b95d75729",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.50k_plus.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3c682b27a8d95933bbfe8df8",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.50k_plus.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3cbe1abe255b9936208440f6",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.50k_plus.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3db5dff7209bbeb71f238a57",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.11k_to_12k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3df05af58d5d6b0b14356305",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.2k_to_3k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:3f5ac42b65199146faddfab6",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.actc_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3f9df53d101d1f4dbebcbf91",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.3k_to_4k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:3fe41c08397bb41745d1fec4",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.5k_to_10k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:41c522c5b469e2c98106e5e0",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.12k_to_13k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4248ba625d75967fd66b7743",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.7k_to_8k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:43f4ee7baedd1911f629bb57",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.11k_to_12k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:461a0aa7f03fca73064e44f2",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.2k_to_3k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:471597b395a26f83f7de5cad",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.1k_to_2k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:474ab9739eb6c77efa243316",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.25k_to_30k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:483243a87599c17ad1473177",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.6k_to_7k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:48a1a752b36372ba79728fdb",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.25k_to_30k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:48d6c00bccfb12598498bb8d",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.4k_to_5k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4930111124cc9e3fcd591c13",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.4k_to_5k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4a4914ff1d8635e365f23db0",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.20k_to_25k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4b3b7b7717ef3cc9a5c17aea",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.1_to_1k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4be2e5c2e6b88a4e1f660260",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.14k_to_15k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4bf423b151eec8ff3b0644ea",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.75k_to_100k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4cca9582706faf5f924fb647",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.25k_to_30k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:4ccc6f8f4cd37e7a7071fdd6",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.table_1_4.all.wages_salaries_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4ce707b28c07ae5fca2cec77",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.5k_to_6k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4ce8f97a68b90db8f8a67967",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.4k_to_5k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4dc9397470051272da418833",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.45k_to_50k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4e53ff14e8670b29a2be9512",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.12k_to_13k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4fb1b8d552dfd53498c9818a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.18k_to_19k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:4fc0b392473afc73cdd268f2",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.3k_to_4k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:504404d4a308df8076962bfa",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.12k_to_13k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:537adc8ffa89ffc011a47def",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.19k_to_20k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:53def7581e649b0e1c41d7ba",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.under_1.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:53ea5f28718e5eba36911436",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.6k_to_7k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:54708459d17126cfb839bd8e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.13k_to_14k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5560c6ea7d34476d73f36c64",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.7k_to_8k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:557b68560efa80e5c4ecea61",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.10k_to_11k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:55e10356a6de75b3b7a94d6b",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_one_child_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:565c75cb5a0d8e503ce86b22",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.35k_to_40k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:56a4ccf10b0de16f336058ba",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.19k_to_20k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:57cc38394d602617ac7207b0",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.tax_exempt_interest_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:584b1887da3f63ef8c5afd90",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.8k_to_9k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:58576a1256de1d9d53b6ec83",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.charitable_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:592e76eef03a605f56c923d4",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.30k_to_40k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:59d3ddd53588ee1033c80321",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.5k_to_6k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:59f7eec123125ddf41daed7f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.8k_to_9k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:5a1cfc6db0d596724784f187",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.taxable_pension_income_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5a621abacd2892c1ec378b2a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.total.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5afd4aeb6aca6174ccea2ed9",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.1_to_5k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5b1daf967909a77e8ad4c5ba",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.7k_to_8k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:5b370a42476602614cd9db75",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.ordinary_dividends_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5b4faa9569cca3c222d82066",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.250k_to_500k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5becbfe8480da000afbe269a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.3k_to_4k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5bf612d2be1e82d83605961b",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.income_tax_liability_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5da82b6cf3f25d1c2e68af30",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.under_1.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5ed09dbb1a4bc9a9b3c01178",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.75k_to_100k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5fae1910d30e565691f94400",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.25k_to_30k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:5fdf031a4e8212f255b43054",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.9k_to_10k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:606b82e57e15d1cfaf81ed04",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.limited_state_local_taxes_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:608f7d02cf442460fb609207",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.taxable_pension_income_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:6098cb4036a636cce6f8dec0",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.15k_to_16k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:6131ee9cf3191c4e934b3ca7",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.16k_to_17k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:61d18d04e7815579dbc75a50",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.40k_to_45k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:623225c6938a1e16e6d810a4",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.18k_to_19k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:6336dda7e9ea270746610df9",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.10k_to_15k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:6493510b3fad58e45a6628d5",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.30k_to_35k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:652a0d33e06299ac21fb47c2",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.8k_to_9k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:659621627c8e3969cec14b37",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_all_returns.earned_income_credit.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:670bd616340e45f4e4ae3aa7",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.20k_to_25k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:6791fd22ba85b9ebb1c2f0d3",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.6k_to_7k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:69aafe94a334027198cbacf9",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.30k_to_35k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:6a31abf8ab7b3dc311d18c28",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.25k_to_30k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:6c9a00df8068b3a63563654f",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.adjusted_gross_income@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:6dba6afdf385c77f7379c662",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.tax_exempt_interest_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:6dd42224d6ab301b7cc49a9a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.1k_to_2k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:6e586f0852d43e51704f959b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.total.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:6e5d0f30d8cbfde736584511",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.total.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:704f7ac5d81991e73e90004e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.5k_to_6k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:71aa6404385bb16e602feff7",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.45k_to_50k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:720d5e7b8e3dad861fd9c9bc",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.8k_to_9k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:72a20aa1fcfdeccadf12dc79",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.20k_to_25k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:72fdb07e354ee03c80892b2e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.9k_to_10k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7451a1f795f5fbbc0fda4aa4",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.under_1.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:76a984397981b723a9034f8e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.18k_to_19k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:780e135b81b65d72f1a8bd2e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.15k_to_16k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:78aade28b8ceb0dc8316e7a8",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.5k_to_6k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:79ce4c37687d488232823b17",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.11k_to_12k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7abbcab512e41688f372db7c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.14k_to_15k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7b3068c8434dbd25a2fda661",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.17k_to_18k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7bf8878365ca50abf61b13b2",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.2k_to_3k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7c108e43cf627fdb0bd7d071",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.30k_to_40k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7c6686eca5ee0d10eeb319bf",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_no_children_amount@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:7d095b235f0f3daafae0ff9e",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.qualified_business_income_deduction_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7d5c13ba2cda1d0e72c89caa",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.7k_to_8k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7d7f1ccf262d7d3842921702",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.45k_to_50k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7f7b7e568d8662120f168e80",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:7feb675197e6410939834c6f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.15k_to_20k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:80d64968233c1f585545353f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.3k_to_4k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:817d78eee7fa341370c43bc1",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.state_2022.us.eitc_three_or_more_children_returns.three_or_more_qualifying_children.return_count@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:81c6bfe13b2d11654e2650c9",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.1_to_5k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8240ff2081da528a284370f1",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_two_children_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:827e1b3112e6cad852f5cc8f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.under_1.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:850c7f28d948200cc0de320a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.4k_to_5k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:852c3293e2278db3105127ab",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.13k_to_14k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8543a6b360789a43a246362a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.1_to_1k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8610e1c464cbc77da23c6dcc",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.50k_plus.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8696496afe15d43c96340cf2",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.30k_to_35k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:87a43bccd77d8aeb14e2102b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.9k_to_10k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8929befcef378d6d109ca9f7",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.4k_to_5k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:89b61d7e394e16d41435ad14",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.40k_to_50k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:89ee28485da9250d38eb7fc5",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.40k_to_45k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8abe5b1b1de26391b3b01a25",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.50k_plus.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:8ac4af452407f284c76cbd16",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.ordinary_dividends_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8b55112714635732b0abd112",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.30k_to_35k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8ba3933a821d497910efc9a6",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.10k_to_11k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8bb7eb5885b3e8c3541dc52c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.12k_to_13k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8c5ddb015f4ac5ddd5cb9d3b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.15k_to_20k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8ca5345bb5558511e3703915",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.35k_to_40k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:8ca666c0605f7e5e0f1d8630",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.net_capital_gains_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8d552f425451ed83f70a135f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.16k_to_17k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:8f3d160e2a4e6480a0871aec",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.15k_to_16k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:90a92ba8d064dba3c21055ae",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.18k_to_19k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:91757f0d86895c55dce0c8f6",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.4k_to_5k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:91cc88821ca1f9214e0059e3",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.5k_to_6k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:939d294c147efa973f54b609",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.35k_to_40k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:94916f0c89094a5f74cb750a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.30k_to_35k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:95364a14d72b30f5402290f3",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.100k_to_200k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:958139e0f6cd8f3721a56503",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.10k_to_11k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:964b1a14ccb4384f4024cb6a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.7k_to_8k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:965955fcca8928474e2fc10b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.25k_to_30k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:986197dd3b461eda99c0ef8c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.20k_to_25k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:98cc2e453f4429ef66847a51",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.charitable_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:9945f6f2d6d237ad6390d4cf",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.5k_to_6k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:99ef9b8ef522fe6af9fd9b93",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.12k_to_13k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:9b1537b671f0601f30f586a8",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.19k_to_20k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:9bccac17160d722b1928f69f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.12k_to_13k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:9c3ee1e6e61c12a0fe67c08d",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.partnership_scorp_income_amount@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:9e0697ffd49ff98a381d0347",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.schedule_c_income_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:9e898b50f22937ee10c1f214",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.10k_to_11k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:a07819618166ad698a233240",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.6k_to_7k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:a228d2bbccc78f66b61b505c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.16k_to_17k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:a2cd77bcfdef6dc8cb7b7d6f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.1m_plus.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:a3d2405431784980894cbb39",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.9k_to_10k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:a4a5339d5570ef6a6f126ddc",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.45k_to_50k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:a54e9ac0d7c54039781cd1ca",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.1_to_1k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:a5b5ab1b00d9195198ce560a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.10k_to_11k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:a806fc87ebadd9da75d41380",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.250k_to_500k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:aa459f25e0336a4f36b5b9f3",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.6k_to_7k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:aa5380b337c8ae0628de4109",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.3k_to_4k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:aae7153a51e7691e8f42ebdf",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.8k_to_9k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:ab0d84d9a82174e24856f9ba",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.partnership_scorp_income_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:aca6dc22e1ee0f2c532fd6c9",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_no_children_claims@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ada47b848a1f137348baa0d3",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.35k_to_40k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ae1ca98f101eca20b8dbe668",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.50k_plus.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ae2f153eb0dbc11c7527da0e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.1k_to_2k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ae7c515d99503bde89c31fb0",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.17k_to_18k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:aecbd8748df85a31b91dcd2b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.total.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:af93949c78ab80048f3634e8",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.9k_to_10k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:b15b5e375e0759f2b3c9b67d",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.45k_to_50k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:b1db9d0a07508533fca0dc27",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.1_to_1k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:b4a987fbcf641e4ee4d4dedb",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.20k_to_25k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:b5939d9045f353bd999c280d",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_claims@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:b5a2f8ab03e6e302074db321",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.1_to_1k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:b63b48160afb69fcbb4ea409",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.30k_to_35k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:b75a5d8104183aa27527d0b1",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.schedule_c_income_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:b8bfa2868502fdba2893b549",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.45k_to_50k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:b93ae16e410285bf75dd4bdd",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.35k_to_40k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:b9785eca7faea1befffebea7",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.50k_plus.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ba2a097bd75490ee95ef8499",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.7k_to_8k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:bb73b8f11bd2b61d71326882",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.3k_to_4k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:bd9d9862eab0e0129679f7d1",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.6k_to_7k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:be64ffa45c2a3e8b44fb4703",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.taxable_social_security_amount@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:beff4572e88b920091dd98d8",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.taxable_social_security_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:bfbe9cf088fdbb4bc8d34806",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.16k_to_17k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:c127b31bdd2a20e7743a0cec",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_two_children_claims@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:c230088b7b662ad07b26bfce",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_three_or_more_children_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:c27c29e49f0c46a5309f760c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.1m_plus.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:c2df51db25ed4efd86ec2d14",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.unemployment_compensation_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:c59e08f82ab1eac2e1c91729",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.total.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:c645ad5f8b40cc8137129c10",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.16k_to_17k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:c85cd54a2367a97441d1d6ef",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.18k_to_19k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:c8f6e619f0265396dbd0ce1d",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.100k_to_200k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:c93a97520b101e7b58c67986",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.10k_to_11k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ca06cd09e59dd428088d9b9b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.18k_to_19k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:cc80371a797f41b5bad05522",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.45k_to_50k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:cca7c11c1becf0274a86e6b3",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.50k_to_75k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ccbe7e182d8d4624ae17f184",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.500k_to_1m.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:cd04f4681806b32dd7a804ac",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.12k_to_13k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ce195478e3bc62bc19ac8323",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.2k_to_3k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:ce534b82b07b93133e439592",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.income_tax_before_credits_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:cfe5bd858bba4f37a4e9301f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.200k_to_250k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d023daa210f9b099bd90bd20",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.1_to_1k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:d10059025177e7663eadc5e0",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.unemployment_compensation_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d17fef12653b721a3ae32cad",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.13k_to_14k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d18f9b5242dbf484293febe8",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.17k_to_18k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d28b284ee6e1e141fdbea3c8",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.8k_to_9k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:d2a61cadf34597a977d540f2",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.qualified_dividends_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d35d876a89d3cc2843bd462b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.17k_to_18k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d3e79e26aa7bf161c8e690ff",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.14k_to_15k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:d408418dfb7c4b784106526b",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.qualified_business_income_deduction_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d40960f25409294ea9fe416b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.14k_to_15k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d458866559ad6c119e3a2df0",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.13k_to_14k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d4a1c1ff8599d2d5de501cfc",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.4k_to_5k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d5855acfe05601449dcfc48e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.2k_to_3k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d598965472cccc0e3d038b79",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.15k_to_16k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d5a01c5522fd3284a43b07de",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.17k_to_18k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:d69477223e4b64528fb21e9a",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.taxable_interest_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d7be16a1db07493be1500058",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.under_1.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:d99e61580d414eb20dcaa3fb",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.19k_to_20k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:da93878865524c90c64b5bd6",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.6k_to_7k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:de1a5541b0448b88e6af617a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.1k_to_2k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:de673b3eff8ad64ff48a2b3b",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.13k_to_14k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e2c7efe422262b191e2563e6",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.under_1.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e31815425472801969276214",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.14k_to_15k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e34d53cc8f500098cbf76f72",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.5k_to_6k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e391447a1c32e9dc20767007",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.4k_to_5k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e3981c9a03caf4cb17b4a2f5",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.1k_to_2k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e3a3c9a45201310e2a7747d3",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.35k_to_40k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:e3ca54ba15caa1fafedfe8ae",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.interest_paid_deduction_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e7ce5cf6a24bd590054281e6",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.20k_to_25k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e7eb68dd87602da9447df1be",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.19k_to_20k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e8aa44fabeef9702c0793632",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.15k_to_16k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:e9177998f40a45b4641321ed",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.qualified_dividends_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:e9728e8ed34008dfe3d0a5c5",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.10k_to_11k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:eaf844c4cdac9d47b860d49c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.50k_plus.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ebe4ada85ea832cc138b02c5",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.2k_to_3k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:eca191cced173d71571187dd",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.25k_to_30k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ed04fea5ce3abfc82dd695ab",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.5k_to_10k.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:edffd22a0d8643bf0aa2d65e",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.13k_to_14k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ee137bff3bc1008950cf0d24",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.18k_to_19k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ef0914e9b21501944d39694f",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.income_tax_liability_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:ef70cb84e0e6134514fde9a7",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.taxable_interest_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:efd2e12d66834537714f3e47",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.7k_to_8k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:f01336cb273f94dd9e81c9a1",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.17k_to_18k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:f2a3b93c2c22c5ae857db386",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.16k_to_17k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:f2d456d4ab7ce58ed8332df4",
+      "match_basis": "reviewed_checkpoint",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.net_capital_gains_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:f3ba06396543b9b32652bc0f",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.three_or_more_qualifying_children.1k_to_2k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "related_calibration_family",
+      "fact_key": "ledger.aggregate_fact.v2:f4a75b8feb504561d618ad81",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.medical_dental_expense_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:f501f39fbb5c9158e980b49c",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.two_qualifying_children.17k_to_18k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:f5504fc4673c091047230cf4",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.1k_to_2k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:f573b213931df135c191e18a",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.30k_to_35k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:f6a0e90d4040b6c47a915710",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.8k_to_9k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:f7febeb5e9340e0f447f17de",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.1k_to_2k.eitc_total@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:f97ee7fca9101fee8d59da95",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.10k_to_15k.total_earned_income_credit_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:fad3c0c0920abd20cad314a8",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.no_qualifying_children.14k_to_15k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:fafc734feb77593790c95296",
+      "match_basis": "legacy_ty2023_to_current_ty2024_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.eitc_amount@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:fba2311e623134c71d8c78cd",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2024",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_by_agi.under_1.total_earned_income_credit_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:fc2a215f87daee8ad8e21889",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.2k_to_3k.eitc_returns@2024"
+    },
+    {
+      "calibration_exposure": "external_validation",
+      "fact_key": "ledger.aggregate_fact.v2:ff89d96f483e014a3b4f0ecd",
+      "match_basis": "exact_source_record_id",
+      "observed_period": "tax_year:2023",
+      "reconstruction_row_key": "irs_soi.ty2023.table_2_5.eitc_by_agi_children.one_qualifying_child.2k_to_3k.eitc_total@2024"
+    }
+  ],
+  "official_yale_output": false,
+  "reconstruction_row_count": 420,
+  "reconstruction_sha256": "c5eeb17bd62a4efe02e043ac21cbcf96d50c3ef2353100cb650d6c8f048d7861",
+  "schema_version": "evaluation_harness.yale_reconstruction_mappings.v1",
+  "source_id": "yale_reconstruction_2024",
+  "unmatched_row_count": 44,
+  "verification_fact_keys": [
+    "ledger.aggregate_fact.v2:659621627c8e3969cec14b37",
+    "ledger.aggregate_fact.v2:6c9a00df8068b3a63563654f",
+    "ledger.aggregate_fact.v2:4ccc6f8f4cd37e7a7071fdd6",
+    "ledger.aggregate_fact.v2:ef70cb84e0e6134514fde9a7",
+    "ledger.aggregate_fact.v2:e9177998f40a45b4641321ed",
+    "ledger.aggregate_fact.v2:f2d456d4ab7ce58ed8332df4",
+    "ledger.aggregate_fact.v2:9c3ee1e6e61c12a0fe67c08d",
+    "ledger.aggregate_fact.v2:5b370a42476602614cd9db75",
+    "ledger.aggregate_fact.v2:5bf612d2be1e82d83605961b",
+    "ledger.aggregate_fact.v2:0ec6eb86d8f4deeb6442b097"
+  ]
+}

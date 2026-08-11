@@ -15,7 +15,8 @@ reconstruction:
   official_yale_output: false
   committed_aggregate_checkpoint_available: true
   record_level_detail_available: false
-  record_level_detail_required_for_adapter: true
+  record_level_detail_required_for_fresh_model_run: true
+  checkpoint_mapping_file: checkpoint_mappings.json
   taxable_income_checkpoint_status: deferred_no_native_2024_ledger_fact
   aggregate_checkpoint_file: verification_results.json
   aggregate_reconstruction_file: frontend/lib/populace/external-datasets/yale-national-2024.json
@@ -30,8 +31,8 @@ source:
   jurisdictions: [US]
   population_period: tax_year:2024
   policy_period: tax_year:2024
-  native_fact_periods: []
-  advanced_fact_periods: [tax_year:2024]
+  native_fact_periods: [tax_year:2024]
+  advanced_fact_periods: []
   geographies: [country]
   entities: [tax_unit]
   weights:

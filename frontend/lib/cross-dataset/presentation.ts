@@ -131,7 +131,7 @@ function formatError(value: string | null | undefined): string {
 function formatCoverageRate(covered: number, total: number): string {
   return total > 0
     ? `${((covered / total) * 100).toFixed(1)}% coverage`
-    : "Coverage unavailable";
+    : "0.0% coverage";
 }
 
 function performanceBuckets(
@@ -189,33 +189,30 @@ function sourceCategories(
 export function buildSourceOverviews(
   summary: CrossDatasetSummary,
   groups: CrossDatasetGroup[],
-  filters: Record<string, Partial<SourceOverviewFilter>> = {},
+  filter: Partial<SourceOverviewFilter> = {},
 ): SourceOverview[] {
   return orderSourceSummaries(summary.sources).map((source) => {
-    const filter = filters[source.source_id] ?? {};
     const geography = filter.geography ?? "all";
     const sample = filter.sample ?? "all";
     const filterActive = geography !== "all" || sample !== "all";
-    const exposure =
-      sample === "in_sample"
-        ? "direct_calibration_target"
-        : sample === "out_of_sample"
-          ? "external_validation"
-          : null;
+    const sampleKey = sample === "all" ? null : sample;
     const filteredGroup =
-      geography === "all" && exposure == null
+      geography === "all" && sampleKey == null
         ? null
         : groups.find((group) => {
-            if (geography !== "all" && exposure != null) {
+            if (geography !== "all" && sampleKey != null) {
               return (
-                group.dimension === "geography_calibration_exposure" &&
-                group.key === `${geography}|${exposure}`
+                group.dimension === "geography_populace_calibration_sample" &&
+                group.key === `${geography}|${sampleKey}`
               );
             }
             if (geography !== "all") {
               return group.dimension === "geography" && group.key === geography;
             }
-            return group.dimension === "calibration_exposure" && group.key === exposure;
+            return (
+              group.dimension === "populace_calibration_sample" &&
+              group.key === sampleKey
+            );
           });
     const filteredCell =
       filteredGroup?.sources[source.source_id] ??
@@ -240,12 +237,9 @@ export function buildSourceOverviews(
     const buckets = filteredCell?.performance_buckets ?? source.performance_buckets;
     const covered = filteredCell?.evaluable ?? source.score.covered;
     const comparable = score.relative_error_count ?? score.scored;
-    const coverageUniverse =
-      geography === "all"
-        ? summary.fact_count
-        : (groups.find(
-            (group) => group.dimension === "geography" && group.key === geography,
-          )?.fact_count ?? summary.fact_count);
+    const coverageUniverse = filterActive
+      ? (filteredGroup?.fact_count ?? 0)
+      : summary.fact_count;
     return {
       sourceId: source.source_id,
       label: sourceDisplayLabel(source),
@@ -284,7 +278,8 @@ export function orderSourceSummaries(sources: SourceSummary[]): SourceSummary[] 
     const sourceId = source.source_id.toLowerCase();
     if (sourceId.includes("populace")) return 0;
     if (sourceId === "taxcalc_public_cps_2024" || sourceId === "cps") return 1;
-    return 2;
+    if (sourceId === "yale_reconstruction_2024") return 2;
+    return 3;
   };
   return sources
     .map((source, index) => ({ source, index }))

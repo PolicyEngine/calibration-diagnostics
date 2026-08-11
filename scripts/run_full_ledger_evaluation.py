@@ -46,12 +46,26 @@ from evaluation_harness.populace_release_targets import (
     materialize_release_target_results,
 )
 from evaluation_harness.publisher import publish_run
+from evaluation_harness.yale_reconstruction_checkpoint import (
+    ESTIMATE_BASIS as YALE_ESTIMATE_BASIS,
+    load_yale_reconstruction_checkpoint,
+    materialize_yale_reconstruction_results,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 POPULACE_INTEGRATION = ROOT / "integrations" / "populace_policyengine_us"
 CPS_INTEGRATION = ROOT / "integrations" / "taxcalc_cps"
 ACS_PUMS_INTEGRATION = ROOT / "integrations" / "census_acs_pums"
+YALE_INTEGRATION = ROOT / "integrations" / "yale_reconstruction"
+YALE_RECONSTRUCTION = (
+    ROOT
+    / "frontend"
+    / "lib"
+    / "populace"
+    / "external-datasets"
+    / "yale-national-2024.json"
+)
 EVALUATION_JURISDICTIONS = frozenset({"US"})
 EVALUATION_EXCLUDED_GEOGRAPHY_IDS = frozenset(
     {
@@ -107,7 +121,13 @@ def run(
     acs_pums_overview = load_integration_overview(
         ACS_PUMS_INTEGRATION / "overview.yaml"
     )
-    for overview in (populace_overview, cps_overview, acs_pums_overview):
+    yale_overview = load_integration_overview(YALE_INTEGRATION / "overview.yaml")
+    for overview in (
+        populace_overview,
+        cps_overview,
+        acs_pums_overview,
+        yale_overview,
+    ):
         if overview.ledger_snapshot_id != snapshot_id:
             raise ValueError(
                 f"integration {overview.integration_id} was reviewed against "
@@ -227,9 +247,13 @@ def run(
         ),
         alignments=acs_pums_bea_wage_transformations.declarations,
     )
+    yale_plan = SourcePlan(
+        source=yale_overview.source,
+        mappings=MappingRegistry.from_yaml(YALE_INTEGRATION / "mappings.yaml"),
+    )
     capabilities = build_full_capability_matrix(
         facts,
-        [populace_plan, cps_plan, acs_pums_plan],
+        [populace_plan, cps_plan, yale_plan, acs_pums_plan],
         snapshot_id=snapshot_id,
     )
     capabilities, release_target_results = materialize_release_target_results(
@@ -241,7 +265,18 @@ def run(
         population_period=populace_plan.source.population_period,
         policy_period=populace_plan.source.policy_period,
     )
-    expected_capabilities = len(facts) * 3
+    yale_checkpoint = load_yale_reconstruction_checkpoint(
+        YALE_RECONSTRUCTION,
+        YALE_INTEGRATION / "checkpoint_mappings.json",
+    )
+    capabilities, yale_results = materialize_yale_reconstruction_results(
+        capabilities,
+        facts,
+        yale_checkpoint,
+        aligned_facts=aligned_facts,
+        source=yale_plan.source,
+    )
+    expected_capabilities = len(facts) * 4
     if len(capabilities) != expected_capabilities:
         raise RuntimeError(
             f"classification produced {len(capabilities)} cells, "
@@ -256,6 +291,9 @@ def run(
                 ),
                 cps_plan.source.source_id: _source_counts(
                     capabilities, cps_plan.source.source_id
+                ),
+                yale_plan.source.source_id: _source_counts(
+                    capabilities, yale_plan.source.source_id
                 ),
                 acs_pums_plan.source.source_id: _source_counts(
                     capabilities, acs_pums_plan.source.source_id
@@ -320,6 +358,11 @@ def run(
     gc.collect()
     print(f"Completed {len(cps_results):,} CPS estimates.", flush=True)
 
+    print(
+        f"Loaded {len(yale_results):,} precomputed Yale reconstruction estimates.",
+        flush=True,
+    )
+
     acs_pums_capabilities = tuple(
         row
         for row in capabilities
@@ -342,7 +385,9 @@ def run(
     gc.collect()
     print(f"Completed {len(acs_pums_results):,} raw ACS estimates.", flush=True)
 
-    results = tuple([*populace_results, *cps_results, *acs_pums_results])
+    results = tuple(
+        [*populace_results, *cps_results, *yale_results, *acs_pums_results]
+    )
     scores = build_scored_results(facts, capabilities, results, aligned_facts)
     summary = build_run_summary(facts, capabilities, results, scores)
     summary["evaluation_scope"] = {
@@ -537,6 +582,35 @@ def run(
                 acs_pums_bea_wage_transformations.scale_factor
             ),
         },
+    }
+    summary["yale_reconstruction_checkpoint"] = {
+        "official_yale_output": False,
+        "reconstruction_sha256": yale_checkpoint.reconstruction_sha256,
+        "reconstruction_row_count": yale_checkpoint.reconstruction_row_count,
+        "evaluated_mapping_count": len(yale_checkpoint.entries),
+        "native_2024_fact_count": sum(
+            entry.observed_period.value == "2024"
+            for entry in yale_checkpoint.entries
+        ),
+        "aligned_2023_fact_count": sum(
+            entry.observed_period.value == "2023"
+            for entry in yale_checkpoint.entries
+        ),
+        "held_out_2022_row_count": yale_checkpoint.held_out_2022_row_count,
+        "unmatched_row_count": yale_checkpoint.unmatched_row_count,
+        "estimate_basis": YALE_ESTIMATE_BASIS,
+        "dataset_version": yale_plan.source.dataset_version,
+        "model_version": yale_plan.source.model_version,
+        "interpretation": (
+            "Precomputed output from the repository's pinned reconstruction of "
+            "Yale Tax-Data and Tax-Simulator. This is not official Yale output."
+        ),
+        "period_policy": (
+            "Native 2024 Chronicle facts are compared directly. Eligible 2023 "
+            "facts use the same exact Microcosm 2023-to-2024 alignments already "
+            "published in this run. Reconstruction rows tied to 2022 facts remain "
+            "held out."
+        ),
     }
     manifest = publish_run(
         output,

@@ -370,6 +370,34 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
         and row["key"] == "external_validation"
     )
     assert exposure_group["sources"]["cps"]["scored"] == 1
+    populace_in_sample = next(
+        row
+        for row in groups
+        if row["dimension"] == "populace_calibration_sample"
+        and row["key"] == "in_sample"
+    )
+    assert populace_in_sample["fact_count"] == 1
+    assert populace_in_sample["sources"]["populace"]["evaluable"] == 1
+    assert populace_in_sample["sources"]["cps"]["evaluable"] == 1
+    assert populace_in_sample["sources"]["cps"]["loss"] == "0.2"
+    populace_out_of_sample = next(
+        row
+        for row in groups
+        if row["dimension"] == "populace_calibration_sample"
+        and row["key"] == "out_of_sample"
+    )
+    assert populace_out_of_sample["fact_count"] == 2
+    assert populace_out_of_sample["sources"]["populace"]["evaluable"] == 1
+    assert populace_out_of_sample["sources"]["cps"]["evaluable"] == 0
+    state_populace_in_sample = next(
+        row
+        for row in groups
+        if row["dimension"] == "geography_populace_calibration_sample"
+        and row["key"] == "state|in_sample"
+    )
+    assert state_populace_in_sample["fact_count"] == 0
+    assert state_populace_in_sample["sources"]["populace"]["evaluable"] == 0
+    assert state_populace_in_sample["sources"]["cps"]["evaluable"] == 0
     state_external = next(
         row
         for row in groups
