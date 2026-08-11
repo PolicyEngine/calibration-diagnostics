@@ -180,7 +180,7 @@ test("fact detail separates original observation, aligned benchmark, and estimat
   expect(detail.observation).toMatchObject({
     valueLabel: "$1.00B",
     periodLabel: "Tax year 2023",
-    sourceLabel: "Irs Soi",
+    sourceLabel: "IRS Statistics of Income",
     geographyLabel: "Country · 0100000US",
   });
   expect(detail.provenance).toContainEqual({

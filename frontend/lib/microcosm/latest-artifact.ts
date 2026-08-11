@@ -3,8 +3,9 @@
 // live from the policyengine/populace-us Hugging Face dataset, resolved through
 // latest.json (current release) or by id (any release, for version compare).
 
+import { sourceAuthorityLabel } from "@/lib/source-labels";
+
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
-import { sourceLabel } from "./source-label";
 
 type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
@@ -1490,7 +1491,7 @@ export function microcosmTargetTreemap(
       const huber_loss = children.reduce((s, c) => s + c.huber_loss, 0);
       return {
         source,
-        label: source === "geography" ? "Geography" : sourceLabel(source),
+        label: source === "geography" ? "Geography" : sourceAuthorityLabel(source),
         n_targets,
         scored,
         within_10pct,
