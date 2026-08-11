@@ -1,11 +1,11 @@
 # Yale reconstruction integration overview
 
-Status: **overview checkpoint only; adapter awaits confirmation**
+Status: **standalone precomputed checkpoint integrated**
 
-This source would be shown as **Yale Budget Lab (reconstruction)**. It must not
-be labeled as an official Yale result. The committed numbers were produced by a
-local reconstruction of Yale's Tax-Data / Tax-Simulator stack using rebuilt
-versions of Yale's unpublished input interfaces.
+This source is shown as **Yale Tax-Data + Tax-Simulator (reconstruction)**. It
+is not labeled as an official Yale result. The committed numbers were produced
+by a local reconstruction of Yale's Tax-Data / Tax-Simulator stack using
+rebuilt versions of Yale's unpublished input interfaces.
 
 ## What would be connected
 
@@ -50,21 +50,39 @@ separate:
    Tax-Data also expects an `IRS-PUF` interface and other model-data interfaces
    that are not shipped as complete runnable inputs in the public repositories.
 
-The source manifest is marked available for capability planning because the
-committed reconstruction checkpoint exists. That does **not** mean a fresh
-record-level run is currently reproducible here. A full adapter should only be
-implemented after a local detail export is supplied or regenerated. It must
-accept that file by explicit path, never commit it, and report a clear input
-error if it is absent.
+The source manifest is marked available because the committed reconstruction
+checkpoint exists. The harness loads those aggregate outputs through the
+`precomputed` execution method, verifies their SHA-256, and exposes their
+dataset/model pins on every result. That does **not** mean a fresh record-level
+run is currently reproducible here. A future live runner must accept a detail
+export by explicit path, never commit it, and report a clear input error if it
+is absent.
 
 An official Yale export, if one is obtained later, must receive a separate
 source ID. It must not silently replace this reconstruction.
 
-## Mechanical adapter design
+## Implemented checkpoint design
 
-After confirmation, `YaleReconstructionRunner` would implement the shared
-`SourceRunner` protocol in
-`evaluation_harness/adapters/yale_reconstruction.py`:
+`evaluation_harness/yale_reconstruction_checkpoint.py` implements the current
+standalone source:
+
+1. It verifies the 420-row aggregate JSON against SHA-256
+   `c5eeb17bd62a4efe02e043ac21cbcf96d50c3ef2353100cb650d6c8f048d7861`.
+2. It loads 318 explicit fact-to-row joins from
+   `integrations/yale_reconstruction/checkpoint_mappings.json` and rejects
+   duplicate facts, reused rows, non-finite values, unsupported periods, or a
+   missing ten-fact verification gate.
+3. It materializes 86 native 2024 facts and 232 2023 facts aligned to 2024 with
+   the already-published Microcosm alignments. It keeps 58 rows tied to 2022
+   facts out of scope and leaves 44 unmatched rows unscored.
+4. Each result is marked `precomputed`, carries the Tax-Data and Tax-Simulator
+   pins, and uses estimate basis
+   `yale_reconstruction_aggregate_checkpoint`.
+
+## Future fresh-run adapter
+
+If a record-level detail file becomes available, a
+`YaleReconstructionRunner` can implement the shared `SourceRunner` protocol:
 
 1. Accept an explicit path to `static/detail/2024.csv` and record its SHA-256 in
    run metadata.
@@ -75,16 +93,16 @@ After confirmation, `YaleReconstructionRunner` would implement the shared
    The fixed geography array is `0100000US` for every record. The two return
    universe masks used by this checkpoint cover the complete tax-unit file,
    matching the existing harness treatment for tax microsimulation files.
-4. Let the common harness apply every Ledger dimension and universe constraint,
+4. Let the common harness apply every Chronicle dimension and universe constraint,
    then perform `weighted_sum` or `weighted_count`. The adapter does not contain
    fact-specific aggregation loops.
-5. Emit ordinary `EvaluationResult` rows with the Ledger snapshot, mapping
+5. Emit ordinary `EvaluationResult` rows with the Chronicle snapshot, mapping
    release, Tax-Data pin, Tax-Simulator pin, population/policy periods,
    calibration exposure, and any fact alignment ID.
 
 The reviewed field mappings are:
 
-| Ledger concept | Yale detail expression | Operation |
+| Chronicle concept | Yale detail expression | Operation |
 |---|---:|---|
 | Returns with EITC | `eitc` | weighted count where nonzero |
 | Adjusted gross income | `agi` | weighted sum |
@@ -103,15 +121,15 @@ against related SOI and macro inputs. Income tax and EITC are labeled external
 validation in this checkpoint. We should tighten those labels only when exact
 reconstruction-input provenance is available.
 
-## Ten directly testable Ledger facts
+## Ten directly testable Chronicle facts
 
-All ten are exact rows from Ledger snapshot
+All ten are exact rows from Chronicle snapshot
 `ledger-7917ea815df710fb20db076b`. They are national tax-unit facts for tax year
 2024, match an explicit Yale detail field, have a reviewed aggregation, and
 already have a finite reconstruction estimate in the committed aggregate
 artifact.
 
-| Ledger concept | Ledger target | Reconstruction estimate | Difference |
+| Chronicle concept | Chronicle target | Reconstruction estimate | Difference |
 |---|---:|---:|---:|
 | Returns with EITC | 23,837,149 | 25,753,349 | +8.04% |
 | Adjusted gross income | $14.425T | $17.763T | +23.14% |
@@ -124,14 +142,15 @@ artifact.
 | Income-tax liability after credits | $2.051T | $2.668T | +30.12% |
 | Earned income tax credit | $69.042B | $70.017B | +1.41% |
 
-These values are a provenance checkpoint, not a full-harness score and not an
-official Yale validation. The adapter commit must recompute all ten from the
-record-level export; reading these ten stored answers is not sufficient.
+These values are a provenance gate and not an official Yale validation. All ten
+are now present in the standalone checkpoint, and the broader harness score is
+computed over 318 fact-level results. A future fresh-run adapter must recompute
+the gate from record-level output before it can supersede this checkpoint.
 
 ### Why taxable income is not one of the ten
 
 The earlier plan named taxable income as a desired checkpoint concept. The
-pinned Ledger snapshot has no national U.S. tax-unit taxable-income fact for
+pinned Chronicle snapshot has no national U.S. tax-unit taxable-income fact for
 2024; its national total is tax year 2022. The legacy reconstruction JSON has a
 2024 model estimate keyed to an older target surface that transformed that 2022
 fact, but the approved alignment rule covers 2023-to-2024 transformations, not
@@ -139,14 +158,14 @@ fact, but the approved alignment rule covers 2023-to-2024 transformations, not
 look successful by changing the requested period policy.
 
 Ordinary dividends replaces it in this checkpoint because it is a native 2024
-Ledger fact with a direct `div_ord` mapping. Taxable income stays deferred until
-Ledger gains a native 2024 fact or a separate 2022 alignment is explicitly
+Chronicle fact with a direct `div_ord` mapping. Taxable income stays deferred until
+Chronicle gains a native 2024 fact or a separate 2022 alignment is explicitly
 designed and approved.
 
-## Treatment of 2023 Ledger facts
+## Treatment of 2023 Chronicle facts
 
-The full Yale run would use exactly the same alignment code as Populace. Before
-planning the 2024 model run, the harness applies
+The Yale checkpoint uses exactly the same alignment output as Microcosm. Before
+materializing a 2023 comparison, the full-run harness applies
 `PopulaceAgingPolicy` (`cbo_growth_factor_aging` version `1.2.0`, Populace commit
 `cae8640f9e65e274aea65c7916cb37b956978e32`) to U.S. 2023 facts:
 
@@ -161,29 +180,20 @@ Scoring compares Yale's 2024 estimate to the transformed 2024 benchmark. The
 published result retains the original 2023 value and period, transformed value
 and period, factor, factor source, aging model/version, Populace commit, and
 alignment ID. The page can therefore state plainly that the displayed score is
-against a 2024 transformation of a 2023 Ledger observation.
+against a 2024 transformation of a 2023 Chronicle observation.
 
 The ten facts above are already 2024 facts, so no aging is involved in this
 overview checkpoint.
 
-## Tests required in the adapter commit
+## Implemented gates
 
-The next commit remains blocked on confirmation and a local detail export. Its
-tests must be written first and must establish all of the following before the
-adapter is accepted:
+The checkpoint tests establish:
 
-1. strict source ID, period, entity, geography, and required-column checks;
-2. one CSV load per runner and cached, equal-length arrays;
-3. fixed national geography and reviewed universe masks;
-4. exact field aliases and both weighted aggregation modes;
-5. faithful 2023-to-2024 Populace aging provenance;
-6. ten finite numerical results from the supplied detail export, with zero
-   `N/A`, private-input, or unsupported checkpoint cells;
-7. a comparison of those ten recomputed values to the committed checkpoint,
-   with any differences reviewed rather than silently blessed;
-8. published result metadata that cannot be mistaken for official Yale output;
-9. full-suite regression coverage; and
-10. no record-level PUF-derived data added to Git.
-
-Only after that ten-fact gate passes should the Yale mappings expand to the
-rest of the Ledger fact set.
+1. the exact reconstruction checksum and 420-row input count;
+2. 318 unique fact/row joins, split into 232 aligned 2023 facts and 86 native
+   2024 facts;
+3. an explicit 58-row 2022 holdout and 44-row unmatched remainder;
+4. ten finite numerical verification results with zero `N/A` cells;
+5. native and aligned period treatment, precomputed execution, and immutable
+   dataset/model provenance; and
+6. a complete four-source capability matrix and frontend artifact.

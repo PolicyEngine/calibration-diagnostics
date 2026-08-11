@@ -134,9 +134,10 @@ function PerformanceLegend() {
 function CrossDatasetOverviewView() {
   const query = useCrossDatasetOverview();
   const [dimension, setDimension] = useState<GroupDimension>("ledger_source");
-  const [sourceFilters, setSourceFilters] = useState<
-    Record<string, SourceOverviewFilter>
-  >({});
+  const [performanceFilter, setPerformanceFilter] = useState<SourceOverviewFilter>({
+    geography: "all",
+    sample: "all",
+  });
   const state = crossDatasetUiState({
     isLoading: query.isLoading,
     error: query.error,
@@ -149,10 +150,10 @@ function CrossDatasetOverviewView() {
         ? buildSourceOverviews(
             query.data.summary,
             query.data.groups.groups,
-            sourceFilters,
+            performanceFilter,
           )
         : [],
-    [query.data, sourceFilters],
+    [performanceFilter, query.data],
   );
   const orderedSources = useMemo(
     () => (query.data ? orderSourceSummaries(query.data.summary.sources) : []),
@@ -197,21 +198,6 @@ function CrossDatasetOverviewView() {
     );
   }
 
-  const updateSourceFilter = <Key extends keyof SourceOverviewFilter>(
-    sourceId: string,
-    key: Key,
-    value: SourceOverviewFilter[Key],
-  ) => {
-    setSourceFilters((current) => ({
-      ...current,
-      [sourceId]: {
-        geography: current[sourceId]?.geography ?? "all",
-        sample: current[sourceId]?.sample ?? "all",
-        [key]: value,
-      },
-    }));
-  };
-
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -233,7 +219,8 @@ function CrossDatasetOverviewView() {
           The reported value is the fact-level mean absolute relative error, with each fact’s
           error capped at 100% before averaging. Lower is better. Microcosm results marked{" "}
           <strong>direct calibration target</strong> are in-sample calibration fit, not
-          independent validation. Results marked{" "}
+          independent validation. The Sample selector uses that Microcosm membership as
+          one shared fact set for every model and dataset. Results marked{" "}
           <strong>2023 facts aligned to 2024</strong> compare against the 2024 transformation
           produced by the same aging and uprating logic used in the Microcosm build—not a native
           2023 society-wide run. Tax-Calculator’s public CPS rows use its population advanced to
@@ -244,12 +231,53 @@ function CrossDatasetOverviewView() {
 
       <SectionCard
         title="Model and dataset performance"
+        actions={
+          <div className="flex flex-wrap items-end justify-end gap-3">
+            <label className="text-xs text-muted-foreground">
+              Geography
+              <select
+                value={performanceFilter.geography}
+                onChange={(event) =>
+                  setPerformanceFilter((current) => ({
+                    ...current,
+                    geography: event.target.value as OverviewGeographyFilter,
+                  }))
+                }
+                className="mt-1 block min-w-[150px] rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground"
+                aria-label="Filter all models by geography"
+              >
+                <option value="all">All geographies</option>
+                <option value="country">National</option>
+                <option value="state">State</option>
+                <option value="congressional_district">Congressional district</option>
+              </select>
+            </label>
+            <label className="text-xs text-muted-foreground">
+              Sample
+              <select
+                value={performanceFilter.sample}
+                onChange={(event) =>
+                  setPerformanceFilter((current) => ({
+                    ...current,
+                    sample: event.target.value as OverviewSampleFilter,
+                  }))
+                }
+                className="mt-1 block min-w-[140px] rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground"
+                aria-label="Filter all models by sample"
+              >
+                <option value="all">All targets</option>
+                <option value="in_sample">In Microcosm sample</option>
+                <option value="out_of_sample">Out of Microcosm sample</option>
+              </select>
+            </label>
+          </div>
+        }
         padded={false}
       >
         <ol className="divide-y divide-border">
           {sourceOverviews.map((source, index) => (
             <li key={source.sourceId} className="px-5 py-5">
-              <div className="grid gap-5 lg:grid-cols-[minmax(250px,1.45fr)_minmax(190px,1fr)_minmax(220px,0.9fr)]">
+              <div className="grid gap-5 lg:grid-cols-[minmax(250px,1.45fr)_minmax(240px,1fr)]">
                 <div>
                   <div className="flex items-start gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[11px] text-muted-foreground">
@@ -272,49 +300,6 @@ function CrossDatasetOverviewView() {
                       label={source.label + " target performance distribution"}
                     />
                   </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                  <label className="text-xs text-muted-foreground">
-                    Geography
-                    <select
-                      value={sourceFilters[source.sourceId]?.geography ?? "all"}
-                      onChange={(event) =>
-                        updateSourceFilter(
-                          source.sourceId,
-                          "geography",
-                          event.target.value as OverviewGeographyFilter,
-                        )
-                      }
-                      className="mt-1 block w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground"
-                      aria-label={`Filter ${source.label} by geography`}
-                    >
-                      <option value="all">All geographies</option>
-                      <option value="country">National</option>
-                      <option value="state">State</option>
-                      <option value="congressional_district">Congressional district</option>
-                    </select>
-                  </label>
-                  {source.sourceId.toLowerCase().includes("populace") && (
-                    <label className="text-xs text-muted-foreground">
-                      Sample
-                      <select
-                        value={sourceFilters[source.sourceId]?.sample ?? "all"}
-                        onChange={(event) =>
-                          updateSourceFilter(
-                            source.sourceId,
-                            "sample",
-                            event.target.value as OverviewSampleFilter,
-                          )
-                        }
-                        className="mt-1 block w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground"
-                        aria-label={`Filter ${source.label} by sample`}
-                      >
-                        <option value="all">All targets</option>
-                        <option value="in_sample">In sample</option>
-                        <option value="out_of_sample">Out of sample</option>
-                      </select>
-                    </label>
-                  )}
                 </div>
               </div>
             </li>

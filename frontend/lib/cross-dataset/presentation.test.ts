@@ -140,9 +140,9 @@ const groups: CrossDatasetGroup[] = [
     },
   },
   {
-    dimension: "geography_calibration_exposure",
-    key: "state|direct_calibration_target",
-    label: "State / Direct calibration target",
+    dimension: "geography_populace_calibration_sample",
+    key: "state|in_sample",
+    label: "State / In sample",
     fact_count: 2_000,
     sources: {
       populace: {
@@ -170,10 +170,86 @@ const groups: CrossDatasetGroup[] = [
           within_bounds: 0,
           outside_bounds: 0,
           far_outside_bounds: 0,
-          unavailable: 0,
-          total: 0,
+          unavailable: 2_000,
+          total: 2_000,
         },
         reason_codes: {},
+      },
+    },
+  },
+  {
+    dimension: "populace_calibration_sample",
+    key: "in_sample",
+    label: "In sample",
+    fact_count: 2_000,
+    sources: {
+      populace: {
+        evaluable: 2_000,
+        scored: 2_000,
+        relative_error_count: 1_999,
+        display_score: "97",
+        loss: "0.03",
+        performance_buckets: {
+          within_bounds: 1_900,
+          outside_bounds: 80,
+          far_outside_bounds: 19,
+          unavailable: 1,
+          total: 2_000,
+        },
+        reason_codes: {},
+      },
+      cps: {
+        evaluable: 0,
+        scored: 0,
+        relative_error_count: 0,
+        display_score: null,
+        loss: null,
+        performance_buckets: {
+          within_bounds: 0,
+          outside_bounds: 0,
+          far_outside_bounds: 0,
+          unavailable: 2_000,
+          total: 2_000,
+        },
+        reason_codes: {},
+      },
+    },
+  },
+  {
+    dimension: "populace_calibration_sample",
+    key: "out_of_sample",
+    label: "Out of sample",
+    fact_count: 46_313,
+    sources: {
+      populace: {
+        evaluable: 7_411,
+        scored: 7_411,
+        relative_error_count: 7_401,
+        display_score: "89",
+        loss: "0.18",
+        performance_buckets: {
+          within_bounds: 6_100,
+          outside_bounds: 820,
+          far_outside_bounds: 481,
+          unavailable: 38_912,
+          total: 46_313,
+        },
+        reason_codes: { mapping_not_found: 29_051 },
+      },
+      cps: {
+        evaluable: 38,
+        scored: 38,
+        relative_error_count: 38,
+        display_score: "91.2164",
+        loss: "0.175672",
+        performance_buckets: {
+          within_bounds: 25,
+          outside_bounds: 8,
+          far_outside_bounds: 5,
+          unavailable: 46_275,
+          total: 46_313,
+        },
+        reason_codes: { geography_not_supported: 44_844 },
       },
     },
   },
@@ -430,59 +506,86 @@ test("legacy Tax-Calculator artifacts display the current Public CPS label", () 
   ).toBe("Public CPS + Tax-Calculator");
 });
 
-test("Microcosm is first and Public CPS + Tax-Calculator precedes Raw ACS PUMS", () => {
+test("orders Microcosm, Public CPS, Yale reconstruction, then Raw ACS", () => {
   const rawAcs = {
     ...summary.sources[1],
     source_id: "census_acs_pums_2024",
     label: "Raw ACS PUMS",
   };
-  const mixedSources = [rawAcs, ...summary.sources];
+  const yale = {
+    ...summary.sources[1],
+    source_id: "yale_reconstruction_2024",
+    label: "Yale Tax-Data + Tax-Simulator (reconstruction)",
+  };
+  const mixedSources = [rawAcs, yale, ...summary.sources];
 
   expect(orderSourceSummaries(mixedSources).map((source) => source.source_id)).toEqual([
     "populace",
     "cps",
+    "yale_reconstruction_2024",
     "census_acs_pums_2024",
   ]);
   expect(
     buildSourceOverviews({ ...summary, sources: mixedSources }, groups).map(
       (source) => source.sourceId,
     ),
-  ).toEqual(["populace", "cps", "census_acs_pums_2024"]);
+  ).toEqual([
+    "populace",
+    "cps",
+    "yale_reconstruction_2024",
+    "census_acs_pums_2024",
+  ]);
 });
 
-test("source metric filters select geography and Microcosm sample aggregates", () => {
+test("shared metric filters select the same geography and sample for every source", () => {
   const geography = buildSourceOverviews(summary, groups, {
-    populace: { geography: "state", sample: "all" },
-  })[0];
-  expect(geography.scoreLabel).toBe("12.0% mean error");
-  expect(geography.coverageRateLabel).toBe("41.7% coverage");
-  expect(geography.performanceBuckets.total).toBe(12_000);
+    geography: "state",
+    sample: "all",
+  });
+  expect(geography[0].scoreLabel).toBe("12.0% mean error");
+  expect(geography[0].coverageRateLabel).toBe("41.7% coverage");
+  expect(geography[0].performanceBuckets.total).toBe(12_000);
+  expect(geography[1].scoreLabel).toBe("Not scored");
+  expect(geography[1].coverageRateLabel).toBe("0.0% coverage");
+  expect(geography[1].performanceBuckets.total).toBe(12_000);
 
   const inSampleState = buildSourceOverviews(summary, groups, {
-    populace: { geography: "state", sample: "in_sample" },
-  })[0];
-  expect(inSampleState.scoreLabel).toBe("3.0% mean error");
-  expect(inSampleState.coverageRateLabel).toBe("16.7% coverage");
-  expect(inSampleState.performanceBuckets).toEqual({
+    geography: "state",
+    sample: "in_sample",
+  });
+  expect(inSampleState[0].scoreLabel).toBe("3.0% mean error");
+  expect(inSampleState[0].coverageRateLabel).toBe("100.0% coverage");
+  expect(inSampleState[0].performanceBuckets).toEqual({
     withinBounds: 1_900,
     outsideBounds: 80,
     farOutsideBounds: 19,
     unavailable: 1,
     total: 2_000,
   });
+  expect(inSampleState[1].scoreLabel).toBe("Not scored");
+  expect(inSampleState[1].coverageRateLabel).toBe("0.0% coverage");
+  expect(inSampleState[1].performanceBuckets.total).toBe(2_000);
+
+  const outOfSample = buildSourceOverviews(summary, groups, {
+    geography: "all",
+    sample: "out_of_sample",
+  });
+  expect(outOfSample[0].scoreLabel).toBe("18.0% mean error");
+  expect(outOfSample[1].scoreLabel).toBe("17.6% mean error");
+  expect(outOfSample[1].performanceBuckets.total).toBe(46_313);
 
   const emptyIntersection = buildSourceOverviews(summary, groups, {
-    populace: { geography: "congressional_district", sample: "in_sample" },
-  })[0];
-  expect(emptyIntersection.scoreLabel).toBe("Not scored");
-  expect(emptyIntersection.coverageRateLabel).toBe("0.0% coverage");
-  expect(emptyIntersection.performanceBuckets).toEqual({
-    withinBounds: 0,
-    outsideBounds: 0,
-    farOutsideBounds: 0,
-    unavailable: 0,
-    total: 0,
+    geography: "congressional_district",
+    sample: "in_sample",
   });
+  expect(
+    emptyIntersection.every(
+      (source) =>
+        source.scoreLabel === "Not scored" &&
+        source.coverageRateLabel === "0.0% coverage" &&
+        source.performanceBuckets.total === 0,
+    ),
+  ).toBe(true);
 });
 
 test("source scorecards identify aligned, advanced, and in-sample comparisons", () => {

@@ -3,7 +3,7 @@
   "source_id": "yale_reconstruction_2024",
   "ledger_snapshot_id": "ledger-7917ea815df710fb20db076b",
   "official_yale_output": false,
-  "adapter_status": "overview_only_awaiting_confirmation",
+  "adapter_status": "standalone_precomputed_checkpoint",
   "reconstruction_sha256": "c5eeb17bd62a4efe02e043ac21cbcf96d50c3ef2353100cb650d6c8f048d7861",
   "results": [
     {

@@ -1,11 +1,12 @@
 # Cross-dataset artifact API
 
 The Cross-dataset API serves immutable evaluation artifacts; an HTTP request
-never imports or runs PolicyEngine or Tax-Calculator. The current approved run
-contains Microcosm + PolicyEngine-US, Public CPS + Tax-Calculator, and raw 2024
-ACS PUMS. Yale is deferred pending a reproducible reconstruction, and the API
-is source-agnostic so it can be added later without changing the response
-contract.
+never imports or runs a microsimulation model. The current approved run
+contains Microcosm + PolicyEngine-US, Public CPS + Tax-Calculator, Yale
+Tax-Data + Tax-Simulator (reconstruction), and raw 2024 ACS PUMS. The Yale item
+is a byte-pinned, precomputed reconstruction checkpoint, not official Yale
+output and not a claim that the underlying PUF-based run can be reproduced from
+public inputs alone.
 
 This page is explicitly US-only. The run records `jurisdictions: [US]` and
 filters the immutable Chronicle source snapshot before capability
@@ -82,3 +83,11 @@ not inferred from the aggregate error in the browser. Every fact is assigned
 to exactly one display bucket: green for absolute relative error at or below
 10%, yellow for error above 10% through 25%, red for error above 25%, and dark
 gray when no comparable relative error exists (including unmapped facts).
+
+The performance section's Sample selector is defined once from Microcosm's
+capability rows. `in_sample` is the set of Chronicle facts marked
+`direct_calibration_target` for Microcosm; `out_of_sample` is its complement in
+the run's US fact catalog. The publisher materializes both sets, and their
+geography intersections, for every source. Selecting a sample therefore scores
+all models and standalone datasets against the same facts rather than applying
+each source's own calibration-exposure labels.

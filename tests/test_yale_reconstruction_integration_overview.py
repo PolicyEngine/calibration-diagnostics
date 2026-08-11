@@ -1,17 +1,31 @@
 import hashlib
 import json
 import math
+from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
 
+import pytest
 import yaml
 
-from evaluation_harness.contracts import CapabilityStatus, PeriodTreatment
+from evaluation_harness.contracts import (
+    AlignedFact,
+    AlignmentQuality,
+    CapabilityStatus,
+    ExecutionMethod,
+    PeriodTreatment,
+)
 from evaluation_harness.integration import (
     load_integration_overview,
     validate_overview_against_snapshot,
 )
+from evaluation_harness.frontend_bundle import DEFAULT_SOURCE_LABELS
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.planner import CapabilityPlanner
+from evaluation_harness.yale_reconstruction_checkpoint import (
+    load_yale_reconstruction_checkpoint,
+    materialize_yale_reconstruction_results,
+)
 
 
 ROOT = Path(__file__).parents[1]
@@ -20,6 +34,7 @@ RECONSTRUCTION = (
     ROOT / "frontend" / "lib" / "populace" / "external-datasets"
     / "yale-national-2024.json"
 )
+COVERAGE_MANIFEST = INTEGRATION / "checkpoint_mappings.json"
 
 
 def _checkpoint() -> dict:
@@ -39,6 +54,9 @@ def test_yale_overview_pins_reconstruction_dataset_and_model() -> None:
     )
     assert overview.source.geographies == frozenset({"country"})
     assert overview.source.entities == frozenset({"tax_unit"})
+    assert DEFAULT_SOURCE_LABELS[overview.source.source_id] == (
+        "Yale Tax-Data + Tax-Simulator (reconstruction)"
+    )
     assert overview.alignment_policy == {
         "model_id": "cbo_growth_factor_aging",
         "model_version": "1.2.0",
@@ -74,10 +92,7 @@ def test_all_ten_yale_facts_are_executable_not_na() -> None:
     assert len(results) == 10
     assert all(result.status is CapabilityStatus.MODEL for result in results)
     assert all(result.query is not None and result.score_eligible for result in results)
-    assert all(
-        result.period_treatment is PeriodTreatment.ADVANCED_POPULATION
-        for result in results
-    )
+    assert all(result.period_treatment is PeriodTreatment.NATIVE for result in results)
 
 
 def test_yale_checkpoint_contains_ten_finite_numerical_results() -> None:
@@ -89,7 +104,7 @@ def test_yale_checkpoint_contains_ten_finite_numerical_results() -> None:
     assert checkpoint["source_id"] == overview.source.source_id
     assert checkpoint["ledger_snapshot_id"] == overview.ledger_snapshot_id
     assert checkpoint["official_yale_output"] is False
-    assert checkpoint["adapter_status"] == "overview_only_awaiting_confirmation"
+    assert checkpoint["adapter_status"] == "standalone_precomputed_checkpoint"
 
     rows = checkpoint["results"]
     assert len(rows) == 10
@@ -112,12 +127,121 @@ def test_yale_checkpoint_values_are_from_the_committed_reconstruction() -> None:
         assert row["estimate"] == reconstruction["rows"][row["reconstruction_row_key"]]
 
 
+def test_yale_checkpoint_expands_to_318_explicit_chronicle_mappings() -> None:
+    overview = load_integration_overview(INTEGRATION / "overview.yaml")
+    checkpoint = load_yale_reconstruction_checkpoint(
+        RECONSTRUCTION,
+        COVERAGE_MANIFEST,
+    )
+    assert checkpoint.source_id == overview.source.source_id
+    assert checkpoint.snapshot_id == overview.ledger_snapshot_id
+    assert checkpoint.reconstruction_row_count == 420
+    assert len(checkpoint.entries) == 318
+    assert len({entry.fact_key for entry in checkpoint.entries}) == 318
+    assert len({entry.reconstruction_row_key for entry in checkpoint.entries}) == 318
+    assert sum(entry.observed_period.value == "2023" for entry in checkpoint.entries) == 232
+    assert sum(entry.observed_period.value == "2024" for entry in checkpoint.entries) == 86
+    assert set(checkpoint.verification_fact_keys) == {
+        fact.fact_key for fact in overview.verification_facts
+    }
+    assert checkpoint.held_out_2022_row_count == 58
+    assert checkpoint.unmatched_row_count == 44
+
+
+def test_yale_checkpoint_materializes_all_ten_reviewed_values() -> None:
+    overview = load_integration_overview(INTEGRATION / "overview.yaml")
+    mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
+    capabilities = CapabilityPlanner(
+        mappings, snapshot_id=overview.ledger_snapshot_id
+    ).classify_all(overview.verification_facts, [overview.source])
+    checkpoint = load_yale_reconstruction_checkpoint(
+        RECONSTRUCTION,
+        COVERAGE_MANIFEST,
+    )
+    materialized, results = materialize_yale_reconstruction_results(
+        capabilities,
+        overview.verification_facts,
+        checkpoint,
+        aligned_facts=(),
+        source=overview.source,
+    )
+    assert len(materialized) == 10
+    assert len(results) == 10
+    assert all(row.execution_method is ExecutionMethod.PRECOMPUTED for row in materialized)
+    assert all(row.status is CapabilityStatus.MODEL for row in materialized)
+    assert all(row.period_treatment is PeriodTreatment.NATIVE for row in materialized)
+    assert all(row.query is None and row.score_eligible for row in materialized)
+    assert all(
+        row.estimate_basis == "yale_reconstruction_aggregate_checkpoint"
+        for row in results
+    )
+
+
+def test_yale_2023_result_reuses_the_published_microcosm_alignment() -> None:
+    overview = load_integration_overview(INTEGRATION / "overview.yaml")
+    checkpoint = load_yale_reconstruction_checkpoint(
+        RECONSTRUCTION,
+        COVERAGE_MANIFEST,
+    )
+    entry = next(
+        row for row in checkpoint.entries if row.observed_period.value == "2023"
+    )
+    fact = replace(
+        overview.verification_facts[0],
+        fact_key=entry.fact_key,
+        period=entry.observed_period,
+        value=Decimal("100"),
+    )
+    capabilities = CapabilityPlanner(
+        MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml"),
+        snapshot_id=overview.ledger_snapshot_id,
+    ).classify_all([fact], [overview.source])
+    alignment = AlignedFact(
+        alignment_id="microcosm-release-target:test:2023-to-2024",
+        source_fact_key=fact.fact_key,
+        observed_period=fact.period,
+        observed_value=fact.value,
+        target_period=overview.source.population_period,
+        aligned_value=Decimal("110"),
+        alignment_model="cbo_growth_factor_aging",
+        alignment_version="1.2.0",
+        factor_sources=("test",),
+        method_quality=AlignmentQuality.VALIDATED,
+        backtest_error=None,
+        metadata={"benchmark_basis": "exact_compiled_microcosm_build_target"},
+    )
+    materialized, results = materialize_yale_reconstruction_results(
+        capabilities,
+        [fact],
+        checkpoint,
+        aligned_facts=[alignment],
+        source=overview.source,
+    )
+    assert len(results) == 1
+    assert materialized[0].status is CapabilityStatus.PROJECTED
+    assert materialized[0].period_treatment is PeriodTreatment.ALIGNED_FACT
+    assert materialized[0].alignment_id == alignment.alignment_id
+
+
+def test_yale_checkpoint_rejects_reconstruction_byte_drift(tmp_path: Path) -> None:
+    changed = tmp_path / "changed-yale.json"
+    changed.write_text(RECONSTRUCTION.read_text() + "\n")
+    with pytest.raises(ValueError, match="SHA-256"):
+        load_yale_reconstruction_checkpoint(changed, COVERAGE_MANIFEST)
+
+
 def test_yale_overview_declares_access_boundary_and_taxable_income_gap() -> None:
     payload = yaml.safe_load((INTEGRATION / "overview.yaml").read_text())
     assert payload["reconstruction"]["official_yale_output"] is False
     assert payload["reconstruction"]["committed_aggregate_checkpoint_available"] is True
     assert payload["reconstruction"]["record_level_detail_available"] is False
-    assert payload["reconstruction"]["record_level_detail_required_for_adapter"] is True
+    assert (
+        payload["reconstruction"]["record_level_detail_required_for_fresh_model_run"]
+        is True
+    )
+    assert payload["reconstruction"]["checkpoint_mapping_file"] == (
+        "checkpoint_mappings.json"
+    )
     assert payload["reconstruction"]["taxable_income_checkpoint_status"] == (
         "deferred_no_native_2024_ledger_fact"
     )
