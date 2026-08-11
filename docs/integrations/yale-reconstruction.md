@@ -68,13 +68,15 @@ standalone source:
 
 1. It verifies the 420-row aggregate JSON against SHA-256
    `c5eeb17bd62a4efe02e043ac21cbcf96d50c3ef2353100cb650d6c8f048d7861`.
-2. It loads 318 explicit fact-to-row joins from
-   `integrations/yale_reconstruction/checkpoint_mappings.json` and rejects
-   duplicate facts, reused rows, non-finite values, unsupported periods, or a
-   missing ten-fact verification gate.
-3. It materializes 86 native 2024 facts and 232 2023 facts aligned to 2024 with
-   the already-published Microcosm alignments. It keeps 58 rows tied to 2022
-   facts out of scope and leaves 44 unmatched rows unscored.
+2. It loads 382 explicit fact mappings from
+   `integrations/yale_reconstruction/checkpoint_mappings.json`, including
+   reviewed reuse of one aggregate against multiple Chronicle benchmarks and a
+   reviewed derived expression for taxable interest plus nonqualified dividends.
+   It rejects duplicate facts, missing rows, non-finite values, unsupported
+   periods, or a missing ten-fact verification gate.
+3. It materializes 92 native 2024 facts, 232 2023 facts aligned to 2024, and 58
+   2022 facts aligned to 2024 with the already-published Microcosm alignments.
+   Forty-one reconstruction rows remain unmatched.
 4. Each result is marked `precomputed`, carries the Tax-Data and Tax-Simulator
    pins, and uses estimate basis
    `yale_reconstruction_aggregate_checkpoint`.
@@ -144,33 +146,28 @@ artifact.
 
 These values are a provenance gate and not an official Yale validation. All ten
 are now present in the standalone checkpoint, and the broader harness score is
-computed over 318 fact-level results. A future fresh-run adapter must recompute
+computed over 382 fact-level results. A future fresh-run adapter must recompute
 the gate from record-level output before it can supersede this checkpoint.
 
-### Why taxable income is not one of the ten
+### Taxable income and the 2022 target surface
 
-The earlier plan named taxable income as a desired checkpoint concept. The
-pinned Chronicle snapshot has no national U.S. tax-unit taxable-income fact for
-2024; its national total is tax year 2022. The legacy reconstruction JSON has a
-2024 model estimate keyed to an older target surface that transformed that 2022
-fact, but the approved alignment rule covers 2023-to-2024 transformations, not
-2022-to-2024 transformations. Using that row here would make the ten-fact gate
-look successful by changing the requested period policy.
+The pinned Chronicle snapshot has no native national U.S. tax-unit
+taxable-income fact for 2024; its national total is tax year 2022. The expanded
+checkpoint now evaluates that fact, along with the other 57 exact 2022 rows in
+the reconstruction, against the corresponding 2024 transformed benchmarks
+already published by Microcosm. Ordinary dividends remains in the ten-fact
+native-2024 provenance gate, while taxable income is part of the broader aligned
+surface.
 
-Ordinary dividends replaces it in this checkpoint because it is a native 2024
-Chronicle fact with a direct `div_ord` mapping. Taxable income stays deferred until
-Chronicle gains a native 2024 fact or a separate 2022 alignment is explicitly
-designed and approved.
-
-## Treatment of 2023 Chronicle facts
+## Treatment of 2022 and 2023 Chronicle facts
 
 The Yale checkpoint uses exactly the same alignment output as Microcosm. Before
-materializing a 2023 comparison, the full-run harness applies
+materializing a 2022 or 2023 comparison, the full-run harness applies
 `PopulaceAgingPolicy` (`cbo_growth_factor_aging` version `1.2.0`, Populace commit
 `cae8640f9e65e274aea65c7916cb37b956978e32`) to U.S. 2023 facts:
 
-- eligible USD sums are transformed to 2024 with Populace's reviewed CBO/SOI
-  factor and fallback order;
+- eligible USD sums are transformed to 2024 with Microcosm's reviewed CBO/SOI
+  factor, exact compiled target, and fallback order;
 - counts and non-dollar facts retain their numerical value but receive an
   explicit 2024 alignment;
 - publisher projection levels are not compounded;
@@ -190,9 +187,9 @@ overview checkpoint.
 The checkpoint tests establish:
 
 1. the exact reconstruction checksum and 420-row input count;
-2. 318 unique fact/row joins, split into 232 aligned 2023 facts and 86 native
-   2024 facts;
-3. an explicit 58-row 2022 holdout and 44-row unmatched remainder;
+2. 382 unique fact mappings, split into 58 aligned 2022 facts, 232 aligned 2023
+   facts, and 92 native 2024 facts;
+3. 58 aligned 2022 facts and a 41-row unmatched remainder;
 4. ten finite numerical verification results with zero `N/A` cells;
 5. native and aligned period treatment, precomputed execution, and immutable
    dataset/model provenance; and

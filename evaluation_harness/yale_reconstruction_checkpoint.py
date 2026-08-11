@@ -25,19 +25,29 @@ from .execution import EvaluationResult
 from .planner import EvaluationSourceManifest
 
 
-CHECKPOINT_SCHEMA = "evaluation_harness.yale_reconstruction_mappings.v1"
-MAPPING_RELEASE = "yale-reconstruction-checkpoint-v1"
+CHECKPOINT_SCHEMA = "evaluation_harness.yale_reconstruction_mappings.v2"
+MAPPING_RELEASE = "yale-reconstruction-checkpoint-v2"
 ESTIMATE_BASIS = "yale_reconstruction_aggregate_checkpoint"
+
+
+@dataclass(frozen=True)
+class YaleCheckpointTerm:
+    reconstruction_row_key: str
+    coefficient: Decimal
 
 
 @dataclass(frozen=True)
 class YaleCheckpointEntry:
     fact_key: str
-    reconstruction_row_key: str
+    reconstruction_terms: tuple[YaleCheckpointTerm, ...]
     estimate: Decimal
     observed_period: TypedPeriod
     match_basis: str
     calibration_exposure: CalibrationExposure
+
+    @property
+    def reconstruction_row_keys(self) -> tuple[str, ...]:
+        return tuple(term.reconstruction_row_key for term in self.reconstruction_terms)
 
 
 @dataclass(frozen=True)
@@ -94,25 +104,53 @@ def load_yale_reconstruction_checkpoint(
 
     entries: list[YaleCheckpointEntry] = []
     for payload in mappings.get("mappings", ()):
-        row_key = str(payload["reconstruction_row_key"])
-        if row_key not in rows:
-            raise ValueError(f"Yale reconstruction row is missing: {row_key}")
-        estimate = Decimal(str(rows[row_key]))
+        term_payloads = payload.get("reconstruction_terms")
+        if term_payloads is None:
+            term_payloads = (
+                {
+                    "reconstruction_row_key": payload["reconstruction_row_key"],
+                    "coefficient": "1",
+                },
+            )
+        terms: list[YaleCheckpointTerm] = []
+        estimate = Decimal("0")
+        for term_payload in term_payloads:
+            row_key = str(term_payload["reconstruction_row_key"])
+            if row_key not in rows:
+                raise ValueError(f"Yale reconstruction row is missing: {row_key}")
+            coefficient = Decimal(str(term_payload.get("coefficient", "1")))
+            if not coefficient.is_finite():
+                raise ValueError(
+                    f"Yale reconstruction coefficient is non-finite: {row_key}"
+                )
+            term_estimate = Decimal(str(rows[row_key]))
+            if not term_estimate.is_finite():
+                raise ValueError(f"Yale reconstruction row is non-finite: {row_key}")
+            terms.append(
+                YaleCheckpointTerm(
+                    reconstruction_row_key=row_key,
+                    coefficient=coefficient,
+                )
+            )
+            estimate += coefficient * term_estimate
+        if not terms:
+            raise ValueError("Yale reconstruction mapping must contain a term")
         if not estimate.is_finite():
-            raise ValueError(f"Yale reconstruction row is non-finite: {row_key}")
+            raise ValueError("Yale reconstruction expression is non-finite")
         period = TypedPeriod.parse(str(payload["observed_period"]))
         if period not in {
+            TypedPeriod.parse("tax_year:2022"),
             TypedPeriod.parse("tax_year:2023"),
             TypedPeriod.parse("tax_year:2024"),
         }:
             raise ValueError(
-                "Yale checkpoint only supports native 2024 and approved 2023 "
+                "Yale checkpoint only supports native 2024 and approved 2022/2023 "
                 f"alignments, not {period.canonical}"
             )
         entries.append(
             YaleCheckpointEntry(
                 fact_key=str(payload["fact_key"]),
-                reconstruction_row_key=row_key,
+                reconstruction_terms=tuple(terms),
                 estimate=estimate,
                 observed_period=period,
                 match_basis=str(payload["match_basis"]),
@@ -123,11 +161,8 @@ def load_yale_reconstruction_checkpoint(
         )
 
     fact_keys = [entry.fact_key for entry in entries]
-    row_keys = [entry.reconstruction_row_key for entry in entries]
     if len(fact_keys) != len(set(fact_keys)):
         raise ValueError("Yale reconstruction checkpoint has duplicate fact mappings")
-    if len(row_keys) != len(set(row_keys)):
-        raise ValueError("Yale reconstruction checkpoint reuses an aggregate row")
     verification_fact_keys = tuple(mappings.get("verification_fact_keys", ()))
     if len(verification_fact_keys) != 10 or not set(verification_fact_keys) <= set(
         fact_keys
@@ -135,10 +170,15 @@ def load_yale_reconstruction_checkpoint(
         raise ValueError("Yale checkpoint must retain all ten verification facts")
     held_out_2022_row_count = int(mappings.get("held_out_2022_row_count", -1))
     unmatched_row_count = int(mappings.get("unmatched_row_count", -1))
-    if len(entries) + held_out_2022_row_count + unmatched_row_count != len(rows):
+    referenced_row_keys = {
+        row_key for entry in entries for row_key in entry.reconstruction_row_keys
+    }
+    if len(referenced_row_keys) + held_out_2022_row_count + unmatched_row_count != len(
+        rows
+    ):
         raise ValueError(
-            "Yale reconstruction row audit does not reconcile evaluated, held-out, "
-            "and unmatched rows"
+            "Yale reconstruction row audit does not reconcile referenced, held-out, "
+            "and unmatched aggregate rows"
         )
 
     return YaleReconstructionCheckpoint(
@@ -202,7 +242,7 @@ def materialize_yale_reconstruction_results(
             )
 
         alignment = None
-        if fact.period.value == "2023":
+        if fact.period.value in {"2022", "2023"}:
             candidates = [
                 row
                 for row in alignments_by_fact.get(fact.fact_key, ())
@@ -212,7 +252,7 @@ def materialize_yale_reconstruction_results(
             ]
             if len(candidates) != 1:
                 raise ValueError(
-                    "Yale 2023 checkpoint fact requires exactly one approved "
+                    "Yale pre-2024 checkpoint fact requires exactly one approved "
                     f"Microcosm alignment, found {len(candidates)}: {fact.fact_key}"
                 )
             alignment = candidates[0]

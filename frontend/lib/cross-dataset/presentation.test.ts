@@ -12,6 +12,7 @@ import {
   crossDatasetUiState,
   groupFactsHref,
   orderSourceSummaries,
+  sourceCompactLabel,
   sourceDisplayLabel,
 } from "./presentation";
 
@@ -506,6 +507,24 @@ test("legacy Tax-Calculator artifacts display the current Public CPS label", () 
   ).toBe("Public CPS + Tax-Calculator");
 });
 
+test("compact source labels fit the group comparison matrix", () => {
+  const rawAcs = {
+    ...summary.sources[1],
+    source_id: "census_acs_pums_2024",
+    label: "Raw ACS PUMS",
+  };
+  const yale = {
+    ...summary.sources[1],
+    source_id: "yale_reconstruction_2024",
+    label: "Yale Tax-Data + Tax-Simulator (reconstruction)",
+  };
+
+  expect(sourceCompactLabel(summary.sources[0])).toBe("Microcosm");
+  expect(sourceCompactLabel(summary.sources[1])).toBe("Public CPS");
+  expect(sourceCompactLabel(yale)).toBe("Yale reconstruction");
+  expect(sourceCompactLabel(rawAcs)).toBe("Raw ACS");
+});
+
 test("orders Microcosm, Public CPS, Yale reconstruction, then Raw ACS", () => {
   const rawAcs = {
     ...summary.sources[1],
@@ -621,6 +640,7 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
   expect(rows[0].label).toBe("IRS Statistics of Income");
   expect(rows[0].sources.populace).toMatchObject({
     scoreLabel: "7.0% mean error",
+    coverageRateLabel: "0.5% coverage",
     coverageLabel: "150 / 33,045",
     unsupportedCount: 32_895,
     performanceBuckets: {
@@ -633,6 +653,7 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
   });
   expect(rows[0].sources.cps).toMatchObject({
     scoreLabel: "18.9% mean error",
+    coverageRateLabel: "0.1% coverage",
     coverageLabel: "37 / 33,045",
     unsupportedCount: 33_008,
   });
