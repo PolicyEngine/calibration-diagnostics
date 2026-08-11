@@ -10,14 +10,17 @@ export const CROSS_DATASET_PAGE_TITLE = "Cross-dataset comparison";
 
 export const GROUP_DIMENSIONS = [
   { key: "ledger_source", label: "Chronicle source" },
-  { key: "concept", label: "Concept" },
   { key: "period", label: "Period" },
   { key: "geography", label: "Geography" },
-  { key: "period_treatment", label: "Period treatment" },
-  { key: "calibration_exposure", label: "Calibration exposure" },
 ] as const;
 
-export type GroupDimension = (typeof GROUP_DIMENSIONS)[number]["key"];
+// The artifact and fact catalog retain all supported dimensions even when a
+// dimension is not offered in the overview's grouping control.
+export type GroupDimension =
+  | (typeof GROUP_DIMENSIONS)[number]["key"]
+  | "concept"
+  | "period_treatment"
+  | "calibration_exposure";
 
 export interface LabeledCount {
   key: string;
