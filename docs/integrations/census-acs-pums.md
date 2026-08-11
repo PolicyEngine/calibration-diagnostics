@@ -18,33 +18,36 @@ records. Their pinned SHA-256 values are:
 - `csv_pus.zip`: `afdc6d90c6e2f0bab365ed32d95ba4c4d8ac651162f46ac7861295b2dc469894`
 - `csv_ppr.zip`: `c9cff0bf3f488f379570c8ff70ed86ac55cbdbb107428da9a445dce103694e35`
 
-The 4,881-row derived sufficient statistic has SHA-256
-`2c3ef941f83b25dc9ffe01c26272f89073483fb8b6e4a23c5e990394c372326f`.
+The v2 4,881-row derived sufficient statistic has SHA-256
+`552db188a651739fd05968dbbf7a018dd5695b0ccbe82cf6b3ccdf73d3917c33`.
+It contains single-age population weights plus `ADJINC`-adjusted `WAGP`
+totals for the full weight and all 80 replicate weights.
 
-## Current Ledger coverage
+## Current Chronicle coverage
 
-The pinned Ledger snapshot has 10,131 Census ACS facts:
+The pinned Chronicle snapshot has 46,241 US facts. Raw ACS PUMS executes these
+reviewed surfaces:
 
-| Ledger surface | Facts | Capability |
+| Chronicle surface | Facts | Capability |
 |---|---:|---|
-| National population by age band | 18 | Direct |
-| State population by age band | 936 | Direct |
-| Congressional-district population | 7,866 | Unsupported geography |
-| Congressional-district households | 1,311 | Unsupported geography |
+| Published ACS national/state population by age | 954 | Native direct |
+| Census Population Estimates national/state population by age | 988 | Native direct |
+| 2024 national population projections by single age | 86 | Native direct |
+| BEA regional wages on the reviewed residence basis | 52 | Aligned direct |
+| BEA 2024 national NIPA wages | 1 | Native direct |
 
-The confirmed adapter surface therefore has 954 executable facts. It does not
+The confirmed adapter surface therefore has 2,081 executable facts. It does not
 allocate PUMAs to congressional districts. Such a crosswalk would be a modeled
 geographic allocation rather than a direct PUMS aggregate.
 
-Ledger currently has no ACS state or national household, employment, wage,
-self-employment, sex, or tenure facts. The adapter will not manufacture ten
-apparently diverse checks by comparing non-equivalent concepts from other
-sources. Its ten-fact gate instead exercises five national and five state
-population estimates across the age distribution.
+The 2023-vintage projection facts are native 2024 comparisons because their
+observed target period is 2024; no aging is applied. Regional BEA wages use the
+same reviewed residence adjustment and NIPA scaling as the other adapters.
+Both regional and national wage comparisons are external validation.
 
 ## Execution and uncertainty
 
-Each fact is a weighted sum of `PWGTP` after applying its exact Ledger GEOID
+Population facts are weighted sums of `PWGTP` after applying their Chronicle GEOID
 and `AGEP` bounds. Both the source and the benchmark are native 2024; no aging,
 uprating, or Populace period transformation is involved. Other years remain
 unsupported until a separately reviewed PUMS release is declared.
@@ -52,7 +55,9 @@ unsupported until a separately reviewed PUMS release is declared.
 Preprocessing reduces the person records to a sufficient statistic keyed by
 state or country and single year of age. It retains the full weight and all 80
 replicate-weight aggregates. This is lossless for every supported age-count
-query while keeping repeated evaluation small and deterministic.
+query while keeping repeated evaluation small and deterministic. Wage queries
+sum the precomputed `WAGP * ADJINC / 1,000,000 * PWGTP_r` statistic for each
+full or replicate weight.
 
 For each estimate `X`, the standard error uses the Census successive difference
 replicate formula:
@@ -62,18 +67,17 @@ SE = sqrt((4 / 80) * sum((X_r - X) ** 2 for r in 1..80))
 MOE90 = 1.645 * SE
 ```
 
-The existing score continues to compare the point estimate with the Ledger
+The existing score continues to compare the point estimate with the Chronicle
 benchmark. Standard error and 90 percent margin of error are diagnostics; they
 do not convert a discrepancy into a perfect score.
 
 ## Interpretation boundary
 
 This comparison measures how closely the public-use ACS subsample reproduces
-published full-sample ACS S0101 estimates. It is not independent external
-validation. Census derives PUMS from ACS and adjusts person weights toward ACS
-demographic estimates. The mapping is therefore marked
-`used_in_imputation_or_reweighting`, and that exposure remains visible in the
-fact artifact and UI.
+published full-sample ACS and population-control estimates, and also evaluates
+external population projections and BEA wages. The ACS and Population
+Estimates mappings are marked `used_in_imputation_or_reweighting`; projection
+and wage mappings are marked `external_validation`.
 
 PUMS can still differ from published ACS estimates because it adds a sampling
 stage and disclosure processing. Those differences are retained as numerical
@@ -81,7 +85,7 @@ results rather than suppressed.
 
 ## Confirmed ten-fact gate
 
-| Geography and age | Ledger target | Fact key |
+| Geography and age | Chronicle target | Fact key |
 |---|---:|---|
 | United States, 0-4 | 18,365,047 | `ledger.aggregate_fact.v2:aa16f206fd09f97084b67314` |
 | United States, 20-24 | 22,232,555 | `ledger.aggregate_fact.v2:28c8b35f03f5098ddcbb237a` |
@@ -116,18 +120,17 @@ The actual gate passed all ten:
 `integrations/census_acs_pums/verification_results.json` retains the exact
 unrounded diagnostics and input manifest.
 
-## Full Ledger run
+## Full Chronicle run
 
-The full pass excludes 2,064 non-US source facts, classifies all 46,249 US facts
-for raw ACS PUMS, and executes all 954 supported cells. Every executed row has
-an estimate, standard error, and 90%
-margin of error in both the immutable run and the frontend fact artifact. The
-source scored 99.427 on the current display scale. That high result must be
-read with the related-weighting caveat above, not as independent validation.
+The full pass classifies all 46,241 US facts and executes all 2,081 supported
+cells. Every executed row has an estimate, standard error, and 90% margin of
+error in both the immutable run and the frontend fact artifact. Raw ACS has a
+1.9075% fact-level capped mean error: 2,056 facts are within 10%, 24 are between
+10% and 25%, and one is above 25%.
 
 The combined three-source artifact is run
-`evaluation-a2a9671d0aa804d700fe37a2`: 138,747 capability cells, 45,338
-estimates, and a complete frontend bundle.
+`evaluation-4369e3a7976eaa38569edb21`: 138,723 capability cells, 55,591
+estimates, and a complete 463-partition frontend bundle.
 
 Rebuild and verify with:
 
@@ -135,8 +138,8 @@ Rebuild and verify with:
 uv run python scripts/build_acs_pums_aggregates.py \
   --us-person-zip /path/to/csv_pus.zip \
   --puerto-rico-person-zip /path/to/csv_ppr.zip \
-  --output .artifacts/acs-pums-2024/person-age.parquet
+  --output .artifacts/acs-pums-2024/person-age-wages-v2.parquet
 
 uv run python scripts/verify_acs_pums_adapter.py \
-  --aggregates .artifacts/acs-pums-2024/person-age.parquet
+  --aggregates .artifacts/acs-pums-2024/person-age-wages-v2.parquet
 ```

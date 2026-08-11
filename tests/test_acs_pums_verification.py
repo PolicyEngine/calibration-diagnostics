@@ -17,6 +17,11 @@ def test_acs_pums_checkpoint_contains_ten_real_numerical_results() -> None:
     assert payload["schema_version"] == "evaluation_harness.verification_results.v1"
     assert payload["source_id"] == overview.source.source_id
     assert payload["ledger_snapshot_id"] == overview.ledger_snapshot_id
+    assert (
+        payload["input_manifest"]["schema_version"]
+        == "evaluation_harness.acs_pums_aggregate.v2"
+    )
+    assert "WAGP" in payload["input_manifest"]["additive_statistics"]
     assert {row["fact_key"] for row in rows} == {
         fact.fact_key for fact in overview.verification_facts
     }

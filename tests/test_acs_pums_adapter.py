@@ -27,7 +27,14 @@ from evaluation_harness.planner import CapabilityPlanner
 def _write_person_zip(
     path: Path, rows: list[dict[str, int]], *, split_members: bool = False
 ) -> None:
-    columns = ["STATE", "AGEP", "PWGTP", *REPLICATE_WEIGHT_NAMES]
+    columns = [
+        "STATE",
+        "AGEP",
+        "ADJINC",
+        "WAGP",
+        "PWGTP",
+        *REPLICATE_WEIGHT_NAMES,
+    ]
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         chunks = [rows]
         if split_members:
@@ -42,10 +49,19 @@ def _write_person_zip(
             archive.write(csv_path, arcname=f"psam_test_{index}.csv")
 
 
-def _row(state: int, age: int, weight: int, replicate: int) -> dict[str, int]:
+def _row(
+    state: int,
+    age: int,
+    weight: int,
+    replicate: int,
+    wage: int,
+    adjustment: int = 1_000_000,
+) -> dict[str, int]:
     return {
         "STATE": state,
         "AGEP": age,
+        "ADJINC": adjustment,
+        "WAGP": wage,
         "PWGTP": weight,
         **{name: replicate for name in REPLICATE_WEIGHT_NAMES},
     }
@@ -59,17 +75,17 @@ def aggregate_path(tmp_path: Path) -> Path:
     _write_person_zip(
         us,
         [
-            _row(1, 2, 10, 11),
-            _row(6, 2, 20, 22),
-            _row(6, 87, 3, 4),
+            _row(1, 2, 10, 11, 100, adjustment=1_100_000),
+            _row(6, 2, 20, 22, 200),
+            _row(6, 87, 3, 4, 50),
         ],
         split_members=True,
     )
-    _write_person_zip(pr, [_row(72, 2, 7, 8)])
+    _write_person_zip(pr, [_row(72, 2, 7, 8, 75)])
 
     manifest = build_person_age_aggregates(us, pr, output)
 
-    assert manifest["schema_version"] == "evaluation_harness.acs_pums_aggregate.v1"
+    assert manifest["schema_version"] == "evaluation_harness.acs_pums_aggregate.v2"
     assert manifest["dataset_version"] == DATASET_VERSION
     assert manifest["row_count"] == 6
     assert len(manifest["inputs"]["us"]["sha256"]) == 64
@@ -96,6 +112,19 @@ def test_preprocessor_builds_lossless_state_and_us_age_cells(
         ("0400000US72", 2): 7,
     }
 
+    wage_values = {
+        (row["__geography__"], row["age"]): (row["WAGP"], row["WAGP1"])
+        for row in rows
+    }
+    assert wage_values == {
+        ("0100000US", 2): (5100, 5610),
+        ("0100000US", 87): (150, 200),
+        ("0400000US01", 2): (1100, 1210),
+        ("0400000US06", 2): (4000, 4400),
+        ("0400000US06", 87): (150, 200),
+        ("0400000US72", 2): (525, 600),
+    }
+
 
 def test_runner_exposes_direct_arrays_and_no_model(aggregate_path: Path) -> None:
     runner = ACSPUMSRunner(aggregate_path)
@@ -113,10 +142,19 @@ def test_runner_exposes_direct_arrays_and_no_model(aggregate_path: Path) -> None
 
     assert bundle.dataset_version == DATASET_VERSION
     assert bundle.model_version is None
-    assert set(bundle.domain_masks) == {"total_population"}
-    assert {"__geography__", "age", "PWGTP", *REPLICATE_WEIGHT_NAMES} <= set(
-        bundle.arrays
-    )
+    assert set(bundle.domain_masks) == {
+        "compensation_of_employees",
+        "personal_income",
+        "population_projection",
+        "resident_population",
+        "total_population",
+    }
+    assert {
+        "__geography__",
+        "age",
+        "PWGTP",
+        *REPLICATE_WEIGHT_NAMES,
+    } <= set(bundle.arrays)
 
 
 def test_sdr_estimate_uses_all_eighty_replicate_weights(
@@ -150,6 +188,37 @@ def test_sdr_estimate_uses_all_eighty_replicate_weights(
     assert estimate.estimate == Decimal("20")
     assert estimate.standard_error == Decimal("4")
     assert estimate.margin_of_error_90 == Decimal("6.580")
+
+
+def test_sdr_estimate_uses_preweighted_wage_replicates(
+    aggregate_path: Path,
+) -> None:
+    bundle = ACSPUMSRunner(aggregate_path).prepare(
+        RunGroup(
+            source_id="census_acs_pums_2024",
+            population_period="calendar_year:2024",
+            policy_period=None,
+            geography_method="pums_state_or_country",
+            entity="person",
+            fact_keys=("fact",),
+            required_variables=("PWGTP", "WAGP"),
+        )
+    )
+    query = AggregateQuery(
+        operation="weighted_sum",
+        value_expression="WAGP",
+        weight="PWGTP",
+        constraints=(
+            {"dimension": "__geography__", "value": "0400000US06"},
+            {"domain": "personal_income"},
+        ),
+    )
+
+    estimate = estimate_with_sdr(query, bundle)
+
+    assert estimate.estimate == Decimal("4150")
+    assert estimate.standard_error == Decimal("900")
+    assert estimate.margin_of_error_90 == Decimal("1480.500")
 
 
 def test_acs_execution_carries_uncertainty_into_the_shared_result_artifact(

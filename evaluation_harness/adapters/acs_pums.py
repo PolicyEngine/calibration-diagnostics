@@ -25,14 +25,28 @@ from ..execution import (
 
 
 DATASET_VERSION = "census-acs-pums-2024-1y-person@2025-09-17"
-AGGREGATE_SCHEMA = "evaluation_harness.acs_pums_aggregate.v1"
+AGGREGATE_SCHEMA = "evaluation_harness.acs_pums_aggregate.v2"
 SOURCE_ID = "census_acs_pums_2024"
 REPLICATE_WEIGHT_NAMES = tuple(f"PWGTP{index}" for index in range(1, 81))
 WEIGHT_NAMES = ("PWGTP", *REPLICATE_WEIGHT_NAMES)
-INPUT_COLUMNS = ("STATE", "AGEP", *WEIGHT_NAMES)
+WAGE_VARIABLE = "WAGP"
+WAGE_STATISTIC_NAMES = (
+    WAGE_VARIABLE,
+    *(f"{WAGE_VARIABLE}{index}" for index in range(1, 81)),
+)
+INPUT_COLUMNS = ("STATE", "AGEP", "ADJINC", WAGE_VARIABLE, *WEIGHT_NAMES)
 MAX_STATE_CODE = 72
 AGE_COUNT = 100
 US_GEOID = "0100000US"
+SUPPORTED_DOMAINS = frozenset(
+    {
+        "compensation_of_employees",
+        "personal_income",
+        "population_projection",
+        "resident_population",
+        "total_population",
+    }
+)
 
 
 def _sha256(path: Path) -> str:
@@ -60,6 +74,8 @@ def _record_batches(path: Path) -> Iterable[pa.RecordBatch]:
     column_types = {
         "STATE": pa.int16(),
         "AGEP": pa.int16(),
+        "ADJINC": pa.int64(),
+        WAGE_VARIABLE: pa.float64(),
         **{name: pa.int64() for name in WEIGHT_NAMES},
     }
     with zipfile.ZipFile(path) as archive:
@@ -89,14 +105,20 @@ def _numpy(batch: pa.RecordBatch, name: str) -> np.ndarray:
 def _accumulate_archive(
     path: Path,
     state_totals: np.ndarray,
+    state_wage_totals: np.ndarray,
     *,
     national_totals: np.ndarray | None,
+    national_wage_totals: np.ndarray | None,
 ) -> int:
     record_count = 0
     state_cell_count = (MAX_STATE_CODE + 1) * AGE_COUNT
     for batch in _record_batches(path):
         states = _numpy(batch, "STATE").astype(np.int64, copy=False)
         ages = _numpy(batch, "AGEP").astype(np.int64, copy=False)
+        adjustments = _numpy(batch, "ADJINC").astype(np.float64, copy=False)
+        wages = np.nan_to_num(
+            _numpy(batch, WAGE_VARIABLE).astype(np.float64, copy=False)
+        ) * (adjustments / 1_000_000)
         if np.any(states < 0) or np.any(states > MAX_STATE_CODE):
             raise ValueError(f"PUMS archive {path} contains an invalid STATE code")
         if np.any(ages < 0) or np.any(ages >= AGE_COUNT):
@@ -109,10 +131,21 @@ def _accumulate_archive(
                 weights=weights,
                 minlength=state_cell_count,
             )
+            state_wage_totals[:, column_index] += np.bincount(
+                state_age,
+                weights=weights * wages,
+                minlength=state_cell_count,
+            )
             if national_totals is not None:
                 national_totals[:, column_index] += np.bincount(
                     ages,
                     weights=weights,
+                    minlength=AGE_COUNT,
+                )
+            if national_wage_totals is not None:
+                national_wage_totals[:, column_index] += np.bincount(
+                    ages,
+                    weights=weights * wages,
                     minlength=AGE_COUNT,
                 )
         record_count += batch.num_rows
@@ -122,10 +155,13 @@ def _accumulate_archive(
 def _aggregate_rows(
     state_totals: np.ndarray,
     national_totals: np.ndarray,
+    state_wage_totals: np.ndarray,
+    national_wage_totals: np.ndarray,
 ) -> list[dict[str, int | str]]:
     rows: list[dict[str, int | str]] = []
     for age in range(AGE_COUNT):
         values = national_totals[age]
+        wage_values = national_wage_totals[age]
         if np.any(values):
             rows.append(
                 {
@@ -135,11 +171,16 @@ def _aggregate_rows(
                         name: int(round(values[index]))
                         for index, name in enumerate(WEIGHT_NAMES)
                     },
+                    **{
+                        name: int(round(wage_values[index]))
+                        for index, name in enumerate(WAGE_STATISTIC_NAMES)
+                    },
                 }
             )
     for state in range(MAX_STATE_CODE + 1):
         for age in range(AGE_COUNT):
             values = state_totals[state * AGE_COUNT + age]
+            wage_values = state_wage_totals[state * AGE_COUNT + age]
             if np.any(values):
                 rows.append(
                     {
@@ -148,6 +189,10 @@ def _aggregate_rows(
                         **{
                             name: int(round(values[index]))
                             for index, name in enumerate(WEIGHT_NAMES)
+                        },
+                        **{
+                            name: int(round(wage_values[index]))
+                            for index, name in enumerate(WAGE_STATISTIC_NAMES)
                         },
                     }
                 )
@@ -174,17 +219,28 @@ def build_person_age_aggregates(
         ((MAX_STATE_CODE + 1) * AGE_COUNT, len(WEIGHT_NAMES)), dtype=np.float64
     )
     national_totals = np.zeros((AGE_COUNT, len(WEIGHT_NAMES)), dtype=np.float64)
+    state_wage_totals = np.zeros_like(state_totals)
+    national_wage_totals = np.zeros_like(national_totals)
     us_records = _accumulate_archive(
         us_path,
         state_totals,
+        state_wage_totals,
         national_totals=national_totals,
+        national_wage_totals=national_wage_totals,
     )
     pr_records = _accumulate_archive(
         pr_path,
         state_totals,
+        state_wage_totals,
         national_totals=None,
+        national_wage_totals=None,
     )
-    rows = _aggregate_rows(state_totals, national_totals)
+    rows = _aggregate_rows(
+        state_totals,
+        national_totals,
+        state_wage_totals,
+        national_wage_totals,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(
         pa.Table.from_pylist(rows),
@@ -213,6 +269,14 @@ def build_person_age_aggregates(
         "geography_grain": "country_or_state",
         "age_grain": "single_year",
         "weight_columns": list(WEIGHT_NAMES),
+        "additive_statistics": {
+            WAGE_VARIABLE: {
+                "input_variable": WAGE_VARIABLE,
+                "inflation_adjustment": "ADJINC / 1000000",
+                "columns": list(WAGE_STATISTIC_NAMES),
+                "replicate_method": "successive_difference_replication",
+            }
+        },
     }
     output.with_suffix(".manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n"
@@ -243,21 +307,39 @@ def estimate_with_sdr(
         raise ValueError("ACS PUMS SDR execution currently supports weighted sums only")
     if query.weight != "PWGTP":
         raise ValueError("ACS PUMS SDR execution requires the PWGTP full-sample weight")
-    missing = [name for name in WEIGHT_NAMES if name not in bundle.arrays]
+    required_names = (
+        WAGE_STATISTIC_NAMES
+        if query.value_expression == WAGE_VARIABLE
+        else WEIGHT_NAMES
+    )
+    missing = [name for name in required_names if name not in bundle.arrays]
     if missing:
-        raise ValueError(f"ACS PUMS bundle is missing weights: {', '.join(missing)}")
+        raise ValueError(
+            "ACS PUMS bundle is missing SDR columns: " + ", ".join(missing)
+        )
 
     full_weights = np.asarray(bundle.arrays["PWGTP"])
     length = len(full_weights)
     mask = _mask(query, bundle, length)
-    if query.value_expression == "__ones__":
+    if query.value_expression == WAGE_VARIABLE:
+        estimates = np.asarray(
+            [
+                np.sum(np.asarray(bundle.arrays[name])[mask])
+                for name in WAGE_STATISTIC_NAMES
+            ]
+        )
+    elif query.value_expression == "__ones__":
         values = np.ones(length, dtype=np.int64)
+        weights = np.column_stack(
+            [np.asarray(bundle.arrays[name]) for name in WEIGHT_NAMES]
+        )
+        estimates = np.sum(weights[mask] * values[mask, np.newaxis], axis=0)
     else:
         values = _array(bundle, query.value_expression, length)
-    weights = np.column_stack(
-        [np.asarray(bundle.arrays[name]) for name in WEIGHT_NAMES]
-    )
-    estimates = np.sum(weights[mask] * values[mask, np.newaxis], axis=0)
+        weights = np.column_stack(
+            [np.asarray(bundle.arrays[name]) for name in WEIGHT_NAMES]
+        )
+        estimates = np.sum(weights[mask] * values[mask, np.newaxis], axis=0)
     point = _decimal(estimates[0])
     replicates = tuple(_decimal(value) for value in estimates[1:])
     variance = (Decimal(4) / Decimal(80)) * sum(
@@ -328,6 +410,8 @@ class ACSPUMSRunner:
             *group.required_variables,
             *REPLICATE_WEIGHT_NAMES,
         }
+        if WAGE_VARIABLE in group.required_variables:
+            required.update(WAGE_STATISTIC_NAMES)
         missing = sorted(required - set(table.column_names))
         if missing:
             raise ValueError(
@@ -343,7 +427,10 @@ class ACSPUMSRunner:
             arrays=arrays,
             dataset_version=DATASET_VERSION,
             model_version=None,
-            domain_masks={"total_population": np.ones(length, dtype=bool)},
+            domain_masks={
+                domain: np.ones(length, dtype=bool)
+                for domain in SUPPORTED_DOMAINS
+            },
         )
 
 
