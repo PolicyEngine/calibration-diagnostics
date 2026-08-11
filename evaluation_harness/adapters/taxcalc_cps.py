@@ -23,6 +23,24 @@ FILING_STATUS = {
     5: "surviving_spouse",
 }
 
+JCT_REPEAL_REFORMS: dict[str, tuple[str, float]] = {
+    "charitable_deduction": ("ID_Charity_hc", 1.0),
+    "deductible_mortgage_interest": ("ID_InterestPaid_hc", 1.0),
+    "medical_expense_deduction": ("ID_Medical_hc", 1.0),
+    "qualified_business_income_deduction": ("PT_qbid_rt", 0.0),
+    "salt_deduction": ("ID_AllTaxes_hc", 1.0),
+    "self_employed_health_insurance_deduction": (
+        "ALD_SelfEmp_HealthIns_hc",
+        1.0,
+    ),
+    "self_employed_pension_contribution_deduction": (
+        "ALD_KEOGH_SEP_hc",
+        1.0,
+    ),
+    "student_loan_interest_deduction": ("ALD_StudentLoan_hc", 1.0),
+    "traditional_ira_deduction": ("ALD_IRAContributions_hc", 1.0),
+}
+
 
 def _default_calculator_factory(year: int) -> Any:
     try:
@@ -36,6 +54,27 @@ def _default_calculator_factory(year: int) -> Any:
     return calculator
 
 
+def _default_counterfactual_calculator_factory(
+    year: int,
+    reform_key: str,
+) -> Any:
+    try:
+        import taxcalc as tc
+    except ImportError as error:  # pragma: no cover - optional install path
+        raise RuntimeError("install the 'taxcalc-cps' extra to run public CPS") from error
+    try:
+        parameter, value = JCT_REPEAL_REFORMS[reform_key]
+    except KeyError as error:
+        raise ValueError(f"unknown reviewed JCT repeal {reform_key!r}") from error
+    policy = tc.Policy()
+    policy.implement_reform({parameter: {year: value}})
+    records = tc.Records.cps_constructor()
+    calculator = tc.Calculator(policy=policy, records=records)
+    calculator.advance_to_year(year)
+    calculator.calc_all()
+    return calculator
+
+
 class TaxCalcCPSRunner:
     """Expose one advanced public-CPS Tax-Calculator run to the shared harness."""
 
@@ -43,18 +82,32 @@ class TaxCalcCPSRunner:
         self,
         *,
         calculator_factory: Callable[[int], Any] = _default_calculator_factory,
+        counterfactual_calculator_factory: Callable[[int, str], Any] = (
+            _default_counterfactual_calculator_factory
+        ),
     ) -> None:
         self._calculator_factory = calculator_factory
+        self._counterfactual_calculator_factory = counterfactual_calculator_factory
         self._calculator: Any | None = None
         self._year: int | None = None
         self._array_cache: dict[str, np.ndarray] = {}
+        self._counterfactual_calculators: dict[str, Any] = {}
 
     def _calculator_for(self, year: int) -> Any:
         if self._calculator is None or self._year != year:
             self._calculator = self._calculator_factory(year)
             self._year = year
             self._array_cache = {}
+            self._counterfactual_calculators = {}
         return self._calculator
+
+    def _counterfactual_calculator_for(self, year: int, reform_key: str) -> Any:
+        self._calculator_for(year)
+        if reform_key not in self._counterfactual_calculators:
+            self._counterfactual_calculators[reform_key] = (
+                self._counterfactual_calculator_factory(year, reform_key)
+            )
+        return self._counterfactual_calculators[reform_key]
 
     def _array(self, name: str, year: int) -> np.ndarray:
         self._calculator_for(year)
@@ -67,7 +120,16 @@ class TaxCalcCPSRunner:
     def _expression(self, name: str, year: int) -> np.ndarray:
         if name in self._array_cache:
             return self._array_cache[name]
-        if name == "taxable_interest_and_nonqualified_dividends":
+        if name.startswith("jct_repeal:"):
+            reform_key = name.split(":", 1)[1]
+            if reform_key not in JCT_REPEAL_REFORMS:
+                raise ValueError(f"unknown reviewed JCT repeal {reform_key!r}")
+            values = np.asarray(
+                self._counterfactual_calculator_for(year, reform_key).array(
+                    "iitax"
+                )
+            ) - self._array("iitax", year)
+        elif name == "taxable_interest_and_nonqualified_dividends":
             values = (
                 self._array("e00300", year)
                 + self._array("e00600", year)
@@ -146,7 +208,13 @@ class TaxCalcCPSRunner:
                 )
         domains = {
             "all_individual_income_tax_returns": np.ones(length, dtype=bool),
+            "compensation_of_employees": np.ones(length, dtype=bool),
+            "federal_income_tax": np.ones(length, dtype=bool),
             "individual_income_tax_returns": np.ones(length, dtype=bool),
+            "national_health_expenditures": np.ones(length, dtype=bool),
+            "personal_current_transfer_receipts": np.ones(length, dtype=bool),
+            "personal_income": np.ones(length, dtype=bool),
+            "resident_population": np.ones(length, dtype=bool),
             "social_security_and_ssi_payments": np.ones(length, dtype=bool),
         }
         if "c59660" in arrays:

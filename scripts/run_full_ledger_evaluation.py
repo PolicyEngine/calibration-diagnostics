@@ -143,6 +143,13 @@ def run(
         facts,
         source_id=populace_overview.source.source_id,
     )
+    taxcalc_bea_wage_transformations = transform_chronicle_bea_wage_facts(
+        facts,
+        source_id=cps_overview.source.source_id,
+        national_calibration_exposure=(
+            CalibrationExposure.EXTERNAL_VALIDATION
+        ),
+    )
     age_topcode_comparisons = build_cps_asec_age_topcode_comparisons(
         facts,
         source_id=populace_overview.source.source_id,
@@ -180,6 +187,7 @@ def run(
             *release_target_alignments.aligned_facts,
             *(row.to_aligned_fact() for row in comparable_aging),
             *bea_wage_transformations.aligned_facts,
+            *taxcalc_bea_wage_transformations.aligned_facts,
             *age_topcode_comparisons.aligned_facts,
         ]
     )
@@ -202,6 +210,7 @@ def run(
     cps_plan = SourcePlan(
         source=cps_overview.source,
         mappings=MappingRegistry.from_yaml(CPS_INTEGRATION / "mappings.yaml"),
+        alignments=taxcalc_bea_wage_transformations.declarations,
     )
     acs_pums_plan = SourcePlan(
         source=acs_pums_overview.source,

@@ -81,8 +81,8 @@ def _component(
         ) from error
 
 
-def _alignment_id(fact: FactContract) -> str:
-    return f"{BEA_WAGE_TRANSFORMATION_ID}:{fact.fact_key}"
+def _alignment_id(source_id: str, fact: FactContract) -> str:
+    return f"{source_id}:{BEA_WAGE_TRANSFORMATION_ID}:{fact.fact_key}"
 
 
 def transform_chronicle_bea_wage_facts(
@@ -91,6 +91,9 @@ def transform_chronicle_bea_wage_facts(
     source_id: str,
     national_total: Decimal = BEA_NIPA_WAGES_AND_SALARIES_2024,
     expected_state_count: int = 51,
+    national_calibration_exposure: CalibrationExposure = (
+        CalibrationExposure.DIRECT_CALIBRATION_TARGET
+    ),
 ) -> BeaWageTransformations:
     """Build residence-basis, national-total-scaled wage benchmarks.
 
@@ -179,9 +182,9 @@ def transform_chronicle_bea_wage_facts(
         benchmark = (
             national_total if is_national else adjusted_value * scale_factor
         )
-        alignment_id = _alignment_id(wage_fact)
+        alignment_id = _alignment_id(source_id, wage_fact)
         exposure = (
-            CalibrationExposure.DIRECT_CALIBRATION_TARGET
+            national_calibration_exposure
             if is_national
             else CalibrationExposure.EXTERNAL_VALIDATION
         )

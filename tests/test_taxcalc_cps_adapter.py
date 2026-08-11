@@ -125,6 +125,49 @@ def test_runner_builds_reviewed_composite_tax_expressions() -> None:
     assert bundle.arrays["positive_schedule_c_income"].tolist() == [12.0, 0.0]
 
 
+def test_runner_executes_and_caches_jct_repeal_counterfactuals() -> None:
+    baseline = FakeCalculator(
+        {
+            "s006": np.array([1.0, 2.0]),
+            "MARS": np.ones(2),
+            "EIC": np.zeros(2),
+            "iitax": np.array([10.0, 20.0]),
+        }
+    )
+    counterfactuals = {
+        "medical_expense_deduction": FakeCalculator(
+            {"iitax": np.array([13.0, 25.0])}
+        ),
+        "charitable_deduction": FakeCalculator(
+            {"iitax": np.array([17.0, 29.0])}
+        ),
+    }
+    counterfactual_calls: list[tuple[int, str]] = []
+
+    def counterfactual_factory(year: int, reform_key: str):
+        counterfactual_calls.append((year, reform_key))
+        return counterfactuals[reform_key]
+
+    runner = TaxCalcCPSRunner(
+        calculator_factory=lambda _: baseline,
+        counterfactual_calculator_factory=counterfactual_factory,
+    )
+    variables = (
+        "jct_repeal:medical_expense_deduction",
+        "jct_repeal:charitable_deduction",
+    )
+    first = runner.prepare(group(*variables))
+    second = runner.prepare(group(*variables))
+
+    assert first.arrays[variables[0]].tolist() == [3.0, 5.0]
+    assert first.arrays[variables[1]].tolist() == [7.0, 9.0]
+    assert second.arrays[variables[0]].tolist() == [3.0, 5.0]
+    assert counterfactual_calls == [
+        (2024, "medical_expense_deduction"),
+        (2024, "charitable_deduction"),
+    ]
+
+
 def test_runner_exposes_geography_domains_and_breakdown_dimensions() -> None:
     calculator = FakeCalculator(
         {
@@ -144,7 +187,13 @@ def test_runner_exposes_geography_domains_and_breakdown_dimensions() -> None:
     assert bundle.arrays["eitc_child_count"].tolist() == [0, 1, 2, "3plus", "3plus"]
     assert set(bundle.domain_masks) == {
         "all_individual_income_tax_returns",
+        "compensation_of_employees",
+        "federal_income_tax",
         "individual_income_tax_returns",
+        "national_health_expenditures",
+        "personal_current_transfer_receipts",
+        "personal_income",
+        "resident_population",
         "individual_income_tax_returns_with_earned_income_credit",
         "social_security_and_ssi_payments",
     }

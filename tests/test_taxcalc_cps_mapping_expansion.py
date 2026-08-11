@@ -153,3 +153,96 @@ def test_public_cps_benefit_totals_bridge_person_facts_to_tax_units(
     assert mapping is not None
     assert mapping.execution_entity == "tax_unit"
     assert mapping.source_expression == expression
+
+
+@pytest.mark.parametrize(
+    ("source", "measure", "unit", "expression", "operation", "entity"),
+    [
+        ("irs_soi", "irs_soi.net_capital_gains", "usd", "e01100", "weighted_sum", "tax_unit"),
+        ("irs_soi", "irs_soi.taxable_net_capital_gains", "usd", "e01100", "weighted_sum", "tax_unit"),
+        ("irs_soi", "irs_soi.returns_with_net_capital_gains", "count", "e01100", "weighted_count", "tax_unit"),
+        ("irs_soi", "irs_soi.returns_with_taxable_net_capital_gains", "count", "e01100", "weighted_count", "tax_unit"),
+        ("cbo", "cbo.net_capital_gain_projection", "usd", "e01100", "weighted_sum", "tax_unit"),
+        ("census_pep", "census_pep.resident_population", "count", "XTOT", "weighted_sum", "person"),
+        ("bea", "bea_regional.wages_and_salaries", "usd", "e00200", "weighted_sum", "person"),
+        ("bea", "bea_nipa.wages_and_salaries", "usd", "e00200", "weighted_sum", "person"),
+        ("bea", "bea_nipa.social_security_benefits", "usd", "e02400", "weighted_sum", "person"),
+        ("bea", "bea_nipa.unemployment_insurance_benefits", "usd", "e02300", "weighted_sum", "person"),
+        ("bea", "bea_nipa.veterans_benefits", "usd", "vet_ben", "weighted_sum", "person"),
+        ("bea", "bea_nipa.medicare_benefits", "usd", "mcare_ben", "weighted_sum", "person"),
+        ("bea", "bea_nipa.medicaid_benefits", "usd", "mcaid_ben", "weighted_sum", "person"),
+        ("bea", "bea_nipa.government_social_benefits_to_persons", "usd", "benefit_cost_total", "weighted_sum", "person"),
+        ("cms_nhe", "cms_nhe.medicaid_title_xix_expenditures", "usd", "mcaid_ben", "weighted_sum", "person"),
+    ],
+)
+def test_reviewed_additive_chronicle_concepts_have_exact_executable_mappings(
+    source: str,
+    measure: str,
+    unit: str,
+    expression: str,
+    operation: str,
+    entity: str,
+) -> None:
+    overview = load_integration_overview(INTEGRATION / "overview.yaml")
+    registry = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
+    candidate = replace(
+        overview.verification_facts[0],
+        fact_key=f"test:{source}:{measure}:{unit}",
+        source=source,
+        entity=entity,
+        measure=measure,
+        unit=unit,
+        dimensions={},
+        universe_constraints=(),
+    )
+
+    mapping = registry.match(candidate)
+    assert mapping is not None
+    assert mapping.source_expression == expression
+    assert mapping.operation == operation
+    if entity == "person":
+        assert mapping.execution_entity == "tax_unit"
+
+
+@pytest.mark.parametrize(
+    "tax_expenditure",
+    [
+        "charitable_deduction",
+        "deductible_mortgage_interest",
+        "medical_expense_deduction",
+        "qualified_business_income_deduction",
+        "salt_deduction",
+        "self_employed_health_insurance_deduction",
+        "self_employed_pension_contribution_deduction",
+        "student_loan_interest_deduction",
+        "traditional_ira_deduction",
+    ],
+)
+def test_reviewed_jct_facts_map_to_distinct_repeal_counterfactuals(
+    tax_expenditure: str,
+) -> None:
+    overview = load_integration_overview(INTEGRATION / "overview.yaml")
+    registry = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
+    candidate = replace(
+        overview.verification_facts[0],
+        fact_key=f"test:jct:{tax_expenditure}",
+        source="jct",
+        entity="tax_unit",
+        measure="jct.individual_tax_expenditure_revenue_loss",
+        unit="usd",
+        dimensions={"tax_expenditure": tax_expenditure},
+        universe_constraints=(
+            {"domain": "federal_income_tax"},
+            {
+                "variable": "tax_expenditure",
+                "operator": "==",
+                "value": tax_expenditure,
+            },
+        ),
+    )
+
+    mapping = registry.match(candidate)
+    assert mapping is not None
+    assert mapping.source_expression == f"jct_repeal:{tax_expenditure}"
+    assert mapping.execution.value == "model"
+    assert mapping.mapping_quality.value == "exact"

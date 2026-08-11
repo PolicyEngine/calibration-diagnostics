@@ -1,4 +1,4 @@
-mapping_release: taxcalc-public-cps-chronicle-expansion-v2
+mapping_release: taxcalc-public-cps-chronicle-expansion-v3
 mappings:
   - mapping_id: taxcalc-cps-returns-with-income-tax
     ledger_selector:
@@ -935,4 +935,432 @@ mappings:
     required_variables: [ssi_ben]
     mapping_quality: exact
     supported_constraint_domains: [social_security_and_ssi_payments]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-capital-gains-amount
+    ledger_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.net_capital_gains
+        - irs_soi.taxable_net_capital_gains
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01100
+    operation: weighted_sum
+    required_variables: [e01100]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-capital-gains-return-count
+    ledger_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.returns_with_net_capital_gains
+        - irs_soi.returns_with_taxable_net_capital_gains
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01100
+    operation: weighted_count
+    required_variables: [e01100]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-cbo-capital-gains
+    ledger_selector:
+      sources: [cbo]
+      measures: [cbo.net_capital_gain_projection]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01100
+    operation: weighted_sum
+    required_variables: [e01100]
+    mapping_quality: exact
+    supported_constraint_domains: [individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-pep-total-population
+    ledger_selector:
+      sources: [census_pep]
+      measures: [census_pep.resident_population]
+      units: [count]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: XTOT
+    operation: weighted_sum
+    required_variables: [XTOT]
+    mapping_quality: exact
+    supported_constraint_domains: [resident_population]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-regional-wages
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_regional.wages_and_salaries]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: e00200
+    operation: weighted_sum
+    required_variables: [e00200]
+    mapping_quality: exact
+    supported_dimensions:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    descriptive_dimensions:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    supported_constraint_domains: [personal_income]
+    supported_constraint_variables:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    descriptive_constraint_variables:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-nipa-wages
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.wages_and_salaries]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: e00200
+    operation: weighted_sum
+    required_variables: [e00200]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [compensation_of_employees]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-social-security-benefits
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.social_security_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: e02400
+    operation: weighted_sum
+    required_variables: [e02400]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-unemployment-benefits
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.unemployment_insurance_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: e02300
+    operation: weighted_sum
+    required_variables: [e02300]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-veterans-benefits
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.veterans_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: vet_ben
+    operation: weighted_sum
+    required_variables: [vet_ben]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-medicare-benefits
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.medicare_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: mcare_ben
+    operation: weighted_sum
+    required_variables: [mcare_ben]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-medicaid-benefits
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.medicaid_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: mcaid_ben
+    operation: weighted_sum
+    required_variables: [mcaid_ben]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-government-social-benefits
+    ledger_selector:
+      sources: [bea]
+      measures: [bea_nipa.government_social_benefits_to_persons]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: benefit_cost_total
+    operation: weighted_sum
+    required_variables: [benefit_cost_total]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-cms-medicaid-title-xix
+    ledger_selector:
+      sources: [cms_nhe]
+      measures: [cms_nhe.medicaid_title_xix_expenditures]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: mcaid_ben
+    operation: weighted_sum
+    required_variables: [mcaid_ben]
+    mapping_quality: exact
+    supported_constraint_domains: [national_health_expenditures]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-charitable-deduction
+    ledger_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [charitable_deduction]
+    execution: model
+    source_expression: jct_repeal:charitable_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:charitable_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-mortgage-interest
+    ledger_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [deductible_mortgage_interest]
+    execution: model
+    source_expression: jct_repeal:deductible_mortgage_interest
+    operation: weighted_sum
+    required_variables: [jct_repeal:deductible_mortgage_interest]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-medical-expense
+    ledger_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [medical_expense_deduction]
+    execution: model
+    source_expression: jct_repeal:medical_expense_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:medical_expense_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-qbi
+    ledger_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [qualified_business_income_deduction]
+    execution: model
+    source_expression: jct_repeal:qualified_business_income_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:qualified_business_income_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-salt
+    ledger_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [salt_deduction]
+    execution: model
+    source_expression: jct_repeal:salt_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:salt_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-self-employed-health
+    ledger_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [self_employed_health_insurance_deduction]
+    execution: model
+    source_expression: jct_repeal:self_employed_health_insurance_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:self_employed_health_insurance_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-self-employed-pension
+    ledger_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [self_employed_pension_contribution_deduction]
+    execution: model
+    source_expression: jct_repeal:self_employed_pension_contribution_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:self_employed_pension_contribution_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-student-loan-interest
+    ledger_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [student_loan_interest_deduction]
+    execution: model
+    source_expression: jct_repeal:student_loan_interest_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:student_loan_interest_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-traditional-ira
+    ledger_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [traditional_ira_deduction]
+    execution: model
+    source_expression: jct_repeal:traditional_ira_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:traditional_ira_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
     calibration_exposure: external_validation
