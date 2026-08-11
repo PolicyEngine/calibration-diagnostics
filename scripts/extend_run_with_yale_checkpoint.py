@@ -314,6 +314,9 @@ def extend(base_run: Path, output: Path) -> dict:
         "aligned_2023_fact_count": sum(
             entry.observed_period.value == "2023" for entry in checkpoint.entries
         ),
+        "aligned_2022_fact_count": sum(
+            entry.observed_period.value == "2022" for entry in checkpoint.entries
+        ),
         "held_out_2022_row_count": checkpoint.held_out_2022_row_count,
         "unmatched_row_count": checkpoint.unmatched_row_count,
         "estimate_basis": ESTIMATE_BASIS,
@@ -324,10 +327,9 @@ def extend(base_run: Path, output: Path) -> dict:
             "Yale Tax-Data and Tax-Simulator. This is not official Yale output."
         ),
         "period_policy": (
-            "Native 2024 Chronicle facts are compared directly. Eligible 2023 "
-            "facts use the same exact Microcosm 2023-to-2024 alignments already "
-            "published in this run. Reconstruction rows tied to 2022 facts remain "
-            "held out."
+            "Native 2024 Chronicle facts are compared directly. Eligible 2022 and "
+            "2023 facts use the same exact Microcosm-to-2024 alignments already "
+            "published in this run."
         ),
     }
     manifest = publish_run(

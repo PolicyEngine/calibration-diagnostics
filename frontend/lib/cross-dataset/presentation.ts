@@ -68,6 +68,7 @@ export interface SourceOverviewFilter {
 export interface GroupSourceView {
   scoreLabel: string;
   performanceBuckets: TargetPerformanceBuckets;
+  coverageRateLabel: string;
   coverageLabel: string;
   evaluableCount: number;
   scoredCount: number;
@@ -273,6 +274,17 @@ export function sourceDisplayLabel(source: SourceSummary): string {
   return source.label.replaceAll("Populace", "Microcosm").replaceAll("Ledger", "Chronicle");
 }
 
+export function sourceCompactLabel(source: SourceSummary): string {
+  const sourceId = source.source_id.toLowerCase();
+  if (sourceId.includes("populace")) return "Microcosm";
+  if (sourceId === "taxcalc_public_cps_2024" || sourceId === "cps") {
+    return "Public CPS";
+  }
+  if (sourceId.includes("yale_reconstruction")) return "Yale reconstruction";
+  if (sourceId.includes("acs_pums") || sourceId === "acs") return "Raw ACS";
+  return sourceDisplayLabel(source);
+}
+
 export function orderSourceSummaries(sources: SourceSummary[]): SourceSummary[] {
   const sourcePriority = (source: SourceSummary): number => {
     const sourceId = source.source_id.toLowerCase();
@@ -339,6 +351,7 @@ function sourceGroupView(
   return {
     scoreLabel: formatError(cell.loss),
     performanceBuckets: performanceBuckets(cell.performance_buckets),
+    coverageRateLabel: formatCoverageRate(cell.evaluable, total),
     coverageLabel: `${cell.evaluable.toLocaleString("en-US")} / ${total.toLocaleString("en-US")}`,
     evaluableCount: cell.evaluable,
     scoredCount: cell.scored,

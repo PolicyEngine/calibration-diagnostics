@@ -23,6 +23,79 @@ RECONSTRUCTION = (
     / "yale-national-2024.json"
 )
 
+REVIEWED_ADDITIONS = (
+    {
+        "fact_key": "ledger.aggregate_fact.v2:79a47ff730c7a462e8cc1609",
+        "reconstruction_row_key": (
+            "irs_soi.ty2023.table_1_1.all.adjusted_gross_income@2024"
+        ),
+        "match_basis": "reviewed_equivalent_aggregate",
+        "calibration_exposure": "related_calibration_family",
+    },
+    {
+        "fact_key": "ledger.aggregate_fact.v2:cb187e7abf9bdc592740e661",
+        "reconstruction_row_key": (
+            "irs_soi.ty2023.table_2_5.eitc_by_agi_children."
+            "three_or_more_qualifying_children.total.eitc_total@2024"
+        ),
+        "match_basis": "reviewed_equivalent_aggregate",
+        "calibration_exposure": "external_validation",
+    },
+    {
+        "fact_key": "ledger.aggregate_fact.v2:06c59904c06817cf61200eef",
+        "reconstruction_row_key": (
+            "irs_soi.ty2023.table_1_2.all_returns.all.adjusted_gross_income@2024"
+        ),
+        "match_basis": "reviewed_cross_publisher_benchmark",
+        "calibration_exposure": "related_calibration_family",
+    },
+    {
+        "fact_key": "ledger.aggregate_fact.v2:07c02eaf03cc25e2d454db3f",
+        "reconstruction_row_key": (
+            "irs_soi.ty2023.table_1_4.all.net_capital_gains_amount@2024"
+        ),
+        "match_basis": "reviewed_cross_publisher_benchmark",
+        "calibration_exposure": "related_calibration_family",
+    },
+    {
+        "fact_key": "ledger.aggregate_fact.v2:709bcad59f889e75f143f9fc",
+        "reconstruction_row_key": (
+            "irs_soi.ty2023.congressional_district_2022.all_returns.us."
+            "qualified_dividends_amount@2024"
+        ),
+        "match_basis": "reviewed_cross_publisher_benchmark",
+        "calibration_exposure": "related_calibration_family",
+    },
+    {
+        "fact_key": "ledger.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9",
+        "reconstruction_terms": (
+            {
+                "reconstruction_row_key": (
+                    "irs_soi.ty2023.congressional_district_2022.all_returns.us."
+                    "taxable_interest_amount@2024"
+                ),
+                "coefficient": "1",
+            },
+            {
+                "reconstruction_row_key": (
+                    "irs_soi.ty2023.congressional_district_2022.all_returns.us."
+                    "ordinary_dividends_amount@2024"
+                ),
+                "coefficient": "1",
+            },
+            {
+                "reconstruction_row_key": (
+                    "irs_soi.ty2023.congressional_district_2022.all_returns.us."
+                    "qualified_dividends_amount@2024"
+                ),
+                "coefficient": "-1",
+            },
+        ),
+        "match_basis": "reviewed_derived_expression",
+        "calibration_exposure": "related_calibration_family",
+    },
+)
+
 
 def _facts(frontend_bundle: Path) -> list[dict]:
     facts: list[dict] = []
@@ -66,28 +139,38 @@ def build(frontend_bundle: Path) -> dict:
 
     def add(
         fact: dict,
-        row_key: str,
+        row_key: str | None,
         match_basis: str,
         calibration_exposure: str,
+        *,
+        terms: tuple[dict, ...] | None = None,
     ) -> None:
         fact_key = str(fact["fact_key"])
-        if fact_key in used_facts or row_key in used_rows:
+        if fact_key in used_facts:
             return
-        if row_key not in rows:
-            raise ValueError(f"reconstruction row is missing: {row_key}")
+        if terms is None:
+            if row_key is None:
+                raise ValueError("simple Yale mapping requires a reconstruction row")
+            terms = ({"reconstruction_row_key": row_key, "coefficient": "1"},)
+        term_row_keys = [str(term["reconstruction_row_key"]) for term in terms]
+        missing_rows = [term_row for term_row in term_row_keys if term_row not in rows]
+        if missing_rows:
+            raise ValueError(f"reconstruction rows are missing: {missing_rows}")
         if fact["geography_level"] != "country" or fact["entity"] != "tax_unit":
             raise ValueError(f"Yale mapping is not a national tax-unit fact: {fact_key}")
-        mappings.append(
-            {
-                "fact_key": fact_key,
-                "reconstruction_row_key": row_key,
-                "observed_period": fact["observed_period"],
-                "match_basis": match_basis,
-                "calibration_exposure": calibration_exposure,
-            }
-        )
+        mapping = {
+            "fact_key": fact_key,
+            "observed_period": fact["observed_period"],
+            "match_basis": match_basis,
+            "calibration_exposure": calibration_exposure,
+        }
+        if len(terms) == 1 and terms[0].get("coefficient", "1") == "1":
+            mapping["reconstruction_row_key"] = term_row_keys[0]
+        else:
+            mapping["reconstruction_terms"] = list(terms)
+        mappings.append(mapping)
         used_facts.add(fact_key)
-        used_rows.add(row_key)
+        used_rows.update(term_row_keys)
 
     verification_fact_keys: list[str] = []
     for row in verification["results"]:
@@ -105,7 +188,11 @@ def build(frontend_bundle: Path) -> dict:
             continue
         if fact["geography_level"] != "country" or fact["entity"] != "tax_unit":
             continue
-        if fact["observed_period"] not in {"tax_year:2023", "tax_year:2024"}:
+        if fact["observed_period"] not in {
+            "tax_year:2022",
+            "tax_year:2023",
+            "tax_year:2024",
+        }:
             continue
         source_record_id = str(fact.get("provenance", {}).get("source_record_id", ""))
         if not source_record_id:
@@ -121,6 +208,15 @@ def build(frontend_bundle: Path) -> dict:
         if row_key not in rows:
             continue
         add(fact, row_key, match_basis, _inferred_exposure(fact))
+
+    for addition in REVIEWED_ADDITIONS:
+        add(
+            fact_by_key[str(addition["fact_key"])],
+            addition.get("reconstruction_row_key"),
+            str(addition["match_basis"]),
+            str(addition["calibration_exposure"]),
+            terms=addition.get("reconstruction_terms"),
+        )
 
     held_out_rows: set[str] = set()
     for fact in facts:
@@ -146,7 +242,7 @@ def build(frontend_bundle: Path) -> dict:
         "verification_fact_keys": verification_fact_keys,
         "mappings": mappings,
     }
-    if (len(mappings), len(held_out_rows), len(unmatched_rows)) != (318, 58, 44):
+    if (len(mappings), len(held_out_rows), len(unmatched_rows)) != (382, 0, 41):
         raise ValueError(
             "unexpected Yale checkpoint audit counts: "
             f"{len(mappings)} evaluated, {len(held_out_rows)} held out, "

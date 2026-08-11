@@ -7,7 +7,7 @@ alignment_policy:
   model_version: 1.2.0
   populace_commit: cae8640f9e65e274aea65c7916cb37b956978e32
   source_module: packages/populace-build/src/populace/build/us_runtime/target_aging.py
-  source_years: [2023]
+  source_years: [2022, 2023]
   build_year: 2024
   evaluate_transformed_facts: true
   display_observed_and_transformed_values: true
@@ -17,7 +17,7 @@ reconstruction:
   record_level_detail_available: false
   record_level_detail_required_for_fresh_model_run: true
   checkpoint_mapping_file: checkpoint_mappings.json
-  taxable_income_checkpoint_status: deferred_no_native_2024_ledger_fact
+  taxable_income_checkpoint_status: evaluated_via_exact_microcosm_2022_to_2024_alignment
   aggregate_checkpoint_file: verification_results.json
   aggregate_reconstruction_file: frontend/lib/populace/external-datasets/yale-national-2024.json
   legacy_artifact_commit: 37922ec2bc07a3f32cd5e920c0aa06385fa52a56
@@ -32,7 +32,7 @@ source:
   population_period: tax_year:2024
   policy_period: tax_year:2024
   native_fact_periods: [tax_year:2024]
-  advanced_fact_periods: []
+  advanced_fact_periods: [tax_year:2022, tax_year:2023]
   geographies: [country]
   entities: [tax_unit]
   weights:

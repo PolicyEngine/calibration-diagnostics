@@ -17,6 +17,7 @@ import { apiGet } from "@/lib/api/client";
 import type {
   CrossDatasetGroupsDocument,
   CrossDatasetSummary,
+  SourceSummary,
 } from "@/lib/cross-dataset/artifact";
 import {
   CROSS_DATASET_PAGE_TITLE,
@@ -25,8 +26,11 @@ import {
   buildSourceOverviews,
   crossDatasetUiState,
   orderSourceSummaries,
+  sourceCompactLabel,
   sourceDisplayLabel,
   type GroupDimension,
+  type GroupSourceView,
+  type LabeledCount,
   type OverviewGeographyFilter,
   type OverviewSampleFilter,
   type SourceOverviewFilter,
@@ -70,14 +74,30 @@ const PERFORMANCE_SEGMENTS = [
 function TargetPerformanceBar({
   buckets,
   label,
+  coverageLabel,
+  unsupportedReasons = [],
+  tooltipAlign = "center",
 }: {
   buckets: TargetPerformanceBuckets;
   label: string;
+  coverageLabel?: string;
+  unsupportedReasons?: LabeledCount[];
+  tooltipAlign?: "center" | "right";
 }) {
-  const ariaText = PERFORMANCE_SEGMENTS.map(
+  const bucketAriaText = PERFORMANCE_SEGMENTS.map(
     (segment) =>
       `${segment.label}: ${buckets[segment.key].toLocaleString("en-US")}`,
   ).join("; ");
+  const reasonAriaText = unsupportedReasons
+    .map((reason) => `${reason.label}: ${reason.count.toLocaleString("en-US")}`)
+    .join("; ");
+  const ariaText = [
+    coverageLabel ? `Evaluated facts: ${coverageLabel}` : null,
+    bucketAriaText,
+    reasonAriaText ? `Leading unavailable reasons: ${reasonAriaText}` : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
   return (
     <div className="group/validation relative" tabIndex={0}>
       <div
@@ -100,8 +120,16 @@ function TargetPerformanceBar({
       </div>
       <div
         role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-max max-w-[280px] -translate-x-1/2 rounded-md border border-border bg-popover px-3 py-2 text-[11px] text-popover-foreground opacity-0 shadow-lg transition-opacity group-hover/validation:opacity-100 group-focus/validation:opacity-100"
+        className={`pointer-events-none absolute bottom-full z-30 mb-2 w-max max-w-[300px] rounded-md border border-border bg-popover px-3 py-2 text-[11px] text-popover-foreground opacity-0 shadow-lg transition-opacity group-hover/validation:opacity-100 group-focus/validation:opacity-100 ${
+          tooltipAlign === "right" ? "right-0" : "left-1/2 -translate-x-1/2"
+        }`}
       >
+        {coverageLabel && (
+          <div className="mb-1.5 flex items-center justify-between gap-6 border-b border-border pb-1.5">
+            <span>Evaluated facts</span>
+            <span className="font-mono tabular-nums">{coverageLabel}</span>
+          </div>
+        )}
         {PERFORMANCE_SEGMENTS.map((segment) => (
           <div key={segment.key} className="flex items-center justify-between gap-6">
             <span className="inline-flex items-center gap-1.5">
@@ -113,8 +141,68 @@ function TargetPerformanceBar({
             </span>
           </div>
         ))}
+        {unsupportedReasons.length > 0 && (
+          <div className="mt-1.5 border-t border-border pt-1.5">
+            <div className="mb-1 text-muted-foreground">Leading unavailable reasons</div>
+            {unsupportedReasons.map((reason) => (
+              <div key={reason.key} className="flex items-center justify-between gap-6">
+                <span>{reason.label}</span>
+                <span className="font-mono tabular-nums">
+                  {reason.count.toLocaleString("en-US")}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function GroupMetricCell({
+  source,
+  groupLabel,
+  cell,
+  showSourceLabel = false,
+  tooltipAlign = "center",
+}: {
+  source: SourceSummary;
+  groupLabel: string;
+  cell: GroupSourceView;
+  showSourceLabel?: boolean;
+  tooltipAlign?: "center" | "right";
+}) {
+  const fullSourceLabel = sourceDisplayLabel(source);
+  return (
+    <Link
+      href={cell.factHref}
+      className="group block rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      aria-label={`View ${groupLabel} facts for ${fullSourceLabel}`}
+    >
+      {showSourceLabel && (
+        <span
+          className="mb-1.5 block truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+          title={fullSourceLabel}
+        >
+          {sourceCompactLabel(source)}
+        </span>
+      )}
+      <span className="block font-semibold tabular-nums group-hover:text-primary">
+        {cell.scoreLabel}
+      </span>
+      <span className="mt-0.5 block text-xs tabular-nums text-foreground/70">
+        {cell.coverageRateLabel}
+      </span>
+      <div className="mt-2">
+        <TargetPerformanceBar
+          buckets={cell.performanceBuckets}
+          coverageLabel={cell.coverageLabel}
+          unsupportedReasons={cell.topUnsupportedReasons}
+          tooltipAlign={tooltipAlign}
+          label={`${fullSourceLabel} target performance distribution for ${groupLabel}`}
+        />
+      </div>
+    </Link>
   );
 }
 
@@ -330,80 +418,101 @@ function CrossDatasetOverviewView() {
         padded={false}
       >
         {groupRows.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/10 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-2.5">Group</th>
-                  <th className="px-4 py-2.5 text-right">Chronicle facts</th>
+          <div className="group-matrix-container">
+            <div className="group-matrix-wide overflow-visible">
+              <table className="w-full min-w-[960px] table-fixed text-sm">
+                <colgroup>
+                  <col className="w-[220px]" />
                   {orderedSources.map((source) => (
-                    <th key={source.source_id} className="min-w-[220px] px-4 py-2.5">
-                      {sourceDisplayLabel(source)}
-                    </th>
+                    <col key={source.source_id} />
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {groupRows.map((row) => (
-                  <tr key={row.key} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3 align-top font-medium">{row.label}</td>
-                    <td className="px-4 py-3 text-right align-top font-mono text-xs tabular-nums text-muted-foreground">
-                      {row.factCount.toLocaleString("en-US")}
-                    </td>
-                    {orderedSources.map((source) => {
-                      const cell = row.sources[source.source_id];
-                      return (
-                        <td key={source.source_id} className="px-4 py-3 align-top">
-                          <Link
-                            href={cell.factHref}
-                            className="group block rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            aria-label={
-                              "View " + row.label + " facts for " + sourceDisplayLabel(source)
-                            }
-                          >
-                            <div className="flex items-baseline justify-between gap-3">
-                              <span className="font-semibold tabular-nums group-hover:text-primary">
-                                {cell.scoreLabel}
-                              </span>
-                              <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-                                {cell.coverageLabel}
-                              </span>
-                            </div>
-                            <div className="mt-1.5">
-                              <TargetPerformanceBar
-                                buckets={cell.performanceBuckets}
-                                label={
-                                  sourceDisplayLabel(source) +
-                                  " target performance distribution for " +
-                                  row.label
-                                }
-                              />
-                            </div>
-                            <div className="mt-1 flex justify-end text-[11px] text-muted-foreground">
-                              <span>
-                                {cell.unsupportedCount
-                                  ? cell.unsupportedCount.toLocaleString("en-US") + " not evaluated"
-                                  : "All represented"}
-                              </span>
-                            </div>
-                            {cell.topUnsupportedReasons.length > 0 && (
-                              <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                                {cell.topUnsupportedReasons
-                                  .map(
-                                    (reason) =>
-                                      reason.label + ": " + reason.count.toLocaleString("en-US"),
-                                  )
-                                  .join(" · ")}
-                              </p>
-                            )}
-                          </Link>
-                        </td>
-                      );
-                    })}
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-border bg-muted/10 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-2.5">Chronicle group</th>
+                    {orderedSources.map((source) => (
+                      <th key={source.source_id} className="px-4 py-2.5">
+                        <span title={sourceDisplayLabel(source)}>
+                          {sourceCompactLabel(source)}
+                        </span>
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {groupRows.map((row) => (
+                    <tr
+                      key={row.key}
+                      className="border-b border-border last:border-0 hover:bg-muted/20"
+                    >
+                      <th className="px-4 py-3 text-left align-top" scope="row">
+                        <span className="block font-medium">{row.label}</span>
+                        <span className="mt-1 block font-mono text-[11px] font-normal tabular-nums text-muted-foreground">
+                          {row.factCount.toLocaleString("en-US")} facts
+                        </span>
+                      </th>
+                      {orderedSources.map((source, sourceIndex) => (
+                        <td key={source.source_id} className="px-4 py-3 align-top">
+                          <GroupMetricCell
+                            source={source}
+                            groupLabel={row.label}
+                            cell={row.sources[source.source_id]}
+                            tooltipAlign={
+                              sourceIndex === orderedSources.length - 1 ? "right" : "center"
+                            }
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div
+              className="group-matrix-compact text-sm"
+              role="table"
+              aria-label="Error by Chronicle group"
+            >
+              <div
+                className="grid grid-cols-[minmax(110px,30%)_minmax(0,1fr)] border-b border-border bg-muted/10 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                role="row"
+              >
+                <div className="px-3 py-2.5" role="columnheader">
+                  Chronicle group
+                </div>
+                <div className="px-3 py-2.5" role="columnheader">
+                  Sources
+                </div>
+              </div>
+              {groupRows.map((row) => (
+                <div
+                  key={row.key}
+                  className="grid grid-cols-[minmax(110px,30%)_minmax(0,1fr)] border-b border-border last:border-0"
+                  role="row"
+                >
+                  <div className="px-3 py-3" role="rowheader">
+                    <span className="block break-words font-medium">{row.label}</span>
+                    <span className="mt-1 block font-mono text-[10px] tabular-nums text-muted-foreground">
+                      {row.factCount.toLocaleString("en-US")} facts
+                    </span>
+                  </div>
+                  <div className="group-matrix-source-grid grid gap-px bg-border">
+                    {orderedSources.map((source) => (
+                      <div key={source.source_id} className="bg-card p-3" role="cell">
+                        <GroupMetricCell
+                          source={source}
+                          groupLabel={row.label}
+                          cell={row.sources[source.source_id]}
+                          showSourceLabel
+                          tooltipAlign="right"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="p-5">

@@ -336,6 +336,41 @@ body::before {
   overflow-x: auto !important;
 }
 
+/* The Chronicle group matrix changes form when its own content area can no
+   longer hold the 960px comparison table, independent of viewport chrome. */
+.group-matrix-container {
+  container-name: chronicle-group-matrix;
+  container-type: inline-size;
+}
+
+.group-matrix-wide {
+  display: none;
+}
+
+.group-matrix-compact {
+  display: block;
+}
+
+.group-matrix-source-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container chronicle-group-matrix (min-width: 480px) {
+  .group-matrix-source-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container chronicle-group-matrix (min-width: 960px) {
+  .group-matrix-wide {
+    display: block;
+  }
+
+  .group-matrix-compact {
+    display: none;
+  }
+}
+
 @keyframes loading-bar {
   0% {
     transform: translateX(-100%);
