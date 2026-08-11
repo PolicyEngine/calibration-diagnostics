@@ -21,6 +21,9 @@ def test_taxcalc_cps_overview_pins_public_dataset_and_model() -> None:
     assert overview.source.entities == frozenset({"tax_unit"})
     assert overview.source.execution_year_from_fact
     assert overview.source.advanced_fact_periods >= {
+        "calendar_year:2018",
+        "calendar_year:2023",
+        "calendar_year:2024",
         "tax_year:2022",
         "tax_year:2023",
         "tax_year:2024",

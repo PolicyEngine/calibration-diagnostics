@@ -9,8 +9,9 @@ contract.
 
 This page is explicitly US-only. The run records `jurisdictions: [US]` and
 filters the immutable Chronicle source snapshot before capability
-classification. Its current scope is 46,249 US facts; 2,064 non-US source facts
-are excluded rather than emitted as `not_applicable` cells.
+classification. Its current scope is 46,241 US facts. The pinned snapshot
+contains no non-US facts; future snapshots will still exclude any non-US rows
+before capability classification.
 
 ## Publish frontend partitions
 
