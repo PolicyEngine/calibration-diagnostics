@@ -4,6 +4,7 @@ import type {
   SourceSummary,
 } from "./artifact";
 import { sourceDisplayLabel } from "./presentation";
+import { sourceAuthorityLabel } from "../source-labels";
 
 export interface FactCatalogParams {
   source: string;
@@ -294,7 +295,7 @@ export function buildFactRowView(
     factKey: fact.fact_key,
     label: fact.label,
     measure: fact.measure,
-    ledgerSource: humanizeIdentifier(fact.ledger_source),
+    ledgerSource: sourceAuthorityLabel(fact.ledger_source),
     observedValue: formatFactValue(fact.observed_value, fact.unit),
     observedPeriod: formatPeriod(fact.observed_period),
     geography: humanizeIdentifier(fact.geography_level),
@@ -403,7 +404,7 @@ export function buildFactDetailView(
     observation: {
       valueLabel: formatFactValue(fact.observed_value, fact.unit),
       periodLabel: formatPeriod(fact.observed_period),
-      sourceLabel: humanizeIdentifier(fact.ledger_source),
+      sourceLabel: sourceAuthorityLabel(fact.ledger_source),
       geographyLabel:
         humanizeIdentifier(fact.geography_level) + " · " + fact.geography_id,
       entityLabel: humanizeIdentifier(fact.entity),

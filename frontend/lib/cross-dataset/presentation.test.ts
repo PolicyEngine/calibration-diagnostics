@@ -514,6 +514,7 @@ test("source scorecards identify aligned, advanced, and in-sample comparisons", 
 test("group rows expose score, coverage, unsupported counts, and fact links", () => {
   const rows = buildGroupRows(groups, "ledger_source", summary.sources);
   expect(rows).toHaveLength(1);
+  expect(rows[0].label).toBe("IRS Statistics of Income");
   expect(rows[0].sources.populace).toMatchObject({
     scoreLabel: "7.0% mean error",
     coverageLabel: "150 / 33,045",

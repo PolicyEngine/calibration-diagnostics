@@ -4,6 +4,7 @@ import type {
   PerformanceBuckets,
   SourceSummary,
 } from "./artifact";
+import { sourceAuthorityLabel } from "../source-labels";
 
 export const CROSS_DATASET_PAGE_TITLE = "Cross-dataset comparison";
 
@@ -359,7 +360,10 @@ export function buildGroupRows(
     .map((group) => ({
       dimension,
       key: group.key,
-      label: group.label,
+      label:
+        dimension === "ledger_source"
+          ? sourceAuthorityLabel(group.key)
+          : group.label,
       factCount: group.fact_count,
       sources: Object.fromEntries(
         sources.map((source) => [
