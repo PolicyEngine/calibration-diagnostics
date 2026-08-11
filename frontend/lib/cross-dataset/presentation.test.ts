@@ -369,12 +369,13 @@ const groups: CrossDatasetGroup[] = [
   },
 ];
 
-test("keeps the existing page title", () => {
+test("keeps the page title and exposes only the requested group controls", () => {
   expect(CROSS_DATASET_PAGE_TITLE).toBe("Cross-dataset comparison");
-  expect(GROUP_DIMENSIONS[0]).toEqual({
-    key: "ledger_source",
-    label: "Chronicle source",
-  });
+  expect(GROUP_DIMENSIONS).toEqual([
+    { key: "ledger_source", label: "Chronicle source" },
+    { key: "period", label: "Period" },
+    { key: "geography", label: "Geography" },
+  ]);
 });
 
 test("classifies loading, error, empty, and ready overview states", () => {
