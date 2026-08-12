@@ -1,8 +1,12 @@
-# Populace calibration diagnostics
+# Microcosm calibration diagnostics
 
-Interactive dashboard for the **populace-US** synthetic population — PolicyEngine's
-calibrated microdataset published on Hugging Face at
+Interactive dashboard for **Microcosm US** — PolicyEngine's calibrated synthetic
+population published on Hugging Face at the legacy repository ID
 [`policyengine/populace-us`](https://huggingface.co/datasets/policyengine/populace-us).
+
+Routes, commands, scripts, release IDs, repository IDs, and environment variables
+containing `populace` below are legacy compatibility identifiers for Microcosm.
+They must remain literal for the documented interfaces to work.
 
 Everything is read **live from Hugging Face**: the current release is resolved
 through `latest.json`, and each release's manifests and per-target calibration
@@ -23,7 +27,7 @@ separate service layer — the Next.js API routes are the API layer.
 - **Compare versions** (`/populace/compare`) — diff two releases: targets matched
   by name, common targets get a fit change, and added/removed targets are
   surfaced.
-- **Staging runs** (`/populace/staging`) — monitor pre-release Populace build
+- **Staging runs** (`/populace/staging`) — monitor pre-release Microcosm build
   runs from the staging Hub repo: current stage, calibration loss progress,
   final candidate diagnostics once uploaded, and candidate-vs-latest fit.
 - **Agentic investigations** (`.claude/`) — Claude Code slash command,
@@ -39,7 +43,7 @@ The Next.js route handlers are the API layer; all read live from Hugging Face:
 | `GET /api/populace/releases` | List published releases (newest first) |
 | `GET /api/populace?release=<id>` | Release summary (default: latest) |
 | `GET /api/populace/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics |
-| `GET /api/populace/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, ledger metadata, artifact paths, repo searches, and next checks |
+| `GET /api/populace/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, Chronicle metadata, artifact paths, repo searches, and next checks |
 | `GET /api/populace/compare?a=<id>&b=<id>` | Version-over-version diff |
 | `GET /api/populace/staging/runs` | List staging build runs |
 | `GET /api/populace/staging/run?id=<run_id>` | One staging run's progress and uploaded candidate diagnostics |

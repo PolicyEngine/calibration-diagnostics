@@ -50,7 +50,8 @@ bundle returns HTTP 503 rather than serving mixed results.
 
 ## Read the API
 
-`GET /api/populace/cross-dataset` accepts these views:
+The compatibility route `GET /api/populace/cross-dataset` accepts these views;
+the `populace` path segment is a legacy internal identifier for Microcosm:
 
 - `view=summary` (default): source-level score, coverage, capability statuses,
   unsupported reasons, period treatments, and target-performance buckets.

@@ -5,6 +5,10 @@ content-addressed evaluation run built from an immutable Chronicle snapshot. A n
 Chronicle release must pass this review before an integration changes its pinned
 `ledger_snapshot_id`.
 
+Commands below retain legacy `ledger` and `populace` identifiers for CLI,
+integration-path, package-extra, and flag compatibility. They refer to Chronicle
+and Microcosm respectively and must remain literal for the commands to work.
+
 ## 1. Compile the candidate snapshot
 
 ```bash

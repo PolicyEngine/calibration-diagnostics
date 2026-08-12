@@ -11,14 +11,14 @@ dashboard already maintains — official actuals stay the referee, and datasets
 compare *by their errors*:
 
 ```
-benchmark row (official actual)   populace   eCPS   taxcalc-CPS   Yale
+benchmark row (official actual)   Microcosm  eCPS   taxcalc-CPS   Yale
 SOI income tax net (TY2023) ....  -1.4%      …      …             …      (pending)
 SOI wages & salaries ..........   …          …      …             …
 IRS EITC — NY (TY2024) ........   -17.5%     …      …             …
 ```
 
-This generalizes the populace-vs-eCPS evidence pattern from issue #88
-(populace within ±20% on 24/29 state EITCs vs 14/29 for per-state eCPS) into a
+This generalizes the Microcosm-vs-eCPS evidence pattern from issue #88
+(Microcosm within ±20% on 24/29 state EITCs vs 14/29 for per-state eCPS) into a
 standing view.
 
 ## Metrics (phase 1)
@@ -26,7 +26,7 @@ standing view.
 1. **Aggregate levels vs official actuals** — per-row % error, and per-dataset
    summary: median |error|, within-10% share, worst row.
    - IRS SOI Pub 1304 TY2023 lines (income tax net, AMT, NIIT, SE tax, credit
-     lines) — already benchmarked for populace.
+     lines) — already benchmarked for Microcosm.
    - Federal EITC by state vs IRS TY2024 — already benchmarked (18 rows).
    - SOI income concepts (wages, interest, dividends, Sch C, capital gains,
      pensions, Social Security) — input-side, computable from any file.
@@ -35,7 +35,7 @@ standing view.
 3. **Coverage** — how many benchmark rows each dataset can express at all.
    Tax-Calculator CPS is federal-tax-only, but its public records retain state
    FIPS and therefore support state aggregation of the modeled federal concepts;
-   Yale is federal tax units; populace covers the full surface. Coverage is a
+   Yale is federal tax units; Microcosm covers the full surface. Coverage is a
    first-class metric, not a footnote.
 
 Phase 2 (later): reform deltas (OBBBA lines via Tax-Calculator's reform JSONs /
@@ -65,7 +65,7 @@ aggregated export above, which is also exactly the shape the dashboard needs.
    → loads the file, applies a variable-concept mapping
    (`e00200→wages`, `iitax→income_tax_net`, …), computes weighted totals
    (national + AGI-bracket + EITC-by-state where fips exists), and emits
-   `frontend/lib/populace/external-datasets/<dataset>.json` keyed by the same
+   the legacy-path `frontend/lib/populace/external-datasets/<dataset>.json`, keyed by the same
    benchmark ids the suites use.
 2. Frontend joins external JSONs to benchmark rows by id; unmatched rows show
    as no-coverage.
