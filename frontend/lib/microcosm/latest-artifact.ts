@@ -2124,8 +2124,8 @@ function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
     release_id: cal.release_id,
     target: targetResponseRow(row),
     source_artifact: {
-      hf_repo: POPULACE_HF_REPO,
-      hf_revision: POPULACE_HF_REVISION,
+      hf_repo: MICROCOSM_HF_REPO,
+      hf_revision: MICROCOSM_HF_REVISION,
       calibration_diagnostics_path: `releases/${cal.release_id}/calibration_diagnostics.json`,
       build_manifest_path: `releases/${cal.release_id}/build_manifest.json`,
       release_manifest_path: `releases/${cal.release_id}/release_manifest.json`,
