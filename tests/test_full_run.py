@@ -106,7 +106,7 @@ def source(source_id: str) -> EvaluationSourceManifest:
 def capability(
     ledger_fact: FactContract,
     *,
-    source_id: str = "populace",
+    source_id: str = "microcosm",
     treatment: PeriodTreatment = PeriodTreatment.NATIVE,
     alignment_id: str | None = None,
 ) -> CapabilityResult:
@@ -166,7 +166,7 @@ def test_full_matrix_contains_one_cell_for_every_fact_source_pair() -> None:
         fact("ledger.aggregate_fact.v2:cccccccccccccccccccccccc"),
     )
     plans = (
-        SourcePlan(source("populace"), registry("populace-v1")),
+        SourcePlan(source("microcosm"), registry("microcosm-v1")),
         SourcePlan(source("taxcalc-cps"), registry("taxcalc-v1")),
     )
     cells = build_full_capability_matrix(facts, plans, snapshot_id="ledger-test")
@@ -214,8 +214,8 @@ def test_evaluation_geography_scope_removes_unrepresented_territories() -> None:
 def test_source_plan_propagates_fact_specific_calibration_exposure() -> None:
     ledger_fact = fact("ledger.aggregate_fact.v2:exposure")
     plan = SourcePlan(
-        source("populace"),
-        registry("populace-v1"),
+        source("microcosm"),
+        registry("microcosm-v1"),
         calibration_exposures={
             ledger_fact.fact_key: CalibrationExposure.DIRECT_CALIBRATION_TARGET
         },
@@ -247,7 +247,7 @@ def test_aligned_result_is_scored_against_transformed_not_2023_value() -> None:
         "ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
         period="tax_year:2023",
     )
-    alignment_id = "populace-aging:agi-2023-2024"
+    alignment_id = "microcosm-aging:agi-2023-2024"
     cell = capability(
         ledger_fact,
         treatment=PeriodTreatment.ALIGNED_FACT,
@@ -272,7 +272,7 @@ def test_aligned_result_is_scored_against_transformed_not_2023_value() -> None:
     assert scored.observed_value == Decimal("100")
     assert scored.benchmark_value == Decimal("125")
     assert scored.benchmark_period == TypedPeriod.parse("tax_year:2024")
-    assert scored.benchmark_basis == "populace_aligned_fact"
+    assert scored.benchmark_basis == "microcosm_aligned_fact"
     assert scored.absolute_relative_error == Decimal("0.2")
 
 
@@ -330,7 +330,7 @@ def test_scoring_rejects_an_aligned_result_without_its_benchmark() -> None:
 
 def test_summary_proves_matrix_completeness_and_reports_unsupported_reasons() -> None:
     ledger_fact = fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
-    executable = capability(ledger_fact, source_id="populace")
+    executable = capability(ledger_fact, source_id="microcosm")
     unsupported = CapabilityResult.unsupported(
         snapshot_id="ledger-test",
         fact=ledger_fact,

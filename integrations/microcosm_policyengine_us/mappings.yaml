@@ -1,4 +1,4 @@
-mapping_release: populace-policyengine-us-2024-chronicle-expansion-v10
+mapping_release: microcosm-policyengine-us-2024-chronicle-expansion-v10
 mappings:
   - mapping_id: census-pep-resident-population-calibration-target
     ledger_selector:

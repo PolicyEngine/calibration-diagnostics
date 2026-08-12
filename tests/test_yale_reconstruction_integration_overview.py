@@ -31,7 +31,7 @@ from evaluation_harness.yale_reconstruction_checkpoint import (
 ROOT = Path(__file__).parents[1]
 INTEGRATION = ROOT / "integrations" / "yale_reconstruction"
 RECONSTRUCTION = (
-    ROOT / "frontend" / "lib" / "populace" / "external-datasets"
+    ROOT / "frontend" / "lib" / "microcosm" / "external-datasets"
     / "yale-national-2024.json"
 )
 COVERAGE_MANIFEST = INTEGRATION / "checkpoint_mappings.json"
@@ -60,9 +60,9 @@ def test_yale_overview_pins_reconstruction_dataset_and_model() -> None:
     assert overview.alignment_policy == {
         "model_id": "cbo_growth_factor_aging",
         "model_version": "1.2.0",
-        "populace_commit": "cae8640f9e65e274aea65c7916cb37b956978e32",
+        "microcosm_commit": "cae8640f9e65e274aea65c7916cb37b956978e32",
         "source_module": (
-            "packages/populace-build/src/populace/build/us_runtime/target_aging.py"
+            "packages/microcosm-build/src/microcosm/build/us_runtime/target_aging.py"
         ),
         "source_years": [2022, 2023],
         "build_year": 2024,

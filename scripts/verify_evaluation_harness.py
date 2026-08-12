@@ -13,12 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def build_commands(
     *,
-    populace_dataset: Path | None = None,
+    microcosm_dataset: Path | None = None,
     acs_pums_aggregates: Path | None = None,
 ) -> list[tuple[str, list[str]]]:
     sync = ["uv", "sync", "--frozen", "--extra", "taxcalc-cps"]
-    if populace_dataset is not None:
-        sync.extend(["--extra", "populace"])
+    if microcosm_dataset is not None:
+        sync.extend(["--extra", "microcosm"])
 
     commands: list[tuple[str, list[str]]] = [
         ("Install locked harness dependencies", sync),
@@ -35,7 +35,7 @@ def build_commands(
             ],
         ),
     ]
-    if populace_dataset is not None:
+    if microcosm_dataset is not None:
         commands.append(
             (
                 "Run the Microcosm + PolicyEngine-US numerical gate",
@@ -43,10 +43,10 @@ def build_commands(
                     "uv",
                     "run",
                     "--extra",
-                    "populace",
+                    "microcosm",
                     "python",
-                    "scripts/verify_populace_adapter.py",
-                    str(populace_dataset),
+                    "scripts/verify_microcosm_adapter.py",
+                    str(microcosm_dataset),
                 ],
             )
         )
@@ -75,7 +75,7 @@ def parse_args() -> argparse.Namespace:
         )
     )
     parser.add_argument(
-        "--populace-dataset",
+        "--microcosm-dataset",
         type=Path,
         help="Pinned Microcosm H5 used for the optional ten-fact numerical gate.",
     )
@@ -93,7 +93,7 @@ def main() -> None:
         raise SystemExit("uv is required: https://docs.astral.sh/uv/")
 
     for label, command in build_commands(
-        populace_dataset=args.populace_dataset,
+        microcosm_dataset=args.microcosm_dataset,
         acs_pums_aggregates=args.acs_pums_aggregates,
     ):
         print(f"\n==> {label}", flush=True)

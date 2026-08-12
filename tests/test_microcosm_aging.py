@@ -5,13 +5,13 @@ from decimal import Decimal
 import pytest
 
 from evaluation_harness.contracts import AlignmentQuality, FactContract, TypedPeriod
-from evaluation_harness.populace_aging import (
+from evaluation_harness.microcosm_aging import (
     AGING_MODEL_ID,
     AGING_MODEL_VERSION,
     AgingStatus,
-    PopulaceAgingPolicy,
-    transform_ledger_facts_to_populace_year,
-    transform_ledger_facts_to_populace_years,
+    MicrocosmAgingPolicy,
+    transform_ledger_facts_to_microcosm_year,
+    transform_ledger_facts_to_microcosm_years,
 )
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.planner import CapabilityPlanner
@@ -65,12 +65,12 @@ def cbo(year: int, series: str, value: str) -> FactContract:
     )
 
 
-def test_matching_cbo_series_uses_populace_ratio_and_provenance() -> None:
+def test_matching_cbo_series_uses_microcosm_ratio_and_provenance() -> None:
     target = fact(
         measure="irs_soi.wages_and_salaries",
         observed_measure={"source_measure_id": "wages_salaries_amount"},
     )
-    policy = PopulaceAgingPolicy.from_facts(
+    policy = MicrocosmAgingPolicy.from_facts(
         [
             cbo(2023, "wages_and_salaries", "1000"),
             cbo(2024, "wages_and_salaries", "1200"),
@@ -92,7 +92,7 @@ def test_unmapped_dollar_concept_falls_back_to_cbo_agi() -> None:
         measure="irs_soi.income_tax_liability_after_credits",
         observed_measure={"source_measure_id": "income_tax_liability_amount"},
     )
-    policy = PopulaceAgingPolicy.from_facts(
+    policy = MicrocosmAgingPolicy.from_facts(
         [
             cbo(2023, "adjusted_gross_income", "200"),
             cbo(2024, "adjusted_gross_income", "220"),
@@ -104,26 +104,26 @@ def test_unmapped_dollar_concept_falls_back_to_cbo_agi() -> None:
     assert float(result.transformed_value) == pytest.approx(110.0)
 
 
-def test_counts_receive_populaces_explicit_identity_treatment() -> None:
+def test_counts_receive_microcosms_explicit_identity_treatment() -> None:
     target = fact(
         measure="irs_soi.individual_income_tax_returns",
         unit="count",
         value=Decimal("160000000"),
         observed_measure={"source_measure_id": "return_count"},
     )
-    result = PopulaceAgingPolicy.from_facts([]).transform(
+    result = MicrocosmAgingPolicy.from_facts([]).transform(
         target, TypedPeriod.parse("tax_year:2024")
     )
     assert result.status is AgingStatus.NOT_DOLLAR_AMOUNT
     assert result.factor == Decimal("1")
     assert result.transformed_value == target.value
     assert result.comparable
-    assert result.note == "Populace leaves counts and non-USD targets raw."
+    assert result.note == "Microcosm leaves counts and non-USD targets raw."
 
 
 def test_source_projection_is_not_projected_again() -> None:
     target = fact(assertion="source_projection")
-    result = PopulaceAgingPolicy.from_facts(
+    result = MicrocosmAgingPolicy.from_facts(
         [
             cbo(2023, "adjusted_gross_income", "200"),
             cbo(2024, "adjusted_gross_income", "220"),
@@ -136,7 +136,7 @@ def test_source_projection_is_not_projected_again() -> None:
 
 
 def test_missing_projection_pair_is_explicitly_not_comparable() -> None:
-    result = PopulaceAgingPolicy.from_facts([]).transform(
+    result = MicrocosmAgingPolicy.from_facts([]).transform(
         fact(), TypedPeriod.parse("tax_year:2024")
     )
     assert result.status is AgingStatus.UNAVAILABLE
@@ -184,7 +184,7 @@ def test_pinned_release_factors_fill_missing_chronicle_projection_inputs(
         observed_measure={"source_measure_id": "income_tax_liability_amount"},
     )
 
-    result = PopulaceAgingPolicy.from_facts(
+    result = MicrocosmAgingPolicy.from_facts(
         [], release_diagnostics_path=diagnostics
     ).transform(target, TypedPeriod.parse("tax_year:2024"))
 
@@ -240,7 +240,7 @@ def test_release_factors_keep_matching_series_priority(tmp_path: Path) -> None:
         observed_measure={"source_measure_id": "wages_salaries_amount"},
     )
 
-    result = PopulaceAgingPolicy.from_facts(
+    result = MicrocosmAgingPolicy.from_facts(
         [], release_diagnostics_path=diagnostics
     ).transform(target, TypedPeriod.parse("tax_year:2024"))
 
@@ -288,7 +288,7 @@ def test_release_factor_reconstructs_same_series_uprating_chain(
         observed_measure={"source_measure_id": "net_capital_gains_amount"},
     )
 
-    result = PopulaceAgingPolicy.from_facts(
+    result = MicrocosmAgingPolicy.from_facts(
         [], release_diagnostics_path=diagnostics
     ).transform(target, TypedPeriod.parse("tax_year:2024"))
 
@@ -331,7 +331,7 @@ def test_release_factor_does_not_reuse_unrelated_surface_uprating(
         )
     )
 
-    result = PopulaceAgingPolicy.from_facts(
+    result = MicrocosmAgingPolicy.from_facts(
         [], release_diagnostics_path=diagnostics
     ).transform(
         fact(
@@ -359,7 +359,7 @@ def test_chained_aging_uses_observed_soi_then_cbo_projection() -> None:
         value=Decimal("14700"),
         lineage={"source_record_id": "irs_soi.ty2023.table_1_1.all.adjusted_gross_income"},
     )
-    policy = PopulaceAgingPolicy.from_facts(
+    policy = MicrocosmAgingPolicy.from_facts(
         [
             cbo(2023, "adjusted_gross_income", "15000"),
             cbo(2024, "adjusted_gross_income", "16500"),
@@ -376,12 +376,12 @@ def test_chained_aging_uses_observed_soi_then_cbo_projection() -> None:
 
 
 def test_comparable_result_converts_to_auditable_aligned_fact() -> None:
-    policy = PopulaceAgingPolicy.from_facts(
+    policy = MicrocosmAgingPolicy.from_facts(
         [
             cbo(2023, "adjusted_gross_income", "15350"),
             cbo(2024, "adjusted_gross_income", "16685.9"),
         ],
-        populace_commit="cae8640f9e65e274aea65c7916cb37b956978e32",
+        microcosm_commit="cae8640f9e65e274aea65c7916cb37b956978e32",
     )
     result = policy.transform(fact(), TypedPeriod.parse("tax_year:2024"))
     aligned = result.to_aligned_fact()
@@ -403,7 +403,7 @@ def test_conflicting_projection_facts_fail_loudly() -> None:
         value=Decimal("221"),
     )
     with pytest.raises(ValueError, match="Conflicting CBO projection facts"):
-        PopulaceAgingPolicy.from_facts(
+        MicrocosmAgingPolicy.from_facts(
             [
                 cbo(2024, "adjusted_gross_income", "220"),
                 duplicate,
@@ -412,7 +412,7 @@ def test_conflicting_projection_facts_fail_loudly() -> None:
 
 
 def test_aged_2023_fact_executes_as_a_labeled_2024_projection() -> None:
-    integration = Path(__file__).parents[1] / "integrations/populace_policyengine_us"
+    integration = Path(__file__).parents[1] / "integrations/microcosm_policyengine_us"
     overview = load_integration_overview(integration / "overview.yaml")
     mappings = MappingRegistry.from_yaml(integration / "mappings.yaml")
     population = next(
@@ -421,7 +421,7 @@ def test_aged_2023_fact_executes_as_a_labeled_2024_projection() -> None:
         if fact.fact_key == "ledger.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52"
     )
     source_fact = replace(population, period=TypedPeriod.parse("calendar_year:2023"))
-    aging = PopulaceAgingPolicy.from_facts([]).transform(
+    aging = MicrocosmAgingPolicy.from_facts([]).transform(
         source_fact, TypedPeriod.parse("calendar_year:2024")
     )
     result = CapabilityPlanner(
@@ -439,15 +439,15 @@ def test_bulk_alignment_transforms_only_us_2023_and_preserves_period_kind() -> N
     us_2023 = fact(unit="count", aggregation={"method": "sum"})
     us_2024 = replace(us_2023, period=TypedPeriod.parse("tax_year:2024"))
     uk_2023 = replace(us_2023, jurisdiction="UK", geography_id="K02000001")
-    results = transform_ledger_facts_to_populace_year(
-        [us_2024, uk_2023, us_2023], PopulaceAgingPolicy.from_facts([])
+    results = transform_ledger_facts_to_microcosm_year(
+        [us_2024, uk_2023, us_2023], MicrocosmAgingPolicy.from_facts([])
     )
     assert len(results) == 1
     assert results[0].target_period == TypedPeriod.parse("tax_year:2024")
     assert results[0].status is AgingStatus.NOT_DOLLAR_AMOUNT
 
 
-def test_bulk_alignment_can_apply_the_populace_policy_to_2022_and_2023() -> None:
+def test_bulk_alignment_can_apply_the_microcosm_policy_to_2022_and_2023() -> None:
     us_2023 = fact(unit="count", aggregation={"method": "sum"})
     us_2022 = replace(
         us_2023,
@@ -455,16 +455,16 @@ def test_bulk_alignment_can_apply_the_populace_policy_to_2022_and_2023() -> None
         period=TypedPeriod.parse("tax_year:2022"),
     )
     us_2024 = replace(us_2023, period=TypedPeriod.parse("tax_year:2024"))
-    results = transform_ledger_facts_to_populace_years(
+    results = transform_ledger_facts_to_microcosm_years(
         [us_2024, us_2023, us_2022],
-        PopulaceAgingPolicy.from_facts([]),
+        MicrocosmAgingPolicy.from_facts([]),
         source_years=(2022, 2023),
     )
     assert [row.source_fact.period.value for row in results] == ["2023", "2022"]
     assert all(row.target_period == TypedPeriod.parse("tax_year:2024") for row in results)
 
 
-def test_real_release_target_matches_populace_diagnostics_byte_for_byte() -> None:
+def test_real_release_target_matches_microcosm_diagnostics_byte_for_byte() -> None:
     net_worth = fact(
         source="federal_reserve",
         period=TypedPeriod.parse("calendar_year:2023"),
@@ -472,7 +472,7 @@ def test_real_release_target_matches_populace_diagnostics_byte_for_byte() -> Non
         value=Decimal("156080700000000"),
         observed_measure={"source_measure_id": "amount_outstanding"},
     )
-    policy = PopulaceAgingPolicy.from_facts(
+    policy = MicrocosmAgingPolicy.from_facts(
         [
             cbo(2023, "adjusted_gross_income", "15347400000000"),
             cbo(2024, "adjusted_gross_income", "16685900000000"),

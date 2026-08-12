@@ -1,7 +1,7 @@
-"""Populace-compatible period aging for Ledger comparison facts.
+"""Microcosm-compatible period aging for Ledger comparison facts.
 
 This is a FactContract-facing implementation of the policy in
-``populace.build.us_runtime.target_aging`` at the pinned Populace release
+``microcosm.build.us_runtime.target_aging`` at the pinned Microcosm release
 commit. Keep the constants, series maps, priority order, and failure behavior
 in parity with that source; parity tests cover the public contract here.
 """
@@ -21,7 +21,7 @@ from .contracts import AlignedFact, AlignmentQuality, FactContract, TypedPeriod
 
 AGING_MODEL_ID = "cbo_growth_factor_aging"
 AGING_MODEL_VERSION = "1.2.0"
-DEFAULT_POPULACE_COMMIT = "cae8640f9e65e274aea65c7916cb37b956978e32"
+DEFAULT_MICROCOSM_COMMIT = "cae8640f9e65e274aea65c7916cb37b956978e32"
 
 _CBO_AGI_INCOME_SOURCE = "adjusted_gross_income"
 _SOI_MEASURE_TO_CBO_INCOME_SOURCE = {
@@ -74,7 +74,7 @@ class AgingStatus(str, Enum):
 
 
 @dataclass(frozen=True)
-class PopulaceAgingResult:
+class MicrocosmAgingResult:
     source_fact: FactContract
     target_period: TypedPeriod
     status: AgingStatus
@@ -84,7 +84,7 @@ class PopulaceAgingResult:
     factor_basis: str
     alignment_model_id: str
     alignment_model_version: str
-    populace_commit: str
+    microcosm_commit: str
     note: str
 
     @property
@@ -115,7 +115,7 @@ class PopulaceAgingResult:
             alignment_version=self.alignment_model_version,
             factor_sources=(
                 self.factor_source,
-                f"populace-target-aging@{self.populace_commit[:13]}",
+                f"microcosm-target-aging@{self.microcosm_commit[:13]}",
             ),
             method_quality=AlignmentQuality.VALIDATED,
             backtest_error=None,
@@ -130,7 +130,7 @@ class PopulaceAgingResult:
                 "factor_basis": self.factor_basis,
                 "source_period": self.source_fact.period.canonical,
                 "aged_to": self.target_period.canonical,
-                "populace_commit": self.populace_commit,
+                "microcosm_commit": self.microcosm_commit,
                 "note": self.note,
             },
         )
@@ -154,8 +154,8 @@ class PopulaceAgingResult:
         )
 
 
-class PopulaceAgingPolicy:
-    """The named Populace v1.2.0 aging policy over normalized Ledger facts."""
+class MicrocosmAgingPolicy:
+    """The named Microcosm v1.2.0 aging policy over normalized Ledger facts."""
 
     def __init__(
         self,
@@ -165,21 +165,21 @@ class PopulaceAgingPolicy:
             tuple[str, int, int], tuple[Decimal, str]
         ] | None = None,
         *,
-        populace_commit: str = DEFAULT_POPULACE_COMMIT,
+        microcosm_commit: str = DEFAULT_MICROCOSM_COMMIT,
     ) -> None:
         self.projections = projections
         self.chain_series = chain_series
         self.release_factors = release_factors or {}
-        self.populace_commit = populace_commit
+        self.microcosm_commit = microcosm_commit
 
     @classmethod
     def from_facts(
         cls,
         facts: Iterable[FactContract],
         *,
-        populace_commit: str = DEFAULT_POPULACE_COMMIT,
+        microcosm_commit: str = DEFAULT_MICROCOSM_COMMIT,
         release_diagnostics_path: str | Path | None = None,
-    ) -> "PopulaceAgingPolicy":
+    ) -> "MicrocosmAgingPolicy":
         projections: dict[str, dict[int, tuple[Decimal, str]]] = {}
         chains: dict[str, dict[int, tuple[Decimal, str]]] = {}
         for fact in facts:
@@ -206,14 +206,14 @@ class PopulaceAgingPolicy:
             projections,
             chains,
             release_factors,
-            populace_commit=populace_commit,
+            microcosm_commit=microcosm_commit,
         )
 
     def transform(
         self,
         fact: FactContract,
         target_period: TypedPeriod,
-    ) -> PopulaceAgingResult:
+    ) -> MicrocosmAgingResult:
         if fact.period == target_period:
             return self._result(
                 fact,
@@ -222,7 +222,7 @@ class PopulaceAgingPolicy:
                 fact.value,
                 Decimal(1),
                 "source_equals_build",
-                "The Ledger fact already refers to the Populace build year.",
+                "The Ledger fact already refers to the Microcosm build year.",
             )
         if fact.aggregation.get("method") != "sum" or fact.unit != "usd":
             return self._result(
@@ -232,7 +232,7 @@ class PopulaceAgingPolicy:
                 fact.value,
                 Decimal(1),
                 "not_dollar_amount",
-                "Populace leaves counts and non-USD targets raw.",
+                "Microcosm leaves counts and non-USD targets raw.",
             )
         if fact.assertion == "source_projection":
             return self._result(
@@ -242,7 +242,7 @@ class PopulaceAgingPolicy:
                 fact.value,
                 Decimal(1),
                 "source_projection_level",
-                "Populace does not compound its aging model onto a publisher projection.",
+                "Microcosm does not compound its aging model onto a publisher projection.",
             )
 
         source_year = _period_year(fact.period)
@@ -262,13 +262,13 @@ class PopulaceAgingPolicy:
             fact,
             target_period,
             AgingStatus.AGED,
-            # Populace's TargetSpec values and growth ratios are Python
+            # Microcosm's TargetSpec values and growth ratios are Python
             # floats. Preserve those arithmetic semantics so our transformed
             # benchmark is byte-for-byte equal to release diagnostics.
             Decimal(str(float(fact.value) * float(value))),
             value,
             source,
-            "Populace projected this USD sum to the build year."
+            "Microcosm projected this USD sum to the build year."
             + (
                 " The factor was recovered from the pinned release diagnostics."
                 if basis == "pinned_release_diagnostics"
@@ -335,7 +335,7 @@ class PopulaceAgingPolicy:
 
     def _unavailable(
         self, fact: FactContract, target_period: TypedPeriod
-    ) -> PopulaceAgingResult:
+    ) -> MicrocosmAgingResult:
         return self._result(
             fact,
             target_period,
@@ -343,7 +343,7 @@ class PopulaceAgingPolicy:
             None,
             None,
             "unavailable",
-            "Populace has no usable CBO/SOI factor chain for this dollar fact.",
+            "Microcosm has no usable CBO/SOI factor chain for this dollar fact.",
         )
 
     def _result(
@@ -356,8 +356,8 @@ class PopulaceAgingPolicy:
         factor_source: str,
         note: str,
         factor_basis: str = "not_applicable",
-    ) -> PopulaceAgingResult:
-        return PopulaceAgingResult(
+    ) -> MicrocosmAgingResult:
+        return MicrocosmAgingResult(
             source_fact=fact,
             target_period=target_period,
             status=status,
@@ -367,26 +367,26 @@ class PopulaceAgingPolicy:
             factor_basis=factor_basis,
             alignment_model_id=AGING_MODEL_ID,
             alignment_model_version=AGING_MODEL_VERSION,
-            populace_commit=self.populace_commit,
+            microcosm_commit=self.microcosm_commit,
             note=note,
         )
 
 
-def transform_ledger_facts_to_populace_year(
+def transform_ledger_facts_to_microcosm_year(
     facts: Iterable[FactContract],
-    policy: PopulaceAgingPolicy,
+    policy: MicrocosmAgingPolicy,
     *,
     source_year: int = 2023,
     build_year: int = 2024,
-) -> tuple[PopulaceAgingResult, ...]:
-    """Apply Populace's policy to every US fact from one source year.
+) -> tuple[MicrocosmAgingResult, ...]:
+    """Apply Microcosm's policy to every US fact from one source year.
 
     The period kind is retained (TY to TY, CY to CY, FY to FY, and month to
     the same month in the build year). Jurisdiction filtering happens here so
-    a US Populace runner never manufactures alignments for other countries.
+    a US Microcosm runner never manufactures alignments for other countries.
     """
 
-    results: list[PopulaceAgingResult] = []
+    results: list[MicrocosmAgingResult] = []
     for fact in facts:
         if fact.jurisdiction != "US" or _period_year(fact.period) != source_year:
             continue
@@ -402,22 +402,22 @@ def transform_ledger_facts_to_populace_year(
     return tuple(sorted(results, key=lambda result: result.source_fact.fact_key))
 
 
-def transform_ledger_facts_to_populace_years(
+def transform_ledger_facts_to_microcosm_years(
     facts: Iterable[FactContract],
-    policy: PopulaceAgingPolicy,
+    policy: MicrocosmAgingPolicy,
     *,
     source_years: Iterable[int],
     build_year: int = 2024,
-) -> tuple[PopulaceAgingResult, ...]:
-    """Apply the same Populace aging policy to each declared source year."""
+) -> tuple[MicrocosmAgingResult, ...]:
+    """Apply the same Microcosm aging policy to each declared source year."""
 
     years = tuple(source_years)
     if len(years) != len(set(years)):
-        raise ValueError("Populace aging source years must be unique")
+        raise ValueError("Microcosm aging source years must be unique")
     results = tuple(
         result
         for source_year in years
-        for result in transform_ledger_facts_to_populace_year(
+        for result in transform_ledger_facts_to_microcosm_year(
             facts,
             policy,
             source_year=source_year,

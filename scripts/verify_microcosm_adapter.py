@@ -1,4 +1,4 @@
-"""Execute the Populace adapter's ten reviewed Ledger verification facts."""
+"""Execute the Microcosm adapter's ten reviewed Ledger verification facts."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import math
 from decimal import Decimal
 from pathlib import Path
 
-from evaluation_harness.adapters.populace import POPULACE_RELEASE, PopulacePolicyEngineRunner
+from evaluation_harness.adapters.microcosm import MICROCOSM_RELEASE, MicrocosmPolicyEngineRunner
 from evaluation_harness.execution import build_run_groups, execute_groups
 from evaluation_harness.integration import load_integration_overview
 from evaluation_harness.mappings import MappingRegistry
@@ -16,7 +16,7 @@ from evaluation_harness.planner import CapabilityPlanner
 
 
 ROOT = Path(__file__).resolve().parents[1]
-INTEGRATION = ROOT / "integrations" / "populace_policyengine_us"
+INTEGRATION = ROOT / "integrations" / "microcosm_policyengine_us"
 
 
 def verify(dataset_path: Path) -> list[dict[str, str | float]]:
@@ -30,7 +30,7 @@ def verify(dataset_path: Path) -> list[dict[str, str | float]]:
             "verification facts must all be executable and score eligible: "
             + ", ".join(f"{cell.fact_key} ({cell.reason_code})" for cell in unavailable)
         )
-    runner = PopulacePolicyEngineRunner(dataset_path=dataset_path)
+    runner = MicrocosmPolicyEngineRunner(dataset_path=dataset_path)
     results = execute_groups(
         build_run_groups(capabilities),
         capabilities,

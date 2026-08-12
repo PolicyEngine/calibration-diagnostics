@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CrossDatasetFactDetailView,
   CrossDatasetFactsView,
-} from "@/components/populace/cross-dataset-facts-view";
+} from "@/components/microcosm/cross-dataset-facts-view";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -47,8 +47,8 @@ function useCrossDatasetOverview() {
     queryKey: ["cross-dataset", "overview", "v3"],
     queryFn: async (): Promise<OverviewResponse> => {
       const [summary, groups] = await Promise.all([
-        apiGet<CrossDatasetSummary>("/populace/cross-dataset", { view: "summary" }),
-        apiGet<CrossDatasetGroupsDocument>("/populace/cross-dataset", { view: "groups" }),
+        apiGet<CrossDatasetSummary>("/microcosm/cross-dataset", { view: "summary" }),
+        apiGet<CrossDatasetGroupsDocument>("/microcosm/cross-dataset", { view: "groups" }),
       ]);
       if (summary.run_id !== groups.run_id || summary.snapshot_id !== groups.snapshot_id) {
         throw new Error("Cross-dataset summary and group data belong to different runs.");

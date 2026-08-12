@@ -7,7 +7,7 @@ from evaluation_harness.contracts import (
     FactContract,
     TypedPeriod,
 )
-from evaluation_harness.populace_bea_wages import (
+from evaluation_harness.microcosm_bea_wages import (
     transform_chronicle_bea_wage_facts,
 )
 
@@ -82,7 +82,7 @@ def wage_fixture() -> tuple[FactContract, ...]:
 def test_bea_wage_transformation_reproduces_archived_residence_adjustment() -> None:
     result = transform_chronicle_bea_wage_facts(
         wage_fixture(),
-        source_id="populace_us_policyengine_us_2024",
+        source_id="microcosm_us_policyengine_us_2024",
         national_total=Decimal("600"),
         expected_state_count=2,
     )
@@ -116,7 +116,7 @@ def test_bea_wage_transformation_reproduces_archived_residence_adjustment() -> N
 def test_bea_wage_declarations_distinguish_national_target_from_state_holdouts() -> None:
     result = transform_chronicle_bea_wage_facts(
         wage_fixture(),
-        source_id="populace_us_policyengine_us_2024",
+        source_id="microcosm_us_policyengine_us_2024",
         national_total=Decimal("600"),
         expected_state_count=2,
     )
@@ -139,9 +139,9 @@ def test_bea_wage_declarations_distinguish_national_target_from_state_holdouts()
 
 
 def test_bea_wage_alignment_ids_are_unique_to_each_evaluation_source() -> None:
-    populace = transform_chronicle_bea_wage_facts(
+    microcosm = transform_chronicle_bea_wage_facts(
         wage_fixture(),
-        source_id="populace_us_policyengine_us_2024",
+        source_id="microcosm_us_policyengine_us_2024",
         national_total=Decimal("600"),
         expected_state_count=2,
     )
@@ -152,11 +152,11 @@ def test_bea_wage_alignment_ids_are_unique_to_each_evaluation_source() -> None:
         expected_state_count=2,
     )
 
-    assert {row.source_fact_key for row in populace.aligned_facts} == {
+    assert {row.source_fact_key for row in microcosm.aligned_facts} == {
         row.source_fact_key for row in taxcalc.aligned_facts
     }
     assert not (
-        {row.alignment_id for row in populace.aligned_facts}
+        {row.alignment_id for row in microcosm.aligned_facts}
         & {row.alignment_id for row in taxcalc.aligned_facts}
     )
     assert all(
@@ -193,7 +193,7 @@ def test_bea_wage_transformation_rejects_incomplete_component_surfaces() -> None
     with pytest.raises(ValueError, match="missing BEA regional component"):
         transform_chronicle_bea_wage_facts(
             facts,
-            source_id="populace_us_policyengine_us_2024",
+            source_id="microcosm_us_policyengine_us_2024",
             national_total=Decimal("600"),
             expected_state_count=2,
         )

@@ -11,16 +11,16 @@ import numpy as np
 from ..execution import ArrayBundle, RunGroup
 
 
-POPULACE_REPOSITORY = "policyengine/populace-us"
+MICROCOSM_REPOSITORY = "policyengine/microcosm-us"
 
 
 @dataclass(frozen=True)
-class PopulaceRelease:
+class MicrocosmRelease:
     release_id: str
     dataset_filename: str
     dataset_sha256: str
     model_version: str
-    repository: str = POPULACE_REPOSITORY
+    repository: str = MICROCOSM_REPOSITORY
     calibration_diagnostics_filename: str | None = None
     calibration_diagnostics_sha256: str | None = None
 
@@ -35,14 +35,14 @@ class PopulaceRelease:
         )
 
 
-POPULACE_RELEASE = PopulaceRelease(
-    release_id="populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
-    dataset_filename="populace_us_2024.h5",
+MICROCOSM_RELEASE = MicrocosmRelease(
+    release_id="microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
+    dataset_filename="microcosm_us_2024.h5",
     dataset_sha256="48b9d479fb4fd1c3537f9383ce4697d130b6f618658409d74f6233c43b994c7e",
     model_version="1.764.6",
     calibration_diagnostics_filename=(
         "releases/"
-        "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
+        "microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
         "calibration_diagnostics.json"
     ),
     calibration_diagnostics_sha256=(
@@ -51,7 +51,7 @@ POPULACE_RELEASE = PopulaceRelease(
 )
 
 
-Downloader = Callable[[PopulaceRelease, Path], Any]
+Downloader = Callable[[MicrocosmRelease, Path], Any]
 Table = Mapping[str, np.ndarray]
 Tables = Mapping[str, Table]
 
@@ -64,44 +64,44 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _download(release: PopulaceRelease, target: Path) -> None:
+def _download(release: MicrocosmRelease, target: Path) -> None:
     urllib.request.urlretrieve(release.download_url, target)
 
 
 def _download_calibration_diagnostics(
-    release: PopulaceRelease, target: Path
+    release: MicrocosmRelease, target: Path
 ) -> None:
     if release.calibration_diagnostics_filename is None:
-        raise ValueError("Populace release does not pin calibration diagnostics")
+        raise ValueError("Microcosm release does not pin calibration diagnostics")
     urllib.request.urlretrieve(
         release.file_download_url(release.calibration_diagnostics_filename), target
     )
 
 
 def resolve_release_dataset(
-    release: PopulaceRelease,
+    release: MicrocosmRelease,
     directory: str | Path,
     downloader: Downloader = _download,
 ) -> Path:
-    """Resolve a pinned Populace artifact and reject any byte-level drift."""
+    """Resolve a pinned Microcosm artifact and reject any byte-level drift."""
 
     destination = Path(directory) / release.dataset_filename
     destination.parent.mkdir(parents=True, exist_ok=True)
     if not destination.exists():
         downloader(release, destination)
     if not destination.is_file():
-        raise ValueError(f"Populace downloader did not create {destination}")
+        raise ValueError(f"Microcosm downloader did not create {destination}")
     actual = _sha256(destination)
     if actual != release.dataset_sha256:
         raise ValueError(
-            "Populace dataset checksum mismatch: "
+            "Microcosm dataset checksum mismatch: "
             f"expected {release.dataset_sha256}, found {actual}"
         )
     return destination
 
 
 def resolve_release_calibration_diagnostics(
-    release: PopulaceRelease,
+    release: MicrocosmRelease,
     directory: str | Path,
     downloader: Downloader = _download_calibration_diagnostics,
 ) -> Path:
@@ -110,17 +110,17 @@ def resolve_release_calibration_diagnostics(
     filename = release.calibration_diagnostics_filename
     expected = release.calibration_diagnostics_sha256
     if filename is None or expected is None:
-        raise ValueError("Populace release does not pin calibration diagnostics")
+        raise ValueError("Microcosm release does not pin calibration diagnostics")
     destination = Path(directory) / Path(filename).name
     destination.parent.mkdir(parents=True, exist_ok=True)
     if not destination.exists():
         downloader(release, destination)
     if not destination.is_file():
-        raise ValueError(f"Populace downloader did not create {destination}")
+        raise ValueError(f"Microcosm downloader did not create {destination}")
     actual = _sha256(destination)
     if actual != expected:
         raise ValueError(
-            "Populace calibration diagnostics checksum mismatch: "
+            "Microcosm calibration diagnostics checksum mismatch: "
             f"expected {expected}, found {actual}"
         )
     return destination
@@ -130,13 +130,13 @@ def _default_table_loader(dataset_path: Path) -> Tables:
     try:
         import pandas as pd
     except ImportError as error:  # pragma: no cover - exercised by optional install
-        raise RuntimeError("install the 'populace' extra to read Populace HDF5") from error
+        raise RuntimeError("install the 'microcosm' extra to read Microcosm HDF5") from error
     tables: dict[str, dict[str, np.ndarray]] = {}
     with pd.HDFStore(dataset_path, mode="r") as store:
         available = {key.lstrip("/"): key for key in store.keys()}
         for entity in ("person", "household", "tax_unit", "spm_unit"):
             if entity not in available:
-                raise ValueError(f"Populace dataset has no {entity!r} table")
+                raise ValueError(f"Microcosm dataset has no {entity!r} table")
             frame = store[available[entity]]
             tables[entity] = {column: frame[column].to_numpy() for column in frame.columns}
     return tables
@@ -146,7 +146,7 @@ def _default_simulation_factory(dataset_path: Path) -> Any:
     try:
         from policyengine_us import Microsimulation
     except ImportError as error:  # pragma: no cover - exercised by optional install
-        raise RuntimeError("install the 'populace' extra to run PolicyEngine-US") from error
+        raise RuntimeError("install the 'microcosm' extra to run PolicyEngine-US") from error
     return Microsimulation(dataset=str(dataset_path))
 
 
@@ -187,14 +187,14 @@ ENTITY_DOMAINS = {
 }
 
 
-class PopulacePolicyEngineRunner:
-    """Prepare entity-aligned arrays from one pinned Populace/PolicyEngine run."""
+class MicrocosmPolicyEngineRunner:
+    """Prepare entity-aligned arrays from one pinned Microcosm/PolicyEngine run."""
 
     def __init__(
         self,
         *,
         dataset_path: str | Path,
-        release: PopulaceRelease = POPULACE_RELEASE,
+        release: MicrocosmRelease = MICROCOSM_RELEASE,
         table_loader: Callable[[Path], Tables] = _default_table_loader,
         simulation_factory: Callable[[Path], Any] = _default_simulation_factory,
         old_congressional_district_assignments: Mapping[str, str] | None = None,
@@ -231,7 +231,7 @@ class PopulacePolicyEngineRunner:
     @staticmethod
     def _column(table: Table, name: str) -> np.ndarray:
         if name not in table:
-            raise ValueError(f"Populace table is missing required column {name!r}")
+            raise ValueError(f"Microcosm table is missing required column {name!r}")
         return np.asarray(table[name])
 
     @staticmethod
@@ -290,7 +290,7 @@ class PopulacePolicyEngineRunner:
                 "SPM-unit household join",
             )
         if entity != "tax_unit":
-            raise ValueError(f"unsupported Populace entity {entity!r}")
+            raise ValueError(f"unsupported Microcosm entity {entity!r}")
 
         person_tax_units = self._column(person, "person_tax_unit_id")
         tax_unit_households: dict[Any, Any] = {}
@@ -612,10 +612,10 @@ class PopulacePolicyEngineRunner:
             ) from error
 
     def prepare(self, group: RunGroup) -> ArrayBundle:
-        if group.source_id != "populace_us_policyengine_us_2024":
-            raise ValueError(f"Populace runner cannot execute source {group.source_id!r}")
+        if group.source_id != "microcosm_us_policyengine_us_2024":
+            raise ValueError(f"Microcosm runner cannot execute source {group.source_id!r}")
         if group.entity not in self.tables:
-            raise ValueError(f"Populace dataset has no entity table {group.entity!r}")
+            raise ValueError(f"Microcosm dataset has no entity table {group.entity!r}")
         table = self.tables[group.entity]
         identifier = self._column(table, f"{group.entity}_id")
         length = len(identifier)

@@ -1,10 +1,10 @@
 """Score external tax microdata against PolicyEngine's national calibration targets.
 
-The Cross-dataset comparison scores every dataset (populace + external tax
+The Cross-dataset comparison scores every dataset (microcosm + external tax
 microdata) against the SAME surface: the model's own *national calibration
 targets* (official IRS/SOI/etc. actuals the US microdata is built to match). The
 benchmark set is therefore not hand-picked — it is exactly what the calibration
-optimizes toward. populace covers ~all targets; the federal Tax-Calculator
+optimizes toward. microcosm covers ~all targets; the federal Tax-Calculator
 public-CPS engine covers the IRS-SOI tax concepts it can
 express, and that coverage gap is part of the comparison.
 
@@ -12,7 +12,7 @@ Pipeline:
   1. `--build-spec` fetches the release's national targets (target-diagnostics,
      level=national) and writes a target-spec JSON: one row per target cell with
      its parsed AGI income-band edges, EITC qualifying-children group, filing
-     status, official value and populace estimate.
+     status, official value and microcosm estimate.
   2. `--score` runs Tax-Calculator with public CPS once, reproduces each cell's
      breakdown (AGI band + EITC children + subpopulation filter), and emits a
      committed JSON keyed by target `name` -> value. The frontend joins those to
@@ -23,9 +23,9 @@ Run (a venv with taxcalc installed):
     python frontend/scripts/score_external_dataset.py --score --spec /tmp/target_spec.json
 
 Concept mapping (PolicyEngine variable -> taxcalc variable), verified against each
-concept's grand total vs BOTH the official IRS value and populace; a concept whose
+concept's grand total vs BOTH the official IRS value and microcosm; a concept whose
 grand total lands >40% off both is dropped for that dataset rather than guessed.
-Subpopulation filters mirror populace: SOI table 2.1 -> itemizers (c04470>0);
+Subpopulation filters mirror microcosm: SOI table 2.1 -> itemizers (c04470>0);
 table 2.5 AGI -> EITC returns (c59660!=0). EITC children via taxcalc EIC
 (EIC==n for 0/1/2, EIC>=3 for "3 or more").
 """
@@ -39,7 +39,7 @@ import re
 import urllib.request
 from pathlib import Path
 
-OUT_DIR = Path(__file__).resolve().parents[1] / "lib" / "populace" / "external-datasets"
+OUT_DIR = Path(__file__).resolve().parents[1] / "lib" / "microcosm" / "external-datasets"
 
 # PolicyEngine variable name -> taxcalc variable (weighted sum for "total";
 # weighted count of nonzero for "count"). Keyed by the target's `variable` label.
@@ -73,7 +73,7 @@ CONCEPT_TO_TAXCALC = {
 }
 
 # Concepts with no clean taxcalc equivalent, or whose grand total is verified
-# >40% off both the official and populace value, are dropped (not guessed).
+# >40% off both the official and microcosm value, are dropped (not guessed).
 COMMON_DROP = {"rent and royalty net income", "assigned aca ptc", "count"}
 # Public CPS structurally mis-represents these (capital gains / partnership are
 # ~zero; several deductions are heavily over-imputed).
@@ -117,7 +117,7 @@ _CHILD = {
 
 
 def build_spec(base_url: str, spec_path: Path) -> None:
-    url = f"{base_url}/api/populace/target-diagnostics?level=national&limit=500"
+    url = f"{base_url}/api/microcosm/target-diagnostics?level=national&limit=500"
     data = json.load(urllib.request.urlopen(url))
     rows = []
     for t in data["targets"]:
@@ -128,7 +128,7 @@ def build_spec(base_url: str, spec_path: Path) -> None:
             "band": _parse_band(dims.get("bd_income_band", {}).get("value")),
             "children": _CHILD.get(dims.get("bd_qualifying_children", {}).get("value"),
                                    dims.get("bd_qualifying_children", {}).get("value")),
-            "target": t.get("target"), "populace": t.get("final_estimate"),
+            "target": t.get("target"), "microcosm": t.get("final_estimate"),
             "expressible_source": t["source"] == "irs_soi",
         })
     spec_path.write_text(json.dumps(rows, indent=1))
@@ -137,7 +137,7 @@ def build_spec(base_url: str, spec_path: Path) -> None:
 
 # --- 2. score a dataset against the spec --------------------------------------
 def _subpop_mask(x, calc):
-    """Mirror the subpopulation populace filters on (base_name)."""
+    """Mirror the subpopulation microcosm filters on (base_name)."""
     bn = x["base_name"] or ""
     if "table_2_1" in bn:  # itemized_all_returns -> itemizers
         return calc.array("c04470") > 0
@@ -203,7 +203,7 @@ METADATA = {
         "partnership/S-corp income (structurally absent from the public CPS, i.e. "
         "zero); SALT, interest, tax-exempt-interest, ordinary-dividend, "
         "IRA-distribution, QBI and total-itemized deductions and combined CTC "
-        "(grand total >40% off BOTH the official IRS value and populace); real "
+        "(grand total >40% off BOTH the official IRS value and microcosm); real "
         "estate taxes (taxcalc e18500 is an all-filer input while SOI counts only "
         "itemizers' Schedule A). Itemizer subpopulation (SOI table 2.1) reproduced "
         "via c04470>0; EITC-return AGI via c59660!=0."

@@ -3,7 +3,7 @@ import io
 import zipfile
 from pathlib import Path
 
-from evaluation_harness.populace_old_cd import (
+from evaluation_harness.microcosm_old_cd import (
     extract_state_assignments,
     load_old_cd_assignments,
 )

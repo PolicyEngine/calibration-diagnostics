@@ -981,7 +981,7 @@ test("local-area diagnostics (value/estimate schema) render as included targets"
       final_loss: 0.058,
       fraction_within_10pct: 0.87,
     },
-    "populace-us-2024-buildl-acs-local-36de5d9a-20260712T104640Z",
+    "microcosm-us-2024-buildl-acs-local-36de5d9a-20260712T104640Z",
     null,
     {},
     { dataset_role: "non_default_local_area", is_default: false, default_datasets: {} },
@@ -1074,7 +1074,7 @@ test("diagnostics missing the targets array report incompatible", () => {
 });
 
 test("releaseRole classifies national default vs non-default local-area", () => {
-  expect(releaseRole({ default_datasets: { national: "populace_us_2024" } })).toEqual({
+  expect(releaseRole({ default_datasets: { national: "microcosm_us_2024" } })).toEqual({
     dataset_role: null,
     is_default: true,
     is_local_area: false,

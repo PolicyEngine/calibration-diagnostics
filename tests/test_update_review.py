@@ -165,7 +165,7 @@ def test_newly_executable_fact_selects_model_execution() -> None:
 
 
 def test_both_active_adapter_gates_keep_ten_directly_testable_facts() -> None:
-    for integration_name in ("populace_policyengine_us", "taxcalc_cps"):
+    for integration_name in ("microcosm_policyengine_us", "taxcalc_cps"):
         integration = ROOT / "integrations" / integration_name
         overview = load_integration_overview(integration / "overview.yaml")
         plan = SourcePlan(

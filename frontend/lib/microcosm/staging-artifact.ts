@@ -15,10 +15,10 @@ import {
 
 type JsonObject = Record<string, unknown>;
 
-export const POPULACE_STAGING_HF_REPO =
-  process.env.POPULACE_STAGING_HF_REPO ?? "policyengine/populace-us-staging";
-export const POPULACE_STAGING_HF_REVISION =
-  process.env.POPULACE_STAGING_HF_REVISION ?? "main";
+export const MICROCOSM_STAGING_HF_REPO =
+  process.env.MICROCOSM_STAGING_HF_REPO ?? "policyengine/microcosm-us-staging";
+export const MICROCOSM_STAGING_HF_REVISION =
+  process.env.MICROCOSM_STAGING_HF_REVISION ?? "main";
 
 class StagingFetchError extends Error {
   constructor(
@@ -32,7 +32,7 @@ class StagingFetchError extends Error {
 function stagingFetchMessage(status: number, path: string): string {
   if (status === 401 || status === 403) {
     return (
-      `Staging repo ${POPULACE_STAGING_HF_REPO} is not readable by this deployment ` +
+      `Staging repo ${MICROCOSM_STAGING_HF_REPO} is not readable by this deployment ` +
       `(${status} fetching ${path}). Set HF_TOKEN/HUGGINGFACE_TOKEN on the server, ` +
       "or publish staging telemetry to a public dataset repo."
     );
@@ -49,7 +49,7 @@ function hfHeaders(): HeadersInit | undefined {
 }
 
 export function stagingResolveUrl(path: string): string {
-  return `https://huggingface.co/datasets/${POPULACE_STAGING_HF_REPO}/resolve/${POPULACE_STAGING_HF_REVISION}/${path}`;
+  return `https://huggingface.co/datasets/${MICROCOSM_STAGING_HF_REPO}/resolve/${MICROCOSM_STAGING_HF_REVISION}/${path}`;
 }
 
 function stagingFetchOptions(revalidate: number): RequestInit {
@@ -84,7 +84,7 @@ async function stagingTextOrNull(path: string, revalidate: number): Promise<stri
 }
 
 async function stagingTree(revalidate: number): Promise<JsonObject[]> {
-  const url = `https://huggingface.co/api/datasets/${POPULACE_STAGING_HF_REPO}/tree/${POPULACE_STAGING_HF_REVISION}/runs?recursive=true`;
+  const url = `https://huggingface.co/api/datasets/${MICROCOSM_STAGING_HF_REPO}/tree/${MICROCOSM_STAGING_HF_REVISION}/runs?recursive=true`;
   const res = await fetch(url, stagingFetchOptions(revalidate));
   if (!res.ok) throw new StagingFetchError(res.status, "runs tree");
   const tree = await res.json();
@@ -190,16 +190,16 @@ export async function loadStagingRuns(revalidate: number) {
   // empty list — a silent empty state hides a broken token.
   if (index == null && treeMissing && runIds.size === 0) {
     const repoRes = await fetch(
-      `https://huggingface.co/api/datasets/${POPULACE_STAGING_HF_REPO}`,
+      `https://huggingface.co/api/datasets/${MICROCOSM_STAGING_HF_REPO}`,
       stagingFetchOptions(revalidate),
     );
     if (!repoRes.ok) {
       return {
         available: false,
-        source_repo: POPULACE_STAGING_HF_REPO,
-        revision: POPULACE_STAGING_HF_REVISION,
+        source_repo: MICROCOSM_STAGING_HF_REPO,
+        revision: MICROCOSM_STAGING_HF_REVISION,
         detail:
-          `Staging repo ${POPULACE_STAGING_HF_REPO} is not visible (HTTP ${repoRes.status}). ` +
+          `Staging repo ${MICROCOSM_STAGING_HF_REPO} is not visible (HTTP ${repoRes.status}). ` +
           "It is private — a missing or expired HF token reads as 404, not 401.",
         runs: [],
       };
@@ -225,8 +225,8 @@ export async function loadStagingRuns(revalidate: number) {
 
   return {
     available: true,
-    source_repo: POPULACE_STAGING_HF_REPO,
-    revision: POPULACE_STAGING_HF_REVISION,
+    source_repo: MICROCOSM_STAGING_HF_REPO,
+    revision: MICROCOSM_STAGING_HF_REVISION,
     truncated,
     runs: [...byId.values()].sort(sortRuns),
   };
@@ -296,8 +296,8 @@ export async function loadStagingRun(runId: string, revalidate: number): Promise
     runId;
   return {
     available: true,
-    source_repo: POPULACE_STAGING_HF_REPO,
-    revision: POPULACE_STAGING_HF_REVISION,
+    source_repo: MICROCOSM_STAGING_HF_REPO,
+    revision: MICROCOSM_STAGING_HF_REVISION,
     run_id: runId,
     candidate_release_id: candidateReleaseId,
     progress,

@@ -5,9 +5,8 @@ content-addressed evaluation run built from an immutable Chronicle snapshot. A n
 Chronicle release must pass this review before an integration changes its pinned
 `ledger_snapshot_id`.
 
-Commands below retain legacy `ledger` and `populace` identifiers for CLI,
-integration-path, package-extra, and flag compatibility. They refer to Chronicle
-and Microcosm respectively and must remain literal for the commands to work.
+Commands below retain legacy `ledger` identifiers for Chronicle compatibility;
+they must remain literal for the commands to work.
 
 ## 1. Compile the candidate snapshot
 
@@ -27,7 +26,7 @@ existing snapshot.
 uv run evaluation-harness ledger review \
   --from .artifacts/ledger/<approved-snapshot> \
   --to .artifacts/ledger/<candidate-snapshot> \
-  --integration integrations/populace_policyengine_us \
+  --integration integrations/microcosm_policyengine_us \
   --integration integrations/taxcalc_cps \
   --integration integrations/census_acs_pums \
   --out .artifacts/ledger-reviews/<review-id>
@@ -68,10 +67,10 @@ The review's `affected_sources` section determines the work:
 The current full-run entry point is:
 
 ```bash
-uv run --extra populace --extra taxcalc-cps \
+uv run --extra microcosm --extra taxcalc-cps \
   python scripts/run_full_ledger_evaluation.py \
   --snapshot .artifacts/ledger/<candidate-snapshot> \
-  --populace-dataset /path/to/pinned-populace.h5 \
+  --microcosm-dataset /path/to/pinned-microcosm.h5 \
   --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet \
   --output .artifacts/evaluations/<new-run>
 ```
@@ -102,7 +101,7 @@ included in the same maintenance run:
 
 ```bash
 uv run python scripts/verify_evaluation_harness.py \
-  --populace-dataset /path/to/pinned-populace.h5 \
+  --microcosm-dataset /path/to/pinned-microcosm.h5 \
   --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet
 ```
 

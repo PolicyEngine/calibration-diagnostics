@@ -282,7 +282,7 @@ def test_publish_run_carries_the_observed_and_aged_benchmarks(tmp_path: Path) ->
         factor_sources=("cbo.ty2024.agi",),
         method_quality=AlignmentQuality.VALIDATED,
         backtest_error=None,
-        metadata={"aging_factor": "1.1", "note": "Aged using Populace logic."},
+        metadata={"aging_factor": "1.1", "note": "Aged using Microcosm logic."},
     )
     output = tmp_path / "aged-run"
     manifest = publish_run(output, [cap], [result], [alignment])
@@ -290,4 +290,4 @@ def test_publish_run_carries_the_observed_and_aged_benchmarks(tmp_path: Path) ->
     assert manifest["alignment_count"] == 1
     assert row["observed_value"] == "100"
     assert row["aligned_value"] == "110"
-    assert row["metadata"]["note"] == "Aged using Populace logic."
+    assert row["metadata"]["note"] == "Aged using Microcosm logic."

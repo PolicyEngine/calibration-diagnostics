@@ -3,10 +3,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from evaluation_harness.adapters.populace import (
-    POPULACE_RELEASE,
-    PopulacePolicyEngineRunner,
-    PopulaceRelease,
+from evaluation_harness.adapters.microcosm import (
+    MICROCOSM_RELEASE,
+    MicrocosmPolicyEngineRunner,
+    MicrocosmRelease,
     resolve_release_calibration_diagnostics,
     resolve_release_dataset,
 )
@@ -134,7 +134,7 @@ def tables() -> dict[str, dict[str, np.ndarray]]:
 
 def group(entity: str, *variables: str) -> RunGroup:
     return RunGroup(
-        source_id="populace_us_policyengine_us_2024",
+        source_id="microcosm_us_policyengine_us_2024",
         population_period="calendar_year:2024",
         policy_period="tax_year:2024",
         geography_method="fixed_country",
@@ -144,11 +144,11 @@ def group(entity: str, *variables: str) -> RunGroup:
     )
 
 
-def runner(tables, simulation=None) -> PopulacePolicyEngineRunner:
+def runner(tables, simulation=None) -> MicrocosmPolicyEngineRunner:
     simulation = simulation or FakeSimulation()
-    return PopulacePolicyEngineRunner(
+    return MicrocosmPolicyEngineRunner(
         dataset_path=Path("fixture.h5"),
-        release=POPULACE_RELEASE,
+        release=MICROCOSM_RELEASE,
         table_loader=lambda _: tables,
         simulation_factory=lambda _: simulation,
     )
@@ -198,8 +198,8 @@ def test_runner_exposes_modeled_tanf_receiving_units_for_caseload_counts(tables)
 
 
 def test_release_dataset_is_checksum_verified(tmp_path: Path) -> None:
-    payload = b"pinned populace"
-    release = PopulaceRelease(
+    payload = b"pinned microcosm"
+    release = MicrocosmRelease(
         release_id="fixture",
         dataset_filename="fixture.h5",
         dataset_sha256=__import__("hashlib").sha256(payload).hexdigest(),
@@ -207,7 +207,7 @@ def test_release_dataset_is_checksum_verified(tmp_path: Path) -> None:
     )
     path = resolve_release_dataset(release, tmp_path, lambda _, target: target.write_bytes(payload))
     assert path.read_bytes() == payload
-    bad = PopulaceRelease("fixture", "bad.h5", "0" * 64, "1.0")
+    bad = MicrocosmRelease("fixture", "bad.h5", "0" * 64, "1.0")
     with pytest.raises(ValueError, match="checksum"):
         resolve_release_dataset(bad, tmp_path, lambda _, target: target.write_bytes(payload))
 
@@ -215,7 +215,7 @@ def test_release_dataset_is_checksum_verified(tmp_path: Path) -> None:
 def test_release_calibration_diagnostics_are_independently_pinned(tmp_path: Path) -> None:
     payload = b'{"targets": []}'
     checksum = __import__("hashlib").sha256(payload).hexdigest()
-    release = PopulaceRelease(
+    release = MicrocosmRelease(
         release_id="fixture",
         dataset_filename="fixture.h5",
         dataset_sha256="0" * 64,
@@ -234,10 +234,10 @@ def test_release_calibration_diagnostics_are_independently_pinned(tmp_path: Path
 
 
 def test_release_url_uses_the_immutable_hugging_face_revision() -> None:
-    assert POPULACE_RELEASE.download_url == (
-        "https://huggingface.co/datasets/policyengine/populace-us/resolve/"
-        "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
-        "populace_us_2024.h5"
+    assert MICROCOSM_RELEASE.download_url == (
+        "https://huggingface.co/datasets/policyengine/microcosm-us/resolve/"
+        "microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
+        "microcosm_us_2024.h5"
     )
 
 
@@ -266,7 +266,7 @@ def test_runner_builds_entity_specific_geographies(tables) -> None:
 
 
 def test_runner_can_use_exact_old_districts_derived_from_household_blocks(tables) -> None:
-    adapter = PopulacePolicyEngineRunner(
+    adapter = MicrocosmPolicyEngineRunner(
         dataset_path=Path("fixture.h5"),
         table_loader=lambda _: tables,
         simulation_factory=lambda _: FakeSimulation(),
@@ -276,7 +276,7 @@ def test_runner_can_use_exact_old_districts_derived_from_household_blocks(tables
         },
     )
     old_group = RunGroup(
-        source_id="populace_us_policyengine_us_2024",
+        source_id="microcosm_us_policyengine_us_2024",
         population_period="calendar_year:2024",
         policy_period="tax_year:2024",
         geography_method="congressional_district_geoid_117th",
@@ -300,7 +300,7 @@ def test_runner_can_use_exact_old_districts_derived_from_household_blocks(tables
 
 
 def test_old_district_evaluation_rejects_unassigned_household_blocks(tables) -> None:
-    adapter = PopulacePolicyEngineRunner(
+    adapter = MicrocosmPolicyEngineRunner(
         dataset_path=Path("fixture.h5"),
         table_loader=lambda _: tables,
         simulation_factory=lambda _: FakeSimulation(),
@@ -309,7 +309,7 @@ def test_old_district_evaluation_rejects_unassigned_household_blocks(tables) -> 
         },
     )
     old_group = RunGroup(
-        source_id="populace_us_policyengine_us_2024",
+        source_id="microcosm_us_policyengine_us_2024",
         population_period="calendar_year:2024",
         policy_period="tax_year:2024",
         geography_method="congressional_district_geoid_117th",
@@ -497,7 +497,7 @@ def test_model_entity_mismatch_and_ambiguous_tax_unit_join_are_rejected(tables) 
         runner(broken).prepare(group("tax_unit", "tax_unit_weight", "__geography__"))
 
 
-def test_supported_populace_domains_are_explicit_masks(tables) -> None:
+def test_supported_microcosm_domains_are_explicit_masks(tables) -> None:
     bundle = runner(tables).prepare(group("person", "person_weight"))
     assert set(bundle.domain_masks) == {
         "aca_marketplace_effectuated_enrollment",
@@ -554,7 +554,7 @@ def test_eitc_return_domain_and_ledger_child_constraint_are_model_backed(tables)
 
 
 def test_all_ten_reviewed_ledger_facts_execute_numerically() -> None:
-    integration = Path("integrations/populace_policyengine_us")
+    integration = Path("integrations/microcosm_policyengine_us")
     overview = load_integration_overview(integration / "overview.yaml")
     mappings = MappingRegistry.from_yaml(integration / "mappings.yaml")
     capabilities = tuple(
@@ -611,7 +611,7 @@ def test_all_ten_reviewed_ledger_facts_execute_numerically() -> None:
                 "tax_unit_is_filer": np.array([True, True, True, True]),
             }[name]
 
-    adapter = PopulacePolicyEngineRunner(
+    adapter = MicrocosmPolicyEngineRunner(
         dataset_path="fixture.h5",
         table_loader=lambda _: target_tables,
         simulation_factory=lambda _: TargetSimulation(),

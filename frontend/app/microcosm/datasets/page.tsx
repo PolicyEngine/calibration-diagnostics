@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { CrossDatasetView } from "@/components/populace/cross-dataset-view";
+import { CrossDatasetView } from "@/components/microcosm/cross-dataset-view";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 
 export default function CrossDatasetPage() {

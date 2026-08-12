@@ -50,7 +50,7 @@ RECONSTRUCTION = (
     ROOT
     / "frontend"
     / "lib"
-    / "populace"
+    / "microcosm"
     / "external-datasets"
     / "yale-national-2024.json"
 )

@@ -223,7 +223,7 @@ def build_scored_results(
             benchmark_value = alignment.aligned_value
             benchmark_basis = str(
                 alignment.metadata.get(
-                    "benchmark_basis", "populace_aligned_fact"
+                    "benchmark_basis", "microcosm_aligned_fact"
                 )
             )
         else:

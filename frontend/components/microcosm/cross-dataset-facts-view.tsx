@@ -78,8 +78,8 @@ function useFactCatalog(params: FactCatalogParams) {
     queryKey: ["cross-dataset", "facts", params],
     queryFn: async (): Promise<CatalogResponse> => {
       const [summary, page] = await Promise.all([
-        apiGet<CrossDatasetSummary>("/populace/cross-dataset", { view: "summary" }),
-        apiGet<FactsPage>("/populace/cross-dataset", apiFactParams(params)),
+        apiGet<CrossDatasetSummary>("/microcosm/cross-dataset", { view: "summary" }),
+        apiGet<FactsPage>("/microcosm/cross-dataset", apiFactParams(params)),
       ]);
       if (summary.run_id !== page.run_id || summary.snapshot_id !== page.snapshot_id) {
         throw new Error("Cross-dataset catalog and summary belong to different runs.");
@@ -227,7 +227,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
         description="Browse every Chronicle observation and the corresponding capability cell for each model. Unsupported cells remain visible with a specific reason."
         actions={
           <Link
-            href="/populace/datasets"
+            href="/microcosm/datasets"
             className="rounded-md border border-border bg-card px-3 py-2 text-xs font-medium hover:bg-muted"
           >
             ← Overview
@@ -327,7 +327,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
               />
             ))}
             <Link
-              href="/populace/datasets?view=facts"
+              href="/microcosm/datasets?view=facts"
               className="ml-auto text-xs font-medium text-primary underline underline-offset-2"
             >
               Clear all
@@ -487,8 +487,8 @@ function useFactDetail(factKey: string) {
     queryKey: ["cross-dataset", "fact", factKey],
     queryFn: async () => {
       const [summary, response] = await Promise.all([
-        apiGet<CrossDatasetSummary>("/populace/cross-dataset", { view: "summary" }),
-        apiGet<FactResponse>("/populace/cross-dataset", {
+        apiGet<CrossDatasetSummary>("/microcosm/cross-dataset", { view: "summary" }),
+        apiGet<FactResponse>("/microcosm/cross-dataset", {
           view: "fact",
           fact_key: factKey,
         }),

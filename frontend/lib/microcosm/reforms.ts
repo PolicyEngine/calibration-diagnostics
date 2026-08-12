@@ -14,7 +14,7 @@
 //
 //   {
 //     "schema_version": 1,
-//     "release_id": "populace-us-2024-<sha>-...",
+//     "release_id": "microcosm-us-2024-<sha>-...",
 //     "baseline_period": 2026,
 //     "scoring_window": "FY2025-2034",
 //     "reforms": [

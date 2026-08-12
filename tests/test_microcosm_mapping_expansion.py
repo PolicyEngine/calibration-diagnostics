@@ -17,7 +17,7 @@ from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.planner import AlignmentDeclaration, CapabilityPlanner
 
 
-INTEGRATION = Path("integrations/populace_policyengine_us")
+INTEGRATION = Path("integrations/microcosm_policyengine_us")
 
 
 def _fact(
@@ -770,7 +770,7 @@ def _classify_aligned_2022(fact: FactContract):
         ),
     ],
 )
-def test_reviewed_2022_return_concepts_map_after_populace_aging(
+def test_reviewed_2022_return_concepts_map_after_microcosm_aging(
     measure, mapping_id
 ) -> None:
     fact = replace(
@@ -797,7 +797,7 @@ def test_reviewed_2022_return_concepts_map_after_populace_aging(
     assert result.score_eligible
 
 
-def test_2022_total_income_amount_maps_after_populace_aging() -> None:
+def test_2022_total_income_amount_maps_after_microcosm_aging() -> None:
     fact = replace(
         _fact(
             "irs_soi",

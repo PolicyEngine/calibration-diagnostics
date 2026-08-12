@@ -159,7 +159,7 @@ export function factCatalogHref(
 ): string {
   const next = { ...current, ...patch };
   const query = serializeCatalogParams(next, { includeView: true });
-  return "/populace/datasets?" + query.toString();
+  return "/microcosm/datasets?" + query.toString();
 }
 
 export function factDetailHref(
@@ -171,7 +171,7 @@ export function factDetailHref(
   query.set("fact_key", factKey);
   const context = serializeCatalogParams(current, { includeView: false });
   for (const [key, value] of context) query.set(key, value);
-  return "/populace/datasets?" + query.toString();
+  return "/microcosm/datasets?" + query.toString();
 }
 
 export function humanizeIdentifier(value: string): string {

@@ -203,7 +203,7 @@ export function buildSourceOverviews(
         : groups.find((group) => {
             if (geography !== "all" && sampleKey != null) {
               return (
-                group.dimension === "geography_populace_calibration_sample" &&
+                group.dimension === "geography_microcosm_calibration_sample" &&
                 group.key === `${geography}|${sampleKey}`
               );
             }
@@ -211,7 +211,7 @@ export function buildSourceOverviews(
               return group.dimension === "geography" && group.key === geography;
             }
             return (
-              group.dimension === "populace_calibration_sample" &&
+              group.dimension === "microcosm_calibration_sample" &&
               group.key === sampleKey
             );
           });
@@ -271,12 +271,12 @@ export function sourceDisplayLabel(source: SourceSummary): string {
   ) {
     return "Public CPS + Tax-Calculator";
   }
-  return source.label.replaceAll("Populace", "Microcosm").replaceAll("Ledger", "Chronicle");
+  return source.label.replaceAll("Microcosm", "Microcosm").replaceAll("Ledger", "Chronicle");
 }
 
 export function sourceCompactLabel(source: SourceSummary): string {
   const sourceId = source.source_id.toLowerCase();
-  if (sourceId.includes("populace")) return "Microcosm";
+  if (sourceId.includes("microcosm")) return "Microcosm";
   if (sourceId === "taxcalc_public_cps_2024" || sourceId === "cps") {
     return "Public CPS";
   }
@@ -288,7 +288,7 @@ export function sourceCompactLabel(source: SourceSummary): string {
 export function orderSourceSummaries(sources: SourceSummary[]): SourceSummary[] {
   const sourcePriority = (source: SourceSummary): number => {
     const sourceId = source.source_id.toLowerCase();
-    if (sourceId.includes("populace")) return 0;
+    if (sourceId.includes("microcosm")) return 0;
     if (sourceId === "taxcalc_public_cps_2024" || sourceId === "cps") return 1;
     if (sourceId === "yale_reconstruction_2024") return 2;
     return 3;
@@ -321,7 +321,7 @@ export function groupFactsHref(
   params.set("view", "facts");
   params.set("source", sourceId);
   params.set(DIMENSION_QUERY_KEYS[dimension], key);
-  return `/populace/datasets?${params.toString()}`;
+  return `/microcosm/datasets?${params.toString()}`;
 }
 
 function sourceGroupView(

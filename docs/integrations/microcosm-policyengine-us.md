@@ -2,20 +2,16 @@
 
 Status: **adapter implemented and verified against the pinned release**
 
-Reviewed Microcosm release: `populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`
+Reviewed Microcosm release: `microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`
 
 Chronicle snapshot: `ledger-7917ea815df710fb20db076b`
-
-The release, repository, package-extra, source-ID, file, flag, and Python-module
-names containing `populace` below are legacy compatibility identifiers. The
-dataset and product are called **Microcosm** throughout this document.
 
 ## What will be connected
 
 This is a model/dataset pairing, not a raw-dataset adapter:
 
-- Dataset: Microcosm US, published at the legacy repository ID
-  `policyengine/populace-us`, file `populace_us_2024.h5`, SHA-256
+- Dataset: Microcosm US, published at
+  `policyengine/microcosm-us`, file `microcosm_us_2024.h5`, SHA-256
   `48b9d479fb4fd1c3537f9383ce4697d130b6f618658409d74f6233c43b994c7e`.
 - Dataset build: Microcosm commit
   `cae8640f9e65e274aea65c7916cb37b956978e32`.
@@ -32,7 +28,7 @@ and expose entity-aligned arrays to the common harness aggregator. Direct
 microdata variables (for example `age` and `employment_income`) and calculated
 PolicyEngine variables (for example `eitc`) use the same aggregation interface.
 
-The legacy-named `frontend/scripts/populace_variable_core.py` proves the local
+`frontend/scripts/microcosm_variable_core.py` proves the local
 loading path and documents the dataset's substantial disk and memory needs. The
 new adapter will move the reusable loading behavior behind a harness interface;
 it will not call a browser API once per fact.
@@ -58,7 +54,7 @@ against that fixture.
 | 10 | EITC, AGI $10k–$15k | TY 2024 | US | `sum(eitc * tax_unit_weight where 10000 <= AGI < 15000)` | $9,085,291,000 | Calibration target |
 
 The precise aggregate fact keys, constraints, source record IDs, and values live
-in `integrations/populace_policyengine_us/ledger_snapshot_fixture/facts.jsonl`.
+in `integrations/microcosm_policyengine_us/ledger_snapshot_fixture/facts.jsonl`.
 The reviewed mapping rules live in the adjacent `mappings.yaml`. Tests require
 all ten planner cells to contain executable queries; zero `N/A` results pass.
 
@@ -136,8 +132,8 @@ scoring the transformed comparison:
    visibly distinguish that score from native-2024 and calibration-fit scores.
 
 There is no blanket “age every 2023 dollar by CPI” behavior. The implementation
-matches Microcosm's legacy-path source module
-`packages/populace-build/src/populace/build/us_runtime/target_aging.py`:
+matches Microcosm's source module
+`packages/microcosm-build/src/microcosm/build/us_runtime/target_aging.py`:
 
 - USD sums use their matching CBO income-by-source series when one is declared.
 - Other USD sums fall back to the CBO AGI series.
@@ -187,7 +183,7 @@ and no unsupported or `N/A` cells. The resulting relative errors are:
 These are performance results, not adapter failures. Microcosm's own release
 diagnostics report the same 13.333% final error for the BEA wage target. The
 congressional-district row is an external holdout. The verifier in
-`scripts/verify_populace_adapter.py` recomputes all ten from the H5 and model.
+`scripts/verify_microcosm_adapter.py` recomputes all ten from the H5 and model.
 
 ## Full Chronicle run
 
@@ -222,10 +218,10 @@ with a reason code; they are not omitted from the run.
 The reproducible command is:
 
 ```bash
-uv run --extra populace --extra taxcalc-cps python \
+uv run --extra microcosm --extra taxcalc-cps python \
   scripts/run_full_ledger_evaluation.py \
   --snapshot /path/to/ledger-snapshot \
-  --populace-dataset /path/to/populace_us_2024.h5 \
+  --microcosm-dataset /path/to/microcosm_us_2024.h5 \
   --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet \
   --output .artifacts/evaluations/<immutable-run-directory>
 ```

@@ -1,8 +1,8 @@
 // Cross-dataset scoring core.
 //
-// The cross-dataset comparison scores every dataset (populace + external tax
+// The cross-dataset comparison scores every dataset (microcosm + external tax
 // microdata) against the SAME surface: PolicyEngine's national calibration
-// targets. Each target carries an official value and populace's own estimate;
+// targets. Each target carries an official value and microcosm's own estimate;
 // external datasets arrive as committed JSONs keyed by the target `name`. A
 // dataset "covers" a target only if it can express that concept — federal
 // tax-unit engines can express the IRS-SOI tax targets but not SNAP/Medicaid/
@@ -18,7 +18,7 @@ export const LOSS_ERROR_CAP = 2.0; // 200% — matches the calibration map's cap
 export interface NationalTarget {
   name: string;
   target: number | null | undefined; // official (IRS/SOI/etc.) actual
-  populace: number | null | undefined; // populace final_estimate
+  microcosm: number | null | undefined; // microcosm final_estimate
   source?: string | null;
   variable?: string | null;
   measure?: string | null; // "total" | "count"

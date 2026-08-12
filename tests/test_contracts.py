@@ -119,10 +119,10 @@ def test_cross_period_capability_requires_alignment() -> None:
         CapabilityResult.direct(
             snapshot_id="ledger-1",
             fact=national_income_fact(),
-            source_id="populace_2024",
+            source_id="microcosm_2024",
             source_type=SourceType.MODEL_DATASET_PAIR,
             mapping_release="us-v1",
-            mapping_id="populace.wages.v1",
+            mapping_id="microcosm.wages.v1",
             mapping_quality=MappingQuality.EXACT,
             population_period=TypedPeriod.parse("tax_year:2024"),
             period_treatment=PeriodTreatment.ALIGNED_FACT,

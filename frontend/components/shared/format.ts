@@ -33,7 +33,7 @@ function releaseDateFromId(releaseId: string): string {
 
 // A readable label for a release: "2026-06-14 · f32c2e5".
 export function releaseLabel(releaseId: string, date?: string | null): string {
-  const sha = releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0];
+  const sha = releaseId.replace(/^microcosm-us-\d{4}-/, "").split("-")[0];
   const formatted = formatReleaseDate(date || releaseDateFromId(releaseId));
   return formatted ? `${formatted} · ${sha}` : sha;
 }

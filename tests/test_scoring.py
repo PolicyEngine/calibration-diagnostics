@@ -121,7 +121,7 @@ def test_calibration_fit_and_holdout_are_separate_surfaces() -> None:
     assert calibration.loss == Decimal("0")
 
 
-def test_populace_aligned_facts_can_be_scored_as_a_separate_group() -> None:
+def test_microcosm_aligned_facts_can_be_scored_as_a_separate_group() -> None:
     rows = [
         observation("native", "100", "100", "income"),
         observation(

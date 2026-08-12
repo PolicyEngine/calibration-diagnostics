@@ -65,7 +65,7 @@ aggregated export above, which is also exactly the shape the dashboard needs.
    → loads the file, applies a variable-concept mapping
    (`e00200→wages`, `iitax→income_tax_net`, …), computes weighted totals
    (national + AGI-bracket + EITC-by-state where fips exists), and emits
-   the legacy-path `frontend/lib/populace/external-datasets/<dataset>.json`, keyed by the same
+   `frontend/lib/microcosm/external-datasets/<dataset>.json`, keyed by the same
    benchmark ids the suites use.
 2. Frontend joins external JSONs to benchmark rows by id; unmatched rows show
    as no-coverage.

@@ -12,9 +12,9 @@ from .integration import IntegrationOverview
 from .integration import load_integration_overview
 from .mappings import MappingRegistry
 from .planner import CapabilityPlanner
-from .populace_aging import (
-    PopulaceAgingPolicy,
-    transform_ledger_facts_to_populace_year,
+from .microcosm_aging import (
+    MicrocosmAgingPolicy,
+    transform_ledger_facts_to_microcosm_year,
 )
 from .snapshot import CONSUMER_SCHEMA, SnapshotDiff, diff_snapshots
 
@@ -463,10 +463,10 @@ def _plan_for_facts(
         raise ValueError(
             f"integration {overview.integration_id} alignment build_year is invalid"
         )
-    aging_policy = PopulaceAgingPolicy.from_facts(facts)
+    aging_policy = MicrocosmAgingPolicy.from_facts(facts)
     declarations = []
     for source_year in source_years:
-        results = transform_ledger_facts_to_populace_year(
+        results = transform_ledger_facts_to_microcosm_year(
             facts,
             aging_policy,
             source_year=source_year,

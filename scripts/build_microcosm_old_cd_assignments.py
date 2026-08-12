@@ -8,17 +8,17 @@ from pathlib import Path
 
 import pandas as pd
 
-from evaluation_harness.populace_old_cd import build_old_cd_assignment_artifact
+from evaluation_harness.microcosm_old_cd import build_old_cd_assignment_artifact
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--populace-dataset", required=True, type=Path)
+    parser.add_argument("--microcosm-dataset", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     arguments = parser.parse_args()
 
     households = pd.read_hdf(
-        arguments.populace_dataset, "household", columns=["block_geoid"]
+        arguments.microcosm_dataset, "household", columns=["block_geoid"]
     )
     manifest = build_old_cd_assignment_artifact(
         households["block_geoid"].astype(str).unique(), arguments.output

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
-  POPULACE_HF_REVISION,
+  MICROCOSM_HF_REVISION,
   asObject,
   classifyApiError,
   hfResolveUrl,
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       scrub({
         source_repo: microcosmRepo(country),
         repo_type: "dataset",
-        revision: POPULACE_HF_REVISION,
+        revision: MICROCOSM_HF_REVISION,
         source: "huggingface_live",
         release_id: cal.release_id,
         updated_at: cal.updated_at,

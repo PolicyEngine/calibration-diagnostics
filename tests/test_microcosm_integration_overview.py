@@ -17,21 +17,21 @@ from evaluation_harness.planner import AlignmentDeclaration
 
 
 ROOT = Path(__file__).parents[1]
-INTEGRATION = ROOT / "integrations" / "populace_policyengine_us"
+INTEGRATION = ROOT / "integrations" / "microcosm_policyengine_us"
 
 
-def test_populace_overview_pins_current_dataset_and_model() -> None:
+def test_microcosm_overview_pins_current_dataset_and_model() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
-    assert overview.source.source_id == "populace_us_policyengine_us_2024"
+    assert overview.source.source_id == "microcosm_us_policyengine_us_2024"
     assert overview.source.dataset_version.endswith("20260728T011454Z")
     assert overview.source.model_version == "policyengine-us==1.764.6"
     assert overview.ledger_snapshot_id == "ledger-7917ea815df710fb20db076b"
     assert overview.alignment_policy == {
         "model_id": "cbo_growth_factor_aging",
         "model_version": "1.2.0",
-        "populace_commit": "cae8640f9e65e274aea65c7916cb37b956978e32",
+        "microcosm_commit": "cae8640f9e65e274aea65c7916cb37b956978e32",
         "source_module": (
-            "packages/populace-build/src/populace/build/us_runtime/target_aging.py"
+            "packages/microcosm-build/src/microcosm/build/us_runtime/target_aging.py"
         ),
         "source_years": [2022, 2023],
         "build_year": 2024,
@@ -40,7 +40,7 @@ def test_populace_overview_pins_current_dataset_and_model() -> None:
     }
 
 
-def test_populace_overview_has_ten_real_numeric_verification_facts() -> None:
+def test_microcosm_overview_has_ten_real_numeric_verification_facts() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     assert len(overview.verification_facts) == 10
     assert len({fact.fact_key for fact in overview.verification_facts}) == 10
@@ -49,7 +49,7 @@ def test_populace_overview_has_ten_real_numeric_verification_facts() -> None:
     assert all(fact.value.is_finite() for fact in overview.verification_facts)
 
 
-def test_all_ten_populace_facts_are_executable_not_na() -> None:
+def test_all_ten_microcosm_facts_are_executable_not_na() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     results = CapabilityPlanner(
@@ -69,7 +69,7 @@ def test_all_ten_populace_facts_are_executable_not_na() -> None:
     assert all(result.query is not None for result in results)
 
 
-def test_populace_overview_distinguishes_calibration_targets_from_holdouts() -> None:
+def test_microcosm_overview_distinguishes_calibration_targets_from_holdouts() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     results = CapabilityPlanner(mappings).classify_all(
@@ -86,7 +86,7 @@ def test_populace_overview_distinguishes_calibration_targets_from_holdouts() -> 
     ) == 4
 
 
-def test_populace_overview_does_not_claim_native_2023_population() -> None:
+def test_microcosm_overview_does_not_claim_native_2023_population() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     old_fact = replace(
@@ -120,7 +120,7 @@ def test_aligned_2023_eitc_count_with_child_slice_is_directly_testable() -> None
         ),
     )
     alignment = AlignmentDeclaration(
-        alignment_id="populace-aging:eic-count-2023-2024",
+        alignment_id="microcosm-aging:eic-count-2023-2024",
         source_id=overview.source.source_id,
         measure=old_fact.measure,
         source_period=old_fact.period,
@@ -137,7 +137,7 @@ def test_aligned_2023_eitc_count_with_child_slice_is_directly_testable() -> None
     assert result.query is not None
 
 
-def test_populace_verification_facts_match_committed_snapshot_fixture() -> None:
+def test_microcosm_verification_facts_match_committed_snapshot_fixture() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     validate_overview_against_snapshot(
         overview,
