@@ -1,3 +1,5 @@
+# Deprecated upstream identifiers: the pinned Microcosm release/file names and
+# Chronicle fact keys in this integration still use `populace`/`ledger` literals.
 schema_version: evaluation_harness.integration_overview.v1
 integration_id: microcosm_policyengine_us_2024
 chronicle_snapshot_id: chronicle-7917ea815df710fb20db076b
@@ -12,9 +14,9 @@ alignment_policy:
   evaluate_transformed_facts: true
   display_observed_and_transformed_values: true
 source:
-  source_id: microcosm_us_policyengine_us_2024
+  source_id: populace_us_policyengine_us_2024
   source_type: model_dataset_pair
-  dataset_version: microcosm-us-2024@microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z
+  dataset_version: populace-us-2024@populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z
   model_version: policyengine-us==1.764.6
   jurisdictions: [US]
   population_period: calendar_year:2024

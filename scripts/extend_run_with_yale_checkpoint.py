@@ -159,7 +159,7 @@ def _score(payload: dict) -> ScoredEvaluationResult:
         snapshot_id=payload["snapshot_id"],
         source_id=payload["source_id"],
         fact_key=payload["fact_key"],
-        chronicle_source=payload["chronicle_source"],
+        ledger_source=payload["ledger_source"],
         measure=payload["measure"],
         unit=payload["unit"],
         family=payload["family"],
@@ -196,7 +196,7 @@ def _frontend_facts(frontend: Path) -> tuple[FactContract, ...]:
                 FactContract(
                     fact_key=row["fact_key"],
                     semantic_fact_key=provenance.get("semantic_fact_key"),
-                    source=row["chronicle_source"],
+                    source=row["ledger_source"],
                     jurisdiction="US",
                     period=TypedPeriod.parse(row["observed_period"]),
                     geography_level=row["geography_level"],

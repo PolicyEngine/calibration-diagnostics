@@ -6,7 +6,7 @@ mappings:
       measures: [irs_soi.returns_with_total_earned_income_credit]
       units: [count]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:659621627c8e3969cec14b37]
+      fact_keys: [ledger.aggregate_fact.v2:659621627c8e3969cec14b37]
     execution: model
     source_expression: eitc
     operation: weighted_count
@@ -23,7 +23,7 @@ mappings:
       measures: [us:statutes/26/62#adjusted_gross_income]
       units: [usd]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:6c9a00df8068b3a63563654f]
+      fact_keys: [ledger.aggregate_fact.v2:6c9a00df8068b3a63563654f]
     execution: model
     source_expression: agi
     operation: weighted_sum
@@ -40,7 +40,7 @@ mappings:
       measures: [cbo.wages_and_salaries_projection]
       units: [usd]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:4ccc6f8f4cd37e7a7071fdd6]
+      fact_keys: [ledger.aggregate_fact.v2:4ccc6f8f4cd37e7a7071fdd6]
     execution: model
     source_expression: wages
     operation: weighted_sum
@@ -55,7 +55,7 @@ mappings:
       measures: [irs_soi.taxable_interest]
       units: [usd]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:ef70cb84e0e6134514fde9a7]
+      fact_keys: [ledger.aggregate_fact.v2:ef70cb84e0e6134514fde9a7]
     execution: model
     source_expression: txbl_int
     operation: weighted_sum
@@ -72,7 +72,7 @@ mappings:
       measures: [irs_soi.qualified_dividends]
       units: [usd]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:e9177998f40a45b4641321ed]
+      fact_keys: [ledger.aggregate_fact.v2:e9177998f40a45b4641321ed]
     execution: model
     source_expression: div_pref
     operation: weighted_sum
@@ -89,7 +89,7 @@ mappings:
       measures: [irs_soi.net_capital_gains]
       units: [usd]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:f2d456d4ab7ce58ed8332df4]
+      fact_keys: [ledger.aggregate_fact.v2:f2d456d4ab7ce58ed8332df4]
     execution: model
     source_expression: txbl_kg
     operation: weighted_sum
@@ -106,7 +106,7 @@ mappings:
       measures: [irs_soi.partnership_s_corporation_net_income]
       units: [usd]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:9c3ee1e6e61c12a0fe67c08d]
+      fact_keys: [ledger.aggregate_fact.v2:9c3ee1e6e61c12a0fe67c08d]
     execution: model
     source_expression: part_scorp
     operation: weighted_sum
@@ -123,7 +123,7 @@ mappings:
       measures: [irs_soi.ordinary_dividends]
       units: [usd]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:5b370a42476602614cd9db75]
+      fact_keys: [ledger.aggregate_fact.v2:5b370a42476602614cd9db75]
     execution: model
     source_expression: div_ord
     operation: weighted_sum
@@ -140,7 +140,7 @@ mappings:
       measures: [irs_soi.income_tax_liability_after_credits]
       units: [usd]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:5bf612d2be1e82d83605961b]
+      fact_keys: [ledger.aggregate_fact.v2:5bf612d2be1e82d83605961b]
     execution: model
     source_expression: liab_iit
     operation: weighted_sum
@@ -157,7 +157,7 @@ mappings:
       measures: [irs_soi.total_earned_income_credit]
       units: [usd]
       entities: [tax_unit]
-      fact_keys: [chronicle.aggregate_fact.v2:0ec6eb86d8f4deeb6442b097]
+      fact_keys: [ledger.aggregate_fact.v2:0ec6eb86d8f4deeb6442b097]
     execution: model
     source_expression: eitc
     operation: weighted_sum

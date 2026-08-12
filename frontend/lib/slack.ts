@@ -8,6 +8,8 @@ const COUNTRY_LABEL: Record<MicrocosmCountry, string> = {
 };
 
 const WEBHOOK_ENV: Record<MicrocosmCountry, string> = {
+  // Deprecated upstream identifiers: the configured webhook variables still
+  // use the former Populace names.
   us: "SLACK_WEBHOOK_POPULACE_US",
   uk: "SLACK_WEBHOOK_POPULACE_UK",
 };

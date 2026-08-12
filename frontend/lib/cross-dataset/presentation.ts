@@ -9,7 +9,7 @@ import { sourceAuthorityLabel } from "../source-labels";
 export const CROSS_DATASET_PAGE_TITLE = "Cross-dataset comparison";
 
 export const GROUP_DIMENSIONS = [
-  { key: "chronicle_source", label: "Chronicle source" },
+  { key: "ledger_source", label: "Chronicle source" },
   { key: "period", label: "Period" },
   { key: "geography", label: "Geography" },
 ] as const;
@@ -203,7 +203,7 @@ export function buildSourceOverviews(
         : groups.find((group) => {
             if (geography !== "all" && sampleKey != null) {
               return (
-                group.dimension === "geography_microcosm_calibration_sample" &&
+                group.dimension === "geography_populace_calibration_sample" &&
                 group.key === `${geography}|${sampleKey}`
               );
             }
@@ -211,7 +211,7 @@ export function buildSourceOverviews(
               return group.dimension === "geography" && group.key === geography;
             }
             return (
-              group.dimension === "microcosm_calibration_sample" &&
+              group.dimension === "populace_calibration_sample" &&
               group.key === sampleKey
             );
           });
@@ -276,7 +276,9 @@ export function sourceDisplayLabel(source: SourceSummary): string {
 
 export function sourceCompactLabel(source: SourceSummary): string {
   const sourceId = source.source_id.toLowerCase();
-  if (sourceId.includes("microcosm")) return "Microcosm";
+  // Deprecated artifact identifier: existing Microcosm rows retain their
+  // former `populace` source ID.
+  if (sourceId.includes("populace") || sourceId.includes("microcosm")) return "Microcosm";
   if (sourceId === "taxcalc_public_cps_2024" || sourceId === "cps") {
     return "Public CPS";
   }
@@ -288,7 +290,7 @@ export function sourceCompactLabel(source: SourceSummary): string {
 export function orderSourceSummaries(sources: SourceSummary[]): SourceSummary[] {
   const sourcePriority = (source: SourceSummary): number => {
     const sourceId = source.source_id.toLowerCase();
-    if (sourceId.includes("microcosm")) return 0;
+    if (sourceId.includes("populace") || sourceId.includes("microcosm")) return 0;
     if (sourceId === "taxcalc_public_cps_2024" || sourceId === "cps") return 1;
     if (sourceId === "yale_reconstruction_2024") return 2;
     return 3;
@@ -304,7 +306,7 @@ export function orderSourceSummaries(sources: SourceSummary[]): SourceSummary[] 
 }
 
 const DIMENSION_QUERY_KEYS: Record<GroupDimension, string> = {
-  chronicle_source: "chronicle_source",
+  ledger_source: "ledger_source",
   concept: "measure",
   period: "period",
   geography: "geography",
@@ -372,7 +374,7 @@ export function buildGroupRows(
       dimension,
       key: group.key,
       label:
-        dimension === "chronicle_source"
+        dimension === "ledger_source"
           ? sourceAuthorityLabel(group.key)
           : group.label,
       factCount: group.fact_count,

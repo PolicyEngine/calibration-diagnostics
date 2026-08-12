@@ -1,8 +1,11 @@
 # Microcosm / PolicyEngine-US integration overview
 
+> Deprecated upstream identifiers: the current Microcosm HF release, files,
+> diagnostics metadata, and Chronicle fact keys still use `populace`/`ledger`.
+
 Status: **adapter implemented and verified against the pinned release**
 
-Reviewed Microcosm release: `microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`
+Reviewed Microcosm release: `populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`
 
 Chronicle snapshot: `chronicle-7917ea815df710fb20db076b`
 
@@ -11,7 +14,7 @@ Chronicle snapshot: `chronicle-7917ea815df710fb20db076b`
 This is a model/dataset pairing, not a raw-dataset adapter:
 
 - Dataset: Microcosm US, published at
-  `policyengine/microcosm-us`, file `microcosm_us_2024.h5`, SHA-256
+  `policyengine/populace-us`, file `populace_us_2024.h5`, SHA-256
   `48b9d479fb4fd1c3537f9383ce4697d130b6f618658409d74f6233c43b994c7e`.
 - Dataset build: Microcosm commit
   `cae8640f9e65e274aea65c7916cb37b956978e32`.
@@ -221,7 +224,7 @@ The reproducible command is:
 uv run --extra microcosm --extra taxcalc-cps python \
   scripts/run_full_chronicle_evaluation.py \
   --snapshot /path/to/chronicle-snapshot \
-  --microcosm-dataset /path/to/microcosm_us_2024.h5 \
+  --microcosm-dataset /path/to/populace_us_2024.h5 \
   --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet \
   --output .artifacts/evaluations/<immutable-run-directory>
 ```

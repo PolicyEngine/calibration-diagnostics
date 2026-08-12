@@ -9,6 +9,8 @@
 //   tools/build_us_fiscal_refresh_release.py emits, so they match what the
 //   Staging runs page shows live while a build runs.
 // - Publish steps come from microcosm-data's publish_cli.
+// Deprecated upstream identifiers: published HF/file names and the
+// `--ledger-facts` build flag retain their former Populace/Ledger literals.
 
 export const PIPELINE_SOURCE = {
   repo: "PolicyEngine/microcosm",
@@ -113,7 +115,7 @@ export const PIPELINE_PHASES: PipelinePhase[] = [
       {
         id: "chronicle_facts",
         title: "Chronicle facts",
-        code: "--chronicle-facts consumer_facts.jsonl",
+        code: "--ledger-facts consumer_facts.jsonl",
         description:
           "Sourced official statistics (IRS SOI, Census PEP/STC, CMS, USDA, HHS, SSA, CBO, JCT) exported from Chronicle. These carry the target values.",
       },

@@ -22,7 +22,7 @@ INTEGRATION = ROOT / "integrations" / "microcosm_policyengine_us"
 
 def test_microcosm_overview_pins_current_dataset_and_model() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
-    assert overview.source.source_id == "microcosm_us_policyengine_us_2024"
+    assert overview.source.source_id == "populace_us_policyengine_us_2024"
     assert overview.source.dataset_version.endswith("20260728T011454Z")
     assert overview.source.model_version == "policyengine-us==1.764.6"
     assert overview.chronicle_snapshot_id == "chronicle-7917ea815df710fb20db076b"
@@ -91,7 +91,7 @@ def test_microcosm_overview_does_not_claim_native_2023_population() -> None:
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     old_fact = replace(
         overview.verification_facts[0],
-        fact_key="chronicle.aggregate_fact.v2:000000000000000000000000",
+        fact_key="ledger.aggregate_fact.v2:000000000000000000000000",
         period=TypedPeriod.parse("calendar_year:2023"),
     )
     result = CapabilityPlanner(mappings).classify(old_fact, overview.source)
@@ -108,7 +108,7 @@ def test_aligned_2023_eitc_count_with_child_slice_is_directly_testable() -> None
     )
     old_fact = replace(
         template,
-        fact_key="chronicle.aggregate_fact.v2:000000000000000000000001",
+        fact_key="ledger.aggregate_fact.v2:000000000000000000000001",
         period=TypedPeriod.parse("tax_year:2023"),
         universe_constraints=(
             {"domain": "individual_income_tax_returns_with_earned_income_credit"},

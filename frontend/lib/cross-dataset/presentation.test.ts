@@ -141,7 +141,7 @@ const groups: CrossDatasetGroup[] = [
     },
   },
   {
-    dimension: "geography_microcosm_calibration_sample",
+    dimension: "geography_populace_calibration_sample",
     key: "state|in_sample",
     label: "State / In sample",
     fact_count: 2_000,
@@ -179,7 +179,7 @@ const groups: CrossDatasetGroup[] = [
     },
   },
   {
-    dimension: "microcosm_calibration_sample",
+    dimension: "populace_calibration_sample",
     key: "in_sample",
     label: "In sample",
     fact_count: 2_000,
@@ -217,7 +217,7 @@ const groups: CrossDatasetGroup[] = [
     },
   },
   {
-    dimension: "microcosm_calibration_sample",
+    dimension: "populace_calibration_sample",
     key: "out_of_sample",
     label: "Out of sample",
     fact_count: 46_313,
@@ -255,7 +255,7 @@ const groups: CrossDatasetGroup[] = [
     },
   },
   {
-    dimension: "chronicle_source",
+    dimension: "ledger_source",
     key: "irs_soi",
     label: "IRS SOI",
     fact_count: 33_045,
@@ -449,7 +449,7 @@ const groups: CrossDatasetGroup[] = [
 test("keeps the page title and exposes only the requested group controls", () => {
   expect(CROSS_DATASET_PAGE_TITLE).toBe("Cross-dataset comparison");
   expect(GROUP_DIMENSIONS).toEqual([
-    { key: "chronicle_source", label: "Chronicle source" },
+    { key: "ledger_source", label: "Chronicle source" },
     { key: "period", label: "Period" },
     { key: "geography", label: "Geography" },
   ]);
@@ -518,8 +518,13 @@ test("compact source labels fit the group comparison matrix", () => {
     source_id: "yale_reconstruction_2024",
     label: "Yale Tax-Data + Tax-Simulator (reconstruction)",
   };
+  const publishedMicrocosm = {
+    ...summary.sources[0],
+    source_id: "populace_us_policyengine_us_2024",
+  };
 
   expect(sourceCompactLabel(summary.sources[0])).toBe("Microcosm");
+  expect(sourceCompactLabel(publishedMicrocosm)).toBe("Microcosm");
   expect(sourceCompactLabel(summary.sources[1])).toBe("Public CPS");
   expect(sourceCompactLabel(yale)).toBe("Yale reconstruction");
   expect(sourceCompactLabel(rawAcs)).toBe("Raw ACS");
@@ -635,7 +640,7 @@ test("source scorecards identify aligned, advanced, and in-sample comparisons", 
 });
 
 test("group rows expose score, coverage, unsupported counts, and fact links", () => {
-  const rows = buildGroupRows(groups, "chronicle_source", summary.sources);
+  const rows = buildGroupRows(groups, "ledger_source", summary.sources);
   expect(rows).toHaveLength(1);
   expect(rows[0].label).toBe("IRS Statistics of Income");
   expect(rows[0].sources.microcosm).toMatchObject({
@@ -658,7 +663,7 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
     unsupportedCount: 33_008,
   });
   expect(rows[0].sources.cps.factHref).toBe(
-    "/microcosm/datasets?view=facts&source=cps&chronicle_source=irs_soi",
+    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi",
   );
   expect("coveragePercent" in rows[0].sources.microcosm).toBe(false);
 });

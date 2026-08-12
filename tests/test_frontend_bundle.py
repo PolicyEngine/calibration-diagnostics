@@ -373,7 +373,7 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
     microcosm_in_sample = next(
         row
         for row in groups
-        if row["dimension"] == "microcosm_calibration_sample"
+        if row["dimension"] == "populace_calibration_sample"
         and row["key"] == "in_sample"
     )
     assert microcosm_in_sample["fact_count"] == 1
@@ -383,7 +383,7 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
     microcosm_out_of_sample = next(
         row
         for row in groups
-        if row["dimension"] == "microcosm_calibration_sample"
+        if row["dimension"] == "populace_calibration_sample"
         and row["key"] == "out_of_sample"
     )
     assert microcosm_out_of_sample["fact_count"] == 2
@@ -392,7 +392,7 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
     state_microcosm_in_sample = next(
         row
         for row in groups
-        if row["dimension"] == "geography_microcosm_calibration_sample"
+        if row["dimension"] == "geography_populace_calibration_sample"
         and row["key"] == "state|in_sample"
     )
     assert state_microcosm_in_sample["fact_count"] == 0

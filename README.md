@@ -4,9 +4,10 @@ Interactive dashboard for the **microcosm-US** synthetic population — PolicyEn
 calibrated microdataset published on Hugging Face at
 [`policyengine/populace-us`](https://huggingface.co/datasets/policyengine/populace-us).
 
-Routes, commands, scripts, release IDs, repository IDs, and environment variables
-containing `populace` below are legacy compatibility identifiers for Microcosm.
-They must remain literal for the documented interfaces to work.
+> Deprecated upstream identifiers: Microcosm's current Hugging Face slugs,
+> release/file names, deployment variables, and Chronicle wire contracts still
+> use `populace`/`ledger`; see
+> [upstream identifier compatibility](docs/upstream-identifier-compatibility.md).
 
 Everything is read **live from Hugging Face**: the current release is resolved
 through `latest.json`, and each release's manifests and per-target calibration

@@ -95,7 +95,7 @@ def test_acs_pums_refuses_district_geography_and_non_native_years() -> None:
 
     district = replace(
         fact,
-        fact_key="chronicle.aggregate_fact.v2:000000000000000000000001",
+        fact_key="ledger.aggregate_fact.v2:000000000000000000000001",
         geography_level="congressional_district",
         geography_id="5001800US0101",
     )
@@ -106,7 +106,7 @@ def test_acs_pums_refuses_district_geography_and_non_native_years() -> None:
 
     old_period = replace(
         fact,
-        fact_key="chronicle.aggregate_fact.v2:000000000000000000000002",
+        fact_key="ledger.aggregate_fact.v2:000000000000000000000002",
         period=TypedPeriod("calendar_year", "2023"),
     )
     old_period_result = planner.classify(old_period, overview.source)

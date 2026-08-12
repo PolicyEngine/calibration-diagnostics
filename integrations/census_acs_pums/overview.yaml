@@ -1,3 +1,5 @@
+# Deprecated upstream identifier: Chronicle fact keys in this integration keep
+# the current `ledger.*` namespace until Chronicle migrates its consumer export.
 schema_version: evaluation_harness.integration_overview.v1
 integration_id: census_acs_pums_2024
 chronicle_snapshot_id: chronicle-7917ea815df710fb20db076b

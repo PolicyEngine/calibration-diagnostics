@@ -6,7 +6,7 @@ mappings:
       measures: [census_pep.resident_population]
       units: [count]
       entities: [person]
-      fact_keys: [chronicle.aggregate_fact.v2:caae1a32d55fddfc7562d21d]
+      fact_keys: [ledger.aggregate_fact.v2:caae1a32d55fddfc7562d21d]
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -23,8 +23,8 @@ mappings:
       units: [count]
       entities: [person]
       fact_keys:
-        - chronicle.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52
-        - chronicle.aggregate_fact.v2:5ca7aa68822556e9e9ad9c06
+        - ledger.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52
+        - ledger.aggregate_fact.v2:5ca7aa68822556e9e9ad9c06
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -40,9 +40,9 @@ mappings:
       units: [count]
       entities: [person]
       excluded_fact_keys:
-        - chronicle.aggregate_fact.v2:caae1a32d55fddfc7562d21d
-        - chronicle.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52
-        - chronicle.aggregate_fact.v2:5ca7aa68822556e9e9ad9c06
+        - ledger.aggregate_fact.v2:caae1a32d55fddfc7562d21d
+        - ledger.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52
+        - ledger.aggregate_fact.v2:5ca7aa68822556e9e9ad9c06
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -63,12 +63,12 @@ mappings:
       # 80–84 and 85 means ages 85+. Dedicated mappings below keep those codes
       # out of literal single-year queries.
       excluded_fact_keys:
-        - chronicle.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
-        - chronicle.aggregate_fact.v2:24ef01329f771565b927bd3d
-        - chronicle.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
-        - chronicle.aggregate_fact.v2:ba9cae909127ad2764caec51
-        - chronicle.aggregate_fact.v2:7d34a92d4a5309888bf1e975
-        - chronicle.aggregate_fact.v2:4270254d5042b64d0d41e551
+        - ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
+        - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
+        - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
+        - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
+        - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
+        - ledger.aggregate_fact.v2:4270254d5042b64d0d41e551
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -85,11 +85,11 @@ mappings:
       units: [count]
       entities: [person]
       fact_keys:
-        - chronicle.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
-        - chronicle.aggregate_fact.v2:24ef01329f771565b927bd3d
-        - chronicle.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
-        - chronicle.aggregate_fact.v2:ba9cae909127ad2764caec51
-        - chronicle.aggregate_fact.v2:7d34a92d4a5309888bf1e975
+        - ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
+        - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
+        - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
+        - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
+        - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
     execution: direct
     source_expression: cps_asec_age_80_84_population
     operation: weighted_sum
@@ -101,10 +101,10 @@ mappings:
     # All five facts retain traceability to the grouped benchmark, but only
     # the age-80 anchor contributes the one independent comparison.
     unscored_fact_keys:
-      - chronicle.aggregate_fact.v2:24ef01329f771565b927bd3d
-      - chronicle.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
-      - chronicle.aggregate_fact.v2:ba9cae909127ad2764caec51
-      - chronicle.aggregate_fact.v2:7d34a92d4a5309888bf1e975
+      - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
+      - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
+      - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
+      - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
     calibration_exposure: external_validation
 
   - mapping_id: census-population-projection-cps-age-85-plus
@@ -113,7 +113,7 @@ mappings:
       measures: [census.population_projection]
       units: [count]
       entities: [person]
-      fact_keys: [chronicle.aggregate_fact.v2:4270254d5042b64d0d41e551]
+      fact_keys: [ledger.aggregate_fact.v2:4270254d5042b64d0d41e551]
     execution: direct
     source_expression: cps_asec_age_85_plus_population
     operation: weighted_sum
@@ -1120,7 +1120,7 @@ mappings:
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [chronicle.aggregate_fact.v2:035d27c7ddaecd3099232f2d]
+      fact_keys: [ledger.aggregate_fact.v2:035d27c7ddaecd3099232f2d]
     execution: direct
     source_expression: social_security
     operation: weighted_sum
@@ -1139,7 +1139,7 @@ mappings:
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [chronicle.aggregate_fact.v2:cf58110712f7a30d1d03b8b0]
+      fact_keys: [ledger.aggregate_fact.v2:cf58110712f7a30d1d03b8b0]
     execution: direct
     source_expression: social_security_dependents
     operation: weighted_sum
@@ -1158,7 +1158,7 @@ mappings:
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [chronicle.aggregate_fact.v2:1d3492e0d2a643f41ba01974]
+      fact_keys: [ledger.aggregate_fact.v2:1d3492e0d2a643f41ba01974]
     execution: direct
     source_expression: social_security_disability
     operation: weighted_sum
@@ -1177,7 +1177,7 @@ mappings:
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [chronicle.aggregate_fact.v2:30dce3f79a7d4c83cf66fb93]
+      fact_keys: [ledger.aggregate_fact.v2:30dce3f79a7d4c83cf66fb93]
     execution: direct
     source_expression: social_security_retirement
     operation: weighted_sum
@@ -1196,7 +1196,7 @@ mappings:
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [chronicle.aggregate_fact.v2:3ea75e37464de497387232b9]
+      fact_keys: [ledger.aggregate_fact.v2:3ea75e37464de497387232b9]
     execution: direct
     source_expression: social_security_survivors
     operation: weighted_sum
@@ -1215,7 +1215,7 @@ mappings:
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [chronicle.aggregate_fact.v2:ddf4fff0450304b664352542]
+      fact_keys: [ledger.aggregate_fact.v2:ddf4fff0450304b664352542]
     execution: model
     source_expression: ssi
     operation: weighted_sum
@@ -1332,7 +1332,7 @@ mappings:
         [cms_nhe.employer_contribution_private_health_insurance_premiums]
       units: [usd]
       entities: [person]
-      fact_keys: [chronicle.aggregate_fact.v2:f4c1ba528660b3f48ca03b90]
+      fact_keys: [ledger.aggregate_fact.v2:f4c1ba528660b3f48ca03b90]
     execution: direct
     source_expression: employer_sponsored_insurance_premiums
     operation: weighted_sum
@@ -1444,8 +1444,8 @@ mappings:
       units: [usd]
       entities: [government]
       excluded_fact_keys:
-        - chronicle.aggregate_fact.v2:2678cc487a40e182ad36fcd7
-        - chronicle.aggregate_fact.v2:b5d81911cf61e7aa92ea516b
+        - ledger.aggregate_fact.v2:2678cc487a40e182ad36fcd7
+        - ledger.aggregate_fact.v2:b5d81911cf61e7aa92ea516b
     execution: model
     execution_entity: spm_unit
     build_target_periods: [fiscal_year:2024]
@@ -1463,8 +1463,8 @@ mappings:
       units: [count]
       entities: [household]
       excluded_fact_keys:
-        - chronicle.aggregate_fact.v2:40fbf9f01a32b51ed9314499
-        - chronicle.aggregate_fact.v2:54d0cb0098771aa4a8af2132
+        - ledger.aggregate_fact.v2:40fbf9f01a32b51ed9314499
+        - ledger.aggregate_fact.v2:54d0cb0098771aa4a8af2132
     execution: model
     execution_entity: spm_unit
     build_target_periods: [fiscal_year:2024]
@@ -1567,7 +1567,7 @@ mappings:
       units: [usd]
       entities: [government]
       excluded_fact_keys:
-        - chronicle.aggregate_fact.v2:b0735b6815dabfcd24f7ff40
+        - ledger.aggregate_fact.v2:b0735b6815dabfcd24f7ff40
     execution: model
     execution_entity: tax_unit
     build_target_periods: [fiscal_year:2024]
@@ -1597,7 +1597,7 @@ mappings:
     # this as a structural zero, so retain the estimate for inspection but do
     # not score it against the missing observation.
     unscored_fact_keys:
-      - chronicle.aggregate_fact.v2:fa4459772a62b4eada33ba30
+      - ledger.aggregate_fact.v2:fa4459772a62b4eada33ba30
 
   - mapping_id: cms-medicaid-total-chip-enrollment
     chronicle_selector:
@@ -1629,7 +1629,7 @@ mappings:
     supported_constraint_domains: [medicaid_chip_enrollment]
     calibration_exposure: direct_calibration_target
     unscored_fact_keys:
-      - chronicle.aggregate_fact.v2:b153e34a3c3354a52fcd2e7e
+      - ledger.aggregate_fact.v2:b153e34a3c3354a52fcd2e7e
 
   - mapping_id: cms-medicaid-total-adult-enrollment
     chronicle_selector:
@@ -1649,7 +1649,7 @@ mappings:
     # December data. Execute the model counterpart for inspection, but do not
     # score the administrative missing-value sentinel as a structural zero.
     unscored_fact_keys:
-      - chronicle.aggregate_fact.v2:09ae62cf32b2eddb8eda7adf
+      - ledger.aggregate_fact.v2:09ae62cf32b2eddb8eda7adf
 
   - mapping_id: cms-medicaid-child-enrollment
     chronicle_selector:
@@ -1666,7 +1666,7 @@ mappings:
     supported_constraint_domains: [medicaid_chip_enrollment]
     calibration_exposure: related_calibration_family
     unscored_fact_keys:
-      - chronicle.aggregate_fact.v2:a30c1502ae98f22d936a27ad
+      - ledger.aggregate_fact.v2:a30c1502ae98f22d936a27ad
 
   - mapping_id: ssa-ssi-federal-payment-recipients-by-age
     chronicle_selector:

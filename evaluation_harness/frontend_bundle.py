@@ -24,7 +24,9 @@ FAR_OUTSIDE_BOUNDS_RELATIVE_ERROR = Decimal("0.25")
 
 DEFAULT_SOURCE_LABELS = {
     "census_acs_pums_2024": "Raw ACS PUMS",
-    "microcosm_us_policyengine_us_2024": "Microcosm + PolicyEngine-US",
+    # Deprecated artifact identifier: evaluation bundle v1 retains the former
+    # Populace source ID while the UI labels it Microcosm.
+    "populace_us_policyengine_us_2024": "Microcosm + PolicyEngine-US",
     "taxcalc_public_cps_2024": "Public CPS + Tax-Calculator",
     "yale_reconstruction_2024": (
         "Yale Tax-Data + Tax-Simulator (reconstruction)"
@@ -245,7 +247,7 @@ def _fact_row(
     return {
         "fact_key": fact.fact_key,
         "label": fact.label or fact.fact_key,
-        "chronicle_source": fact.source,
+        "ledger_source": fact.source,
         "measure": fact.measure,
         "unit": fact.unit,
         "observed_period": fact.period.canonical,
@@ -344,7 +346,7 @@ def _build_groups(
 ) -> list[dict[str, Any]]:
     fact_values = tuple(facts)
     definitions = {
-        "chronicle_source": lambda fact: fact.source,
+        "ledger_source": lambda fact: fact.source,
         "concept": lambda fact: fact.measure,
         "period": lambda fact: fact.period.canonical,
         "geography": lambda fact: fact.geography_level,
@@ -441,7 +443,9 @@ def _build_groups(
                 }
             )
     microcosm_source_ids = [
-        source_id for source_id in source_ids if "microcosm" in source_id.lower()
+        source_id
+        for source_id in source_ids
+        if any(name in source_id.lower() for name in ("populace", "microcosm"))
     ]
     if len(microcosm_source_ids) != 1:
         raise ValueError(
@@ -459,10 +463,12 @@ def _build_groups(
         "in_sample": in_sample_fact_keys,
         "out_of_sample": all_fact_keys - in_sample_fact_keys,
     }
+    # Deprecated artifact identifier: bundle v1 names the Microcosm calibration
+    # partition with the former Populace product name.
     for sample, fact_keys in sample_fact_keys.items():
         groups.append(
             {
-                "dimension": "microcosm_calibration_sample",
+                "dimension": "populace_calibration_sample",
                 "key": sample,
                 "label": _display_label(sample),
                 "fact_count": len(fact_keys),
@@ -541,7 +547,7 @@ def _build_groups(
             intersection = geography_fact_keys & fact_keys
             groups.append(
                 {
-                    "dimension": "geography_microcosm_calibration_sample",
+                    "dimension": "geography_populace_calibration_sample",
                     "key": f"{geography}|{sample}",
                     "label": (
                         f"{_display_label(geography)} / "
@@ -728,7 +734,7 @@ def publish_frontend_bundle(
     fact_partitions: list[dict[str, Any]] = []
     fact_index: dict[str, int] = {}
     facets: dict[str, Any] = {
-        "chronicle_source": {},
+        "ledger_source": {},
         "measure": {},
         "period": {},
         "geography": {},
@@ -747,7 +753,7 @@ def publish_frontend_bundle(
         page_rows = rows[index * page_size : (index + 1) * page_size]
         for row in page_rows:
             fact_index[row["fact_key"]] = page
-            add_facet("chronicle_source", row["chronicle_source"], page)
+            add_facet("ledger_source", row["ledger_source"], page)
             add_facet("measure", row["measure"], page)
             add_facet("period", row["observed_period"], page)
             add_facet("geography", row["geography_level"], page)

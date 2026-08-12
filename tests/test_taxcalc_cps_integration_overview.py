@@ -67,7 +67,7 @@ def test_taxcalc_cps_plans_income_band_and_eitc_child_breakdowns() -> None:
     )
     income_band = replace(
         eitc,
-        fact_key="chronicle.aggregate_fact.v2:000000000000000000000001",
+        fact_key="ledger.aggregate_fact.v2:000000000000000000000001",
         dimensions={"income_range": "10k_to_15k"},
         universe_constraints=(
             {"domain": "all_individual_income_tax_returns"},
@@ -93,7 +93,7 @@ def test_taxcalc_cps_plans_income_band_and_eitc_child_breakdowns() -> None:
 
     child = replace(
         eitc,
-        fact_key="chronicle.aggregate_fact.v2:000000000000000000000002",
+        fact_key="ledger.aggregate_fact.v2:000000000000000000000002",
         measure="irs_soi.earned_income_credit",
         dimensions={"eitc_child_count": 2, "filing_status": "all", "income_range": "all"},
         universe_constraints=(

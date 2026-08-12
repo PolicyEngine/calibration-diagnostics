@@ -40,7 +40,9 @@ class ReleaseTargetAlignments:
 
 def _target_period(fact: FactContract, target: dict) -> TypedPeriod:
     metadata = target.get("metadata", {})
-    period_kind = str(metadata.get("chronicle_period_type", fact.period.kind))
+    # Deprecated upstream identifier: Microcosm diagnostics still use the
+    # former Ledger prefix for Chronicle-backed target metadata.
+    period_kind = str(metadata.get("ledger_period_type", fact.period.kind))
     target_value = str(target["period"])
     if period_kind == "month":
         month = fact.period.value.split("-", 1)[-1]
@@ -63,7 +65,8 @@ def compile_release_target_alignments(
     """Match source records to their exact post-aging, post-uprating build targets.
 
     Source-record IDs are the stable join because Chronicle fact keys changed namespace
-    between the pinned build (``arch.*``) and the evaluation snapshot (``chronicle.*``).
+    between the pinned build (``arch.*``) and the evaluation snapshot
+    (the deprecated upstream ``ledger.*`` key namespace).
     """
 
     payload = json.loads(Path(diagnostics_path).read_text())
@@ -71,7 +74,7 @@ def compile_release_target_alignments(
     by_record: dict[str, dict] = {}
     for target in targets:
         source_record_id = str(
-            target.get("metadata", {}).get("chronicle_source_record_id", "")
+            target.get("metadata", {}).get("ledger_source_record_id", "")
         )
         if not source_record_id:
             continue
@@ -92,7 +95,7 @@ def compile_release_target_alignments(
         if target is None:
             continue
         metadata = target.get("metadata", {})
-        release_unit = str(metadata.get("chronicle_measure_unit", fact.unit))
+        release_unit = str(metadata.get("ledger_measure_unit", fact.unit))
         if release_unit != fact.unit:
             rejected[fact.fact_key] = (
                 f"release target unit {release_unit} does not match Chronicle unit "
@@ -100,10 +103,10 @@ def compile_release_target_alignments(
             )
             continue
         release_source_period = str(
-            metadata.get("chronicle_fact_period", fact.period.value)
+            metadata.get("ledger_fact_period", fact.period.value)
         )
         release_source_kind = str(
-            metadata.get("chronicle_period_type", fact.period.kind)
+            metadata.get("ledger_period_type", fact.period.kind)
         )
         if (release_source_kind, release_source_period) != (
             fact.period.kind,

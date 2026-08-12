@@ -142,7 +142,9 @@ export interface FactSourceCell {
 export interface CrossDatasetFact {
   fact_key: string;
   label: string;
-  chronicle_source: string;
+  // Deprecated artifact identifier: existing bundles and their index retain
+  // `ledger_source`; the UI presents this field as Chronicle source.
+  ledger_source: string;
   measure: string;
   unit: string;
   observed_period: string;
@@ -172,7 +174,7 @@ interface FactIndexDocument {
   snapshot_id: string;
   facts: Record<string, number>;
   facets: {
-    chronicle_source: Record<string, number[]>;
+    ledger_source: Record<string, number[]>;
     measure: Record<string, number[]>;
     period: Record<string, number[]>;
     geography: Record<string, number[]>;
@@ -484,7 +486,7 @@ export class CrossDatasetArtifactReader {
       throw new ArtifactError("partial_artifact", "Cross-dataset fact index is incomplete.");
     }
     for (const dimension of [
-      "chronicle_source",
+      "ledger_source",
       "measure",
       "period",
       "geography",
@@ -504,7 +506,7 @@ export class CrossDatasetArtifactReader {
     const index = await this.factIndex();
     const candidates: number[][] = [];
     const add = (values: number[] | undefined) => candidates.push(values ?? []);
-    if (query.chronicleSource) add(index.facets.chronicle_source[query.chronicleSource]);
+    if (query.chronicleSource) add(index.facets.ledger_source[query.chronicleSource]);
     if (query.measure) add(index.facets.measure[query.measure]);
     if (query.period) add(index.facets.period[query.period]);
     if (query.geography) add(index.facets.geography[query.geography]);
@@ -554,7 +556,7 @@ export class CrossDatasetArtifactReader {
       return (
         (!query.source || cell != null) &&
         (!query.status || cell?.status === query.status) &&
-        (!query.chronicleSource || row.chronicle_source === query.chronicleSource) &&
+        (!query.chronicleSource || row.ledger_source === query.chronicleSource) &&
         (!query.measure || row.measure === query.measure) &&
         (!query.period || row.observed_period === query.period) &&
         (!query.geography || row.geography_level === query.geography) &&

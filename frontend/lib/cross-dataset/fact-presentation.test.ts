@@ -56,7 +56,7 @@ const sources: SourceSummary[] = [
 const fact: CrossDatasetFact = {
   fact_key: "irs-soi-dividends-2023",
   label: "Ordinary dividends",
-  chronicle_source: "irs_soi",
+  ledger_source: "irs_soi",
   measure: "irs_soi.ordinary_dividends",
   unit: "usd",
   observed_period: "tax_year:2023",
@@ -116,7 +116,7 @@ const fact: CrossDatasetFact = {
 test("catalog query parser accepts supported filters and normalizes unsafe pagination", () => {
   const parsed = parseFactCatalogParams(
     new URLSearchParams(
-      "view=facts&source=microcosm&chronicle_source=irs_soi&period=tax_year%3A2023" +
+      "view=facts&source=microcosm&ledger_source=irs_soi&period=tax_year%3A2023" +
         "&period_treatment=aligned_fact&calibration_exposure=direct_calibration_target" +
         "&status=evaluable_projected&search=dividend&page=-2&page_size=999&sort=error_desc",
     ),
@@ -139,16 +139,16 @@ test("catalog query parser accepts supported filters and normalizes unsafe pagin
 
 test("catalog and detail URLs preserve stable filters and encode fact keys", () => {
   const current = parseFactCatalogParams(
-    new URLSearchParams("source=cps&chronicle_source=irs_soi&search=income&page=3"),
+    new URLSearchParams("source=cps&ledger_source=irs_soi&search=income&page=3"),
   );
   expect(factCatalogHref(current, { page: 4 })).toBe(
-    "/microcosm/datasets?view=facts&source=cps&chronicle_source=irs_soi&search=income&page=4",
+    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi&search=income&page=4",
   );
   expect(factCatalogHref(current, { search: "", page: 1 })).toBe(
-    "/microcosm/datasets?view=facts&source=cps&chronicle_source=irs_soi",
+    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi",
   );
   expect(factDetailHref("irs/soi fact", current)).toBe(
-    "/microcosm/datasets?view=fact&fact_key=irs%2Fsoi+fact&source=cps&chronicle_source=irs_soi&search=income&page=3",
+    "/microcosm/datasets?view=fact&fact_key=irs%2Fsoi+fact&source=cps&ledger_source=irs_soi&search=income&page=3",
   );
 });
 

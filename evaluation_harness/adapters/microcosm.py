@@ -11,7 +11,9 @@ import numpy as np
 from ..execution import ArrayBundle, RunGroup
 
 
-MICROCOSM_REPOSITORY = "policyengine/microcosm-us"
+# Deprecated upstream identifiers: Microcosm still publishes this release under
+# the former Populace Hugging Face repository, release, and filename literals.
+MICROCOSM_REPOSITORY = "policyengine/populace-us"
 
 
 @dataclass(frozen=True)
@@ -36,13 +38,13 @@ class MicrocosmRelease:
 
 
 MICROCOSM_RELEASE = MicrocosmRelease(
-    release_id="microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
-    dataset_filename="microcosm_us_2024.h5",
+    release_id="populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
+    dataset_filename="populace_us_2024.h5",
     dataset_sha256="48b9d479fb4fd1c3537f9383ce4697d130b6f618658409d74f6233c43b994c7e",
     model_version="1.764.6",
     calibration_diagnostics_filename=(
         "releases/"
-        "microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
+        "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
         "calibration_diagnostics.json"
     ),
     calibration_diagnostics_sha256=(
@@ -612,7 +614,7 @@ class MicrocosmPolicyEngineRunner:
             ) from error
 
     def prepare(self, group: RunGroup) -> ArrayBundle:
-        if group.source_id != "microcosm_us_policyengine_us_2024":
+        if group.source_id != "populace_us_policyengine_us_2024":
             raise ValueError(f"Microcosm runner cannot execute source {group.source_id!r}")
         if group.entity not in self.tables:
             raise ValueError(f"Microcosm dataset has no entity table {group.entity!r}")

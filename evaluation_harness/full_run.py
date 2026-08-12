@@ -38,7 +38,7 @@ class ScoredEvaluationResult:
     snapshot_id: str
     source_id: str
     fact_key: str
-    chronicle_source: str
+    ledger_source: str
     measure: str
     unit: str
     family: str
@@ -235,7 +235,7 @@ def build_scored_results(
                 snapshot_id=result.snapshot_id,
                 source_id=result.source_id,
                 fact_key=result.fact_key,
-                chronicle_source=fact.source,
+                ledger_source=fact.source,
                 measure=fact.measure,
                 unit=fact.unit,
                 family=fact.measure,

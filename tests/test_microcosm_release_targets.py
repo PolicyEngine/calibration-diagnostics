@@ -24,7 +24,7 @@ from evaluation_harness.microcosm_release_targets import (
 )
 
 
-def fact(*, fact_key: str = "chronicle.aggregate_fact.v2:old") -> FactContract:
+def fact(*, fact_key: str = "ledger.aggregate_fact.v2:old") -> FactContract:
     return FactContract(
         fact_key=fact_key,
         source="irs_soi",
@@ -58,10 +58,10 @@ def write_diagnostics(
                         "compiled_target": 112.5,
                         "final_estimate": 109.5,
                         "metadata": {
-                            "chronicle_source_record_id": source_record_id,
-                            "chronicle_fact_period": source_year,
-                            "chronicle_period_type": "tax_year",
-                            "chronicle_measure_unit": "usd",
+                            "ledger_source_record_id": source_record_id,
+                            "ledger_fact_period": source_year,
+                            "ledger_period_type": "tax_year",
+                            "ledger_measure_unit": "usd",
                             "aging_factor": "1.125",
                             "aging_factor_source": "chained:soi-control+cbo-agi",
                             "alignment_model_id": "cbo_growth_factor_aging",
@@ -82,7 +82,7 @@ def test_exact_compiled_build_target_becomes_a_scored_alignment(tmp_path: Path) 
     result = compile_release_target_alignments(
         [fact()],
         diagnostics,
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         release_id="pinned-release",
     )
 
@@ -110,7 +110,7 @@ def test_release_alignment_rejects_period_or_unit_drift(tmp_path: Path) -> None:
     result = compile_release_target_alignments(
         [wrong_unit],
         diagnostics,
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         release_id="pinned-release",
     )
 
@@ -125,13 +125,13 @@ def test_release_alignment_ignores_native_year_and_unmatched_facts(tmp_path: Pat
     write_diagnostics(diagnostics, source_year="2024")
     native = FactContract.from_dict(
         {
-            **fact(fact_key="chronicle.aggregate_fact.v2:native").to_dict(),
+            **fact(fact_key="ledger.aggregate_fact.v2:native").to_dict(),
             "period": "tax_year:2024",
         }
     )
     unmatched = FactContract.from_dict(
         {
-            **fact(fact_key="chronicle.aggregate_fact.v2:unmatched").to_dict(),
+            **fact(fact_key="ledger.aggregate_fact.v2:unmatched").to_dict(),
             "lineage": {"source_record_id": "not-in-build"},
         }
     )
@@ -139,7 +139,7 @@ def test_release_alignment_ignores_native_year_and_unmatched_facts(tmp_path: Pat
     result = compile_release_target_alignments(
         [native, unmatched],
         diagnostics,
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         release_id="pinned-release",
     )
 
@@ -158,13 +158,13 @@ def test_release_final_estimate_replaces_only_matching_executed_results(
     release = compile_release_target_alignments(
         [fact()],
         diagnostics,
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         release_id="pinned-release",
     )
     result = EvaluationResult(
         snapshot_id="chronicle-test",
         mapping_release="mapping-v1",
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         fact_key=fact().fact_key,
         estimate=Decimal("999"),
         dataset_version="pinned-release",
@@ -202,13 +202,13 @@ def test_release_diagnostic_materializes_target_without_a_generic_query(
     release = compile_release_target_alignments(
         [jct_fact],
         diagnostics,
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         release_id="pinned-release",
     )
     unsupported = CapabilityResult.unsupported(
         snapshot_id="chronicle-test",
         fact=jct_fact,
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         source_type=SourceType.MODEL_DATASET_PAIR,
         mapping_release="mapping-v1",
         status=CapabilityStatus.UNSUPPORTED_CONCEPT,
@@ -219,7 +219,7 @@ def test_release_diagnostic_materializes_target_without_a_generic_query(
     capabilities, results = materialize_release_target_results(
         (unsupported,),
         release,
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         dataset_version="pinned-release",
         model_version="policyengine-us==1",
         population_period=TypedPeriod.parse("calendar_year:2024"),
@@ -245,14 +245,14 @@ def test_release_diagnostic_preserves_a_reviewed_unscored_mapping(
     release = compile_release_target_alignments(
         [fact()],
         diagnostics,
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         release_id="pinned-release",
     )
     reviewed_missing = replace(
         CapabilityResult.unsupported(
             snapshot_id="chronicle-test",
             fact=fact(),
-            source_id="microcosm_us_policyengine_us_2024",
+            source_id="populace_us_policyengine_us_2024",
             source_type=SourceType.MODEL_DATASET_PAIR,
             mapping_release="mapping-v1",
             status=CapabilityStatus.UNSUPPORTED_PERIOD,
@@ -266,7 +266,7 @@ def test_release_diagnostic_preserves_a_reviewed_unscored_mapping(
     capabilities, _ = materialize_release_target_results(
         (reviewed_missing,),
         release,
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         dataset_version="pinned-release",
         model_version="policyengine-us==1",
         population_period=TypedPeriod.parse("calendar_year:2024"),
@@ -287,6 +287,6 @@ def test_release_target_without_a_final_estimate_is_rejected(tmp_path: Path) -> 
         compile_release_target_alignments(
             [fact()],
             diagnostics,
-            source_id="microcosm_us_policyengine_us_2024",
+            source_id="populace_us_policyengine_us_2024",
             release_id="pinned-release",
         )

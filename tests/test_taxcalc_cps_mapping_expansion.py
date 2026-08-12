@@ -117,13 +117,13 @@ def test_eitc_mappings_cover_both_chronicle_names_and_child_breakdowns() -> None
     ("fact_key", "measure", "expression", "dimensions"),
     [
         (
-            "chronicle.aggregate_fact.v2:035d27c7ddaecd3099232f2d",
+            "ledger.aggregate_fact.v2:035d27c7ddaecd3099232f2d",
             "ssa.annual_oasdi_or_ssi_payment_amount",
             "e02400",
             {"us_social_security_and_ssi.program_payment_type": "social_security_benefits"},
         ),
         (
-            "chronicle.aggregate_fact.v2:87b624b0ca9e9bcdfaa480c1",
+            "ledger.aggregate_fact.v2:87b624b0ca9e9bcdfaa480c1",
             "ssa.ssi_payment_amount",
             "ssi_ben",
             {},

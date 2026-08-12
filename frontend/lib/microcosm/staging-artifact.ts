@@ -15,10 +15,14 @@ import {
 
 type JsonObject = Record<string, unknown>;
 
+export const MICROCOSM_STAGING_HF_REPO_ENV = "POPULACE_STAGING_HF_REPO";
+export const MICROCOSM_STAGING_HF_REVISION_ENV = "POPULACE_STAGING_HF_REVISION";
 export const MICROCOSM_STAGING_HF_REPO =
-  process.env.MICROCOSM_STAGING_HF_REPO ?? "policyengine/microcosm-us-staging";
+  // Deprecated upstream identifier: Microcosm staging still publishes under
+  // the former Populace repository and deployment-variable names.
+  process.env[MICROCOSM_STAGING_HF_REPO_ENV] ?? "policyengine/populace-us-staging";
 export const MICROCOSM_STAGING_HF_REVISION =
-  process.env.MICROCOSM_STAGING_HF_REVISION ?? "main";
+  process.env[MICROCOSM_STAGING_HF_REVISION_ENV] ?? "main";
 
 class StagingFetchError extends Error {
   constructor(

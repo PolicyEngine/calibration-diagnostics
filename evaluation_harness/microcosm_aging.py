@@ -509,9 +509,11 @@ def _load_release_factors(
             or metadata.get("alignment_model_version") != AGING_MODEL_VERSION
         ):
             continue
-        source_year = _metadata_year(metadata.get("chronicle_fact_period"))
+        # Deprecated upstream identifier: Microcosm release diagnostics still
+        # emit Chronicle metadata under the former Ledger field prefix.
+        source_year = _metadata_year(metadata.get("ledger_fact_period"))
         effective_source_year = _metadata_year(
-            metadata.get("source_period", metadata.get("chronicle_fact_period"))
+            metadata.get("source_period", metadata.get("ledger_fact_period"))
         )
         build_year = _metadata_year(
             metadata.get("aged_to", target.get("period"))

@@ -92,7 +92,7 @@ def age_facts() -> tuple[FactContract, ...]:
 def test_cps_age_80_code_compares_once_to_sum_of_five_chronicle_facts() -> None:
     result = build_cps_asec_age_topcode_comparisons(
         age_facts(),
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
     )
 
     assert result.age_80_84_benchmark == Decimal("7416564")
@@ -125,7 +125,7 @@ def test_cps_age_topcode_comparison_refuses_an_incomplete_age_group() -> None:
     with pytest.raises(ValueError, match="requires exactly the five"):
         build_cps_asec_age_topcode_comparisons(
             age_facts()[:-2],
-            source_id="microcosm_us_policyengine_us_2024",
+            source_id="populace_us_policyengine_us_2024",
         )
 
 
@@ -141,7 +141,7 @@ def test_cps_age_topcode_comparison_refuses_a_wrong_85_plus_fact() -> None:
     with pytest.raises(ValueError, match="85-plus"):
         build_cps_asec_age_topcode_comparisons(
             rows,
-            source_id="microcosm_us_policyengine_us_2024",
+            source_id="populace_us_policyengine_us_2024",
         )
 
 

@@ -30,7 +30,7 @@ def _fact(
     constraints: tuple[dict, ...] = (),
     dimensions: dict | None = None,
     period: str | None = None,
-    fact_key: str = "chronicle.aggregate_fact.v2:ffffffffffffffffffffffff",
+    fact_key: str = "ledger.aggregate_fact.v2:ffffffffffffffffffffffff",
 ) -> FactContract:
     return FactContract(
         fact_key=fact_key,
@@ -381,7 +381,7 @@ def test_pinned_eitc_targets_accept_the_individual_return_universe() -> None:
                     "person",
                     "national_health_expenditures",
                 ),
-                fact_key="chronicle.aggregate_fact.v2:f4c1ba528660b3f48ca03b90",
+                fact_key="ledger.aggregate_fact.v2:f4c1ba528660b3f48ca03b90",
             ),
             "cms-nhe-employer-health-insurance-premiums",
         ),
@@ -894,8 +894,8 @@ def test_cms_child_and_adult_enrollment_are_2024_build_period_mappings(
 @pytest.mark.parametrize(
     "fact_key",
     [
-        "chronicle.aggregate_fact.v2:09ae62cf32b2eddb8eda7adf",
-        "chronicle.aggregate_fact.v2:a30c1502ae98f22d936a27ad",
+        "ledger.aggregate_fact.v2:09ae62cf32b2eddb8eda7adf",
+        "ledger.aggregate_fact.v2:a30c1502ae98f22d936a27ad",
     ],
 )
 def test_rhode_island_missing_cms_age_rows_are_covered_but_unscored(

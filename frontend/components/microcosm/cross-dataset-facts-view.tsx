@@ -60,7 +60,7 @@ function apiFactParams(params: FactCatalogParams): Record<string, string | numbe
     view: "facts",
     source: params.source || undefined,
     status: params.status || undefined,
-    chronicle_source: params.chronicleSource || undefined,
+    ledger_source: params.chronicleSource || undefined,
     measure: params.measure || undefined,
     period: params.period || undefined,
     geography: params.geography || undefined,

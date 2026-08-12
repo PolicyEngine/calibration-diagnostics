@@ -240,7 +240,7 @@ def test_snapshot_compatibility_checks_schema_hash_count_and_consumer_contract(
 
     with pytest.raises(ValueError, match="consumer schema"):
         validate_snapshot_compatibility(
-            write_snapshot(tmp_path / "bad", consumer_schema="chronicle.consumer_fact.v2")
+            write_snapshot(tmp_path / "bad", consumer_schema="ledger.consumer_fact.v2")
         )
 
 

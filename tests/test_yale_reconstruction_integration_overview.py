@@ -155,18 +155,18 @@ def test_yale_checkpoint_adds_six_reviewed_2024_chronicle_benchmarks() -> None:
     )
     entries = {entry.fact_key: entry for entry in checkpoint.entries}
     expected = {
-        "chronicle.aggregate_fact.v2:79a47ff730c7a462e8cc1609",
-        "chronicle.aggregate_fact.v2:cb187e7abf9bdc592740e661",
-        "chronicle.aggregate_fact.v2:06c59904c06817cf61200eef",
-        "chronicle.aggregate_fact.v2:07c02eaf03cc25e2d454db3f",
-        "chronicle.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9",
-        "chronicle.aggregate_fact.v2:709bcad59f889e75f143f9fc",
+        "ledger.aggregate_fact.v2:79a47ff730c7a462e8cc1609",
+        "ledger.aggregate_fact.v2:cb187e7abf9bdc592740e661",
+        "ledger.aggregate_fact.v2:06c59904c06817cf61200eef",
+        "ledger.aggregate_fact.v2:07c02eaf03cc25e2d454db3f",
+        "ledger.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9",
+        "ledger.aggregate_fact.v2:709bcad59f889e75f143f9fc",
     }
     assert expected <= entries.keys()
     assert all(entries[fact_key].observed_period.value == "2024" for fact_key in expected)
 
     combined_income = entries[
-        "chronicle.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9"
+        "ledger.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9"
     ]
     assert combined_income.estimate == Decimal("297492207793.81948")
     assert len(combined_income.reconstruction_row_keys) == 3
@@ -179,10 +179,10 @@ def test_yale_checkpoint_allows_one_model_aggregate_to_validate_multiple_facts()
     )
     entries = {entry.fact_key: entry for entry in checkpoint.entries}
     irs_qualified_dividends = entries[
-        "chronicle.aggregate_fact.v2:e9177998f40a45b4641321ed"
+        "ledger.aggregate_fact.v2:e9177998f40a45b4641321ed"
     ]
     cbo_qualified_dividends = entries[
-        "chronicle.aggregate_fact.v2:709bcad59f889e75f143f9fc"
+        "ledger.aggregate_fact.v2:709bcad59f889e75f143f9fc"
     ]
     assert irs_qualified_dividends.reconstruction_row_keys == (
         "irs_soi.ty2023.congressional_district_2022.all_returns.us."

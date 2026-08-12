@@ -1,4 +1,4 @@
-// Pure-HF data layer for the microcosm-US dashboard. No committed snapshot:
+// Pure-HF data layer for the Microcosm US dashboard. No committed snapshot:
 // every release's manifests and per-target calibration diagnostics are read
 // live from the policyengine/populace-us Hugging Face dataset, resolved through
 // latest.json (current release) or by id (any release, for version compare).
@@ -11,18 +11,25 @@ type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
 export type CalibrationLossKind = "normalized_target_loss" | "raw_optimizer_objective";
 
-export const POPULACE_HF_REPO = process.env.POPULACE_HF_REPO ?? "policyengine/populace-us";
-export const POPULACE_HF_REVISION = process.env.POPULACE_HF_REVISION ?? "main";
+// Deprecated upstream identifiers: Microcosm's published HF repositories and
+// deployment variables still use the former Populace names.
+export const MICROCOSM_HF_REPO_ENV = "POPULACE_HF_REPO";
+export const MICROCOSM_HF_REVISION_ENV = "POPULACE_HF_REVISION";
+export const MICROCOSM_UK_HF_REPO_ENV = "POPULACE_UK_HF_REPO";
+export const MICROCOSM_UK_HF_REVISION_ENV = "POPULACE_UK_HF_REVISION";
+export const MICROCOSM_HF_REPO =
+  process.env[MICROCOSM_HF_REPO_ENV] ?? "policyengine/populace-us";
+export const MICROCOSM_HF_REVISION = process.env[MICROCOSM_HF_REVISION_ENV] ?? "main";
 
 // Microcosm ships one HF dataset per country. US is public; UK is private and
 // needs an HF token on the server.
 export type MicrocosmCountry = "us" | "uk";
 
 const COUNTRY_REPO: Record<MicrocosmCountry, { repo: string; revision: string }> = {
-  us: { repo: POPULACE_HF_REPO, revision: POPULACE_HF_REVISION },
+  us: { repo: MICROCOSM_HF_REPO, revision: MICROCOSM_HF_REVISION },
   uk: {
-    repo: process.env.POPULACE_UK_HF_REPO ?? "policyengine/populace-uk-private",
-    revision: process.env.POPULACE_UK_HF_REVISION ?? "main",
+    repo: process.env[MICROCOSM_UK_HF_REPO_ENV] ?? "policyengine/populace-uk-private",
+    revision: process.env[MICROCOSM_UK_HF_REVISION_ENV] ?? "main",
   },
 };
 
@@ -210,6 +217,9 @@ interface ChronicleFactFields {
   filters: ChronicleFilter[];
 }
 
+// Deprecated upstream identifiers: Microcosm calibration diagnostics still
+// serialize Chronicle provenance with the former `ledger_*` metadata prefix.
+
 function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
@@ -347,7 +357,7 @@ function measureFromMetadata(metadata: JsonObject): string | null {
   const sourceMeasure = stringValue(metadata.source_measure_id);
   const namedMeasure = measureFromName(sourceMeasure);
   if (namedMeasure) return namedMeasure;
-  const unit = stringValue(metadata.chronicle_measure_unit);
+  const unit = stringValue(metadata.ledger_measure_unit);
   if (stringValue(metadata.count) === "true" || unit === "count") return "count";
   if (unit === "usd") return "total";
   return null;
@@ -365,7 +375,7 @@ function dimensionLabel(value: string | null): string {
 }
 
 function filterDimensionLabel(key: string): string {
-  const suffix = key.replace(/^chronicle_filter_/, "");
+  const suffix = key.replace(/^ledger_filter_/, "");
   if (suffix === "income_range") return "Income band";
   if (suffix === "filing_status") return "Filing status";
   if (suffix === "eitc_child_count") return "Qualifying children";
@@ -382,7 +392,7 @@ function isGeographyLayoutDimension(value: string | null): boolean {
 
 function isRedundantGeographyValue(metadata: JsonObject, value: string | null): boolean {
   if (!value) return false;
-  const geography = stateFromGeoId(stringValue(metadata.chronicle_geography_id));
+  const geography = stateFromGeoId(stringValue(metadata.ledger_geography_id));
   return Boolean(geography && value.toLowerCase() === geography.toLowerCase());
 }
 
@@ -394,7 +404,7 @@ function readableDimensionValue(value: string | null): string | null {
 }
 
 function readableFilterValue(key: string, value: string | null): string | null {
-  if (key === "chronicle_filter_eitc_child_count") {
+  if (key === "ledger_filter_eitc_child_count") {
     return qualifyingChildrenFromCount(value);
   }
   return readableDimensionValue(value);
@@ -402,7 +412,7 @@ function readableFilterValue(key: string, value: string | null): string | null {
 
 function chronicleFilters(metadata: JsonObject): ChronicleFilter[] {
   return Object.entries(metadata)
-    .filter(([key, raw]) => key.startsWith("chronicle_filter_") && stringValue(raw))
+    .filter(([key, raw]) => key.startsWith("ledger_filter_") && stringValue(raw))
     .map(([key, raw]) => {
       const rawValue = stringValue(raw)!;
       return {
@@ -417,33 +427,33 @@ function chronicleFilters(metadata: JsonObject): ChronicleFilter[] {
 
 function chronicleFactFields(metadata: JsonObject): ChronicleFactFields {
   return {
-    fact_key: stringValue(metadata.chronicle_fact_key),
-    source_record_id: stringValue(metadata.chronicle_source_record_id),
-    semantic_fact_key: stringValue(metadata.chronicle_semantic_fact_key),
-    aggregate_fact_key: stringValue(metadata.chronicle_aggregate_fact_key),
-    legacy_fact_key: stringValue(metadata.chronicle_legacy_fact_key),
-    period_type: stringValue(metadata.chronicle_period_type),
+    fact_key: stringValue(metadata.ledger_fact_key),
+    source_record_id: stringValue(metadata.ledger_source_record_id),
+    semantic_fact_key: stringValue(metadata.ledger_semantic_fact_key),
+    aggregate_fact_key: stringValue(metadata.ledger_aggregate_fact_key),
+    legacy_fact_key: stringValue(metadata.ledger_legacy_fact_key),
+    period_type: stringValue(metadata.ledger_period_type),
     source_period: stringValue(metadata.source_period),
     target_period: stringValue(metadata.target_period),
-    geography_level: stringValue(metadata.chronicle_geography_level),
-    geography_id: stringValue(metadata.chronicle_geography_id),
-    geography_vintage: stringValue(metadata.chronicle_geography_vintage),
-    domain: stringValue(metadata.chronicle_domain),
-    entity_name: stringValue(metadata.chronicle_entity_name),
-    entity_role: stringValue(metadata.chronicle_entity_role),
-    measure_concept: stringValue(metadata.chronicle_measure_concept),
-    source_concept: stringValue(metadata.chronicle_source_concept),
-    concept_relation: stringValue(metadata.chronicle_concept_relation),
-    concept_authority: stringValue(metadata.chronicle_concept_authority),
-    measure_unit: stringValue(metadata.chronicle_measure_unit),
-    value_operation: stringValue(metadata.chronicle_value_operation),
-    layout_record_set_id: stringValue(metadata.chronicle_layout_record_set_id),
-    layout_groupby_dimension: stringValue(metadata.chronicle_layout_groupby_dimension),
-    layout_groupby_value_id: stringValue(metadata.chronicle_layout_groupby_value_id),
-    layout_measure_id: stringValue(metadata.chronicle_layout_measure_id),
-    dimension_set_key: stringValue(metadata.chronicle_dimension_set_key),
-    universe_constraint_set_key: stringValue(metadata.chronicle_universe_constraint_set_key),
-    universe_constraint_count: numberOrNull(metadata.chronicle_universe_constraint_count),
+    geography_level: stringValue(metadata.ledger_geography_level),
+    geography_id: stringValue(metadata.ledger_geography_id),
+    geography_vintage: stringValue(metadata.ledger_geography_vintage),
+    domain: stringValue(metadata.ledger_domain),
+    entity_name: stringValue(metadata.ledger_entity_name),
+    entity_role: stringValue(metadata.ledger_entity_role),
+    measure_concept: stringValue(metadata.ledger_measure_concept),
+    source_concept: stringValue(metadata.ledger_source_concept),
+    concept_relation: stringValue(metadata.ledger_concept_relation),
+    concept_authority: stringValue(metadata.ledger_concept_authority),
+    measure_unit: stringValue(metadata.ledger_measure_unit),
+    value_operation: stringValue(metadata.ledger_value_operation),
+    layout_record_set_id: stringValue(metadata.ledger_layout_record_set_id),
+    layout_groupby_dimension: stringValue(metadata.ledger_layout_groupby_dimension),
+    layout_groupby_value_id: stringValue(metadata.ledger_layout_groupby_value_id),
+    layout_measure_id: stringValue(metadata.ledger_layout_measure_id),
+    dimension_set_key: stringValue(metadata.ledger_dimension_set_key),
+    universe_constraint_set_key: stringValue(metadata.ledger_universe_constraint_set_key),
+    universe_constraint_count: numberOrNull(metadata.ledger_universe_constraint_count),
     filters: chronicleFilters(metadata),
   };
 }
@@ -479,8 +489,8 @@ function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
   const metadata = asObject(row.metadata);
   if (!Object.keys(metadata).length) return null;
   const dimensions: TargetBreakdownDimension[] = [];
-  const layoutDimension = stringValue(metadata.chronicle_layout_groupby_dimension);
-  const layoutValue = stringValue(metadata.chronicle_layout_groupby_value_id);
+  const layoutDimension = stringValue(metadata.ledger_layout_groupby_dimension);
+  const layoutValue = stringValue(metadata.ledger_layout_groupby_value_id);
   if (
     layoutValue &&
     !isGeographyLayoutDimension(layoutDimension) &&
@@ -490,12 +500,12 @@ function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
       dimensions,
       dimensionLabel(layoutDimension),
       readableDimensionValue(layoutValue),
-      "chronicle_layout_groupby_value_id",
+      "ledger_layout_groupby_value_id",
       layoutValue,
     );
   }
   for (const [key, raw] of Object.entries(metadata)) {
-    if (!key.startsWith("chronicle_filter_")) continue;
+    if (!key.startsWith("ledger_filter_")) continue;
     const rawValue = stringValue(raw);
     if (!rawValue) continue;
     const label = filterDimensionLabel(key);
@@ -506,19 +516,19 @@ function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
   addDimension(
     dimensions,
     "Qualifying children",
-    qualifyingChildrenFromCount(stringValue(metadata.chronicle_filter_eitc_child_count)) ??
-      qualifyingChildrenFromRecordSet(stringValue(metadata.chronicle_layout_record_set_id)) ??
+    qualifyingChildrenFromCount(stringValue(metadata.ledger_filter_eitc_child_count)) ??
+      qualifyingChildrenFromRecordSet(stringValue(metadata.ledger_layout_record_set_id)) ??
       qualifyingChildrenFromSourceMeasure(
         stringValue(metadata.variable),
         stringValue(metadata.source_measure_id),
       ),
-    stringValue(metadata.chronicle_filter_eitc_child_count)
-      ? "chronicle_filter_eitc_child_count"
-      : stringValue(metadata.chronicle_layout_record_set_id)
-        ? "chronicle_layout_record_set_id"
+    stringValue(metadata.ledger_filter_eitc_child_count)
+      ? "ledger_filter_eitc_child_count"
+      : stringValue(metadata.ledger_layout_record_set_id)
+        ? "ledger_layout_record_set_id"
         : "source_measure_id",
-    stringValue(metadata.chronicle_filter_eitc_child_count) ??
-      stringValue(metadata.chronicle_layout_record_set_id) ??
+    stringValue(metadata.ledger_filter_eitc_child_count) ??
+      stringValue(metadata.ledger_layout_record_set_id) ??
       stringValue(metadata.source_measure_id),
   );
   addDimension(dimensions, "Filing status", stringValue(metadata.filing_status));
@@ -541,8 +551,8 @@ function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
   const registry = asObject(row.registry);
   const parts = name.split(".");
   const source = stringValue(registry.family) ?? parts[0] ?? "";
-  const geoLevel = stringValue(metadata.chronicle_geography_level);
-  const geoId = stringValue(metadata.chronicle_geography_id);
+  const geoLevel = stringValue(metadata.ledger_geography_level);
+  const geoId = stringValue(metadata.ledger_geography_id);
   const geography =
     geoLevel === "country"
       ? "United States"
@@ -564,10 +574,10 @@ function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
     readableToken(parts.at(-2) ?? null) ??
     "";
   const childBreakdown = qualifyingChildrenFromRecordSet(
-    stringValue(metadata.chronicle_layout_record_set_id),
+    stringValue(metadata.ledger_layout_record_set_id),
   );
   const breakdown = [
-    readableToken(stringValue(metadata.chronicle_layout_groupby_value_id)),
+    readableToken(stringValue(metadata.ledger_layout_groupby_value_id)),
     childBreakdown ?? breakdownFromSourceMeasure(variable, measureId),
     readableToken(stringValue(metadata.filing_status)),
   ]
@@ -823,7 +833,7 @@ function targetNames(row: TargetRow, fullName: string, baseName: string): string
     baseName,
     stringValue(row.name),
     stringValue(row.target_name),
-    stringValue(asObject(row.metadata).chronicle_source_record_id),
+    stringValue(asObject(row.metadata).ledger_source_record_id),
   ];
   return [...new Set(names.filter((name): name is string => Boolean(name)))];
 }
@@ -943,7 +953,7 @@ function enrichTargetRow(
     name: fullName,
     base_name: baseName,
     family: deriveFamily(baseName),
-    state: stateFromGeoId(stringValue(metadata.chronicle_geography_id)) ?? deriveState(baseName),
+    state: stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography: parsed.geography,
     level: parsed.level,
     source: parsed.source,
@@ -989,17 +999,17 @@ function enrichTargetRow(
 function estimateScopeKey(row: TargetRow): string | null {
   if (row.filter != null) return null;
   const metadata = asObject(row.metadata);
-  const recordSet = stringValue(metadata.chronicle_layout_record_set_id);
+  const recordSet = stringValue(metadata.ledger_layout_record_set_id);
   const initial = numberOrNull(row.initial_estimate);
   const final = numberOrNull(row.final_estimate);
   if (!recordSet || initial == null || final == null) return null;
   return [
     row.source,
     row.period,
-    metadata.chronicle_geography_id,
-    metadata.chronicle_layout_groupby_dimension,
-    metadata.chronicle_layout_groupby_value_id,
-    metadata.chronicle_layout_measure_id,
+    metadata.ledger_geography_id,
+    metadata.ledger_layout_groupby_dimension,
+    metadata.ledger_layout_groupby_value_id,
+    metadata.ledger_layout_measure_id,
     metadata.source_measure_id,
     metadata.variable,
     initial,
@@ -1010,7 +1020,7 @@ function estimateScopeKey(row: TargetRow): string | null {
 function estimateScopeWarning(row: TargetRow): string {
   const metadata = asObject(row.metadata);
   const childGroup = qualifyingChildrenFromRecordSet(
-    stringValue(metadata.chronicle_layout_record_set_id),
+    stringValue(metadata.ledger_layout_record_set_id),
   );
   if (childGroup) {
     return "This Chronicle fact is for a qualifying-children slice, but the calibration diagnostics did not include a compiled model filter for that child-count slice. The estimate may reflect the broader EITC aggregate instead of this exact slice.";
@@ -1030,7 +1040,7 @@ function addEstimateScopeWarnings(rows: TargetRow[]): TargetRow[] {
   for (const group of groups.values()) {
     const recordSets = new Set(
       group
-        .map((row) => stringValue(asObject(row.metadata).chronicle_layout_record_set_id))
+        .map((row) => stringValue(asObject(row.metadata).ledger_layout_record_set_id))
         .filter((value): value is string => Boolean(value)),
     );
     const targets = new Set(group.map((row) => numberOrNull(row.target)));
@@ -1175,8 +1185,8 @@ function isHealthcareTarget(row: TargetRow): boolean {
     row.variable,
     row.variable_key,
     metadata.source_measure_id,
-    metadata.chronicle_measure_concept,
-    metadata.chronicle_domain,
+    metadata.ledger_measure_concept,
+    metadata.ledger_domain,
   ]
     .filter((value) => value != null)
     .join(" ")

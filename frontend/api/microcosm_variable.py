@@ -42,8 +42,10 @@ class handler(BaseHTTPRequestHandler):
         variables = list(dict.fromkeys(variables))
         period = (params.get("period", ["2024"])[0] or "2024").strip()
         requested_release = (params.get("release", ["latest"])[0] or "latest").strip()
-        repo = os.environ.get("MICROCOSM_HF_REPO", DEFAULT_REPO)
-        hf_revision = os.environ.get("MICROCOSM_HF_REVISION", DEFAULT_REVISION)
+        # Deprecated upstream identifiers: deployment configuration retains the
+        # former Populace names until Microcosm migrates the published contract.
+        repo = os.environ.get("POPULACE_HF_REPO", DEFAULT_REPO)
+        hf_revision = os.environ.get("POPULACE_HF_REVISION", DEFAULT_REVISION)
 
         if not variables:
             _json_response(self, 400, {"detail": "Enter at least one PolicyEngine variable name."})

@@ -11,8 +11,10 @@ from typing import Any, Iterable
 from .contracts import FactContract, TypedPeriod
 
 
-CONSUMER_SCHEMA = "chronicle.consumer_fact.v1"
-CONSUMER_ARTIFACT_SCHEMA = "policyengine_chronicle.consumer_artifact.v1"
+# Deprecated upstream identifiers: Chronicle's current consumer export keeps
+# the former Ledger schema names until that producer contract is migrated.
+CONSUMER_SCHEMA = "ledger.consumer_fact.v1"
+CONSUMER_ARTIFACT_SCHEMA = "policyengine_ledger.consumer_artifact.v1"
 SNAPSHOT_SCHEMA = "evaluation_harness.chronicle_snapshot.v1"
 
 REQUIRED_ROW_KEYS = {
@@ -179,8 +181,10 @@ def _load_input_manifest(bundle_or_file: Path, facts_path: Path) -> dict[str, An
             f"{actual_hash} != {manifest.get('facts_sha256')}"
         )
     return {
-        "chronicle_commit": manifest.get("chronicle_commit"),
-        "chronicle_release": manifest.get("chronicle_release"),
+        # Deprecated upstream identifiers: older Chronicle manifests may carry
+        # the former Ledger field names; normalize them at this boundary.
+        "chronicle_commit": manifest.get("ledger_commit"),
+        "chronicle_release": manifest.get("ledger_release"),
         "input_manifest_sha256": _sha256(manifest_path),
         "declared_fact_count": manifest.get("fact_row_count"),
     }

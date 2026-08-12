@@ -13,9 +13,11 @@ from urllib.request import urlopen
 import numpy as np
 
 
-DEFAULT_REPO = "policyengine/microcosm-us"
+# Deprecated upstream identifiers: Microcosm's current HF repository and H5
+# filename still use the former Populace names.
+DEFAULT_REPO = "policyengine/populace-us"
 DEFAULT_REVISION = "main"
-DEFAULT_FILENAME = "microcosm_us_2024.h5"
+DEFAULT_FILENAME = "populace_us_2024.h5"
 
 os.environ.setdefault("HF_HOME", "/tmp/huggingface")
 os.environ.setdefault("HF_HUB_CACHE", "/tmp/huggingface/hub")

@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from evaluation_harness.adapters.microcosm import (
+    MICROCOSM_REPOSITORY,
     MICROCOSM_RELEASE,
     MicrocosmPolicyEngineRunner,
     MicrocosmRelease,
@@ -15,6 +16,12 @@ from evaluation_harness.execution import build_run_groups, execute_groups
 from evaluation_harness.integration import load_integration_overview
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.planner import CapabilityPlanner
+
+
+def test_pinned_release_uses_microcosms_current_deprecated_hf_contract() -> None:
+    assert MICROCOSM_REPOSITORY == "policyengine/populace-us"
+    assert MICROCOSM_RELEASE.release_id.startswith("populace-us-")
+    assert MICROCOSM_RELEASE.dataset_filename == "populace_us_2024.h5"
 
 
 class FakeVariable:
@@ -134,7 +141,7 @@ def tables() -> dict[str, dict[str, np.ndarray]]:
 
 def group(entity: str, *variables: str) -> RunGroup:
     return RunGroup(
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         population_period="calendar_year:2024",
         policy_period="tax_year:2024",
         geography_method="fixed_country",
@@ -235,9 +242,9 @@ def test_release_calibration_diagnostics_are_independently_pinned(tmp_path: Path
 
 def test_release_url_uses_the_immutable_hugging_face_revision() -> None:
     assert MICROCOSM_RELEASE.download_url == (
-        "https://huggingface.co/datasets/policyengine/microcosm-us/resolve/"
-        "microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
-        "microcosm_us_2024.h5"
+        "https://huggingface.co/datasets/policyengine/populace-us/resolve/"
+        "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
+        "populace_us_2024.h5"
     )
 
 
@@ -276,7 +283,7 @@ def test_runner_can_use_exact_old_districts_derived_from_household_blocks(tables
         },
     )
     old_group = RunGroup(
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         population_period="calendar_year:2024",
         policy_period="tax_year:2024",
         geography_method="congressional_district_geoid_117th",
@@ -309,7 +316,7 @@ def test_old_district_evaluation_rejects_unassigned_household_blocks(tables) -> 
         },
     )
     old_group = RunGroup(
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         population_period="calendar_year:2024",
         policy_period="tax_year:2024",
         geography_method="congressional_district_geoid_117th",

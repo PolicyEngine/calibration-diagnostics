@@ -25,8 +25,8 @@ from evaluation_harness.planner import (
 
 def fact(**changes) -> FactContract:
     base = FactContract(
-        fact_key="chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
-        semantic_fact_key="chronicle.semantic_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+        fact_key="ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+        semantic_fact_key="ledger.semantic_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
         source="irs_soi",
         jurisdiction="US",
         period=TypedPeriod.parse("tax_year:2024"),
@@ -46,9 +46,9 @@ def fact(**changes) -> FactContract:
 
 def source(**changes) -> EvaluationSourceManifest:
     base = EvaluationSourceManifest(
-        source_id="microcosm_us_policyengine_us_2024",
+        source_id="populace_us_policyengine_us_2024",
         source_type=SourceType.MODEL_DATASET_PAIR,
-        dataset_version="microcosm_us_2024@test",
+        dataset_version="populace_us_2024@test",
         model_version="policyengine-us@test",
         jurisdictions=frozenset({"US"}),
         population_period=TypedPeriod.parse("calendar_year:2024"),
@@ -433,7 +433,7 @@ def test_fact_specific_alignment_lookup_does_not_scan_unrelated_facts() -> None:
             fact_key=(
                 old_fact.fact_key
                 if index == 999
-                else f"chronicle.aggregate_fact.v2:{index:024d}"
+                else f"ledger.aggregate_fact.v2:{index:024d}"
             ),
             score_eligible=True,
         )
@@ -472,7 +472,7 @@ def test_direct_calibration_target_is_not_reported_as_holdout() -> None:
 
 
 def test_capability_matrix_has_exactly_one_cell_per_fact_source_pair() -> None:
-    facts = [fact(), replace(fact(), fact_key="chronicle.aggregate_fact.v2:cccccccccccccccccccccccc")]
+    facts = [fact(), replace(fact(), fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")]
     sources = [source(), replace(source(), source_id="second-source")]
     results = CapabilityPlanner(registry()).classify_all(facts, sources)
     assert len(results) == 4
@@ -512,7 +512,7 @@ def test_mapping_registry_can_scope_a_mapping_to_reviewed_fact_keys() -> None:
     scoped = MappingRegistry.from_data(data)
     assert scoped.match(fact()) is not None
     assert scoped.match(
-        fact(fact_key="chronicle.aggregate_fact.v2:cccccccccccccccccccccccc")
+        fact(fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")
     ) is None
 
 
@@ -524,7 +524,7 @@ def test_mapping_registry_can_exclude_previously_reviewed_fact_keys() -> None:
     scoped = MappingRegistry.from_data(data)
     assert scoped.match(fact()) is None
     assert scoped.match(
-        fact(fact_key="chronicle.aggregate_fact.v2:cccccccccccccccccccccccc")
+        fact(fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")
     ) is not None
 
 

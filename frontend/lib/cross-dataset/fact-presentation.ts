@@ -112,7 +112,7 @@ export function parseFactCatalogParams(params: URLSearchParams): FactCatalogPara
   return {
     source: params.get("source")?.trim() ?? "",
     status: params.get("status")?.trim() ?? "",
-    chronicleSource: params.get("chronicle_source")?.trim() ?? "",
+    chronicleSource: params.get("ledger_source")?.trim() ?? "",
     measure: params.get("measure")?.trim() ?? "",
     period: params.get("period")?.trim() ?? "",
     geography: params.get("geography")?.trim() ?? "",
@@ -134,7 +134,7 @@ function serializeCatalogParams(
   const values: [string, string][] = [
     ["source", params.source],
     ["status", params.status],
-    ["chronicle_source", params.chronicleSource],
+    ["ledger_source", params.chronicleSource],
     ["measure", params.measure],
     ["period", params.period],
     ["geography", params.geography],
@@ -295,7 +295,7 @@ export function buildFactRowView(
     factKey: fact.fact_key,
     label: fact.label,
     measure: fact.measure,
-    chronicleSource: sourceAuthorityLabel(fact.chronicle_source),
+    chronicleSource: sourceAuthorityLabel(fact.ledger_source),
     observedValue: formatFactValue(fact.observed_value, fact.unit),
     observedPeriod: formatPeriod(fact.observed_period),
     geography: humanizeIdentifier(fact.geography_level),
@@ -404,7 +404,7 @@ export function buildFactDetailView(
     observation: {
       valueLabel: formatFactValue(fact.observed_value, fact.unit),
       periodLabel: formatPeriod(fact.observed_period),
-      sourceLabel: sourceAuthorityLabel(fact.chronicle_source),
+      sourceLabel: sourceAuthorityLabel(fact.ledger_source),
       geographyLabel:
         humanizeIdentifier(fact.geography_level) + " · " + fact.geography_id,
       entityLabel: humanizeIdentifier(fact.entity),

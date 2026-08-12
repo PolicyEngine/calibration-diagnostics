@@ -161,9 +161,9 @@ def result(cell: CapabilityResult, estimate: str) -> EvaluationResult:
 
 def test_full_matrix_contains_one_cell_for_every_fact_source_pair() -> None:
     facts = (
-        fact("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa"),
-        fact("chronicle.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb"),
-        fact("chronicle.aggregate_fact.v2:cccccccccccccccccccccccc"),
+        fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa"),
+        fact("ledger.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb"),
+        fact("ledger.aggregate_fact.v2:cccccccccccccccccccccccc"),
     )
     plans = (
         SourcePlan(source("microcosm"), registry("microcosm-v1")),
@@ -179,9 +179,9 @@ def test_full_matrix_contains_one_cell_for_every_fact_source_pair() -> None:
 
 
 def test_us_scope_removes_non_us_chronicle_facts_before_classification() -> None:
-    us_fact = fact("chronicle.aggregate_fact.v2:us")
+    us_fact = fact("ledger.aggregate_fact.v2:us")
     uk_fact = replace(
-        fact("chronicle.aggregate_fact.v2:uk", jurisdiction="UK"),
+        fact("ledger.aggregate_fact.v2:uk", jurisdiction="UK"),
         geography_id="K02000001",
     )
 
@@ -191,14 +191,14 @@ def test_us_scope_removes_non_us_chronicle_facts_before_classification() -> None
 
 
 def test_evaluation_geography_scope_removes_unrepresented_territories() -> None:
-    country = fact("chronicle.aggregate_fact.v2:country")
+    country = fact("ledger.aggregate_fact.v2:country")
     guam = replace(
-        fact("chronicle.aggregate_fact.v2:guam"),
+        fact("ledger.aggregate_fact.v2:guam"),
         geography_level="state",
         geography_id="0400000US66",
     )
     virgin_islands = replace(
-        fact("chronicle.aggregate_fact.v2:virgin-islands"),
+        fact("ledger.aggregate_fact.v2:virgin-islands"),
         geography_level="state",
         geography_id="0400000US78",
     )
@@ -212,7 +212,7 @@ def test_evaluation_geography_scope_removes_unrepresented_territories() -> None:
 
 
 def test_source_plan_propagates_fact_specific_calibration_exposure() -> None:
-    chronicle_fact = fact("chronicle.aggregate_fact.v2:exposure")
+    chronicle_fact = fact("ledger.aggregate_fact.v2:exposure")
     plan = SourcePlan(
         source("microcosm"),
         registry("microcosm-v1"),
@@ -230,7 +230,7 @@ def test_source_plan_propagates_fact_specific_calibration_exposure() -> None:
 
 
 def test_native_result_is_scored_against_observed_chronicle_value() -> None:
-    chronicle_fact = fact("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
+    chronicle_fact = fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
     cell = capability(chronicle_fact)
     scored = build_scored_results(
         [chronicle_fact], [cell], [result(cell, "110")], []
@@ -244,7 +244,7 @@ def test_native_result_is_scored_against_observed_chronicle_value() -> None:
 
 def test_aligned_result_is_scored_against_transformed_not_2023_value() -> None:
     chronicle_fact = fact(
-        "chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+        "ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
         period="tax_year:2023",
     )
     alignment_id = "microcosm-aging:agi-2023-2024"
@@ -277,7 +277,7 @@ def test_aligned_result_is_scored_against_transformed_not_2023_value() -> None:
 
 
 def test_same_period_semantic_alignment_uses_transformed_benchmark_basis() -> None:
-    chronicle_fact = fact("chronicle.aggregate_fact.v2:semantic", value="100")
+    chronicle_fact = fact("ledger.aggregate_fact.v2:semantic", value="100")
     alignment_id = "bea-state-wages:semantic"
     cell = capability(
         chronicle_fact,
@@ -316,7 +316,7 @@ def test_same_period_semantic_alignment_uses_transformed_benchmark_basis() -> No
 
 def test_scoring_rejects_an_aligned_result_without_its_benchmark() -> None:
     chronicle_fact = fact(
-        "chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+        "ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
         period="tax_year:2023",
     )
     cell = capability(
@@ -329,7 +329,7 @@ def test_scoring_rejects_an_aligned_result_without_its_benchmark() -> None:
 
 
 def test_summary_proves_matrix_completeness_and_reports_unsupported_reasons() -> None:
-    chronicle_fact = fact("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
+    chronicle_fact = fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
     executable = capability(chronicle_fact, source_id="microcosm")
     unsupported = CapabilityResult.unsupported(
         snapshot_id="chronicle-test",
@@ -359,7 +359,7 @@ def test_summary_proves_matrix_completeness_and_reports_unsupported_reasons() ->
 def test_snapshot_loader_verifies_count_and_normalized_hash(tmp_path: Path) -> None:
     snapshot = tmp_path / "snapshot"
     snapshot.mkdir()
-    chronicle_fact = fact("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
+    chronicle_fact = fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
     facts_text = chronicle_fact.to_json() + "\n"
     (snapshot / "facts.jsonl").write_text(facts_text)
     (snapshot / "snapshot_manifest.json").write_text(

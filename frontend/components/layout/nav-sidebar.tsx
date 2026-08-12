@@ -11,8 +11,10 @@ import {
 } from "@/components/layout/nav-items";
 
 const DATASET: Record<Country, { label: string; repo: string }> = {
-  us: { label: "Microcosm US", repo: "policyengine/microcosm-us" },
-  uk: { label: "Microcosm UK", repo: "policyengine/microcosm-uk" },
+  // Deprecated upstream identifiers: Microcosm's HF repositories retain the
+  // former Populace slugs.
+  us: { label: "Microcosm US", repo: "policyengine/populace-us" },
+  uk: { label: "Microcosm UK", repo: "policyengine/populace-uk-private" },
 };
 
 export function NavSidebar() {

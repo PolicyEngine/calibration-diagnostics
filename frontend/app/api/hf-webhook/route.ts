@@ -30,8 +30,10 @@ const TAG_PREFIX = "refs/tags/";
 // across US and UK, so without an allowlist a valid caller could spoof an
 // arbitrary repo name into either Slack channel.
 const ALLOWED_REPOS: Record<string, MicrocosmCountry> = {
+  // Deprecated upstream identifiers: Hugging Face webhook payloads still use
+  // the former Populace dataset repository names.
   "policyengine/populace-us": "us",
-  "policyengine/populace-uk": "uk",
+  "policyengine/populace-uk-private": "uk",
 };
 
 function countryForRepo(repoName: string): MicrocosmCountry | null {

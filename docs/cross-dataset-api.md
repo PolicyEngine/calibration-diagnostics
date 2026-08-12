@@ -1,5 +1,9 @@
 # Cross-dataset artifact API
 
+> Deprecated artifact identifiers: version 1 bundles retain `ledger_source`,
+> `populace_calibration_sample`, and the `populace_us_policyengine_us_2024`
+> source ID; responses label those concepts Chronicle and Microcosm.
+
 The Cross-dataset API serves immutable evaluation artifacts; an HTTP request
 never imports or runs a microsimulation model. The current approved run
 contains Microcosm + PolicyEngine-US, Public CPS + Tax-Calculator, Yale
@@ -54,12 +58,12 @@ bundle returns HTTP 503 rather than serving mixed results.
 
 - `view=summary` (default): source-level score, coverage, capability statuses,
   unsupported reasons, period treatments, and target-performance buckets.
-- `view=groups`: groups by `chronicle_source`, `concept`, observed `period`,
+- `view=groups`: groups by `ledger_source`, `concept`, observed `period`,
   `geography`, `period_treatment`, or `calibration_exposure`; optional
   `dimension` and `source` filters.
 - `view=source&source=...`: one source and its group results.
 - `view=facts`: paginated facts, with optional `source`, `status`,
-  `chronicle_source`, `measure`, `period`, `geography`, `period_treatment`,
+  `ledger_source`, `measure`, `period`, `geography`, `period_treatment`,
   `calibration_exposure`, and `search` filters. Source-specific filters require
   `source`.
 - `view=fact&fact_key=...`: one Chronicle observation and its sparse source cells,
