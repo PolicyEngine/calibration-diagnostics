@@ -2,7 +2,7 @@
 calibration dashboard's own validation would notice breaking.
 
 Usage:
-  python generate_model_coverage.py /path/to/policyengine-us /path/to/populace \
+  python generate_model_coverage.py /path/to/policyengine-us /path/to/microcosm \
       [--api http://localhost:4321]
 
 Unlike upstream unit tests, the relevant checks here are the dashboard's two
@@ -36,14 +36,14 @@ from pathlib import Path
 import yaml
 
 pe_repo = Path(sys.argv[1])
-populace_repo = Path(sys.argv[2])
+microcosm_repo = Path(sys.argv[2])
 api_base = "http://localhost:4321"
 if "--api" in sys.argv:
     api_base = sys.argv[sys.argv.index("--api") + 1]
 
 var_root = pe_repo / "policyengine_us" / "variables"
 param_root = pe_repo / "policyengine_us" / "parameters"
-build_us = populace_repo / "packages/populace-build/src/populace/build/us"
+build_us = microcosm_repo / "packages/microcosm-build/src/microcosm/build/us"
 out_path = Path(__file__).resolve().parents[1] / "public" / "model-coverage.json"
 
 CLASS_RE = re.compile(r"^class\s+([A-Za-z_0-9]+)\s*\(\s*Variable\s*\)", re.M)
@@ -124,7 +124,7 @@ while True:
     q = urllib.parse.urlencode(
         {"limit": 500, "offset": offset, "sort_by": "name", "sort_dir": "asc"}
     )
-    page = fetch_json(f"{api_base}/api/populace/target-diagnostics?{q}")
+    page = fetch_json(f"{api_base}/api/microcosm/target-diagnostics?{q}")
     release_id = page.get("release_id") or release_id
     rows = page.get("targets") or []
     for row in rows:

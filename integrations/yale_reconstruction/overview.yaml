@@ -5,8 +5,8 @@ verification_facts_file: ledger_snapshot_fixture/facts.jsonl
 alignment_policy:
   model_id: cbo_growth_factor_aging
   model_version: 1.2.0
-  populace_commit: cae8640f9e65e274aea65c7916cb37b956978e32
-  source_module: packages/populace-build/src/populace/build/us_runtime/target_aging.py
+  microcosm_commit: cae8640f9e65e274aea65c7916cb37b956978e32
+  source_module: packages/microcosm-build/src/microcosm/build/us_runtime/target_aging.py
   source_years: [2022, 2023]
   build_year: 2024
   evaluate_transformed_facts: true
@@ -19,7 +19,7 @@ reconstruction:
   checkpoint_mapping_file: checkpoint_mappings.json
   taxable_income_checkpoint_status: evaluated_via_exact_microcosm_2022_to_2024_alignment
   aggregate_checkpoint_file: verification_results.json
-  aggregate_reconstruction_file: frontend/lib/populace/external-datasets/yale-national-2024.json
+  aggregate_reconstruction_file: frontend/lib/microcosm/external-datasets/yale-national-2024.json
   legacy_artifact_commit: 37922ec2bc07a3f32cd5e920c0aa06385fa52a56
   upstream_pin_basis: latest_commits_before_legacy_artifact_commit
   exact_original_upstream_pins_recorded: false

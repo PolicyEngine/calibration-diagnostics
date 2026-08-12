@@ -1,6 +1,6 @@
 ---
 name: policyengine-model-auditor
-description: Audits PolicyEngine model variables and aggregate expressions used by a Populace target
+description: Audits PolicyEngine model variables and aggregate expressions used by a Microcosm target
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 ---
 

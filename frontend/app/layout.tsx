@@ -3,7 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
-// The two families populace.dev vendors — self-hosted here via next/font so the
+// The two families microcosm.dev vendors — self-hosted here via next/font so the
 // dashboard renders in the same faces with no external request. Exposed as CSS
 // variables that globals.css points --font-sans / --font-mono at.
 const inter = Inter({

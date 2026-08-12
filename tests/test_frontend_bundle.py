@@ -190,19 +190,19 @@ def published_inputs(
         )
     )
 
-    populace_a = replace(
-        supported(facts[0], "populace"),
+    microcosm_a = replace(
+        supported(facts[0], "microcosm"),
         status=CapabilityStatus.CALIBRATION_TARGET,
         calibration_exposure=CalibrationExposure.DIRECT_CALIBRATION_TARGET,
     )
-    populace_b = supported(facts[1], "populace")
+    microcosm_b = supported(facts[1], "microcosm")
     cps_a = supported(facts[0], "cps")
     capabilities = (
-        populace_a,
-        populace_b,
+        microcosm_a,
+        microcosm_b,
         unsupported(
             facts[2],
-            "populace",
+            "microcosm",
             status=CapabilityStatus.UNSUPPORTED_PERIOD,
             reason_code="period_not_supported",
         ),
@@ -221,9 +221,9 @@ def published_inputs(
         ),
     )
     results = (
-        result(populace_a, "101"),
+        result(microcosm_a, "101"),
         replace(
-            result(populace_b, "140"),
+            result(microcosm_b, "140"),
             standard_error=Decimal("3"),
             margin_of_error_90=Decimal("4.935"),
         ),
@@ -299,7 +299,7 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
         output,
         page_size=2,
         source_labels={
-            "populace": "Microcosm + PolicyEngine-US",
+            "microcosm": "Microcosm + PolicyEngine-US",
             "cps": "Public CPS + Tax-Calculator",
         },
     )
@@ -331,9 +331,9 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
     first_page = json.loads((output / "facts" / "00001.json").read_text())
     assert [row["fact_key"] for row in first_page["rows"]] == ["fact-a", "fact-b"]
     state = first_page["rows"][1]
-    assert state["sources"]["populace"]["estimate"] == "140"
-    assert state["sources"]["populace"]["standard_error"] == "3"
-    assert state["sources"]["populace"]["margin_of_error_90"] == "4.935"
+    assert state["sources"]["microcosm"]["estimate"] == "140"
+    assert state["sources"]["microcosm"]["standard_error"] == "3"
+    assert state["sources"]["microcosm"]["margin_of_error_90"] == "4.935"
     assert state["sources"]["cps"] == {
         "status": "unsupported_geography",
         "reason_code": "geography_not_supported",
@@ -352,8 +352,8 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
     state_group = next(
         row for row in groups if row["dimension"] == "geography" and row["key"] == "state"
     )
-    assert state_group["sources"]["populace"]["evaluable"] == 1
-    assert state_group["sources"]["populace"]["performance_buckets"] == {
+    assert state_group["sources"]["microcosm"]["evaluable"] == 1
+    assert state_group["sources"]["microcosm"]["performance_buckets"] == {
         "within_bounds": 0,
         "outside_bounds": 0,
         "far_outside_bounds": 1,
@@ -370,43 +370,43 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
         and row["key"] == "external_validation"
     )
     assert exposure_group["sources"]["cps"]["scored"] == 1
-    populace_in_sample = next(
+    microcosm_in_sample = next(
         row
         for row in groups
-        if row["dimension"] == "populace_calibration_sample"
+        if row["dimension"] == "microcosm_calibration_sample"
         and row["key"] == "in_sample"
     )
-    assert populace_in_sample["fact_count"] == 1
-    assert populace_in_sample["sources"]["populace"]["evaluable"] == 1
-    assert populace_in_sample["sources"]["cps"]["evaluable"] == 1
-    assert populace_in_sample["sources"]["cps"]["loss"] == "0.2"
-    populace_out_of_sample = next(
+    assert microcosm_in_sample["fact_count"] == 1
+    assert microcosm_in_sample["sources"]["microcosm"]["evaluable"] == 1
+    assert microcosm_in_sample["sources"]["cps"]["evaluable"] == 1
+    assert microcosm_in_sample["sources"]["cps"]["loss"] == "0.2"
+    microcosm_out_of_sample = next(
         row
         for row in groups
-        if row["dimension"] == "populace_calibration_sample"
+        if row["dimension"] == "microcosm_calibration_sample"
         and row["key"] == "out_of_sample"
     )
-    assert populace_out_of_sample["fact_count"] == 2
-    assert populace_out_of_sample["sources"]["populace"]["evaluable"] == 1
-    assert populace_out_of_sample["sources"]["cps"]["evaluable"] == 0
-    state_populace_in_sample = next(
+    assert microcosm_out_of_sample["fact_count"] == 2
+    assert microcosm_out_of_sample["sources"]["microcosm"]["evaluable"] == 1
+    assert microcosm_out_of_sample["sources"]["cps"]["evaluable"] == 0
+    state_microcosm_in_sample = next(
         row
         for row in groups
-        if row["dimension"] == "geography_populace_calibration_sample"
+        if row["dimension"] == "geography_microcosm_calibration_sample"
         and row["key"] == "state|in_sample"
     )
-    assert state_populace_in_sample["fact_count"] == 0
-    assert state_populace_in_sample["sources"]["populace"]["evaluable"] == 0
-    assert state_populace_in_sample["sources"]["cps"]["evaluable"] == 0
+    assert state_microcosm_in_sample["fact_count"] == 0
+    assert state_microcosm_in_sample["sources"]["microcosm"]["evaluable"] == 0
+    assert state_microcosm_in_sample["sources"]["cps"]["evaluable"] == 0
     state_external = next(
         row
         for row in groups
         if row["dimension"] == "geography_calibration_exposure"
         and row["key"] == "state|external_validation"
     )
-    assert state_external["sources"]["populace"]["evaluable"] == 1
-    assert state_external["sources"]["populace"]["relative_error_count"] == 1
-    assert state_external["sources"]["populace"]["loss"] == "0.3"
+    assert state_external["sources"]["microcosm"]["evaluable"] == 1
+    assert state_external["sources"]["microcosm"]["relative_error_count"] == 1
+    assert state_external["sources"]["microcosm"]["loss"] == "0.3"
     empty_state_direct = next(
         row
         for row in groups
@@ -414,9 +414,9 @@ def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> N
         and row["key"] == "state|direct_calibration_target"
     )
     assert empty_state_direct["fact_count"] == 0
-    assert empty_state_direct["sources"]["populace"]["evaluable"] == 0
-    assert empty_state_direct["sources"]["populace"]["loss"] is None
-    assert empty_state_direct["sources"]["populace"]["performance_buckets"] == {
+    assert empty_state_direct["sources"]["microcosm"]["evaluable"] == 0
+    assert empty_state_direct["sources"]["microcosm"]["loss"] is None
+    assert empty_state_direct["sources"]["microcosm"]["performance_buckets"] == {
         "within_bounds": 0,
         "outside_bounds": 0,
         "far_outside_bounds": 0,

@@ -115,7 +115,7 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-populace = [
+microcosm = [
     { name = "pandas" },
     { name = "policyengine-core" },
     { name = "policyengine-us" },
@@ -133,15 +133,15 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=1.26,<3" },
-    { name = "pandas", marker = "extra == 'populace'", specifier = ">=2.2,<3" },
-    { name = "policyengine-core", marker = "extra == 'populace'", specifier = "==3.26.11" },
-    { name = "policyengine-us", marker = "extra == 'populace'", specifier = "==1.764.6" },
+    { name = "pandas", marker = "extra == 'microcosm'", specifier = ">=2.2,<3" },
+    { name = "policyengine-core", marker = "extra == 'microcosm'", specifier = "==3.26.11" },
+    { name = "policyengine-us", marker = "extra == 'microcosm'", specifier = "==1.764.6" },
     { name = "pyarrow", specifier = ">=18,<24" },
     { name = "pyyaml", specifier = ">=6,<7" },
-    { name = "tables", marker = "extra == 'populace'", specifier = ">=3.10,<4" },
+    { name = "tables", marker = "extra == 'microcosm'", specifier = ">=3.10,<4" },
     { name = "taxcalc", marker = "extra == 'taxcalc-cps'", specifier = "==6.7.1" },
 ]
-provides-extras = ["populace", "taxcalc-cps"]
+provides-extras = ["microcosm", "taxcalc-cps"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.3,<9" }]

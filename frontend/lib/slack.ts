@@ -1,21 +1,21 @@
-import type { PopulaceCountry } from "@/lib/populace/latest-artifact";
+import type { MicrocosmCountry } from "@/lib/microcosm/latest-artifact";
 
-const DASHBOARD_URL = "https://populace.dev/calibration/dashboard/populace";
+const DASHBOARD_URL = "https://microcosm.dev/calibration/dashboard/microcosm";
 
-const COUNTRY_LABEL: Record<PopulaceCountry, string> = {
+const COUNTRY_LABEL: Record<MicrocosmCountry, string> = {
   us: "🇺🇸 US",
   uk: "🇬🇧 UK",
 };
 
-const WEBHOOK_ENV: Record<PopulaceCountry, string> = {
-  us: "SLACK_WEBHOOK_POPULACE_US",
-  uk: "SLACK_WEBHOOK_POPULACE_UK",
+const WEBHOOK_ENV: Record<MicrocosmCountry, string> = {
+  us: "SLACK_WEBHOOK_MICROCOSM_US",
+  uk: "SLACK_WEBHOOK_MICROCOSM_UK",
 };
 
 // Post a "new release" alert to the country's Slack incoming webhook.
 // No-op (returns false) when that channel's webhook env var is unset.
 export async function postReleaseAlert(opts: {
-  country: PopulaceCountry;
+  country: MicrocosmCountry;
   releaseId: string;
   repo: string;
   updatedAt?: string | null;

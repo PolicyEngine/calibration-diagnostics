@@ -24,7 +24,7 @@ FAR_OUTSIDE_BOUNDS_RELATIVE_ERROR = Decimal("0.25")
 
 DEFAULT_SOURCE_LABELS = {
     "census_acs_pums_2024": "Raw ACS PUMS",
-    "populace_us_policyengine_us_2024": "Microcosm + PolicyEngine-US",
+    "microcosm_us_policyengine_us_2024": "Microcosm + PolicyEngine-US",
     "taxcalc_public_cps_2024": "Public CPS + Tax-Calculator",
     "yale_reconstruction_2024": (
         "Yale Tax-Data + Tax-Simulator (reconstruction)"
@@ -440,19 +440,19 @@ def _build_groups(
                     "sources": source_values,
                 }
             )
-    populace_source_ids = [
-        source_id for source_id in source_ids if "populace" in source_id.lower()
+    microcosm_source_ids = [
+        source_id for source_id in source_ids if "microcosm" in source_id.lower()
     ]
-    if len(populace_source_ids) != 1:
+    if len(microcosm_source_ids) != 1:
         raise ValueError(
-            "frontend bundle requires exactly one Populace source to define the "
+            "frontend bundle requires exactly one Microcosm source to define the "
             "shared calibration sample"
         )
-    populace_source_id = populace_source_ids[0]
+    microcosm_source_id = microcosm_source_ids[0]
     all_fact_keys = {fact.fact_key for fact in fact_values}
     in_sample_fact_keys = {
         row["fact_key"]
-        for row in capabilities_by_source[populace_source_id]
+        for row in capabilities_by_source[microcosm_source_id]
         if row.get("calibration_exposure") == "direct_calibration_target"
     }
     sample_fact_keys = {
@@ -462,7 +462,7 @@ def _build_groups(
     for sample, fact_keys in sample_fact_keys.items():
         groups.append(
             {
-                "dimension": "populace_calibration_sample",
+                "dimension": "microcosm_calibration_sample",
                 "key": sample,
                 "label": _display_label(sample),
                 "fact_count": len(fact_keys),
@@ -541,7 +541,7 @@ def _build_groups(
             intersection = geography_fact_keys & fact_keys
             groups.append(
                 {
-                    "dimension": "geography_populace_calibration_sample",
+                    "dimension": "geography_microcosm_calibration_sample",
                     "key": f"{geography}|{sample}",
                     "label": (
                         f"{_display_label(geography)} / "

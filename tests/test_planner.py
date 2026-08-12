@@ -46,9 +46,9 @@ def fact(**changes) -> FactContract:
 
 def source(**changes) -> EvaluationSourceManifest:
     base = EvaluationSourceManifest(
-        source_id="populace_us_policyengine_us_2024",
+        source_id="microcosm_us_policyengine_us_2024",
         source_type=SourceType.MODEL_DATASET_PAIR,
-        dataset_version="populace_us_2024@test",
+        dataset_version="microcosm_us_2024@test",
         model_version="policyengine-us@test",
         jurisdictions=frozenset({"US"}),
         population_period=TypedPeriod.parse("calendar_year:2024"),
@@ -275,7 +275,7 @@ def test_cross_period_fact_is_unsupported_without_alignment() -> None:
     assert result.status is CapabilityStatus.UNSUPPORTED_PERIOD
 
 
-def test_mapping_can_declare_a_populace_build_target_period_proxy() -> None:
+def test_mapping_can_declare_a_microcosm_build_target_period_proxy() -> None:
     data = registry(execution="model").to_data()
     data["mappings"][0]["build_target_periods"] = ["fiscal_year:2024"]
     result = CapabilityPlanner(MappingRegistry.from_data(data)).classify(

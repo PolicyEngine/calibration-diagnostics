@@ -1,12 +1,8 @@
 # Microcosm calibration diagnostics
 
 Interactive dashboard for **Microcosm US** — PolicyEngine's calibrated synthetic
-population published on Hugging Face at the legacy repository ID
-[`policyengine/populace-us`](https://huggingface.co/datasets/policyengine/populace-us).
-
-Routes, commands, scripts, release IDs, repository IDs, and environment variables
-containing `populace` below are legacy compatibility identifiers for Microcosm.
-They must remain literal for the documented interfaces to work.
+population published on Hugging Face at
+[`policyengine/microcosm-us`](https://huggingface.co/datasets/policyengine/microcosm-us).
 
 Everything is read **live from Hugging Face**: the current release is resolved
 through `latest.json`, and each release's manifests and per-target calibration
@@ -15,19 +11,19 @@ separate service layer — the Next.js API routes are the API layer.
 
 ## What it shows
 
-- **Release summary** (`/populace`) — calibration fit KPIs, target coverage,
+- **Release summary** (`/microcosm`) — calibration fit KPIs, target coverage,
   per-family fit, and worst-fit / biggest-improvement targets, for the current
   release (or any release via `?release=`).
-- **Target diagnostics** (`/populace/targets`) — browse the calibration target
+- **Target diagnostics** (`/microcosm/targets`) — browse the calibration target
   surface by the quantity each constraint measures (e.g. *adjusted gross income*),
   then drill its breakdown dimensions (income band x return type x filing status,
   geography, ...). Every axis a variable varies on becomes a filterable, sortable
   facet, and any target opens a canonical detail card (structured registry
   fields, source citation, initial -> final -> target).
-- **Compare versions** (`/populace/compare`) — diff two releases: targets matched
+- **Compare versions** (`/microcosm/compare`) — diff two releases: targets matched
   by name, common targets get a fit change, and added/removed targets are
   surfaced.
-- **Staging runs** (`/populace/staging`) — monitor pre-release Microcosm build
+- **Staging runs** (`/microcosm/staging`) — monitor pre-release Microcosm build
   runs from the staging Hub repo: current stage, calibration loss progress,
   final candidate diagnostics once uploaded, and candidate-vs-latest fit.
 - **Agentic investigations** (`.claude/`) — Claude Code slash command,
@@ -40,15 +36,15 @@ The Next.js route handlers are the API layer; all read live from Hugging Face:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/populace/releases` | List published releases (newest first) |
-| `GET /api/populace?release=<id>` | Release summary (default: latest) |
-| `GET /api/populace/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics |
-| `GET /api/populace/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, Chronicle metadata, artifact paths, repo searches, and next checks |
-| `GET /api/populace/compare?a=<id>&b=<id>` | Version-over-version diff |
-| `GET /api/populace/staging/runs` | List staging build runs |
-| `GET /api/populace/staging/run?id=<run_id>` | One staging run's progress and uploaded candidate diagnostics |
-| `GET /api/populace/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
-| `GET /api/populace/staging/compare?run=<run_id>&release=latest` | Diff staging candidate against a published release |
+| `GET /api/microcosm/releases` | List published releases (newest first) |
+| `GET /api/microcosm?release=<id>` | Release summary (default: latest) |
+| `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics |
+| `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, Chronicle metadata, artifact paths, repo searches, and next checks |
+| `GET /api/microcosm/compare?a=<id>&b=<id>` | Version-over-version diff |
+| `GET /api/microcosm/staging/runs` | List staging build runs |
+| `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and uploaded candidate diagnostics |
+| `GET /api/microcosm/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
+| `GET /api/microcosm/staging/compare?run=<run_id>&release=latest` | Diff staging candidate against a published release |
 
 ## Agentic target investigations
 
@@ -56,7 +52,7 @@ The dashboard is only the observation surface. Root-cause work should run throug
 the Claude Code harness in `.claude/`.
 
 ```text
-/investigate-populace-target --release <release-id> <target-id>
+/investigate-microcosm-target --release <release-id> <target-id>
 ```
 
 The command fetches a target packet, then coordinates specialist agents for
@@ -64,8 +60,8 @@ ledger/source semantics, Populus materialization, PolicyEngine model mapping,
 and calibration mechanics. The underlying packet can also be fetched directly:
 
 ```bash
-node scripts/populace-investigation-packet.mjs \
-  --release populace-us-2024-incumbent-improved-996401a-20260618 \
+node scripts/microcosm-investigation-packet.mjs \
+  --release microcosm-us-2024-incumbent-improved-996401a-20260618 \
   irs_soi.ty2022.historic_table_2.us.under_1.ctc_amount \
   --out investigations/ctc-under-1.json
 ```
@@ -90,7 +86,7 @@ uv run python scripts/verify_evaluation_harness.py
 See [the Chronicle update workflow](docs/ledger-update-workflow.md) for the
 optional Microcosm and ACS inputs and the separate full-artifact command.
 
-Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different
-published dataset/revision. Staging defaults to `policyengine/populace-us-staging`;
-set `POPULACE_STAGING_HF_REPO`, `POPULACE_STAGING_HF_REVISION`, and `HF_TOKEN`
+Optional env: `MICROCOSM_HF_REPO`, `MICROCOSM_HF_REVISION` to point at a different
+published dataset/revision. Staging defaults to `policyengine/microcosm-us-staging`;
+set `MICROCOSM_STAGING_HF_REPO`, `MICROCOSM_STAGING_HF_REVISION`, and `HF_TOKEN`
 if the staging dataset is private.

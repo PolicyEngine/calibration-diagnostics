@@ -163,7 +163,7 @@ surface.
 
 The Yale checkpoint uses exactly the same alignment output as Microcosm. Before
 materializing a 2022 or 2023 comparison, the full-run harness applies
-the legacy-named `PopulaceAgingPolicy` used by Microcosm
+the `MicrocosmAgingPolicy` used by Microcosm
 (`cbo_growth_factor_aging` version `1.2.0`, Microcosm commit
 `cae8640f9e65e274aea65c7916cb37b956978e32`) to U.S. 2023 facts:
 

@@ -9,9 +9,9 @@ from collections import Counter
 from pathlib import Path
 
 from evaluation_harness.adapters.acs_pums import ACSPUMSRunner, execute_acs_pums
-from evaluation_harness.adapters.populace import (
-    POPULACE_RELEASE,
-    PopulacePolicyEngineRunner,
+from evaluation_harness.adapters.microcosm import (
+    MICROCOSM_RELEASE,
+    MicrocosmPolicyEngineRunner,
     resolve_release_calibration_diagnostics,
 )
 from evaluation_harness.adapters.taxcalc_cps import TaxCalcCPSRunner
@@ -29,19 +29,19 @@ from evaluation_harness.full_run import (
 from evaluation_harness.frontend_bundle import publish_frontend_bundle
 from evaluation_harness.integration import load_integration_overview
 from evaluation_harness.mappings import MappingRegistry
-from evaluation_harness.populace_aging import (
-    PopulaceAgingPolicy,
-    transform_ledger_facts_to_populace_year,
-    transform_ledger_facts_to_populace_years,
+from evaluation_harness.microcosm_aging import (
+    MicrocosmAgingPolicy,
+    transform_ledger_facts_to_microcosm_year,
+    transform_ledger_facts_to_microcosm_years,
 )
-from evaluation_harness.populace_age_topcodes import (
+from evaluation_harness.microcosm_age_topcodes import (
     build_cps_asec_age_topcode_comparisons,
 )
-from evaluation_harness.populace_bea_wages import (
+from evaluation_harness.microcosm_bea_wages import (
     transform_chronicle_bea_wage_facts,
 )
-from evaluation_harness.populace_old_cd import load_old_cd_assignments
-from evaluation_harness.populace_release_targets import (
+from evaluation_harness.microcosm_old_cd import load_old_cd_assignments
+from evaluation_harness.microcosm_release_targets import (
     compile_release_target_alignments,
     materialize_release_target_results,
 )
@@ -54,7 +54,7 @@ from evaluation_harness.yale_reconstruction_checkpoint import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-POPULACE_INTEGRATION = ROOT / "integrations" / "populace_policyengine_us"
+MICROCOSM_INTEGRATION = ROOT / "integrations" / "microcosm_policyengine_us"
 CPS_INTEGRATION = ROOT / "integrations" / "taxcalc_cps"
 ACS_PUMS_INTEGRATION = ROOT / "integrations" / "census_acs_pums"
 YALE_INTEGRATION = ROOT / "integrations" / "yale_reconstruction"
@@ -62,7 +62,7 @@ YALE_RECONSTRUCTION = (
     ROOT
     / "frontend"
     / "lib"
-    / "populace"
+    / "microcosm"
     / "external-datasets"
     / "yale-national-2024.json"
 )
@@ -92,11 +92,11 @@ def _source_counts(capabilities, source_id: str) -> dict[str, int]:
 
 def run(
     snapshot: Path,
-    populace_dataset: Path,
+    microcosm_dataset: Path,
     acs_pums_aggregates: Path,
     output: Path,
-    populace_calibration_diagnostics: Path | None = None,
-    populace_old_cd_assignments: Path | None = None,
+    microcosm_calibration_diagnostics: Path | None = None,
+    microcosm_old_cd_assignments: Path | None = None,
 ) -> dict:
     snapshot_facts, snapshot_manifest = load_snapshot_facts(snapshot)
     jurisdiction_facts = scope_facts_to_jurisdictions(
@@ -114,8 +114,8 @@ def run(
         flush=True,
     )
 
-    populace_overview = load_integration_overview(
-        POPULACE_INTEGRATION / "overview.yaml"
+    microcosm_overview = load_integration_overview(
+        MICROCOSM_INTEGRATION / "overview.yaml"
     )
     cps_overview = load_integration_overview(CPS_INTEGRATION / "overview.yaml")
     acs_pums_overview = load_integration_overview(
@@ -123,7 +123,7 @@ def run(
     )
     yale_overview = load_integration_overview(YALE_INTEGRATION / "overview.yaml")
     for overview in (
-        populace_overview,
+        microcosm_overview,
         cps_overview,
         acs_pums_overview,
         yale_overview,
@@ -134,20 +134,20 @@ def run(
                 f"{overview.ledger_snapshot_id}, not {snapshot_id}"
             )
 
-    diagnostics_path = populace_calibration_diagnostics
+    diagnostics_path = microcosm_calibration_diagnostics
     if diagnostics_path is None:
         diagnostics_path = resolve_release_calibration_diagnostics(
-            POPULACE_RELEASE, populace_dataset.parent
+            MICROCOSM_RELEASE, microcosm_dataset.parent
         )
-    aging_policy = PopulaceAgingPolicy.from_facts(
+    aging_policy = MicrocosmAgingPolicy.from_facts(
         facts,
         release_diagnostics_path=diagnostics_path,
     )
     source_years = tuple(
-        int(year) for year in populace_overview.alignment_policy["source_years"]
+        int(year) for year in microcosm_overview.alignment_policy["source_years"]
     )
-    build_year = int(populace_overview.alignment_policy["build_year"])
-    aging_results = transform_ledger_facts_to_populace_years(
+    build_year = int(microcosm_overview.alignment_policy["build_year"])
+    aging_results = transform_ledger_facts_to_microcosm_years(
         facts,
         aging_policy,
         source_years=source_years,
@@ -156,12 +156,12 @@ def run(
     release_target_alignments = compile_release_target_alignments(
         facts,
         diagnostics_path,
-        source_id=populace_overview.source.source_id,
-        release_id=POPULACE_RELEASE.release_id,
+        source_id=microcosm_overview.source.source_id,
+        release_id=MICROCOSM_RELEASE.release_id,
     )
     bea_wage_transformations = transform_chronicle_bea_wage_facts(
         facts,
-        source_id=populace_overview.source.source_id,
+        source_id=microcosm_overview.source.source_id,
     )
     taxcalc_bea_wage_transformations = transform_chronicle_bea_wage_facts(
         facts,
@@ -179,7 +179,7 @@ def run(
     )
     age_topcode_comparisons = build_cps_asec_age_topcode_comparisons(
         facts,
-        source_id=populace_overview.source.source_id,
+        source_id=microcosm_overview.source.source_id,
     )
     exact_release_fact_keys = {
         row.source_fact_key for row in release_target_alignments.aligned_facts
@@ -219,16 +219,16 @@ def run(
             *age_topcode_comparisons.aligned_facts,
         ]
     )
-    populace_plan = SourcePlan(
-        source=populace_overview.source,
-        mappings=MappingRegistry.from_yaml(POPULACE_INTEGRATION / "mappings.yaml"),
+    microcosm_plan = SourcePlan(
+        source=microcosm_overview.source,
+        mappings=MappingRegistry.from_yaml(MICROCOSM_INTEGRATION / "mappings.yaml"),
         alignments=tuple(
             [
                 *release_target_alignments.declarations,
                 *bea_wage_transformations.declarations,
                 *age_topcode_comparisons.declarations,
                 *(
-                    row.to_alignment_declaration(populace_overview.source.source_id)
+                    row.to_alignment_declaration(microcosm_overview.source.source_id)
                     for row in comparable_aging
                 ),
             ]
@@ -253,17 +253,17 @@ def run(
     )
     capabilities = build_full_capability_matrix(
         facts,
-        [populace_plan, cps_plan, yale_plan, acs_pums_plan],
+        [microcosm_plan, cps_plan, yale_plan, acs_pums_plan],
         snapshot_id=snapshot_id,
     )
     capabilities, release_target_results = materialize_release_target_results(
         capabilities,
         release_target_alignments,
-        source_id=populace_plan.source.source_id,
-        dataset_version=POPULACE_RELEASE.release_id,
-        model_version=f"policyengine-us=={POPULACE_RELEASE.model_version}",
-        population_period=populace_plan.source.population_period,
-        policy_period=populace_plan.source.policy_period,
+        source_id=microcosm_plan.source.source_id,
+        dataset_version=MICROCOSM_RELEASE.release_id,
+        model_version=f"policyengine-us=={MICROCOSM_RELEASE.model_version}",
+        population_period=microcosm_plan.source.population_period,
+        policy_period=microcosm_plan.source.policy_period,
     )
     yale_checkpoint = load_yale_reconstruction_checkpoint(
         YALE_RECONSTRUCTION,
@@ -286,8 +286,8 @@ def run(
         "Classified every fact/source pair: "
         + json.dumps(
             {
-                populace_plan.source.source_id: _source_counts(
-                    capabilities, populace_plan.source.source_id
+                microcosm_plan.source.source_id: _source_counts(
+                    capabilities, microcosm_plan.source.source_id
                 ),
                 cps_plan.source.source_id: _source_counts(
                     capabilities, cps_plan.source.source_id
@@ -304,40 +304,40 @@ def run(
         flush=True,
     )
 
-    populace_capabilities = tuple(
+    microcosm_capabilities = tuple(
         row
         for row in capabilities
-        if row.source_id == populace_plan.source.source_id
+        if row.source_id == microcosm_plan.source.source_id
     )
-    populace_groups = build_run_groups(populace_capabilities)
+    microcosm_groups = build_run_groups(microcosm_capabilities)
     print(
-        f"Executing {sum(len(group.fact_keys) for group in populace_groups):,} "
-        f"Populace/PolicyEngine capability cells in {len(populace_groups)} groups.",
+        f"Executing {sum(len(group.fact_keys) for group in microcosm_groups):,} "
+        f"Microcosm/PolicyEngine capability cells in {len(microcosm_groups)} groups.",
         flush=True,
     )
-    old_cd_path = populace_old_cd_assignments
+    old_cd_path = microcosm_old_cd_assignments
     if old_cd_path is None:
-        old_cd_path = populace_dataset.with_name(
+        old_cd_path = microcosm_dataset.with_name(
             "old_congressional_district_assignments.csv"
         )
     old_cd_assignments = load_old_cd_assignments(old_cd_path)
-    populace_runner = PopulacePolicyEngineRunner(
-        dataset_path=populace_dataset,
+    microcosm_runner = MicrocosmPolicyEngineRunner(
+        dataset_path=microcosm_dataset,
         old_congressional_district_assignments=old_cd_assignments,
     )
-    populace_results = tuple(
+    microcosm_results = tuple(
         [
             *release_target_results,
             *execute_groups(
-                populace_groups,
-                populace_capabilities,
-                {populace_plan.source.source_id: populace_runner},
+                microcosm_groups,
+                microcosm_capabilities,
+                {microcosm_plan.source.source_id: microcosm_runner},
             ),
         ]
     )
-    del populace_runner
+    del microcosm_runner
     gc.collect()
-    print(f"Completed {len(populace_results):,} Populace estimates.", flush=True)
+    print(f"Completed {len(microcosm_results):,} Microcosm estimates.", flush=True)
 
     cps_capabilities = tuple(
         row for row in capabilities if row.source_id == cps_plan.source.source_id
@@ -386,7 +386,7 @@ def run(
     print(f"Completed {len(acs_pums_results):,} raw ACS estimates.", flush=True)
 
     results = tuple(
-        [*populace_results, *cps_results, *yale_results, *acs_pums_results]
+        [*microcosm_results, *cps_results, *yale_results, *acs_pums_results]
     )
     scores = build_scored_results(facts, capabilities, results, aligned_facts)
     summary = build_run_summary(facts, capabilities, results, scores)
@@ -399,8 +399,8 @@ def run(
         "excluded_geography_ids": sorted(EVALUATION_EXCLUDED_GEOGRAPHY_IDS),
         "excluded_geography_fact_count": len(jurisdiction_facts) - len(facts),
     }
-    summary["populace_prior_years_to_2024_alignment"] = {
-        "policy": "Exact Populace cbo_growth_factor_aging@1.2.0 semantics",
+    summary["microcosm_prior_years_to_2024_alignment"] = {
+        "policy": "Exact Microcosm cbo_growth_factor_aging@1.2.0 semantics",
         "observed_years": list(source_years),
         "evaluation_year": build_year,
         "fact_count": len(aging_results),
@@ -431,8 +431,8 @@ def run(
         ),
     }
     summary["microcosm_exact_release_targets"] = {
-        "release_id": POPULACE_RELEASE.release_id,
-        "diagnostics_sha256": POPULACE_RELEASE.calibration_diagnostics_sha256,
+        "release_id": MICROCOSM_RELEASE.release_id,
+        "diagnostics_sha256": MICROCOSM_RELEASE.calibration_diagnostics_sha256,
         "compiled_target_count": release_target_alignments.target_count,
         "cross_period_fact_count": release_target_alignments.matched_fact_count,
         "native_period_fact_count": len(
@@ -441,7 +441,7 @@ def run(
         "rejected_match_count": len(release_target_alignments.rejected_matches),
         "final_estimate_result_count": sum(
             row.estimate_basis == "microcosm_release_final_estimate"
-            for row in populace_results
+            for row in microcosm_results
         ),
         "estimate_basis": "microcosm_release_final_estimate",
         "benchmark_basis": (
@@ -511,7 +511,7 @@ def run(
             "hard targets; these results are out-of-sample validation."
         ),
     }
-    aging_2023 = transform_ledger_facts_to_populace_year(
+    aging_2023 = transform_ledger_facts_to_microcosm_year(
         facts,
         aging_policy,
         source_year=2023,
@@ -527,8 +527,8 @@ def run(
         for row in aging_2023
         if row.comparable and row.source_fact.fact_key not in exact_release_fact_keys
     )
-    summary["populace_2023_to_2024_alignment"] = {
-        "policy": "Exact Populace cbo_growth_factor_aging@1.2.0 semantics",
+    summary["microcosm_2023_to_2024_alignment"] = {
+        "policy": "Exact Microcosm cbo_growth_factor_aging@1.2.0 semantics",
         "observed_year": 2023,
         "evaluation_year": build_year,
         "fact_count": len(aging_2023),
@@ -645,19 +645,19 @@ def run(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot", required=True, type=Path)
-    parser.add_argument("--populace-dataset", required=True, type=Path)
-    parser.add_argument("--populace-calibration-diagnostics", type=Path)
-    parser.add_argument("--populace-old-cd-assignments", type=Path)
+    parser.add_argument("--microcosm-dataset", required=True, type=Path)
+    parser.add_argument("--microcosm-calibration-diagnostics", type=Path)
+    parser.add_argument("--microcosm-old-cd-assignments", type=Path)
     parser.add_argument("--acs-pums-aggregates", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     arguments = parser.parse_args()
     run(
         arguments.snapshot,
-        arguments.populace_dataset,
+        arguments.microcosm_dataset,
         arguments.acs_pums_aggregates,
         arguments.output,
-        arguments.populace_calibration_diagnostics,
-        arguments.populace_old_cd_assignments,
+        arguments.microcosm_calibration_diagnostics,
+        arguments.microcosm_old_cd_assignments,
     )
 
 

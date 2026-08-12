@@ -14,7 +14,7 @@ Fairness (no over/underfit): identical target spec, identical per-cell logic
 (_cell/_subpop/_parse_band mirror score_external_dataset.py), identical raw units
 (weighted dollars for totals, weighted return counts for counts). A concept is
 dropped only when its grand total is verifiably far off BOTH the official IRS
-value and populace (a mapping/coverage failure), documented below — never tuned
+value and microcosm (a mapping/coverage failure), documented below — never tuned
 to lower Yale's loss.
 
 Run:
@@ -32,7 +32,7 @@ import math
 import re
 from pathlib import Path
 
-OUT_DIR = Path(__file__).resolve().parents[1] / "lib" / "populace" / "external-datasets"
+OUT_DIR = Path(__file__).resolve().parents[1] / "lib" / "microcosm" / "external-datasets"
 
 # PolicyEngine target `variable` label -> Yale detail column(s). A record's value
 # for the concept is the (weighted) sum of these columns. Yale is PUF-derived, so
@@ -195,19 +195,19 @@ def score(spec, cols):
 
 def verify(spec, out):
     """Print each concept's grand total (summed over its 'All'-band cells, else
-    all cells) vs official target and populace — the audit that catches mapping /
+    all cells) vs official target and microcosm — the audit that catches mapping /
     unit errors before they masquerade as over/underfit."""
     from collections import defaultdict
 
-    agg = defaultdict(lambda: [0.0, 0.0, 0.0])  # yale, target, populace
+    agg = defaultdict(lambda: [0.0, 0.0, 0.0])  # yale, target, microcosm
     for x in spec:
         if x["name"] not in out:
             continue
         a = agg[x["variable"]]
         a[0] += out[x["name"]]
         a[1] += x.get("target") or 0
-        a[2] += x.get("populace") or 0
-    print(f"\n{'concept':38s}{'yale':>14s}{'official':>14s}{'populace':>14s}  flag")
+        a[2] += x.get("microcosm") or 0
+    print(f"\n{'concept':38s}{'yale':>14s}{'official':>14s}{'microcosm':>14s}  flag")
     for v in sorted(agg):
         y, t, p = agg[v]
         offt = abs(y - t) / t if t else 0

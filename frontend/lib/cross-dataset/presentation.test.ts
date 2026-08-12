@@ -24,8 +24,8 @@ const summary: CrossDatasetSummary = {
   matrix_complete: true,
   sources: [
     {
-      source_id: "populace",
-      label: "Populace + PolicyEngine-US",
+      source_id: "microcosm",
+      label: "Microcosm + PolicyEngine-US",
       source_type: "model_dataset_pair",
       capability_count: 48_313,
       result_count: 9_411,
@@ -59,7 +59,7 @@ const summary: CrossDatasetSummary = {
         aligned_fact: 116,
         unsupported: 38_902,
       },
-      dataset_version: "populace-2024",
+      dataset_version: "microcosm-2024",
       model_version: "policyengine-us==1.0",
     },
     {
@@ -108,7 +108,7 @@ const groups: CrossDatasetGroup[] = [
     label: "State",
     fact_count: 12_000,
     sources: {
-      populace: {
+      microcosm: {
         evaluable: 5_000,
         scored: 5_000,
         relative_error_count: 4_990,
@@ -141,12 +141,12 @@ const groups: CrossDatasetGroup[] = [
     },
   },
   {
-    dimension: "geography_populace_calibration_sample",
+    dimension: "geography_microcosm_calibration_sample",
     key: "state|in_sample",
     label: "State / In sample",
     fact_count: 2_000,
     sources: {
-      populace: {
+      microcosm: {
         evaluable: 2_000,
         scored: 2_000,
         relative_error_count: 1_999,
@@ -179,12 +179,12 @@ const groups: CrossDatasetGroup[] = [
     },
   },
   {
-    dimension: "populace_calibration_sample",
+    dimension: "microcosm_calibration_sample",
     key: "in_sample",
     label: "In sample",
     fact_count: 2_000,
     sources: {
-      populace: {
+      microcosm: {
         evaluable: 2_000,
         scored: 2_000,
         relative_error_count: 1_999,
@@ -217,12 +217,12 @@ const groups: CrossDatasetGroup[] = [
     },
   },
   {
-    dimension: "populace_calibration_sample",
+    dimension: "microcosm_calibration_sample",
     key: "out_of_sample",
     label: "Out of sample",
     fact_count: 46_313,
     sources: {
-      populace: {
+      microcosm: {
         evaluable: 7_411,
         scored: 7_411,
         relative_error_count: 7_401,
@@ -260,7 +260,7 @@ const groups: CrossDatasetGroup[] = [
     label: "IRS SOI",
     fact_count: 33_045,
     sources: {
-      populace: {
+      microcosm: {
         evaluable: 150,
         scored: 150,
         relative_error_count: 149,
@@ -298,7 +298,7 @@ const groups: CrossDatasetGroup[] = [
     label: "Aligned fact",
     fact_count: 116,
     sources: {
-      populace: {
+      microcosm: {
         evaluable: 116,
         scored: 116,
         relative_error_count: 116,
@@ -336,7 +336,7 @@ const groups: CrossDatasetGroup[] = [
     label: "Advanced population",
     fact_count: 38,
     sources: {
-      populace: {
+      microcosm: {
         evaluable: 0,
         scored: 0,
         relative_error_count: 0,
@@ -374,7 +374,7 @@ const groups: CrossDatasetGroup[] = [
     label: "Direct calibration target",
     fact_count: 152,
     sources: {
-      populace: {
+      microcosm: {
         evaluable: 152,
         scored: 152,
         relative_error_count: 152,
@@ -412,7 +412,7 @@ const groups: CrossDatasetGroup[] = [
     label: "External validation",
     fact_count: 9_297,
     sources: {
-      populace: {
+      microcosm: {
         evaluable: 9_259,
         scored: 9_259,
         relative_error_count: 9_248,
@@ -468,22 +468,22 @@ test("classifies loading, error, empty, and ready overview states", () => {
 
 test("source metric rows keep performance inseparable from Chronicle coverage counts", () => {
   const cards = buildSourceOverviews(summary, groups);
-  const populace = cards[0];
+  const microcosm = cards[0];
   const cps = cards[1];
 
-  expect(populace.scoreLabel).toBe("15.1% mean error");
-  expect(populace.coverageRateLabel).toBe("19.5% coverage");
-  expect(populace.label).toBe("Microcosm + PolicyEngine-US");
-  expect(populace.coverageLabel).toBe("9,411 of 48,313 facts");
-  expect(populace.scoreScopeLabel).toBe("Mean capped error across 9,400 comparable facts");
-  expect(populace.performanceBuckets).toEqual({
+  expect(microcosm.scoreLabel).toBe("15.1% mean error");
+  expect(microcosm.coverageRateLabel).toBe("19.5% coverage");
+  expect(microcosm.label).toBe("Microcosm + PolicyEngine-US");
+  expect(microcosm.coverageLabel).toBe("9,411 of 48,313 facts");
+  expect(microcosm.scoreScopeLabel).toBe("Mean capped error across 9,400 comparable facts");
+  expect(microcosm.performanceBuckets).toEqual({
     withinBounds: 8_000,
     outsideBounds: 900,
     farOutsideBounds: 511,
     unavailable: 38_902,
     total: 48_313,
   });
-  expect("coveragePercent" in populace).toBe(false);
+  expect("coveragePercent" in microcosm).toBe(false);
 
   expect(cps.scoreLabel).toBe("17.6% mean error");
   expect(cps.coverageRateLabel).toBe("0.1% coverage");
@@ -539,7 +539,7 @@ test("orders Microcosm, Public CPS, Yale reconstruction, then Raw ACS", () => {
   const mixedSources = [rawAcs, yale, ...summary.sources];
 
   expect(orderSourceSummaries(mixedSources).map((source) => source.source_id)).toEqual([
-    "populace",
+    "microcosm",
     "cps",
     "yale_reconstruction_2024",
     "census_acs_pums_2024",
@@ -549,7 +549,7 @@ test("orders Microcosm, Public CPS, Yale reconstruction, then Raw ACS", () => {
       (source) => source.sourceId,
     ),
   ).toEqual([
-    "populace",
+    "microcosm",
     "cps",
     "yale_reconstruction_2024",
     "census_acs_pums_2024",
@@ -609,15 +609,15 @@ test("shared metric filters select the same geography and sample for every sourc
 
 test("source scorecards identify aligned, advanced, and in-sample comparisons", () => {
   const cards = buildSourceOverviews(summary, groups);
-  const populace = cards[0];
+  const microcosm = cards[0];
   const cps = cards[1];
 
-  expect(populace.periodTreatments).toContainEqual({
+  expect(microcosm.periodTreatments).toContainEqual({
     key: "aligned_fact",
     label: "Chronicle facts transformed to model-comparable benchmarks",
     count: 116,
   });
-  expect(populace.calibrationExposures).toContainEqual({
+  expect(microcosm.calibrationExposures).toContainEqual({
     key: "direct_calibration_target",
     label: "Direct calibration targets (in-sample)",
     count: 152,
@@ -638,7 +638,7 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
   const rows = buildGroupRows(groups, "ledger_source", summary.sources);
   expect(rows).toHaveLength(1);
   expect(rows[0].label).toBe("IRS Statistics of Income");
-  expect(rows[0].sources.populace).toMatchObject({
+  expect(rows[0].sources.microcosm).toMatchObject({
     scoreLabel: "7.0% mean error",
     coverageRateLabel: "0.5% coverage",
     coverageLabel: "150 / 33,045",
@@ -658,25 +658,25 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
     unsupportedCount: 33_008,
   });
   expect(rows[0].sources.cps.factHref).toBe(
-    "/populace/datasets?view=facts&source=cps&ledger_source=irs_soi",
+    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi",
   );
-  expect("coveragePercent" in rows[0].sources.populace).toBe(false);
+  expect("coveragePercent" in rows[0].sources.microcosm).toBe(false);
 });
 
 test("every supported grouping maps to a stable fact-catalog URL", () => {
   expect(groupFactsHref("concept", "irs_soi.wages", "cps")).toBe(
-    "/populace/datasets?view=facts&source=cps&measure=irs_soi.wages",
+    "/microcosm/datasets?view=facts&source=cps&measure=irs_soi.wages",
   );
   expect(groupFactsHref("period", "tax_year:2024", "cps")).toBe(
-    "/populace/datasets?view=facts&source=cps&period=tax_year%3A2024",
+    "/microcosm/datasets?view=facts&source=cps&period=tax_year%3A2024",
   );
   expect(groupFactsHref("geography", "country", "cps")).toBe(
-    "/populace/datasets?view=facts&source=cps&geography=country",
+    "/microcosm/datasets?view=facts&source=cps&geography=country",
   );
   expect(groupFactsHref("period_treatment", "advanced_population", "cps")).toBe(
-    "/populace/datasets?view=facts&source=cps&period_treatment=advanced_population",
+    "/microcosm/datasets?view=facts&source=cps&period_treatment=advanced_population",
   );
   expect(groupFactsHref("calibration_exposure", "external_validation", "cps")).toBe(
-    "/populace/datasets?view=facts&source=cps&calibration_exposure=external_validation",
+    "/microcosm/datasets?view=facts&source=cps&calibration_exposure=external_validation",
   );
 });

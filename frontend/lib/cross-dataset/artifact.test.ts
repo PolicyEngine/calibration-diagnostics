@@ -30,7 +30,7 @@ function fixture() {
     matrix_complete: true,
     sources: [
       {
-        source_id: "populace",
+        source_id: "microcosm",
         label: "Microcosm + PolicyEngine-US",
         source_type: "model_dataset_pair",
         capability_count: 3,
@@ -64,7 +64,7 @@ function fixture() {
         label: "IRS SOI",
         fact_count: 2,
         sources: {
-          populace: { evaluable: 1, scored: 1, display_score: "95", reason_codes: { period_not_supported: 1 } },
+          microcosm: { evaluable: 1, scored: 1, display_score: "95", reason_codes: { period_not_supported: 1 } },
           cps: { evaluable: 1, scored: 1, display_score: "90", reason_codes: { geography_not_supported: 1 } },
         },
       },
@@ -74,7 +74,7 @@ function fixture() {
         label: "State",
         fact_count: 1,
         sources: {
-          populace: { evaluable: 1, scored: 1, display_score: "96", reason_codes: {} },
+          microcosm: { evaluable: 1, scored: 1, display_score: "96", reason_codes: {} },
           cps: { evaluable: 0, scored: 0, display_score: null, reason_codes: { geography_not_supported: 1 } },
         },
       },
@@ -102,7 +102,7 @@ function fixture() {
           entity: "tax_unit",
           dimensions: { filing_status: "all" },
           sources: {
-            populace: { status: "evaluable_direct", period_treatment: "native", calibration_exposure: "external_validation", estimate: "101", absolute_relative_error: "0.01" },
+            microcosm: { status: "evaluable_direct", period_treatment: "native", calibration_exposure: "external_validation", estimate: "101", absolute_relative_error: "0.01" },
             cps: { status: "evaluable_via_model", period_treatment: "advanced_population", calibration_exposure: "external_validation", estimate: "90", absolute_relative_error: "0.1" },
           },
         },
@@ -119,7 +119,7 @@ function fixture() {
           entity: "person",
           dimensions: {},
           sources: {
-            populace: { status: "evaluable_direct", estimate: "198", absolute_relative_error: "0.02" },
+            microcosm: { status: "evaluable_direct", estimate: "198", absolute_relative_error: "0.02" },
             cps: { status: "unsupported_geography", reason_code: "geography_not_supported" },
           },
         },
@@ -146,7 +146,7 @@ function fixture() {
           entity: "tax_unit",
           dimensions: {},
           sources: {
-            populace: { status: "unsupported_period", reason_code: "period_not_supported" },
+            microcosm: { status: "unsupported_period", reason_code: "period_not_supported" },
             cps: { status: "unsupported_geography", reason_code: "geography_not_supported" },
           },
         },
@@ -168,15 +168,15 @@ function fixture() {
       period: { "tax_year:2024": [1], "calendar_year:2024": [1], "tax_year:2023": [2] },
       geography: { country: [1, 2], state: [1] },
       source_status: {
-        populace: { evaluable_direct: [1], unsupported_period: [2] },
+        microcosm: { evaluable_direct: [1], unsupported_period: [2] },
         cps: { evaluable_via_model: [1], unsupported_geography: [1, 2] },
       },
       source_period_treatment: {
-        populace: { native: [1], unsupported: [2] },
+        microcosm: { native: [1], unsupported: [2] },
         cps: { advanced_population: [1], unsupported: [1, 2] },
       },
       source_calibration_exposure: {
-        populace: { external_validation: [1], unknown_exposure: [2] },
+        microcosm: { external_validation: [1], unknown_exposure: [2] },
         cps: { external_validation: [1], unknown_exposure: [1, 2] },
       },
     },
@@ -194,7 +194,7 @@ function fixture() {
     run_id: RUN_ID,
     snapshot_id: SNAPSHOT_ID,
     fact_count: 3,
-    source_ids: ["populace", "cps"],
+    source_ids: ["microcosm", "cps"],
     page_size: 2,
     page_count: 2,
     partitions: {
@@ -241,7 +241,7 @@ test("group and source responses filter without loading fact pages", async () =>
   );
   expect(groups.status).toBe(200);
   expect((groups.body as { groups: unknown[] }).groups).toHaveLength(1);
-  expect(JSON.stringify(groups.body)).not.toContain("populace");
+  expect(JSON.stringify(groups.body)).not.toContain("microcosm");
 
   const source = await crossDatasetApiResponse(
     "http://example.test/api?view=source&source=cps",
@@ -286,7 +286,7 @@ test("source selection alone keeps direct partition pagination", async () => {
 test("fact catalog sorting is stable and invalid sort values fail closed", async () => {
   const sorted = fixture();
   const response = await crossDatasetApiResponse(
-    "http://example.test/api?view=facts&source=populace&status=evaluable_direct&sort=error_desc",
+    "http://example.test/api?view=facts&source=microcosm&status=evaluable_direct&sort=error_desc",
     sorted.reader,
   );
   expect(response.status).toBe(200);
@@ -313,7 +313,7 @@ test("fact detail reads only its indexed partition and preserves sparse cells", 
   );
   expect(response.status).toBe(200);
   const fact = (response.body as { fact: { sources: Record<string, { status: string; reason_code?: string }> } }).fact;
-  expect(fact.sources.populace.status).toBe("evaluable_direct");
+  expect(fact.sources.microcosm.status).toBe("evaluable_direct");
   expect(fact.sources.cps).toEqual({
     status: "unsupported_geography",
     reason_code: "geography_not_supported",

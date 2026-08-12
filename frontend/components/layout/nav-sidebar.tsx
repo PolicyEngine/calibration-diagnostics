@@ -7,8 +7,8 @@ import { useCountry, type Country } from "@/components/layout/country-context";
 import { isActive, navGroupsForCountry } from "@/components/layout/nav-items";
 
 const DATASET: Record<Country, { label: string; repo: string }> = {
-  us: { label: "Microcosm US", repo: "policyengine/populace-us" },
-  uk: { label: "Microcosm UK", repo: "policyengine/populace-uk" },
+  us: { label: "Microcosm US", repo: "policyengine/microcosm-us" },
+  uk: { label: "Microcosm UK", repo: "policyengine/microcosm-uk" },
 };
 
 export function NavSidebar() {

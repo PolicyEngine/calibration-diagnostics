@@ -16,7 +16,7 @@ test("shows calibration targets directly under calibration fit", () => {
 
   expect(calibrationFitIndex).toBeGreaterThanOrEqual(0);
   expect(calibrationTargetsIndex).toBe(calibrationFitIndex + 1);
-  expect(items[calibrationTargetsIndex]?.href).toBe("/populace/targets");
+  expect(items[calibrationTargetsIndex]?.href).toBe("/microcosm/targets");
 });
 
 test("targets path activates calibration targets instead of calibration fit", () => {
@@ -28,18 +28,18 @@ test("targets path activates calibration targets instead of calibration fit", ()
     throw new Error("Calibration nav items not found");
   }
 
-  expect(calibrationFit.also ?? []).not.toContain("/populace/targets");
-  expect(isActive("/populace", calibrationFit)).toBe(true);
-  expect(isActive("/populace/targets", calibrationFit)).toBe(false);
-  expect(isActive("/populace/targets", calibrationTargets)).toBe(true);
+  expect(calibrationFit.also ?? []).not.toContain("/microcosm/targets");
+  expect(isActive("/microcosm", calibrationFit)).toBe(true);
+  expect(isActive("/microcosm/targets", calibrationFit)).toBe(false);
+  expect(isActive("/microcosm/targets", calibrationTargets)).toBe(true);
 });
 
 test("preserves the Cross-dataset navigation label and route", () => {
   const item = datasetAccuracyItems().find((candidate) => candidate.label === "Cross-dataset");
   expect(item).toEqual({
-    href: "/populace/datasets",
+    href: "/microcosm/datasets",
     label: "Cross-dataset",
     usOnly: true,
   });
-  expect(isActive("/populace/datasets", item!)).toBe(true);
+  expect(isActive("/microcosm/datasets", item!)).toBe(true);
 });

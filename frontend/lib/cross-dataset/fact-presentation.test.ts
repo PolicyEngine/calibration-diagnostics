@@ -14,8 +14,8 @@ import {
 
 const sources: SourceSummary[] = [
   {
-    source_id: "populace",
-    label: "Populace + PolicyEngine-US",
+    source_id: "microcosm",
+    label: "Microcosm + PolicyEngine-US",
     source_type: "model_dataset_pair",
     capability_count: 2,
     result_count: 1,
@@ -30,7 +30,7 @@ const sources: SourceSummary[] = [
     capability_statuses: { evaluable_projected: 1, unsupported_concept: 1 },
     reason_codes: { mapping_not_found: 1 },
     period_treatments: { aligned_fact: 1, unsupported: 1 },
-    dataset_version: "populace-2024",
+    dataset_version: "microcosm-2024",
     model_version: "policyengine-us==1.0",
   },
   {
@@ -73,10 +73,10 @@ const fact: CrossDatasetFact = {
     source_sha256: "a".repeat(64),
   },
   sources: {
-    populace: {
+    microcosm: {
       status: "evaluable_projected",
       execution_method: "model",
-      mapping_id: "populace-ordinary-dividends",
+      mapping_id: "microcosm-ordinary-dividends",
       mapping_quality: "exact",
       period_treatment: "aligned_fact",
       calibration_exposure: "direct_calibration_target",
@@ -95,9 +95,9 @@ const fact: CrossDatasetFact = {
         source_period: "tax_year:2023",
         target_period: "tax_year:2024",
         factor: "1.05",
-        method: "populace_target_uprating",
+        method: "microcosm_target_uprating",
       },
-      dataset_version: "populace-2024",
+      dataset_version: "microcosm-2024",
       model_version: "policyengine-us==1.0",
     },
     cps: {
@@ -116,13 +116,13 @@ const fact: CrossDatasetFact = {
 test("catalog query parser accepts supported filters and normalizes unsafe pagination", () => {
   const parsed = parseFactCatalogParams(
     new URLSearchParams(
-      "view=facts&source=populace&ledger_source=irs_soi&period=tax_year%3A2023" +
+      "view=facts&source=microcosm&ledger_source=irs_soi&period=tax_year%3A2023" +
         "&period_treatment=aligned_fact&calibration_exposure=direct_calibration_target" +
         "&status=evaluable_projected&search=dividend&page=-2&page_size=999&sort=error_desc",
     ),
   );
   expect(parsed).toEqual({
-    source: "populace",
+    source: "microcosm",
     status: "evaluable_projected",
     ledgerSource: "irs_soi",
     measure: "",
@@ -142,13 +142,13 @@ test("catalog and detail URLs preserve stable filters and encode fact keys", () 
     new URLSearchParams("source=cps&ledger_source=irs_soi&search=income&page=3"),
   );
   expect(factCatalogHref(current, { page: 4 })).toBe(
-    "/populace/datasets?view=facts&source=cps&ledger_source=irs_soi&search=income&page=4",
+    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi&search=income&page=4",
   );
   expect(factCatalogHref(current, { search: "", page: 1 })).toBe(
-    "/populace/datasets?view=facts&source=cps&ledger_source=irs_soi",
+    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi",
   );
   expect(factDetailHref("irs/soi fact", current)).toBe(
-    "/populace/datasets?view=fact&fact_key=irs%2Fsoi+fact&source=cps&ledger_source=irs_soi&search=income&page=3",
+    "/microcosm/datasets?view=fact&fact_key=irs%2Fsoi+fact&source=cps&ledger_source=irs_soi&search=income&page=3",
   );
 });
 
@@ -157,9 +157,9 @@ test("fact rows show sparse supported and unsupported cells accessibly", () => {
   expect(row.observedValue).toBe("$1.00B");
   expect(row.observedPeriod).toBe("Tax year 2023");
   expect(row.detailHref).toBe(
-    "/populace/datasets?view=fact&fact_key=irs-soi-dividends-2023",
+    "/microcosm/datasets?view=fact&fact_key=irs-soi-dividends-2023",
   );
-  expect(row.sourceCells.populace).toMatchObject({
+  expect(row.sourceCells.microcosm).toMatchObject({
     statusLabel: "Evaluable · projected",
     estimateLabel: "$1.08B",
     errorLabel: "2.9% error",
@@ -187,12 +187,12 @@ test("fact detail separates original observation, aligned benchmark, and estimat
     label: "Source record",
     value: "soi-2023-1.4",
   });
-  expect(detail.sourceCells.populace).toMatchObject({
+  expect(detail.sourceCells.microcosm).toMatchObject({
     estimateLabel: "$1.08B",
     benchmarkLabel: "$1.05B",
     benchmarkPeriodLabel: "Tax year 2024",
     benchmarkBasisLabel: "Aligned fact",
-    mappingLabel: "populace-ordinary-dividends",
+    mappingLabel: "microcosm-ordinary-dividends",
     executionLabel: "Model · exact",
     populationPeriodLabel: "Calendar year 2024",
     policyPeriodLabel: "Tax year 2024",
@@ -200,9 +200,9 @@ test("fact detail separates original observation, aligned benchmark, and estimat
     standardErrorLabel: "$2.50M",
     marginOfError90Label: "$4.11M",
   });
-  expect(detail.sourceCells.populace.alignment).toContainEqual({
+  expect(detail.sourceCells.microcosm.alignment).toContainEqual({
     label: "Method",
-    value: "populace_target_uprating",
+    value: "microcosm_target_uprating",
   });
   expect(detail.sourceCells.cps).toMatchObject({
     benchmarkLabel: "Not available",
