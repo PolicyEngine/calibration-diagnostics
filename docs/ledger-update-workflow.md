@@ -1,8 +1,8 @@
-# Ledger update workflow
+# Chronicle update workflow
 
-The Cross-dataset page never reads a mutable Ledger checkout. It reads a
-content-addressed evaluation run built from an immutable Ledger snapshot. A new
-Ledger release must pass this review before an integration changes its pinned
+The Cross-dataset page never reads a mutable Chronicle checkout. It reads a
+content-addressed evaluation run built from an immutable Chronicle snapshot. A new
+Chronicle release must pass this review before an integration changes its pinned
 `ledger_snapshot_id`.
 
 ## 1. Compile the candidate snapshot
@@ -13,7 +13,7 @@ uv run evaluation-harness ledger snapshot \
   --out .artifacts/ledger/<candidate-snapshot>
 ```
 
-Compilation validates the Ledger consumer schema, manifest hash, row count,
+Compilation validates the Chronicle consumer schema, manifest hash, row count,
 duplicate keys, and normalized fact contracts. It refuses to overwrite an
 existing snapshot.
 
@@ -50,7 +50,7 @@ snapshot.
 ## 3. Approve mappings, then recompute
 
 Review any mapping regression or changed fact definition. Update mappings only
-after checking the underlying Ledger fact semantics. Re-run the review until
+after checking the underlying Chronicle fact semantics. Re-run the review until
 `ready_for_evaluation` is true, then update each approved integration's
 `ledger_snapshot_id`.
 
@@ -73,35 +73,41 @@ uv run --extra populace --extra taxcalc-cps \
 ```
 
 The command refuses to use an integration reviewed against another snapshot.
-It classifies every fact for all three active sources, runs
-Populace/PolicyEngine-US, Tax-Calculator/public CPS, and raw ACS PUMS, scores
-the results, and publishes the frontend partitions.
+It classifies every fact for every registered source, runs Microcosm +
+PolicyEngine-US, Public CPS + Tax-Calculator, and Raw ACS PUMS, incorporates the
+reviewed Yale reconstruction checkpoint, scores the results, and publishes the
+frontend partitions.
 
-## 4. Verification and CI
+## 4. Manual harness verification
 
-CI runs the complete Python harness suite, all frontend tests, type checking,
-and the production build. It also executes Tax-Calculator/public CPS against
-its ten real Ledger facts and requires ten finite numerical results.
-
-Raw ACS PUMS has the same ten-result requirement, including uncertainty from
-all 80 replicate weights:
+The Python evaluation harness and adapter gates are intentionally not run on
+every commit or pull request. Run the maintenance script periodically, after a
+Chronicle or dependency update, and before publishing a new evaluation:
 
 ```bash
-uv run python scripts/verify_acs_pums_adapter.py \
-  --aggregates /path/to/pinned-acs-pums-person-age.parquet
+uv run python scripts/verify_evaluation_harness.py
 ```
 
-The Populace ten-fact contract is checked in CI for exact snapshot membership,
-mapping, executability, and score eligibility. Its numerical gate requires the
-pinned Populace dataset and remains:
+The script installs the locked dependencies, runs the complete Python harness
+suite, and executes Public CPS + Tax-Calculator against its ten real Chronicle
+facts. All ten must remain executable and produce finite numerical results.
+It does not regenerate the full evaluation artifact described in step 3.
+
+The numerical Microcosm and Raw ACS gates require local pinned inputs and can be
+included in the same maintenance run:
 
 ```bash
-uv run --extra populace python scripts/verify_populace_adapter.py \
-  /path/to/pinned-populace.h5
+uv run python scripts/verify_evaluation_harness.py \
+  --populace-dataset /path/to/pinned-populace.h5 \
+  --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet
 ```
 
-Run that gate before publishing a new Populace-backed artifact. It must return
-ten numerical estimates; unsupported results do not count as completion.
+Raw ACS includes uncertainty from all 80 replicate weights. The Microcosm gate
+uses the pinned H5. Each optional gate must return ten numerical estimates;
+unsupported results do not count as completion.
+
+Frontend tests, type checking, and the production build remain in CI because
+they are lightweight and do not execute the evaluation models.
 
 ## Immutable history
 

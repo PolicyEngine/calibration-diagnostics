@@ -1,4 +1,4 @@
-"""Execute the public-CPS adapter's ten reviewed Ledger verification facts."""
+"""Execute the public-CPS adapter's ten reviewed Chronicle verification facts."""
 
 from __future__ import annotations
 
