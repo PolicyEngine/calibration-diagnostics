@@ -156,10 +156,10 @@ These remain deliberately unscored:
 
 ## Evidence
 
-- Pinned Microcosm release:
+- Pinned Microcosm release (legacy artifact identifier):
   `populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`.
 - Pinned PolicyEngine-US version: `1.764.6`.
-- Reviewed Microcosm target inclusions and exclusions:
+- Reviewed Microcosm target inclusions and exclusions (legacy internal source path):
   `packages/populace-build/src/populace/build/us/target_parity_manifest.json`
   at commit `cae8640f9e65e274aea65c7916cb37b956978e32`.
 - TANF model result: PolicyEngine-US `tanf` on SPM units; the federal TANF
@@ -168,7 +168,7 @@ These remain deliberately unscored:
   <https://www.bea.gov/help/glossary/local-area-personal-income>.
 - BEA Medicare benefit and contribution accounting:
   <https://www.bea.gov/help/faq/170>.
-- Harness mappings:
+- Harness mappings (legacy source-ID path):
   `integrations/populace_policyengine_us/mappings.yaml` release v10.
-- Adapter expressions:
+- Adapter expressions (legacy Python module path):
   `evaluation_harness/adapters/populace.py`.

@@ -49,7 +49,7 @@ Both regional and national wage comparisons are external validation.
 
 Population facts are weighted sums of `PWGTP` after applying their Chronicle GEOID
 and `AGEP` bounds. Both the source and the benchmark are native 2024; no aging,
-uprating, or Populace period transformation is involved. Other years remain
+uprating, or Microcosm period transformation is involved. Other years remain
 unsupported until a separately reviewed PUMS release is declared.
 
 Preprocessing reduces the person records to a sufficient statistic keyed by

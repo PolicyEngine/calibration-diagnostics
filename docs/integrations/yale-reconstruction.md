@@ -163,7 +163,8 @@ surface.
 
 The Yale checkpoint uses exactly the same alignment output as Microcosm. Before
 materializing a 2022 or 2023 comparison, the full-run harness applies
-`PopulaceAgingPolicy` (`cbo_growth_factor_aging` version `1.2.0`, Populace commit
+the legacy-named `PopulaceAgingPolicy` used by Microcosm
+(`cbo_growth_factor_aging` version `1.2.0`, Microcosm commit
 `cae8640f9e65e274aea65c7916cb37b956978e32`) to U.S. 2023 facts:
 
 - eligible USD sums are transformed to 2024 with Microcosm's reviewed CBO/SOI
@@ -175,7 +176,7 @@ materializing a 2022 or 2023 comparison, the full-run harness applies
 
 Scoring compares Yale's 2024 estimate to the transformed 2024 benchmark. The
 published result retains the original 2023 value and period, transformed value
-and period, factor, factor source, aging model/version, Populace commit, and
+and period, factor, factor source, aging model/version, Microcosm commit, and
 alignment ID. The page can therefore state plainly that the displayed score is
 against a 2024 transformation of a 2023 Chronicle observation.
 
