@@ -23,9 +23,11 @@ existing snapshot.
 uv run evaluation-harness chronicle review \
   --from .artifacts/chronicle/<approved-snapshot> \
   --to .artifacts/chronicle/<candidate-snapshot> \
+  --microcosm-calibration-diagnostics /path/to/pinned-calibration-diagnostics.json \
   --integration integrations/microcosm_policyengine_us \
   --integration integrations/taxcalc_cps \
   --integration integrations/census_acs_pums \
+  --integration integrations/yale_reconstruction \
   --out .artifacts/chronicle-reviews/<review-id>
 ```
 
@@ -35,8 +37,11 @@ The immutable review contains:
 - each source's old and new executable counts;
 - retained facts that lost a reviewed mapping;
 - facts that became executable or changed execution query;
+- source-version, query-execution, precomputed-materialization, and scoring-only
+  changes as separate categories;
 - value changes that require rescoring but not another model run;
-- source lists for classification, model execution, rescoring, and publishing;
+- source lists for classification, model execution, precomputed
+  materialization, rescoring, and publishing;
 - one gate per active integration proving that all ten reviewed facts still
   exist and are executable and score-eligible.
 
@@ -58,6 +63,7 @@ The review's `affected_sources` section determines the work:
 
 - `classify`: rebuild the complete capability matrix;
 - `execute`: run the dataset/model only for new or changed executable queries;
+- `materialize`: reload reviewed release diagnostics or aggregate checkpoints;
 - `rescore`: recompute scores when a benchmark value changed;
 - `publish`: produce a new immutable run and frontend bundle.
 
@@ -68,6 +74,7 @@ uv run --extra microcosm --extra taxcalc-cps \
   python scripts/run_full_chronicle_evaluation.py \
   --snapshot .artifacts/chronicle/<candidate-snapshot> \
   --microcosm-dataset /path/to/pinned-microcosm.h5 \
+  --microcosm-calibration-diagnostics /path/to/pinned-calibration-diagnostics.json \
   --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet \
   --output .artifacts/evaluations/<new-run>
 ```

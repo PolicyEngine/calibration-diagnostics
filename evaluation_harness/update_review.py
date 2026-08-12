@@ -6,21 +6,35 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Literal
 
+import yaml
+
+from .adapters.microcosm import (
+    MICROCOSM_RELEASE,
+    verify_release_calibration_diagnostics,
+)
 from .contracts import CapabilityResult, ExecutionMethod, FactContract
-from .full_run import SourcePlan, load_snapshot_facts
+from .full_run import SourcePlan, build_full_capability_matrix, load_snapshot_facts
 from .integration import IntegrationOverview
 from .integration import load_integration_overview
 from .mappings import MappingRegistry
-from .planner import CapabilityPlanner
 from .microcosm_aging import (
     MicrocosmAgingPolicy,
     transform_chronicle_facts_to_microcosm_year,
 )
+from .microcosm_release_targets import (
+    compile_release_target_alignments,
+    release_target_capability_specs,
+)
 from .snapshot import CONSUMER_SCHEMA, SnapshotDiff, diff_snapshots
+from .yale_reconstruction_checkpoint import (
+    YaleReconstructionCheckpoint,
+    load_yale_reconstruction_checkpoint,
+    yale_checkpoint_capability_specs,
+)
 
 
-REVIEW_SCHEMA = "evaluation_harness.chronicle_update_review.v1"
-REVIEW_MANIFEST_SCHEMA = "evaluation_harness.chronicle_update_review_manifest.v1"
+REVIEW_SCHEMA = "evaluation_harness.chronicle_update_review.v2"
+REVIEW_MANIFEST_SCHEMA = "evaluation_harness.chronicle_update_review_manifest.v2"
 
 
 def _facts_by_key(
@@ -97,37 +111,100 @@ def _classify(
     facts: Iterable[FactContract],
     plan: SourcePlan,
     snapshot_id: str,
+    *,
+    require_all_precomputed_specs: bool = True,
 ) -> dict[str, CapabilityResult]:
-    planner = CapabilityPlanner(
-        plan.mappings,
-        alignments=plan.alignments,
-        snapshot_id=snapshot_id,
-    )
     return {
-        fact.fact_key: planner.classify(fact, plan.source)
-        for fact in facts
+        capability.fact_key: capability
+        for capability in build_full_capability_matrix(
+            facts,
+            (plan,),
+            snapshot_id=snapshot_id,
+            require_all_precomputed_specs=require_all_precomputed_specs,
+        )
     }
 
 
-def _executable(capability: CapabilityResult | None) -> bool:
+def _result_capable(capability: CapabilityResult | None) -> bool:
     return (
         capability is not None
         and capability.execution_method is not ExecutionMethod.NONE
-        and capability.query is not None
+    )
+
+
+def _query_executable(capability: CapabilityResult | None) -> bool:
+    return bool(
+        capability is not None
+        and capability.execution_method
+        in {ExecutionMethod.DIRECT, ExecutionMethod.MODEL}
     )
 
 
 def _execution_signature(capability: CapabilityResult) -> tuple[Any, ...]:
     return (
         capability.execution_method,
-        capability.mapping_id,
         capability.query,
         capability.population_period,
         capability.policy_period,
-        capability.period_treatment,
         capability.required_variables,
         capability.weight_variable,
         capability.geography_method,
+    )
+
+
+def _precomputed_materialization_signature(
+    capability: CapabilityResult,
+) -> tuple[Any, ...]:
+    return (
+        capability.execution_method,
+        capability.mapping_release,
+        capability.mapping_id,
+        capability.population_period,
+        capability.policy_period,
+        capability.geography_method,
+    )
+
+
+def _scoring_signature(capability: CapabilityResult) -> tuple[Any, ...]:
+    return (
+        capability.mapping_quality,
+        capability.period_treatment,
+        capability.alignment_id,
+        capability.alignment_quality,
+        capability.calibration_exposure,
+        capability.score_eligible,
+    )
+
+
+def _source_signature(plan: SourcePlan) -> tuple[Any, ...]:
+    source = plan.source
+    return (
+        source.source_type,
+        source.dataset_version,
+        source.model_version,
+        tuple(sorted(source.jurisdictions)),
+        source.population_period,
+        source.policy_period,
+        tuple(sorted(source.native_fact_periods)),
+        tuple(sorted(source.advanced_fact_periods)),
+        tuple(sorted(source.geographies)),
+        tuple(sorted(source.entities)),
+        tuple(sorted(source.weights.items())),
+        tuple(sorted(source.geography_methods.items())),
+        tuple(sorted(source.geography_id_prefixes.items())),
+        tuple(sorted(source.geography_id_methods.items())),
+        source.execution_year_from_fact,
+        source.available,
+    )
+
+
+def _plan_signature(plan: SourcePlan) -> tuple[Any, ...]:
+    return (
+        _source_signature(plan),
+        plan.mappings.to_data(),
+        plan.alignments,
+        plan.calibration_exposures,
+        plan.precomputed_capabilities,
     )
 
 
@@ -143,10 +220,15 @@ class SourceUpdateReview:
     mapping_regressions: tuple[dict[str, str | None], ...]
     newly_executable: tuple[str, ...]
     retired_executable: tuple[str, ...]
+    source_changes_requiring_execution: tuple[str, ...]
+    source_changes_requiring_materialization: tuple[str, ...]
     execution_changes: tuple[str, ...]
+    precomputed_materialization_changes: tuple[str, ...]
+    scoring_changes_requiring_rescore: tuple[str, ...]
     value_changes_requiring_rescore: tuple[str, ...]
     requires_classification: bool
     requires_execution: bool
+    requires_precomputed_materialization: bool
     requires_rescore: bool
     requires_publish: bool
 
@@ -207,7 +289,12 @@ def review_source_update(
     newly_executable: list[str] = []
     retired_executable: list[str] = []
     execution_changes: list[str] = []
+    materialization_changes: list[str] = []
+    source_execution_changes: list[str] = []
+    source_materialization_changes: list[str] = []
+    scoring_changes: list[str] = []
     value_changes: list[str] = []
+    source_changed = _source_signature(old_plan) != _source_signature(new_plan)
 
     for old_fact, new_fact in pairs:
         identity = _review_identity(old_fact, new_fact, duplicate_semantics)
@@ -217,8 +304,8 @@ def review_source_update(
         new_capability = (
             new_capabilities.get(new_fact.fact_key) if new_fact else None
         )
-        old_exec = _executable(old_capability)
-        new_exec = _executable(new_capability)
+        old_exec = _result_capable(old_capability)
+        new_exec = _result_capable(new_capability)
         if old_exec and not new_exec:
             assert old_fact is not None and old_capability is not None
             regressions.append(
@@ -237,14 +324,38 @@ def review_source_update(
             )
             retired_executable.append(identity)
         elif not old_exec and new_exec:
+            assert new_capability is not None
             newly_executable.append(identity)
-            execution_changes.append(identity)
+            if new_capability.execution_method is ExecutionMethod.PRECOMPUTED:
+                materialization_changes.append(identity)
+            else:
+                execution_changes.append(identity)
         elif old_exec and new_exec:
             assert old_capability is not None and new_capability is not None
-            if _execution_signature(old_capability) != _execution_signature(
+            if source_changed:
+                if new_capability.execution_method is ExecutionMethod.PRECOMPUTED:
+                    source_materialization_changes.append(identity)
+                elif _query_executable(new_capability):
+                    source_execution_changes.append(identity)
+            elif (
+                new_capability.execution_method is ExecutionMethod.PRECOMPUTED
+                and _precomputed_materialization_signature(old_capability)
+                != _precomputed_materialization_signature(new_capability)
+            ):
+                materialization_changes.append(identity)
+            elif _execution_signature(old_capability) != _execution_signature(
                 new_capability
             ):
-                execution_changes.append(identity)
+                if new_capability.execution_method is ExecutionMethod.PRECOMPUTED:
+                    materialization_changes.append(identity)
+                elif _query_executable(new_capability):
+                    execution_changes.append(identity)
+            if (
+                not source_changed
+                and _scoring_signature(old_capability)
+                != _scoring_signature(new_capability)
+            ):
+                scoring_changes.append(identity)
             if (
                 old_fact is not None
                 and new_fact is not None
@@ -253,25 +364,55 @@ def review_source_update(
                 value_changes.append(identity)
 
     changed_snapshot = from_snapshot != to_snapshot
-    requires_execution = bool(execution_changes)
-    requires_rescore = requires_execution or bool(value_changes)
+    plan_changed = _plan_signature(old_plan) != _plan_signature(new_plan)
+    requires_execution = bool(execution_changes or source_execution_changes)
+    requires_materialization = bool(
+        materialization_changes or source_materialization_changes
+    )
+    requires_rescore = (
+        requires_execution
+        or requires_materialization
+        or bool(scoring_changes)
+        or bool(value_changes)
+        or bool(retired_executable)
+    )
     return SourceUpdateReview(
         source_id=old_plan.source.source_id,
         from_snapshot=from_snapshot,
         to_snapshot=to_snapshot,
         old_fact_count=len(old_values),
         new_fact_count=len(new_values),
-        old_executable_count=sum(map(_executable, old_capabilities.values())),
-        new_executable_count=sum(map(_executable, new_capabilities.values())),
+        old_executable_count=sum(map(_result_capable, old_capabilities.values())),
+        new_executable_count=sum(map(_result_capable, new_capabilities.values())),
         mapping_regressions=tuple(regressions),
         newly_executable=tuple(newly_executable),
         retired_executable=tuple(retired_executable),
+        source_changes_requiring_execution=tuple(
+            sorted(set(source_execution_changes))
+        ),
+        source_changes_requiring_materialization=tuple(
+            sorted(set(source_materialization_changes))
+        ),
         execution_changes=tuple(sorted(set(execution_changes))),
+        precomputed_materialization_changes=tuple(
+            sorted(set(materialization_changes))
+        ),
+        scoring_changes_requiring_rescore=tuple(
+            sorted(set(scoring_changes))
+        ),
         value_changes_requiring_rescore=tuple(value_changes),
-        requires_classification=changed_snapshot,
+        requires_classification=changed_snapshot or plan_changed,
         requires_execution=requires_execution,
+        requires_precomputed_materialization=requires_materialization,
         requires_rescore=requires_rescore,
-        requires_publish=changed_snapshot,
+        requires_publish=(
+            changed_snapshot
+            or plan_changed
+            or bool(regressions)
+            or bool(newly_executable)
+            or bool(retired_executable)
+            or bool(value_changes)
+        ),
     )
 
 
@@ -291,10 +432,11 @@ def verification_gate(
             candidate
         )
     expected = tuple(overview.verification_facts)
-    planner = CapabilityPlanner(
-        plan.mappings,
-        alignments=plan.alignments,
-        snapshot_id=snapshot_id,
+    capabilities = _classify(
+        candidates.values(),
+        plan,
+        snapshot_id,
+        require_all_precomputed_specs=False,
     )
     failures: list[dict[str, str | None]] = []
     testable = 0
@@ -316,8 +458,8 @@ def verification_gate(
             )
             continue
         matched += 1
-        capability = planner.classify(fact, plan.source)
-        if _executable(capability) and capability.score_eligible:
+        capability = capabilities[fact.fact_key]
+        if _result_capable(capability) and capability.score_eligible:
             testable += 1
         else:
             failures.append(
@@ -348,11 +490,14 @@ def verification_gate(
 def select_affected_sources(
     reviews: Iterable[SourceUpdateReview],
     *,
-    action: Literal["classify", "execute", "rescore", "publish"],
+    action: Literal[
+        "classify", "execute", "materialize", "rescore", "publish"
+    ],
 ) -> tuple[str, ...]:
     attribute = {
         "classify": "requires_classification",
         "execute": "requires_execution",
+        "materialize": "requires_precomputed_materialization",
         "rescore": "requires_rescore",
         "publish": "requires_publish",
     }[action]
@@ -382,7 +527,13 @@ def build_update_review_document(
         "verification_gates": [gate.to_dict() for gate in gate_values],
         "affected_sources": {
             action: list(select_affected_sources(reviews, action=action))
-            for action in ("classify", "execute", "rescore", "publish")
+            for action in (
+                "classify",
+                "execute",
+                "materialize",
+                "rescore",
+                "publish",
+            )
         },
         "ready_for_evaluation": (
             regressions == 0
@@ -447,6 +598,9 @@ def _plan_for_facts(
     overview: IntegrationOverview,
     mappings: MappingRegistry,
     facts: tuple[FactContract, ...],
+    *,
+    microcosm_calibration_diagnostics: Path | None = None,
+    yale_checkpoint: YaleReconstructionCheckpoint | None = None,
 ) -> SourcePlan:
     policy = overview.alignment_policy
     if not policy.get("evaluate_transformed_facts"):
@@ -463,8 +617,12 @@ def _plan_for_facts(
         raise ValueError(
             f"integration {overview.integration_id} alignment build_year is invalid"
         )
-    aging_policy = MicrocosmAgingPolicy.from_facts(facts)
+    aging_policy = MicrocosmAgingPolicy.from_facts(
+        facts,
+        release_diagnostics_path=microcosm_calibration_diagnostics,
+    )
     declarations = []
+    aligned_facts = []
     for source_year in source_years:
         results = transform_chronicle_facts_to_microcosm_year(
             facts,
@@ -472,18 +630,107 @@ def _plan_for_facts(
             source_year=source_year,
             build_year=build_year,
         )
+        comparable = tuple(result for result in results if result.comparable)
         declarations.extend(
             result.to_alignment_declaration(overview.source.source_id)
-            for result in results
-            if result.comparable
+            for result in comparable
         )
-    return SourcePlan(overview.source, mappings, tuple(declarations))
+        aligned_facts.extend(result.to_aligned_fact() for result in comparable)
+
+    precomputed = ()
+    if overview.integration_id == "microcosm_policyengine_us_2024":
+        if microcosm_calibration_diagnostics is None:
+            raise ValueError(
+                "Microcosm update review requires pinned calibration diagnostics"
+            )
+        release_targets = compile_release_target_alignments(
+            facts,
+            microcosm_calibration_diagnostics,
+            source_id=overview.source.source_id,
+            release_id=MICROCOSM_RELEASE.release_id,
+        )
+        exact_keys = {
+            fact.source_fact_key for fact in release_targets.aligned_facts
+        }
+        declarations = [
+            *release_targets.declarations,
+            *(
+                declaration
+                for declaration in declarations
+                if declaration.fact_key not in exact_keys
+            ),
+        ]
+        precomputed = release_target_capability_specs(
+            release_targets,
+            source_id=overview.source.source_id,
+            population_period=overview.source.population_period,
+            policy_period=overview.source.policy_period,
+        )
+    elif overview.integration_id == "yale_reconstruction_2024":
+        if microcosm_calibration_diagnostics is None:
+            raise ValueError(
+                "Yale update review requires pinned Microcosm calibration "
+                "diagnostics for its approved pre-2024 alignments"
+            )
+        if yale_checkpoint is None:
+            raise ValueError("Yale update review requires its pinned checkpoint")
+        release_targets = compile_release_target_alignments(
+            facts,
+            microcosm_calibration_diagnostics,
+            source_id=overview.source.source_id,
+            release_id=MICROCOSM_RELEASE.release_id,
+        )
+        exact_keys = {
+            fact.source_fact_key for fact in release_targets.aligned_facts
+        }
+        declarations = [
+            *release_targets.declarations,
+            *(
+                declaration
+                for declaration in declarations
+                if declaration.fact_key not in exact_keys
+            ),
+        ]
+        aligned_facts = [
+            *release_targets.aligned_facts,
+            *(
+                alignment
+                for alignment in aligned_facts
+                if alignment.source_fact_key not in exact_keys
+            ),
+        ]
+        precomputed = yale_checkpoint_capability_specs(
+            facts,
+            yale_checkpoint,
+            aligned_facts=aligned_facts,
+            source=overview.source,
+        )
+    return SourcePlan(
+        overview.source,
+        mappings,
+        tuple(declarations),
+        precomputed_capabilities=precomputed,
+    )
+
+
+def _load_yale_checkpoint(
+    overview: IntegrationOverview,
+) -> YaleReconstructionCheckpoint:
+    payload = yaml.safe_load(overview.overview_path.read_text())
+    reconstruction = payload.get("reconstruction", {})
+    repository_root = overview.overview_path.parents[2]
+    return load_yale_reconstruction_checkpoint(
+        repository_root / reconstruction["aggregate_reconstruction_file"],
+        overview.overview_path.parent / reconstruction["checkpoint_mapping_file"],
+    )
 
 
 def compile_update_review(
     from_snapshot_path: str | Path,
     to_snapshot_path: str | Path,
     integration_paths: Iterable[str | Path],
+    *,
+    microcosm_calibration_diagnostics: str | Path | None = None,
 ) -> dict[str, Any]:
     """Build the review gate before any run adopts a new Chronicle snapshot."""
 
@@ -494,6 +741,12 @@ def compile_update_review(
     diff = diff_snapshots(from_snapshot_path, to_snapshot_path)
     reviews: list[SourceUpdateReview] = []
     gates: list[VerificationGate] = []
+    diagnostics_path = None
+    if microcosm_calibration_diagnostics is not None:
+        diagnostics_path = verify_release_calibration_diagnostics(
+            Path(microcosm_calibration_diagnostics),
+            MICROCOSM_RELEASE,
+        )
     for path_value in integration_paths:
         path = Path(path_value)
         overview_path = path / "overview.yaml" if path.is_dir() else path
@@ -506,8 +759,25 @@ def compile_update_review(
                 f"{old_manifest['snapshot_id']}"
             )
         mappings = MappingRegistry.from_yaml(integration / "mappings.yaml")
-        old_plan = _plan_for_facts(overview, mappings, old_facts)
-        new_plan = _plan_for_facts(overview, mappings, new_facts)
+        yale_checkpoint = (
+            _load_yale_checkpoint(overview)
+            if overview.integration_id == "yale_reconstruction_2024"
+            else None
+        )
+        old_plan = _plan_for_facts(
+            overview,
+            mappings,
+            old_facts,
+            microcosm_calibration_diagnostics=diagnostics_path,
+            yale_checkpoint=yale_checkpoint,
+        )
+        new_plan = _plan_for_facts(
+            overview,
+            mappings,
+            new_facts,
+            microcosm_calibration_diagnostics=diagnostics_path,
+            yale_checkpoint=yale_checkpoint,
+        )
         reviews.append(
             review_source_update(
                 old_facts,

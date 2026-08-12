@@ -8,7 +8,11 @@ import math
 from decimal import Decimal
 from pathlib import Path
 
-from evaluation_harness.adapters.microcosm import MICROCOSM_RELEASE, MicrocosmPolicyEngineRunner
+from evaluation_harness.adapters.microcosm import (
+    MICROCOSM_RELEASE,
+    MicrocosmPolicyEngineRunner,
+    verify_release_dataset,
+)
 from evaluation_harness.execution import build_run_groups, execute_groups
 from evaluation_harness.integration import load_integration_overview
 from evaluation_harness.mappings import MappingRegistry
@@ -20,6 +24,7 @@ INTEGRATION = ROOT / "integrations" / "microcosm_policyengine_us"
 
 
 def verify(dataset_path: Path) -> list[dict[str, str | float]]:
+    dataset_path = verify_release_dataset(dataset_path, MICROCOSM_RELEASE)
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     planner = CapabilityPlanner(mappings, snapshot_id=overview.chronicle_snapshot_id)

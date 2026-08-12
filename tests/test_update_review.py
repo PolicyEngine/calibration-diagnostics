@@ -6,7 +6,17 @@ from pathlib import Path
 
 import pytest
 
-from evaluation_harness.contracts import FactContract, SourceType, TypedPeriod
+from evaluation_harness.contracts import (
+    AlignmentQuality,
+    CalibrationExposure,
+    CapabilityStatus,
+    FactContract,
+    MappingQuality,
+    PeriodTreatment,
+    PrecomputedCapabilitySpec,
+    SourceType,
+    TypedPeriod,
+)
 from evaluation_harness.full_run import SourcePlan
 from evaluation_harness.integration import load_integration_overview
 from evaluation_harness.mappings import MappingRegistry
@@ -98,6 +108,25 @@ def source() -> EvaluationSourceManifest:
     )
 
 
+def precomputed_spec(chronicle_fact: FactContract) -> PrecomputedCapabilitySpec:
+    return PrecomputedCapabilitySpec(
+        source_id="model",
+        fact_key=chronicle_fact.fact_key,
+        mapping_release="checkpoint-v1",
+        status=CapabilityStatus.MODEL,
+        mapping_id="checkpoint:" + chronicle_fact.fact_key,
+        mapping_quality=MappingQuality.EXACT,
+        population_period=TypedPeriod.parse("tax_year:2024"),
+        policy_period=TypedPeriod.parse("tax_year:2024"),
+        period_treatment=PeriodTreatment.NATIVE,
+        alignment_id=None,
+        alignment_quality=AlignmentQuality.NONE,
+        geography_method="precomputed_national_checkpoint",
+        calibration_exposure=CalibrationExposure.EXTERNAL_VALIDATION,
+        score_eligible=True,
+    )
+
+
 def test_source_review_flags_mapping_regressions_without_reexecuting_value_only_changes() -> None:
     old_a = fact("old-a", "semantic-a")
     old_b = fact("old-b", "semantic-b")
@@ -162,6 +191,155 @@ def test_newly_executable_fact_selects_model_execution() -> None:
     assert review.requires_execution
     assert select_affected_sources([review], action="execute") == ("model",)
     assert select_affected_sources([review], action="publish") == ("model",)
+
+
+def test_precomputed_final_capabilities_participate_in_update_review() -> None:
+    checkpoint_fact = fact(
+        "checkpoint-fact",
+        "checkpoint-semantic",
+        measure="irs_soi.not_mapped",
+    )
+    old_plan = SourcePlan(
+        source(),
+        registry(),
+        precomputed_capabilities=(precomputed_spec(checkpoint_fact),),
+    )
+    new_plan = SourcePlan(source(), registry())
+
+    review = review_source_update(
+        (checkpoint_fact,),
+        (checkpoint_fact,),
+        old_plan=old_plan,
+        new_plan=new_plan,
+        from_snapshot="chronicle-old",
+        to_snapshot="chronicle-new",
+    )
+
+    assert review.old_executable_count == 1
+    assert review.new_executable_count == 0
+    assert review.retired_executable == ("checkpoint-semantic",)
+    assert review.mapping_regressions[0]["reason_code"] == "mapping_not_found"
+
+
+def test_new_precomputed_capability_requests_materialization_not_model_execution() -> None:
+    checkpoint_fact = fact(
+        "checkpoint-fact",
+        "checkpoint-semantic",
+        measure="irs_soi.not_mapped",
+    )
+    old_plan = SourcePlan(source(), registry())
+    new_plan = SourcePlan(
+        source(),
+        registry(),
+        precomputed_capabilities=(precomputed_spec(checkpoint_fact),),
+    )
+
+    review = review_source_update(
+        (checkpoint_fact,),
+        (checkpoint_fact,),
+        old_plan=old_plan,
+        new_plan=new_plan,
+        from_snapshot="chronicle-old",
+        to_snapshot="chronicle-new",
+    )
+
+    assert review.newly_executable == ("checkpoint-semantic",)
+    assert review.precomputed_materialization_changes == ("checkpoint-semantic",)
+    assert review.requires_precomputed_materialization
+    assert not review.requires_execution
+    assert review.requires_rescore
+    assert select_affected_sources([review], action="materialize") == ("model",)
+
+
+def test_source_version_change_is_not_hidden_by_an_unchanged_query() -> None:
+    row = fact("fact-a", "semantic-a")
+    old_plan = SourcePlan(source(), registry())
+    new_plan = SourcePlan(
+        replace(source(), dataset_version="data-v2"),
+        registry(),
+    )
+
+    review = review_source_update(
+        (row,),
+        (row,),
+        old_plan=old_plan,
+        new_plan=new_plan,
+        from_snapshot="chronicle-same",
+        to_snapshot="chronicle-same",
+    )
+
+    assert review.source_changes_requiring_execution == ("semantic-a",)
+    assert review.execution_changes == ()
+    assert review.requires_classification
+    assert review.requires_execution
+    assert review.requires_rescore
+    assert review.requires_publish
+
+
+def test_scoring_change_requires_rescore_without_model_execution() -> None:
+    row = fact("fact-a", "semantic-a")
+    old_registry = registry()
+    new_registry = replace(
+        old_registry,
+        mappings=(
+            replace(
+                old_registry.mappings[0],
+                mapping_quality=MappingQuality.APPROXIMATE,
+            ),
+        ),
+    )
+
+    review = review_source_update(
+        (row,),
+        (row,),
+        old_plan=SourcePlan(source(), old_registry),
+        new_plan=SourcePlan(source(), new_registry),
+        from_snapshot="chronicle-same",
+        to_snapshot="chronicle-same",
+    )
+
+    assert review.scoring_changes_requiring_rescore == ("semantic-a",)
+    assert review.execution_changes == ()
+    assert not review.requires_execution
+    assert review.requires_rescore
+    assert review.requires_publish
+
+
+def test_alignment_identity_change_is_a_rescore_not_a_materialization() -> None:
+    row = replace(
+        fact("fact-a", "semantic-a"),
+        period=TypedPeriod.parse("tax_year:2023"),
+    )
+    base = replace(
+        precomputed_spec(row),
+        status=CapabilityStatus.PROJECTED,
+        period_treatment=PeriodTreatment.ALIGNED_FACT,
+        alignment_id="alignment-v1",
+        alignment_quality=AlignmentQuality.VALIDATED,
+    )
+
+    review = review_source_update(
+        (row,),
+        (row,),
+        old_plan=SourcePlan(
+            source(), registry(), precomputed_capabilities=(base,)
+        ),
+        new_plan=SourcePlan(
+            source(),
+            registry(),
+            precomputed_capabilities=(
+                replace(base, alignment_id="alignment-v2"),
+            ),
+        ),
+        from_snapshot="chronicle-same",
+        to_snapshot="chronicle-same",
+    )
+
+    assert review.scoring_changes_requiring_rescore == ("semantic-a",)
+    assert review.precomputed_materialization_changes == ()
+    assert not review.requires_precomputed_materialization
+    assert not review.requires_execution
+    assert review.requires_rescore
 
 
 def test_both_active_adapter_gates_keep_ten_directly_testable_facts() -> None:

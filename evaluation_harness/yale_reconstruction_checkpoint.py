@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
@@ -15,10 +15,10 @@ from .contracts import (
     CalibrationExposure,
     CapabilityResult,
     CapabilityStatus,
-    ExecutionMethod,
     FactContract,
     MappingQuality,
     PeriodTreatment,
+    PrecomputedCapabilitySpec,
     TypedPeriod,
 )
 from .execution import EvaluationResult
@@ -193,17 +193,15 @@ def load_yale_reconstruction_checkpoint(
     )
 
 
-def materialize_yale_reconstruction_results(
-    capabilities: Iterable[CapabilityResult],
+def yale_checkpoint_capability_specs(
     facts: Iterable[FactContract],
     checkpoint: YaleReconstructionCheckpoint,
     *,
     aligned_facts: Iterable[AlignedFact],
     source: EvaluationSourceManifest,
-) -> tuple[tuple[CapabilityResult, ...], tuple[EvaluationResult, ...]]:
-    """Replace reviewed Yale cells with immutable precomputed model results."""
+) -> tuple[PrecomputedCapabilitySpec, ...]:
+    """Describe and validate the reviewed Yale checkpoint capability surface."""
 
-    capability_values = tuple(capabilities)
     fact_values = tuple(facts)
     alignment_values = tuple(aligned_facts)
     fact_by_key = {fact.fact_key: fact for fact in fact_values}
@@ -212,23 +210,17 @@ def materialize_yale_reconstruction_results(
     alignments_by_fact: dict[str, list[AlignedFact]] = {}
     for alignment in alignment_values:
         alignments_by_fact.setdefault(alignment.source_fact_key, []).append(alignment)
-    entry_by_fact = {entry.fact_key: entry for entry in checkpoint.entries}
     if checkpoint.source_id != source.source_id:
         raise ValueError("Yale checkpoint and source manifest IDs differ")
 
-    materialized_capabilities: list[CapabilityResult] = []
-    results: list[EvaluationResult] = []
-    for capability in capability_values:
-        entry = entry_by_fact.get(capability.fact_key)
-        if capability.source_id != source.source_id or entry is None:
-            materialized_capabilities.append(capability)
-            continue
-        fact = fact_by_key.get(capability.fact_key)
+    specs: list[PrecomputedCapabilitySpec] = []
+    for entry in checkpoint.entries:
+        fact = fact_by_key.get(entry.fact_key)
         if fact is None:
-            raise ValueError(f"Yale checkpoint fact is absent: {capability.fact_key}")
+            continue
         if fact.period != entry.observed_period:
             raise ValueError(
-                f"Yale checkpoint period differs for {capability.fact_key}: "
+                f"Yale checkpoint period differs for {entry.fact_key}: "
                 f"{entry.observed_period.canonical} != {fact.period.canonical}"
             )
         if (
@@ -238,7 +230,7 @@ def materialize_yale_reconstruction_results(
         ):
             raise ValueError(
                 f"Yale checkpoint fact is outside the national tax-unit surface: "
-                f"{capability.fact_key}"
+                f"{entry.fact_key}"
             )
 
         alignment = None
@@ -265,40 +257,70 @@ def materialize_yale_reconstruction_results(
                     f"Yale alignment does not preserve and transform {fact.fact_key}"
                 )
 
-        materialized = replace(
-            capability,
-            mapping_release=MAPPING_RELEASE,
-            status=(
-                CapabilityStatus.PROJECTED
-                if alignment is not None
-                else CapabilityStatus.MODEL
-            ),
-            reason_code=None,
-            reason_detail=None,
-            execution_method=ExecutionMethod.PRECOMPUTED,
-            mapping_id=f"yale-checkpoint:{capability.fact_key.rsplit(':', 1)[-1]}",
-            mapping_quality=MappingQuality.EXACT,
-            population_period=source.population_period,
-            policy_period=source.policy_period,
-            period_treatment=(
-                PeriodTreatment.ALIGNED_FACT
-                if alignment is not None
-                else PeriodTreatment.NATIVE
-            ),
-            alignment_id=alignment.alignment_id if alignment is not None else None,
-            alignment_quality=(
-                alignment.method_quality
-                if alignment is not None
-                else AlignmentQuality.NONE
-            ),
-            weight_variable=None,
-            required_variables=(),
-            geography_method="precomputed_national_reconstruction_checkpoint",
-            query=None,
-            calibration_exposure=entry.calibration_exposure,
-            score_eligible=True,
+        specs.append(
+            PrecomputedCapabilitySpec(
+                source_id=source.source_id,
+                fact_key=entry.fact_key,
+                mapping_release=MAPPING_RELEASE,
+                status=(
+                    CapabilityStatus.PROJECTED
+                    if alignment is not None
+                    else CapabilityStatus.MODEL
+                ),
+                mapping_id=f"yale-checkpoint:{entry.fact_key.rsplit(':', 1)[-1]}",
+                mapping_quality=MappingQuality.EXACT,
+                population_period=source.population_period,
+                policy_period=source.policy_period,
+                period_treatment=(
+                    PeriodTreatment.ALIGNED_FACT
+                    if alignment is not None
+                    else PeriodTreatment.NATIVE
+                ),
+                alignment_id=(
+                    alignment.alignment_id if alignment is not None else None
+                ),
+                alignment_quality=(
+                    alignment.method_quality
+                    if alignment is not None
+                    else AlignmentQuality.NONE
+                ),
+                geography_method=(
+                    "precomputed_national_reconstruction_checkpoint"
+                ),
+                calibration_exposure=entry.calibration_exposure,
+                score_eligible=True,
+            )
         )
-        materialized_capabilities.append(materialized)
+    return tuple(specs)
+
+
+def materialize_yale_reconstruction_results(
+    capabilities: Iterable[CapabilityResult],
+    facts: Iterable[FactContract],
+    checkpoint: YaleReconstructionCheckpoint,
+    *,
+    aligned_facts: Iterable[AlignedFact],
+    source: EvaluationSourceManifest,
+) -> tuple[tuple[CapabilityResult, ...], tuple[EvaluationResult, ...]]:
+    """Replace reviewed Yale cells with immutable precomputed model results."""
+
+    from .full_run import apply_precomputed_capability_specs
+
+    entry_by_fact = {entry.fact_key: entry for entry in checkpoint.entries}
+    materialized_capabilities = apply_precomputed_capability_specs(
+        capabilities,
+        yale_checkpoint_capability_specs(
+            facts,
+            checkpoint,
+            aligned_facts=aligned_facts,
+            source=source,
+        ),
+    )
+    results: list[EvaluationResult] = []
+    for materialized in materialized_capabilities:
+        entry = entry_by_fact.get(materialized.fact_key)
+        if materialized.source_id != source.source_id or entry is None:
+            continue
         results.append(
             EvaluationResult.from_capability(
                 materialized,
@@ -309,4 +331,4 @@ def materialize_yale_reconstruction_results(
             )
         )
 
-    return tuple(materialized_capabilities), tuple(results)
+    return materialized_capabilities, tuple(results)

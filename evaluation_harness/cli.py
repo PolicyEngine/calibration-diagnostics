@@ -32,6 +32,13 @@ def main() -> None:
         help="Integration directory or overview.yaml; repeat for every active source.",
     )
     review.add_argument("--out", required=True)
+    review.add_argument(
+        "--microcosm-calibration-diagnostics",
+        help=(
+            "Pinned Microcosm release diagnostics; required when reviewing "
+            "Microcosm or its Yale-alignment surface."
+        ),
+    )
 
     args = parser.parse_args()
     if args.chronicle_command == "snapshot":
@@ -45,6 +52,9 @@ def main() -> None:
             args.from_path,
             args.to_path,
             args.integrations,
+            microcosm_calibration_diagnostics=(
+                args.microcosm_calibration_diagnostics
+            ),
         )
         manifest = publish_update_review(document, args.out)
         print(

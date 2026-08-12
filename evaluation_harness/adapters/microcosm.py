@@ -66,6 +66,52 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _verify_release_file(
+    path: str | Path,
+    *,
+    expected_sha256: str,
+    label: str,
+) -> Path:
+    verified = Path(path)
+    if not verified.is_file():
+        raise FileNotFoundError(f"{label} does not exist: {verified}")
+    actual = _sha256(verified)
+    if actual != expected_sha256:
+        raise ValueError(
+            f"{label} checksum mismatch: expected {expected_sha256}, found {actual}"
+        )
+    return verified
+
+
+def verify_release_dataset(
+    path: str | Path,
+    release: MicrocosmRelease = MICROCOSM_RELEASE,
+) -> Path:
+    """Authenticate a caller-supplied HDF5 against the pinned release."""
+
+    return _verify_release_file(
+        path,
+        expected_sha256=release.dataset_sha256,
+        label="Microcosm dataset",
+    )
+
+
+def verify_release_calibration_diagnostics(
+    path: str | Path,
+    release: MicrocosmRelease = MICROCOSM_RELEASE,
+) -> Path:
+    """Authenticate caller-supplied diagnostics against the pinned release."""
+
+    expected = release.calibration_diagnostics_sha256
+    if expected is None:
+        raise ValueError("Microcosm release does not pin calibration diagnostics")
+    return _verify_release_file(
+        path,
+        expected_sha256=expected,
+        label="Microcosm calibration diagnostics",
+    )
+
+
 def _download(release: MicrocosmRelease, target: Path) -> None:
     urllib.request.urlretrieve(release.download_url, target)
 
@@ -93,13 +139,7 @@ def resolve_release_dataset(
         downloader(release, destination)
     if not destination.is_file():
         raise ValueError(f"Microcosm downloader did not create {destination}")
-    actual = _sha256(destination)
-    if actual != release.dataset_sha256:
-        raise ValueError(
-            "Microcosm dataset checksum mismatch: "
-            f"expected {release.dataset_sha256}, found {actual}"
-        )
-    return destination
+    return verify_release_dataset(destination, release)
 
 
 def resolve_release_calibration_diagnostics(
@@ -119,13 +159,7 @@ def resolve_release_calibration_diagnostics(
         downloader(release, destination)
     if not destination.is_file():
         raise ValueError(f"Microcosm downloader did not create {destination}")
-    actual = _sha256(destination)
-    if actual != expected:
-        raise ValueError(
-            "Microcosm calibration diagnostics checksum mismatch: "
-            f"expected {expected}, found {actual}"
-        )
-    return destination
+    return verify_release_calibration_diagnostics(destination, release)
 
 
 def _default_table_loader(dataset_path: Path) -> Tables:

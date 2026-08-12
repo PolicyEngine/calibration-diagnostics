@@ -12,8 +12,10 @@ from .contracts import (
     AlignedFact,
     CalibrationExposure,
     CapabilityResult,
+    ExecutionMethod,
     FactContract,
     PeriodTreatment,
+    PrecomputedCapabilitySpec,
     TypedPeriod,
 )
 from .execution import EvaluationResult, validate_results
@@ -31,6 +33,7 @@ class SourcePlan:
     calibration_exposures: dict[str, CalibrationExposure] = field(
         default_factory=dict
     )
+    precomputed_capabilities: tuple[PrecomputedCapabilitySpec, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -136,6 +139,7 @@ def build_full_capability_matrix(
     source_plans: Iterable[SourcePlan],
     *,
     snapshot_id: str,
+    require_all_precomputed_specs: bool = True,
 ) -> tuple[CapabilityResult, ...]:
     """Classify every fact once for every source-specific mapping registry."""
 
@@ -148,12 +152,16 @@ def build_full_capability_matrix(
     capabilities = tuple(
         capability
         for plan in plans
-        for capability in CapabilityPlanner(
-            plan.mappings,
-            alignments=plan.alignments,
-            calibration_exposures=plan.calibration_exposures,
-            snapshot_id=snapshot_id,
-        ).classify_all(fact_values, [plan.source])
+        for capability in apply_precomputed_capability_specs(
+            CapabilityPlanner(
+                plan.mappings,
+                alignments=plan.alignments,
+                calibration_exposures=plan.calibration_exposures,
+                snapshot_id=snapshot_id,
+            ).classify_all(fact_values, [plan.source]),
+            plan.precomputed_capabilities,
+            require_all_specs=require_all_precomputed_specs,
+        )
     )
     expected = len(fact_values) * len(plans)
     cells = {(row.fact_key, row.source_id) for row in capabilities}
@@ -163,6 +171,77 @@ def build_full_capability_matrix(
             f"found {len(cells)} unique cells, expected {expected}"
         )
     return capabilities
+
+
+def apply_precomputed_capability_specs(
+    capabilities: Iterable[CapabilityResult],
+    specs: Iterable[PrecomputedCapabilitySpec],
+    *,
+    require_all_specs: bool = True,
+) -> tuple[CapabilityResult, ...]:
+    """Apply reviewed precomputed surfaces to ordinary planner classifications."""
+
+    spec_values = tuple(specs)
+    by_cell = {(spec.source_id, spec.fact_key): spec for spec in spec_values}
+    if len(by_cell) != len(spec_values):
+        raise ValueError("precomputed capability specs contain duplicate cells")
+    materialized: list[CapabilityResult] = []
+    matched: set[tuple[str, str]] = set()
+    for capability in capabilities:
+        cell = (capability.source_id, capability.fact_key)
+        spec = by_cell.get(cell)
+        if spec is None:
+            materialized.append(capability)
+            continue
+        matched.add(cell)
+        had_mapping = capability.mapping_id is not None
+        materialized.append(
+            CapabilityResult(
+                snapshot_id=capability.snapshot_id,
+                fact_key=capability.fact_key,
+                source_id=capability.source_id,
+                source_type=capability.source_type,
+                mapping_release=(
+                    capability.mapping_release
+                    if spec.mapping_release is None
+                    else spec.mapping_release
+                ),
+                status=spec.status,
+                reason_code=None,
+                reason_detail=None,
+                execution_method=ExecutionMethod.PRECOMPUTED,
+                mapping_id=(
+                    capability.mapping_id
+                    if spec.preserve_existing_mapping and had_mapping
+                    else spec.mapping_id
+                ),
+                mapping_quality=spec.mapping_quality,
+                fact_period=capability.fact_period,
+                population_period=spec.population_period,
+                policy_period=spec.policy_period,
+                period_treatment=spec.period_treatment,
+                alignment_id=spec.alignment_id,
+                alignment_quality=spec.alignment_quality,
+                entity=capability.entity,
+                weight_variable=None,
+                required_variables=(),
+                geography_method=spec.geography_method,
+                query=None,
+                calibration_exposure=spec.calibration_exposure,
+                score_eligible=(
+                    capability.score_eligible
+                    if spec.preserve_mapped_score_eligibility and had_mapping
+                    else spec.score_eligible
+                ),
+            )
+        )
+    missing = sorted(by_cell.keys() - matched)
+    if missing and require_all_specs:
+        raise ValueError(
+            "precomputed capability specs have no classified cells: "
+            + ", ".join(f"{source_id}/{fact_key}" for source_id, fact_key in missing)
+        )
+    return tuple(materialized)
 
 
 def build_scored_results(

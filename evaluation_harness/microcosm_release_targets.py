@@ -14,10 +14,10 @@ from .contracts import (
     CalibrationExposure,
     CapabilityResult,
     CapabilityStatus,
-    ExecutionMethod,
     FactContract,
     MappingQuality,
     PeriodTreatment,
+    PrecomputedCapabilitySpec,
     TypedPeriod,
 )
 from .execution import EvaluationResult
@@ -217,6 +217,56 @@ def apply_release_target_estimates(
     )
 
 
+def release_target_capability_specs(
+    release_targets: ReleaseTargetAlignments,
+    *,
+    source_id: str,
+    population_period: TypedPeriod,
+    policy_period: TypedPeriod | None,
+) -> tuple[PrecomputedCapabilitySpec, ...]:
+    """Describe the exact capability surface supplied by release diagnostics."""
+
+    aligned_by_fact_key = {
+        row.source_fact_key: row for row in release_targets.aligned_facts
+    }
+    specs: list[PrecomputedCapabilitySpec] = []
+    for fact_key in sorted(release_targets.final_estimates_by_fact_key):
+        alignment = aligned_by_fact_key.get(fact_key)
+        specs.append(
+            PrecomputedCapabilitySpec(
+                source_id=source_id,
+                fact_key=fact_key,
+                mapping_release=None,
+                status=CapabilityStatus.CALIBRATION_TARGET,
+                mapping_id="microcosm-release-diagnostics",
+                mapping_quality=MappingQuality.EXACT,
+                population_period=population_period,
+                policy_period=policy_period,
+                period_treatment=(
+                    PeriodTreatment.ALIGNED_FACT
+                    if alignment is not None
+                    else PeriodTreatment.NATIVE
+                ),
+                alignment_id=(
+                    alignment.alignment_id if alignment is not None else None
+                ),
+                alignment_quality=(
+                    alignment.method_quality
+                    if alignment is not None
+                    else AlignmentQuality.NONE
+                ),
+                geography_method="microcosm_release_diagnostics",
+                calibration_exposure=(
+                    CalibrationExposure.DIRECT_CALIBRATION_TARGET
+                ),
+                score_eligible=True,
+                preserve_existing_mapping=True,
+                preserve_mapped_score_eligibility=True,
+            )
+        )
+    return tuple(specs)
+
+
 def materialize_release_target_results(
     capabilities: Iterable[CapabilityResult],
     release_targets: ReleaseTargetAlignments,
@@ -235,63 +285,30 @@ def materialize_release_target_results(
     authoritative post-calibration estimate for those exact Chronicle records.
     """
 
-    aligned_by_fact_key = {
-        row.source_fact_key: row for row in release_targets.aligned_facts
-    }
-    target_fact_keys = set(release_targets.final_estimates_by_fact_key)
-    materialized_capabilities: list[CapabilityResult] = []
-    materialized_results: list[EvaluationResult] = []
-    for capability in capabilities:
-        if (
-            capability.source_id != source_id
-            or capability.fact_key not in target_fact_keys
-        ):
-            materialized_capabilities.append(capability)
-            continue
+    from .full_run import apply_precomputed_capability_specs
 
-        alignment = aligned_by_fact_key.get(capability.fact_key)
-        materialized = replace(
-            capability,
-            status=CapabilityStatus.CALIBRATION_TARGET,
-            reason_code=None,
-            reason_detail=None,
-            execution_method=ExecutionMethod.PRECOMPUTED,
-            mapping_id=capability.mapping_id or "microcosm-release-diagnostics",
-            mapping_quality=MappingQuality.EXACT,
+    target_fact_keys = set(release_targets.final_estimates_by_fact_key)
+    materialized_capabilities = apply_precomputed_capability_specs(
+        capabilities,
+        release_target_capability_specs(
+            release_targets,
+            source_id=source_id,
             population_period=population_period,
             policy_period=policy_period,
-            period_treatment=(
-                PeriodTreatment.ALIGNED_FACT
-                if alignment is not None
-                else PeriodTreatment.NATIVE
-            ),
-            alignment_id=alignment.alignment_id if alignment is not None else None,
-            alignment_quality=(
-                alignment.method_quality
-                if alignment is not None
-                else AlignmentQuality.NONE
-            ),
-            weight_variable=None,
-            required_variables=(),
-            geography_method="microcosm_release_diagnostics",
-            query=None,
-            calibration_exposure=CalibrationExposure.DIRECT_CALIBRATION_TARGET,
-            # A release diagnostic makes an otherwise unmapped build target
-            # scoreable (for example JCT counterfactuals). If a reviewed
-            # mapping exists, however, preserve its explicit eligibility
-            # decision so source-declared missing observations stay unscored.
-            score_eligible=(
-                capability.score_eligible
-                if capability.mapping_id is not None
-                else True
-            ),
-        )
-        materialized_capabilities.append(materialized)
+        ),
+    )
+    materialized_results: list[EvaluationResult] = []
+    for materialized in materialized_capabilities:
+        if (
+            materialized.source_id != source_id
+            or materialized.fact_key not in target_fact_keys
+        ):
+            continue
         materialized_results.append(
             EvaluationResult.from_capability(
                 materialized,
                 estimate=release_targets.final_estimates_by_fact_key[
-                    capability.fact_key
+                    materialized.fact_key
                 ],
                 dataset_version=dataset_version,
                 model_version=model_version,
@@ -299,4 +316,4 @@ def materialize_release_target_results(
             )
         )
 
-    return tuple(materialized_capabilities), tuple(materialized_results)
+    return materialized_capabilities, tuple(materialized_results)

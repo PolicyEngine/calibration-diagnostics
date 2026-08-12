@@ -200,6 +200,39 @@ Query = AggregateQuery | ModelQuery
 
 
 @dataclass(frozen=True)
+class PrecomputedCapabilitySpec:
+    """A reviewed result surface that is materialized outside query execution."""
+
+    source_id: str
+    fact_key: str
+    mapping_release: str | None
+    status: CapabilityStatus
+    mapping_id: str
+    mapping_quality: MappingQuality
+    population_period: TypedPeriod
+    policy_period: TypedPeriod | None
+    period_treatment: PeriodTreatment
+    alignment_id: str | None
+    alignment_quality: AlignmentQuality
+    geography_method: str
+    calibration_exposure: CalibrationExposure
+    score_eligible: bool
+    preserve_existing_mapping: bool = False
+    preserve_mapped_score_eligibility: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.source_id or not self.fact_key or not self.mapping_id:
+            raise ValueError("precomputed capability identifiers must not be blank")
+        if self.period_treatment is PeriodTreatment.ALIGNED_FACT and (
+            not self.alignment_id
+            or self.alignment_quality is AlignmentQuality.NONE
+        ):
+            raise ValueError(
+                "aligned precomputed capability requires alignment provenance"
+            )
+
+
+@dataclass(frozen=True)
 class CapabilityResult:
     snapshot_id: str
     fact_key: str

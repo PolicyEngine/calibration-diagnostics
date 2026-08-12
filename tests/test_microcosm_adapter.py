@@ -10,6 +10,8 @@ from evaluation_harness.adapters.microcosm import (
     MicrocosmRelease,
     resolve_release_calibration_diagnostics,
     resolve_release_dataset,
+    verify_release_calibration_diagnostics,
+    verify_release_dataset,
 )
 from evaluation_harness.execution import RunGroup
 from evaluation_harness.execution import build_run_groups, execute_groups
@@ -219,6 +221,24 @@ def test_release_dataset_is_checksum_verified(tmp_path: Path) -> None:
         resolve_release_dataset(bad, tmp_path, lambda _, target: target.write_bytes(payload))
 
 
+def test_locally_supplied_release_dataset_is_checksum_verified(tmp_path: Path) -> None:
+    payload = b"pinned microcosm"
+    path = tmp_path / "supplied.h5"
+    path.write_bytes(payload)
+    release = MicrocosmRelease(
+        release_id="fixture",
+        dataset_filename="fixture.h5",
+        dataset_sha256=__import__("hashlib").sha256(payload).hexdigest(),
+        model_version="1.0",
+    )
+
+    assert verify_release_dataset(path, release) == path
+
+    path.write_bytes(b"different but structurally plausible dataset")
+    with pytest.raises(ValueError, match="checksum"):
+        verify_release_dataset(path, release)
+
+
 def test_release_calibration_diagnostics_are_independently_pinned(tmp_path: Path) -> None:
     payload = b'{"targets": []}'
     checksum = __import__("hashlib").sha256(payload).hexdigest()
@@ -238,6 +258,28 @@ def test_release_calibration_diagnostics_are_independently_pinned(tmp_path: Path
     )
 
     assert path.read_bytes() == payload
+
+
+def test_locally_supplied_calibration_diagnostics_are_checksum_verified(
+    tmp_path: Path,
+) -> None:
+    payload = b'{"targets": []}'
+    path = tmp_path / "supplied-diagnostics.json"
+    path.write_bytes(payload)
+    release = MicrocosmRelease(
+        release_id="fixture",
+        dataset_filename="fixture.h5",
+        dataset_sha256="0" * 64,
+        model_version="1.0",
+        calibration_diagnostics_filename="release/calibration_diagnostics.json",
+        calibration_diagnostics_sha256=__import__("hashlib").sha256(payload).hexdigest(),
+    )
+
+    assert verify_release_calibration_diagnostics(path, release) == path
+
+    path.write_bytes(b'{"targets": [{"different": true}]}')
+    with pytest.raises(ValueError, match="checksum"):
+        verify_release_calibration_diagnostics(path, release)
 
 
 def test_release_url_uses_the_immutable_hugging_face_revision() -> None:

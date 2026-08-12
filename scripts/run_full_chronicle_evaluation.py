@@ -6,13 +6,17 @@ import argparse
 import gc
 import json
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 
 from evaluation_harness.adapters.acs_pums import ACSPUMSRunner, execute_acs_pums
 from evaluation_harness.adapters.microcosm import (
     MICROCOSM_RELEASE,
+    MicrocosmRelease,
     MicrocosmPolicyEngineRunner,
     resolve_release_calibration_diagnostics,
+    verify_release_calibration_diagnostics,
+    verify_release_dataset,
 )
 from evaluation_harness.adapters.taxcalc_cps import TaxCalcCPSRunner
 from evaluation_harness.contracts import CalibrationExposure
@@ -44,12 +48,14 @@ from evaluation_harness.microcosm_old_cd import load_old_cd_assignments
 from evaluation_harness.microcosm_release_targets import (
     compile_release_target_alignments,
     materialize_release_target_results,
+    release_target_capability_specs,
 )
 from evaluation_harness.publisher import publish_run
 from evaluation_harness.yale_reconstruction_checkpoint import (
     ESTIMATE_BASIS as YALE_ESTIMATE_BASIS,
     load_yale_reconstruction_checkpoint,
     materialize_yale_reconstruction_results,
+    yale_checkpoint_capability_specs,
 )
 
 
@@ -78,6 +84,42 @@ EVALUATION_EXCLUDED_GEOGRAPHY_IDS = frozenset(
 )
 
 
+@dataclass(frozen=True)
+class AuthenticatedMicrocosmInputs:
+    dataset_path: Path
+    calibration_diagnostics_path: Path
+    dataset_sha256: str
+    calibration_diagnostics_sha256: str
+
+
+def authenticate_microcosm_inputs(
+    dataset_path: Path,
+    calibration_diagnostics_path: Path | None,
+    *,
+    release: MicrocosmRelease = MICROCOSM_RELEASE,
+) -> AuthenticatedMicrocosmInputs:
+    """Authenticate local inputs before they can inherit a release identity."""
+
+    dataset = verify_release_dataset(dataset_path, release)
+    diagnostics = (
+        verify_release_calibration_diagnostics(
+            calibration_diagnostics_path,
+            release,
+        )
+        if calibration_diagnostics_path is not None
+        else resolve_release_calibration_diagnostics(release, dataset.parent)
+    )
+    diagnostics_sha256 = release.calibration_diagnostics_sha256
+    if diagnostics_sha256 is None:  # guarded by the verifier, retained for typing
+        raise ValueError("Microcosm release does not pin calibration diagnostics")
+    return AuthenticatedMicrocosmInputs(
+        dataset_path=dataset,
+        calibration_diagnostics_path=diagnostics,
+        dataset_sha256=release.dataset_sha256,
+        calibration_diagnostics_sha256=diagnostics_sha256,
+    )
+
+
 def _source_counts(capabilities, source_id: str) -> dict[str, int]:
     return dict(
         sorted(
@@ -98,6 +140,12 @@ def run(
     microcosm_calibration_diagnostics: Path | None = None,
     microcosm_old_cd_assignments: Path | None = None,
 ) -> dict:
+    authenticated_microcosm = authenticate_microcosm_inputs(
+        microcosm_dataset,
+        microcosm_calibration_diagnostics,
+    )
+    microcosm_dataset = authenticated_microcosm.dataset_path
+    diagnostics_path = authenticated_microcosm.calibration_diagnostics_path
     snapshot_facts, snapshot_manifest = load_snapshot_facts(snapshot)
     jurisdiction_facts = scope_facts_to_jurisdictions(
         snapshot_facts, EVALUATION_JURISDICTIONS
@@ -134,11 +182,6 @@ def run(
                 f"{overview.chronicle_snapshot_id}, not {snapshot_id}"
             )
 
-    diagnostics_path = microcosm_calibration_diagnostics
-    if diagnostics_path is None:
-        diagnostics_path = resolve_release_calibration_diagnostics(
-            MICROCOSM_RELEASE, microcosm_dataset.parent
-        )
     aging_policy = MicrocosmAgingPolicy.from_facts(
         facts,
         release_diagnostics_path=diagnostics_path,
@@ -219,6 +262,10 @@ def run(
             *age_topcode_comparisons.aligned_facts,
         ]
     )
+    yale_checkpoint = load_yale_reconstruction_checkpoint(
+        YALE_RECONSTRUCTION,
+        YALE_INTEGRATION / "checkpoint_mappings.json",
+    )
     microcosm_plan = SourcePlan(
         source=microcosm_overview.source,
         mappings=MappingRegistry.from_yaml(MICROCOSM_INTEGRATION / "mappings.yaml"),
@@ -234,6 +281,12 @@ def run(
             ]
         ),
         calibration_exposures=calibration_exposures,
+        precomputed_capabilities=release_target_capability_specs(
+            release_target_alignments,
+            source_id=microcosm_overview.source.source_id,
+            population_period=microcosm_overview.source.population_period,
+            policy_period=microcosm_overview.source.policy_period,
+        ),
     )
     cps_plan = SourcePlan(
         source=cps_overview.source,
@@ -250,6 +303,12 @@ def run(
     yale_plan = SourcePlan(
         source=yale_overview.source,
         mappings=MappingRegistry.from_yaml(YALE_INTEGRATION / "mappings.yaml"),
+        precomputed_capabilities=yale_checkpoint_capability_specs(
+            facts,
+            yale_checkpoint,
+            aligned_facts=aligned_facts,
+            source=yale_overview.source,
+        ),
     )
     capabilities = build_full_capability_matrix(
         facts,
@@ -264,10 +323,6 @@ def run(
         model_version=f"policyengine-us=={MICROCOSM_RELEASE.model_version}",
         population_period=microcosm_plan.source.population_period,
         policy_period=microcosm_plan.source.policy_period,
-    )
-    yale_checkpoint = load_yale_reconstruction_checkpoint(
-        YALE_RECONSTRUCTION,
-        YALE_INTEGRATION / "checkpoint_mappings.json",
     )
     capabilities, yale_results = materialize_yale_reconstruction_results(
         capabilities,
@@ -432,7 +487,10 @@ def run(
     }
     summary["microcosm_exact_release_targets"] = {
         "release_id": MICROCOSM_RELEASE.release_id,
-        "diagnostics_sha256": MICROCOSM_RELEASE.calibration_diagnostics_sha256,
+        "dataset_sha256": authenticated_microcosm.dataset_sha256,
+        "diagnostics_sha256": (
+            authenticated_microcosm.calibration_diagnostics_sha256
+        ),
         "compiled_target_count": release_target_alignments.target_count,
         "cross_period_fact_count": release_target_alignments.matched_fact_count,
         "native_period_fact_count": len(
