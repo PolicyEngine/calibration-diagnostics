@@ -87,16 +87,16 @@ results rather than suppressed.
 
 | Geography and age | Chronicle target | Fact key |
 |---|---:|---|
-| United States, 0-4 | 18,365,047 | `ledger.aggregate_fact.v2:aa16f206fd09f97084b67314` |
-| United States, 20-24 | 22,232,555 | `ledger.aggregate_fact.v2:28c8b35f03f5098ddcbb237a` |
-| United States, 40-44 | 22,701,029 | `ledger.aggregate_fact.v2:06bd1927915c0067b2cfafbf` |
-| United States, 65-69 | 19,356,883 | `ledger.aggregate_fact.v2:566a18fd49c5b43ea91ce205` |
-| United States, 85+ | 6,343,153 | `ledger.aggregate_fact.v2:224acf500d92eae5b6c734be` |
-| Alabama, 60-64 | 338,081 | `ledger.aggregate_fact.v2:00411972c11eca98b255d061` |
-| California, 0-4 | 2,083,154 | `ledger.aggregate_fact.v2:ceb7ba00099219f300397c09` |
-| New York, 25-29 | 1,365,498 | `ledger.aggregate_fact.v2:3fd47cffbfe7f01f9cec2373` |
-| Texas, 15-19 | 2,269,275 | `ledger.aggregate_fact.v2:b895c85916a74d8c3d25ce62` |
-| Wyoming, 85+ | 9,802 | `ledger.aggregate_fact.v2:6602bd548d348950081306bc` |
+| United States, 0-4 | 18,365,047 | `chronicle.aggregate_fact.v2:aa16f206fd09f97084b67314` |
+| United States, 20-24 | 22,232,555 | `chronicle.aggregate_fact.v2:28c8b35f03f5098ddcbb237a` |
+| United States, 40-44 | 22,701,029 | `chronicle.aggregate_fact.v2:06bd1927915c0067b2cfafbf` |
+| United States, 65-69 | 19,356,883 | `chronicle.aggregate_fact.v2:566a18fd49c5b43ea91ce205` |
+| United States, 85+ | 6,343,153 | `chronicle.aggregate_fact.v2:224acf500d92eae5b6c734be` |
+| Alabama, 60-64 | 338,081 | `chronicle.aggregate_fact.v2:00411972c11eca98b255d061` |
+| California, 0-4 | 2,083,154 | `chronicle.aggregate_fact.v2:ceb7ba00099219f300397c09` |
+| New York, 25-29 | 1,365,498 | `chronicle.aggregate_fact.v2:3fd47cffbfe7f01f9cec2373` |
+| Texas, 15-19 | 2,269,275 | `chronicle.aggregate_fact.v2:b895c85916a74d8c3d25ce62` |
+| Wyoming, 85+ | 9,802 | `chronicle.aggregate_fact.v2:6602bd548d348950081306bc` |
 
 Completion requires ten finite direct estimates, ten scored results, and
 replicate-weight diagnostics for every row. Unsupported or `N/A` rows cannot

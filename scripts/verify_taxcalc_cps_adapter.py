@@ -22,7 +22,7 @@ def verify() -> list[dict[str, str | float]]:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     capabilities = tuple(
-        CapabilityPlanner(mappings, snapshot_id=overview.ledger_snapshot_id).classify(
+        CapabilityPlanner(mappings, snapshot_id=overview.chronicle_snapshot_id).classify(
             fact, overview.source
         )
         for fact in overview.verification_facts
@@ -53,7 +53,7 @@ def verify() -> list[dict[str, str | float]]:
             {
                 "fact_key": result.fact_key,
                 "estimate": str(result.estimate),
-                "ledger_target": str(target),
+                "chronicle_target": str(target),
                 "relative_error": float(relative_error),
             }
         )

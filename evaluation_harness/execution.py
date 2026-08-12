@@ -261,7 +261,7 @@ def execute_groups(
 def run_group_cache_key(
     group: RunGroup,
     *,
-    ledger_subset_hash: str,
+    chronicle_subset_hash: str,
     source_manifest_hash: str,
     mapping_hash: str,
     alignment_hash: str,
@@ -277,7 +277,7 @@ def run_group_cache_key(
             "fact_keys": group.fact_keys,
             "required_variables": group.required_variables,
         },
-        "ledger_subset_hash": ledger_subset_hash,
+        "chronicle_subset_hash": chronicle_subset_hash,
         "source_manifest_hash": source_manifest_hash,
         "mapping_hash": mapping_hash,
         "alignment_hash": alignment_hash,

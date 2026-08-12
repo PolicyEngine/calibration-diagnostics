@@ -22,7 +22,7 @@ class IntegrationOverview:
     """Reviewed inputs that must be approved before an adapter is implemented."""
 
     integration_id: str
-    ledger_snapshot_id: str
+    chronicle_snapshot_id: str
     source: EvaluationSourceManifest
     verification_facts: tuple[FactContract, ...]
     alignment_policy: dict[str, Any]
@@ -101,7 +101,7 @@ def load_integration_overview(path: str | Path) -> IntegrationOverview:
         )
     return IntegrationOverview(
         integration_id=_required(payload, "integration_id", "integration overview"),
-        ledger_snapshot_id=_required(payload, "ledger_snapshot_id", "integration overview"),
+        chronicle_snapshot_id=_required(payload, "chronicle_snapshot_id", "integration overview"),
         source=_source_manifest(_required(payload, "source", "integration overview")),
         verification_facts=facts,
         alignment_policy=dict(payload.get("alignment_policy", {})),
@@ -146,10 +146,10 @@ def validate_overview_against_snapshot(
     schema = manifest.get("schema_version")
     if schema not in {SNAPSHOT_SCHEMA, INTEGRATION_FIXTURE_SCHEMA}:
         raise ValueError(f"unsupported verification snapshot schema: {schema!r}")
-    if manifest.get("snapshot_id") != overview.ledger_snapshot_id:
+    if manifest.get("snapshot_id") != overview.chronicle_snapshot_id:
         raise ValueError(
             "integration and snapshot IDs differ: "
-            f"{overview.ledger_snapshot_id} != {manifest.get('snapshot_id')}"
+            f"{overview.chronicle_snapshot_id} != {manifest.get('snapshot_id')}"
         )
 
     facts_path = path / "facts.jsonl"

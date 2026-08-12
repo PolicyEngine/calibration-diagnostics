@@ -9,7 +9,7 @@ import { sourceAuthorityLabel } from "../source-labels";
 export const CROSS_DATASET_PAGE_TITLE = "Cross-dataset comparison";
 
 export const GROUP_DIMENSIONS = [
-  { key: "ledger_source", label: "Chronicle source" },
+  { key: "chronicle_source", label: "Chronicle source" },
   { key: "period", label: "Period" },
   { key: "geography", label: "Geography" },
 ] as const;
@@ -271,7 +271,7 @@ export function sourceDisplayLabel(source: SourceSummary): string {
   ) {
     return "Public CPS + Tax-Calculator";
   }
-  return source.label.replaceAll("Microcosm", "Microcosm").replaceAll("Ledger", "Chronicle");
+  return source.label;
 }
 
 export function sourceCompactLabel(source: SourceSummary): string {
@@ -304,7 +304,7 @@ export function orderSourceSummaries(sources: SourceSummary[]): SourceSummary[] 
 }
 
 const DIMENSION_QUERY_KEYS: Record<GroupDimension, string> = {
-  ledger_source: "ledger_source",
+  chronicle_source: "chronicle_source",
   concept: "measure",
   period: "period",
   geography: "geography",
@@ -372,7 +372,7 @@ export function buildGroupRows(
       dimension,
       key: group.key,
       label:
-        dimension === "ledger_source"
+        dimension === "chronicle_source"
           ? sourceAuthorityLabel(group.key)
           : group.label,
       factCount: group.fact_count,

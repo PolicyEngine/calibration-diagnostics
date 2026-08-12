@@ -1,4 +1,4 @@
-"""Classify and execute the full pinned Ledger snapshot for approved adapters."""
+"""Classify and execute the full pinned Chronicle snapshot for approved adapters."""
 
 from __future__ import annotations
 
@@ -31,8 +31,8 @@ from evaluation_harness.integration import load_integration_overview
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.microcosm_aging import (
     MicrocosmAgingPolicy,
-    transform_ledger_facts_to_microcosm_year,
-    transform_ledger_facts_to_microcosm_years,
+    transform_chronicle_facts_to_microcosm_year,
+    transform_chronicle_facts_to_microcosm_years,
 )
 from evaluation_harness.microcosm_age_topcodes import (
     build_cps_asec_age_topcode_comparisons,
@@ -128,10 +128,10 @@ def run(
         acs_pums_overview,
         yale_overview,
     ):
-        if overview.ledger_snapshot_id != snapshot_id:
+        if overview.chronicle_snapshot_id != snapshot_id:
             raise ValueError(
                 f"integration {overview.integration_id} was reviewed against "
-                f"{overview.ledger_snapshot_id}, not {snapshot_id}"
+                f"{overview.chronicle_snapshot_id}, not {snapshot_id}"
             )
 
     diagnostics_path = microcosm_calibration_diagnostics
@@ -147,7 +147,7 @@ def run(
         int(year) for year in microcosm_overview.alignment_policy["source_years"]
     )
     build_year = int(microcosm_overview.alignment_policy["build_year"])
-    aging_results = transform_ledger_facts_to_microcosm_years(
+    aging_results = transform_chronicle_facts_to_microcosm_years(
         facts,
         aging_policy,
         source_years=source_years,
@@ -511,7 +511,7 @@ def run(
             "hard targets; these results are out-of-sample validation."
         ),
     }
-    aging_2023 = transform_ledger_facts_to_microcosm_year(
+    aging_2023 = transform_chronicle_facts_to_microcosm_year(
         facts,
         aging_policy,
         source_year=2023,

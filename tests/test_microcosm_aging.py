@@ -10,8 +10,8 @@ from evaluation_harness.microcosm_aging import (
     AGING_MODEL_VERSION,
     AgingStatus,
     MicrocosmAgingPolicy,
-    transform_ledger_facts_to_microcosm_year,
-    transform_ledger_facts_to_microcosm_years,
+    transform_chronicle_facts_to_microcosm_year,
+    transform_chronicle_facts_to_microcosm_years,
 )
 from evaluation_harness.mappings import MappingRegistry
 from evaluation_harness.planner import CapabilityPlanner
@@ -22,8 +22,8 @@ from pathlib import Path
 
 def fact(**changes) -> FactContract:
     base = FactContract(
-        fact_key="ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
-        semantic_fact_key="ledger.semantic_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+        fact_key="chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+        semantic_fact_key="chronicle.semantic_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
         source="irs_soi",
         jurisdiction="US",
         period=TypedPeriod.parse("tax_year:2023"),
@@ -46,8 +46,8 @@ def fact(**changes) -> FactContract:
 
 def cbo(year: int, series: str, value: str) -> FactContract:
     return fact(
-        fact_key=f"ledger.aggregate_fact.v2:cbo{year}{series}",
-        semantic_fact_key=f"ledger.semantic_fact.v2:cbo{year}{series}",
+        fact_key=f"chronicle.aggregate_fact.v2:cbo{year}{series}",
+        semantic_fact_key=f"chronicle.semantic_fact.v2:cbo{year}{series}",
         source="cbo",
         period=TypedPeriod.parse(f"tax_year:{year}"),
         measure=f"cbo.{series}_projection",
@@ -157,7 +157,7 @@ def test_pinned_release_factors_fill_missing_chronicle_projection_inputs(
                     {
                         "period": 2024,
                         "metadata": {
-                            "ledger_fact_period": "2022",
+                            "chronicle_fact_period": "2022",
                             "source_period": "2022",
                             "aged_to": "2024",
                             "source_measure_id": "adjusted_gross_income",
@@ -207,7 +207,7 @@ def test_release_factors_keep_matching_series_priority(tmp_path: Path) -> None:
                     {
                         "period": 2024,
                         "metadata": {
-                            "ledger_fact_period": "2022",
+                            "chronicle_fact_period": "2022",
                             "source_period": "2022",
                             "aged_to": "2024",
                             "source_measure_id": source_measure,
@@ -259,7 +259,7 @@ def test_release_factor_reconstructs_same_series_uprating_chain(
                     {
                         "period": 2024,
                         "metadata": {
-                            "ledger_fact_period": "2022",
+                            "chronicle_fact_period": "2022",
                             "source_period": "2023",
                             "aged_to": "2024",
                             "source_measure_id": "net_capital_gains_amount",
@@ -311,7 +311,7 @@ def test_release_factor_does_not_reuse_unrelated_surface_uprating(
                     {
                         "period": 2024,
                         "metadata": {
-                            "ledger_fact_period": "2022",
+                            "chronicle_fact_period": "2022",
                             "source_period": "2023",
                             "aged_to": "2024",
                             "source_measure_id": "taxable_interest_amount",
@@ -354,7 +354,7 @@ def test_chained_aging_uses_observed_soi_then_cbo_projection() -> None:
     soi_2022 = replace(source, value=Decimal("14000"))
     soi_2023 = replace(
         source,
-        fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc",
+        fact_key="chronicle.aggregate_fact.v2:cccccccccccccccccccccccc",
         period=TypedPeriod.parse("tax_year:2023"),
         value=Decimal("14700"),
         lineage={"source_record_id": "irs_soi.ty2023.table_1_1.all.adjusted_gross_income"},
@@ -399,7 +399,7 @@ def test_comparable_result_converts_to_auditable_aligned_fact() -> None:
 def test_conflicting_projection_facts_fail_loudly() -> None:
     duplicate = replace(
         cbo(2024, "adjusted_gross_income", "220"),
-        fact_key="ledger.aggregate_fact.v2:dddddddddddddddddddddddd",
+        fact_key="chronicle.aggregate_fact.v2:dddddddddddddddddddddddd",
         value=Decimal("221"),
     )
     with pytest.raises(ValueError, match="Conflicting CBO projection facts"):
@@ -418,7 +418,7 @@ def test_aged_2023_fact_executes_as_a_labeled_2024_projection() -> None:
     population = next(
         fact
         for fact in overview.verification_facts
-        if fact.fact_key == "ledger.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52"
+        if fact.fact_key == "chronicle.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52"
     )
     source_fact = replace(population, period=TypedPeriod.parse("calendar_year:2023"))
     aging = MicrocosmAgingPolicy.from_facts([]).transform(
@@ -439,7 +439,7 @@ def test_bulk_alignment_transforms_only_us_2023_and_preserves_period_kind() -> N
     us_2023 = fact(unit="count", aggregation={"method": "sum"})
     us_2024 = replace(us_2023, period=TypedPeriod.parse("tax_year:2024"))
     uk_2023 = replace(us_2023, jurisdiction="UK", geography_id="K02000001")
-    results = transform_ledger_facts_to_microcosm_year(
+    results = transform_chronicle_facts_to_microcosm_year(
         [us_2024, uk_2023, us_2023], MicrocosmAgingPolicy.from_facts([])
     )
     assert len(results) == 1
@@ -451,11 +451,11 @@ def test_bulk_alignment_can_apply_the_microcosm_policy_to_2022_and_2023() -> Non
     us_2023 = fact(unit="count", aggregation={"method": "sum"})
     us_2022 = replace(
         us_2023,
-        fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc",
+        fact_key="chronicle.aggregate_fact.v2:cccccccccccccccccccccccc",
         period=TypedPeriod.parse("tax_year:2022"),
     )
     us_2024 = replace(us_2023, period=TypedPeriod.parse("tax_year:2024"))
-    results = transform_ledger_facts_to_microcosm_years(
+    results = transform_chronicle_facts_to_microcosm_years(
         [us_2024, us_2023, us_2022],
         MicrocosmAgingPolicy.from_facts([]),
         source_years=(2022, 2023),

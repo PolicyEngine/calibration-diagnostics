@@ -113,7 +113,7 @@ export const PIPELINE_PHASES: PipelinePhase[] = [
       {
         id: "chronicle_facts",
         title: "Chronicle facts",
-        code: "--ledger-facts consumer_facts.jsonl",
+        code: "--chronicle-facts consumer_facts.jsonl",
         description:
           "Sourced official statistics (IRS SOI, Census PEP/STC, CMS, USDA, HHS, SSA, CBO, JCT) exported from Chronicle. These carry the target values.",
       },

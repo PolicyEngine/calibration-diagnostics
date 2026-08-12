@@ -159,7 +159,7 @@ def _score(payload: dict) -> ScoredEvaluationResult:
         snapshot_id=payload["snapshot_id"],
         source_id=payload["source_id"],
         fact_key=payload["fact_key"],
-        ledger_source=payload["ledger_source"],
+        chronicle_source=payload["chronicle_source"],
         measure=payload["measure"],
         unit=payload["unit"],
         family=payload["family"],
@@ -196,7 +196,7 @@ def _frontend_facts(frontend: Path) -> tuple[FactContract, ...]:
                 FactContract(
                     fact_key=row["fact_key"],
                     semantic_fact_key=provenance.get("semantic_fact_key"),
-                    source=row["ledger_source"],
+                    source=row["chronicle_source"],
                     jurisdiction="US",
                     period=TypedPeriod.parse(row["observed_period"]),
                     geography_level=row["geography_level"],
@@ -257,7 +257,7 @@ def extend(base_run: Path, output: Path) -> dict:
         raise ValueError("base run already contains the Yale reconstruction")
 
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
-    if overview.ledger_snapshot_id != snapshot_id:
+    if overview.chronicle_snapshot_id != snapshot_id:
         raise ValueError("Yale overview and base run snapshot IDs differ")
     plan = SourcePlan(
         source=overview.source,

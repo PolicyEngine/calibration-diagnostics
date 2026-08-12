@@ -142,7 +142,7 @@ export interface FactSourceCell {
 export interface CrossDatasetFact {
   fact_key: string;
   label: string;
-  ledger_source: string;
+  chronicle_source: string;
   measure: string;
   unit: string;
   observed_period: string;
@@ -172,7 +172,7 @@ interface FactIndexDocument {
   snapshot_id: string;
   facts: Record<string, number>;
   facets: {
-    ledger_source: Record<string, number[]>;
+    chronicle_source: Record<string, number[]>;
     measure: Record<string, number[]>;
     period: Record<string, number[]>;
     geography: Record<string, number[]>;
@@ -187,7 +187,7 @@ export interface FactsQuery {
   pageSize?: number;
   source?: string;
   status?: string;
-  ledgerSource?: string;
+  chronicleSource?: string;
   measure?: string;
   period?: string;
   geography?: string;
@@ -484,7 +484,7 @@ export class CrossDatasetArtifactReader {
       throw new ArtifactError("partial_artifact", "Cross-dataset fact index is incomplete.");
     }
     for (const dimension of [
-      "ledger_source",
+      "chronicle_source",
       "measure",
       "period",
       "geography",
@@ -504,7 +504,7 @@ export class CrossDatasetArtifactReader {
     const index = await this.factIndex();
     const candidates: number[][] = [];
     const add = (values: number[] | undefined) => candidates.push(values ?? []);
-    if (query.ledgerSource) add(index.facets.ledger_source[query.ledgerSource]);
+    if (query.chronicleSource) add(index.facets.chronicle_source[query.chronicleSource]);
     if (query.measure) add(index.facets.measure[query.measure]);
     if (query.period) add(index.facets.period[query.period]);
     if (query.geography) add(index.facets.geography[query.geography]);
@@ -534,7 +534,7 @@ export class CrossDatasetArtifactReader {
       throw new RangeError("page_size must be between 1 and 250");
     }
     const filtered = Boolean(
-      query.status || query.ledgerSource || query.measure || query.period || query.geography || query.periodTreatment || query.calibrationExposure || query.search,
+      query.status || query.chronicleSource || query.measure || query.period || query.geography || query.periodTreatment || query.calibrationExposure || query.search,
     );
     const sort = query.sort ?? "fact_key";
     if (!filtered && sort === "fact_key" && pageSize === manifest.page_size) {
@@ -554,7 +554,7 @@ export class CrossDatasetArtifactReader {
       return (
         (!query.source || cell != null) &&
         (!query.status || cell?.status === query.status) &&
-        (!query.ledgerSource || row.ledger_source === query.ledgerSource) &&
+        (!query.chronicleSource || row.chronicle_source === query.chronicleSource) &&
         (!query.measure || row.measure === query.measure) &&
         (!query.period || row.observed_period === query.period) &&
         (!query.geography || row.geography_level === query.geography) &&

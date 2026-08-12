@@ -678,7 +678,7 @@ test("dotted chronicle zero targets use structural-zero percentage errors", () =
   expect(cal.rows[0].abs_relative_error).toBe(1);
 });
 
-test("dotted ledger zero targets accept numerical zero noise", () => {
+test("dotted chronicle zero targets accept numerical zero noise", () => {
   const cal = calibration([
     {
       name: "irs_soi.zero_target@2024",
@@ -689,8 +689,8 @@ test("dotted ledger zero targets accept numerical zero noise", () => {
       metadata: {
         variable: "zero_target",
         source_measure_id: "zero_target_amount",
-        ledger_geography_level: "country",
-        ledger_geography_id: "0100000US",
+        chronicle_geography_level: "country",
+        chronicle_geography_id: "0100000US",
       },
     },
   ]);
@@ -699,7 +699,7 @@ test("dotted ledger zero targets accept numerical zero noise", () => {
   expect(cal.rows[0].abs_relative_error).toBe(0);
 });
 
-test("dotted ledger zero targets reject values above the structural-zero tolerance", () => {
+test("dotted chronicle zero targets reject values above the structural-zero tolerance", () => {
   const cal = calibration([
     {
       name: "irs_soi.zero_target@2024",
@@ -710,8 +710,8 @@ test("dotted ledger zero targets reject values above the structural-zero toleran
       metadata: {
         variable: "zero_target",
         source_measure_id: "zero_target_amount",
-        ledger_geography_level: "country",
-        ledger_geography_id: "0100000US",
+        chronicle_geography_level: "country",
+        chronicle_geography_id: "0100000US",
       },
     },
   ]);

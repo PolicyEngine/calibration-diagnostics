@@ -4,7 +4,7 @@ Status: **adapter implemented and verified against the pinned release**
 
 Reviewed Microcosm release: `microcosm-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`
 
-Chronicle snapshot: `ledger-7917ea815df710fb20db076b`
+Chronicle snapshot: `chronicle-7917ea815df710fb20db076b`
 
 ## What will be connected
 
@@ -54,7 +54,7 @@ against that fixture.
 | 10 | EITC, AGI $10k–$15k | TY 2024 | US | `sum(eitc * tax_unit_weight where 10000 <= AGI < 15000)` | $9,085,291,000 | Calibration target |
 
 The precise aggregate fact keys, constraints, source record IDs, and values live
-in `integrations/microcosm_policyengine_us/ledger_snapshot_fixture/facts.jsonl`.
+in `integrations/microcosm_policyengine_us/chronicle_snapshot_fixture/facts.jsonl`.
 The reviewed mapping rules live in the adjacent `mappings.yaml`. Tests require
 all ten planner cells to contain executable queries; zero `N/A` results pass.
 
@@ -187,7 +187,7 @@ congressional-district row is an external holdout. The verifier in
 
 ## Full Chronicle run
 
-`scripts/run_full_ledger_evaluation.py` loads and hash-verifies the complete
+`scripts/run_full_chronicle_evaluation.py` loads and hash-verifies the complete
 pinned Chronicle source snapshot, then applies the run's explicit US scope
 before classification. It creates exactly one capability row for every scoped
 fact/source pair, runs every executable query in batches, attaches the correct
@@ -219,8 +219,8 @@ The reproducible command is:
 
 ```bash
 uv run --extra microcosm --extra taxcalc-cps python \
-  scripts/run_full_ledger_evaluation.py \
-  --snapshot /path/to/ledger-snapshot \
+  scripts/run_full_chronicle_evaluation.py \
+  --snapshot /path/to/chronicle-snapshot \
   --microcosm-dataset /path/to/microcosm_us_2024.h5 \
   --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet \
   --output .artifacts/evaluations/<immutable-run-directory>
@@ -234,7 +234,7 @@ Adapter implementation was written after failing tests covering:
 2. a single cached microsimulation and batched variable calculation;
 3. correct person, household, and tax-unit weights;
 4. country, state, and congressional-district masks;
-5. all supported Ledger comparison operators;
+5. all supported Chronicle comparison operators;
 6. domain and source-metadata constraint handling;
 7. entity alignment and rejection of mismatched array lengths;
 8. deterministic aggregation and cache keys;

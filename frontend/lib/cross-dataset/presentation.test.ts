@@ -19,7 +19,7 @@ import {
 const summary: CrossDatasetSummary = {
   schema_version: "cross_dataset.frontend_bundle.v1",
   run_id: "evaluation-test",
-  snapshot_id: "ledger-test",
+  snapshot_id: "chronicle-test",
   fact_count: 48_313,
   matrix_complete: true,
   sources: [
@@ -255,7 +255,7 @@ const groups: CrossDatasetGroup[] = [
     },
   },
   {
-    dimension: "ledger_source",
+    dimension: "chronicle_source",
     key: "irs_soi",
     label: "IRS SOI",
     fact_count: 33_045,
@@ -449,7 +449,7 @@ const groups: CrossDatasetGroup[] = [
 test("keeps the page title and exposes only the requested group controls", () => {
   expect(CROSS_DATASET_PAGE_TITLE).toBe("Cross-dataset comparison");
   expect(GROUP_DIMENSIONS).toEqual([
-    { key: "ledger_source", label: "Chronicle source" },
+    { key: "chronicle_source", label: "Chronicle source" },
     { key: "period", label: "Period" },
     { key: "geography", label: "Geography" },
   ]);
@@ -635,7 +635,7 @@ test("source scorecards identify aligned, advanced, and in-sample comparisons", 
 });
 
 test("group rows expose score, coverage, unsupported counts, and fact links", () => {
-  const rows = buildGroupRows(groups, "ledger_source", summary.sources);
+  const rows = buildGroupRows(groups, "chronicle_source", summary.sources);
   expect(rows).toHaveLength(1);
   expect(rows[0].label).toBe("IRS Statistics of Income");
   expect(rows[0].sources.microcosm).toMatchObject({
@@ -658,7 +658,7 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
     unsupportedCount: 33_008,
   });
   expect(rows[0].sources.cps.factHref).toBe(
-    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi",
+    "/microcosm/datasets?view=facts&source=cps&chronicle_source=irs_soi",
   );
   expect("coveragePercent" in rows[0].sources.microcosm).toBe(false);
 });

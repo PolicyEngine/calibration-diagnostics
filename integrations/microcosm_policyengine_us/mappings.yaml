@@ -1,12 +1,12 @@
 mapping_release: microcosm-policyengine-us-2024-chronicle-expansion-v10
 mappings:
   - mapping_id: census-pep-resident-population-calibration-target
-    ledger_selector:
+    chronicle_selector:
       sources: [census_pep]
       measures: [census_pep.resident_population]
       units: [count]
       entities: [person]
-      fact_keys: [ledger.aggregate_fact.v2:caae1a32d55fddfc7562d21d]
+      fact_keys: [chronicle.aggregate_fact.v2:caae1a32d55fddfc7562d21d]
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -17,14 +17,14 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: census-pep-resident-population-holdouts
-    ledger_selector:
+    chronicle_selector:
       sources: [census_pep]
       measures: [census_pep.resident_population]
       units: [count]
       entities: [person]
       fact_keys:
-        - ledger.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52
-        - ledger.aggregate_fact.v2:5ca7aa68822556e9e9ad9c06
+        - chronicle.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52
+        - chronicle.aggregate_fact.v2:5ca7aa68822556e9e9ad9c06
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -34,15 +34,15 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: census-pep-resident-population-validation
-    ledger_selector:
+    chronicle_selector:
       sources: [census_pep]
       measures: [census_pep.resident_population]
       units: [count]
       entities: [person]
       excluded_fact_keys:
-        - ledger.aggregate_fact.v2:caae1a32d55fddfc7562d21d
-        - ledger.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52
-        - ledger.aggregate_fact.v2:5ca7aa68822556e9e9ad9c06
+        - chronicle.aggregate_fact.v2:caae1a32d55fddfc7562d21d
+        - chronicle.aggregate_fact.v2:13157ca7aa5f8cbb37c8ad52
+        - chronicle.aggregate_fact.v2:5ca7aa68822556e9e9ad9c06
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -54,7 +54,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: census-population-projection
-    ledger_selector:
+    chronicle_selector:
       sources: [census_population_projections]
       measures: [census.population_projection]
       units: [count]
@@ -63,12 +63,12 @@ mappings:
       # 80–84 and 85 means ages 85+. Dedicated mappings below keep those codes
       # out of literal single-year queries.
       excluded_fact_keys:
-        - ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
-        - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
-        - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
-        - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
-        - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
-        - ledger.aggregate_fact.v2:4270254d5042b64d0d41e551
+        - chronicle.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
+        - chronicle.aggregate_fact.v2:24ef01329f771565b927bd3d
+        - chronicle.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
+        - chronicle.aggregate_fact.v2:ba9cae909127ad2764caec51
+        - chronicle.aggregate_fact.v2:7d34a92d4a5309888bf1e975
+        - chronicle.aggregate_fact.v2:4270254d5042b64d0d41e551
     execution: direct
     source_expression: __ones__
     operation: weighted_sum
@@ -79,17 +79,17 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: census-population-projection-cps-age-80-84
-    ledger_selector:
+    chronicle_selector:
       sources: [census_population_projections]
       measures: [census.population_projection]
       units: [count]
       entities: [person]
       fact_keys:
-        - ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
-        - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
-        - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
-        - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
-        - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
+        - chronicle.aggregate_fact.v2:60be3a49582e5eb0681b1cbc
+        - chronicle.aggregate_fact.v2:24ef01329f771565b927bd3d
+        - chronicle.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
+        - chronicle.aggregate_fact.v2:ba9cae909127ad2764caec51
+        - chronicle.aggregate_fact.v2:7d34a92d4a5309888bf1e975
     execution: direct
     source_expression: cps_asec_age_80_84_population
     operation: weighted_sum
@@ -101,19 +101,19 @@ mappings:
     # All five facts retain traceability to the grouped benchmark, but only
     # the age-80 anchor contributes the one independent comparison.
     unscored_fact_keys:
-      - ledger.aggregate_fact.v2:24ef01329f771565b927bd3d
-      - ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
-      - ledger.aggregate_fact.v2:ba9cae909127ad2764caec51
-      - ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975
+      - chronicle.aggregate_fact.v2:24ef01329f771565b927bd3d
+      - chronicle.aggregate_fact.v2:2d017e244d58edc8d99bcc0c
+      - chronicle.aggregate_fact.v2:ba9cae909127ad2764caec51
+      - chronicle.aggregate_fact.v2:7d34a92d4a5309888bf1e975
     calibration_exposure: external_validation
 
   - mapping_id: census-population-projection-cps-age-85-plus
-    ledger_selector:
+    chronicle_selector:
       sources: [census_population_projections]
       measures: [census.population_projection]
       units: [count]
       entities: [person]
-      fact_keys: [ledger.aggregate_fact.v2:4270254d5042b64d0d41e551]
+      fact_keys: [chronicle.aggregate_fact.v2:4270254d5042b64d0d41e551]
     execution: direct
     source_expression: cps_asec_age_85_plus_population
     operation: weighted_sum
@@ -125,7 +125,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: census-acs-person-count-holdout
-    ledger_selector:
+    chronicle_selector:
       sources: [census_acs]
       measures: [census_acs.person_count]
       units: [count]
@@ -140,7 +140,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: census-acs-household-count-holdout
-    ledger_selector:
+    chronicle_selector:
       sources: [census_acs]
       measures: [census_acs.household_count]
       units: [count]
@@ -155,7 +155,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-eitc-return-count
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.returns_with_total_earned_income_credit
@@ -179,7 +179,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-eitc-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.total_earned_income_credit
@@ -203,7 +203,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-additional-child-tax-credit-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.additional_child_tax_credit]
       units: [usd]
@@ -219,7 +219,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-additional-child-tax-credit-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_additional_child_tax_credit]
       units: [count]
@@ -235,7 +235,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-business-profession-income-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.business_or_profession_net_income
@@ -253,7 +253,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-business-profession-income-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_business_or_profession_net_income]
       units: [count]
@@ -269,7 +269,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-charitable-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.charitable_contributions_deduction]
       units: [usd]
@@ -285,7 +285,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-charitable-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_charitable_contributions_deduction]
       units: [count]
@@ -301,7 +301,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-income-tax-before-credits-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.income_tax_before_credits]
       units: [usd]
@@ -317,7 +317,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-income-tax-before-credits-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_income_tax_before_credits]
       units: [count]
@@ -333,7 +333,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-income-tax-liability-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.income_tax_liability_after_credits]
       units: [usd]
@@ -349,7 +349,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-income-tax-liability-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_income_tax_liability_after_credits]
       units: [count]
@@ -365,7 +365,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-interest-paid-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.interest_paid_deduction]
       units: [usd]
@@ -381,7 +381,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-interest-paid-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_interest_paid_deduction]
       units: [count]
@@ -397,7 +397,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-salt-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.limited_state_local_taxes]
       units: [usd]
@@ -413,7 +413,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-salt-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_limited_state_local_taxes]
       units: [count]
@@ -429,7 +429,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-medical-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.medical_dental_expense_deduction]
       units: [usd]
@@ -445,7 +445,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-medical-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_medical_dental_expense_deduction]
       units: [count]
@@ -461,7 +461,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-net-capital-gains-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.net_capital_gains]
       units: [usd]
@@ -477,7 +477,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-net-capital-gains-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_net_capital_gains]
       units: [count]
@@ -493,7 +493,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-ordinary-dividends-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.ordinary_dividends]
       units: [usd]
@@ -509,7 +509,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-ordinary-dividends-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_ordinary_dividends]
       units: [count]
@@ -525,7 +525,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-partnership-s-corp-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.partnership_s_corporation_net_income
@@ -543,7 +543,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-partnership-s-corp-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_partnership_s_corporation_net_income]
       units: [count]
@@ -559,7 +559,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-premium-tax-credit-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.premium_tax_credit]
       units: [usd]
@@ -575,7 +575,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-premium-tax-credit-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_premium_tax_credit]
       units: [count]
@@ -591,7 +591,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-qbi-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.qualified_business_income_deduction]
       units: [usd]
@@ -607,7 +607,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-qbi-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_qualified_business_income_deduction]
       units: [count]
@@ -623,7 +623,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-qualified-dividends-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.qualified_dividends]
       units: [usd]
@@ -639,7 +639,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-qualified-dividends-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_qualified_dividends]
       units: [count]
@@ -655,7 +655,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-tax-exempt-interest-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.tax_exempt_interest]
       units: [usd]
@@ -671,7 +671,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-tax-exempt-interest-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_tax_exempt_interest]
       units: [count]
@@ -687,7 +687,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-taxable-interest-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.taxable_interest]
       units: [usd]
@@ -703,7 +703,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-taxable-interest-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_interest]
       units: [count]
@@ -719,7 +719,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-taxable-ira-distributions-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.taxable_ira_distributions]
       units: [usd]
@@ -735,7 +735,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-taxable-ira-distributions-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_ira_distributions]
       units: [count]
@@ -751,7 +751,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-taxable-pensions-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.taxable_pensions_and_annuities
@@ -769,7 +769,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-taxable-pensions-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_pensions_and_annuities]
       units: [count]
@@ -785,7 +785,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-taxable-social-security-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.taxable_social_security_benefits]
       units: [usd]
@@ -801,7 +801,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-taxable-social-security-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_social_security_benefits]
       units: [count]
@@ -817,7 +817,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-itemized-deductions-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.total_itemized_deductions]
       units: [usd]
@@ -833,7 +833,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-unemployment-compensation-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.unemployment_compensation]
       units: [usd]
@@ -849,7 +849,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-unemployment-compensation-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_unemployment_compensation]
       units: [count]
@@ -865,7 +865,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-adjusted-gross-income-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [us:statutes/26/62#adjusted_gross_income]
       units: [usd]
@@ -881,7 +881,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-return-count
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.individual_income_tax_returns]
       units: [count]
@@ -897,7 +897,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-filer-individual-count
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.tax_filer_individuals]
       units: [count]
@@ -913,7 +913,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-traditional-401k-contributions
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.form_w2_401k_elective_deferrals]
       units: [usd]
@@ -927,7 +927,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-roth-401k-contributions
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.form_w2_designated_roth_401k_contributions]
       units: [usd]
@@ -941,7 +941,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-traditional-ira-contributions
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.traditional_ira_contributions]
       units: [usd]
@@ -955,7 +955,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-traditional-ira-contributors
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.traditional_ira_contributors]
       units: [count]
@@ -969,7 +969,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-roth-ira-contributions
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.roth_ira_contributions]
       units: [usd]
@@ -983,7 +983,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-roth-ira-contributors
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.roth_ira_contributors]
       units: [count]
@@ -997,7 +997,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: cbo-adjusted-gross-income
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures: [cbo.adjusted_gross_income_projection]
       units: [usd]
@@ -1011,7 +1011,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: cbo-net-business-income
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures: [cbo.net_business_income_projection]
       units: [usd]
@@ -1025,7 +1025,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: cbo-net-capital-gain
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures: [cbo.net_capital_gain_projection]
       units: [usd]
@@ -1039,7 +1039,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: cbo-qualified-dividend-income
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures: [cbo.qualified_dividend_income_projection]
       units: [usd]
@@ -1053,7 +1053,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: cbo-taxable-interest-and-non-qualified-dividends
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures:
         - cbo.taxable_interest_and_ordinary_dividends_excluding_qualified_dividends_projection
@@ -1069,7 +1069,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: cbo-wages-and-salaries
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures: [cbo.wages_and_salaries_projection]
       units: [usd]
@@ -1083,7 +1083,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: ssa-ssi-payment-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.ssi_payment_amount]
       units: [usd]
@@ -1099,7 +1099,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: ssa-ssi-recipient-count
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.ssi_recipient_count]
       units: [count]
@@ -1115,12 +1115,12 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: ssa-annual-social-security-total
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [ledger.aggregate_fact.v2:035d27c7ddaecd3099232f2d]
+      fact_keys: [chronicle.aggregate_fact.v2:035d27c7ddaecd3099232f2d]
     execution: direct
     source_expression: social_security
     operation: weighted_sum
@@ -1134,12 +1134,12 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: ssa-annual-social-security-dependents
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [ledger.aggregate_fact.v2:cf58110712f7a30d1d03b8b0]
+      fact_keys: [chronicle.aggregate_fact.v2:cf58110712f7a30d1d03b8b0]
     execution: direct
     source_expression: social_security_dependents
     operation: weighted_sum
@@ -1153,12 +1153,12 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: ssa-annual-social-security-disability
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [ledger.aggregate_fact.v2:1d3492e0d2a643f41ba01974]
+      fact_keys: [chronicle.aggregate_fact.v2:1d3492e0d2a643f41ba01974]
     execution: direct
     source_expression: social_security_disability
     operation: weighted_sum
@@ -1172,12 +1172,12 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: ssa-annual-social-security-retirement
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [ledger.aggregate_fact.v2:30dce3f79a7d4c83cf66fb93]
+      fact_keys: [chronicle.aggregate_fact.v2:30dce3f79a7d4c83cf66fb93]
     execution: direct
     source_expression: social_security_retirement
     operation: weighted_sum
@@ -1191,12 +1191,12 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: ssa-annual-social-security-survivors
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [ledger.aggregate_fact.v2:3ea75e37464de497387232b9]
+      fact_keys: [chronicle.aggregate_fact.v2:3ea75e37464de497387232b9]
     execution: direct
     source_expression: social_security_survivors
     operation: weighted_sum
@@ -1210,12 +1210,12 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: ssa-annual-ssi
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
       entities: [person]
-      fact_keys: [ledger.aggregate_fact.v2:ddf4fff0450304b664352542]
+      fact_keys: [chronicle.aggregate_fact.v2:ddf4fff0450304b664352542]
     execution: model
     source_expression: ssi
     operation: weighted_sum
@@ -1229,7 +1229,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: bea-nipa-wages-and-salaries
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.wages_and_salaries]
       units: [usd]
@@ -1246,7 +1246,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: bea-nipa-employer-government-social-insurance-contributions
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures:
         [bea_nipa.employer_contributions_for_government_social_insurance]
@@ -1266,7 +1266,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: bea-nipa-gross-medicare-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.medicare_benefits]
       units: [usd]
@@ -1287,7 +1287,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: bea-regional-residence-adjusted-wages
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_regional.wages_and_salaries]
       units: [usd]
@@ -1312,7 +1312,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: cms-nhe-medicaid-title-xix-expenditures
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_nhe]
       measures: [cms_nhe.medicaid_title_xix_expenditures]
       units: [usd]
@@ -1326,13 +1326,13 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: cms-nhe-employer-health-insurance-premiums
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_nhe]
       measures:
         [cms_nhe.employer_contribution_private_health_insurance_premiums]
       units: [usd]
       entities: [person]
-      fact_keys: [ledger.aggregate_fact.v2:f4c1ba528660b3f48ca03b90]
+      fact_keys: [chronicle.aggregate_fact.v2:f4c1ba528660b3f48ca03b90]
     execution: direct
     source_expression: employer_sponsored_insurance_premiums
     operation: weighted_sum
@@ -1342,7 +1342,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: cms-medicare-part-b-premium-income
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_medicare]
       measures: [cms_medicare.part_b_premium_income]
       units: [usd]
@@ -1365,7 +1365,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: cms-aca-aptc-consumers
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_aca]
       measures: [cms_aca.aptc_consumers]
       units: [count]
@@ -1379,7 +1379,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: cms-aca-marketplace-plan-selections
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_aca]
       measures: [cms_aca.marketplace_plan_selections]
       units: [count]
@@ -1393,7 +1393,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: cms-aca-average-monthly-aptc
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_aca]
       measures: [cms_aca.average_monthly_aptc]
       units: [usd]
@@ -1409,7 +1409,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: kff-marketplace-effectuated-enrollment
-    ledger_selector:
+    chronicle_selector:
       sources: [kff]
       measures: [cms_aca.marketplace_effectuated_enrollment]
       units: [count]
@@ -1423,7 +1423,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: federal-reserve-household-net-worth
-    ledger_selector:
+    chronicle_selector:
       sources: [federal_reserve]
       measures: [federal_reserve.z1.households_nonprofits_net_worth]
       units: [usd]
@@ -1438,14 +1438,14 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: usda-snap-total-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [usda_snap]
       measures: [usda_snap.total_benefits]
       units: [usd]
       entities: [government]
       excluded_fact_keys:
-        - ledger.aggregate_fact.v2:2678cc487a40e182ad36fcd7
-        - ledger.aggregate_fact.v2:b5d81911cf61e7aa92ea516b
+        - chronicle.aggregate_fact.v2:2678cc487a40e182ad36fcd7
+        - chronicle.aggregate_fact.v2:b5d81911cf61e7aa92ea516b
     execution: model
     execution_entity: spm_unit
     build_target_periods: [fiscal_year:2024]
@@ -1457,14 +1457,14 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: usda-snap-average-monthly-households
-    ledger_selector:
+    chronicle_selector:
       sources: [usda_snap]
       measures: [usda_snap.average_monthly_households]
       units: [count]
       entities: [household]
       excluded_fact_keys:
-        - ledger.aggregate_fact.v2:40fbf9f01a32b51ed9314499
-        - ledger.aggregate_fact.v2:54d0cb0098771aa4a8af2132
+        - chronicle.aggregate_fact.v2:40fbf9f01a32b51ed9314499
+        - chronicle.aggregate_fact.v2:54d0cb0098771aa4a8af2132
     execution: model
     execution_entity: spm_unit
     build_target_periods: [fiscal_year:2024]
@@ -1476,7 +1476,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: usda-snap-average-monthly-persons
-    ledger_selector:
+    chronicle_selector:
       sources: [usda_snap]
       measures: [usda_snap.average_monthly_persons]
       units: [count]
@@ -1492,7 +1492,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: usda-snap-average-monthly-benefit-per-person
-    ledger_selector:
+    chronicle_selector:
       sources: [usda_snap]
       measures: [usda_snap.average_monthly_benefit_per_person]
       units: [usd_per_month]
@@ -1509,7 +1509,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: liheap-households-served
-    ledger_selector:
+    chronicle_selector:
       sources: [hhs_acf_liheap]
       measures: [hhs_acf_liheap.households_served_by_state_programs]
       units: [count]
@@ -1529,7 +1529,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: tanf-cash-assistance-expenditures
-    ledger_selector:
+    chronicle_selector:
       sources: [hhs_acf_tanf]
       measures: [hhs_acf_tanf.cash_assistance_expenditures]
       units: [usd]
@@ -1545,7 +1545,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: tanf-average-monthly-total-families
-    ledger_selector:
+    chronicle_selector:
       sources: [hhs_acf_tanf]
       measures: [hhs_acf_tanf.average_monthly_tanf_total_families]
       units: [count]
@@ -1561,13 +1561,13 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: census-stc-individual-income-tax-collections
-    ledger_selector:
+    chronicle_selector:
       sources: [census_stc]
       measures: [census_stc.individual_income_tax_collections]
       units: [usd]
       entities: [government]
       excluded_fact_keys:
-        - ledger.aggregate_fact.v2:b0735b6815dabfcd24f7ff40
+        - chronicle.aggregate_fact.v2:b0735b6815dabfcd24f7ff40
     execution: model
     execution_entity: tax_unit
     build_target_periods: [fiscal_year:2024]
@@ -1579,7 +1579,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: cms-medicaid-total-medicaid-enrollment
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_medicaid]
       measures: [cms_medicaid.total_medicaid_enrollment]
       units: [count]
@@ -1597,10 +1597,10 @@ mappings:
     # this as a structural zero, so retain the estimate for inspection but do
     # not score it against the missing observation.
     unscored_fact_keys:
-      - ledger.aggregate_fact.v2:fa4459772a62b4eada33ba30
+      - chronicle.aggregate_fact.v2:fa4459772a62b4eada33ba30
 
   - mapping_id: cms-medicaid-total-chip-enrollment
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_medicaid]
       measures: [cms_medicaid.total_chip_enrollment]
       units: [count]
@@ -1615,7 +1615,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: cms-medicaid-total-medicaid-chip-enrollment
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_medicaid]
       measures: [cms_medicaid.total_medicaid_chip_enrollment]
       units: [count]
@@ -1629,10 +1629,10 @@ mappings:
     supported_constraint_domains: [medicaid_chip_enrollment]
     calibration_exposure: direct_calibration_target
     unscored_fact_keys:
-      - ledger.aggregate_fact.v2:b153e34a3c3354a52fcd2e7e
+      - chronicle.aggregate_fact.v2:b153e34a3c3354a52fcd2e7e
 
   - mapping_id: cms-medicaid-total-adult-enrollment
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_medicaid]
       measures: [cms_medicaid.total_adult_medicaid_enrollment]
       units: [count]
@@ -1649,10 +1649,10 @@ mappings:
     # December data. Execute the model counterpart for inspection, but do not
     # score the administrative missing-value sentinel as a structural zero.
     unscored_fact_keys:
-      - ledger.aggregate_fact.v2:09ae62cf32b2eddb8eda7adf
+      - chronicle.aggregate_fact.v2:09ae62cf32b2eddb8eda7adf
 
   - mapping_id: cms-medicaid-child-enrollment
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_medicaid]
       measures: [cms_medicaid.medicaid_chip_child_enrollment]
       units: [count]
@@ -1666,10 +1666,10 @@ mappings:
     supported_constraint_domains: [medicaid_chip_enrollment]
     calibration_exposure: related_calibration_family
     unscored_fact_keys:
-      - ledger.aggregate_fact.v2:a30c1502ae98f22d936a27ad
+      - chronicle.aggregate_fact.v2:a30c1502ae98f22d936a27ad
 
   - mapping_id: ssa-ssi-federal-payment-recipients-by-age
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.ssi_federal_payment_recipient_count]
       units: [count]
@@ -1685,7 +1685,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-form-w2-social-security-tip-income
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.form_w2_social_security_tip_income]
       units: [usd]
@@ -1699,7 +1699,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-form-w2-social-security-tip-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.form_w2_social_security_tip_returns]
       units: [count]
@@ -1713,7 +1713,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: irs-soi-form-w2-social-security-tip-taxpayers
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.form_w2_social_security_tip_taxpayers]
       units: [count]
@@ -1727,7 +1727,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: irs-soi-rental-royalty-net-income
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.rental_and_royalty_net_income
@@ -1745,7 +1745,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-rental-royalty-return-count
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.returns_with_rental_and_royalty_net_income
@@ -1763,7 +1763,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-2022-real-estate-taxes-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.real_estate_taxes]
       units: [usd]
@@ -1779,7 +1779,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-wages-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [us:statutes/26/62#input.wages]
       units: [usd]
@@ -1795,7 +1795,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-child-tax-credit-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.child_tax_credit]
       units: [usd]
@@ -1811,7 +1811,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-taxable-income-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.taxable_income]
       units: [usd]
@@ -1827,7 +1827,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-total-income-tax-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.total_income_tax]
       units: [usd]
@@ -1843,7 +1843,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-taxable-net-capital-gains-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.taxable_net_capital_gains]
       units: [usd]
@@ -1859,7 +1859,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-schedule-c-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_schedule_c_income]
       units: [count]
@@ -1875,7 +1875,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-income-tax-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_total_income_tax]
       units: [count]
@@ -1891,7 +1891,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-wage-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_total_wages]
       units: [count]
@@ -1907,7 +1907,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-itemized-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_itemized_deductions]
       units: [count]
@@ -1923,7 +1923,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-ctc-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_child_tax_credit]
       units: [count]
@@ -1939,7 +1939,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-capital-gain-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_net_capital_gains]
       units: [count]
@@ -1955,7 +1955,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-taxable-income-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_income]
       units: [count]
@@ -1971,7 +1971,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-taxable-pension-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_pension_income]
       units: [count]
@@ -1987,7 +1987,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-real-estate-tax-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_real_estate_taxes]
       units: [count]
@@ -2003,7 +2003,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: irs-soi-2022-total-income-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_total_income]
       units: [count]
@@ -2019,7 +2019,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-2022-total-income-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.total_income]
       units: [usd]
@@ -2035,7 +2035,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: irs-soi-2022-partnership-s-corp-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_partnership_scorp_income]
       units: [count]
@@ -2051,7 +2051,7 @@ mappings:
     calibration_exposure: direct_calibration_target
 
   - mapping_id: bea-nipa-medicaid-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.medicaid_benefits]
       units: [usd]
@@ -2069,7 +2069,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: bea-nipa-social-security-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.social_security_benefits]
       units: [usd]
@@ -2087,7 +2087,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: bea-nipa-unemployment-insurance-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.unemployment_insurance_benefits]
       units: [usd]
@@ -2105,7 +2105,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: bea-nipa-veterans-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.veterans_benefits]
       units: [usd]
@@ -2123,7 +2123,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: bea-nipa-proprietors-income
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures:
         [bea_nipa.proprietors_income_with_inventory_valuation_and_capital_consumption_adjustments]
@@ -2142,7 +2142,7 @@ mappings:
     calibration_exposure: related_calibration_family
 
   - mapping_id: bea-regional-proprietors-income
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_regional.proprietors_income]
       units: [usd]

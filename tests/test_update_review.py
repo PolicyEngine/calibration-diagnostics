@@ -61,7 +61,7 @@ def registry() -> MappingRegistry:
             "mappings": [
                 {
                     "mapping_id": "agi",
-                    "ledger_selector": {
+                    "chronicle_selector": {
                         "sources": ["irs_soi"],
                         "measures": ["irs_soi.adjusted_gross_income"],
                         "units": ["usd"],
@@ -124,8 +124,8 @@ def test_source_review_flags_mapping_regressions_without_reexecuting_value_only_
         (new_a, new_b, new_d),
         old_plan=plan,
         new_plan=plan,
-        from_snapshot="ledger-old",
-        to_snapshot="ledger-new",
+        from_snapshot="chronicle-old",
+        to_snapshot="chronicle-new",
     )
 
     assert review.mapping_regressions == (
@@ -155,8 +155,8 @@ def test_newly_executable_fact_selects_model_execution() -> None:
         new,
         old_plan=plan,
         new_plan=plan,
-        from_snapshot="ledger-old",
-        to_snapshot="ledger-new",
+        from_snapshot="chronicle-old",
+        to_snapshot="chronicle-new",
     )
     assert review.newly_executable == ("semantic-b",)
     assert review.requires_execution
@@ -176,7 +176,7 @@ def test_both_active_adapter_gates_keep_ten_directly_testable_facts() -> None:
             overview,
             overview.verification_facts,
             plan=plan,
-            snapshot_id=overview.ledger_snapshot_id,
+            snapshot_id=overview.chronicle_snapshot_id,
         )
         assert gate.expected_count == 10
         assert gate.matched_count == 10
@@ -204,7 +204,7 @@ def test_verification_gate_rejects_a_ten_na_completion() -> None:
         overview,
         unsupported,
         plan=plan,
-        snapshot_id="ledger-new",
+        snapshot_id="chronicle-new",
     )
     assert gate.matched_count == 10
     assert gate.testable_count == 0
@@ -221,7 +221,7 @@ def write_snapshot(path: Path, *, consumer_schema: str = CONSUMER_SCHEMA) -> Pat
         json.dumps(
             {
                 "schema_version": SNAPSHOT_SCHEMA,
-                "snapshot_id": "ledger-test",
+                "snapshot_id": "chronicle-test",
                 "consumer_schema_version": consumer_schema,
                 "fact_count": 1,
                 "normalized_facts_sha256": hashlib.sha256(facts.encode()).hexdigest(),
@@ -235,12 +235,12 @@ def test_snapshot_compatibility_checks_schema_hash_count_and_consumer_contract(
     tmp_path: Path,
 ) -> None:
     compatible = validate_snapshot_compatibility(write_snapshot(tmp_path / "ok"))
-    assert compatible["snapshot_id"] == "ledger-test"
+    assert compatible["snapshot_id"] == "chronicle-test"
     assert compatible["fact_count"] == 1
 
     with pytest.raises(ValueError, match="consumer schema"):
         validate_snapshot_compatibility(
-            write_snapshot(tmp_path / "bad", consumer_schema="ledger.consumer_fact.v2")
+            write_snapshot(tmp_path / "bad", consumer_schema="chronicle.consumer_fact.v2")
         )
 
 
@@ -255,12 +255,12 @@ def test_update_review_publication_is_immutable_and_content_addressed(
         new,
         old_plan=plan,
         new_plan=plan,
-        from_snapshot="ledger-old",
-        to_snapshot="ledger-new",
+        from_snapshot="chronicle-old",
+        to_snapshot="chronicle-new",
     )
     diff = SnapshotDiff(
-        from_snapshot="ledger-old",
-        to_snapshot="ledger-new",
+        from_snapshot="chronicle-old",
+        to_snapshot="chronicle-new",
         added=(),
         removed=(),
         changed_values=("old-a",),
@@ -276,7 +276,7 @@ def test_update_review_publication_is_immutable_and_content_addressed(
     assert document["affected_sources"]["rescore"] == ["model"]
     output = tmp_path / "review"
     manifest = publish_update_review(document, output)
-    assert manifest["review_id"].startswith("ledger-review-")
+    assert manifest["review_id"].startswith("chronicle-review-")
     assert (output / "review.json").exists()
     assert (output / "review_manifest.json").exists()
     with pytest.raises(FileExistsError):

@@ -1,7 +1,7 @@
 schema_version: evaluation_harness.integration_overview.v1
 integration_id: census_acs_pums_2024
-ledger_snapshot_id: ledger-7917ea815df710fb20db076b
-verification_facts_file: ledger_snapshot_fixture/facts.jsonl
+chronicle_snapshot_id: chronicle-7917ea815df710fb20db076b
+verification_facts_file: chronicle_snapshot_fixture/facts.jsonl
 alignment_policy: {}
 source:
   source_id: census_acs_pums_2024

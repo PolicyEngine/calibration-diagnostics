@@ -69,7 +69,7 @@ export async function crossDatasetApiResponse(
           pageSize,
           source: params.get("source") || undefined,
           status: params.get("status") || undefined,
-          ledgerSource: params.get("ledger_source") || undefined,
+          chronicleSource: params.get("chronicle_source") || undefined,
           measure: params.get("measure") || undefined,
           period: params.get("period") || undefined,
           geography: params.get("geography") || undefined,

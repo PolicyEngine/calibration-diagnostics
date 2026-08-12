@@ -1,7 +1,7 @@
 mapping_release: taxcalc-public-cps-chronicle-expansion-v3
 mappings:
   - mapping_id: taxcalc-cps-returns-with-income-tax
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_income_tax_liability_after_credits]
       units: [count]
@@ -19,7 +19,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-eitc-by-children
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.earned_income_credit
@@ -43,7 +43,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-eitc-return-count-by-children
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.returns_with_earned_income_credit
@@ -67,7 +67,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-adjusted-gross-income
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [us:statutes/26/62#adjusted_gross_income]
       units: [usd]
@@ -83,7 +83,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-wages
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures: [cbo.wages_and_salaries_projection]
       units: [usd]
@@ -97,7 +97,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-interest
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.taxable_interest]
       units: [usd]
@@ -113,7 +113,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-ordinary-dividends
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.ordinary_dividends]
       units: [usd]
@@ -129,7 +129,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-pensions
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.taxable_pensions_and_annuities
@@ -147,7 +147,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-social-security
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.taxable_social_security_benefits]
       units: [usd]
@@ -163,7 +163,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-unemployment-compensation
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.unemployment_compensation]
       units: [usd]
@@ -179,7 +179,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-income-tax
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.income_tax_liability_after_credits]
       units: [usd]
@@ -195,7 +195,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-cbo-adjusted-gross-income
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures: [cbo.adjusted_gross_income_projection]
       units: [usd]
@@ -209,7 +209,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-cbo-qualified-dividends
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures: [cbo.qualified_dividend_income_projection]
       units: [usd]
@@ -223,7 +223,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-cbo-interest-and-nonqualified-dividends
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures:
         - cbo.taxable_interest_and_ordinary_dividends_excluding_qualified_dividends_projection
@@ -238,7 +238,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-additional-child-tax-credit-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.additional_child_tax_credit]
       units: [usd]
@@ -254,7 +254,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-additional-child-tax-credit-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_additional_child_tax_credit]
       units: [count]
@@ -270,7 +270,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-child-tax-credit-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.child_tax_credit]
       units: [usd]
@@ -286,7 +286,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-child-tax-credit-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_child_tax_credit]
       units: [count]
@@ -302,7 +302,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-schedule-c-income-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.business_or_profession_net_income
@@ -320,7 +320,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-schedule-c-income-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.returns_with_business_or_profession_net_income
@@ -338,7 +338,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-charitable-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.charitable_contributions_deduction]
       units: [usd]
@@ -354,7 +354,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-charitable-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_charitable_contributions_deduction]
       units: [count]
@@ -370,7 +370,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-income-tax-before-credits-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.income_tax_before_credits]
       units: [usd]
@@ -386,7 +386,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-income-tax-before-credits-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_income_tax_before_credits]
       units: [count]
@@ -402,7 +402,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-interest-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.interest_paid_deduction]
       units: [usd]
@@ -418,7 +418,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-interest-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_interest_paid_deduction]
       units: [count]
@@ -434,7 +434,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-salt-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.limited_state_local_taxes]
       units: [usd]
@@ -450,7 +450,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-salt-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_limited_state_local_taxes]
       units: [count]
@@ -466,7 +466,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-medical-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.medical_dental_expense_deduction]
       units: [usd]
@@ -482,7 +482,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-medical-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_medical_dental_expense_deduction]
       units: [count]
@@ -498,7 +498,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-ordinary-dividend-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_ordinary_dividends]
       units: [count]
@@ -514,7 +514,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-qbi-deduction-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.qualified_business_income_deduction]
       units: [usd]
@@ -530,7 +530,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-qbi-deduction-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_qualified_business_income_deduction]
       units: [count]
@@ -546,7 +546,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-qualified-dividend-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.qualified_dividends]
       units: [usd]
@@ -562,7 +562,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-qualified-dividend-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_qualified_dividends]
       units: [count]
@@ -578,7 +578,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-tax-exempt-interest-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.tax_exempt_interest]
       units: [usd]
@@ -594,7 +594,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-tax-exempt-interest-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_tax_exempt_interest]
       units: [count]
@@ -610,7 +610,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-interest-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_interest]
       units: [count]
@@ -626,7 +626,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-ira-distributions-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.taxable_ira_distributions]
       units: [usd]
@@ -642,7 +642,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-ira-distributions-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_ira_distributions]
       units: [count]
@@ -658,7 +658,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-pension-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.returns_with_taxable_pensions_and_annuities
@@ -676,7 +676,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-social-security-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_social_security_benefits]
       units: [count]
@@ -692,7 +692,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-itemized-deductions-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.total_itemized_deductions]
       units: [usd]
@@ -708,7 +708,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-itemized-deductions-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_itemized_deductions]
       units: [count]
@@ -724,7 +724,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-unemployment-compensation-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_unemployment_compensation]
       units: [count]
@@ -740,7 +740,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-income-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.taxable_income]
       units: [usd]
@@ -756,7 +756,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-taxable-income-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_taxable_income]
       units: [count]
@@ -772,7 +772,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-total-income-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.total_income]
       units: [usd]
@@ -788,7 +788,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-total-income-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_total_income]
       units: [count]
@@ -804,7 +804,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-total-income-tax-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.total_income_tax]
       units: [usd]
@@ -820,7 +820,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-total-income-tax-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_total_income_tax]
       units: [count]
@@ -836,7 +836,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-real-estate-taxes-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.real_estate_taxes]
       units: [usd]
@@ -852,7 +852,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-real-estate-taxes-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_real_estate_taxes]
       units: [count]
@@ -868,7 +868,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-irs-wages-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [us:statutes/26/62#input.wages]
       units: [usd]
@@ -884,7 +884,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-irs-wage-returns
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.returns_with_total_wages]
       units: [count]
@@ -900,7 +900,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-social-security-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.annual_oasdi_or_ssi_payment_amount]
       units: [usd]
@@ -922,7 +922,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-ssi-payment-total
-    ledger_selector:
+    chronicle_selector:
       sources: [ssa]
       measures: [ssa.ssi_payment_amount]
       units: [usd]
@@ -938,7 +938,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-capital-gains-amount
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.net_capital_gains
@@ -958,7 +958,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-capital-gains-return-count
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures:
         - irs_soi.returns_with_net_capital_gains
@@ -978,7 +978,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-cbo-capital-gains
-    ledger_selector:
+    chronicle_selector:
       sources: [cbo]
       measures: [cbo.net_capital_gain_projection]
       units: [usd]
@@ -992,7 +992,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-pep-total-population
-    ledger_selector:
+    chronicle_selector:
       sources: [census_pep]
       measures: [census_pep.resident_population]
       units: [count]
@@ -1007,7 +1007,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-bea-regional-wages
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_regional.wages_and_salaries]
       units: [usd]
@@ -1038,7 +1038,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-bea-nipa-wages
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.wages_and_salaries]
       units: [usd]
@@ -1057,7 +1057,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-bea-social-security-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.social_security_benefits]
       units: [usd]
@@ -1076,7 +1076,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-bea-unemployment-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.unemployment_insurance_benefits]
       units: [usd]
@@ -1095,7 +1095,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-bea-veterans-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.veterans_benefits]
       units: [usd]
@@ -1114,7 +1114,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-bea-medicare-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.medicare_benefits]
       units: [usd]
@@ -1133,7 +1133,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-bea-medicaid-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.medicaid_benefits]
       units: [usd]
@@ -1152,7 +1152,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-bea-government-social-benefits
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.government_social_benefits_to_persons]
       units: [usd]
@@ -1171,7 +1171,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-cms-medicaid-title-xix
-    ledger_selector:
+    chronicle_selector:
       sources: [cms_nhe]
       measures: [cms_nhe.medicaid_title_xix_expenditures]
       units: [usd]
@@ -1186,7 +1186,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-jct-charitable-deduction
-    ledger_selector:
+    chronicle_selector:
       sources: [jct]
       measures: [jct.individual_tax_expenditure_revenue_loss]
       units: [usd]
@@ -1206,7 +1206,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-jct-mortgage-interest
-    ledger_selector:
+    chronicle_selector:
       sources: [jct]
       measures: [jct.individual_tax_expenditure_revenue_loss]
       units: [usd]
@@ -1226,7 +1226,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-jct-medical-expense
-    ledger_selector:
+    chronicle_selector:
       sources: [jct]
       measures: [jct.individual_tax_expenditure_revenue_loss]
       units: [usd]
@@ -1246,7 +1246,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-jct-qbi
-    ledger_selector:
+    chronicle_selector:
       sources: [jct]
       measures: [jct.individual_tax_expenditure_revenue_loss]
       units: [usd]
@@ -1266,7 +1266,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-jct-salt
-    ledger_selector:
+    chronicle_selector:
       sources: [jct]
       measures: [jct.individual_tax_expenditure_revenue_loss]
       units: [usd]
@@ -1286,7 +1286,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-jct-self-employed-health
-    ledger_selector:
+    chronicle_selector:
       sources: [jct]
       measures: [jct.individual_tax_expenditure_revenue_loss]
       units: [usd]
@@ -1306,7 +1306,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-jct-self-employed-pension
-    ledger_selector:
+    chronicle_selector:
       sources: [jct]
       measures: [jct.individual_tax_expenditure_revenue_loss]
       units: [usd]
@@ -1326,7 +1326,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-jct-student-loan-interest
-    ledger_selector:
+    chronicle_selector:
       sources: [jct]
       measures: [jct.individual_tax_expenditure_revenue_loss]
       units: [usd]
@@ -1346,7 +1346,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: taxcalc-cps-jct-traditional-ira
-    ledger_selector:
+    chronicle_selector:
       sources: [jct]
       measures: [jct.individual_tax_expenditure_revenue_loss]
       units: [usd]

@@ -1,19 +1,10 @@
 ---
-<<<<<<<< HEAD:.claude/agents/microcosm-chronicle-auditor.md
 name: microcosm-chronicle-auditor
 description: Audits Chronicle, Arch, and source target metadata for a Microcosm calibration target
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 ---
 
 # Microcosm Chronicle Auditor
-========
-name: microcosm-ledger-auditor
-description: Audits Ledger, Arch, and source target metadata for a Microcosm calibration target
-tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
----
-
-# Microcosm Ledger Auditor
->>>>>>>> 310072e (Rename Populace to Microcosm throughout):.claude/agents/microcosm-ledger-auditor.md
 
 Audit whether the target value and semantic identity are correct.
 

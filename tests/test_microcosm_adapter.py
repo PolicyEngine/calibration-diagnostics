@@ -537,7 +537,7 @@ def test_supported_microcosm_domains_are_explicit_masks(tables) -> None:
     assert "state_government_tax_collections" in tax_units.domain_masks
 
 
-def test_eitc_return_domain_and_ledger_child_constraint_are_model_backed(tables) -> None:
+def test_eitc_return_domain_and_chronicle_child_constraint_are_model_backed(tables) -> None:
     bundle = runner(tables).prepare(
         group(
             "tax_unit",
@@ -553,12 +553,12 @@ def test_eitc_return_domain_and_ledger_child_constraint_are_model_backed(tables)
     ].tolist() == [False, True]
 
 
-def test_all_ten_reviewed_ledger_facts_execute_numerically() -> None:
+def test_all_ten_reviewed_chronicle_facts_execute_numerically() -> None:
     integration = Path("integrations/microcosm_policyengine_us")
     overview = load_integration_overview(integration / "overview.yaml")
     mappings = MappingRegistry.from_yaml(integration / "mappings.yaml")
     capabilities = tuple(
-        CapabilityPlanner(mappings, snapshot_id=overview.ledger_snapshot_id).classify(
+        CapabilityPlanner(mappings, snapshot_id=overview.chronicle_snapshot_id).classify(
             fact, overview.source
         )
         for fact in overview.verification_facts

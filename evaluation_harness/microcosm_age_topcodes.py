@@ -23,15 +23,15 @@ from .planner import AlignmentDeclaration
 
 
 CPS_ASEC_AGE_80_84_FACT_KEYS = (
-    "ledger.aggregate_fact.v2:60be3a49582e5eb0681b1cbc",  # age 80
-    "ledger.aggregate_fact.v2:24ef01329f771565b927bd3d",  # age 81
-    "ledger.aggregate_fact.v2:2d017e244d58edc8d99bcc0c",  # age 82
-    "ledger.aggregate_fact.v2:ba9cae909127ad2764caec51",  # age 83
-    "ledger.aggregate_fact.v2:7d34a92d4a5309888bf1e975",  # age 84
+    "chronicle.aggregate_fact.v2:60be3a49582e5eb0681b1cbc",  # age 80
+    "chronicle.aggregate_fact.v2:24ef01329f771565b927bd3d",  # age 81
+    "chronicle.aggregate_fact.v2:2d017e244d58edc8d99bcc0c",  # age 82
+    "chronicle.aggregate_fact.v2:ba9cae909127ad2764caec51",  # age 83
+    "chronicle.aggregate_fact.v2:7d34a92d4a5309888bf1e975",  # age 84
 )
 CPS_ASEC_AGE_80_84_ANCHOR_FACT_KEY = CPS_ASEC_AGE_80_84_FACT_KEYS[0]
 CPS_ASEC_AGE_85_PLUS_FACT_KEY = (
-    "ledger.aggregate_fact.v2:4270254d5042b64d0d41e551"
+    "chronicle.aggregate_fact.v2:4270254d5042b64d0d41e551"
 )
 CPS_ASEC_AGE_ALIGNMENT_MODEL = "cps_asec_public_use_age_topcode"
 CPS_ASEC_AGE_ALIGNMENT_VERSION = "census-asec-2023:A_AGE"

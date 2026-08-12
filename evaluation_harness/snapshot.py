@@ -11,9 +11,9 @@ from typing import Any, Iterable
 from .contracts import FactContract, TypedPeriod
 
 
-CONSUMER_SCHEMA = "ledger.consumer_fact.v1"
-CONSUMER_ARTIFACT_SCHEMA = "policyengine_ledger.consumer_artifact.v1"
-SNAPSHOT_SCHEMA = "evaluation_harness.ledger_snapshot.v1"
+CONSUMER_SCHEMA = "chronicle.consumer_fact.v1"
+CONSUMER_ARTIFACT_SCHEMA = "policyengine_chronicle.consumer_artifact.v1"
+SNAPSHOT_SCHEMA = "evaluation_harness.chronicle_snapshot.v1"
 
 REQUIRED_ROW_KEYS = {
     "schema_version",
@@ -156,7 +156,7 @@ def _facts_path(path: Path) -> Path:
     if path.is_dir():
         candidate = path / "consumer_facts.jsonl"
         if not candidate.exists():
-            raise FileNotFoundError(f"no consumer_facts.jsonl in Ledger bundle {path}")
+            raise FileNotFoundError(f"no consumer_facts.jsonl in Chronicle bundle {path}")
         return candidate
     return path
 
@@ -165,22 +165,22 @@ def _load_input_manifest(bundle_or_file: Path, facts_path: Path) -> dict[str, An
     manifest_path = bundle_or_file / "manifest.json" if bundle_or_file.is_dir() else None
     if manifest_path is None or not manifest_path.exists():
         return {
-            "ledger_commit": None,
-            "ledger_release": None,
+            "chronicle_commit": None,
+            "chronicle_release": None,
             "input_manifest_sha256": None,
         }
     manifest = json.loads(manifest_path.read_text())
     if manifest.get("schema_version") != CONSUMER_ARTIFACT_SCHEMA:
-        raise ValueError(f"unsupported Ledger artifact schema: {manifest.get('schema_version')!r}")
+        raise ValueError(f"unsupported Chronicle artifact schema: {manifest.get('schema_version')!r}")
     actual_hash = _sha256(facts_path)
     if manifest.get("facts_sha256") != actual_hash:
         raise ValueError(
-            "Ledger consumer facts hash does not match manifest: "
+            "Chronicle consumer facts hash does not match manifest: "
             f"{actual_hash} != {manifest.get('facts_sha256')}"
         )
     return {
-        "ledger_commit": manifest.get("ledger_commit"),
-        "ledger_release": manifest.get("ledger_release"),
+        "chronicle_commit": manifest.get("chronicle_commit"),
+        "chronicle_release": manifest.get("chronicle_release"),
         "input_manifest_sha256": _sha256(manifest_path),
         "declared_fact_count": manifest.get("fact_row_count"),
     }
@@ -206,7 +206,7 @@ def load_consumer_rows(path: str | Path) -> tuple[list[FactContract], dict[str, 
     declared = metadata.get("declared_fact_count")
     if declared is not None and declared != len(facts):
         raise ValueError(
-            f"Ledger manifest declares {declared} rows but consumer file contains {len(facts)}"
+            f"Chronicle manifest declares {declared} rows but consumer file contains {len(facts)}"
         )
     metadata["facts_sha256"] = _sha256(facts_path)
     metadata["fact_count"] = len(facts)
@@ -232,10 +232,10 @@ def compile_snapshot(
         "consumer_schema": CONSUMER_SCHEMA,
         "input_facts_sha256": input_metadata["facts_sha256"],
         "normalized_facts_sha256": normalized_sha,
-        "ledger_commit": input_metadata.get("ledger_commit"),
-        "ledger_release": input_metadata.get("ledger_release"),
+        "chronicle_commit": input_metadata.get("chronicle_commit"),
+        "chronicle_release": input_metadata.get("chronicle_release"),
     }
-    snapshot_id = "ledger-" + hashlib.sha256(_canonical_json(identity).encode()).hexdigest()[:24]
+    snapshot_id = "chronicle-" + hashlib.sha256(_canonical_json(identity).encode()).hexdigest()[:24]
     manifest = {
         "schema_version": SNAPSHOT_SCHEMA,
         "snapshot_id": snapshot_id,
@@ -243,8 +243,8 @@ def compile_snapshot(
         "fact_count": len(facts),
         "facts_sha256": input_metadata["facts_sha256"],
         "normalized_facts_sha256": normalized_sha,
-        "ledger_commit": input_metadata.get("ledger_commit"),
-        "ledger_release": input_metadata.get("ledger_release"),
+        "chronicle_commit": input_metadata.get("chronicle_commit"),
+        "chronicle_release": input_metadata.get("chronicle_release"),
         "input_manifest_sha256": input_metadata.get("input_manifest_sha256"),
     }
     summary = {

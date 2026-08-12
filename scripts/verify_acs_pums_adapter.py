@@ -1,4 +1,4 @@
-"""Execute raw ACS PUMS against ten reviewed, directly testable Ledger facts."""
+"""Execute raw ACS PUMS against ten reviewed, directly testable Chronicle facts."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def verify(aggregate_path: Path) -> dict[str, object]:
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     capabilities = tuple(
         CapabilityPlanner(
-            mappings, snapshot_id=overview.ledger_snapshot_id
+            mappings, snapshot_id=overview.chronicle_snapshot_id
         ).classify(fact, overview.source)
         for fact in overview.verification_facts
     )
@@ -58,7 +58,7 @@ def verify(aggregate_path: Path) -> dict[str, object]:
             {
                 "fact_key": result.fact_key,
                 "estimate": str(result.estimate),
-                "ledger_target": str(target),
+                "chronicle_target": str(target),
                 "relative_error": str(relative_error),
                 "standard_error": str(result.standard_error),
                 "margin_of_error_90": str(result.margin_of_error_90),
@@ -71,7 +71,7 @@ def verify(aggregate_path: Path) -> dict[str, object]:
     return {
         "schema_version": "evaluation_harness.verification_results.v1",
         "source_id": overview.source.source_id,
-        "ledger_snapshot_id": overview.ledger_snapshot_id,
+        "chronicle_snapshot_id": overview.chronicle_snapshot_id,
         "dataset_version": overview.source.dataset_version,
         "input_manifest": runner.input_manifest,
         "rows": rows,

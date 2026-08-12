@@ -15,7 +15,7 @@ from .contracts import (
 
 
 @dataclass(frozen=True)
-class LedgerSelector:
+class ChronicleSelector:
     sources: frozenset[str]
     measures: frozenset[str]
     units: frozenset[str]
@@ -44,7 +44,7 @@ class LedgerSelector:
 @dataclass(frozen=True)
 class MappingRule:
     mapping_id: str
-    selector: LedgerSelector
+    selector: ChronicleSelector
     execution: ExecutionMethod
     source_expression: str
     operation: str
@@ -63,7 +63,7 @@ class MappingRule:
 
     @classmethod
     def from_data(cls, payload: dict[str, Any]) -> "MappingRule":
-        selector = payload["ledger_selector"]
+        selector = payload["chronicle_selector"]
         execution = ExecutionMethod(payload["execution"])
         if execution in {ExecutionMethod.NONE, ExecutionMethod.PRECOMPUTED}:
             raise ValueError("mapping execution must be direct or model")
@@ -82,7 +82,7 @@ class MappingRule:
             )
         return cls(
             mapping_id=payload["mapping_id"],
-            selector=LedgerSelector(
+            selector=ChronicleSelector(
                 sources=frozenset(selector["sources"]),
                 measures=frozenset(selector["measures"]),
                 units=frozenset(selector["units"]),
@@ -133,7 +133,7 @@ class MappingRule:
     def to_data(self) -> dict[str, Any]:
         return {
             "mapping_id": self.mapping_id,
-            "ledger_selector": {
+            "chronicle_selector": {
                 "sources": sorted(self.selector.sources),
                 "measures": sorted(self.selector.measures),
                 "units": sorted(self.selector.units),

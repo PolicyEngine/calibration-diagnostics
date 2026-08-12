@@ -67,10 +67,10 @@ def fact(
     )
 
 
-def supported(ledger_fact: FactContract, source_id: str) -> CapabilityResult:
+def supported(chronicle_fact: FactContract, source_id: str) -> CapabilityResult:
     return CapabilityResult(
-        snapshot_id="ledger-test",
-        fact_key=ledger_fact.fact_key,
+        snapshot_id="chronicle-test",
+        fact_key=chronicle_fact.fact_key,
         source_id=source_id,
         source_type=SourceType.MODEL_DATASET_PAIR,
         mapping_release=f"{source_id}-mapping-v1",
@@ -80,13 +80,13 @@ def supported(ledger_fact: FactContract, source_id: str) -> CapabilityResult:
         execution_method=ExecutionMethod.MODEL,
         mapping_id=f"{source_id}-agi",
         mapping_quality=MappingQuality.EXACT,
-        fact_period=ledger_fact.period,
+        fact_period=chronicle_fact.period,
         population_period=TypedPeriod.parse("tax_year:2024"),
         policy_period=TypedPeriod.parse("tax_year:2024"),
         period_treatment=PeriodTreatment.NATIVE,
         alignment_id=None,
         alignment_quality=AlignmentQuality.NONE,
-        entity=ledger_fact.entity,
+        entity=chronicle_fact.entity,
         weight_variable="weight",
         required_variables=("agi",),
         geography_method="fixed_country",
@@ -101,15 +101,15 @@ def supported(ledger_fact: FactContract, source_id: str) -> CapabilityResult:
 
 
 def unsupported(
-    ledger_fact: FactContract,
+    chronicle_fact: FactContract,
     source_id: str,
     *,
     status: CapabilityStatus,
     reason_code: str,
 ) -> CapabilityResult:
     return CapabilityResult.unsupported(
-        snapshot_id="ledger-test",
-        fact=ledger_fact,
+        snapshot_id="chronicle-test",
+        fact=chronicle_fact,
         source_id=source_id,
         source_type=SourceType.MODEL_DATASET_PAIR,
         mapping_release=f"{source_id}-mapping-v1",
@@ -183,7 +183,7 @@ def published_inputs(
         json.dumps(
             {
                 "schema_version": SNAPSHOT_SCHEMA,
-                "snapshot_id": "ledger-test",
+                "snapshot_id": "chronicle-test",
                 "fact_count": len(snapshot_facts),
                 "normalized_facts_sha256": hashlib.sha256(facts_text.encode()).hexdigest(),
             }

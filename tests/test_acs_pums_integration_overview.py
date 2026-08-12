@@ -63,7 +63,7 @@ def test_all_ten_acs_pums_facts_plan_as_native_direct_aggregates() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     results = CapabilityPlanner(
-        mappings, snapshot_id=overview.ledger_snapshot_id
+        mappings, snapshot_id=overview.chronicle_snapshot_id
     ).classify_all(overview.verification_facts, [overview.source])
 
     assert len(results) == 10
@@ -80,22 +80,22 @@ def test_all_ten_acs_pums_facts_plan_as_native_direct_aggregates() -> None:
     )
 
 
-def test_acs_pums_checkpoint_matches_the_pinned_ledger_snapshot() -> None:
+def test_acs_pums_checkpoint_matches_the_pinned_chronicle_snapshot() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     validate_overview_against_snapshot(
-        overview, INTEGRATION / "ledger_snapshot_fixture"
+        overview, INTEGRATION / "chronicle_snapshot_fixture"
     )
 
 
 def test_acs_pums_refuses_district_geography_and_non_native_years() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
-    planner = CapabilityPlanner(mappings, snapshot_id=overview.ledger_snapshot_id)
+    planner = CapabilityPlanner(mappings, snapshot_id=overview.chronicle_snapshot_id)
     fact = overview.verification_facts[0]
 
     district = replace(
         fact,
-        fact_key="ledger.aggregate_fact.v2:000000000000000000000001",
+        fact_key="chronicle.aggregate_fact.v2:000000000000000000000001",
         geography_level="congressional_district",
         geography_id="5001800US0101",
     )
@@ -106,7 +106,7 @@ def test_acs_pums_refuses_district_geography_and_non_native_years() -> None:
 
     old_period = replace(
         fact,
-        fact_key="ledger.aggregate_fact.v2:000000000000000000000002",
+        fact_key="chronicle.aggregate_fact.v2:000000000000000000000002",
         period=TypedPeriod("calendar_year", "2023"),
     )
     old_period_result = planner.classify(old_period, overview.source)

@@ -25,8 +25,8 @@ from evaluation_harness.planner import (
 
 def fact(**changes) -> FactContract:
     base = FactContract(
-        fact_key="ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
-        semantic_fact_key="ledger.semantic_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+        fact_key="chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+        semantic_fact_key="chronicle.semantic_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
         source="irs_soi",
         jurisdiction="US",
         period=TypedPeriod.parse("tax_year:2024"),
@@ -71,7 +71,7 @@ def registry(execution: str = "direct", quality: str = "exact") -> MappingRegist
             "mappings": [
                 {
                     "mapping_id": "us.soi.agi.v1",
-                    "ledger_selector": {
+                    "chronicle_selector": {
                         "sources": ["irs_soi"],
                         "measures": ["irs_soi.adjusted_gross_income"],
                         "units": ["usd"],
@@ -104,7 +104,7 @@ def test_planner_compiles_an_exact_direct_query() -> None:
     )
 
 
-def test_planner_normalizes_ledger_comparison_operators() -> None:
+def test_planner_normalizes_chronicle_comparison_operators() -> None:
     constrained = fact(
         universe_constraints=(
             {"domain": "all_individual_income_tax_returns"},
@@ -209,7 +209,7 @@ def test_source_can_execute_an_advanced_fact_with_that_facts_year() -> None:
 
 def test_mapping_can_bridge_observed_entity_to_execution_entity() -> None:
     data = registry(execution="model").to_data()
-    data["mappings"][0]["ledger_selector"]["entities"] = ["government"]
+    data["mappings"][0]["chronicle_selector"]["entities"] = ["government"]
     data["mappings"][0]["execution_entity"] = "person"
     bridged_source = source(
         weights={"tax_unit": "tax_unit_weight", "person": "person_weight"}
@@ -433,7 +433,7 @@ def test_fact_specific_alignment_lookup_does_not_scan_unrelated_facts() -> None:
             fact_key=(
                 old_fact.fact_key
                 if index == 999
-                else f"ledger.aggregate_fact.v2:{index:024d}"
+                else f"chronicle.aggregate_fact.v2:{index:024d}"
             ),
             score_eligible=True,
         )
@@ -472,7 +472,7 @@ def test_direct_calibration_target_is_not_reported_as_holdout() -> None:
 
 
 def test_capability_matrix_has_exactly_one_cell_per_fact_source_pair() -> None:
-    facts = [fact(), replace(fact(), fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")]
+    facts = [fact(), replace(fact(), fact_key="chronicle.aggregate_fact.v2:cccccccccccccccccccccccc")]
     sources = [source(), replace(source(), source_id="second-source")]
     results = CapabilityPlanner(registry()).classify_all(facts, sources)
     assert len(results) == 4
@@ -486,7 +486,7 @@ def test_mapping_registry_loads_versioned_yaml(tmp_path: Path) -> None:
 mapping_release: us-v1
 mappings:
   - mapping_id: us.soi.agi.v1
-    ledger_selector:
+    chronicle_selector:
       sources: [irs_soi]
       measures: [irs_soi.adjusted_gross_income]
       units: [usd]
@@ -508,29 +508,29 @@ mappings:
 
 def test_mapping_registry_can_scope_a_mapping_to_reviewed_fact_keys() -> None:
     data = registry().to_data()
-    data["mappings"][0]["ledger_selector"]["fact_keys"] = [fact().fact_key]
+    data["mappings"][0]["chronicle_selector"]["fact_keys"] = [fact().fact_key]
     scoped = MappingRegistry.from_data(data)
     assert scoped.match(fact()) is not None
     assert scoped.match(
-        fact(fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")
+        fact(fact_key="chronicle.aggregate_fact.v2:cccccccccccccccccccccccc")
     ) is None
 
 
 def test_mapping_registry_can_exclude_previously_reviewed_fact_keys() -> None:
     data = registry().to_data()
-    data["mappings"][0]["ledger_selector"]["excluded_fact_keys"] = [
+    data["mappings"][0]["chronicle_selector"]["excluded_fact_keys"] = [
         fact().fact_key
     ]
     scoped = MappingRegistry.from_data(data)
     assert scoped.match(fact()) is None
     assert scoped.match(
-        fact(fact_key="ledger.aggregate_fact.v2:cccccccccccccccccccccccc")
+        fact(fact_key="chronicle.aggregate_fact.v2:cccccccccccccccccccccccc")
     ) is not None
 
 
 def test_mapping_registry_can_select_and_exclude_dimension_values() -> None:
     data = registry().to_data()
-    selector = data["mappings"][0]["ledger_selector"]
+    selector = data["mappings"][0]["chronicle_selector"]
     selector["dimension_values"] = {"program": ["social_security"]}
     selector["absent_dimensions"] = ["subprogram"]
     scoped = MappingRegistry.from_data(data)

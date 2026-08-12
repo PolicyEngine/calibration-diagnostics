@@ -1,4 +1,4 @@
-"""Offline Ledger evaluation harness for calibration diagnostics."""
+"""Offline Chronicle evaluation harness for calibration diagnostics."""
 
 from .contracts import FactContract
 

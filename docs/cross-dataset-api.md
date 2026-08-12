@@ -21,12 +21,12 @@ Chronicle snapshot and content-addressed evaluation artifact:
 
 ```bash
 uv run python scripts/publish_cross_dataset_frontend_bundle.py \
-  --snapshot /path/to/ledger-snapshot \
+  --snapshot /path/to/chronicle-snapshot \
   --run /path/to/evaluation-run \
   --output /path/to/evaluation-run/frontend
 ```
 
-`scripts/run_full_ledger_evaluation.py` performs this step automatically for
+`scripts/run_full_chronicle_evaluation.py` performs this step automatically for
 new runs. The publisher verifies the snapshot and every hash in the evaluation
 run before writing. It emits a manifest, summary and group partitions, a fact
 index, and bounded fact pages. Every partition carries the immutable run and
@@ -54,12 +54,12 @@ bundle returns HTTP 503 rather than serving mixed results.
 
 - `view=summary` (default): source-level score, coverage, capability statuses,
   unsupported reasons, period treatments, and target-performance buckets.
-- `view=groups`: groups by `ledger_source`, `concept`, observed `period`,
+- `view=groups`: groups by `chronicle_source`, `concept`, observed `period`,
   `geography`, `period_treatment`, or `calibration_exposure`; optional
   `dimension` and `source` filters.
 - `view=source&source=...`: one source and its group results.
 - `view=facts`: paginated facts, with optional `source`, `status`,
-  `ledger_source`, `measure`, `period`, `geography`, `period_treatment`,
+  `chronicle_source`, `measure`, `period`, `geography`, `period_treatment`,
   `calibration_exposure`, and `search` filters. Source-specific filters require
   `source`.
 - `view=fact&fact_key=...`: one Chronicle observation and its sparse source cells,

@@ -25,7 +25,7 @@ def test_microcosm_overview_pins_current_dataset_and_model() -> None:
     assert overview.source.source_id == "microcosm_us_policyengine_us_2024"
     assert overview.source.dataset_version.endswith("20260728T011454Z")
     assert overview.source.model_version == "policyengine-us==1.764.6"
-    assert overview.ledger_snapshot_id == "ledger-7917ea815df710fb20db076b"
+    assert overview.chronicle_snapshot_id == "chronicle-7917ea815df710fb20db076b"
     assert overview.alignment_policy == {
         "model_id": "cbo_growth_factor_aging",
         "model_version": "1.2.0",
@@ -54,7 +54,7 @@ def test_all_ten_microcosm_facts_are_executable_not_na() -> None:
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     results = CapabilityPlanner(
         mappings,
-        snapshot_id=overview.ledger_snapshot_id,
+        snapshot_id=overview.chronicle_snapshot_id,
     ).classify_all(overview.verification_facts, [overview.source])
     assert len(results) == 10
     assert all(
@@ -91,7 +91,7 @@ def test_microcosm_overview_does_not_claim_native_2023_population() -> None:
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     old_fact = replace(
         overview.verification_facts[0],
-        fact_key="ledger.aggregate_fact.v2:000000000000000000000000",
+        fact_key="chronicle.aggregate_fact.v2:000000000000000000000000",
         period=TypedPeriod.parse("calendar_year:2023"),
     )
     result = CapabilityPlanner(mappings).classify(old_fact, overview.source)
@@ -108,7 +108,7 @@ def test_aligned_2023_eitc_count_with_child_slice_is_directly_testable() -> None
     )
     old_fact = replace(
         template,
-        fact_key="ledger.aggregate_fact.v2:000000000000000000000001",
+        fact_key="chronicle.aggregate_fact.v2:000000000000000000000001",
         period=TypedPeriod.parse("tax_year:2023"),
         universe_constraints=(
             {"domain": "individual_income_tax_returns_with_earned_income_credit"},
@@ -141,5 +141,5 @@ def test_microcosm_verification_facts_match_committed_snapshot_fixture() -> None
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     validate_overview_against_snapshot(
         overview,
-        INTEGRATION / "ledger_snapshot_fixture",
+        INTEGRATION / "chronicle_snapshot_fixture",
     )

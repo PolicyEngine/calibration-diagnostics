@@ -1,7 +1,7 @@
 mapping_release: census-acs-pums-2024-chronicle-expansion-v2
 mappings:
   - mapping_id: census-acs-pums-person-age-count
-    ledger_selector:
+    chronicle_selector:
       sources: [census_acs]
       measures: [census_acs.person_count]
       units: [count]
@@ -17,7 +17,7 @@ mappings:
     calibration_exposure: used_in_imputation_or_reweighting
 
   - mapping_id: census-acs-pums-pep-resident-population
-    ledger_selector:
+    chronicle_selector:
       sources: [census_pep]
       measures: [census_pep.resident_population]
       units: [count]
@@ -33,7 +33,7 @@ mappings:
     calibration_exposure: used_in_imputation_or_reweighting
 
   - mapping_id: census-acs-pums-national-population-projection
-    ledger_selector:
+    chronicle_selector:
       sources: [census_population_projections]
       measures: [census.population_projection]
       units: [count]
@@ -49,7 +49,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: census-acs-pums-bea-regional-wages
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_regional.wages_and_salaries]
       units: [usd]
@@ -79,7 +79,7 @@ mappings:
     calibration_exposure: external_validation
 
   - mapping_id: census-acs-pums-bea-nipa-wages
-    ledger_selector:
+    chronicle_selector:
       sources: [bea]
       measures: [bea_nipa.wages_and_salaries]
       units: [usd]

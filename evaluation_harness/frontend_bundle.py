@@ -245,7 +245,7 @@ def _fact_row(
     return {
         "fact_key": fact.fact_key,
         "label": fact.label or fact.fact_key,
-        "ledger_source": fact.source,
+        "chronicle_source": fact.source,
         "measure": fact.measure,
         "unit": fact.unit,
         "observed_period": fact.period.canonical,
@@ -344,7 +344,7 @@ def _build_groups(
 ) -> list[dict[str, Any]]:
     fact_values = tuple(facts)
     definitions = {
-        "ledger_source": lambda fact: fact.source,
+        "chronicle_source": lambda fact: fact.source,
         "concept": lambda fact: fact.measure,
         "period": lambda fact: fact.period.canonical,
         "geography": lambda fact: fact.geography_level,
@@ -728,7 +728,7 @@ def publish_frontend_bundle(
     fact_partitions: list[dict[str, Any]] = []
     fact_index: dict[str, int] = {}
     facets: dict[str, Any] = {
-        "ledger_source": {},
+        "chronicle_source": {},
         "measure": {},
         "period": {},
         "geography": {},
@@ -747,7 +747,7 @@ def publish_frontend_bundle(
         page_rows = rows[index * page_size : (index + 1) * page_size]
         for row in page_rows:
             fact_index[row["fact_key"]] = page
-            add_facet("ledger_source", row["ledger_source"], page)
+            add_facet("chronicle_source", row["chronicle_source"], page)
             add_facet("measure", row["measure"], page)
             add_facet("period", row["observed_period"], page)
             add_facet("geography", row["geography_level"], page)

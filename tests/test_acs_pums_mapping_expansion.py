@@ -112,7 +112,7 @@ def test_reviewed_raw_acs_expansions_are_exact_native_2024_aggregates(
 
     capability = CapabilityPlanner(
         registry,
-        snapshot_id=overview.ledger_snapshot_id,
+        snapshot_id=overview.chronicle_snapshot_id,
     ).classify(candidate, overview.source)
 
     assert capability.status is CapabilityStatus.DIRECT

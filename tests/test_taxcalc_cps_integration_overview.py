@@ -42,7 +42,7 @@ def test_taxcalc_cps_has_ten_real_numeric_verification_facts() -> None:
 def test_all_ten_taxcalc_cps_facts_are_executable_advanced_results() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
-    results = CapabilityPlanner(mappings, snapshot_id=overview.ledger_snapshot_id).classify_all(
+    results = CapabilityPlanner(mappings, snapshot_id=overview.chronicle_snapshot_id).classify_all(
         overview.verification_facts, [overview.source]
     )
     assert len(results) == 10
@@ -53,13 +53,13 @@ def test_all_ten_taxcalc_cps_facts_are_executable_advanced_results() -> None:
 
 def test_taxcalc_cps_facts_match_committed_snapshot_fixture() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
-    validate_overview_against_snapshot(overview, INTEGRATION / "ledger_snapshot_fixture")
+    validate_overview_against_snapshot(overview, INTEGRATION / "chronicle_snapshot_fixture")
 
 
 def test_taxcalc_cps_plans_income_band_and_eitc_child_breakdowns() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
-    planner = CapabilityPlanner(mappings, snapshot_id=overview.ledger_snapshot_id)
+    planner = CapabilityPlanner(mappings, snapshot_id=overview.chronicle_snapshot_id)
     eitc = next(
         fact
         for fact in overview.verification_facts
@@ -67,7 +67,7 @@ def test_taxcalc_cps_plans_income_band_and_eitc_child_breakdowns() -> None:
     )
     income_band = replace(
         eitc,
-        fact_key="ledger.aggregate_fact.v2:000000000000000000000001",
+        fact_key="chronicle.aggregate_fact.v2:000000000000000000000001",
         dimensions={"income_range": "10k_to_15k"},
         universe_constraints=(
             {"domain": "all_individual_income_tax_returns"},
@@ -93,7 +93,7 @@ def test_taxcalc_cps_plans_income_band_and_eitc_child_breakdowns() -> None:
 
     child = replace(
         eitc,
-        fact_key="ledger.aggregate_fact.v2:000000000000000000000002",
+        fact_key="chronicle.aggregate_fact.v2:000000000000000000000002",
         measure="irs_soi.earned_income_credit",
         dimensions={"eitc_child_count": 2, "filing_status": "all", "income_range": "all"},
         universe_constraints=(

@@ -25,7 +25,7 @@ RECONSTRUCTION = (
 
 REVIEWED_ADDITIONS = (
     {
-        "fact_key": "ledger.aggregate_fact.v2:79a47ff730c7a462e8cc1609",
+        "fact_key": "chronicle.aggregate_fact.v2:79a47ff730c7a462e8cc1609",
         "reconstruction_row_key": (
             "irs_soi.ty2023.table_1_1.all.adjusted_gross_income@2024"
         ),
@@ -33,7 +33,7 @@ REVIEWED_ADDITIONS = (
         "calibration_exposure": "related_calibration_family",
     },
     {
-        "fact_key": "ledger.aggregate_fact.v2:cb187e7abf9bdc592740e661",
+        "fact_key": "chronicle.aggregate_fact.v2:cb187e7abf9bdc592740e661",
         "reconstruction_row_key": (
             "irs_soi.ty2023.table_2_5.eitc_by_agi_children."
             "three_or_more_qualifying_children.total.eitc_total@2024"
@@ -42,7 +42,7 @@ REVIEWED_ADDITIONS = (
         "calibration_exposure": "external_validation",
     },
     {
-        "fact_key": "ledger.aggregate_fact.v2:06c59904c06817cf61200eef",
+        "fact_key": "chronicle.aggregate_fact.v2:06c59904c06817cf61200eef",
         "reconstruction_row_key": (
             "irs_soi.ty2023.table_1_2.all_returns.all.adjusted_gross_income@2024"
         ),
@@ -50,7 +50,7 @@ REVIEWED_ADDITIONS = (
         "calibration_exposure": "related_calibration_family",
     },
     {
-        "fact_key": "ledger.aggregate_fact.v2:07c02eaf03cc25e2d454db3f",
+        "fact_key": "chronicle.aggregate_fact.v2:07c02eaf03cc25e2d454db3f",
         "reconstruction_row_key": (
             "irs_soi.ty2023.table_1_4.all.net_capital_gains_amount@2024"
         ),
@@ -58,7 +58,7 @@ REVIEWED_ADDITIONS = (
         "calibration_exposure": "related_calibration_family",
     },
     {
-        "fact_key": "ledger.aggregate_fact.v2:709bcad59f889e75f143f9fc",
+        "fact_key": "chronicle.aggregate_fact.v2:709bcad59f889e75f143f9fc",
         "reconstruction_row_key": (
             "irs_soi.ty2023.congressional_district_2022.all_returns.us."
             "qualified_dividends_amount@2024"
@@ -67,7 +67,7 @@ REVIEWED_ADDITIONS = (
         "calibration_exposure": "related_calibration_family",
     },
     {
-        "fact_key": "ledger.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9",
+        "fact_key": "chronicle.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9",
         "reconstruction_terms": (
             {
                 "reconstruction_row_key": (
@@ -108,7 +108,7 @@ def _manual_exposures() -> dict[str, str]:
     payload = yaml.safe_load((INTEGRATION / "mappings.yaml").read_text())
     exposures: dict[str, str] = {}
     for mapping in payload["mappings"]:
-        for fact_key in mapping["ledger_selector"].get("fact_keys", ()):
+        for fact_key in mapping["chronicle_selector"].get("fact_keys", ()):
             exposures[fact_key] = mapping["calibration_exposure"]
     return exposures
 
@@ -232,7 +232,7 @@ def build(frontend_bundle: Path) -> dict:
     result = {
         "schema_version": CHECKPOINT_SCHEMA,
         "source_id": verification["source_id"],
-        "ledger_snapshot_id": verification["ledger_snapshot_id"],
+        "chronicle_snapshot_id": verification["chronicle_snapshot_id"],
         "official_yale_output": False,
         "reconstruction_sha256": hashlib.sha256(reconstruction_bytes).hexdigest(),
         "reconstruction_row_count": len(rows),

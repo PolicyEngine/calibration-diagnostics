@@ -16,7 +16,7 @@ from evaluation_harness.snapshot import (
 def consumer_row(
     fact_key: str,
     *,
-    semantic_key: str = "ledger.semantic_fact.v2:111111111111111111111111",
+    semantic_key: str = "chronicle.semantic_fact.v2:111111111111111111111111",
     value: int | str = 100,
     period_type: str = "tax_year",
     period_value: int | str = 2023,
@@ -27,15 +27,15 @@ def consumer_row(
     measure_id: str = "adjusted_gross_income",
 ) -> dict:
     return {
-        "schema_version": "ledger.consumer_fact.v1",
+        "schema_version": "chronicle.consumer_fact.v1",
         "aggregate_fact_key": fact_key,
         "semantic_fact_key": semantic_key,
-        "legacy_fact_key": "ledger.fact.v1:222222222222222222222222",
-        "source_release_key": "ledger.source_release.v2:333333333333333333333333",
-        "source_series_key": "ledger.source_series.v2:444444444444444444444444",
-        "observed_measure_key": "ledger.observed_measure.v2:555555555555555555555555",
-        "dimension_set_key": "ledger.dimension_set.v2:666666666666666666666666",
-        "universe_constraint_set_key": "ledger.universe_constraint_set.v2:777777777777777777777777",
+        "legacy_fact_key": "chronicle.fact.v1:222222222222222222222222",
+        "source_release_key": "chronicle.source_release.v2:333333333333333333333333",
+        "source_series_key": "chronicle.source_series.v2:444444444444444444444444",
+        "observed_measure_key": "chronicle.observed_measure.v2:555555555555555555555555",
+        "dimension_set_key": "chronicle.dimension_set.v2:666666666666666666666666",
+        "universe_constraint_set_key": "chronicle.universe_constraint_set.v2:777777777777777777777777",
         "value": value,
         "value_type": "integer",
         "assertion": "observation",
@@ -65,11 +65,11 @@ def consumer_row(
             "extraction_method": "fixture",
             "source_sha256": "a" * 64,
             "source_size_bytes": 10,
-            "raw_r2_uri": "r2://ledger-raw/source.xlsx",
+            "raw_r2_uri": "r2://chronicle-raw/source.xlsx",
         },
         "lineage": {
             "source_record_id": "table.row.measure",
-            "source_cell_keys": ["ledger.source_cell.v1:888888888888888888888888"],
+            "source_cell_keys": ["chronicle.source_cell.v1:888888888888888888888888"],
             "source_row_keys": [],
         },
         "label": "Adjusted gross income",
@@ -84,26 +84,26 @@ def write_bundle(path: Path, rows: list[dict], *, with_manifest: bool = True) ->
         (path / "manifest.json").write_text(
             json.dumps(
                 {
-                    "schema_version": "policyengine_ledger.consumer_artifact.v1",
-                    "consumer_fact_schema_versions": ["ledger.consumer_fact.v1"],
+                    "schema_version": "policyengine_chronicle.consumer_artifact.v1",
+                    "consumer_fact_schema_versions": ["chronicle.consumer_fact.v1"],
                     "fact_row_count": len(rows),
                     "facts_sha256": hashlib.sha256(facts.read_bytes()).hexdigest(),
-                    "ledger_commit": "ledger-commit-1",
-                    "ledger_release": "ledger-release-1",
+                    "chronicle_commit": "chronicle-commit-1",
+                    "chronicle_release": "chronicle-release-1",
                 }
             )
         )
     return path
 
 
-def test_load_consumer_rows_supports_real_ledger_shape(tmp_path: Path) -> None:
+def test_load_consumer_rows_supports_real_chronicle_shape(tmp_path: Path) -> None:
     bundle = write_bundle(
         tmp_path / "bundle",
         [
-            consumer_row("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa"),
+            consumer_row("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa"),
             consumer_row(
-                "ledger.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
-                semantic_key="ledger.semantic_fact.v2:999999999999999999999999",
+                "chronicle.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+                semantic_key="chronicle.semantic_fact.v2:999999999999999999999999",
                 value="-25.5",
                 period_type="month",
                 period_value="2024-12",
@@ -117,24 +117,24 @@ def test_load_consumer_rows_supports_real_ledger_shape(tmp_path: Path) -> None:
     )
     facts, metadata = load_consumer_rows(bundle)
     assert len(facts) == 2
-    assert facts[0].fact_key.startswith("ledger.aggregate_fact.v2:")
+    assert facts[0].fact_key.startswith("chronicle.aggregate_fact.v2:")
     assert facts[0].source == "irs_soi"
     assert facts[0].lineage["source_record_id"] == "table.row.measure"
     assert facts[1].period.canonical == "month:2024-12"
     assert facts[1].geography_level == "state"
-    assert metadata["ledger_commit"] == "ledger-commit-1"
+    assert metadata["chronicle_commit"] == "chronicle-commit-1"
 
 
 def test_load_rejects_unknown_consumer_schema(tmp_path: Path) -> None:
-    row = consumer_row("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
-    row["schema_version"] = "ledger.consumer_fact.v2"
+    row = consumer_row("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
+    row["schema_version"] = "chronicle.consumer_fact.v2"
     bundle = write_bundle(tmp_path / "bundle", [row], with_manifest=False)
     with pytest.raises(ValueError, match="schema"):
         load_consumer_rows(bundle)
 
 
 def test_load_rejects_duplicate_aggregate_fact_keys(tmp_path: Path) -> None:
-    row = consumer_row("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
+    row = consumer_row("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
     bundle = write_bundle(tmp_path / "bundle", [row, deepcopy(row)], with_manifest=False)
     with pytest.raises(ValueError, match="duplicate"):
         load_consumer_rows(bundle)
@@ -143,7 +143,7 @@ def test_load_rejects_duplicate_aggregate_fact_keys(tmp_path: Path) -> None:
 def test_load_rejects_manifest_hash_mismatch(tmp_path: Path) -> None:
     bundle = write_bundle(
         tmp_path / "bundle",
-        [consumer_row("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")],
+        [consumer_row("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")],
     )
     manifest_path = bundle / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
@@ -156,12 +156,12 @@ def test_load_rejects_manifest_hash_mismatch(tmp_path: Path) -> None:
 def test_compile_snapshot_writes_immutable_catalog(tmp_path: Path) -> None:
     bundle = write_bundle(
         tmp_path / "bundle",
-        [consumer_row("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")],
+        [consumer_row("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")],
     )
     output = tmp_path / "snapshot"
     compiled = compile_snapshot(bundle, output)
     assert compiled.manifest["fact_count"] == 1
-    assert compiled.manifest["snapshot_id"].startswith("ledger-")
+    assert compiled.manifest["snapshot_id"].startswith("chronicle-")
     assert (output / "facts.jsonl").exists()
     assert json.loads((output / "catalog_summary.json").read_text())["by_source"] == {
         "irs_soi": 1
@@ -171,19 +171,19 @@ def test_compile_snapshot_writes_immutable_catalog(tmp_path: Path) -> None:
 
 
 def test_snapshot_diff_reports_values_additions_removals_and_key_churn(tmp_path: Path) -> None:
-    old_a = consumer_row("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa", value=100)
+    old_a = consumer_row("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa", value=100)
     old_b = consumer_row(
-        "ledger.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
-        semantic_key="ledger.semantic_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+        "chronicle.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+        semantic_key="chronicle.semantic_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
         value=50,
     )
     new_a = deepcopy(old_a)
     new_a["value"] = 125
     churned_b = deepcopy(old_b)
-    churned_b["aggregate_fact_key"] = "ledger.aggregate_fact.v2:cccccccccccccccccccccccc"
+    churned_b["aggregate_fact_key"] = "chronicle.aggregate_fact.v2:cccccccccccccccccccccccc"
     added = consumer_row(
-        "ledger.aggregate_fact.v2:dddddddddddddddddddddddd",
-        semantic_key="ledger.semantic_fact.v2:dddddddddddddddddddddddd",
+        "chronicle.aggregate_fact.v2:dddddddddddddddddddddddd",
+        semantic_key="chronicle.semantic_fact.v2:dddddddddddddddddddddddd",
         value=10,
     )
     old = write_bundle(tmp_path / "old", [old_a, old_b], with_manifest=False)
@@ -207,19 +207,19 @@ def test_snapshot_diff_reports_values_additions_removals_and_key_churn(tmp_path:
 def test_snapshot_diff_disambiguates_repeated_semantic_keys_for_key_churn(
     tmp_path: Path,
 ) -> None:
-    semantic = "ledger.semantic_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa"
+    semantic = "chronicle.semantic_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa"
     old_state = consumer_row(
-        "ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+        "chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
         semantic_key=semantic,
         geography_level="state",
         geography_id="0400000US06",
     )
     country = consumer_row(
-        "ledger.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+        "chronicle.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
         semantic_key=semantic,
     )
     new_state = deepcopy(old_state)
-    new_state["aggregate_fact_key"] = "ledger.aggregate_fact.v2:cccccccccccccccccccccccc"
+    new_state["aggregate_fact_key"] = "chronicle.aggregate_fact.v2:cccccccccccccccccccccccc"
     old = compile_snapshot(
         write_bundle(tmp_path / "old-duplicate", [old_state, country], with_manifest=False),
         tmp_path / "old-duplicate-snapshot",

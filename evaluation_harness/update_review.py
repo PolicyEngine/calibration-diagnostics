@@ -14,13 +14,13 @@ from .mappings import MappingRegistry
 from .planner import CapabilityPlanner
 from .microcosm_aging import (
     MicrocosmAgingPolicy,
-    transform_ledger_facts_to_microcosm_year,
+    transform_chronicle_facts_to_microcosm_year,
 )
 from .snapshot import CONSUMER_SCHEMA, SnapshotDiff, diff_snapshots
 
 
-REVIEW_SCHEMA = "evaluation_harness.ledger_update_review.v1"
-REVIEW_MANIFEST_SCHEMA = "evaluation_harness.ledger_update_review_manifest.v1"
+REVIEW_SCHEMA = "evaluation_harness.chronicle_update_review.v1"
+REVIEW_MANIFEST_SCHEMA = "evaluation_harness.chronicle_update_review_manifest.v1"
 
 
 def _facts_by_key(
@@ -402,12 +402,12 @@ def publish_update_review(
     output_path: str | Path,
 ) -> dict[str, Any]:
     if document.get("schema_version") != REVIEW_SCHEMA:
-        raise ValueError("unsupported Ledger update review schema")
+        raise ValueError("unsupported Chronicle update review schema")
     output = Path(output_path)
     if output.exists():
-        raise FileExistsError(f"Ledger update review already exists: {output}")
+        raise FileExistsError(f"Chronicle update review already exists: {output}")
     review_hash = hashlib.sha256(_canonical_json(document)).hexdigest()
-    review_id = "ledger-review-" + review_hash[:24]
+    review_id = "chronicle-review-" + review_hash[:24]
     published = {**document, "review_id": review_id}
     review_bytes = _canonical_json(published)
     manifest = {
@@ -430,11 +430,11 @@ def validate_snapshot_compatibility(
     consumer_schema = manifest.get("consumer_schema_version")
     if consumer_schema != CONSUMER_SCHEMA:
         raise ValueError(
-            "unsupported Ledger consumer schema: "
+            "unsupported Chronicle consumer schema: "
             f"{consumer_schema!r}; expected {CONSUMER_SCHEMA!r}"
         )
-    if not str(manifest.get("snapshot_id", "")).startswith("ledger-"):
-        raise ValueError("Ledger snapshot ID is missing or malformed")
+    if not str(manifest.get("snapshot_id", "")).startswith("chronicle-"):
+        raise ValueError("Chronicle snapshot ID is missing or malformed")
     return {
         "snapshot_id": manifest["snapshot_id"],
         "fact_count": len(facts),
@@ -466,7 +466,7 @@ def _plan_for_facts(
     aging_policy = MicrocosmAgingPolicy.from_facts(facts)
     declarations = []
     for source_year in source_years:
-        results = transform_ledger_facts_to_microcosm_year(
+        results = transform_chronicle_facts_to_microcosm_year(
             facts,
             aging_policy,
             source_year=source_year,
@@ -485,7 +485,7 @@ def compile_update_review(
     to_snapshot_path: str | Path,
     integration_paths: Iterable[str | Path],
 ) -> dict[str, Any]:
-    """Build the review gate before any run adopts a new Ledger snapshot."""
+    """Build the review gate before any run adopts a new Chronicle snapshot."""
 
     old_compatibility = validate_snapshot_compatibility(from_snapshot_path)
     new_compatibility = validate_snapshot_compatibility(to_snapshot_path)
@@ -499,10 +499,10 @@ def compile_update_review(
         overview_path = path / "overview.yaml" if path.is_dir() else path
         overview = load_integration_overview(overview_path)
         integration = overview_path.parent
-        if overview.ledger_snapshot_id != old_manifest["snapshot_id"]:
+        if overview.chronicle_snapshot_id != old_manifest["snapshot_id"]:
             raise ValueError(
                 f"integration {overview.integration_id} is pinned to "
-                f"{overview.ledger_snapshot_id}, not review baseline "
+                f"{overview.chronicle_snapshot_id}, not review baseline "
                 f"{old_manifest['snapshot_id']}"
             )
         mappings = MappingRegistry.from_yaml(integration / "mappings.yaml")

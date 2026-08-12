@@ -221,7 +221,7 @@ function PerformanceLegend() {
 
 function CrossDatasetOverviewView() {
   const query = useCrossDatasetOverview();
-  const [dimension, setDimension] = useState<GroupDimension>("ledger_source");
+  const [dimension, setDimension] = useState<GroupDimension>("chronicle_source");
   const [performanceFilter, setPerformanceFilter] = useState<SourceOverviewFilter>({
     geography: "all",
     sample: "all",

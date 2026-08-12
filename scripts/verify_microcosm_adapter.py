@@ -1,4 +1,4 @@
-"""Execute the Microcosm adapter's ten reviewed Ledger verification facts."""
+"""Execute the Microcosm adapter's ten reviewed Chronicle verification facts."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ INTEGRATION = ROOT / "integrations" / "microcosm_policyengine_us"
 def verify(dataset_path: Path) -> list[dict[str, str | float]]:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
-    planner = CapabilityPlanner(mappings, snapshot_id=overview.ledger_snapshot_id)
+    planner = CapabilityPlanner(mappings, snapshot_id=overview.chronicle_snapshot_id)
     capabilities = tuple(planner.classify(fact, overview.source) for fact in overview.verification_facts)
     unavailable = [cell for cell in capabilities if not cell.score_eligible or cell.query is None]
     if unavailable:
@@ -51,7 +51,7 @@ def verify(dataset_path: Path) -> list[dict[str, str | float]]:
             {
                 "fact_key": result.fact_key,
                 "estimate": str(result.estimate),
-                "ledger_target": str(target),
+                "chronicle_target": str(target),
                 "relative_error": float(relative_error),
             }
         )

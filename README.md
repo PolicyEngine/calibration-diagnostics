@@ -87,7 +87,7 @@ gate manually when reviewing Chronicle or dependency updates:
 uv run python scripts/verify_evaluation_harness.py
 ```
 
-See [the Chronicle update workflow](docs/ledger-update-workflow.md) for the
+See [the Chronicle update workflow](docs/chronicle-update-workflow.md) for the
 optional Microcosm and ACS inputs and the separate full-artifact command.
 
 Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different

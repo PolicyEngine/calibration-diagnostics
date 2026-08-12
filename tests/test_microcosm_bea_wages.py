@@ -23,7 +23,7 @@ def fact(
 ) -> FactContract:
     geography_level = "country" if geography_id == "0100000US" else "state"
     return FactContract(
-        fact_key=f"ledger.aggregate_fact.v2:{key:0<24}",
+        fact_key=f"chronicle.aggregate_fact.v2:{key:0<24}",
         source="bea",
         jurisdiction="US",
         period=PERIOD,

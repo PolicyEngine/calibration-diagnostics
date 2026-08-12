@@ -183,7 +183,7 @@ def load_yale_reconstruction_checkpoint(
 
     return YaleReconstructionCheckpoint(
         source_id=str(mappings["source_id"]),
-        snapshot_id=str(mappings["ledger_snapshot_id"]),
+        snapshot_id=str(mappings["chronicle_snapshot_id"]),
         reconstruction_sha256=reconstruction_sha256,
         reconstruction_row_count=len(rows),
         held_out_2022_row_count=held_out_2022_row_count,

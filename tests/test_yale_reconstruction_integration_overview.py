@@ -87,7 +87,7 @@ def test_all_ten_yale_facts_are_executable_not_na() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     results = CapabilityPlanner(
-        mappings, snapshot_id=overview.ledger_snapshot_id
+        mappings, snapshot_id=overview.chronicle_snapshot_id
     ).classify_all(overview.verification_facts, [overview.source])
     assert len(results) == 10
     assert all(result.status is CapabilityStatus.MODEL for result in results)
@@ -102,7 +102,7 @@ def test_yale_checkpoint_contains_ten_finite_numerical_results() -> None:
         "evaluation_harness.yale_reconstruction_checkpoint.v1"
     )
     assert checkpoint["source_id"] == overview.source.source_id
-    assert checkpoint["ledger_snapshot_id"] == overview.ledger_snapshot_id
+    assert checkpoint["chronicle_snapshot_id"] == overview.chronicle_snapshot_id
     assert checkpoint["official_yale_output"] is False
     assert checkpoint["adapter_status"] == "standalone_precomputed_checkpoint"
 
@@ -134,7 +134,7 @@ def test_yale_checkpoint_expands_to_382_explicit_chronicle_mappings() -> None:
         COVERAGE_MANIFEST,
     )
     assert checkpoint.source_id == overview.source.source_id
-    assert checkpoint.snapshot_id == overview.ledger_snapshot_id
+    assert checkpoint.snapshot_id == overview.chronicle_snapshot_id
     assert checkpoint.reconstruction_row_count == 420
     assert len(checkpoint.entries) == 382
     assert len({entry.fact_key for entry in checkpoint.entries}) == 382
@@ -155,18 +155,18 @@ def test_yale_checkpoint_adds_six_reviewed_2024_chronicle_benchmarks() -> None:
     )
     entries = {entry.fact_key: entry for entry in checkpoint.entries}
     expected = {
-        "ledger.aggregate_fact.v2:79a47ff730c7a462e8cc1609",
-        "ledger.aggregate_fact.v2:cb187e7abf9bdc592740e661",
-        "ledger.aggregate_fact.v2:06c59904c06817cf61200eef",
-        "ledger.aggregate_fact.v2:07c02eaf03cc25e2d454db3f",
-        "ledger.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9",
-        "ledger.aggregate_fact.v2:709bcad59f889e75f143f9fc",
+        "chronicle.aggregate_fact.v2:79a47ff730c7a462e8cc1609",
+        "chronicle.aggregate_fact.v2:cb187e7abf9bdc592740e661",
+        "chronicle.aggregate_fact.v2:06c59904c06817cf61200eef",
+        "chronicle.aggregate_fact.v2:07c02eaf03cc25e2d454db3f",
+        "chronicle.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9",
+        "chronicle.aggregate_fact.v2:709bcad59f889e75f143f9fc",
     }
     assert expected <= entries.keys()
     assert all(entries[fact_key].observed_period.value == "2024" for fact_key in expected)
 
     combined_income = entries[
-        "ledger.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9"
+        "chronicle.aggregate_fact.v2:0e677ef6cb1f1142f25d25e9"
     ]
     assert combined_income.estimate == Decimal("297492207793.81948")
     assert len(combined_income.reconstruction_row_keys) == 3
@@ -179,10 +179,10 @@ def test_yale_checkpoint_allows_one_model_aggregate_to_validate_multiple_facts()
     )
     entries = {entry.fact_key: entry for entry in checkpoint.entries}
     irs_qualified_dividends = entries[
-        "ledger.aggregate_fact.v2:e9177998f40a45b4641321ed"
+        "chronicle.aggregate_fact.v2:e9177998f40a45b4641321ed"
     ]
     cbo_qualified_dividends = entries[
-        "ledger.aggregate_fact.v2:709bcad59f889e75f143f9fc"
+        "chronicle.aggregate_fact.v2:709bcad59f889e75f143f9fc"
     ]
     assert irs_qualified_dividends.reconstruction_row_keys == (
         "irs_soi.ty2023.congressional_district_2022.all_returns.us."
@@ -198,7 +198,7 @@ def test_yale_checkpoint_materializes_all_ten_reviewed_values() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     mappings = MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml")
     capabilities = CapabilityPlanner(
-        mappings, snapshot_id=overview.ledger_snapshot_id
+        mappings, snapshot_id=overview.chronicle_snapshot_id
     ).classify_all(overview.verification_facts, [overview.source])
     checkpoint = load_yale_reconstruction_checkpoint(
         RECONSTRUCTION,
@@ -240,7 +240,7 @@ def test_yale_2023_result_reuses_the_published_microcosm_alignment() -> None:
     )
     capabilities = CapabilityPlanner(
         MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml"),
-        snapshot_id=overview.ledger_snapshot_id,
+        snapshot_id=overview.chronicle_snapshot_id,
     ).classify_all([fact], [overview.source])
     alignment = AlignedFact(
         alignment_id="microcosm-release-target:test:2023-to-2024",
@@ -286,7 +286,7 @@ def test_yale_2022_result_reuses_the_published_microcosm_alignment() -> None:
     )
     capabilities = CapabilityPlanner(
         MappingRegistry.from_yaml(INTEGRATION / "mappings.yaml"),
-        snapshot_id=overview.ledger_snapshot_id,
+        snapshot_id=overview.chronicle_snapshot_id,
     ).classify_all([fact], [overview.source])
     alignment = AlignedFact(
         alignment_id="microcosm-release-target:test:2022-to-2024",
@@ -350,5 +350,5 @@ def test_yale_verification_facts_match_committed_snapshot_fixture() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     validate_overview_against_snapshot(
         overview,
-        INTEGRATION / "ledger_snapshot_fixture",
+        INTEGRATION / "chronicle_snapshot_fixture",
     )

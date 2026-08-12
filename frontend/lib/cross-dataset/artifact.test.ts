@@ -11,7 +11,7 @@ import { crossDatasetApiResponse } from "./query";
 
 const SCHEMA = "cross_dataset.frontend_bundle.v1";
 const RUN_ID = "evaluation-test-run";
-const SNAPSHOT_ID = "ledger-test-snapshot";
+const SNAPSHOT_ID = "chronicle-test-snapshot";
 
 function serialized(value: unknown): string {
   return `${JSON.stringify(value)}\n`;
@@ -59,7 +59,7 @@ function fixture() {
     snapshot_id: SNAPSHOT_ID,
     groups: [
       {
-        dimension: "ledger_source",
+        dimension: "chronicle_source",
         key: "irs_soi",
         label: "IRS SOI",
         fact_count: 2,
@@ -92,7 +92,7 @@ function fixture() {
         {
           fact_key: "fact-a",
           label: "National AGI",
-          ledger_source: "irs_soi",
+          chronicle_source: "irs_soi",
           measure: "adjusted_gross_income",
           unit: "usd",
           observed_period: "tax_year:2024",
@@ -109,7 +109,7 @@ function fixture() {
         {
           fact_key: "fact-b",
           label: "State population",
-          ledger_source: "census_acs",
+          chronicle_source: "census_acs",
           measure: "population",
           unit: "count",
           observed_period: "calendar_year:2024",
@@ -136,7 +136,7 @@ function fixture() {
         {
           fact_key: "fact-c",
           label: "Historic dividends",
-          ledger_source: "irs_soi",
+          chronicle_source: "irs_soi",
           measure: "ordinary_dividends",
           unit: "usd",
           observed_period: "tax_year:2023",
@@ -159,7 +159,7 @@ function fixture() {
     snapshot_id: SNAPSHOT_ID,
     facts: { "fact-a": 1, "fact-b": 1, "fact-c": 2 },
     facets: {
-      ledger_source: { irs_soi: [1, 2], census_acs: [1] },
+      chronicle_source: { irs_soi: [1, 2], census_acs: [1] },
       measure: {
         adjusted_gross_income: [1],
         population: [1],
@@ -263,7 +263,7 @@ test("facts paginate and support source/status and catalog filters", async () =>
   reads.length = 0;
 
   const filtered = await crossDatasetApiResponse(
-    "http://example.test/api?view=facts&source=cps&status=evaluable_via_model&period_treatment=advanced_population&calibration_exposure=external_validation&ledger_source=irs_soi&search=agi",
+    "http://example.test/api?view=facts&source=cps&status=evaluable_via_model&period_treatment=advanced_population&calibration_exposure=external_validation&chronicle_source=irs_soi&search=agi",
     reader,
   );
   expect(filtered.status).toBe(200);

@@ -66,7 +66,7 @@ def registry(release: str) -> MappingRegistry:
             "mappings": [
                 {
                     "mapping_id": f"{release}.agi",
-                    "ledger_selector": {
+                    "chronicle_selector": {
                         "sources": ["irs_soi"],
                         "measures": ["irs_soi.adjusted_gross_income"],
                         "units": ["usd"],
@@ -104,15 +104,15 @@ def source(source_id: str) -> EvaluationSourceManifest:
 
 
 def capability(
-    ledger_fact: FactContract,
+    chronicle_fact: FactContract,
     *,
     source_id: str = "microcosm",
     treatment: PeriodTreatment = PeriodTreatment.NATIVE,
     alignment_id: str | None = None,
 ) -> CapabilityResult:
     return CapabilityResult(
-        snapshot_id="ledger-test",
-        fact_key=ledger_fact.fact_key,
+        snapshot_id="chronicle-test",
+        fact_key=chronicle_fact.fact_key,
         source_id=source_id,
         source_type=SourceType.MODEL_DATASET_PAIR,
         mapping_release=f"{source_id}-mappings",
@@ -126,7 +126,7 @@ def capability(
         execution_method=ExecutionMethod.MODEL,
         mapping_id="agi",
         mapping_quality=MappingQuality.EXACT,
-        fact_period=ledger_fact.period,
+        fact_period=chronicle_fact.period,
         population_period=TypedPeriod.parse("tax_year:2024"),
         policy_period=TypedPeriod.parse("tax_year:2024"),
         period_treatment=treatment,
@@ -161,27 +161,27 @@ def result(cell: CapabilityResult, estimate: str) -> EvaluationResult:
 
 def test_full_matrix_contains_one_cell_for_every_fact_source_pair() -> None:
     facts = (
-        fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa"),
-        fact("ledger.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb"),
-        fact("ledger.aggregate_fact.v2:cccccccccccccccccccccccc"),
+        fact("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa"),
+        fact("chronicle.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb"),
+        fact("chronicle.aggregate_fact.v2:cccccccccccccccccccccccc"),
     )
     plans = (
         SourcePlan(source("microcosm"), registry("microcosm-v1")),
         SourcePlan(source("taxcalc-cps"), registry("taxcalc-v1")),
     )
-    cells = build_full_capability_matrix(facts, plans, snapshot_id="ledger-test")
+    cells = build_full_capability_matrix(facts, plans, snapshot_id="chronicle-test")
     assert len(cells) == len(facts) * len(plans)
     assert {(cell.fact_key, cell.source_id) for cell in cells} == {
-        (ledger_fact.fact_key, plan.source.source_id)
-        for ledger_fact in facts
+        (chronicle_fact.fact_key, plan.source.source_id)
+        for chronicle_fact in facts
         for plan in plans
     }
 
 
 def test_us_scope_removes_non_us_chronicle_facts_before_classification() -> None:
-    us_fact = fact("ledger.aggregate_fact.v2:us")
+    us_fact = fact("chronicle.aggregate_fact.v2:us")
     uk_fact = replace(
-        fact("ledger.aggregate_fact.v2:uk", jurisdiction="UK"),
+        fact("chronicle.aggregate_fact.v2:uk", jurisdiction="UK"),
         geography_id="K02000001",
     )
 
@@ -191,14 +191,14 @@ def test_us_scope_removes_non_us_chronicle_facts_before_classification() -> None
 
 
 def test_evaluation_geography_scope_removes_unrepresented_territories() -> None:
-    country = fact("ledger.aggregate_fact.v2:country")
+    country = fact("chronicle.aggregate_fact.v2:country")
     guam = replace(
-        fact("ledger.aggregate_fact.v2:guam"),
+        fact("chronicle.aggregate_fact.v2:guam"),
         geography_level="state",
         geography_id="0400000US66",
     )
     virgin_islands = replace(
-        fact("ledger.aggregate_fact.v2:virgin-islands"),
+        fact("chronicle.aggregate_fact.v2:virgin-islands"),
         geography_level="state",
         geography_id="0400000US78",
     )
@@ -212,51 +212,51 @@ def test_evaluation_geography_scope_removes_unrepresented_territories() -> None:
 
 
 def test_source_plan_propagates_fact_specific_calibration_exposure() -> None:
-    ledger_fact = fact("ledger.aggregate_fact.v2:exposure")
+    chronicle_fact = fact("chronicle.aggregate_fact.v2:exposure")
     plan = SourcePlan(
         source("microcosm"),
         registry("microcosm-v1"),
         calibration_exposures={
-            ledger_fact.fact_key: CalibrationExposure.DIRECT_CALIBRATION_TARGET
+            chronicle_fact.fact_key: CalibrationExposure.DIRECT_CALIBRATION_TARGET
         },
     )
 
     cell = build_full_capability_matrix(
-        [ledger_fact], [plan], snapshot_id="ledger-test"
+        [chronicle_fact], [plan], snapshot_id="chronicle-test"
     )[0]
 
     assert cell.status is CapabilityStatus.CALIBRATION_TARGET
     assert cell.calibration_exposure is CalibrationExposure.DIRECT_CALIBRATION_TARGET
 
 
-def test_native_result_is_scored_against_observed_ledger_value() -> None:
-    ledger_fact = fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
-    cell = capability(ledger_fact)
+def test_native_result_is_scored_against_observed_chronicle_value() -> None:
+    chronicle_fact = fact("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
+    cell = capability(chronicle_fact)
     scored = build_scored_results(
-        [ledger_fact], [cell], [result(cell, "110")], []
+        [chronicle_fact], [cell], [result(cell, "110")], []
     )[0]
     assert scored.observed_value == Decimal("100")
     assert scored.benchmark_value == Decimal("100")
     assert scored.benchmark_period == TypedPeriod.parse("tax_year:2024")
-    assert scored.benchmark_basis == "ledger_observed"
+    assert scored.benchmark_basis == "chronicle_observed"
     assert scored.absolute_relative_error == Decimal("0.1")
 
 
 def test_aligned_result_is_scored_against_transformed_not_2023_value() -> None:
-    ledger_fact = fact(
-        "ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+    chronicle_fact = fact(
+        "chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
         period="tax_year:2023",
     )
     alignment_id = "microcosm-aging:agi-2023-2024"
     cell = capability(
-        ledger_fact,
+        chronicle_fact,
         treatment=PeriodTreatment.ALIGNED_FACT,
         alignment_id=alignment_id,
     )
     alignment = AlignedFact(
         alignment_id=alignment_id,
-        source_fact_key=ledger_fact.fact_key,
-        observed_period=ledger_fact.period,
+        source_fact_key=chronicle_fact.fact_key,
+        observed_period=chronicle_fact.period,
         observed_value=Decimal("100"),
         target_period=TypedPeriod.parse("tax_year:2024"),
         aligned_value=Decimal("125"),
@@ -267,7 +267,7 @@ def test_aligned_result_is_scored_against_transformed_not_2023_value() -> None:
         backtest_error=None,
     )
     scored = build_scored_results(
-        [ledger_fact], [cell], [result(cell, "100")], [alignment]
+        [chronicle_fact], [cell], [result(cell, "100")], [alignment]
     )[0]
     assert scored.observed_value == Decimal("100")
     assert scored.benchmark_value == Decimal("125")
@@ -277,19 +277,19 @@ def test_aligned_result_is_scored_against_transformed_not_2023_value() -> None:
 
 
 def test_same_period_semantic_alignment_uses_transformed_benchmark_basis() -> None:
-    ledger_fact = fact("ledger.aggregate_fact.v2:semantic", value="100")
+    chronicle_fact = fact("chronicle.aggregate_fact.v2:semantic", value="100")
     alignment_id = "bea-state-wages:semantic"
     cell = capability(
-        ledger_fact,
+        chronicle_fact,
         treatment=PeriodTreatment.ALIGNED_FACT,
         alignment_id=alignment_id,
     )
     alignment = AlignedFact(
         alignment_id=alignment_id,
-        source_fact_key=ledger_fact.fact_key,
-        observed_period=ledger_fact.period,
-        observed_value=ledger_fact.value,
-        target_period=ledger_fact.period,
+        source_fact_key=chronicle_fact.fact_key,
+        observed_period=chronicle_fact.period,
+        observed_value=chronicle_fact.value,
+        target_period=chronicle_fact.period,
         aligned_value=Decimal("125"),
         alignment_model="bea_state_wage_residence_adjustment",
         alignment_version="test",
@@ -303,11 +303,11 @@ def test_same_period_semantic_alignment_uses_transformed_benchmark_basis() -> No
     )
 
     scored = build_scored_results(
-        [ledger_fact], [cell], [result(cell, "100")], [alignment]
+        [chronicle_fact], [cell], [result(cell, "100")], [alignment]
     )[0]
 
     assert scored.benchmark_value == Decimal("125")
-    assert scored.benchmark_period == ledger_fact.period
+    assert scored.benchmark_period == chronicle_fact.period
     assert (
         scored.benchmark_basis
         == "microcosm_bea_residence_adjusted_wage_target"
@@ -315,25 +315,25 @@ def test_same_period_semantic_alignment_uses_transformed_benchmark_basis() -> No
 
 
 def test_scoring_rejects_an_aligned_result_without_its_benchmark() -> None:
-    ledger_fact = fact(
-        "ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+    chronicle_fact = fact(
+        "chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
         period="tax_year:2023",
     )
     cell = capability(
-        ledger_fact,
+        chronicle_fact,
         treatment=PeriodTreatment.ALIGNED_FACT,
         alignment_id="missing-alignment",
     )
     with pytest.raises(ValueError, match="aligned benchmark"):
-        build_scored_results([ledger_fact], [cell], [result(cell, "100")], [])
+        build_scored_results([chronicle_fact], [cell], [result(cell, "100")], [])
 
 
 def test_summary_proves_matrix_completeness_and_reports_unsupported_reasons() -> None:
-    ledger_fact = fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
-    executable = capability(ledger_fact, source_id="microcosm")
+    chronicle_fact = fact("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
+    executable = capability(chronicle_fact, source_id="microcosm")
     unsupported = CapabilityResult.unsupported(
-        snapshot_id="ledger-test",
-        fact=ledger_fact,
+        snapshot_id="chronicle-test",
+        fact=chronicle_fact,
         source_id="taxcalc-cps",
         source_type=SourceType.MODEL_DATASET_PAIR,
         mapping_release="taxcalc-v1",
@@ -343,10 +343,10 @@ def test_summary_proves_matrix_completeness_and_reports_unsupported_reasons() ->
     )
     evaluated = result(executable, "110")
     scored = build_scored_results(
-        [ledger_fact], [executable, unsupported], [evaluated], []
+        [chronicle_fact], [executable, unsupported], [evaluated], []
     )
     summary = build_run_summary(
-        [ledger_fact], [executable, unsupported], [evaluated], scored
+        [chronicle_fact], [executable, unsupported], [evaluated], scored
     )
     assert summary["expected_capability_count"] == 2
     assert summary["capability_count"] == 2
@@ -359,14 +359,14 @@ def test_summary_proves_matrix_completeness_and_reports_unsupported_reasons() ->
 def test_snapshot_loader_verifies_count_and_normalized_hash(tmp_path: Path) -> None:
     snapshot = tmp_path / "snapshot"
     snapshot.mkdir()
-    ledger_fact = fact("ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
-    facts_text = ledger_fact.to_json() + "\n"
+    chronicle_fact = fact("chronicle.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa")
+    facts_text = chronicle_fact.to_json() + "\n"
     (snapshot / "facts.jsonl").write_text(facts_text)
     (snapshot / "snapshot_manifest.json").write_text(
         json.dumps(
             {
-                "schema_version": "evaluation_harness.ledger_snapshot.v1",
-                "snapshot_id": "ledger-test",
+                "schema_version": "evaluation_harness.chronicle_snapshot.v1",
+                "snapshot_id": "chronicle-test",
                 "fact_count": 1,
                 "normalized_facts_sha256": hashlib.sha256(
                     facts_text.encode()
@@ -375,8 +375,8 @@ def test_snapshot_loader_verifies_count_and_normalized_hash(tmp_path: Path) -> N
         )
     )
     loaded, manifest = load_snapshot_facts(snapshot)
-    assert loaded == (ledger_fact,)
-    assert manifest["snapshot_id"] == "ledger-test"
+    assert loaded == (chronicle_fact,)
+    assert manifest["snapshot_id"] == "chronicle-test"
 
     bad_manifest = json.loads((snapshot / "snapshot_manifest.json").read_text())
     bad_manifest["fact_count"] = 2

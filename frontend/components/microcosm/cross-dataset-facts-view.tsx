@@ -60,7 +60,7 @@ function apiFactParams(params: FactCatalogParams): Record<string, string | numbe
     view: "facts",
     source: params.source || undefined,
     status: params.status || undefined,
-    ledger_source: params.ledgerSource || undefined,
+    chronicle_source: params.chronicleSource || undefined,
     measure: params.measure || undefined,
     period: params.period || undefined,
     geography: params.geography || undefined,
@@ -206,7 +206,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
     label: string;
     value: string;
   }[] = [
-    { key: "ledgerSource", label: "Chronicle source", value: params.ledgerSource },
+    { key: "chronicleSource", label: "Chronicle source", value: params.chronicleSource },
     { key: "measure", label: "Concept", value: params.measure },
     { key: "period", label: "Period", value: params.period },
     { key: "geography", label: "Geography", value: params.geography },
@@ -386,7 +386,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
                         {row.measure}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {row.ledgerSource} · {row.geography}
+                        {row.chronicleSource} · {row.geography}
                       </div>
                     </td>
                     <td className="px-4 py-3 align-top">

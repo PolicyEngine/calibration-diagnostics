@@ -235,12 +235,12 @@ def test_runner_rejects_wrong_entity_geography_and_array_lengths() -> None:
         runner.prepare(group("s006", "c00100"))
 
 
-def test_all_ten_reviewed_ledger_facts_execute_numerically() -> None:
+def test_all_ten_reviewed_chronicle_facts_execute_numerically() -> None:
     integration = Path("integrations/taxcalc_cps")
     overview = load_integration_overview(integration / "overview.yaml")
     mappings = MappingRegistry.from_yaml(integration / "mappings.yaml")
     capabilities = tuple(
-        CapabilityPlanner(mappings, snapshot_id=overview.ledger_snapshot_id).classify(
+        CapabilityPlanner(mappings, snapshot_id=overview.chronicle_snapshot_id).classify(
             fact, overview.source
         )
         for fact in overview.verification_facts

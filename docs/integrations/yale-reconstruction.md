@@ -31,7 +31,7 @@ aggregate JSON itself *is* byte-pinned by SHA-256
 `c5eeb17bd62a4efe02e043ac21cbcf96d50c3ef2353100cb650d6c8f048d7861`.
 
 The upstream code supports the intended path. Tax-Data starts with a 2017-base
-PUF, builds a projection ledger, and materializes yearly tax-unit files. Its
+PUF, builds a projection chronicle, and materializes yearly tax-unit files. Its
 `process_puf.R` explicitly reads `puf_2015.csv` and
 `demographics_2015.csv` through the `IRS-PUF` interface. Tax-Simulator lists
 the needed fields—including `weight`, `filer`, `wages`, `txbl_int`, `div_ord`,
@@ -126,7 +126,7 @@ reconstruction-input provenance is available.
 ## Ten directly testable Chronicle facts
 
 All ten are exact rows from Chronicle snapshot
-`ledger-7917ea815df710fb20db076b`. They are national tax-unit facts for tax year
+`chronicle-7917ea815df710fb20db076b`. They are national tax-unit facts for tax year
 2024, match an explicit Yale detail field, have a reviewed aggregation, and
 already have a finite reconstruction estimate in the committed aggregate
 artifact.

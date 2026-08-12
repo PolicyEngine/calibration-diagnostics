@@ -1,4 +1,4 @@
-"""Microcosm-compatible period aging for Ledger comparison facts.
+"""Microcosm-compatible period aging for Chronicle comparison facts.
 
 This is a FactContract-facing implementation of the policy in
 ``microcosm.build.us_runtime.target_aging`` at the pinned Microcosm release
@@ -155,7 +155,7 @@ class MicrocosmAgingResult:
 
 
 class MicrocosmAgingPolicy:
-    """The named Microcosm v1.2.0 aging policy over normalized Ledger facts."""
+    """The named Microcosm v1.2.0 aging policy over normalized Chronicle facts."""
 
     def __init__(
         self,
@@ -222,7 +222,7 @@ class MicrocosmAgingPolicy:
                 fact.value,
                 Decimal(1),
                 "source_equals_build",
-                "The Ledger fact already refers to the Microcosm build year.",
+                "The Chronicle fact already refers to the Microcosm build year.",
             )
         if fact.aggregation.get("method") != "sum" or fact.unit != "usd":
             return self._result(
@@ -372,7 +372,7 @@ class MicrocosmAgingPolicy:
         )
 
 
-def transform_ledger_facts_to_microcosm_year(
+def transform_chronicle_facts_to_microcosm_year(
     facts: Iterable[FactContract],
     policy: MicrocosmAgingPolicy,
     *,
@@ -402,7 +402,7 @@ def transform_ledger_facts_to_microcosm_year(
     return tuple(sorted(results, key=lambda result: result.source_fact.fact_key))
 
 
-def transform_ledger_facts_to_microcosm_years(
+def transform_chronicle_facts_to_microcosm_years(
     facts: Iterable[FactContract],
     policy: MicrocosmAgingPolicy,
     *,
@@ -417,7 +417,7 @@ def transform_ledger_facts_to_microcosm_years(
     results = tuple(
         result
         for source_year in years
-        for result in transform_ledger_facts_to_microcosm_year(
+        for result in transform_chronicle_facts_to_microcosm_year(
             facts,
             policy,
             source_year=source_year,
@@ -509,9 +509,9 @@ def _load_release_factors(
             or metadata.get("alignment_model_version") != AGING_MODEL_VERSION
         ):
             continue
-        source_year = _metadata_year(metadata.get("ledger_fact_period"))
+        source_year = _metadata_year(metadata.get("chronicle_fact_period"))
         effective_source_year = _metadata_year(
-            metadata.get("source_period", metadata.get("ledger_fact_period"))
+            metadata.get("source_period", metadata.get("chronicle_fact_period"))
         )
         build_year = _metadata_year(
             metadata.get("aged_to", target.get("period"))

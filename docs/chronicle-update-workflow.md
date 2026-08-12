@@ -3,17 +3,14 @@
 The Cross-dataset page never reads a mutable Chronicle checkout. It reads a
 content-addressed evaluation run built from an immutable Chronicle snapshot. A new
 Chronicle release must pass this review before an integration changes its pinned
-`ledger_snapshot_id`.
-
-Commands below retain legacy `ledger` identifiers for Chronicle compatibility;
-they must remain literal for the commands to work.
+`chronicle_snapshot_id`.
 
 ## 1. Compile the candidate snapshot
 
 ```bash
-uv run evaluation-harness ledger snapshot \
-  --bundle /path/to/ledger-consumer-bundle \
-  --out .artifacts/ledger/<candidate-snapshot>
+uv run evaluation-harness chronicle snapshot \
+  --bundle /path/to/chronicle-consumer-bundle \
+  --out .artifacts/chronicle/<candidate-snapshot>
 ```
 
 Compilation validates the Chronicle consumer schema, manifest hash, row count,
@@ -23,13 +20,13 @@ existing snapshot.
 ## 2. Review it against the approved snapshot
 
 ```bash
-uv run evaluation-harness ledger review \
-  --from .artifacts/ledger/<approved-snapshot> \
-  --to .artifacts/ledger/<candidate-snapshot> \
+uv run evaluation-harness chronicle review \
+  --from .artifacts/chronicle/<approved-snapshot> \
+  --to .artifacts/chronicle/<candidate-snapshot> \
   --integration integrations/microcosm_policyengine_us \
   --integration integrations/taxcalc_cps \
   --integration integrations/census_acs_pums \
-  --out .artifacts/ledger-reviews/<review-id>
+  --out .artifacts/chronicle-reviews/<review-id>
 ```
 
 The immutable review contains:
@@ -55,7 +52,7 @@ snapshot.
 Review any mapping regression or changed fact definition. Update mappings only
 after checking the underlying Chronicle fact semantics. Re-run the review until
 `ready_for_evaluation` is true, then update each approved integration's
-`ledger_snapshot_id`.
+`chronicle_snapshot_id`.
 
 The review's `affected_sources` section determines the work:
 
@@ -68,8 +65,8 @@ The current full-run entry point is:
 
 ```bash
 uv run --extra microcosm --extra taxcalc-cps \
-  python scripts/run_full_ledger_evaluation.py \
-  --snapshot .artifacts/ledger/<candidate-snapshot> \
+  python scripts/run_full_chronicle_evaluation.py \
+  --snapshot .artifacts/chronicle/<candidate-snapshot> \
   --microcosm-dataset /path/to/pinned-microcosm.h5 \
   --acs-pums-aggregates /path/to/pinned-acs-pums-person-age.parquet \
   --output .artifacts/evaluations/<new-run>

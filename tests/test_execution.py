@@ -42,7 +42,7 @@ def capability(
     denominator: str | None = None,
 ) -> CapabilityResult:
     return CapabilityResult(
-        snapshot_id="ledger-snapshot-1",
+        snapshot_id="chronicle-snapshot-1",
         fact_key=fact_key,
         source_id="fixture-source",
         source_type=SourceType.MODEL_DATASET_PAIR,
@@ -165,14 +165,14 @@ def test_cache_key_changes_for_every_reproducibility_input() -> None:
     group = build_run_groups([capability("a", "income")])[0]
     base = run_group_cache_key(
         group,
-        ledger_subset_hash="facts-1",
+        chronicle_subset_hash="facts-1",
         source_manifest_hash="source-1",
         mapping_hash="mapping-1",
         alignment_hash="alignment-1",
         harness_version="code-1",
     )
     fields = {
-        "ledger_subset_hash": "facts-2",
+        "chronicle_subset_hash": "facts-2",
         "source_manifest_hash": "source-2",
         "mapping_hash": "mapping-2",
         "alignment_hash": "alignment-2",
@@ -180,7 +180,7 @@ def test_cache_key_changes_for_every_reproducibility_input() -> None:
     }
     for key, value in fields.items():
         arguments = {
-            "ledger_subset_hash": "facts-1",
+            "chronicle_subset_hash": "facts-1",
             "source_manifest_hash": "source-1",
             "mapping_hash": "mapping-1",
             "alignment_hash": "alignment-1",

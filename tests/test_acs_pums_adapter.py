@@ -233,7 +233,7 @@ def test_acs_execution_carries_uncertainty_into_the_shared_result_artifact(
     )
     capability = CapabilityPlanner(
         MappingRegistry.from_yaml(integration / "mappings.yaml"),
-        snapshot_id=overview.ledger_snapshot_id,
+        snapshot_id=overview.chronicle_snapshot_id,
     ).classify(california, overview.source)
 
     result = execute_acs_pums(

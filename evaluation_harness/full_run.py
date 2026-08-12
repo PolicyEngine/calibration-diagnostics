@@ -38,7 +38,7 @@ class ScoredEvaluationResult:
     snapshot_id: str
     source_id: str
     fact_key: str
-    ledger_source: str
+    chronicle_source: str
     measure: str
     unit: str
     family: str
@@ -64,7 +64,7 @@ def load_snapshot_facts(
     manifest = json.loads((path / "snapshot_manifest.json").read_text())
     if manifest.get("schema_version") != SNAPSHOT_SCHEMA:
         raise ValueError(
-            f"unsupported Ledger snapshot schema: {manifest.get('schema_version')!r}"
+            f"unsupported Chronicle snapshot schema: {manifest.get('schema_version')!r}"
         )
     facts_path = path / "facts.jsonl"
     facts_bytes = facts_path.read_bytes()
@@ -73,7 +73,7 @@ def load_snapshot_facts(
         actual_hash = hashlib.sha256(facts_bytes).hexdigest()
         if actual_hash != expected_hash:
             raise ValueError(
-                "Ledger snapshot normalized facts hash does not match its manifest"
+                "Chronicle snapshot normalized facts hash does not match its manifest"
             )
 
     facts: list[FactContract] = []
@@ -84,16 +84,16 @@ def load_snapshot_facts(
             facts.append(FactContract.from_dict(json.loads(line)))
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
             raise ValueError(
-                f"invalid normalized Ledger fact on line {line_number}: {error}"
+                f"invalid normalized Chronicle fact on line {line_number}: {error}"
             ) from error
     expected_count = manifest.get("fact_count")
     if expected_count != len(facts):
         raise ValueError(
-            f"Ledger snapshot fact count mismatch: {len(facts)} != {expected_count}"
+            f"Chronicle snapshot fact count mismatch: {len(facts)} != {expected_count}"
         )
     keys = [fact.fact_key for fact in facts]
     if len(keys) != len(set(keys)):
-        raise ValueError("Ledger snapshot contains duplicate fact keys")
+        raise ValueError("Chronicle snapshot contains duplicate fact keys")
     return tuple(facts), manifest
 
 
@@ -200,7 +200,7 @@ def build_scored_results(
             fact = fact_by_key[result.fact_key]
         except KeyError as error:
             raise ValueError(
-                f"evaluation result has no Ledger fact: {result.fact_key}"
+                f"evaluation result has no Chronicle fact: {result.fact_key}"
             ) from error
         if capability.period_treatment is PeriodTreatment.ALIGNED_FACT:
             alignment = alignment_by_id.get(capability.alignment_id or "")
@@ -229,13 +229,13 @@ def build_scored_results(
         else:
             benchmark_period = fact.period
             benchmark_value = fact.value
-            benchmark_basis = "ledger_observed"
+            benchmark_basis = "chronicle_observed"
         scored.append(
             ScoredEvaluationResult(
                 snapshot_id=result.snapshot_id,
                 source_id=result.source_id,
                 fact_key=result.fact_key,
-                ledger_source=fact.source,
+                chronicle_source=fact.source,
                 measure=fact.measure,
                 unit=fact.unit,
                 family=fact.measure,

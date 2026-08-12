@@ -67,7 +67,7 @@ def test_fact_contract_rejects_blank_unit() -> None:
 def test_raw_dataset_capability_cannot_run_a_model() -> None:
     with pytest.raises(ValueError, match="raw dataset"):
         CapabilityResult(
-            snapshot_id="ledger-1",
+            snapshot_id="chronicle-1",
             fact_key=national_income_fact().fact_key,
             source_id="acs_pums_2023",
             source_type=SourceType.AGGREGATE_DATASET,
@@ -100,7 +100,7 @@ def test_raw_dataset_capability_cannot_run_a_model() -> None:
 
 def test_unsupported_capability_has_no_executable_query() -> None:
     capability = CapabilityResult.unsupported(
-        snapshot_id="ledger-1",
+        snapshot_id="chronicle-1",
         fact=national_income_fact(),
         source_id="acs_pums_2023",
         source_type=SourceType.AGGREGATE_DATASET,
@@ -117,7 +117,7 @@ def test_unsupported_capability_has_no_executable_query() -> None:
 def test_cross_period_capability_requires_alignment() -> None:
     with pytest.raises(ValueError, match="alignment"):
         CapabilityResult.direct(
-            snapshot_id="ledger-1",
+            snapshot_id="chronicle-1",
             fact=national_income_fact(),
             source_id="microcosm_2024",
             source_type=SourceType.MODEL_DATASET_PAIR,
