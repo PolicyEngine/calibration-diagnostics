@@ -76,6 +76,16 @@ make test      # bun test (data-layer suite)
 make build     # next build
 ```
 
+Run the Python Chronicle evaluation harness and its public numerical adapter
+gate manually when reviewing Chronicle or dependency updates:
+
+```bash
+uv run python scripts/verify_evaluation_harness.py
+```
+
+See [the Chronicle update workflow](docs/ledger-update-workflow.md) for the
+optional Microcosm and ACS inputs and the separate full-artifact command.
+
 Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different
 published dataset/revision. Staging defaults to `policyengine/populace-us-staging`;
 set `POPULACE_STAGING_HF_REPO`, `POPULACE_STAGING_HF_REVISION`, and `HF_TOKEN`
