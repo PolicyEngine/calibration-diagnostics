@@ -22,6 +22,7 @@ import {
   useMicrocosmReleases,
 } from "@/lib/api/hooks/use-microcosm";
 import type { GeographyCoverageBlock } from "@/lib/api/hooks/use-microcosm";
+import { microcosmSourceAttribution } from "@/lib/microcosm/source-attribution";
 
 function formatPublishedAt(value: string | null | undefined): string {
   if (!value) return "—";
@@ -80,6 +81,7 @@ export function MicrocosmOverviewView() {
   const lossKind = cal.loss_kind;
   const diagnosticsStatus = cal.diagnostics_status ?? "ok";
   const isNonDefault = cal.is_local_area === true || cal.is_default === false;
+  const sourceAttribution = microcosmSourceAttribution(country, data.source_repo);
 
   return (
     <div className="flex flex-col gap-5">
@@ -98,14 +100,18 @@ export function MicrocosmOverviewView() {
               : "EITC stats, population, and Medicaid enrollment"}
             . Tile size shows how much we calibrate to it, while color shows how closely the
             weighted data matches. Built live from{" "}
-            <a
-              className="underline decoration-dotted underline-offset-2"
-              href={`https://huggingface.co/datasets/${data.source_repo}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {data.source_repo}
-            </a>
+            {sourceAttribution.href ? (
+              <a
+                className="underline decoration-dotted underline-offset-2"
+                href={sourceAttribution.href}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {sourceAttribution.label}
+              </a>
+            ) : (
+              sourceAttribution.label
+            )}
             .
           </>
         }

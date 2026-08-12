@@ -10,11 +10,11 @@ import {
   navLinkAttributes,
 } from "@/components/layout/nav-items";
 
-const DATASET: Record<Country, { label: string; repo: string }> = {
+const DATASET: Record<Country, { label: string; repo?: string }> = {
   // Deprecated upstream identifiers: Microcosm's HF repositories retain the
   // former Populace slugs.
   us: { label: "Microcosm US", repo: "policyengine/populace-us" },
-  uk: { label: "Microcosm UK", repo: "policyengine/populace-uk-private" },
+  uk: { label: "Microcosm UK" },
 };
 
 export function NavSidebar() {
@@ -56,7 +56,9 @@ export function NavSidebar() {
           })}
         </div>
         <div className="mt-1.5 text-sm font-semibold text-foreground">{dataset.label}</div>
-        <div className="font-mono text-xs text-muted-foreground">{dataset.repo}</div>
+        {dataset.repo ? (
+          <div className="font-mono text-xs text-muted-foreground">{dataset.repo}</div>
+        ) : null}
       </div>
       <nav className="flex flex-col gap-4 px-3">
         {groups.map((group) => (

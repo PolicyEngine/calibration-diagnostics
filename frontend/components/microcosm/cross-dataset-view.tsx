@@ -319,6 +319,7 @@ function CrossDatasetOverviewView() {
 
       <SectionCard
         title="Model and dataset performance"
+        headerAlign="center"
         actions={
           <div className="flex flex-wrap items-end justify-end gap-3">
             <label className="text-xs text-muted-foreground">

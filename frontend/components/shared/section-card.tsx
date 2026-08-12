@@ -9,6 +9,7 @@ interface SectionCardProps {
   actions?: ReactNode;
   footer?: ReactNode;
   padded?: boolean;
+  headerAlign?: "start" | "center";
   className?: string;
   children: ReactNode;
 }
@@ -19,6 +20,7 @@ export function SectionCard({
   actions,
   footer,
   padded = true,
+  headerAlign = "start",
   className,
   children,
 }: SectionCardProps) {
@@ -26,7 +28,11 @@ export function SectionCard({
     <Card
       className={`gap-0 overflow-visible border-border/80 py-0 shadow-[var(--elev-1)] ${className ?? ""}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border bg-muted/20 px-5 py-3">
+      <div
+        className={`flex flex-wrap justify-between gap-3 border-b border-border bg-muted/20 px-5 py-3 ${
+          headerAlign === "center" ? "items-center" : "items-start"
+        }`}
+      >
         <div className="min-w-[220px] flex-1">
           <div className="text-sm font-semibold leading-tight text-foreground">
             {title}
