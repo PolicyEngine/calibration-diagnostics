@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { createExplorerState, type ExplorerState } from "./calibration-explorer";
 import {
+  CALIBRATION_PREFETCH_POLICY,
   prefetchCalibrationDescendants,
   type CalibrationTreeFetcher,
 } from "./calibration-prefetch";
@@ -97,6 +98,15 @@ function pathKey(state: ExplorerState): string {
 }
 
 describe("calibration tree descendant prefetch", () => {
+  test("loads the root early but only prefetches one level from the active view", () => {
+    expect(CALIBRATION_PREFETCH_POLICY).toEqual({
+      pageLoadDescendantDepth: 0,
+      activeViewDescendantDepth: 1,
+      concurrency: 6,
+      cacheTimeMs: 6 * 60 * 60 * 1000,
+    });
+  });
+
   test("walks exactly three selectable levels and never requests target leaves", async () => {
     const root = createExplorerState();
     const requested: string[] = [];

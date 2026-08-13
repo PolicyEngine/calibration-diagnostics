@@ -31,7 +31,10 @@ import {
   type ExplorerFilters,
   type ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
-import { prefetchCalibrationDescendants } from "@/lib/microcosm/calibration-prefetch";
+import {
+  CALIBRATION_PREFETCH_POLICY,
+  prefetchCalibrationDescendants,
+} from "@/lib/microcosm/calibration-prefetch";
 import {
   MISSING_VALUE,
   type CalibrationTreeGroup,
@@ -51,10 +54,6 @@ import { squarify, type Placed } from "@/lib/treemap/squarify";
 const GROUP_GAP = 8;
 const NODE_GAP = 3;
 const HEADER_HEIGHT = 24;
-const PAGE_LOAD_PREFETCH_DEPTH = 3;
-const ACTIVE_VIEW_PREFETCH_DEPTH = 1;
-const PREFETCH_CONCURRENCY = 6;
-
 const FIT_LABELS: Record<string, string> = {
   "0_5": "0–5%",
   "5_10": "5–10%",
@@ -445,7 +444,7 @@ function usePrefetchCalibrationLevels({
       state,
       data,
       depth,
-      concurrency: PREFETCH_CONCURRENCY,
+      concurrency: CALIBRATION_PREFETCH_POLICY.concurrency,
       fetchTree: async (childState) =>
         queryClient.fetchQuery(
           microcosmCalibrationTreeQueryOptions(childState, release, country),
@@ -470,7 +469,7 @@ export function CalibrationExplorerDataPrefetch({
     data,
     release,
     isPlaceholderData,
-    depth: PAGE_LOAD_PREFETCH_DEPTH,
+    depth: CALIBRATION_PREFETCH_POLICY.pageLoadDescendantDepth,
   });
   return null;
 }
@@ -504,7 +503,7 @@ export function CalibrationExplorerMap({
     data,
     release,
     isPlaceholderData,
-    depth: ACTIVE_VIEW_PREFETCH_DEPTH,
+    depth: CALIBRATION_PREFETCH_POLICY.activeViewDescendantDepth,
   });
 
   useEffect(() => {
