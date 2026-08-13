@@ -23,6 +23,8 @@ interface Edge {
 const W = 1280;
 const H = 560;
 
+// Deprecated upstream identifier: the current Microcosm H5 filename retains
+// its former Populace literal.
 const NODES: Node[] = [
   // Column 0 — source surveys (upstream enrichment, baked into the base H5)
   { id: "cps", x: 20, y: 24, w: 150, h: 40, title: "CPS ASEC", sub: "base survey", kind: "source" },

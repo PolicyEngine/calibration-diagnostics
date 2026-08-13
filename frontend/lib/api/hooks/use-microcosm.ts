@@ -6,6 +6,7 @@ import {
 } from "@/components/layout/country-context";
 import { withBasePath } from "@/lib/base-path";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
+import { CALIBRATION_PREFETCH_POLICY } from "@/lib/microcosm/calibration-prefetch";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
 import { apiGet } from "../client";
 
@@ -757,7 +758,8 @@ export function microcosmCalibrationTreeQueryOptions(
         release: release || undefined,
         country,
       }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: CALIBRATION_PREFETCH_POLICY.cacheTimeMs,
+    gcTime: CALIBRATION_PREFETCH_POLICY.cacheTimeMs,
   };
 }
 

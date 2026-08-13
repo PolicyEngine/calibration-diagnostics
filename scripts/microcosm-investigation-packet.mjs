@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 const PRODUCTION_BASE_URL = "https://calibration-diagnostics.vercel.app";
+// Deprecated compatibility identifier: existing callers still configure this
+// repository-owned script with the former Populace environment-variable name.
 const DEFAULT_BASE_URL = process.env.POPULACE_DIAGNOSTICS_BASE_URL ?? PRODUCTION_BASE_URL;
 const LOCAL_FALLBACK_BASE_URLS = [
   "http://localhost:3000",

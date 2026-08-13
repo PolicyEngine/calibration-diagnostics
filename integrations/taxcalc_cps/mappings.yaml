@@ -1,0 +1,1366 @@
+mapping_release: taxcalc-public-cps-chronicle-expansion-v3
+mappings:
+  - mapping_id: taxcalc-cps-returns-with-income-tax
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_income_tax_liability_after_credits]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: positive_iitax
+    operation: weighted_count
+    required_variables: [positive_iitax]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-eitc-by-children
+    chronicle_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.earned_income_credit
+        - irs_soi.total_earned_income_credit
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c59660
+    operation: weighted_sum
+    required_variables: [c59660, EIC]
+    mapping_quality: exact
+    supported_dimensions: [eitc_child_count, filing_status, income_range]
+    descriptive_dimensions: [eitc_child_count, income_range]
+    supported_constraint_domains:
+      - all_individual_income_tax_returns
+      - individual_income_tax_returns
+      - individual_income_tax_returns_with_earned_income_credit
+    supported_constraint_variables:
+      - us.tax.earned_income_credit_qualifying_children
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-eitc-return-count-by-children
+    chronicle_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.returns_with_earned_income_credit
+        - irs_soi.returns_with_total_earned_income_credit
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c59660
+    operation: weighted_count
+    required_variables: [c59660, EIC]
+    mapping_quality: exact
+    supported_dimensions: [eitc_child_count, filing_status, income_range]
+    descriptive_dimensions: [eitc_child_count, income_range]
+    supported_constraint_domains:
+      - all_individual_income_tax_returns
+      - individual_income_tax_returns
+      - individual_income_tax_returns_with_earned_income_credit
+    supported_constraint_variables:
+      - us.tax.earned_income_credit_qualifying_children
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-adjusted-gross-income
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [us:statutes/26/62#adjusted_gross_income]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c00100
+    operation: weighted_sum
+    required_variables: [c00100]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-wages
+    chronicle_selector:
+      sources: [cbo]
+      measures: [cbo.wages_and_salaries_projection]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00200
+    operation: weighted_sum
+    required_variables: [e00200]
+    mapping_quality: exact
+    supported_constraint_domains: [individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-interest
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.taxable_interest]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00300
+    operation: weighted_sum
+    required_variables: [e00300]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-ordinary-dividends
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.ordinary_dividends]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00600
+    operation: weighted_sum
+    required_variables: [e00600]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-pensions
+    chronicle_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.taxable_pensions_and_annuities
+        - irs_soi.taxable_pension_income
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01700
+    operation: weighted_sum
+    required_variables: [e01700]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-social-security
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.taxable_social_security_benefits]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c02500
+    operation: weighted_sum
+    required_variables: [c02500]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-unemployment-compensation
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.unemployment_compensation]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e02300
+    operation: weighted_sum
+    required_variables: [e02300]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-income-tax
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.income_tax_liability_after_credits]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: iitax
+    operation: weighted_sum
+    required_variables: [iitax]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-cbo-adjusted-gross-income
+    chronicle_selector:
+      sources: [cbo]
+      measures: [cbo.adjusted_gross_income_projection]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c00100
+    operation: weighted_sum
+    required_variables: [c00100]
+    mapping_quality: exact
+    supported_constraint_domains: [individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-cbo-qualified-dividends
+    chronicle_selector:
+      sources: [cbo]
+      measures: [cbo.qualified_dividend_income_projection]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00650
+    operation: weighted_sum
+    required_variables: [e00650]
+    mapping_quality: exact
+    supported_constraint_domains: [individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-cbo-interest-and-nonqualified-dividends
+    chronicle_selector:
+      sources: [cbo]
+      measures:
+        - cbo.taxable_interest_and_ordinary_dividends_excluding_qualified_dividends_projection
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: taxable_interest_and_nonqualified_dividends
+    operation: weighted_sum
+    required_variables: [taxable_interest_and_nonqualified_dividends]
+    mapping_quality: exact
+    supported_constraint_domains: [individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-additional-child-tax-credit-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.additional_child_tax_credit]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c11070
+    operation: weighted_sum
+    required_variables: [c11070]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-additional-child-tax-credit-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_additional_child_tax_credit]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c11070
+    operation: weighted_count
+    required_variables: [c11070]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-child-tax-credit-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.child_tax_credit]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c07220
+    operation: weighted_sum
+    required_variables: [c07220]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-child-tax-credit-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_child_tax_credit]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c07220
+    operation: weighted_count
+    required_variables: [c07220]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-schedule-c-income-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.business_or_profession_net_income
+        - irs_soi.schedule_c_income
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: positive_schedule_c_income
+    operation: weighted_sum
+    required_variables: [positive_schedule_c_income]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-schedule-c-income-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.returns_with_business_or_profession_net_income
+        - irs_soi.returns_with_schedule_c_income
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: positive_schedule_c_income
+    operation: weighted_count
+    required_variables: [positive_schedule_c_income]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-charitable-deduction-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.charitable_contributions_deduction]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c19700
+    operation: weighted_sum
+    required_variables: [c19700]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-charitable-deduction-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_charitable_contributions_deduction]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c19700
+    operation: weighted_count
+    required_variables: [c19700]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-income-tax-before-credits-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.income_tax_before_credits]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c05800
+    operation: weighted_sum
+    required_variables: [c05800]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-income-tax-before-credits-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_income_tax_before_credits]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c05800
+    operation: weighted_count
+    required_variables: [c05800]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-interest-deduction-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.interest_paid_deduction]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c19200
+    operation: weighted_sum
+    required_variables: [c19200]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-interest-deduction-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_interest_paid_deduction]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c19200
+    operation: weighted_count
+    required_variables: [c19200]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-salt-deduction-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.limited_state_local_taxes]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c18300
+    operation: weighted_sum
+    required_variables: [c18300]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-salt-deduction-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_limited_state_local_taxes]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c18300
+    operation: weighted_count
+    required_variables: [c18300]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-medical-deduction-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.medical_dental_expense_deduction]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c17000
+    operation: weighted_sum
+    required_variables: [c17000]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-medical-deduction-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_medical_dental_expense_deduction]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c17000
+    operation: weighted_count
+    required_variables: [c17000]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-ordinary-dividend-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_ordinary_dividends]
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00600
+    operation: weighted_count
+    required_variables: [e00600]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-qbi-deduction-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.qualified_business_income_deduction]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: qbided
+    operation: weighted_sum
+    required_variables: [qbided]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-qbi-deduction-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_qualified_business_income_deduction]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: qbided
+    operation: weighted_count
+    required_variables: [qbided]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-qualified-dividend-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.qualified_dividends]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00650
+    operation: weighted_sum
+    required_variables: [e00650]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-qualified-dividend-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_qualified_dividends]
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00650
+    operation: weighted_count
+    required_variables: [e00650]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-tax-exempt-interest-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.tax_exempt_interest]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00400
+    operation: weighted_sum
+    required_variables: [e00400]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-tax-exempt-interest-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_tax_exempt_interest]
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00400
+    operation: weighted_count
+    required_variables: [e00400]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-interest-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_taxable_interest]
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00300
+    operation: weighted_count
+    required_variables: [e00300]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-ira-distributions-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.taxable_ira_distributions]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01400
+    operation: weighted_sum
+    required_variables: [e01400]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-ira-distributions-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_taxable_ira_distributions]
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01400
+    operation: weighted_count
+    required_variables: [e01400]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-pension-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.returns_with_taxable_pensions_and_annuities
+        - irs_soi.returns_with_taxable_pension_income
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01700
+    operation: weighted_count
+    required_variables: [e01700]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-social-security-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_taxable_social_security_benefits]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c02500
+    operation: weighted_count
+    required_variables: [c02500]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-itemized-deductions-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.total_itemized_deductions]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c04470
+    operation: weighted_sum
+    required_variables: [c04470]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-itemized-deductions-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_itemized_deductions]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c04470
+    operation: weighted_count
+    required_variables: [c04470]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-unemployment-compensation-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_unemployment_compensation]
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e02300
+    operation: weighted_count
+    required_variables: [e02300]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-income-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.taxable_income]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c04800
+    operation: weighted_sum
+    required_variables: [c04800]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-taxable-income-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_taxable_income]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: c04800
+    operation: weighted_count
+    required_variables: [c04800]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-total-income-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.total_income]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: total_income
+    operation: weighted_sum
+    required_variables: [total_income]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-total-income-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_total_income]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: total_income
+    operation: weighted_count
+    required_variables: [total_income]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-total-income-tax-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.total_income_tax]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: income_tax_after_nonrefundable_credits
+    operation: weighted_sum
+    required_variables: [income_tax_after_nonrefundable_credits]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-total-income-tax-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_total_income_tax]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: income_tax_after_nonrefundable_credits
+    operation: weighted_count
+    required_variables: [income_tax_after_nonrefundable_credits]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-real-estate-taxes-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.real_estate_taxes]
+      units: [usd]
+      entities: [tax_unit]
+    execution: model
+    source_expression: itemized_real_estate_taxes
+    operation: weighted_sum
+    required_variables: [itemized_real_estate_taxes]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-real-estate-taxes-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_real_estate_taxes]
+      units: [count]
+      entities: [tax_unit]
+    execution: model
+    source_expression: itemized_real_estate_taxes
+    operation: weighted_count
+    required_variables: [itemized_real_estate_taxes]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-irs-wages-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [us:statutes/26/62#input.wages]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00200
+    operation: weighted_sum
+    required_variables: [e00200]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-irs-wage-returns
+    chronicle_selector:
+      sources: [irs_soi]
+      measures: [irs_soi.returns_with_total_wages]
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e00200
+    operation: weighted_count
+    required_variables: [e00200]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-social-security-benefits
+    chronicle_selector:
+      sources: [ssa]
+      measures: [ssa.annual_oasdi_or_ssi_payment_amount]
+      units: [usd]
+      entities: [person]
+      dimension_values:
+        us_social_security_and_ssi.program_payment_type:
+          - social_security_benefits
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: e02400
+    operation: weighted_sum
+    required_variables: [e02400]
+    mapping_quality: exact
+    supported_dimensions: [us_social_security_and_ssi.program_payment_type]
+    descriptive_dimensions: [us_social_security_and_ssi.program_payment_type]
+    supported_constraint_domains: [social_security_and_ssi_payments]
+    supported_constraint_variables: [us_social_security_and_ssi.program_payment_type]
+    descriptive_constraint_variables: [us_social_security_and_ssi.program_payment_type]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-ssi-payment-total
+    chronicle_selector:
+      sources: [ssa]
+      measures: [ssa.ssi_payment_amount]
+      units: [usd]
+      entities: [person]
+      absent_dimensions: [ssi_category]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: ssi_ben
+    operation: weighted_sum
+    required_variables: [ssi_ben]
+    mapping_quality: exact
+    supported_constraint_domains: [social_security_and_ssi_payments]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-capital-gains-amount
+    chronicle_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.net_capital_gains
+        - irs_soi.taxable_net_capital_gains
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01100
+    operation: weighted_sum
+    required_variables: [e01100]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-capital-gains-return-count
+    chronicle_selector:
+      sources: [irs_soi]
+      measures:
+        - irs_soi.returns_with_net_capital_gains
+        - irs_soi.returns_with_taxable_net_capital_gains
+      units: [count]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01100
+    operation: weighted_count
+    required_variables: [e01100]
+    mapping_quality: exact
+    supported_dimensions: [filing_status, income_range]
+    descriptive_dimensions: [filing_status, income_range]
+    supported_constraint_domains: [all_individual_income_tax_returns]
+    supported_constraint_variables:
+      - us:statutes/26/62#adjusted_gross_income
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-cbo-capital-gains
+    chronicle_selector:
+      sources: [cbo]
+      measures: [cbo.net_capital_gain_projection]
+      units: [usd]
+      entities: [tax_unit]
+    execution: direct
+    source_expression: e01100
+    operation: weighted_sum
+    required_variables: [e01100]
+    mapping_quality: exact
+    supported_constraint_domains: [individual_income_tax_returns]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-pep-total-population
+    chronicle_selector:
+      sources: [census_pep]
+      measures: [census_pep.resident_population]
+      units: [count]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: XTOT
+    operation: weighted_sum
+    required_variables: [XTOT]
+    mapping_quality: exact
+    supported_constraint_domains: [resident_population]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-regional-wages
+    chronicle_selector:
+      sources: [bea]
+      measures: [bea_regional.wages_and_salaries]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: e00200
+    operation: weighted_sum
+    required_variables: [e00200]
+    mapping_quality: exact
+    supported_dimensions:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    descriptive_dimensions:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    supported_constraint_domains: [personal_income]
+    supported_constraint_variables:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    descriptive_constraint_variables:
+      - bea_regional.geo_name
+      - bea_regional.line_code
+      - bea_regional.table_name
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-nipa-wages
+    chronicle_selector:
+      sources: [bea]
+      measures: [bea_nipa.wages_and_salaries]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: e00200
+    operation: weighted_sum
+    required_variables: [e00200]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [compensation_of_employees]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-social-security-benefits
+    chronicle_selector:
+      sources: [bea]
+      measures: [bea_nipa.social_security_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: e02400
+    operation: weighted_sum
+    required_variables: [e02400]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-unemployment-benefits
+    chronicle_selector:
+      sources: [bea]
+      measures: [bea_nipa.unemployment_insurance_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: e02300
+    operation: weighted_sum
+    required_variables: [e02300]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-veterans-benefits
+    chronicle_selector:
+      sources: [bea]
+      measures: [bea_nipa.veterans_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: vet_ben
+    operation: weighted_sum
+    required_variables: [vet_ben]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-medicare-benefits
+    chronicle_selector:
+      sources: [bea]
+      measures: [bea_nipa.medicare_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: mcare_ben
+    operation: weighted_sum
+    required_variables: [mcare_ben]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-medicaid-benefits
+    chronicle_selector:
+      sources: [bea]
+      measures: [bea_nipa.medicaid_benefits]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: mcaid_ben
+    operation: weighted_sum
+    required_variables: [mcaid_ben]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-bea-government-social-benefits
+    chronicle_selector:
+      sources: [bea]
+      measures: [bea_nipa.government_social_benefits_to_persons]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: benefit_cost_total
+    operation: weighted_sum
+    required_variables: [benefit_cost_total]
+    mapping_quality: exact
+    supported_dimensions: [bea_nipa.series_code]
+    descriptive_dimensions: [bea_nipa.series_code]
+    supported_constraint_domains: [personal_current_transfer_receipts]
+    supported_constraint_variables: [bea_nipa.series_code]
+    descriptive_constraint_variables: [bea_nipa.series_code]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-cms-medicaid-title-xix
+    chronicle_selector:
+      sources: [cms_nhe]
+      measures: [cms_nhe.medicaid_title_xix_expenditures]
+      units: [usd]
+      entities: [person]
+    execution: direct
+    execution_entity: tax_unit
+    source_expression: mcaid_ben
+    operation: weighted_sum
+    required_variables: [mcaid_ben]
+    mapping_quality: exact
+    supported_constraint_domains: [national_health_expenditures]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-charitable-deduction
+    chronicle_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [charitable_deduction]
+    execution: model
+    source_expression: jct_repeal:charitable_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:charitable_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-mortgage-interest
+    chronicle_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [deductible_mortgage_interest]
+    execution: model
+    source_expression: jct_repeal:deductible_mortgage_interest
+    operation: weighted_sum
+    required_variables: [jct_repeal:deductible_mortgage_interest]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-medical-expense
+    chronicle_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [medical_expense_deduction]
+    execution: model
+    source_expression: jct_repeal:medical_expense_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:medical_expense_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-qbi
+    chronicle_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [qualified_business_income_deduction]
+    execution: model
+    source_expression: jct_repeal:qualified_business_income_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:qualified_business_income_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-salt
+    chronicle_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [salt_deduction]
+    execution: model
+    source_expression: jct_repeal:salt_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:salt_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-self-employed-health
+    chronicle_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [self_employed_health_insurance_deduction]
+    execution: model
+    source_expression: jct_repeal:self_employed_health_insurance_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:self_employed_health_insurance_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-self-employed-pension
+    chronicle_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [self_employed_pension_contribution_deduction]
+    execution: model
+    source_expression: jct_repeal:self_employed_pension_contribution_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:self_employed_pension_contribution_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-student-loan-interest
+    chronicle_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [student_loan_interest_deduction]
+    execution: model
+    source_expression: jct_repeal:student_loan_interest_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:student_loan_interest_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation
+
+  - mapping_id: taxcalc-cps-jct-traditional-ira
+    chronicle_selector:
+      sources: [jct]
+      measures: [jct.individual_tax_expenditure_revenue_loss]
+      units: [usd]
+      entities: [tax_unit]
+      dimension_values:
+        tax_expenditure: [traditional_ira_deduction]
+    execution: model
+    source_expression: jct_repeal:traditional_ira_deduction
+    operation: weighted_sum
+    required_variables: [jct_repeal:traditional_ira_deduction]
+    mapping_quality: exact
+    supported_dimensions: [tax_expenditure]
+    descriptive_dimensions: [tax_expenditure]
+    supported_constraint_domains: [federal_income_tax]
+    supported_constraint_variables: [tax_expenditure]
+    descriptive_constraint_variables: [tax_expenditure]
+    calibration_exposure: external_validation

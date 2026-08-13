@@ -1,27 +1,35 @@
-// Pure-HF data layer for the microcosm-US dashboard. No committed snapshot:
+// Pure-HF data layer for the Microcosm US dashboard. No committed snapshot:
 // every release's manifests and per-target calibration diagnostics are read
 // live from the policyengine/populace-us Hugging Face dataset, resolved through
 // latest.json (current release) or by id (any release, for version compare).
 
+import { sourceAuthorityLabel } from "@/lib/source-labels";
+
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
-import { sourceLabel } from "./source-label";
 
 type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
 export type CalibrationLossKind = "normalized_target_loss" | "raw_optimizer_objective";
 
-export const POPULACE_HF_REPO = process.env.POPULACE_HF_REPO ?? "policyengine/populace-us";
-export const POPULACE_HF_REVISION = process.env.POPULACE_HF_REVISION ?? "main";
+// Deprecated upstream identifiers: Microcosm's published HF repositories and
+// deployment variables still use the former Populace names.
+export const MICROCOSM_HF_REPO_ENV = "POPULACE_HF_REPO";
+export const MICROCOSM_HF_REVISION_ENV = "POPULACE_HF_REVISION";
+export const MICROCOSM_UK_HF_REPO_ENV = "POPULACE_UK_HF_REPO";
+export const MICROCOSM_UK_HF_REVISION_ENV = "POPULACE_UK_HF_REVISION";
+export const MICROCOSM_HF_REPO =
+  process.env[MICROCOSM_HF_REPO_ENV] ?? "policyengine/populace-us";
+export const MICROCOSM_HF_REVISION = process.env[MICROCOSM_HF_REVISION_ENV] ?? "main";
 
 // Microcosm ships one HF dataset per country. US is public; UK is private and
 // needs an HF token on the server.
 export type MicrocosmCountry = "us" | "uk";
 
 const COUNTRY_REPO: Record<MicrocosmCountry, { repo: string; revision: string }> = {
-  us: { repo: POPULACE_HF_REPO, revision: POPULACE_HF_REVISION },
+  us: { repo: MICROCOSM_HF_REPO, revision: MICROCOSM_HF_REVISION },
   uk: {
-    repo: process.env.POPULACE_UK_HF_REPO ?? "policyengine/populace-uk-private",
-    revision: process.env.POPULACE_UK_HF_REVISION ?? "main",
+    repo: process.env[MICROCOSM_UK_HF_REPO_ENV] ?? "policyengine/populace-uk-private",
+    revision: process.env[MICROCOSM_UK_HF_REVISION_ENV] ?? "main",
   },
 };
 
@@ -141,9 +149,18 @@ function calibrationLossKind(
   return "raw_optimizer_objective";
 }
 
+// A zero benchmark is a structural zero, not an epsilon denominator. Numerical
+// noise at or below this tolerance is an exact fit; any substantive nonzero
+// estimate is the maximum 100% error used by the Chronicle harness.
+const ZERO_BENCHMARK_ABSOLUTE_TOLERANCE = 1e-4;
+
 function relativeError(estimate: number | null, target: number | null): number | null {
   if (estimate == null || target == null) return null;
-  return target === 0 ? estimate - target : (estimate - target) / Math.abs(target);
+  if (target === 0) {
+    if (Math.abs(estimate) <= ZERO_BENCHMARK_ABSOLUTE_TOLERANCE) return 0;
+    return estimate < 0 ? -1 : 1;
+  }
+  return (estimate - target) / Math.abs(target);
 }
 
 interface ParsedTarget {
@@ -199,6 +216,9 @@ interface ChronicleFactFields {
   universe_constraint_count: number | null;
   filters: ChronicleFilter[];
 }
+
+// Deprecated upstream identifiers: Microcosm calibration diagnostics still
+// serialize Chronicle provenance with the former `ledger_*` metadata prefix.
 
 function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
@@ -337,7 +357,7 @@ function measureFromMetadata(metadata: JsonObject): string | null {
   const sourceMeasure = stringValue(metadata.source_measure_id);
   const namedMeasure = measureFromName(sourceMeasure);
   if (namedMeasure) return namedMeasure;
-  const unit = stringValue(metadata.chronicle_measure_unit);
+  const unit = stringValue(metadata.ledger_measure_unit);
   if (stringValue(metadata.count) === "true" || unit === "count") return "count";
   if (unit === "usd") return "total";
   return null;
@@ -355,7 +375,7 @@ function dimensionLabel(value: string | null): string {
 }
 
 function filterDimensionLabel(key: string): string {
-  const suffix = key.replace(/^chronicle_filter_/, "");
+  const suffix = key.replace(/^ledger_filter_/, "");
   if (suffix === "income_range") return "Income band";
   if (suffix === "filing_status") return "Filing status";
   if (suffix === "eitc_child_count") return "Qualifying children";
@@ -372,7 +392,7 @@ function isGeographyLayoutDimension(value: string | null): boolean {
 
 function isRedundantGeographyValue(metadata: JsonObject, value: string | null): boolean {
   if (!value) return false;
-  const geography = stateFromGeoId(stringValue(metadata.chronicle_geography_id));
+  const geography = stateFromGeoId(stringValue(metadata.ledger_geography_id));
   return Boolean(geography && value.toLowerCase() === geography.toLowerCase());
 }
 
@@ -384,7 +404,7 @@ function readableDimensionValue(value: string | null): string | null {
 }
 
 function readableFilterValue(key: string, value: string | null): string | null {
-  if (key === "chronicle_filter_eitc_child_count") {
+  if (key === "ledger_filter_eitc_child_count") {
     return qualifyingChildrenFromCount(value);
   }
   return readableDimensionValue(value);
@@ -392,7 +412,7 @@ function readableFilterValue(key: string, value: string | null): string | null {
 
 function chronicleFilters(metadata: JsonObject): ChronicleFilter[] {
   return Object.entries(metadata)
-    .filter(([key, raw]) => key.startsWith("chronicle_filter_") && stringValue(raw))
+    .filter(([key, raw]) => key.startsWith("ledger_filter_") && stringValue(raw))
     .map(([key, raw]) => {
       const rawValue = stringValue(raw)!;
       return {
@@ -407,33 +427,33 @@ function chronicleFilters(metadata: JsonObject): ChronicleFilter[] {
 
 function chronicleFactFields(metadata: JsonObject): ChronicleFactFields {
   return {
-    fact_key: stringValue(metadata.chronicle_fact_key),
-    source_record_id: stringValue(metadata.chronicle_source_record_id),
-    semantic_fact_key: stringValue(metadata.chronicle_semantic_fact_key),
-    aggregate_fact_key: stringValue(metadata.chronicle_aggregate_fact_key),
-    legacy_fact_key: stringValue(metadata.chronicle_legacy_fact_key),
-    period_type: stringValue(metadata.chronicle_period_type),
+    fact_key: stringValue(metadata.ledger_fact_key),
+    source_record_id: stringValue(metadata.ledger_source_record_id),
+    semantic_fact_key: stringValue(metadata.ledger_semantic_fact_key),
+    aggregate_fact_key: stringValue(metadata.ledger_aggregate_fact_key),
+    legacy_fact_key: stringValue(metadata.ledger_legacy_fact_key),
+    period_type: stringValue(metadata.ledger_period_type),
     source_period: stringValue(metadata.source_period),
     target_period: stringValue(metadata.target_period),
-    geography_level: stringValue(metadata.chronicle_geography_level),
-    geography_id: stringValue(metadata.chronicle_geography_id),
-    geography_vintage: stringValue(metadata.chronicle_geography_vintage),
-    domain: stringValue(metadata.chronicle_domain),
-    entity_name: stringValue(metadata.chronicle_entity_name),
-    entity_role: stringValue(metadata.chronicle_entity_role),
-    measure_concept: stringValue(metadata.chronicle_measure_concept),
-    source_concept: stringValue(metadata.chronicle_source_concept),
-    concept_relation: stringValue(metadata.chronicle_concept_relation),
-    concept_authority: stringValue(metadata.chronicle_concept_authority),
-    measure_unit: stringValue(metadata.chronicle_measure_unit),
-    value_operation: stringValue(metadata.chronicle_value_operation),
-    layout_record_set_id: stringValue(metadata.chronicle_layout_record_set_id),
-    layout_groupby_dimension: stringValue(metadata.chronicle_layout_groupby_dimension),
-    layout_groupby_value_id: stringValue(metadata.chronicle_layout_groupby_value_id),
-    layout_measure_id: stringValue(metadata.chronicle_layout_measure_id),
-    dimension_set_key: stringValue(metadata.chronicle_dimension_set_key),
-    universe_constraint_set_key: stringValue(metadata.chronicle_universe_constraint_set_key),
-    universe_constraint_count: numberOrNull(metadata.chronicle_universe_constraint_count),
+    geography_level: stringValue(metadata.ledger_geography_level),
+    geography_id: stringValue(metadata.ledger_geography_id),
+    geography_vintage: stringValue(metadata.ledger_geography_vintage),
+    domain: stringValue(metadata.ledger_domain),
+    entity_name: stringValue(metadata.ledger_entity_name),
+    entity_role: stringValue(metadata.ledger_entity_role),
+    measure_concept: stringValue(metadata.ledger_measure_concept),
+    source_concept: stringValue(metadata.ledger_source_concept),
+    concept_relation: stringValue(metadata.ledger_concept_relation),
+    concept_authority: stringValue(metadata.ledger_concept_authority),
+    measure_unit: stringValue(metadata.ledger_measure_unit),
+    value_operation: stringValue(metadata.ledger_value_operation),
+    layout_record_set_id: stringValue(metadata.ledger_layout_record_set_id),
+    layout_groupby_dimension: stringValue(metadata.ledger_layout_groupby_dimension),
+    layout_groupby_value_id: stringValue(metadata.ledger_layout_groupby_value_id),
+    layout_measure_id: stringValue(metadata.ledger_layout_measure_id),
+    dimension_set_key: stringValue(metadata.ledger_dimension_set_key),
+    universe_constraint_set_key: stringValue(metadata.ledger_universe_constraint_set_key),
+    universe_constraint_count: numberOrNull(metadata.ledger_universe_constraint_count),
     filters: chronicleFilters(metadata),
   };
 }
@@ -469,8 +489,8 @@ function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
   const metadata = asObject(row.metadata);
   if (!Object.keys(metadata).length) return null;
   const dimensions: TargetBreakdownDimension[] = [];
-  const layoutDimension = stringValue(metadata.chronicle_layout_groupby_dimension);
-  const layoutValue = stringValue(metadata.chronicle_layout_groupby_value_id);
+  const layoutDimension = stringValue(metadata.ledger_layout_groupby_dimension);
+  const layoutValue = stringValue(metadata.ledger_layout_groupby_value_id);
   if (
     layoutValue &&
     !isGeographyLayoutDimension(layoutDimension) &&
@@ -480,12 +500,12 @@ function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
       dimensions,
       dimensionLabel(layoutDimension),
       readableDimensionValue(layoutValue),
-      "chronicle_layout_groupby_value_id",
+      "ledger_layout_groupby_value_id",
       layoutValue,
     );
   }
   for (const [key, raw] of Object.entries(metadata)) {
-    if (!key.startsWith("chronicle_filter_")) continue;
+    if (!key.startsWith("ledger_filter_")) continue;
     const rawValue = stringValue(raw);
     if (!rawValue) continue;
     const label = filterDimensionLabel(key);
@@ -496,19 +516,19 @@ function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
   addDimension(
     dimensions,
     "Qualifying children",
-    qualifyingChildrenFromCount(stringValue(metadata.chronicle_filter_eitc_child_count)) ??
-      qualifyingChildrenFromRecordSet(stringValue(metadata.chronicle_layout_record_set_id)) ??
+    qualifyingChildrenFromCount(stringValue(metadata.ledger_filter_eitc_child_count)) ??
+      qualifyingChildrenFromRecordSet(stringValue(metadata.ledger_layout_record_set_id)) ??
       qualifyingChildrenFromSourceMeasure(
         stringValue(metadata.variable),
         stringValue(metadata.source_measure_id),
       ),
-    stringValue(metadata.chronicle_filter_eitc_child_count)
-      ? "chronicle_filter_eitc_child_count"
-      : stringValue(metadata.chronicle_layout_record_set_id)
-        ? "chronicle_layout_record_set_id"
+    stringValue(metadata.ledger_filter_eitc_child_count)
+      ? "ledger_filter_eitc_child_count"
+      : stringValue(metadata.ledger_layout_record_set_id)
+        ? "ledger_layout_record_set_id"
         : "source_measure_id",
-    stringValue(metadata.chronicle_filter_eitc_child_count) ??
-      stringValue(metadata.chronicle_layout_record_set_id) ??
+    stringValue(metadata.ledger_filter_eitc_child_count) ??
+      stringValue(metadata.ledger_layout_record_set_id) ??
       stringValue(metadata.source_measure_id),
   );
   addDimension(dimensions, "Filing status", stringValue(metadata.filing_status));
@@ -531,8 +551,8 @@ function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
   const registry = asObject(row.registry);
   const parts = name.split(".");
   const source = stringValue(registry.family) ?? parts[0] ?? "";
-  const geoLevel = stringValue(metadata.chronicle_geography_level);
-  const geoId = stringValue(metadata.chronicle_geography_id);
+  const geoLevel = stringValue(metadata.ledger_geography_level);
+  const geoId = stringValue(metadata.ledger_geography_id);
   const geography =
     geoLevel === "country"
       ? "United States"
@@ -554,10 +574,10 @@ function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
     readableToken(parts.at(-2) ?? null) ??
     "";
   const childBreakdown = qualifyingChildrenFromRecordSet(
-    stringValue(metadata.chronicle_layout_record_set_id),
+    stringValue(metadata.ledger_layout_record_set_id),
   );
   const breakdown = [
-    readableToken(stringValue(metadata.chronicle_layout_groupby_value_id)),
+    readableToken(stringValue(metadata.ledger_layout_groupby_value_id)),
     childBreakdown ?? breakdownFromSourceMeasure(variable, measureId),
     readableToken(stringValue(metadata.filing_status)),
   ]
@@ -813,7 +833,7 @@ function targetNames(row: TargetRow, fullName: string, baseName: string): string
     baseName,
     stringValue(row.name),
     stringValue(row.target_name),
-    stringValue(asObject(row.metadata).chronicle_source_record_id),
+    stringValue(asObject(row.metadata).ledger_source_record_id),
   ];
   return [...new Set(names.filter((name): name is string => Boolean(name)))];
 }
@@ -881,8 +901,13 @@ function enrichTargetRow(
   const target = numberOrNull(row.target);
   const initial = numberOrNull(row.initial_estimate);
   const final = numberOrNull(row.final_estimate);
-  const errorKind = target === 0 ? "absolute" : "relative";
-  const rawFinalError = numberOrNull(row.relative_error) ?? relativeError(final, target);
+  const errorKind = "relative";
+  // Published diagnostics may carry a raw absolute miss in `relative_error`
+  // for a zero target. Recompute that case so all releases use the structural-
+  // zero rule consistently.
+  const rawFinalError = target === 0
+    ? relativeError(final, target)
+    : numberOrNull(row.relative_error) ?? relativeError(final, target);
   const rawInitialError = relativeError(initial, target);
   const initialMiss = initial != null && target != null ? initial - target : null;
   const finalMiss = final != null && target != null ? final - target : null;
@@ -892,14 +917,8 @@ function enrichTargetRow(
     absInitialMiss == null || absFinalMiss == null
       ? null
       : absInitialMiss - absFinalMiss;
-  const initialError =
-    errorKind === "absolute" && initial != null && target != null
-      ? initialMiss
-      : rawInitialError;
-  const finalError =
-    errorKind === "absolute" && final != null && target != null
-      ? finalMiss
-      : rawFinalError;
+  const initialError = rawInitialError;
+  const finalError = rawFinalError;
   const absFinalError = finalError == null ? null : Math.abs(finalError);
   const improvement =
     initialError == null || finalError == null
@@ -934,7 +953,7 @@ function enrichTargetRow(
     name: fullName,
     base_name: baseName,
     family: deriveFamily(baseName),
-    state: stateFromGeoId(stringValue(metadata.chronicle_geography_id)) ?? deriveState(baseName),
+    state: stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography: parsed.geography,
     level: parsed.level,
     source: parsed.source,
@@ -968,8 +987,9 @@ function enrichTargetRow(
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
     period: numberOrNull(row.period),
     chronicle: chronicleFactFields(metadata),
-    initial_relative_error: errorKind === "relative" ? initialError : null,
-    abs_relative_error: errorKind === "relative" ? absFinalError : null,
+    relative_error: finalError,
+    initial_relative_error: initialError,
+    abs_relative_error: absFinalError,
     improvement,
     direction: finalError == null ? null : finalError > 0 ? "over" : finalError < 0 ? "under" : "exact",
     ...status,
@@ -979,17 +999,17 @@ function enrichTargetRow(
 function estimateScopeKey(row: TargetRow): string | null {
   if (row.filter != null) return null;
   const metadata = asObject(row.metadata);
-  const recordSet = stringValue(metadata.chronicle_layout_record_set_id);
+  const recordSet = stringValue(metadata.ledger_layout_record_set_id);
   const initial = numberOrNull(row.initial_estimate);
   const final = numberOrNull(row.final_estimate);
   if (!recordSet || initial == null || final == null) return null;
   return [
     row.source,
     row.period,
-    metadata.chronicle_geography_id,
-    metadata.chronicle_layout_groupby_dimension,
-    metadata.chronicle_layout_groupby_value_id,
-    metadata.chronicle_layout_measure_id,
+    metadata.ledger_geography_id,
+    metadata.ledger_layout_groupby_dimension,
+    metadata.ledger_layout_groupby_value_id,
+    metadata.ledger_layout_measure_id,
     metadata.source_measure_id,
     metadata.variable,
     initial,
@@ -1000,7 +1020,7 @@ function estimateScopeKey(row: TargetRow): string | null {
 function estimateScopeWarning(row: TargetRow): string {
   const metadata = asObject(row.metadata);
   const childGroup = qualifyingChildrenFromRecordSet(
-    stringValue(metadata.chronicle_layout_record_set_id),
+    stringValue(metadata.ledger_layout_record_set_id),
   );
   if (childGroup) {
     return "This Chronicle fact is for a qualifying-children slice, but the calibration diagnostics did not include a compiled model filter for that child-count slice. The estimate may reflect the broader EITC aggregate instead of this exact slice.";
@@ -1020,7 +1040,7 @@ function addEstimateScopeWarnings(rows: TargetRow[]): TargetRow[] {
   for (const group of groups.values()) {
     const recordSets = new Set(
       group
-        .map((row) => stringValue(asObject(row.metadata).chronicle_layout_record_set_id))
+        .map((row) => stringValue(asObject(row.metadata).ledger_layout_record_set_id))
         .filter((value): value is string => Boolean(value)),
     );
     const targets = new Set(group.map((row) => numberOrNull(row.target)));
@@ -1165,8 +1185,8 @@ function isHealthcareTarget(row: TargetRow): boolean {
     row.variable,
     row.variable_key,
     metadata.source_measure_id,
-    metadata.chronicle_measure_concept,
-    metadata.chronicle_domain,
+    metadata.ledger_measure_concept,
+    metadata.ledger_domain,
   ]
     .filter((value) => value != null)
     .join(" ")
@@ -1417,9 +1437,9 @@ function treemapRows(
 // Build the source → variable hierarchy that powers the calibration map.
 // Each leaf carries both "how much we calibrate to it" (n_targets) and "how
 // much of the calibration loss lands here" (loss = sum of squared relative
-// errors, the per-target term of the normalized target loss). Targets with no
-// relative error (absolute targets where the target value is zero) still count
-// toward n_targets but contribute nothing to loss or fit.
+// errors, the per-target term of the normalized target loss). Structural-zero
+// targets contribute 0% when matched within numerical tolerance and 100% when
+// the estimate is substantively nonzero.
 export function microcosmTargetTreemap(
   rows: TargetRow[],
   releaseId: string,
@@ -1481,7 +1501,7 @@ export function microcosmTargetTreemap(
       const huber_loss = children.reduce((s, c) => s + c.huber_loss, 0);
       return {
         source,
-        label: source === "geography" ? "Geography" : sourceLabel(source),
+        label: source === "geography" ? "Geography" : sourceAuthorityLabel(source),
         n_targets,
         scored,
         within_10pct,
@@ -2030,7 +2050,7 @@ function investigationSignals(row: TargetRow): InvestigationSignal[] {
     signals.push({
       tone: "warning",
       label: "Zero target has non-zero estimate",
-      detail: "The dashboard reports absolute miss instead of relative error because the target value is zero.",
+      detail: "The dashboard treats a substantive non-zero estimate against a structural-zero target as 100% error.",
     });
   }
   if (absRel != null) {
@@ -2080,17 +2100,17 @@ function investigationSignals(row: TargetRow): InvestigationSignal[] {
 
 function investigationNextSteps(row: TargetRow): string[] {
   const steps = [
-    "Verify the chronicle fact: source period, target period, geography, unit, measure concept, and every filter/group-by value.",
-    "Verify target materialization: confirm the Populus compiler creates a model selector for the exact chronicle dimensions, not a broader aggregate.",
+    "Verify the Chronicle fact: source period, target period, geography, unit, measure concept, and every filter/group-by value.",
+    "Verify target materialization: confirm the Populus compiler creates a model selector for the exact Chronicle dimensions, not a broader aggregate.",
     "Verify model aggregate mapping: confirm the PolicyEngine variable or aggregate used for the estimate has the same unit, tax unit/person entity, sign convention, and period.",
     "Compare initial versus final miss: if both are badly off in the same direction, inspect source/model scope before tuning calibration weights.",
     "Inspect competing constraints for the same population slice if calibration improved one target while worsening another.",
   ];
   if (row.estimate_warning) {
-    steps.unshift("Start with target materialization: the published diagnostics already indicate this estimate may be broader than the chronicle slice.");
+    steps.unshift("Start with target materialization: the published diagnostics already indicate this estimate may be broader than the Chronicle slice.");
   }
   if (numberOrNull(row.target) === 0) {
-    steps.unshift("Start with the chronicle target value: confirm whether zero means a real zero, suppressed/missing source data, or a target intentionally dropped to zero.");
+    steps.unshift("Start with the Chronicle target value: confirm whether zero means a real zero, suppressed/missing source data, or a target intentionally dropped to zero.");
   }
   if (row.calibration_status !== "included") {
     steps.unshift("Start with the calibration status: the target was not included as an active calibration constraint.");
@@ -2104,8 +2124,8 @@ function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
     release_id: cal.release_id,
     target: targetResponseRow(row),
     source_artifact: {
-      hf_repo: POPULACE_HF_REPO,
-      hf_revision: POPULACE_HF_REVISION,
+      hf_repo: MICROCOSM_HF_REPO,
+      hf_revision: MICROCOSM_HF_REVISION,
       calibration_diagnostics_path: `releases/${cal.release_id}/calibration_diagnostics.json`,
       build_manifest_path: `releases/${cal.release_id}/build_manifest.json`,
       release_manifest_path: `releases/${cal.release_id}/release_manifest.json`,
@@ -2120,7 +2140,7 @@ function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
     next_steps: investigationNextSteps(row),
     repo_searches: investigationSearches(row),
     limits: [
-      "The dashboard can prove what is in the release artifacts and chronicle metadata.",
+      "The dashboard can prove what is in the release artifacts and Chronicle metadata.",
       "It cannot prove the generated per-record model filter or expression unless Populus exports that compiler trace for the target.",
       "When the artifact warns about scope, treat the estimate as provisional until the Populus materialized target is inspected.",
     ],
@@ -2387,8 +2407,7 @@ function absRel(row: TargetRow | undefined): number | null {
 }
 
 function comparableRelative(row: TargetRow | undefined): number | null {
-  if (!row || numberOrNull(row.target) === 0) return null;
-  return numberOrNull(row.relative_error);
+  return row ? numberOrNull(row.final_error) : null;
 }
 
 function absoluteMiss(row: TargetRow | undefined): number | null {
@@ -2473,8 +2492,8 @@ export function buildComparison(a: Calibration, b: Calibration) {
     const ar = aByName.get(name);
     const br = bByName.get(name);
     if (ar && br) {
-      const aAbs = numberOrNull(ar.target) === 0 ? null : absRel(ar);
-      const bAbs = numberOrNull(br.target) === 0 ? null : absRel(br);
+      const aAbs = absRel(ar);
+      const bAbs = absRel(br);
       const delta = aAbs != null && bAbs != null ? bAbs - aAbs : null;
       if (delta != null && delta < -1e-9) improved += 1;
       else if (delta != null && delta > 1e-9) regressed += 1;

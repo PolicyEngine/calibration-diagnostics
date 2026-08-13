@@ -287,6 +287,10 @@ for line in (pe_repo / "pyproject.toml").read_text().splitlines():
 
 reached = root["anchored"] + root["exercised"]
 payload = {
+    "identifier_compatibility_note": (
+        "Deprecated upstream identifier: Microcosm release IDs still use the "
+        "former populace-us-* prefix."
+    ),
     "source": {"repo": "PolicyEngine/policyengine-us", "version": version, "commit": commit},
     "release_id": release_id,
     "anchor_counts": {

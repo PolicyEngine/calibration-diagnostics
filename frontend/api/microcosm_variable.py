@@ -42,6 +42,8 @@ class handler(BaseHTTPRequestHandler):
         variables = list(dict.fromkeys(variables))
         period = (params.get("period", ["2024"])[0] or "2024").strip()
         requested_release = (params.get("release", ["latest"])[0] or "latest").strip()
+        # Deprecated upstream identifiers: deployment configuration retains the
+        # former Populace names until Microcosm migrates the published contract.
         repo = os.environ.get("POPULACE_HF_REPO", DEFAULT_REPO)
         hf_revision = os.environ.get("POPULACE_HF_REVISION", DEFAULT_REVISION)
 

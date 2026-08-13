@@ -49,14 +49,6 @@ test("targets path activates calibration targets instead of calibration fit", ()
   expect(isActive("/microcosm/targets", calibrationFit)).toBe(false);
   expect(isActive("/microcosm/targets", calibrationTargets)).toBe(true);
 });
-
-test("does not expose the retired cross-dataset evaluation", () => {
-  const items = datasetAccuracyItems();
-
-  expect(items.some((item) => item.label === "Cross-dataset")).toBe(false);
-  expect(items.some((item) => item.href === "/microcosm/datasets")).toBe(false);
-});
-
 test("opens external navigation in a new tab without changing internal navigation", () => {
   const items = datasetAccuracyItems();
   const externalChecks = items.find(
@@ -73,4 +65,14 @@ test("opens external navigation in a new tab without changing internal navigatio
     rel: "noopener noreferrer",
   });
   expect(navLinkAttributes(calibrationFit)).toEqual({});
+});
+
+test("preserves the Cross-dataset navigation label and route", () => {
+  const item = datasetAccuracyItems().find((candidate) => candidate.label === "Cross-dataset");
+  expect(item).toEqual({
+    href: "/microcosm/datasets",
+    label: "Cross-dataset",
+    usOnly: true,
+  });
+  expect(isActive("/microcosm/datasets", item!)).toBe(true);
 });

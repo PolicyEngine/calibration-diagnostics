@@ -1,0 +1,25 @@
+# Deprecated upstream identifier: Chronicle fact keys in this integration keep
+# the current `ledger.*` namespace until Chronicle migrates its consumer export.
+schema_version: evaluation_harness.integration_overview.v1
+integration_id: census_acs_pums_2024
+chronicle_snapshot_id: chronicle-7917ea815df710fb20db076b
+verification_facts_file: chronicle_snapshot_fixture/facts.jsonl
+alignment_policy: {}
+source:
+  source_id: census_acs_pums_2024
+  source_type: aggregate_dataset
+  dataset_version: census-acs-pums-2024-1y-person@2025-09-17
+  model_version: null
+  jurisdictions: [US]
+  population_period: calendar_year:2024
+  policy_period: null
+  native_fact_periods: [calendar_year:2024]
+  advanced_fact_periods: []
+  geographies: [country, state]
+  entities: [person]
+  weights:
+    person: PWGTP
+  geography_methods:
+    country: pums_state_or_country
+    state: pums_state_or_country
+  available: true

@@ -1,0 +1,70 @@
+{
+  "schema_version": "evaluation_harness.yale_reconstruction_checkpoint.v1",
+  "source_id": "yale_reconstruction_2024",
+  "chronicle_snapshot_id": "chronicle-7917ea815df710fb20db076b",
+  "official_yale_output": false,
+  "adapter_status": "standalone_precomputed_checkpoint",
+  "reconstruction_sha256": "c5eeb17bd62a4efe02e043ac21cbcf96d50c3ef2353100cb650d6c8f048d7861",
+  "results": [
+    {
+      "fact_key": "ledger.aggregate_fact.v2:659621627c8e3969cec14b37",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_all_returns.earned_income_credit.total_earned_income_credit_returns@2024",
+      "estimate": 25753349.37272175,
+      "status": "ok"
+    },
+    {
+      "fact_key": "ledger.aggregate_fact.v2:6c9a00df8068b3a63563654f",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.adjusted_gross_income@2024",
+      "estimate": 17763403333230.27,
+      "status": "ok"
+    },
+    {
+      "fact_key": "ledger.aggregate_fact.v2:4ccc6f8f4cd37e7a7071fdd6",
+      "reconstruction_row_key": "irs_soi.ty2023.table_1_4.all.wages_salaries_amount@2024",
+      "estimate": 10928617468125.998,
+      "status": "ok"
+    },
+    {
+      "fact_key": "ledger.aggregate_fact.v2:ef70cb84e0e6134514fde9a7",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.taxable_interest_amount@2024",
+      "estimate": 187957510506.78333,
+      "status": "ok"
+    },
+    {
+      "fact_key": "ledger.aggregate_fact.v2:e9177998f40a45b4641321ed",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.qualified_dividends_amount@2024",
+      "estimate": 366574615814.9453,
+      "status": "ok"
+    },
+    {
+      "fact_key": "ledger.aggregate_fact.v2:f2d456d4ab7ce58ed8332df4",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.net_capital_gains_amount@2024",
+      "estimate": 1680155525564.4854,
+      "status": "ok"
+    },
+    {
+      "fact_key": "ledger.aggregate_fact.v2:9c3ee1e6e61c12a0fe67c08d",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.partnership_scorp_income_amount@2024",
+      "estimate": 1486305866432.5076,
+      "status": "ok"
+    },
+    {
+      "fact_key": "ledger.aggregate_fact.v2:5b370a42476602614cd9db75",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.ordinary_dividends_amount@2024",
+      "estimate": 476109313101.98145,
+      "status": "ok"
+    },
+    {
+      "fact_key": "ledger.aggregate_fact.v2:5bf612d2be1e82d83605961b",
+      "reconstruction_row_key": "irs_soi.ty2023.congressional_district_2022.all_returns.us.income_tax_liability_amount@2024",
+      "estimate": 2668345649529.919,
+      "status": "ok"
+    },
+    {
+      "fact_key": "ledger.aggregate_fact.v2:0ec6eb86d8f4deeb6442b097",
+      "reconstruction_row_key": "irs_soi.ty2024.filing_season_week47.eitc_all_returns.earned_income_credit.total_earned_income_credit_amount@2024",
+      "estimate": 70017232594.00652,
+      "status": "ok"
+    }
+  ]
+}

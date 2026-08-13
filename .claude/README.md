@@ -2,6 +2,9 @@
 
 Agentic workflows for Microcosm calibration diagnostics.
 
+> Deprecated upstream identifier: Microcosm release IDs still use the former
+> `populace-us-*` prefix.
+
 ## Commands
 
 ### `/investigate-microcosm-target`
@@ -33,4 +36,3 @@ The command fetches a machine-readable target packet from the diagnostics API, t
 ## Skill
 
 - `microcosm-target-investigation` - reusable checklist and report schema for target discrepancy investigations.
-

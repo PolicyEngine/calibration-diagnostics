@@ -32,7 +32,7 @@
 //           "published": "2025-05-..."         // optional ISO date
 //         },
 //         "microcosm": {
-//           "budget_effect": -3650000000000,   // microcosm microsim, same window
+//           "budget_effect": -3650000000000,   // Microcosm microsim, same window
 //           "window": "FY2025-2034",
 //           "annual": { "2025": -1.2e11, … }   // optional per-year series
 //         }

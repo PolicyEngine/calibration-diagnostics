@@ -1,0 +1,44 @@
+# Deprecated upstream identifier: Chronicle fact keys in this integration keep
+# the current `ledger.*` namespace until Chronicle migrates its consumer export.
+schema_version: evaluation_harness.integration_overview.v1
+integration_id: yale_reconstruction_2024
+chronicle_snapshot_id: chronicle-7917ea815df710fb20db076b
+verification_facts_file: chronicle_snapshot_fixture/facts.jsonl
+alignment_policy:
+  model_id: cbo_growth_factor_aging
+  model_version: 1.2.0
+  microcosm_commit: cae8640f9e65e274aea65c7916cb37b956978e32
+  source_module: packages/microcosm-build/src/microcosm/build/us_runtime/target_aging.py
+  source_years: [2022, 2023]
+  build_year: 2024
+  evaluate_transformed_facts: true
+  display_observed_and_transformed_values: true
+reconstruction:
+  official_yale_output: false
+  committed_aggregate_checkpoint_available: true
+  record_level_detail_available: false
+  record_level_detail_required_for_fresh_model_run: true
+  checkpoint_mapping_file: checkpoint_mappings.json
+  taxable_income_checkpoint_status: evaluated_via_exact_microcosm_2022_to_2024_alignment
+  aggregate_checkpoint_file: verification_results.json
+  aggregate_reconstruction_file: frontend/lib/microcosm/external-datasets/yale-national-2024.json
+  legacy_artifact_commit: 37922ec2bc07a3f32cd5e920c0aa06385fa52a56
+  upstream_pin_basis: latest_commits_before_legacy_artifact_commit
+  exact_original_upstream_pins_recorded: false
+source:
+  source_id: yale_reconstruction_2024
+  source_type: model_dataset_pair
+  dataset_version: budget-lab-yale-tax-data@a3919fd96d87837388f1b8bd588ff6859be391af
+  model_version: budget-lab-yale-tax-simulator@310870383d24ed3e84b7179ce35860cf177197cc
+  jurisdictions: [US]
+  population_period: tax_year:2024
+  policy_period: tax_year:2024
+  native_fact_periods: [tax_year:2024]
+  advanced_fact_periods: [tax_year:2022, tax_year:2023]
+  geographies: [country]
+  entities: [tax_unit]
+  weights:
+    tax_unit: weight
+  geography_methods:
+    country: fixed_country
+  available: true

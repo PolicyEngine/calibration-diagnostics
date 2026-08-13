@@ -1,8 +1,15 @@
 import { expect, test } from "bun:test";
 
+// Deprecated upstream identifiers: fixtures mirror current Microcosm release
+// names and its `ledger_*` Chronicle metadata contract.
+
 import {
   buildCalibration,
   buildComparison,
+  MICROCOSM_HF_REPO_ENV,
+  MICROCOSM_HF_REVISION_ENV,
+  MICROCOSM_UK_HF_REPO_ENV,
+  MICROCOSM_UK_HF_REVISION_ENV,
   latestMicrocosmCalibrationHighlights,
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
@@ -11,6 +18,20 @@ import {
   type Calibration,
 } from "./latest-artifact";
 import { buildCalibrationTree } from "./calibration-tree";
+
+test("keeps Microcosm deployment configuration on its published Populace env contract", () => {
+  expect([
+    MICROCOSM_HF_REPO_ENV,
+    MICROCOSM_HF_REVISION_ENV,
+    MICROCOSM_UK_HF_REPO_ENV,
+    MICROCOSM_UK_HF_REVISION_ENV,
+  ]).toEqual([
+    "POPULACE_HF_REPO",
+    "POPULACE_HF_REVISION",
+    "POPULACE_UK_HF_REPO",
+    "POPULACE_UK_HF_REVISION",
+  ]);
+});
 
 // A v2-shaped target: AGI bracket × return type × filing status, with @period.
 function agiTarget(band: string, ret: string, filing: string, rel: number) {
@@ -253,10 +274,10 @@ test("program filter includes both count and amount targets", () => {
       metadata: {
         variable: "taxable_interest_income",
         source_measure_id: "taxable_interest_amount",
-        chronicle_geography_level: "country",
-        chronicle_geography_id: "0100000US",
-        chronicle_measure_unit: "usd",
-        chronicle_layout_groupby_value_id: "all",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "usd",
+        ledger_layout_groupby_value_id: "all",
       },
     },
     {
@@ -270,10 +291,10 @@ test("program filter includes both count and amount targets", () => {
       metadata: {
         variable: "taxable_interest_income",
         source_measure_id: "taxable_interest_returns",
-        chronicle_geography_level: "country",
-        chronicle_geography_id: "0100000US",
-        chronicle_measure_unit: "count",
-        chronicle_layout_groupby_value_id: "all",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "count",
+        ledger_layout_groupby_value_id: "all",
       },
     },
     {
@@ -287,10 +308,10 @@ test("program filter includes both count and amount targets", () => {
       metadata: {
         variable: "eitc",
         source_measure_id: "eitc_returns",
-        chronicle_geography_level: "country",
-        chronicle_geography_id: "0100000US",
-        chronicle_measure_unit: "count",
-        chronicle_layout_groupby_value_id: "all",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "count",
+        ledger_layout_groupby_value_id: "all",
       },
     },
   ]);
@@ -336,9 +357,9 @@ test("missing geography filter isolates targets without parsed geography", () =>
       metadata: {
         variable: "eitc",
         source_measure_id: "eitc_returns",
-        chronicle_geography_level: "country",
-        chronicle_geography_id: "0100000US",
-        chronicle_measure_unit: "count",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "count",
       },
     },
   ]);
@@ -371,12 +392,12 @@ test("income band facets sort total first, then descending numeric bands", () =>
       metadata: {
         variable: "adjusted_gross_income",
         source_measure_id: "adjusted_gross_income",
-        chronicle_geography_level: "country",
-        chronicle_geography_id: "0100000US",
-        chronicle_measure_unit: "usd",
-        chronicle_layout_groupby_dimension: "us:statutes/26/62#adjusted_gross_income",
-        chronicle_layout_groupby_value_id: band,
-        chronicle_filter_income_range: band === "total" ? "all" : band,
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_measure_unit: "usd",
+        ledger_layout_groupby_dimension: "us:statutes/26/62#adjusted_gross_income",
+        ledger_layout_groupby_value_id: band,
+        ledger_filter_income_range: band === "total" ? "all" : band,
         filing_status: "All",
       },
     }));
@@ -522,8 +543,8 @@ test("healthcare scope includes ACA, Medicaid, Medicare, and PTC targets", () =>
         measure_mode: "positive_count",
         materializer: "policyengine_variable",
         source_measure_id: "aptc_recipients",
-        chronicle_geography_level: "state",
-        chronicle_geography_id: "0400000US06",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US06",
       },
     },
     {
@@ -563,8 +584,8 @@ test("healthcare scope includes ACA, Medicaid, Medicare, and PTC targets", () =>
         base_variable: "assigned_aca_ptc",
         measure_mode: "sum",
         source_measure_id: "premium_tax_credit_amount",
-        chronicle_geography_level: "country",
-        chronicle_geography_id: "0100000US",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
       },
     },
     agiTarget("AGI in 30k-40k", "taxable", "All", 0.01),
@@ -646,7 +667,7 @@ test("new target loss weighting metadata marks loss as normalized", () => {
   expect(buildComparison(raw, normalized).summary.loss_kind).toBe("mixed");
 });
 
-test("dotted chronicle target names use metadata for readable fields", () => {
+test("dotted chronicle zero targets use structural-zero percentage errors", () => {
   const cal = calibration([
     {
       name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount@2024",
@@ -659,9 +680,9 @@ test("dotted chronicle target names use metadata for readable fields", () => {
       metadata: {
         variable: "real_estate_taxes",
         source_measure_id: "real_estate_taxes_amount",
-        chronicle_geography_level: "country",
-        chronicle_geography_id: "0100000US",
-        chronicle_layout_groupby_value_id: "under_1",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_layout_groupby_value_id: "under_1",
         filing_status: "All",
       },
     },
@@ -671,11 +692,52 @@ test("dotted chronicle target names use metadata for readable fields", () => {
   expect(cal.rows[0].measure).toBe("total");
   expect(cal.rows[0].geography).toBe("United States");
   expect(cal.rows[0].breakdown).toBe("under 1 · All");
-  expect(cal.rows[0].error_kind).toBe("absolute");
-  expect(cal.rows[0].initial_error).toBe(100);
-  expect(cal.rows[0].final_error).toBe(90);
-  expect(cal.rows[0].initial_relative_error).toBe(null);
-  expect(cal.rows[0].abs_relative_error).toBe(null);
+  expect(cal.rows[0].error_kind).toBe("relative");
+  expect(cal.rows[0].initial_error).toBe(1);
+  expect(cal.rows[0].final_error).toBe(1);
+  expect(cal.rows[0].initial_relative_error).toBe(1);
+  expect(cal.rows[0].abs_relative_error).toBe(1);
+});
+
+test("dotted chronicle zero targets accept numerical zero noise", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.zero_target@2024",
+      target: 0,
+      initial_estimate: 0,
+      final_estimate: 1e-4,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "zero_target",
+        source_measure_id: "zero_target_amount",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+      },
+    },
+  ]);
+  expect(cal.rows[0].error_kind).toBe("relative");
+  expect(cal.rows[0].initial_relative_error).toBe(0);
+  expect(cal.rows[0].abs_relative_error).toBe(0);
+});
+
+test("dotted chronicle zero targets reject values above the structural-zero tolerance", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.zero_target@2024",
+      target: 0,
+      initial_estimate: 0,
+      final_estimate: 1.0001e-4,
+      registry: { family: "irs_soi" },
+      metadata: {
+        variable: "zero_target",
+        source_measure_id: "zero_target_amount",
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+      },
+    },
+  ]);
+  expect(cal.rows[0].error_kind).toBe("relative");
+  expect(cal.rows[0].abs_relative_error).toBe(1);
 });
 
 test("source measure details become breakdown dimensions", () => {
@@ -691,9 +753,9 @@ test("source measure details become breakdown dimensions", () => {
       metadata: {
         variable: "eitc",
         source_measure_id: "eitc_amount",
-        chronicle_geography_level: "state",
-        chronicle_geography_id: "0400000US04",
-        chronicle_layout_groupby_value_id: "az",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US04",
+        ledger_layout_groupby_value_id: "az",
         filing_status: "All",
       },
     },
@@ -708,9 +770,9 @@ test("source measure details become breakdown dimensions", () => {
       metadata: {
         variable: "eitc",
         source_measure_id: "eitc_no_children_amount",
-        chronicle_geography_level: "state",
-        chronicle_geography_id: "0400000US04",
-        chronicle_layout_groupby_value_id: "az",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US04",
+        ledger_layout_groupby_value_id: "az",
         filing_status: "All",
       },
     },
@@ -741,12 +803,12 @@ test("metadata dimensions skip geography repeated as layout breakdown", () => {
       metadata: {
         variable: "ctc",
         source_measure_id: "ctc_amount",
-        chronicle_geography_level: "state",
-        chronicle_geography_id: "0400000US04",
-        chronicle_layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_broad.az",
-        chronicle_layout_groupby_dimension: "state",
-        chronicle_layout_groupby_value_id: "all",
-        chronicle_filter_income_range: "all",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US04",
+        ledger_layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_broad.az",
+        ledger_layout_groupby_dimension: "state",
+        ledger_layout_groupby_value_id: "all",
+        ledger_filter_income_range: "all",
         filing_status: "All",
       },
     },
@@ -761,12 +823,12 @@ test("metadata dimensions skip geography repeated as layout breakdown", () => {
       metadata: {
         variable: "ctc",
         source_measure_id: "ctc_amount",
-        chronicle_geography_level: "state",
-        chronicle_geography_id: "0400000US06",
-        chronicle_layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_broad.ca",
-        chronicle_layout_groupby_dimension: "state",
-        chronicle_layout_groupby_value_id: "all",
-        chronicle_filter_income_range: "all",
+        ledger_geography_level: "state",
+        ledger_geography_id: "0400000US06",
+        ledger_layout_record_set_id: "irs_soi.ty2022.historic_table_2.state_broad.ca",
+        ledger_layout_groupby_dimension: "state",
+        ledger_layout_groupby_value_id: "all",
+        ledger_filter_income_range: "all",
         filing_status: "All",
       },
     },
@@ -794,11 +856,11 @@ test("EITC table 2.5 child groups come from record set ids", () => {
       metadata: {
         variable: "eitc",
         source_measure_id: "eitc_total",
-        chronicle_geography_level: "country",
-        chronicle_geography_id: "0100000US",
-        chronicle_layout_record_set_id:
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_layout_record_set_id:
           "irs_soi.ty2022.table_2_5.eitc_by_agi_children.no_qualifying_children",
-        chronicle_layout_groupby_value_id: "25k_to_30k",
+        ledger_layout_groupby_value_id: "25k_to_30k",
         filing_status: "All",
       },
     },
@@ -814,11 +876,11 @@ test("EITC table 2.5 child groups come from record set ids", () => {
       metadata: {
         variable: "eitc",
         source_measure_id: "eitc_total",
-        chronicle_geography_level: "country",
-        chronicle_geography_id: "0100000US",
-        chronicle_layout_record_set_id:
+        ledger_geography_level: "country",
+        ledger_geography_id: "0100000US",
+        ledger_layout_record_set_id:
           "irs_soi.ty2022.table_2_5.eitc_by_agi_children.one_qualifying_child",
-        chronicle_layout_groupby_value_id: "25k_to_30k",
+        ledger_layout_groupby_value_id: "25k_to_30k",
         filing_status: "All",
       },
     },
@@ -842,11 +904,11 @@ test("repeated unfiltered sibling estimates get generic scope warnings", () => {
       metadata: {
         variable: "example",
         source_measure_id: "amount",
-        chronicle_geography_id: "0100000US",
-        chronicle_layout_record_set_id: "source.example.slice_a",
-        chronicle_layout_groupby_dimension: "age",
-        chronicle_layout_groupby_value_id: "under_50",
-        chronicle_layout_measure_id: "amount",
+        ledger_geography_id: "0100000US",
+        ledger_layout_record_set_id: "source.example.slice_a",
+        ledger_layout_groupby_dimension: "age",
+        ledger_layout_groupby_value_id: "under_50",
+        ledger_layout_measure_id: "amount",
       },
     },
     {
@@ -861,11 +923,11 @@ test("repeated unfiltered sibling estimates get generic scope warnings", () => {
       metadata: {
         variable: "example",
         source_measure_id: "amount",
-        chronicle_geography_id: "0100000US",
-        chronicle_layout_record_set_id: "source.example.slice_b",
-        chronicle_layout_groupby_dimension: "age",
-        chronicle_layout_groupby_value_id: "under_50",
-        chronicle_layout_measure_id: "amount",
+        ledger_geography_id: "0100000US",
+        ledger_layout_record_set_id: "source.example.slice_b",
+        ledger_layout_groupby_dimension: "age",
+        ledger_layout_groupby_value_id: "under_50",
+        ledger_layout_measure_id: "amount",
       },
     },
   ]);
@@ -873,7 +935,7 @@ test("repeated unfiltered sibling estimates get generic scope warnings", () => {
   expect(cal.rows[1].estimate_warning).toContain("sibling slices share the same estimate");
 });
 
-test("zero targets compare as absolute misses, not relative-error movers", () => {
+test("zero targets compare as structural-zero relative-error movers", () => {
   const target = {
     name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount@2024",
     target_name: "irs_soi.ty2022.historic_table_2.us.under_1.real_estate_taxes_amount",
@@ -882,20 +944,20 @@ test("zero targets compare as absolute misses, not relative-error movers", () =>
     metadata: {
       variable: "real_estate_taxes",
       source_measure_id: "real_estate_taxes_amount",
-      chronicle_geography_level: "country",
-      chronicle_geography_id: "0100000US",
-      chronicle_layout_groupby_value_id: "under_1",
+      ledger_geography_level: "country",
+      ledger_geography_id: "0100000US",
+      ledger_layout_groupby_value_id: "under_1",
       filing_status: "All",
     },
   };
   const a = calibration([{ ...target, final_estimate: 100, relative_error: 100 }], "a");
-  const b = calibration([{ ...target, final_estimate: 90, relative_error: 90 }], "b");
+  const b = calibration([{ ...target, final_estimate: 0, relative_error: 0 }], "b");
   const cmp = buildComparison(a, b);
-  expect(cmp.summary.improved).toBe(0);
-  expect(cmp.rows[0].error_kind).toBe("absolute");
-  expect(cmp.rows[0].a_error).toBe(100);
-  expect(cmp.rows[0].b_error).toBe(90);
-  expect(cmp.rows[0].abs_rel_delta).toBe(null);
+  expect(cmp.summary.improved).toBe(1);
+  expect(cmp.rows[0].error_kind).toBe("relative");
+  expect(cmp.rows[0].a_error).toBe(1);
+  expect(cmp.rows[0].b_error).toBe(0);
+  expect(cmp.rows[0].abs_rel_delta).toBe(-1);
 });
 
 test("count and total measures split into distinct variables", () => {

@@ -4,6 +4,11 @@ Interactive dashboard for the **microcosm-US** synthetic population — PolicyEn
 calibrated microdataset published on Hugging Face at
 [`policyengine/populace-us`](https://huggingface.co/datasets/policyengine/populace-us).
 
+> Deprecated upstream identifiers: Microcosm's current Hugging Face slugs,
+> release/file names, deployment variables, and Chronicle wire contracts still
+> use `populace`/`ledger`; see
+> [upstream identifier compatibility](docs/upstream-identifier-compatibility.md).
+
 Everything is read **live from Hugging Face**: the current release is resolved
 through `latest.json`, and each release's manifests and per-target calibration
 diagnostics are fetched on demand. There is no committed data snapshot and no
@@ -75,6 +80,16 @@ make typecheck # tsc --noEmit
 make test      # bun test (data-layer suite)
 make build     # next build
 ```
+
+Run the Python Chronicle evaluation harness and its public numerical adapter
+gate manually when reviewing Chronicle or dependency updates:
+
+```bash
+uv run python scripts/verify_evaluation_harness.py
+```
+
+See [the Chronicle update workflow](docs/chronicle-update-workflow.md) for the
+optional Microcosm and ACS inputs and the separate full-artifact command.
 
 Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different
 published dataset/revision. Staging defaults to `policyengine/populace-us-staging`;

@@ -13,6 +13,8 @@ from urllib.request import urlopen
 import numpy as np
 
 
+# Deprecated upstream identifiers: Microcosm's current HF repository and H5
+# filename still use the former Populace names.
 DEFAULT_REPO = "policyengine/populace-us"
 DEFAULT_REVISION = "main"
 DEFAULT_FILENAME = "populace_us_2024.h5"
