@@ -49,6 +49,22 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   return value.toExponential(3).replace("e+", "e");
 }
 
+function OverviewMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 flex-1 px-4 py-3.5 text-center sm:px-5">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </div>
+      <div
+        className="mt-1 truncate text-2xl font-semibold tabular-nums text-foreground"
+        title={value}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export function MicrocosmOverviewView() {
   const { country } = useCountry();
   const [release, setRelease] = useState("");
@@ -94,12 +110,12 @@ export function MicrocosmOverviewView() {
             Microcosm reweights survey microdata so it matches thousands of official
             statistics from agencies like{" "}
             {country === "uk" ? "the ONS, OBR, and HMRC" : "the IRS, the Census Bureau, and CMS"}.
-            Each tile below is one of those things we calibrate to, including{" "}
+            Each tile in the Calibration fit explorer below is a category we calibrate to,
+            including{" "}
             {country === "uk"
               ? "population by region and age, household types, and tax receipts"
               : "EITC stats, population, and Medicaid enrollment"}
-            . Tile size shows how much we calibrate to it, while color shows how closely the
-            weighted data matches. Built live from{" "}
+            . Data is built live from{" "}
             {sourceAttribution.href ? (
               <a
                 className="underline decoration-dotted underline-offset-2"
@@ -155,16 +171,17 @@ export function MicrocosmOverviewView() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <KpiCard
-          label={
-            <HelpHint
-              label="Targets included"
-              tooltip="Targets that made it into the active calibration matrix for this release."
-            />
-          }
-          value={diagnosticsStatus === "incompatible" ? "—" : fmt(includedTargets, { digits: 0 })}
-        />
+      <SectionCard title="Calibration overview" padded={false}>
+        <div className="mx-3 flex divide-x divide-border/70">
+          <OverviewMetric
+            label="Targets"
+            value={diagnosticsStatus === "incompatible" ? "—" : fmt(includedTargets, { digits: 0 })}
+          />
+          <OverviewMetric label="Published" value={formatPublishedAt(data.updated_at)} />
+        </div>
+      </SectionCard>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <KpiCard
           label={
             <HelpHint
@@ -192,10 +209,7 @@ export function MicrocosmOverviewView() {
           }
           value={cal.n_nonzero == null ? "—" : fmtCompact(cal.n_nonzero)}
         />
-        <KpiCard label="Published" value={formatPublishedAt(data.updated_at)} />
       </div>
-
-      <GeographyCoverageSection coverage={cal.geography_coverage ?? null} />
 
       <SectionCard title="Calibration map">
         <CalibrationExplorerMap
@@ -203,6 +217,8 @@ export function MicrocosmOverviewView() {
           pageIntroHeight={pageIntroHeight}
         />
       </SectionCard>
+
+      <GeographyCoverageSection coverage={cal.geography_coverage ?? null} />
 
       <details className="group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
