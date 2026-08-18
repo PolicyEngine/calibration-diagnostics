@@ -70,6 +70,7 @@ export async function GET(request: Request) {
           calibration.rows as CalibrationTreeTarget[],
           state,
           calibration.release_id,
+          calibration.target_loss_attribution.status !== "unavailable",
         ),
       ),
     );

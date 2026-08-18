@@ -108,6 +108,54 @@ const rows: CalibrationTreeTarget[] = [
 ];
 
 describe("source, geography, and declared-dimension hierarchy", () => {
+  test("aggregates normalized target contributions from leaves to the root", () => {
+    const attributedRows = [
+      target("one", {
+        source: "source-a",
+        variable: "program-a",
+        target_loss_weight_share: 0.1,
+        final_capped_scaled_error: 0.2,
+        final_loss_contribution: 0.02,
+      }),
+      target("two", {
+        source: "source-a",
+        variable: "program-a",
+        target_loss_weight_share: 0.1,
+        final_capped_scaled_error: 0.3,
+        final_loss_contribution: 0.03,
+      }),
+      target("three", {
+        source: "source-b",
+        variable: "program-b",
+        target_loss_weight_share: 0.8,
+        final_capped_scaled_error: 0.125,
+        final_loss_contribution: 0.1,
+      }),
+    ];
+    const tree = buildCalibrationTree(attributedRows, state({ dimensions: [] }));
+
+    expect(tree.lossAttributionAvailable).toBe(true);
+    expect(tree.filteredMetrics.loss).toBeCloseTo(0.15, 15);
+    expect(tree.filteredMetrics.targetLossWeightShare).toBeCloseTo(1, 15);
+    expect(tree.filteredMetrics.weightedAverageCappedError).toBeCloseTo(0.15, 15);
+    expect(tree.groups[0].metrics.weightedAverageCappedError).toBeCloseTo(0.25, 15);
+    expect(
+      effectiveNodeMetric(tree.groups.flatMap((group) => group.nodes), "weight")
+        .reduce((sum, value) => sum + value, 0),
+    ).toBeCloseTo(1, 15);
+    expect(tree.groups.reduce((sum, group) => sum + group.metrics.loss, 0)).toBeCloseTo(
+      0.15,
+      15,
+    );
+  });
+
+  test("reports an ordinary unavailable state when contributions are absent", () => {
+    const tree = buildCalibrationTree(rows, state({ dimensions: [] }));
+
+    expect(tree.lossAttributionAvailable).toBe(false);
+    expect(tree.filteredMetrics.loss).toBe(0);
+  });
+
   test("skips a meaningless singleton missing-geography tier", () => {
     const geographylessRows = ["Adult", "Child"].map((age) =>
       target(`geographyless/${age}`, {
@@ -503,7 +551,7 @@ describe("calibration tree metrics and filters", () => {
     ).groups.flatMap((group) => group.nodes);
 
     expect(effectiveNodeMetric(nodes, "loss")).toEqual(nodes.map((node) => node.metrics.nTargets));
-    expect(effectiveNodeMetric(nodes, "error_intensity")).toEqual(nodes.map((node) => node.metrics.nTargets));
+    expect(effectiveNodeMetric(nodes, "weight")).toEqual(nodes.map((node) => node.metrics.nTargets));
   });
 
   test("classifies fit bands on the legend boundaries", () => {

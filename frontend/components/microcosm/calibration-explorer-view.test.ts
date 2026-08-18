@@ -4,12 +4,18 @@ import type { ExplorerState } from "../../lib/microcosm/calibration-explorer";
 import {
   EXPLORER_MAP_VERTICAL_PADDING,
   explorerBreadcrumbs,
+  explorerColorLegendLabel,
+  explorerColorMetric,
+  explorerColorPhrase,
   explorerEmptyMessage,
   explorerGeographyLevelLabel,
   explorerMapHeight,
   explorerNodeLabel,
   explorerSizePhrase,
+  explorerLossAvailabilityMessage,
   explorerUpLabel,
+  WEIGHTED_MEAN_ERROR_HELP,
+  WEIGHTED_TARGET_ERROR_HELP,
 } from "./calibration-explorer-view";
 
 const EMPTY_FILTERS = {
@@ -253,9 +259,37 @@ describe("calibration explorer presentation model", () => {
 
   test("preserves the original explanation for each sizing view", () => {
     expect(explorerSizePhrase("targets")).toBe("how many targets it covers");
-    expect(explorerSizePhrase("loss")).toBe("its share of the calibration loss");
-    expect(explorerSizePhrase("error_intensity")).toBe(
-      "its Huberized error intensity",
+    expect(explorerSizePhrase("weight")).toBe("its share of total target weight");
+    expect(explorerSizePhrase("loss")).toBe("its share of weighted target error");
+  });
+
+  test("colors both attribution views by importance-weighted capped error", () => {
+    const metrics = {
+      medianAbsRelativeError: 1.55,
+      weightedAverageCappedError: 0.19,
+    };
+
+    expect(explorerColorMetric("loss", metrics)).toBe(0.19);
+    expect(explorerColorMetric("weight", metrics)).toBe(0.19);
+    expect(explorerColorLegendLabel("loss")).toBe("Weighted mean error");
+    expect(explorerColorPhrase("loss")).toContain("importance-weighted");
+    expect(explorerColorMetric("targets", metrics)).toBe(1.55);
+  });
+
+  test("explains both weighted-error concepts in exactly two sentences", () => {
+    expect(WEIGHTED_TARGET_ERROR_HELP.split(". ")).toHaveLength(2);
+    expect(WEIGHTED_MEAN_ERROR_HELP.split(". ")).toHaveLength(2);
+    expect(WEIGHTED_TARGET_ERROR_HELP).toContain("box area");
+    expect(WEIGHTED_MEAN_ERROR_HELP).toContain("Redder boxes");
+  });
+
+  test("uses an ordinary unavailable message without attribution provenance", () => {
+    expect(explorerLossAvailabilityMessage(true)).toBeNull();
+    expect(explorerLossAvailabilityMessage(false)).toBe(
+      "Target weight and weighted target error are unavailable for this release.",
+    );
+    expect(explorerLossAvailabilityMessage(false)).not.toMatch(
+      /reported|reconstructed|derived|recipe|hash/i,
     );
   });
 });

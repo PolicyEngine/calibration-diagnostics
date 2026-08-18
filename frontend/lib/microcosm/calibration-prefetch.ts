@@ -4,18 +4,6 @@ import {
 } from "./calibration-explorer";
 import type { CalibrationTreeResponse } from "./calibration-tree";
 
-export const CALIBRATION_PREFETCH_POLICY = {
-  // Start the root query while the surrounding page loads, but do not crawl
-  // every descendant branch before the user chooses a path.
-  pageLoadDescendantDepth: 0,
-  // Once a view is active, warm only its directly selectable children.
-  activeViewDescendantDepth: 1,
-  concurrency: 6,
-  // React Query is browser-memory scoped, so disconnecting from the site
-  // clears these entries even if their six-hour lifetime has not elapsed.
-  cacheTimeMs: 6 * 60 * 60 * 1000,
-} as const;
-
 export type CalibrationTreeFetcher = (
   state: ExplorerState,
 ) => Promise<CalibrationTreeResponse | null>;

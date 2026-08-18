@@ -35,8 +35,8 @@ function metricValue(
   mode: CalibrationTreeSizeMode,
 ): number {
   if (mode === "targets") return metrics.nTargets;
-  if (mode === "loss") return metrics.loss;
-  return metrics.huberErrorIntensity ?? 0;
+  if (mode === "weight") return metrics.targetLossWeightShare;
+  return metrics.loss;
 }
 
 function effectiveMetricValues(
@@ -70,14 +70,20 @@ export function aggregateCalibrationTreeMetrics(
 ): CalibrationTreeMetrics {
   const metrics = items.map((item) => item.metrics);
   const scored = metrics.reduce((sum, item) => sum + item.scored, 0);
-  const huberLoss = metrics.reduce((sum, item) => sum + item.huberLoss, 0);
+  const loss = metrics.reduce((sum, item) => sum + item.loss, 0);
+  const targetLossWeightShare = metrics.reduce(
+    (sum, item) => sum + item.targetLossWeightShare,
+    0,
+  );
   return {
     nTargets: metrics.reduce((sum, item) => sum + item.nTargets, 0),
     scored,
     within10Pct: metrics.reduce((sum, item) => sum + item.within10Pct, 0),
-    loss: metrics.reduce((sum, item) => sum + item.loss, 0),
-    huberLoss,
-    huberErrorIntensity: scored ? Math.sqrt((2 * huberLoss) / scored) : null,
+    loss,
+    targetLossWeightShare,
+    weightedAverageCappedError: targetLossWeightShare > 0
+      ? loss / targetLossWeightShare
+      : null,
     meanAbsRelativeError: weightedError(metrics, "meanAbsRelativeError"),
     medianAbsRelativeError: weightedError(metrics, "medianAbsRelativeError"),
   };

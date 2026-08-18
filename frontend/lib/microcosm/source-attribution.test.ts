@@ -2,16 +2,16 @@ import { expect, test } from "bun:test";
 
 import { microcosmSourceAttribution } from "./source-attribution";
 
-test("does not expose the private UK artifact repository as a dataset link", () => {
-  expect(microcosmSourceAttribution("uk", "policyengine/populace-uk-private")).toEqual({
-    label: "the selected Microcosm UK release",
-    href: null,
+test("links Microcosm to the public US Hugging Face dataset", () => {
+  expect(microcosmSourceAttribution("us", "policyengine/populace-us")).toEqual({
+    label: "Microcosm",
+    href: "https://huggingface.co/datasets/policyengine/populace-us",
   });
 });
 
-test("links the public US artifact repository", () => {
-  expect(microcosmSourceAttribution("us", "policyengine/populace-us")).toEqual({
-    label: "policyengine/populace-us",
-    href: "https://huggingface.co/datasets/policyengine/populace-us",
+test("does not expose the private UK Hugging Face dataset", () => {
+  expect(microcosmSourceAttribution("uk", "policyengine/populace-uk-private")).toEqual({
+    label: "Microcosm",
+    href: null,
   });
 });

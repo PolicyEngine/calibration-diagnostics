@@ -9,15 +9,11 @@ export function microcosmSourceAttribution(
   country: MicrocosmCountry,
   sourceRepo: string,
 ): MicrocosmSourceAttribution {
-  if (country === "uk") {
-    return {
-      label: "the selected Microcosm UK release",
-      href: null,
-    };
-  }
-
   return {
-    label: sourceRepo,
-    href: `https://huggingface.co/datasets/${sourceRepo}`,
+    label: "Microcosm",
+    href:
+      country === "us"
+        ? `https://huggingface.co/datasets/${sourceRepo}`
+        : null,
   };
 }

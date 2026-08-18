@@ -14,7 +14,7 @@ import type {
 } from "@/lib/api/hooks/use-microcosm";
 
 type BreakdownMode = "program" | "geography";
-type SizeMode = "targets" | "loss" | "error_intensity";
+type SizeMode = "targets" | "loss";
 
 const GROUP_GAP = 8;
 const LEAF_GAP = 3;
@@ -26,12 +26,11 @@ const MIN_LEAF_AREA = 780;
 const OTHER_SOURCES_KEY = "__other_sources__";
 
 function metric(
-  node: { n_targets: number; loss: number; huber_error_intensity?: number | null },
+  node: { n_targets: number; loss: number },
   mode: SizeMode,
 ): number {
   if (mode === "targets") return node.n_targets;
-  if (mode === "loss") return node.loss;
-  return node.huber_error_intensity ?? 0;
+  return node.loss;
 }
 
 function isSynthetic(key: string): boolean {
@@ -96,12 +95,6 @@ function aggregateLeaves(
     scored: leaves.reduce((a, c) => a + c.scored, 0),
     within_10pct: leaves.reduce((a, c) => a + c.within_10pct, 0),
     loss: leaves.reduce((a, c) => a + c.loss, 0),
-    huber_loss: leaves.reduce((a, c) => a + c.huber_loss, 0),
-    huber_error_intensity: (() => {
-      const scored = leaves.reduce((a, c) => a + c.scored, 0);
-      const huber = leaves.reduce((a, c) => a + c.huber_loss, 0);
-      return scored ? Math.sqrt((2 * huber) / scored) : null;
-    })(),
     mean_abs_relative_error: weightedError(leaves, (l) => l.mean_abs_relative_error),
     median_abs_relative_error: weightedError(leaves, (l) => l.median_abs_relative_error),
     filters: {},
@@ -162,8 +155,6 @@ function condense(
         within_10pct: agg.within_10pct,
         scored: agg.scored,
         loss: agg.loss,
-        huber_loss: agg.huber_loss,
-        huber_error_intensity: agg.huber_error_intensity,
         mean_abs_relative_error: agg.mean_abs_relative_error,
         median_abs_relative_error: agg.median_abs_relative_error,
         children: [agg],
@@ -328,18 +319,10 @@ function HoverCard({
           label: "Target share",
           value: targetShare == null ? "—" : fmt(targetShare, { pct: true, digits: 1 }),
         }
-      : mode === "loss"
-        ? {
-            label: "Share of loss",
-            value: lossShare == null ? "—" : fmt(lossShare, { pct: true, digits: 1 }),
-          }
-        : {
-            label: "Huber intensity",
-            value:
-              leaf.huber_error_intensity == null
-                ? "—"
-                : fmt(leaf.huber_error_intensity, { pct: true, digits: 1 }),
-          };
+      : {
+          label: "Share of weighted error",
+          value: lossShare == null ? "—" : fmt(lossShare, { pct: true, digits: 1 }),
+        };
   const swatch = fitColor(leaf.median_abs_relative_error);
   return (
     <div className="pointer-events-none w-[17rem] overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl ring-1 ring-border/60 backdrop-blur">
@@ -428,6 +411,10 @@ export function CalibrationMap({
     setHover(null);
   }, [data]);
 
+  useEffect(() => {
+    if (!data.loss_attribution_available && mode === "loss") setMode("targets");
+  }, [data.loss_attribution_available, mode]);
+
   const height = Math.round(Math.min(Math.max(width * 0.58, 460), 680));
   const groups = useMemo(
     () => layout(data.groups, mode, width, height),
@@ -475,10 +462,16 @@ export function CalibrationMap({
             }}
             options={[
               { value: "targets", label: "Target count" },
-              { value: "loss", label: "Loss sources" },
-              { value: "error_intensity", label: "Error intensity" },
+              ...(data.loss_attribution_available
+                ? [{ value: "loss" as const, label: "Weighted target error" }]
+                : []),
             ]}
           />
+          {!data.loss_attribution_available && (
+            <span className="self-end pb-2 text-[10px] text-muted-foreground">
+              Weighted target error is unavailable for this release.
+            </span>
+          )}
         </div>
         <FitLegend />
       </div>
@@ -653,15 +646,10 @@ export function CalibrationMap({
         <span className="font-medium text-foreground">
           {mode === "targets"
             ? "how many targets it covers"
-            : mode === "loss"
-              ? "its share of the calibration loss"
-              : "its Huberized error intensity"}
+            : "its share of weighted target error"}
         </span>
         ; color shows the median gap between the weighted data and the official
-        figure. Error intensity is a per-target Huberized relative error:
-        ordinary misses are scored by their squared size, but very large misses
-        are softened so one pathological target does not dominate the map. Hover
-        for detail, click a tile to pop out its targets.
+        figure. Hover for detail, click a tile to pop out its targets.
       </p>
     </div>
   );

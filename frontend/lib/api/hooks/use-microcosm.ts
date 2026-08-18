@@ -6,7 +6,6 @@ import {
 } from "@/components/layout/country-context";
 import { withBasePath } from "@/lib/base-path";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
-import { CALIBRATION_PREFETCH_POLICY } from "@/lib/microcosm/calibration-prefetch";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
 import { apiGet } from "../client";
 
@@ -122,6 +121,11 @@ export interface MicrocosmTargetRow {
   abs_relative_error?: number | null;
   improvement?: number | null;
   direction?: "over" | "under" | "exact" | null;
+  target_loss_weight?: number | null;
+  target_loss_weight_share?: number | null;
+  target_loss_scale?: number | null;
+  final_capped_scaled_error?: number | null;
+  final_loss_contribution?: number | null;
   [key: string]: unknown;
 }
 
@@ -157,6 +161,11 @@ export interface MicrocosmFamilyFitRow {
 }
 
 export type MicrocosmDiagnosticsStatus = "ok" | "empty" | "incompatible";
+export type MicrocosmTargetLossAttributionStatus =
+  | "reported"
+  | "exact_reconstructed"
+  | "derived"
+  | "unavailable";
 
 export interface GeographyCoverageBlock {
   n_geographies?: number | null;
@@ -197,6 +206,30 @@ export interface MicrocosmCalibration {
   compiled_candidate_targets?: number | null;
   dropped_target_count?: number;
   included_target_count?: number;
+  target_loss_attribution?: {
+    status: MicrocosmTargetLossAttributionStatus;
+    aggregate: number | null;
+    historical_final_loss: number | null;
+    cap: number | null;
+    basis_identifier: string | null;
+    basis_hash: string | null;
+    verification: {
+      valid: boolean;
+      difference: number | null;
+      tolerance: {
+        kind: "floating_point" | "six_decimal_quantization" | "not_applicable";
+        absolute: number;
+        relative: number;
+      };
+    } | null;
+    producer_warnings: Array<{
+      code: string;
+      severity: string | null;
+      message: string;
+    }>;
+    reason: string | null;
+    target_count: number;
+  };
   total_targets?: number;
   within_tolerance_count?: number;
   family_fit?: MicrocosmFamilyFitRow[];
@@ -666,8 +699,6 @@ export interface MicrocosmTreemapLeaf {
   within_10pct: number;
   scored: number;
   loss: number;
-  huber_loss: number;
-  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
 }
@@ -679,8 +710,6 @@ export interface MicrocosmTreemapGroup {
   within_10pct: number;
   scored: number;
   loss: number;
-  huber_loss: number;
-  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
   children: MicrocosmTreemapLeaf[];
@@ -688,11 +717,11 @@ export interface MicrocosmTreemapGroup {
 
 export interface MicrocosmTreemapResponse {
   release_id: string;
+  loss_attribution_available: boolean;
   total_targets: number;
   total_within_10pct: number;
   total_scored: number;
   total_loss: number;
-  total_huber_loss: number;
   groups: MicrocosmTreemapGroup[];
 }
 
@@ -758,8 +787,7 @@ export function microcosmCalibrationTreeQueryOptions(
         release: release || undefined,
         country,
       }),
-    staleTime: CALIBRATION_PREFETCH_POLICY.cacheTimeMs,
-    gcTime: CALIBRATION_PREFETCH_POLICY.cacheTimeMs,
+    staleTime: 5 * 60 * 1000,
   };
 }
 

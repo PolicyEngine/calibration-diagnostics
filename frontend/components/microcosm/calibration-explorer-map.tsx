@@ -8,16 +8,23 @@ import { useCountry } from "@/components/layout/country-context";
 import {
   EXPLORER_MAP_VERTICAL_PADDING,
   explorerBreadcrumbs,
+  explorerColorLegendLabel,
+  explorerColorMetric,
+  explorerColorPhrase,
   explorerEmptyMessage,
   explorerGeographyLevelLabel,
   explorerMapHeight,
+  explorerLossAvailabilityMessage,
   explorerNodeLabel,
   explorerSizePhrase,
   explorerUpLabel,
   hasExplorerFilters,
+  WEIGHTED_MEAN_ERROR_HELP,
+  WEIGHTED_TARGET_ERROR_HELP,
 } from "@/components/microcosm/calibration-explorer-view";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { fmt, humanizeName } from "@/components/shared/format";
+import { HelpHint } from "@/components/shared/help-hint";
 import {
   microcosmCalibrationTreeQueryOptions,
   useMicrocosmCalibrationTree,
@@ -31,10 +38,7 @@ import {
   type ExplorerFilters,
   type ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
-import {
-  CALIBRATION_PREFETCH_POLICY,
-  prefetchCalibrationDescendants,
-} from "@/lib/microcosm/calibration-prefetch";
+import { prefetchCalibrationDescendants } from "@/lib/microcosm/calibration-prefetch";
 import {
   MISSING_VALUE,
   type CalibrationTreeGroup,
@@ -54,6 +58,10 @@ import { squarify, type Placed } from "@/lib/treemap/squarify";
 const GROUP_GAP = 8;
 const NODE_GAP = 3;
 const HEADER_HEIGHT = 24;
+const PAGE_LOAD_PREFETCH_DEPTH = 3;
+const ACTIVE_VIEW_PREFETCH_DEPTH = 1;
+const PREFETCH_CONCURRENCY = 6;
+
 const FIT_LABELS: Record<string, string> = {
   "0_5": "0–5%",
   "5_10": "5–10%",
@@ -79,8 +87,8 @@ function metricValue(
   mode: CalibrationTreeSizeMode,
 ): number {
   if (mode === "targets") return metrics.nTargets;
-  if (mode === "loss") return metrics.loss;
-  return metrics.huberErrorIntensity ?? 0;
+  if (mode === "weight") return metrics.targetLossWeightShare;
+  return metrics.loss;
 }
 
 interface LaidGroup {
@@ -151,7 +159,13 @@ function SegmentedControl<T extends string>({
 }: {
   label: string;
   value: T;
-  options: Array<{ value: T; label: string }>;
+  options: Array<{
+    value: T;
+    label: string;
+    disabled?: boolean;
+    title?: string;
+    tooltip?: string;
+  }>;
   onChange: (value: T) => void;
 }) {
   return (
@@ -161,20 +175,44 @@ function SegmentedControl<T extends string>({
       </span>
       <div role="tablist" aria-label={label} className="flex rounded-lg border border-border bg-muted/40 p-1">
         {options.map((option) => (
-          <button
+          <div
             key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={value === option.value}
-            onClick={() => onChange(option.value)}
-            className={`h-8 rounded-md px-3 text-[13px] font-medium ${
+            role="presentation"
+            className={`flex h-8 items-center rounded-md text-[13px] font-medium ${
               value === option.value
                 ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+                : "text-muted-foreground"
+            } ${option.disabled ? "opacity-45" : ""}`}
           >
-            {option.label}
-          </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={value === option.value}
+              disabled={option.disabled}
+              title={option.title}
+              onClick={() => onChange(option.value)}
+              className={`h-full ${
+                option.tooltip ? "pl-3 pr-1" : "px-3"
+              } ${
+                option.disabled
+                  ? "cursor-not-allowed"
+                  : "cursor-pointer hover:text-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+            {option.tooltip && (
+              <span className="mr-2 inline-flex">
+                <HelpHint
+                  label={<span className="sr-only">About {option.label}</span>}
+                  tooltip={option.tooltip}
+                  interaction="click"
+                  underline={false}
+                  inheritTypography
+                />
+              </span>
+            )}
+          </div>
         ))}
       </div>
     </div>
@@ -203,9 +241,11 @@ function BreakdownControl({
 
 function SizeControl({
   value,
+  lossAvailable,
   onChange,
 }: {
   value: CalibrationTreeSizeMode;
+  lossAvailable: boolean;
   onChange: (value: CalibrationTreeSizeMode) => void;
 }) {
   return (
@@ -215,17 +255,43 @@ function SizeControl({
       onChange={onChange}
       options={[
         { value: "targets", label: "Target count" },
-        { value: "loss", label: "Loss sources" },
-        { value: "error_intensity", label: "Error intensity" },
+        {
+          value: "weight",
+          label: "Target weight",
+          disabled: !lossAvailable,
+          title: lossAvailable
+            ? undefined
+            : "Target weight is unavailable for this release.",
+        },
+        {
+          value: "loss",
+          label: "Weighted target error",
+          disabled: !lossAvailable,
+          title: lossAvailable
+            ? undefined
+            : "Weighted target error is unavailable for this release.",
+          tooltip: WEIGHTED_TARGET_ERROR_HELP,
+        },
       ]}
     />
   );
 }
 
-function FitLegend() {
+function FitLegend({ mode }: { mode: CalibrationTreeSizeMode }) {
+  const label = explorerColorLegendLabel(mode);
   return (
     <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-      <span className="font-semibold uppercase tracking-wide">Median error</span>
+      <span className="font-semibold uppercase tracking-wide">
+        {mode === "loss" || mode === "weight" ? (
+          <HelpHint
+            label={label}
+            tooltip={WEIGHTED_MEAN_ERROR_HELP}
+            interaction="click"
+            underline={false}
+            inheritTypography
+          />
+        ) : label}
+      </span>
       <div>
         <div
           className="h-2 w-36 rounded-full ring-1 ring-border/60"
@@ -444,7 +510,7 @@ function usePrefetchCalibrationLevels({
       state,
       data,
       depth,
-      concurrency: CALIBRATION_PREFETCH_POLICY.concurrency,
+      concurrency: PREFETCH_CONCURRENCY,
       fetchTree: async (childState) =>
         queryClient.fetchQuery(
           microcosmCalibrationTreeQueryOptions(childState, release, country),
@@ -469,7 +535,7 @@ export function CalibrationExplorerDataPrefetch({
     data,
     release,
     isPlaceholderData,
-    depth: CALIBRATION_PREFETCH_POLICY.pageLoadDescendantDepth,
+    depth: PAGE_LOAD_PREFETCH_DEPTH,
   });
   return null;
 }
@@ -503,7 +569,7 @@ export function CalibrationExplorerMap({
     data,
     release,
     isPlaceholderData,
-    depth: CALIBRATION_PREFETCH_POLICY.activeViewDescendantDepth,
+    depth: ACTIVE_VIEW_PREFETCH_DEPTH,
   });
 
   useEffect(() => {
@@ -529,6 +595,16 @@ export function CalibrationExplorerMap({
   // The map container is not mounted during the initial loading state. Re-run
   // when query data arrives so the observer attaches to the real element.
   }, [data]);
+
+  useEffect(() => {
+    if (
+      data &&
+      !data.lossAttributionAvailable &&
+      (sizeMode === "loss" || sizeMode === "weight")
+    ) {
+      setSizeMode("targets");
+    }
+  }, [data, sizeMode]);
 
   if (error || !data) {
     if (!error) {
@@ -567,6 +643,9 @@ export function CalibrationExplorerMap({
     ...dimension,
     values: [],
   }));
+  const lossUnavailableMessage = explorerLossAvailabilityMessage(
+    data.lossAttributionAvailable,
+  );
   return (
     <div className="flex flex-col gap-3">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
@@ -578,7 +657,18 @@ export function CalibrationExplorerMap({
                 dispatch({ type: "breakdown", breakdown });
               }}
             />
-            <SizeControl value={sizeMode} onChange={setSizeMode} />
+            <div className="flex flex-col gap-1">
+              <SizeControl
+                value={sizeMode}
+                lossAvailable={data.lossAttributionAvailable}
+                onChange={setSizeMode}
+              />
+              {lossUnavailableMessage && (
+                <span className="text-[10px] text-muted-foreground">
+                  {lossUnavailableMessage}
+                </span>
+              )}
+            </div>
             <FilterMenu
               data={data}
               state={state}
@@ -589,7 +679,7 @@ export function CalibrationExplorerMap({
             />
           </div>
           <div className="ml-auto shrink-0">
-            <FitLegend />
+            <FitLegend mode={sizeMode} />
           </div>
         </div>
 
@@ -691,8 +781,9 @@ export function CalibrationExplorerMap({
                 const tileWidth = Math.max(placed.w - NODE_GAP, 0);
                 const tileHeight = Math.max(placed.h - NODE_GAP, 0);
                 if (tileWidth < 2 || tileHeight < 2) return null;
-                const color = fitColor(item.metrics.medianAbsRelativeError);
-                const ink = readableInk(item.metrics.medianAbsRelativeError);
+                const colorError = explorerColorMetric(sizeMode, item.metrics);
+                const color = fitColor(colorError);
+                const ink = readableInk(colorError);
                 const showText = tileWidth >= 44 && tileHeight >= 24;
                 const showSub = tileWidth >= 70 && tileHeight >= 46;
                 const selected = item.kind === "target" && item.id === state.path.target;
@@ -744,11 +835,8 @@ export function CalibrationExplorerMap({
         <span className="font-medium text-foreground">
           {explorerSizePhrase(sizeMode)}
         </span>
-        ; color shows the median gap between the weighted data and the official
-        figure. Error intensity is a Huberized per-target relative error: it
-        behaves like RMSE for ordinary misses, then grows linearly for extreme
-        outliers so one pathological target does not dominate the map. Hover for
-        detail, click a tile to pop out its targets.
+        ; color shows {explorerColorPhrase(sizeMode)}.
+        Hover for detail, click a tile to pop out its targets.
       </p>
 
       {selectedTarget && (

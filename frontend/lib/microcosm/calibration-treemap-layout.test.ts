@@ -19,8 +19,8 @@ function metrics(
     scored: nTargets,
     within10Pct: nTargets,
     loss: nTargets,
-    huberLoss: nTargets / 2,
-    huberErrorIntensity: 1,
+    targetLossWeightShare: nTargets,
+    weightedAverageCappedError: 1,
     meanAbsRelativeError: 0.1,
     medianAbsRelativeError: 0.1,
     ...overrides,
@@ -146,14 +146,15 @@ describe("calibration treemap legibility grouping", () => {
     ]);
   });
 
-  test("aggregates additive metrics and recalculates Huber intensity", () => {
+  test("aggregates additive metrics and recalculates weighted mean error", () => {
     const first = {
       ...node("first", 1),
       metrics: metrics(1, {
         scored: 1,
         within10Pct: 1,
         loss: 2,
-        huberLoss: 0.5,
+        targetLossWeightShare: 10,
+        weightedAverageCappedError: 0.2,
         meanAbsRelativeError: 0.1,
         medianAbsRelativeError: 0.1,
       }),
@@ -164,7 +165,8 @@ describe("calibration treemap legibility grouping", () => {
         scored: 2,
         within10Pct: 0,
         loss: 4,
-        huberLoss: 4,
+        targetLossWeightShare: 10,
+        weightedAverageCappedError: 0.4,
         meanAbsRelativeError: 0.4,
         medianAbsRelativeError: 0.4,
       }),
@@ -183,8 +185,8 @@ describe("calibration treemap legibility grouping", () => {
       scored: 3,
       within10Pct: 1,
       loss: 6,
-      huberLoss: 4.5,
-      huberErrorIntensity: Math.sqrt(3),
+      targetLossWeightShare: 20,
+      weightedAverageCappedError: 0.3,
       meanAbsRelativeError: 0.3,
       medianAbsRelativeError: 0.3,
     });

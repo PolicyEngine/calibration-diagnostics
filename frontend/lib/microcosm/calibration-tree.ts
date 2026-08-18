@@ -7,8 +7,6 @@ import type {
 import { canonicalLabel, programLabel } from "./program-label";
 import { sourceLabel } from "./source-label";
 
-const LOSS_ERROR_CAP = 2;
-const HUBER_DELTA = 2;
 export const MISSING_VALUE = "__missing__";
 
 export interface CalibrationTreeDimension {
@@ -30,6 +28,9 @@ export interface CalibrationTreeTarget {
   level?: string | null;
   geography?: string | null;
   abs_relative_error?: number | null;
+  target_loss_weight_share?: number | null;
+  final_capped_scaled_error?: number | null;
+  final_loss_contribution?: number | null;
   calibration_status?: CalibrationStatus | null;
   target_dimensions?: CalibrationTreeDimension[] | null;
   [key: string]: unknown;
@@ -40,8 +41,8 @@ export interface CalibrationTreeMetrics {
   scored: number;
   within10Pct: number;
   loss: number;
-  huberLoss: number;
-  huberErrorIntensity: number | null;
+  targetLossWeightShare: number;
+  weightedAverageCappedError: number | null;
   meanAbsRelativeError: number | null;
   medianAbsRelativeError: number | null;
 }
@@ -64,6 +65,7 @@ export interface CalibrationTreeGroup {
 
 export interface CalibrationTreeResponse {
   releaseId?: string;
+  lossAttributionAvailable: boolean;
   path: ExplorerState["path"];
   currentLevel:
     | { kind: "overview"; label: string }
@@ -82,11 +84,21 @@ export interface CalibrationTreeResponse {
   filteredMetrics: CalibrationTreeMetrics;
 }
 
-export type CalibrationTreeSizeMode = "targets" | "loss" | "error_intensity";
+export type CalibrationTreeSizeMode = "targets" | "weight" | "loss";
 
 function finiteError(row: CalibrationTreeTarget): number | null {
   const value = row.abs_relative_error;
   return typeof value === "number" && Number.isFinite(value) ? Math.abs(value) : null;
+}
+
+function finiteLossContribution(row: CalibrationTreeTarget): number | null {
+  const value = row.final_loss_contribution;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function finiteTargetLossWeightShare(row: CalibrationTreeTarget): number | null {
+  const value = row.target_loss_weight_share;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 export function fitBandForTarget(row: CalibrationTreeTarget): FitBand {
@@ -126,29 +138,26 @@ function median(values: number[]): number | null {
     : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-function huberLoss(error: number): number {
-  return error <= HUBER_DELTA
-    ? 0.5 * error * error
-    : HUBER_DELTA * (error - 0.5 * HUBER_DELTA);
-}
-
 export function calibrationTreeMetrics(
   rows: CalibrationTreeTarget[],
 ): CalibrationTreeMetrics {
   const errors = rows.map(finiteError).filter((value): value is number => value != null);
-  const loss = errors.reduce((sum, error) => {
-    const capped = Math.min(error, LOSS_ERROR_CAP);
-    return sum + capped * capped;
-  }, 0);
-  const totalHuberLoss = errors.reduce((sum, error) => sum + huberLoss(error), 0);
+  const loss = rows.reduce(
+    (sum, row) => sum + (finiteLossContribution(row) ?? 0),
+    0,
+  );
+  const targetLossWeightShare = rows.reduce(
+    (sum, row) => sum + (finiteTargetLossWeightShare(row) ?? 0),
+    0,
+  );
   return {
     nTargets: rows.length,
     scored: errors.length,
     within10Pct: errors.filter((error) => error <= 0.1).length,
     loss,
-    huberLoss: totalHuberLoss,
-    huberErrorIntensity: errors.length
-      ? Math.sqrt((2 * totalHuberLoss) / errors.length)
+    targetLossWeightShare,
+    weightedAverageCappedError: targetLossWeightShare > 0
+      ? loss / targetLossWeightShare
       : null,
     meanAbsRelativeError: errors.length
       ? errors.reduce((sum, error) => sum + error, 0) / errors.length
@@ -428,6 +437,8 @@ export function buildCalibrationTree(
   allRows: CalibrationTreeTarget[],
   state: ExplorerState,
   releaseId?: string,
+  lossAttributionAvailable =
+    allRows.length > 0 && allRows.every((row) => finiteLossContribution(row) != null),
 ): CalibrationTreeResponse {
   const { path } = state;
   const options = filterOptions(allRows);
@@ -437,6 +448,7 @@ export function buildCalibrationTree(
     const nodes = geographyNodes(filteredRows);
     return {
       releaseId,
+      lossAttributionAvailable,
       path,
       currentLevel: { kind: "geography", label: "Geography" },
       groups: [{
@@ -461,6 +473,7 @@ export function buildCalibrationTree(
     );
     return {
       releaseId,
+      lossAttributionAvailable,
       path,
       currentLevel: { kind: "overview", label: "Programs" },
       groups: programGroups(filteredGeographyRows),
@@ -473,6 +486,7 @@ export function buildCalibrationTree(
   if (!path.source || !path.program) {
     return {
       releaseId,
+      lossAttributionAvailable,
       path,
       currentLevel: { kind: "overview", label: "Programs" },
       groups: programGroups(filteredRows),
@@ -497,6 +511,7 @@ export function buildCalibrationTree(
       const nodes = geographyNodes(filteredProgramRows);
       return {
         releaseId,
+        lossAttributionAvailable,
         path,
         currentLevel: { kind: "geography", label: "Geography" },
         groups: [{
@@ -599,6 +614,7 @@ export function buildCalibrationTree(
         : { kind: "mixed" as const, label: "Breakdowns and targets" };
   return {
     releaseId,
+    lossAttributionAvailable,
     path,
     currentLevel,
     groups,
@@ -614,8 +630,8 @@ export function effectiveNodeMetric(
 ): number[] {
   const values = nodes.map((item) => {
     if (mode === "targets") return item.metrics.nTargets;
-    if (mode === "loss") return item.metrics.loss;
-    return item.metrics.huberErrorIntensity ?? 0;
+    if (mode === "weight") return item.metrics.targetLossWeightShare;
+    return item.metrics.loss;
   });
   return values.some((value) => value > 0)
     ? values

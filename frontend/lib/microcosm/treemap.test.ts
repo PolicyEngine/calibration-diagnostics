@@ -9,8 +9,17 @@ function row(
   measure: string | null,
   abs_relative_error: number | null,
   geography?: string | null,
+  final_loss_contribution?: number | null,
 ) {
-  return { source, variable_key, variable, measure, abs_relative_error, geography };
+  return {
+    source,
+    variable_key,
+    variable,
+    measure,
+    abs_relative_error,
+    geography,
+    final_loss_contribution,
+  };
 }
 
 test("groups by source then variable_key and sums targets", () => {
@@ -34,14 +43,14 @@ test("groups by source then variable_key and sums targets", () => {
   );
 });
 
-test("loss winsorizes extreme outliers but median stays robust", () => {
+test("loss sums normalized target contributions while median error stays independent", () => {
   // One pathological near-zero target with a 50x relative error among well-fit ones.
   const data = microcosmTargetTreemap(
     [
-      row("irs_soi", "v · total", "v", "total", 0.02),
-      row("irs_soi", "v · total", "v", "total", 0.02),
-      row("irs_soi", "v · total", "v", "total", 0.04),
-      row("irs_soi", "v · total", "v", "total", 50.0),
+      row("irs_soi", "v · total", "v", "total", 0.02, null, 0.01),
+      row("irs_soi", "v · total", "v", "total", 0.02, null, 0.02),
+      row("irs_soi", "v · total", "v", "total", 0.04, null, 0.03),
+      row("irs_soi", "v · total", "v", "total", 50.0, null, 0.04),
     ],
     "rel-x",
   );
@@ -50,8 +59,10 @@ test("loss winsorizes extreme outliers but median stays robust", () => {
   expect(leaf.median_abs_relative_error).toBeCloseTo(0.03, 6);
   // Mean is dragged up by the outlier.
   expect(leaf.mean_abs_relative_error).toBeGreaterThan(10);
-  // Loss caps the outlier at 2.0 before squaring: 0.02^2*2 + 0.04^2 + 2^2 ≈ 4.0024.
-  expect(leaf.loss).toBeCloseTo(0.0008 + 0.0016 + 4, 4);
+  // Contribution aggregation is independent of the raw relative-error size.
+  expect(leaf.loss).toBeCloseTo(0.1, 12);
+  expect(data.total_loss).toBeCloseTo(0.1, 12);
+  expect(data.loss_attribution_available).toBe(true);
 });
 
 test("targets without a relative error count but add no loss", () => {
@@ -117,28 +128,4 @@ test("geography breakdown groups targets by geography leaves", () => {
   expect(data.groups[0].children.find((leaf) => leaf.key === "N/A")?.filters).toEqual({
     missing_geography: true,
   });
-});
-
-test("treemap computes Huber error intensity", () => {
-  const data = microcosmTargetTreemap(
-    [
-      row("irs_soi", "irs_soi / v · total", "v", "total", 0.1),
-      row("irs_soi", "irs_soi / v · total", "v", "total", 1.0),
-      row("irs_soi", "irs_soi / v · total", "v", "total", 5.0),
-      row("irs_soi", "irs_soi / v · total", "v", "total", null),
-    ],
-    "rel-x",
-    "program",
-  );
-
-  const leaf = data.groups[0].children[0];
-  // Huber(delta=2): 0.5*0.1^2, 0.5*1^2, 2*(5 - 1).
-  const expectedHuberLoss = 0.005 + 0.5 + 8;
-  expect(leaf.huber_loss).toBeCloseTo(expectedHuberLoss, 6);
-  expect(leaf.huber_error_intensity).toBeCloseTo(
-    Math.sqrt((2 * expectedHuberLoss) / 3),
-    6,
-  );
-  expect(leaf.n_targets).toBe(4);
-  expect(leaf.scored).toBe(3);
 });

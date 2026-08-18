@@ -4,6 +4,7 @@ import type {
 } from "@/lib/microcosm/calibration-explorer";
 import {
   MISSING_VALUE,
+  type CalibrationTreeMetrics,
   type CalibrationTreeNode,
   type CalibrationTreeSizeMode,
 } from "@/lib/microcosm/calibration-tree";
@@ -11,6 +12,12 @@ import { canonicalLabel, programLabel } from "@/lib/microcosm/program-label";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 
 export const EXPLORER_MAP_VERTICAL_PADDING = 10;
+
+export const WEIGHTED_TARGET_ERROR_HELP =
+  "Weighted target error is the final calibration loss: the importance-weighted mean of each target's scaled error after applying the loss cap. In this view, box area shows how much each target or group contributes to that total.";
+
+export const WEIGHTED_MEAN_ERROR_HELP =
+  "Weighted mean error is the arithmetic mean of the capped, scaled target errors in a box, weighted by each target's calibration importance. Redder boxes therefore contain more severe errors after more important targets are given greater influence.";
 
 function humanize(value: string): string {
   const acronyms = new Set(["agi", "ctc", "eitc", "irs", "jct", "ssi"]);
@@ -134,8 +141,37 @@ export function explorerGeographyLevelLabel(value: string): string {
 
 export function explorerSizePhrase(mode: CalibrationTreeSizeMode): string {
   if (mode === "targets") return "how many targets it covers";
-  if (mode === "loss") return "its share of the calibration loss";
-  return "its Huberized error intensity";
+  if (mode === "weight") return "its share of total target weight";
+  if (mode === "loss") return "its share of weighted target error";
+  return "its selected metric";
+}
+
+export function explorerColorMetric(
+  mode: CalibrationTreeSizeMode,
+  metrics: Pick<
+    CalibrationTreeMetrics,
+    "medianAbsRelativeError" | "weightedAverageCappedError"
+  >,
+): number | null {
+  return mode === "loss" || mode === "weight"
+    ? metrics.weightedAverageCappedError
+    : metrics.medianAbsRelativeError;
+}
+
+export function explorerColorLegendLabel(mode: CalibrationTreeSizeMode): string {
+  return mode === "loss" || mode === "weight" ? "Weighted mean error" : "Median error";
+}
+
+export function explorerColorPhrase(mode: CalibrationTreeSizeMode): string {
+  return mode === "loss" || mode === "weight"
+    ? "the importance-weighted mean error within each box, after target scaling and the loss cap"
+    : "the median gap between the weighted data and the official figure";
+}
+
+export function explorerLossAvailabilityMessage(available: boolean): string | null {
+  return available
+    ? null
+    : "Target weight and weighted target error are unavailable for this release.";
 }
 
 export function explorerMapHeight(pageIntroHeight: number): string {
