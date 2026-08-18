@@ -26,7 +26,7 @@ const MIN_LEAF_AREA = 780;
 const OTHER_SOURCES_KEY = "__other_sources__";
 
 function metric(
-  node: { n_targets: number; loss: number; huber_error_intensity?: number | null },
+  node: { n_targets: number; loss: number },
   mode: SizeMode,
 ): number {
   if (mode === "targets") return node.n_targets;
@@ -95,12 +95,6 @@ function aggregateLeaves(
     scored: leaves.reduce((a, c) => a + c.scored, 0),
     within_10pct: leaves.reduce((a, c) => a + c.within_10pct, 0),
     loss: leaves.reduce((a, c) => a + c.loss, 0),
-    huber_loss: leaves.reduce((a, c) => a + c.huber_loss, 0),
-    huber_error_intensity: (() => {
-      const scored = leaves.reduce((a, c) => a + c.scored, 0);
-      const huber = leaves.reduce((a, c) => a + c.huber_loss, 0);
-      return scored ? Math.sqrt((2 * huber) / scored) : null;
-    })(),
     mean_abs_relative_error: weightedError(leaves, (l) => l.mean_abs_relative_error),
     median_abs_relative_error: weightedError(leaves, (l) => l.median_abs_relative_error),
     filters: {},
@@ -161,8 +155,6 @@ function condense(
         within_10pct: agg.within_10pct,
         scored: agg.scored,
         loss: agg.loss,
-        huber_loss: agg.huber_loss,
-        huber_error_intensity: agg.huber_error_intensity,
         mean_abs_relative_error: agg.mean_abs_relative_error,
         median_abs_relative_error: agg.median_abs_relative_error,
         children: [agg],

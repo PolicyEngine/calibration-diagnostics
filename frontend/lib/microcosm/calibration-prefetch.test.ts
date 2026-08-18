@@ -17,8 +17,6 @@ const EMPTY_METRICS = {
   loss: 0,
   targetLossWeightShare: 0,
   weightedAverageCappedError: null,
-  huberLoss: 0,
-  huberErrorIntensity: null,
   meanAbsRelativeError: null,
   medianAbsRelativeError: null,
 };

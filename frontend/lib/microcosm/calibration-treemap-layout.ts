@@ -70,7 +70,6 @@ export function aggregateCalibrationTreeMetrics(
 ): CalibrationTreeMetrics {
   const metrics = items.map((item) => item.metrics);
   const scored = metrics.reduce((sum, item) => sum + item.scored, 0);
-  const huberLoss = metrics.reduce((sum, item) => sum + item.huberLoss, 0);
   const loss = metrics.reduce((sum, item) => sum + item.loss, 0);
   const targetLossWeightShare = metrics.reduce(
     (sum, item) => sum + item.targetLossWeightShare,
@@ -85,8 +84,6 @@ export function aggregateCalibrationTreeMetrics(
     weightedAverageCappedError: targetLossWeightShare > 0
       ? loss / targetLossWeightShare
       : null,
-    huberLoss,
-    huberErrorIntensity: scored ? Math.sqrt((2 * huberLoss) / scored) : null,
     meanAbsRelativeError: weightedError(metrics, "meanAbsRelativeError"),
     medianAbsRelativeError: weightedError(metrics, "medianAbsRelativeError"),
   };

@@ -57,9 +57,11 @@ const HISTORICAL_WEIGHTING_CAP_1000 =
 const CONCEPT_BUDGET_WEIGHTING =
   "sqrt_value_concept_budget_weighted_mape_50_50_amount_count_target_scale_cap_100pct";
 
-// Audited against every US release eligible for the picker on 2026-08-18.
-// These fingerprints cover ordered diagnostic row names, not downloaded files;
-// runtime reconstruction must refuse a release whose target surface changes.
+// This manifest is required because older builds do not expose target-importance
+// weights in their published diagnostic files. It was audited against every US
+// release eligible for the picker on 2026-08-18. These fingerprints cover
+// ordered diagnostic row names, not downloaded files; runtime reconstruction
+// must refuse a release whose target surface changes.
 export const HISTORICAL_ATTRIBUTION_SUPPORT: readonly HistoricalAttributionSupport[] = [
   {
     releaseId: "populace-us-2024-f32c2e5-20260614",

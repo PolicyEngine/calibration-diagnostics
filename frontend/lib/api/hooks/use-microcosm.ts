@@ -699,8 +699,6 @@ export interface MicrocosmTreemapLeaf {
   within_10pct: number;
   scored: number;
   loss: number;
-  huber_loss: number;
-  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
 }
@@ -712,8 +710,6 @@ export interface MicrocosmTreemapGroup {
   within_10pct: number;
   scored: number;
   loss: number;
-  huber_loss: number;
-  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
   children: MicrocosmTreemapLeaf[];
@@ -726,7 +722,6 @@ export interface MicrocosmTreemapResponse {
   total_within_10pct: number;
   total_scored: number;
   total_loss: number;
-  total_huber_loss: number;
   groups: MicrocosmTreemapGroup[];
 }
 

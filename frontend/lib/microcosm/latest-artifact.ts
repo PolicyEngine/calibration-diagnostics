@@ -1322,12 +1322,6 @@ function familyFitSummary(rows: TargetRow[]) {
 }
 
 // --- calibration map (treemap) ----------------------------------------------
-// A few IRS targets sit near zero and blow up the relative error (the same
-// "extreme outliers" the diagnostics lists exclude). Winsorize the per-target
-// error before squaring so the loss map shows where error broadly concentrates
-// rather than which single target is the most pathological, and color by the
-// median so one outlier can't paint a whole group red.
-const HUBER_DELTA = 2.0;
 
 export type TreemapBreakdown = "program" | "geography";
 
@@ -1355,8 +1349,6 @@ export interface TreemapLeaf {
   within_10pct: number;
   scored: number;
   loss: number;
-  huber_loss: number;
-  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
 }
@@ -1368,8 +1360,6 @@ export interface TreemapGroup {
   within_10pct: number;
   scored: number;
   loss: number;
-  huber_loss: number;
-  huber_error_intensity: number | null;
   mean_abs_relative_error: number | null;
   median_abs_relative_error: number | null;
   children: TreemapLeaf[];
@@ -1382,17 +1372,7 @@ export interface TreemapData {
   total_within_10pct: number;
   total_scored: number;
   total_loss: number;
-  total_huber_loss: number;
   groups: TreemapGroup[];
-}
-
-function huberLoss(error: number, delta: number = HUBER_DELTA): number {
-  const abs = Math.abs(error);
-  return abs <= delta ? 0.5 * abs * abs : delta * (abs - 0.5 * delta);
-}
-
-function huberErrorIntensity(huber_loss: number, scored: number): number | null {
-  return scored ? Math.sqrt((2 * huber_loss) / scored) : null;
 }
 
 function targetProgramKey(row: TargetRow): string {
@@ -1450,7 +1430,7 @@ function treemapRows(
 // Each leaf carries both "how much we calibrate to it" (n_targets) and "how
 // much weighted capped target error lands here. Loss is the sum of normalized
 // per-target final_loss_contribution values produced by the artifact adapter;
-// relative-error and Huber metrics remain separate fit diagnostics.
+// relative-error metrics remain separate fit diagnostics.
 export function microcosmTargetTreemap(
   rows: TargetRow[],
   releaseId: string,
@@ -1466,7 +1446,6 @@ export function microcosmTargetTreemap(
       .map((row) => numberOrNull(row.abs_relative_error))
       .filter((v): v is number => v != null && Number.isFinite(v));
     const first = group[0];
-    const huber_loss = absErrors.reduce((sum, v) => sum + huberLoss(v), 0);
     const filters: TreemapFilters =
       breakdown === "geography"
         ? key === "N/A"
@@ -1490,8 +1469,6 @@ export function microcosmTargetTreemap(
         (sum, row) => sum + (numberOrNull(row.final_loss_contribution) ?? 0),
         0,
       ),
-      huber_loss,
-      huber_error_intensity: huberErrorIntensity(huber_loss, absErrors.length),
       mean_abs_relative_error: absErrors.length
         ? absErrors.reduce((s, v) => s + v, 0) / absErrors.length
         : null,
@@ -1512,7 +1489,6 @@ export function microcosmTargetTreemap(
       const scored = children.reduce((s, c) => s + c.scored, 0);
       const within_10pct = children.reduce((s, c) => s + c.within_10pct, 0);
       const loss = children.reduce((s, c) => s + c.loss, 0);
-      const huber_loss = children.reduce((s, c) => s + c.huber_loss, 0);
       return {
         source,
         label: source === "geography" ? "Geography" : sourceAuthorityLabel(source),
@@ -1520,8 +1496,6 @@ export function microcosmTargetTreemap(
         scored,
         within_10pct,
         loss,
-        huber_loss,
-        huber_error_intensity: huberErrorIntensity(huber_loss, scored),
         mean_abs_relative_error: allErrors.length
           ? allErrors.reduce((s, v) => s + v, 0) / allErrors.length
           : null,
@@ -1538,7 +1512,6 @@ export function microcosmTargetTreemap(
     total_within_10pct: groupList.reduce((s, g) => s + g.within_10pct, 0),
     total_scored: groupList.reduce((s, g) => s + g.scored, 0),
     total_loss: groupList.reduce((s, g) => s + g.loss, 0),
-    total_huber_loss: groupList.reduce((s, g) => s + g.huber_loss, 0),
     groups: groupList,
   };
 }

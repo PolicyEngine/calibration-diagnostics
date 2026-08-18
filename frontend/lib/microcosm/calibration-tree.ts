@@ -7,7 +7,6 @@ import type {
 import { canonicalLabel, programLabel } from "./program-label";
 import { sourceLabel } from "./source-label";
 
-const HUBER_DELTA = 2;
 export const MISSING_VALUE = "__missing__";
 
 export interface CalibrationTreeDimension {
@@ -44,8 +43,6 @@ export interface CalibrationTreeMetrics {
   loss: number;
   targetLossWeightShare: number;
   weightedAverageCappedError: number | null;
-  huberLoss: number;
-  huberErrorIntensity: number | null;
   meanAbsRelativeError: number | null;
   medianAbsRelativeError: number | null;
 }
@@ -141,12 +138,6 @@ function median(values: number[]): number | null {
     : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-function huberLoss(error: number): number {
-  return error <= HUBER_DELTA
-    ? 0.5 * error * error
-    : HUBER_DELTA * (error - 0.5 * HUBER_DELTA);
-}
-
 export function calibrationTreeMetrics(
   rows: CalibrationTreeTarget[],
 ): CalibrationTreeMetrics {
@@ -159,7 +150,6 @@ export function calibrationTreeMetrics(
     (sum, row) => sum + (finiteTargetLossWeightShare(row) ?? 0),
     0,
   );
-  const totalHuberLoss = errors.reduce((sum, error) => sum + huberLoss(error), 0);
   return {
     nTargets: rows.length,
     scored: errors.length,
@@ -168,10 +158,6 @@ export function calibrationTreeMetrics(
     targetLossWeightShare,
     weightedAverageCappedError: targetLossWeightShare > 0
       ? loss / targetLossWeightShare
-      : null,
-    huberLoss: totalHuberLoss,
-    huberErrorIntensity: errors.length
-      ? Math.sqrt((2 * totalHuberLoss) / errors.length)
       : null,
     meanAbsRelativeError: errors.length
       ? errors.reduce((sum, error) => sum + error, 0) / errors.length

@@ -129,27 +129,3 @@ test("geography breakdown groups targets by geography leaves", () => {
     missing_geography: true,
   });
 });
-
-test("treemap computes Huber error intensity", () => {
-  const data = microcosmTargetTreemap(
-    [
-      row("irs_soi", "irs_soi / v · total", "v", "total", 0.1),
-      row("irs_soi", "irs_soi / v · total", "v", "total", 1.0),
-      row("irs_soi", "irs_soi / v · total", "v", "total", 5.0),
-      row("irs_soi", "irs_soi / v · total", "v", "total", null),
-    ],
-    "rel-x",
-    "program",
-  );
-
-  const leaf = data.groups[0].children[0];
-  // Huber(delta=2): 0.5*0.1^2, 0.5*1^2, 2*(5 - 1).
-  const expectedHuberLoss = 0.005 + 0.5 + 8;
-  expect(leaf.huber_loss).toBeCloseTo(expectedHuberLoss, 6);
-  expect(leaf.huber_error_intensity).toBeCloseTo(
-    Math.sqrt((2 * expectedHuberLoss) / 3),
-    6,
-  );
-  expect(leaf.n_targets).toBe(4);
-  expect(leaf.scored).toBe(3);
-});
