@@ -6,6 +6,12 @@
 import { sourceAuthorityLabel } from "@/lib/source-labels";
 
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
+import {
+  normalizeTargetLossAttribution,
+  targetLossAttributionSummary,
+  type FinalTargetLossAttribution,
+  type TargetLossDiagnosticWarning,
+} from "./target-loss-attribution";
 
 type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
@@ -138,9 +144,15 @@ function calibrationLossKind(
   buildManifest: JsonObject,
 ): CalibrationLossKind {
   const options = asObject(diag.options);
+  const diagnosticsBuild = asObject(diag.build);
   if (
+    (numberOrNull(diag.schema_version) != null &&
+      Number(diag.schema_version) >= 6) ||
+    diag.target_loss_basis != null ||
     options.target_loss_scales != null ||
     options.target_loss_weights != null ||
+    diagnosticsBuild.target_loss_weighting != null ||
+    diagnosticsBuild.target_loss_cap != null ||
     buildManifest.target_loss_weighting != null ||
     buildManifest.target_loss_cap != null
   ) {
@@ -1315,7 +1327,6 @@ function familyFitSummary(rows: TargetRow[]) {
 // error before squaring so the loss map shows where error broadly concentrates
 // rather than which single target is the most pathological, and color by the
 // median so one outlier can't paint a whole group red.
-const LOSS_ERROR_CAP = 2.0; // 200%
 const HUBER_DELTA = 2.0;
 
 export type TreemapBreakdown = "program" | "geography";
@@ -1366,6 +1377,7 @@ export interface TreemapGroup {
 
 export interface TreemapData {
   release_id: string;
+  loss_attribution_available: boolean;
   total_targets: number;
   total_within_10pct: number;
   total_scored: number;
@@ -1436,14 +1448,16 @@ function treemapRows(
 
 // Build the source → variable hierarchy that powers the calibration map.
 // Each leaf carries both "how much we calibrate to it" (n_targets) and "how
-// much of the calibration loss lands here" (loss = sum of squared relative
-// errors, the per-target term of the normalized target loss). Structural-zero
-// targets contribute 0% when matched within numerical tolerance and 100% when
-// the estimate is substantively nonzero.
+// much weighted capped target error lands here. Loss is the sum of normalized
+// per-target final_loss_contribution values produced by the artifact adapter;
+// relative-error and Huber metrics remain separate fit diagnostics.
 export function microcosmTargetTreemap(
   rows: TargetRow[],
   releaseId: string,
   breakdown: TreemapBreakdown = "program",
+  lossAttributionAvailable = rows.length > 0 && rows.every(
+    (row) => numberOrNull(row.final_loss_contribution) != null,
+  ),
 ): TreemapData {
   const groups = treemapRows(rows, breakdown);
 
@@ -1472,10 +1486,10 @@ export function microcosmTargetTreemap(
       n_targets: group.length,
       scored: absErrors.length,
       within_10pct: absErrors.filter((v) => v <= 0.1).length,
-      loss: absErrors.reduce((sum, v) => {
-        const capped = Math.min(v, LOSS_ERROR_CAP);
-        return sum + capped * capped;
-      }, 0),
+      loss: group.reduce(
+        (sum, row) => sum + (numberOrNull(row.final_loss_contribution) ?? 0),
+        0,
+      ),
       huber_loss,
       huber_error_intensity: huberErrorIntensity(huber_loss, absErrors.length),
       mean_abs_relative_error: absErrors.length
@@ -1519,6 +1533,7 @@ export function microcosmTargetTreemap(
 
   return {
     release_id: releaseId,
+    loss_attribution_available: lossAttributionAvailable,
     total_targets: groupList.reduce((s, g) => s + g.n_targets, 0),
     total_within_10pct: groupList.reduce((s, g) => s + g.within_10pct, 0),
     total_scored: groupList.reduce((s, g) => s + g.scored, 0),
@@ -1550,6 +1565,10 @@ export interface Calibration {
   compiled_candidate_targets: number | null;
   dropped_target_names: string[];
   included_target_count: number;
+  diagnostics_build: JsonObject;
+  diagnostic_warnings: TargetLossDiagnosticWarning[];
+  target_loss_basis: JsonObject | null;
+  target_loss_attribution: FinalTargetLossAttribution;
   build_manifest: JsonObject;
   release_manifest: JsonObject;
   // demographics.json geography_coverage: unweighted household-record counts
@@ -1682,9 +1701,18 @@ export function buildCalibration(
     : [];
   const skippedByName = skippedTargetReasons(skipped);
   const dropped = new Set(droppedTargetNames);
-  const rows = addEstimateScopeWarnings(
+  const enrichedRows = addEstimateScopeWarnings(
     targets.map((row) => enrichTargetRow(row, skippedByName, dropped)),
   );
+  const role = releaseRole(releaseManifest);
+  const normalizedAttribution = normalizeTargetLossAttribution({
+    diagnostics: diag,
+    rows: enrichedRows,
+    releaseId,
+    buildManifest,
+    releaseFamily: role.is_local_area ? "local_area" : "national",
+  });
+  const rows = normalizedAttribution.rows;
   const includedTargetCount = rows.filter((row) => row.calibration_status === "included").length;
   return {
     source: "huggingface_live",
@@ -1707,6 +1735,12 @@ export function buildCalibration(
     compiled_candidate_targets: numberOrNull(targetCompilation.compiled_candidate_targets),
     dropped_target_names: droppedTargetNames,
     included_target_count: includedTargetCount,
+    diagnostics_build: asObject(diag.build),
+    diagnostic_warnings: normalizedAttribution.attribution.producer_warnings,
+    target_loss_basis: Object.keys(asObject(diag.target_loss_basis)).length
+      ? asObject(diag.target_loss_basis)
+      : null,
+    target_loss_attribution: normalizedAttribution.attribution,
     build_manifest: buildManifest,
     release_manifest: releaseManifest,
     geography_coverage: Object.keys(asObject(demographics.geography_coverage)).length
@@ -2171,6 +2205,7 @@ export function latestMicrocosmCalibrationSummary(cal: Calibration) {
     compiled_candidate_targets: cal.compiled_candidate_targets,
     dropped_target_count: cal.dropped_target_names.length,
     included_target_count: cal.included_target_count,
+    target_loss_attribution: targetLossAttributionSummary(cal.target_loss_attribution),
     total_targets: cal.rows.length,
     within_tolerance_count: withinToleranceCount(cal.rows),
     family_fit: familyFitSummary(cal.rows),

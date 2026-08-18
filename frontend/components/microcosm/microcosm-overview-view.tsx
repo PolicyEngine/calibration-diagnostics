@@ -1,16 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import {
   CalibrationExplorerDataPrefetch,
   CalibrationExplorerMap,
 } from "@/components/microcosm/calibration-explorer-map";
+import { WEIGHTED_TARGET_ERROR_HELP } from "@/components/microcosm/calibration-explorer-view";
 import { useCountry } from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
-import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
@@ -21,7 +21,6 @@ import {
   useMicrocosm,
   useMicrocosmReleases,
 } from "@/lib/api/hooks/use-microcosm";
-import type { GeographyCoverageBlock } from "@/lib/api/hooks/use-microcosm";
 import { microcosmSourceAttribution } from "@/lib/microcosm/source-attribution";
 
 function formatPublishedAt(value: string | null | undefined): string {
@@ -44,15 +43,15 @@ function isNormalizedLoss(kind: LossKind): boolean {
 
 function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
+  if (isNormalizedLoss(kind)) return fmt(value, { pct: true, digits: 2 });
   if (value === 0) return "0";
-  if (isNormalizedLoss(kind)) return fmt(value, { digits: value < 1 ? 4 : 3 });
   return value.toExponential(3).replace("e+", "e");
 }
 
-function OverviewMetric({ label, value }: { label: string; value: string }) {
+function OverviewMetric({ label, value }: { label: ReactNode; value: string }) {
   return (
     <div className="min-w-0 flex-1 px-4 py-3.5 text-center sm:px-5">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+      <div className="flex h-8 items-start justify-center text-[10px] font-semibold uppercase leading-tight tracking-[0.12em] text-muted-foreground">
         {label}
       </div>
       <div
@@ -95,6 +94,7 @@ export function MicrocosmOverviewView() {
   const totalTargets = cal.total_targets ?? 0;
   const includedTargets = cal.included_target_count ?? totalTargets;
   const lossKind = cal.loss_kind;
+  const normalizedLoss = isNormalizedLoss(lossKind);
   const diagnosticsStatus = cal.diagnostics_status ?? "ok";
   const isNonDefault = cal.is_local_area === true || cal.is_default === false;
   const sourceAttribution = microcosmSourceAttribution(country, data.source_repo);
@@ -174,42 +174,52 @@ export function MicrocosmOverviewView() {
       <SectionCard title="Calibration overview" padded={false}>
         <div className="mx-3 flex divide-x divide-border/70">
           <OverviewMetric
+            label={
+              <HelpHint
+                label={normalizedLoss ? "Weighted target error" : "Raw optimizer loss"}
+                tooltip={
+                  normalizedLoss
+                    ? WEIGHTED_TARGET_ERROR_HELP
+                    : "Raw optimizer loss reported by this release. Its scale is producer-defined and is not a percentage."
+                }
+                interaction="click"
+                underline={false}
+                inheritTypography
+              />
+            }
+            value={fmtLoss(cal.final_loss, lossKind)}
+          />
+          <OverviewMetric
             label="Targets"
             value={diagnosticsStatus === "incompatible" ? "—" : fmt(includedTargets, { digits: 0 })}
+          />
+          <OverviewMetric
+            label={
+              <HelpHint
+                label="Within 10% of target"
+                tooltip="Share of calibration targets whose final aggregate is within 10% of the target value."
+                interaction="click"
+                underline={false}
+                inheritTypography
+              />
+            }
+            value={fmt(cal.fraction_within_10pct, { pct: true, digits: 1 })}
+          />
+          <OverviewMetric
+            label={
+              <HelpHint
+                label="Weighted synthetic households"
+                tooltip="Synthetic households with a non-zero calibrated weight in this release."
+                interaction="click"
+                underline={false}
+                inheritTypography
+              />
+            }
+            value={cal.n_nonzero == null ? "—" : fmtCompact(cal.n_nonzero)}
           />
           <OverviewMetric label="Published" value={formatPublishedAt(data.updated_at)} />
         </div>
       </SectionCard>
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <KpiCard
-          label={
-            <HelpHint
-              label="Final loss"
-              tooltip="Target-normalized calibration loss after reweighting. Lower is better; roughly 0 means the weighted estimates match the target surface."
-            />
-          }
-          value={fmtLoss(cal.final_loss, lossKind)}
-        />
-        <KpiCard
-          label={
-            <HelpHint
-              label="Within 10% of target"
-              tooltip="Share of calibration targets whose final aggregate is within 10% of the target value."
-            />
-          }
-          value={fmt(cal.fraction_within_10pct, { pct: true, digits: 1 })}
-        />
-        <KpiCard
-          label={
-            <HelpHint
-              label="Weighted synthetic households"
-              tooltip="Synthetic households with a non-zero calibrated weight in this release."
-            />
-          }
-          value={cal.n_nonzero == null ? "—" : fmtCompact(cal.n_nonzero)}
-        />
-      </div>
 
       <SectionCard title="Calibration map">
         <CalibrationExplorerMap
@@ -217,8 +227,6 @@ export function MicrocosmOverviewView() {
           pageIntroHeight={pageIntroHeight}
         />
       </SectionCard>
-
-      <GeographyCoverageSection coverage={cal.geography_coverage ?? null} />
 
       <details className="group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
@@ -279,78 +287,5 @@ export function MicrocosmOverviewView() {
         </ul>
       </SectionCard>
     </div>
-  );
-}
-
-/** Household-record counts by geography — the release's sub-national
- *  resolution floor. Records, not weights: no calibration can rescue a
- *  geography with too few underlying records (48 districts under 50 in the
- *  2026-07 national-only release blocked district features downstream). */
-function GeographyCoverageSection({
-  coverage,
-}: {
-  coverage: {
-    unit?: string;
-    states?: GeographyCoverageBlock | null;
-    congressional_districts?: GeographyCoverageBlock | null;
-  } | null;
-}) {
-  const districts = coverage?.congressional_districts ?? null;
-  const states = coverage?.states ?? null;
-  if (!districts && !states) return null;
-  const under50 = districts?.n_under_50 ?? null;
-  const thinnest = districts?.counts
-    ? Object.entries(districts.counts)
-        .sort((a, b) => a[1] - b[1])
-        .slice(0, 10)
-    : [];
-  return (
-    <SectionCard
-      title="Geography coverage"
-      description="Unique synthetic household records per geography"
-    >
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard
-          label="Congressional districts"
-          value={districts?.n_geographies == null ? "—" : fmt(districts.n_geographies, { digits: 0 })}
-        />
-        <KpiCard
-          label="Median records / district"
-          value={districts?.household_records_median == null ? "—" : fmt(districts.household_records_median, { digits: 0 })}
-        />
-        <KpiCard
-          label={
-            <HelpHint
-              label="Districts under 50 records"
-              tooltip="Districts with fewer than 50 household records cannot support district-level rate estimates. Zero here is the readiness bar for congressional-district features."
-            />
-          }
-          value={under50 == null ? "—" : fmt(under50, { digits: 0 })}
-        />
-        <KpiCard
-          label="Min records / state"
-          value={states?.household_records_min == null ? "—" : fmt(states.household_records_min, { digits: 0 })}
-        />
-      </div>
-      {thinnest.length > 0 && (under50 ?? 0) > 0 && (
-        <div className="mt-4">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Thinnest districts
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs tabular-nums">
-            {thinnest.map(([district, count]) => (
-              <span
-                key={district}
-                className={`rounded border border-border px-2 py-0.5 ${
-                  count < 50 ? "text-destructive" : "text-muted-foreground"
-                }`}
-              >
-                {district}: {count}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </SectionCard>
   );
 }

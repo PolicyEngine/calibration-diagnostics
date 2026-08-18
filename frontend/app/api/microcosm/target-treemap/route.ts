@@ -21,7 +21,14 @@ export async function GET(request: Request) {
   try {
     const cal = await loadRelease(release, revalidate, country);
     return NextResponse.json(
-      scrub(microcosmTargetTreemap(cal.rows, cal.release_id, breakdown)),
+      scrub(
+        microcosmTargetTreemap(
+          cal.rows,
+          cal.release_id,
+          breakdown,
+          cal.target_loss_attribution.status !== "unavailable",
+        ),
+      ),
     );
   } catch (error) {
     const { status, body } = classifyApiError(error);

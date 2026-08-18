@@ -15,6 +15,8 @@ const EMPTY_METRICS = {
   scored: 0,
   within10Pct: 0,
   loss: 0,
+  targetLossWeightShare: 0,
+  weightedAverageCappedError: null,
   huberLoss: 0,
   huberErrorIntensity: null,
   meanAbsRelativeError: null,
@@ -26,6 +28,7 @@ function response(
   nodes: CalibrationTreeNode[],
 ): CalibrationTreeResponse {
   return {
+    lossAttributionAvailable: false,
     path: state.path,
     currentLevel: { kind: "overview", label: "Test" },
     groups: [{ id: "test", label: "Test", nodes, metrics: EMPTY_METRICS }],
