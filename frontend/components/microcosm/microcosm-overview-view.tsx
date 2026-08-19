@@ -144,7 +144,11 @@ export function MicrocosmOverviewView() {
               onChange={setRelease}
               options={releaseOptions}
             />
-            <Button asChild variant="secondary">
+            <Button
+              asChild
+              variant="outline"
+              className="border-primary bg-background text-primary hover:bg-primary/5"
+            >
               <a href={publicationUrl} target="_blank" rel="noopener noreferrer">
                 View on Hugging Face
               </a>
