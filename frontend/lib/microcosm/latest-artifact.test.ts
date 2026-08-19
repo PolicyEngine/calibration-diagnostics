@@ -331,7 +331,7 @@ test("program filter includes both count and amount targets", () => {
   expect(countOnly.filters?.measure).toBe("count");
 });
 
-test("missing geography filter isolates targets without parsed geography", () => {
+test("targets without geography metadata default to the national geography", () => {
   const cal = calibration([
     {
       name: "selection_mass_protection.keogh_distributions@2024",
@@ -346,25 +346,12 @@ test("missing geography filter isolates targets without parsed geography", () =>
         source_measure_id: "keogh_distributions",
       },
     },
-    {
-      name: "irs_soi.ty2022.historic_table_2.us.all.eitc_returns@2024",
-      target_name: "irs_soi.ty2022.historic_table_2.us.all.eitc_returns",
-      target: 100,
-      initial_estimate: 100,
-      final_estimate: 100,
-      relative_error: 0,
-      registry: { family: "irs_soi" },
-      metadata: {
-        variable: "eitc",
-        source_measure_id: "eitc_returns",
-        ledger_geography_level: "country",
-        ledger_geography_id: "0100000US",
-        ledger_measure_unit: "count",
-      },
-    },
   ]);
+  expect(cal.rows[0].geography).toBe("United States");
+  expect(cal.rows[0].level).toBe("national");
+
   const result = latestMicrocosmTargetDiagnosticsPage(
-    "http://x/api/microcosm/target-diagnostics?missing_geography=true",
+    "http://x/api/microcosm/target-diagnostics?level=national&geography=United%20States",
     cal,
   );
   expect(result.filtered_total).toBe(1);

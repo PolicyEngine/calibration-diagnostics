@@ -40,7 +40,6 @@ import {
 } from "@/lib/microcosm/calibration-explorer";
 import { prefetchCalibrationDescendants } from "@/lib/microcosm/calibration-prefetch";
 import {
-  MISSING_VALUE,
   type CalibrationTreeGroup,
   type CalibrationTreeNode,
   type CalibrationTreeResponse,
@@ -77,7 +76,6 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function displayValue(value: string): string {
-  if (value === MISSING_VALUE) return "Not specified";
   return humanizeName(value) || value;
 }
 

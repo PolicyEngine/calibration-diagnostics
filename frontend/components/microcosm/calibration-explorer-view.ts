@@ -3,7 +3,6 @@ import type {
   ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
 import {
-  MISSING_VALUE,
   type CalibrationTreeMetrics,
   type CalibrationTreeNode,
   type CalibrationTreeSizeMode,
@@ -31,7 +30,7 @@ function humanize(value: string): string {
 }
 
 function geographyLabel(value: string): string {
-  return value === MISSING_VALUE ? "Not specified" : humanize(value);
+  return humanize(value);
 }
 
 export function explorerUpLabel(state: ExplorerState): string | null {

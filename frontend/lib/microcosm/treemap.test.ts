@@ -119,13 +119,15 @@ test("geography breakdown groups targets by geography leaves", () => {
   expect(data.groups[0].label).toBe("Geography");
   expect(data.groups[0].children.map((leaf) => leaf.key).sort()).toEqual([
     "CA",
-    "N/A",
     "United States",
   ]);
   expect(data.groups[0].children.find((leaf) => leaf.key === "CA")?.filters).toEqual({
     geography: "CA",
   });
-  expect(data.groups[0].children.find((leaf) => leaf.key === "N/A")?.filters).toEqual({
-    missing_geography: true,
-  });
+  expect(data.groups[0].children.find((leaf) => leaf.key === "United States")).toEqual(
+    expect.objectContaining({
+      n_targets: 2,
+      filters: { geography: "United States" },
+    }),
+  );
 });
