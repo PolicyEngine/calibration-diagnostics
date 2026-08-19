@@ -156,7 +156,7 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     expect(tree.filteredMetrics.loss).toBe(0);
   });
 
-  test("skips a meaningless singleton missing-geography tier", () => {
+  test("presents targets without geography as national before their dimensions", () => {
     const geographylessRows = ["Adult", "Child"].map((age) =>
       target(`geographyless/${age}`, {
         source: "test",
@@ -171,14 +171,22 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     };
     const tree = buildCalibrationTree(geographylessRows, state(programPath));
 
-    expect(tree.currentLevel).toEqual({ kind: "dimension", key: "bd_age", label: "Age" });
-    expect(tree.groups.map((group) => group.id)).toEqual(["bd_age"]);
-    expect(tree.groups[0].nodes.map((node) => node.label)).toEqual(["Adult", "Child"]);
+    expect(tree.currentLevel).toEqual({ kind: "geography", label: "Geography" });
+    expect(tree.groups[0].nodes.map((node) => node.label)).toEqual(["United States"]);
+
+    const national = buildCalibrationTree(
+      geographylessRows,
+      state({ ...programPath, geography: "United States" }),
+    );
+    expect(national.currentLevel).toEqual({ kind: "dimension", key: "bd_age", label: "Age" });
+    expect(national.groups.map((group) => group.id)).toEqual(["bd_age"]);
+    expect(national.groups[0].nodes.map((node) => node.label)).toEqual(["Adult", "Child"]);
 
     const adult = buildCalibrationTree(
       geographylessRows,
       state({
         ...programPath,
+        geography: "United States",
         dimensions: [{ key: "bd_age", label: "Age", value: "Adult" }],
       }),
     );
@@ -544,6 +552,42 @@ describe("source, geography, and declared-dimension hierarchy", () => {
 });
 
 describe("calibration tree metrics and filters", () => {
+  test("classifies targets without generated model data as skipped", () => {
+    const missingModelData = target("missing-model-data", {
+      source: "test",
+      variable: "missing model data",
+      level: "national",
+      geography: "United States",
+      calibration_status: "not_materialized",
+      calibration_status_label: "Not materialized",
+      calibration_status_reason: "The required measure column was not generated.",
+    });
+
+    const filtered = applyExplorerFilters([missingModelData], {
+      ...EMPTY_FILTERS,
+      calibrationStatuses: ["skipped"],
+    });
+    expect(filtered).toEqual([missingModelData]);
+
+    const tree = buildCalibrationTree(
+      [missingModelData],
+      state({
+        source: "test",
+        program: "missing model data",
+        geography: "United States",
+        dimensions: [],
+      }),
+    );
+    expect(tree.filterOptions.calibrationStatuses).toEqual(["included", "skipped"]);
+    expect(tree.groups[0].nodes[0].target).toEqual(
+      expect.objectContaining({
+        calibration_status: "skipped",
+        calibration_status_label: "Skipped",
+        calibration_status_reason: "The required measure column was not generated.",
+      }),
+    );
+  });
+
   test("falls back to target count when the selected sizing metric is all zero", () => {
     const nodes = buildCalibrationTree(
       rows.map((row) => ({ ...row, abs_relative_error: null })),
@@ -602,17 +646,27 @@ describe("calibration tree metrics and filters", () => {
     expect(tree.filteredMetrics.nTargets).toBe(1);
   });
 
-  test("supports missing geography as an explicit filter value", () => {
-    const missing = applyExplorerFilters(
-      [...rows, { name: "missing-place", source: "other", variable: "unknown" }],
+  test("treats missing geography as national in filters and filter options", () => {
+    const rowsWithMissing = [
+      ...rows,
+      { name: "missing-place", source: "other", variable: "unknown" },
+    ];
+    const national = applyExplorerFilters(
+      rowsWithMissing,
       {
-        geographyLevels: [],
-        geographies: ["__missing__"],
+        geographyLevels: ["national"],
+        geographies: ["United States"],
         fitBands: [],
         calibrationStatuses: [],
       },
     );
 
-    expect(missing.map((row) => row.name)).toEqual(["missing-place"]);
+    expect(national.map((row) => row.name)).toContain("missing-place");
+
+    const tree = buildCalibrationTree(rowsWithMissing, state({ dimensions: [] }));
+    expect(tree.filterOptions.geographyLevels).not.toContain("__missing__");
+    expect(tree.filterOptions.geographies).not.toContain("__missing__");
+    expect(tree.filterOptions.geographyLevels).toContain("national");
+    expect(tree.filterOptions.geographies).toContain("United States");
   });
 });

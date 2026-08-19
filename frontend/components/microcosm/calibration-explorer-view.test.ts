@@ -156,18 +156,18 @@ describe("calibration explorer presentation model", () => {
     ]);
   });
 
-  test("labels the missing sentinel consistently and supports geography-less dimensions", () => {
+  test("labels the national fallback and supports geography-less dimensions", () => {
     expect(
       explorerBreadcrumbs(
         state({
           source: "irs_soi",
           program: "ctc",
-          geography: "__missing__",
+          geography: "United States",
           dimensions: [],
         }),
       ),
     ).toContainEqual(
-      expect.objectContaining({ label: "Not specified" }),
+      expect.objectContaining({ label: "United States" }),
     );
 
     expect(

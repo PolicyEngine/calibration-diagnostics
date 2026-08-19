@@ -17,6 +17,9 @@ type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
 export type CalibrationLossKind = "normalized_target_loss" | "raw_optimizer_objective";
 
+const DEFAULT_GEOGRAPHY = "United States";
+const DEFAULT_GEOGRAPHY_LEVEL = "national";
+
 // Deprecated upstream identifiers: Microcosm's published HF repositories and
 // deployment variables still use the former Populace names.
 export const MICROCOSM_HF_REPO_ENV = "POPULACE_HF_REPO";
@@ -937,6 +940,9 @@ function enrichTargetRow(
       ? null
       : Math.abs(initialError) - Math.abs(finalError);
   const parsed = parseDottedTarget(baseName, row) ?? parseTarget(baseName);
+  const hasGeography = Boolean(parsed.geography.trim());
+  const geography = hasGeography ? parsed.geography : DEFAULT_GEOGRAPHY;
+  const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
   const measureCol = asObject(row.measure);
   const metadataTargetDimensions = metadataDimensions(row);
   const targetDimensions =
@@ -966,8 +972,8 @@ function enrichTargetRow(
     base_name: baseName,
     family: deriveFamily(baseName),
     state: stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
-    geography: parsed.geography,
-    level: parsed.level,
+    geography,
+    level,
     source: parsed.source,
     variable: parsed.variable,
     measure,
@@ -1328,7 +1334,6 @@ export type TreemapBreakdown = "program" | "geography";
 export interface TreemapFilters {
   program?: string;
   geography?: string;
-  missing_geography?: true;
 }
 
 function median(values: number[]): number | null {
@@ -1386,7 +1391,7 @@ function targetProgramKey(row: TargetRow): string {
 
 function targetGeographyKey(row: TargetRow): string {
   const geography = String(row.geography ?? "").trim();
-  return geography || "N/A";
+  return geography || DEFAULT_GEOGRAPHY;
 }
 
 function measureCounts(rows: TargetRow[]): { measure: string | null; n_targets: number }[] {
@@ -1448,9 +1453,7 @@ export function microcosmTargetTreemap(
     const first = group[0];
     const filters: TreemapFilters =
       breakdown === "geography"
-        ? key === "N/A"
-          ? { missing_geography: true }
-          : { geography: key }
+        ? { geography: key }
         : { program: key };
     return {
       key,
@@ -2275,7 +2278,6 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
   const source = stringParam(url.searchParams.get("source"));
   const level = stringParam(url.searchParams.get("level"));
   const geography = stringParam(url.searchParams.get("geography"));
-  const missingGeography = booleanParam(url.searchParams.get("missing_geography"));
   const state = stringParam(url.searchParams.get("state"));
   const direction = stringParam(url.searchParams.get("direction"));
   const within = booleanParam(url.searchParams.get("within_tolerance"));
@@ -2303,9 +2305,6 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
   if (source) filtered = filtered.filter((row) => row.source === source);
   if (level) filtered = filtered.filter((row) => row.level === level);
   if (geography) filtered = filtered.filter((row) => row.geography === geography);
-  if (missingGeography === true) {
-    filtered = filtered.filter((row) => !String(row.geography ?? "").trim());
-  }
   if (state) filtered = filtered.filter((row) => row.state === state);
   const dimensions = variable ? computeDimensions(filtered) : [];
   for (const [key, value] of facetFilters) {

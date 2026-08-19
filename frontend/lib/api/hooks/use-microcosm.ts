@@ -693,7 +693,6 @@ export interface MicrocosmTreemapLeaf {
   filters?: {
     program?: string;
     geography?: string;
-    missing_geography?: true;
   };
   n_targets: number;
   within_10pct: number;
@@ -803,7 +802,6 @@ export function useMicrocosmTargetDiagnostics(params: {
   source?: string;
   level?: string;
   geography?: string;
-  missing_geography?: string;
   state?: string;
   direction?: string;
   within_tolerance?: string;

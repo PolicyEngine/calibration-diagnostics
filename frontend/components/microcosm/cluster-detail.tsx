@@ -97,14 +97,13 @@ export function ClusterDetail({
   const { data, isLoading } = useMicrocosmTargetDiagnostics({
     release,
     variable:
-      synthetic || filters.program || filters.geography || filters.missing_geography
+      synthetic || filters.program || filters.geography
         ? undefined
         : leaf.key,
     program: synthetic ? undefined : filters.program,
     measure: measure || undefined,
     source: synthetic ? leaf.source : undefined,
     geography: synthetic ? undefined : filters.geography,
-    missing_geography: !synthetic && filters.missing_geography ? "true" : undefined,
     facet: facetParam.length ? facetParam : undefined,
     within_tolerance: fit || undefined,
     direction: direction || undefined,
@@ -179,8 +178,6 @@ export function ClusterDetail({
       if (measure) params.set("measure", measure);
     } else if (filters.geography) {
       params.set("geography", filters.geography);
-    } else if (filters.missing_geography) {
-      params.set("missing_geography", "true");
     } else {
       params.set("variable", leaf.key);
     }

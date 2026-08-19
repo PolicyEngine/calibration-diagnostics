@@ -1,6 +1,20 @@
 import { expect, test } from "bun:test";
 
-import { microcosmSourceAttribution } from "./source-attribution";
+import {
+  microcosmPublicationUrl,
+  microcosmSourceAttribution,
+} from "./source-attribution";
+
+test("links a Microcosm release to its exact Hugging Face tag", () => {
+  expect(
+    microcosmPublicationUrl(
+      "policyengine/populace-us",
+      "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
+    ),
+  ).toBe(
+    "https://huggingface.co/datasets/policyengine/populace-us/tree/populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
+  );
+});
 
 test("links Microcosm to the public US Hugging Face dataset", () => {
   expect(microcosmSourceAttribution("us", "policyengine/populace-us")).toEqual({

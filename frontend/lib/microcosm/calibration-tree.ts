@@ -7,7 +7,8 @@ import type {
 import { canonicalLabel, programLabel } from "./program-label";
 import { sourceLabel } from "./source-label";
 
-export const MISSING_VALUE = "__missing__";
+const DEFAULT_GEOGRAPHY = "United States";
+const DEFAULT_GEOGRAPHY_LEVEL = "national";
 
 export interface CalibrationTreeDimension {
   key: string;
@@ -31,7 +32,7 @@ export interface CalibrationTreeTarget {
   target_loss_weight_share?: number | null;
   final_capped_scaled_error?: number | null;
   final_loss_contribution?: number | null;
-  calibration_status?: CalibrationStatus | null;
+  calibration_status?: CalibrationStatus | "not_materialized" | null;
   target_dimensions?: CalibrationTreeDimension[] | null;
   [key: string]: unknown;
 }
@@ -116,9 +117,12 @@ export function applyExplorerFilters(
   filters: ExplorerState["filters"],
 ): CalibrationTreeTarget[] {
   return rows.filter((row) => {
-    const geographyLevel = String(row.level ?? "").trim() || MISSING_VALUE;
-    const geography = String(row.geography ?? "").trim() || MISSING_VALUE;
-    const status = row.calibration_status ?? null;
+    const geographyLevel = String(row.level ?? "").trim() || DEFAULT_GEOGRAPHY_LEVEL;
+    const geography = String(row.geography ?? "").trim() || DEFAULT_GEOGRAPHY;
+    const status =
+      row.calibration_status === "not_materialized"
+        ? "skipped"
+        : row.calibration_status ?? null;
     return (
       (!filters.geographyLevels.length || filters.geographyLevels.includes(geographyLevel)) &&
       (!filters.geographies.length || filters.geographies.includes(geography)) &&
@@ -266,7 +270,7 @@ export function orderedBreakdownDimensions(
 }
 
 function geographyId(row: CalibrationTreeTarget): string {
-  return String(row.geography ?? "").trim() || MISSING_VALUE;
+  return String(row.geography ?? "").trim() || DEFAULT_GEOGRAPHY;
 }
 
 function targetLabel(row: CalibrationTreeTarget): string {
@@ -367,21 +371,34 @@ function sortNodes(nodes: CalibrationTreeNode[]): CalibrationTreeNode[] {
   return nodes.sort(
     (left, right) =>
       right.metrics.nTargets - left.metrics.nTargets ||
-      (left.id === MISSING_VALUE ? 1 : right.id === MISSING_VALUE ? -1 : left.label.localeCompare(right.label)),
+      left.label.localeCompare(right.label),
   );
 }
 
 function filterOptions(rows: CalibrationTreeTarget[]) {
-  const unique = (values: Array<string | null | undefined>) =>
-    [...new Set(values.map((value) => String(value ?? "").trim() || MISSING_VALUE))].sort(
-      (left, right) =>
-        left === MISSING_VALUE ? 1 : right === MISSING_VALUE ? -1 : left.localeCompare(right),
-    );
+  const unique = (values: string[]) => [...new Set(values)].sort((left, right) =>
+    left.localeCompare(right),
+  );
   return {
-    geographyLevels: unique(rows.map((row) => row.level)),
-    geographies: unique(rows.map((row) => row.geography)),
+    geographyLevels: unique(rows.map(
+      (row) => String(row.level ?? "").trim() || DEFAULT_GEOGRAPHY_LEVEL,
+    )),
+    geographies: unique(rows.map(
+      (row) => String(row.geography ?? "").trim() || DEFAULT_GEOGRAPHY,
+    )),
     fitBands: ["0_5", "5_10", "10_20", "20_40", "40_plus", "unscored"],
-    calibrationStatuses: ["included", "skipped", "not_materialized"],
+    calibrationStatuses: ["included", "skipped"],
+  };
+}
+
+function normalizeChartCalibrationStatus(
+  row: CalibrationTreeTarget,
+): CalibrationTreeTarget {
+  if (row.calibration_status !== "not_materialized") return row;
+  return {
+    ...row,
+    calibration_status: "skipped",
+    calibration_status_label: "Skipped",
   };
 }
 
@@ -424,7 +441,7 @@ function geographyNodes(rows: CalibrationTreeTarget[]): CalibrationTreeNode[] {
     [...byGeography.entries()].map(([geography, geographyRows]) =>
       node(
         geography,
-        geography === MISSING_VALUE ? "Not specified" : geography,
+        geography,
         "geography",
         { kind: "geography", value: geography },
         geographyRows,
@@ -440,9 +457,10 @@ export function buildCalibrationTree(
   lossAttributionAvailable =
     allRows.length > 0 && allRows.every((row) => finiteLossContribution(row) != null),
 ): CalibrationTreeResponse {
+  const chartRows = allRows.map(normalizeChartCalibrationStatus);
   const { path } = state;
-  const options = filterOptions(allRows);
-  const filteredRows = applyExplorerFilters(allRows, state.filters);
+  const options = filterOptions(chartRows);
+  const filteredRows = applyExplorerFilters(chartRows, state.filters);
 
   if (state.breakdown === "geography" && !path.geography) {
     const nodes = geographyNodes(filteredRows);
@@ -464,7 +482,7 @@ export function buildCalibrationTree(
   }
 
   if (state.breakdown === "geography" && (!path.source || !path.program)) {
-    const geographyRows = allRows.filter(
+    const geographyRows = chartRows.filter(
       (row) => geographyId(row) === path.geography,
     );
     const filteredGeographyRows = applyExplorerFilters(
@@ -496,35 +514,29 @@ export function buildCalibrationTree(
     };
   }
 
-  const programRows = allRows.filter(
+  const programRows = chartRows.filter(
     (row) =>
       String(row.source ?? "other") === path.source &&
       programId(row) === path.program,
   );
   const filteredProgramRows = applyExplorerFilters(programRows, state.filters);
   if (!path.geography) {
-    const allGeographyNodes = geographyNodes(programRows);
-    const onlyMissingGeography =
-      allGeographyNodes.length === 1 &&
-      allGeographyNodes[0].id === MISSING_VALUE;
-    if (!onlyMissingGeography) {
-      const nodes = geographyNodes(filteredProgramRows);
-      return {
-        releaseId,
-        lossAttributionAvailable,
-        path,
-        currentLevel: { kind: "geography", label: "Geography" },
-        groups: [{
-          id: path.program,
-          label: path.program,
-          nodes,
-          metrics: calibrationTreeMetrics(filteredProgramRows),
-        }],
-        dimensionOrder: [],
-        filterOptions: options,
-        filteredMetrics: calibrationTreeMetrics(filteredProgramRows),
-      };
-    }
+    const nodes = geographyNodes(filteredProgramRows);
+    return {
+      releaseId,
+      lossAttributionAvailable,
+      path,
+      currentLevel: { kind: "geography", label: "Geography" },
+      groups: [{
+        id: path.program,
+        label: path.program,
+        nodes,
+        metrics: calibrationTreeMetrics(filteredProgramRows),
+      }],
+      dimensionOrder: [],
+      filterOptions: options,
+      filteredMetrics: calibrationTreeMetrics(filteredProgramRows),
+    };
   }
 
   const geographyRows = path.geography

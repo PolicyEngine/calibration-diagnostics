@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useMemo, useState } from "react";
+import { Button } from "@policyengine/ui-kit";
 
 import {
   CalibrationExplorerDataPrefetch,
@@ -21,7 +22,10 @@ import {
   useMicrocosm,
   useMicrocosmReleases,
 } from "@/lib/api/hooks/use-microcosm";
-import { microcosmSourceAttribution } from "@/lib/microcosm/source-attribution";
+import {
+  microcosmPublicationUrl,
+  microcosmSourceAttribution,
+} from "@/lib/microcosm/source-attribution";
 
 function formatPublishedAt(value: string | null | undefined): string {
   if (!value) return "—";
@@ -98,6 +102,7 @@ export function MicrocosmOverviewView() {
   const diagnosticsStatus = cal.diagnostics_status ?? "ok";
   const isNonDefault = cal.is_local_area === true || cal.is_default === false;
   const sourceAttribution = microcosmSourceAttribution(country, data.source_repo);
+  const publicationUrl = microcosmPublicationUrl(data.source_repo, data.release_id);
 
   return (
     <div className="flex flex-col gap-5">
@@ -132,12 +137,23 @@ export function MicrocosmOverviewView() {
           </>
         }
         actions={
-          <ToolbarSelect
-            label="Release"
-            value={release}
-            onChange={setRelease}
-            options={releaseOptions}
-          />
+          <>
+            <ToolbarSelect
+              label="Release"
+              value={release}
+              onChange={setRelease}
+              options={releaseOptions}
+            />
+            <Button
+              asChild
+              variant="outline"
+              className="border-primary bg-background text-primary hover:bg-primary/5"
+            >
+              <a href={publicationUrl} target="_blank" rel="noopener noreferrer">
+                View on Hugging Face
+              </a>
+            </Button>
+          </>
         }
         onHeightChange={setPageIntroHeight}
       />
@@ -227,57 +243,6 @@ export function MicrocosmOverviewView() {
           pageIntroHeight={pageIntroHeight}
         />
       </SectionCard>
-
-      <details className="group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)]">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold leading-tight text-foreground">
-              Release artifacts
-            </div>
-            <div className="mt-1 max-w-2xl text-xs leading-snug text-muted-foreground">
-              {release ? (
-                <>Read live from Hugging Face for the selected release</>
-              ) : (
-                <>
-                  Read live from Hugging Face, resolved through <code>latest.json</code>
-                </>
-              )}
-              {data.updated_at ? ` (published ${data.updated_at})` : ""}.
-            </div>
-          </div>
-          <span className="shrink-0 text-xs text-muted-foreground transition-transform group-open:rotate-180">
-            ▾
-          </span>
-        </summary>
-        <div className="border-t border-border p-5">
-          <table className="w-full text-left text-sm">
-            <tbody>
-              {data.source_artifacts.map((artifact) => (
-                <tr key={artifact.name} className="border-b border-border/60 last:border-b-0">
-                  <td className="py-1.5 pr-3 font-medium">{artifact.name}</td>
-                  <td className="py-1.5 pr-3 text-muted-foreground">
-                    <a
-                      className="underline decoration-dotted underline-offset-2"
-                      href={artifact.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {artifact.path}
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="mt-3 text-xs text-muted-foreground">
-            Compatible with{" "}
-            {(data.release_manifest.compatible_model_packages ?? [])
-              .map((pkg) => `${pkg.name}${pkg.specifier}`)
-              .join(", ") || "—"}
-            .
-          </div>
-        </div>
-      </details>
 
       <SectionCard title="Limitations">
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">

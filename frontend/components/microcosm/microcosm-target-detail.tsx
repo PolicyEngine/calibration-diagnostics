@@ -110,13 +110,6 @@ function naturalList(values: string[]): string {
   return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
 }
 
-function calculationFormula(row: MicrocosmTargetRow): string | null {
-  const variables = row.policyengine_variables ?? [];
-  if (!variables.length) return null;
-  const operation = row.measure_mode || row.aggregation || "aggregate";
-  return `${operation}(${variables.join(" + ")})`;
-}
-
 function niceAxisLimit(value: number, minimum: number): number {
   const target = Math.max(value, minimum);
   const exponent = 10 ** Math.floor(Math.log10(target));
@@ -343,16 +336,22 @@ function DefinitionItem({ label, value }: { label: string; value: React.ReactNod
   );
 }
 
-function CodeChips({ values }: { values: string[] }) {
-  if (!values.length) return <span className="text-muted-foreground">—</span>;
+function DetailSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <span className="flex flex-wrap gap-1.5">
-      {values.map((value) => (
-        <code key={value} className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs text-foreground">
-          {value}
-        </code>
-      ))}
-    </span>
+    <section className="border-t border-border/60 py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+        {title}
+      </h3>
+      <dl className="mt-3 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        {children}
+      </dl>
+    </section>
   );
 }
 
@@ -428,8 +427,6 @@ export function MicrocosmTargetDetail({
       ? row.abs_relative_error <= 0.1
       : null;
   const chronicle = row.chronicle;
-  const policyengineVariables = row.policyengine_variables ?? [];
-  const formula = calculationFormula(row);
   const chronicleEntryUrl = chronicleSourceEntryUrl(
     row.source_citation,
     chronicle?.layout_record_set_id,
@@ -568,120 +565,55 @@ export function MicrocosmTargetDetail({
 
       <div className="border-t border-border/80">
         <Disclosure
-          title="What this target measures"
-          description="Topic, geography, period, and target dimensions"
+          title="Target details"
+          description="Measure, source, geography, and period"
         >
-          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-            <DefinitionItem label="Measure" value={measure} />
-            <DefinitionItem label="Unit" value={unit} />
-            <DefinitionItem label="Domain" value={titleFromIdentifier(chronicle?.domain)} />
-            <DefinitionItem label="Geography" value={usStateName(row.geography)} />
-            <DefinitionItem label="Geography level" value={chronicle?.geography_level || row.level} />
-            <DefinitionItem label="Period" value={periodText(row)} />
-            {shownDimensions.map((dimension) => (
+          <div>
+            <DetailSection title="Target definition">
+              <DefinitionItem label="Measure" value={measure} />
+              <DefinitionItem label="Unit" value={unit} />
+              <DefinitionItem label="Domain" value={titleFromIdentifier(chronicle?.domain)} />
+              <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
+              {shownDimensions.map((dimension) => (
+                <DefinitionItem
+                  key={`definition:${dimension.label}:${dimension.value}`}
+                  label={dimension.label}
+                  value={cleanDimensionValue(dimension.value)}
+                />
+              ))}
+            </DetailSection>
+
+            <DetailSection title="Scope">
+              <DefinitionItem label="Geography" value={usStateName(row.geography)} />
               <DefinitionItem
-                key={`definition:${dimension.label}:${dimension.value}`}
-                label={dimension.label}
-                value={cleanDimensionValue(dimension.value)}
+                label="Geography level"
+                value={canonicalLabel(chronicle?.geography_level || row.level)}
               />
-            ))}
-          </dl>
-        </Disclosure>
+              <DefinitionItem label="Period" value={periodText(row)} />
+            </DetailSection>
 
-        <Disclosure
-          title="PolicyEngine calculation"
-          description="Mapped variables and aggregation used to produce the estimate"
-        >
-          {formula ? (
-            <>
-              <code className="block overflow-x-auto rounded-md bg-muted/60 px-3 py-2.5 font-mono text-sm text-foreground">
-                {formula}
-              </code>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                The mapped model {policyengineVariables.length === 1 ? "variable is" : "variables are"} aggregated across calibrated weights to produce the estimate.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              No PolicyEngine variable mapping is published for this target.
-            </p>
-          )}
-          <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3">
-            <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
-            <DefinitionItem
-              label="Aggregation"
-              value={canonicalLabel(row.measure_mode || row.aggregation)}
-            />
-            <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
-            <DefinitionItem label="Filter" value={row.policyengine_filter_variable} />
-          </dl>
-        </Disclosure>
+            <DetailSection title="Official source">
+              <DefinitionItem label="Source" value={sourceName} />
+              <DefinitionItem
+                label="Chronicle entry"
+                value={
+                  chronicleEntryUrl ? (
+                    <a
+                      href={chronicleEntryUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      View Chronicle entry ↗
+                    </a>
+                  ) : (
+                    "Not available"
+                  )
+                }
+              />
+            </DetailSection>
 
-        <Disclosure
-          title="Source and calculation details"
-          description="Chronicle source entry and model mapping used for the estimate"
-        >
-          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-            <DefinitionItem label="Source" value={sourceName} />
-            <DefinitionItem
-              label="Chronicle entry"
-              value={
-                chronicleEntryUrl ? (
-                  <a
-                    href={chronicleEntryUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    View Chronicle entry ↗
-                  </a>
-                ) : (
-                  "Not available"
-                )
-              }
-            />
-            <DefinitionItem label="Measure concept" value={chronicle?.measure_concept} />
-            <DefinitionItem label="Source concept" value={chronicle?.source_concept} />
-            <DefinitionItem
-              label="Operation"
-              value={canonicalLabel(chronicle?.value_operation)}
-            />
-            <DefinitionItem
-              label="Model variables"
-              value={policyengineVariables.length ? <CodeChips values={policyengineVariables} /> : null}
-            />
-            <DefinitionItem
-              label="Aggregation"
-              value={canonicalLabel(row.measure_mode || row.aggregation)}
-            />
-            <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
-            <DefinitionItem label="Filter variable" value={row.policyengine_filter_variable} />
-            <DefinitionItem label="Target role" value={row.target_role} />
-            <DefinitionItem label="Materializer" value={row.materializer} />
-          </dl>
-        </Disclosure>
-
-        <Disclosure
-          title="Technical identifiers and lineage"
-          description="Canonical keys for debugging and reproducibility"
-        >
-          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-            <DefinitionItem label="Target name" value={row.name} />
-            <DefinitionItem label="Fact key" value={chronicle?.fact_key} />
-            <DefinitionItem label="Source record ID" value={chronicle?.source_record_id} />
-            <DefinitionItem label="Semantic fact key" value={chronicle?.semantic_fact_key} />
-            <DefinitionItem label="Aggregate fact key" value={chronicle?.aggregate_fact_key} />
-            <DefinitionItem label="Legacy fact key" value={chronicle?.legacy_fact_key} />
-            <DefinitionItem label="Record set" value={chronicle?.layout_record_set_id} />
-            <DefinitionItem label="Dimension set" value={chronicle?.dimension_set_key} />
-            <DefinitionItem label="Universe constraints" value={chronicle?.universe_constraint_set_key} />
-            <DefinitionItem label="Group-by dimension" value={chronicle?.layout_groupby_dimension} />
-            <DefinitionItem label="Group-by value" value={chronicle?.layout_groupby_value_id} />
-            <DefinitionItem label="Layout measure" value={chronicle?.layout_measure_id} />
-            <DefinitionItem label="Source measure ID" value={row.source_measure_id} />
-            <DefinitionItem label="Measure name" value={row.measure_name} />
-            <DefinitionItem label="Geography ID" value={chronicle?.geography_id} />
-          </dl>
+          </div>
         </Disclosure>
       </div>
     </article>

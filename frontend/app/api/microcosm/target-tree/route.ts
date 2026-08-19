@@ -24,7 +24,6 @@ export const maxDuration = 300;
 const CALIBRATION_STATUSES = new Set<CalibrationStatus>([
   "included",
   "skipped",
-  "not_materialized",
 ]);
 
 function requestState(params: URLSearchParams) {
@@ -51,6 +50,7 @@ function requestState(params: URLSearchParams) {
     .filter((value): value is FitBand => FIT_BANDS.includes(value as FitBand));
   state.filters.calibrationStatuses = params
     .getAll("status")
+    .map((value) => (value === "not_materialized" ? "skipped" : value))
     .filter((value): value is CalibrationStatus =>
       CALIBRATION_STATUSES.has(value as CalibrationStatus),
     );

@@ -46,7 +46,7 @@ describe("MicrocosmTargetDetail", () => {
     expect(markup).not.toContain("sm:grid-cols-3");
   });
 
-  test("publishes both plot values and the resolved Chronicle entry in the markup", () => {
+  test("publishes plot values and consolidated target details in the markup", () => {
     const markup = render();
 
     expect(markup).toContain("aria-label=\"Before calibration:");
@@ -54,20 +54,90 @@ describe("MicrocosmTargetDetail", () => {
     expect(markup).toContain(
       "href=\"https://chronicle.institute/sources/soi-table-2-5-eitc-agi-children-2023\"",
     );
+    expect(markup).toContain("Target details");
+    expect(markup).toContain("Measure, source, geography, and period");
+    for (const section of [
+      "Target definition",
+      "Scope",
+      "Official source",
+    ]) {
+      expect(markup).toContain(`>${section}</h3>`);
+    }
     expect(markup).toContain(
-      "Chronicle source entry and model mapping used for the estimate",
+      'class="text-xs font-semibold uppercase tracking-[0.12em] text-primary"',
     );
+    expect(markup).not.toContain(">Implementation</h3>");
+    expect(markup).not.toContain(">Model representation</h3>");
+    expect(markup).not.toContain("PolicyEngine calculation");
+    expect(markup).not.toContain("Source and calculation details");
   });
 
-  test("renders explicit fallbacks when optional mapping metadata is absent", () => {
+  test("renders an explicit Chronicle fallback when optional metadata is absent", () => {
     const markup = render({
       ...TARGET,
       source_citation: "ssa | SSI Monthly Statistics, December 2024, Table 1",
       policyengine_variables: [],
     });
 
-    expect(markup).toContain("No PolicyEngine variable mapping is published for this target.");
     expect(markup).toContain("Chronicle entry</dt><dd");
     expect(markup).toContain("Not available");
+  });
+
+  test("renders the geography level in sentence case", () => {
+    const markup = render({
+      ...TARGET,
+      level: "congressional_district",
+      chronicle: { geography_level: "congressional_district" },
+    });
+
+    expect(markup).toContain(
+      'Geography level</dt><dd class="mt-0.5 break-words text-sm text-foreground">Congressional district</dd>',
+    );
+  });
+
+  test("omits the generated PolicyEngine formula summary", () => {
+    const markup = render({
+      ...TARGET,
+      measure_mode: "sum",
+    });
+
+    expect(markup).not.toContain("sum(taxable_interest_income)");
+    expect(markup).not.toContain("aggregated across calibrated weights");
+    expect(markup).not.toContain("Model variables</dt><dd");
+    expect(markup).toContain("Entity</dt><dd");
+  });
+
+  test("omits retired calculation and lineage content", () => {
+    const markup = render({
+      ...TARGET,
+      measure_mode: "indicator_sum",
+      source_measure_id: "returns_count",
+      metadata: {
+        chronicle_fact_key: "fact-key",
+        chronicle_semantic_fact_key: "semantic-fact-key",
+        chronicle_aggregate_fact_key: "aggregate-fact-key",
+        chronicle_legacy_fact_key: "legacy-fact-key",
+        chronicle_layout_measure_id: "layout-measure",
+        chronicle_geography_id: "11",
+        chronicle_value_operation: "sum",
+      },
+    });
+
+    for (const label of [
+      "Operation",
+      "Aggregation",
+      "Measure concept",
+      "Source concept",
+      "Geography ID",
+      "Source measure ID",
+      "Layout measure",
+      "Semantic fact key",
+      "Aggregate fact key",
+      "Legacy fact key",
+      "Fact key",
+    ]) {
+      expect(markup).not.toContain(`>${label}</dt>`);
+    }
+    expect(markup).not.toContain("Technical identifiers and lineage");
   });
 });
