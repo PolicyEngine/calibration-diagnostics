@@ -349,6 +349,25 @@ function CodeChips({ values }: { values: string[] }) {
   );
 }
 
+function DetailSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-t border-border/60 py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        {title}
+      </h3>
+      <dl className="mt-3 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        {children}
+      </dl>
+    </section>
+  );
+}
+
 function Disclosure({
   title,
   description,
@@ -563,48 +582,64 @@ export function MicrocosmTargetDetail({
           title="Target details"
           description="Measure, source, geography, period, and model mapping"
         >
-          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-            <DefinitionItem label="Measure" value={measure} />
-            <DefinitionItem label="Unit" value={unit} />
-            <DefinitionItem label="Domain" value={titleFromIdentifier(chronicle?.domain)} />
-            <DefinitionItem label="Geography" value={usStateName(row.geography)} />
-            <DefinitionItem label="Geography level" value={chronicle?.geography_level || row.level} />
-            <DefinitionItem label="Period" value={periodText(row)} />
-            <DefinitionItem label="Source" value={sourceName} />
-            <DefinitionItem
-              label="Chronicle entry"
-              value={
-                chronicleEntryUrl ? (
-                  <a
-                    href={chronicleEntryUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    View Chronicle entry ↗
-                  </a>
-                ) : (
-                  "Not available"
-                )
-              }
-            />
-            <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
-            <DefinitionItem
-              label="Model variables"
-              value={policyengineVariables.length ? <CodeChips values={policyengineVariables} /> : null}
-            />
-            <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
-            <DefinitionItem label="Filter variable" value={row.policyengine_filter_variable} />
-            <DefinitionItem label="Target role" value={row.target_role} />
-            <DefinitionItem label="Materializer" value={row.materializer} />
-            {shownDimensions.map((dimension) => (
+          <div>
+            <DetailSection title="Target definition">
+              <DefinitionItem label="Measure" value={measure} />
+              <DefinitionItem label="Unit" value={unit} />
+              <DefinitionItem label="Domain" value={titleFromIdentifier(chronicle?.domain)} />
+              {shownDimensions.map((dimension) => (
+                <DefinitionItem
+                  key={`definition:${dimension.label}:${dimension.value}`}
+                  label={dimension.label}
+                  value={cleanDimensionValue(dimension.value)}
+                />
+              ))}
+            </DetailSection>
+
+            <DetailSection title="Scope">
+              <DefinitionItem label="Geography" value={usStateName(row.geography)} />
+              <DefinitionItem label="Geography level" value={chronicle?.geography_level || row.level} />
+              <DefinitionItem label="Period" value={periodText(row)} />
+            </DetailSection>
+
+            <DetailSection title="Official source">
+              <DefinitionItem label="Source" value={sourceName} />
               <DefinitionItem
-                key={`definition:${dimension.label}:${dimension.value}`}
-                label={dimension.label}
-                value={cleanDimensionValue(dimension.value)}
+                label="Chronicle entry"
+                value={
+                  chronicleEntryUrl ? (
+                    <a
+                      href={chronicleEntryUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      View Chronicle entry ↗
+                    </a>
+                  ) : (
+                    "Not available"
+                  )
+                }
               />
-            ))}
-          </dl>
+            </DetailSection>
+
+            <DetailSection title="Model representation">
+              <DefinitionItem
+                label="Model variables"
+                value={policyengineVariables.length ? <CodeChips values={policyengineVariables} /> : null}
+              />
+              <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
+              <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
+              <DefinitionItem label="Filter variable" value={row.policyengine_filter_variable} />
+            </DetailSection>
+
+            {row.target_role || row.materializer ? (
+              <DetailSection title="Implementation">
+                <DefinitionItem label="Target role" value={row.target_role} />
+                <DefinitionItem label="Materializer" value={row.materializer} />
+              </DetailSection>
+            ) : null}
+          </div>
         </Disclosure>
       </div>
     </article>
