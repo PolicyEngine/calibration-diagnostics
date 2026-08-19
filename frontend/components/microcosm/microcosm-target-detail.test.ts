@@ -47,11 +47,7 @@ describe("MicrocosmTargetDetail", () => {
   });
 
   test("publishes plot values and consolidated target details in the markup", () => {
-    const markup = render({
-      ...TARGET,
-      target_role: "taxable_interest",
-      materializer: "irs_soi_slice",
-    });
+    const markup = render();
 
     expect(markup).toContain("aria-label=\"Before calibration:");
     expect(markup).toContain("After calibration:");
@@ -65,10 +61,13 @@ describe("MicrocosmTargetDetail", () => {
       "Scope",
       "Official source",
       "Model representation",
-      "Implementation",
     ]) {
       expect(markup).toContain(`>${section}</h3>`);
     }
+    expect(markup).toContain(
+      'class="text-xs font-semibold uppercase tracking-[0.12em] text-primary"',
+    );
+    expect(markup).not.toContain(">Implementation</h3>");
     expect(markup).not.toContain("PolicyEngine calculation");
     expect(markup).not.toContain("Source and calculation details");
   });
