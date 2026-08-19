@@ -59,16 +59,26 @@ describe("MicrocosmTargetDetail", () => {
     );
   });
 
-  test("renders explicit fallbacks when optional mapping metadata is absent", () => {
+  test("renders an explicit Chronicle fallback when optional metadata is absent", () => {
     const markup = render({
       ...TARGET,
       source_citation: "ssa | SSI Monthly Statistics, December 2024, Table 1",
       policyengine_variables: [],
     });
 
-    expect(markup).toContain("No PolicyEngine variable mapping is published for this target.");
     expect(markup).toContain("Chronicle entry</dt><dd");
     expect(markup).toContain("Not available");
+  });
+
+  test("omits the generated PolicyEngine formula summary", () => {
+    const markup = render({
+      ...TARGET,
+      measure_mode: "sum",
+    });
+
+    expect(markup).not.toContain("sum(taxable_interest_income)");
+    expect(markup).not.toContain("aggregated across calibrated weights");
+    expect(markup).toContain("Model entity and filters used to produce the estimate");
   });
 
   test("omits retired calculation and lineage fields", () => {

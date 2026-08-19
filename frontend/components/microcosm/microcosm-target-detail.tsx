@@ -110,13 +110,6 @@ function naturalList(values: string[]): string {
   return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
 }
 
-function calculationFormula(row: MicrocosmTargetRow): string | null {
-  const variables = row.policyengine_variables ?? [];
-  if (!variables.length) return null;
-  const operation = row.measure_mode || row.aggregation || "aggregate";
-  return `${operation}(${variables.join(" + ")})`;
-}
-
 function niceAxisLimit(value: number, minimum: number): number {
   const target = Math.max(value, minimum);
   const exponent = 10 ** Math.floor(Math.log10(target));
@@ -429,7 +422,6 @@ export function MicrocosmTargetDetail({
       : null;
   const chronicle = row.chronicle;
   const policyengineVariables = row.policyengine_variables ?? [];
-  const formula = calculationFormula(row);
   const chronicleEntryUrl = chronicleSourceEntryUrl(
     row.source_citation,
     chronicle?.layout_record_set_id,
@@ -590,23 +582,9 @@ export function MicrocosmTargetDetail({
 
         <Disclosure
           title="PolicyEngine calculation"
-          description="Mapped variables and aggregation used to produce the estimate"
+          description="Model entity and filters used to produce the estimate"
         >
-          {formula ? (
-            <>
-              <code className="block overflow-x-auto rounded-md bg-muted/60 px-3 py-2.5 font-mono text-sm text-foreground">
-                {formula}
-              </code>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                The mapped model {policyengineVariables.length === 1 ? "variable is" : "variables are"} aggregated across calibrated weights to produce the estimate.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              No PolicyEngine variable mapping is published for this target.
-            </p>
-          )}
-          <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3">
+          <dl className="grid grid-cols-2 gap-x-5 gap-y-3">
             <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
             <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
             <DefinitionItem label="Filter" value={row.policyengine_filter_variable} />
