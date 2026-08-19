@@ -91,7 +91,8 @@ describe("MicrocosmTargetDetail", () => {
 
     expect(markup).not.toContain("sum(taxable_interest_income)");
     expect(markup).not.toContain("aggregated across calibrated weights");
-    expect(markup).toContain("Model variables</dt><dd");
+    expect(markup).not.toContain("Model variables</dt><dd");
+    expect(markup).toContain("Entity</dt><dd");
   });
 
   test("omits retired calculation and lineage content", () => {

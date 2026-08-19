@@ -336,19 +336,6 @@ function DefinitionItem({ label, value }: { label: string; value: React.ReactNod
   );
 }
 
-function CodeChips({ values }: { values: string[] }) {
-  if (!values.length) return <span className="text-muted-foreground">—</span>;
-  return (
-    <span className="flex flex-wrap gap-1.5">
-      {values.map((value) => (
-        <code key={value} className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs text-foreground">
-          {value}
-        </code>
-      ))}
-    </span>
-  );
-}
-
 function DetailSection({
   title,
   children,
@@ -440,7 +427,6 @@ export function MicrocosmTargetDetail({
       ? row.abs_relative_error <= 0.1
       : null;
   const chronicle = row.chronicle;
-  const policyengineVariables = row.policyengine_variables ?? [];
   const chronicleEntryUrl = chronicleSourceEntryUrl(
     row.source_citation,
     chronicle?.layout_record_set_id,
@@ -587,6 +573,7 @@ export function MicrocosmTargetDetail({
               <DefinitionItem label="Measure" value={measure} />
               <DefinitionItem label="Unit" value={unit} />
               <DefinitionItem label="Domain" value={titleFromIdentifier(chronicle?.domain)} />
+              <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
               {shownDimensions.map((dimension) => (
                 <DefinitionItem
                   key={`definition:${dimension.label}:${dimension.value}`}
@@ -624,15 +611,9 @@ export function MicrocosmTargetDetail({
             </DetailSection>
 
             <DetailSection title="Model representation">
-              <DefinitionItem
-                label="Model variables"
-                value={policyengineVariables.length ? <CodeChips values={policyengineVariables} /> : null}
-              />
-              <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
               <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
               <DefinitionItem label="Filter variable" value={row.policyengine_filter_variable} />
             </DetailSection>
-
           </div>
         </Disclosure>
       </div>
