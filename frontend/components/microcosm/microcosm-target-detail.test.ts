@@ -65,7 +65,7 @@ describe("MicrocosmTargetDetail", () => {
       expect(markup).toContain(`>${section}</h3>`);
     }
     expect(markup).toContain(
-      'class="text-xs font-semibold uppercase tracking-[0.12em] text-primary"',
+      'class="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-deep)]"',
     );
     expect(markup).not.toContain(">Implementation</h3>");
     expect(markup).not.toContain("PolicyEngine calculation");

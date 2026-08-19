@@ -358,7 +358,7 @@ function DetailSection({
 }) {
   return (
     <section className="border-t border-border/60 py-4 first:border-t-0 first:pt-0 last:pb-0">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent-deep)]">
         {title}
       </h3>
       <dl className="mt-3 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">

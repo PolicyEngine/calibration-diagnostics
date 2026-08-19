@@ -30,6 +30,7 @@
   --text-tertiary: #6e7f74;
   --accent: #3e7a5e;
   --accent-strong: #2c5a45;
+  --accent-deep: color-mix(in srgb, var(--accent) 50%, black);
   --accent-subtle: #e4f0e9;
 
   /* ---------- ui-kit compat: same names, Microcosm palette ----------
