@@ -31,9 +31,10 @@ separate service layer — the Next.js API routes are the API layer.
 - **Staging runs** (`/microcosm/staging`) — monitor pre-release Microcosm build
   runs from the staging Hub repo: current stage, calibration loss progress,
   final candidate diagnostics once uploaded, and candidate-vs-latest fit.
-- **Agentic investigations** (`.claude/`) — Claude Code slash command,
-  specialist agents, and a reusable skill for root-causing a discrepant target
-  from release artifacts and relevant source repos.
+- **Calibration target investigations** (`docs/ai/`) — tool-independent procedures,
+  specialist review responsibilities, and a reusable checklist for identifying
+  the cause of a discrepant target from release artifacts and relevant source
+  repositories.
 
 ## API
 
@@ -51,25 +52,21 @@ The Next.js route handlers are the API layer; all read live from Hugging Face:
 | `GET /api/microcosm/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
 | `GET /api/microcosm/staging/compare?run=<run_id>&release=latest` | Diff staging candidate against a published release |
 
-## Agentic target investigations
+## Calibration target investigations
 
-The dashboard is only the observation surface. Root-cause work should run through
-the Claude Code harness in `.claude/`.
-
-```text
-/investigate-microcosm-target --release <release-id> <target-id>
-```
-
-The command fetches a target packet, then coordinates specialist agents for
-chronicle/source semantics, Populus materialization, PolicyEngine model mapping,
-and calibration mechanics. The underlying packet can also be fetched directly:
+The dashboard identifies discrepancies. Determine their cause from a target
+investigation packet, release artifacts, and relevant source code by following
+[the shared investigation workflow](docs/ai/workflows/investigate-microcosm-target.md).
 
 ```bash
 node scripts/microcosm-investigation-packet.mjs \
-  --release populace-us-2024-incumbent-improved-996401a-20260618 \
-  irs_soi.ty2022.historic_table_2.us.under_1.ctc_amount \
-  --out investigations/ctc-under-1.json
+  --release <release-id> <target-id> \
+  --out investigations/latest-target-packet.json
 ```
+
+The workflow separates reviews of Chronicle source semantics, target
+materialization, PolicyEngine model mapping, and calibration calculations before
+combining their evidence into one report.
 
 ## Develop
 
