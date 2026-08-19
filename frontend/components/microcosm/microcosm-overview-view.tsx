@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useMemo, useState } from "react";
+import { Button } from "@policyengine/ui-kit";
 
 import {
   CalibrationExplorerDataPrefetch,
@@ -21,7 +22,10 @@ import {
   useMicrocosm,
   useMicrocosmReleases,
 } from "@/lib/api/hooks/use-microcosm";
-import { microcosmSourceAttribution } from "@/lib/microcosm/source-attribution";
+import {
+  microcosmPublicationUrl,
+  microcosmSourceAttribution,
+} from "@/lib/microcosm/source-attribution";
 
 function formatPublishedAt(value: string | null | undefined): string {
   if (!value) return "—";
@@ -98,6 +102,7 @@ export function MicrocosmOverviewView() {
   const diagnosticsStatus = cal.diagnostics_status ?? "ok";
   const isNonDefault = cal.is_local_area === true || cal.is_default === false;
   const sourceAttribution = microcosmSourceAttribution(country, data.source_repo);
+  const publicationUrl = microcosmPublicationUrl(data.source_repo, data.release_id);
 
   return (
     <div className="flex flex-col gap-5">
@@ -132,12 +137,19 @@ export function MicrocosmOverviewView() {
           </>
         }
         actions={
-          <ToolbarSelect
-            label="Release"
-            value={release}
-            onChange={setRelease}
-            options={releaseOptions}
-          />
+          <>
+            <ToolbarSelect
+              label="Release"
+              value={release}
+              onChange={setRelease}
+              options={releaseOptions}
+            />
+            <Button asChild variant="secondary">
+              <a href={publicationUrl} target="_blank" rel="noopener noreferrer">
+                View on Hugging Face
+              </a>
+            </Button>
+          </>
         }
         onHeightChange={setPageIntroHeight}
       />
