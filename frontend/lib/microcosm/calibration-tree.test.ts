@@ -544,6 +544,42 @@ describe("source, geography, and declared-dimension hierarchy", () => {
 });
 
 describe("calibration tree metrics and filters", () => {
+  test("classifies targets without generated model data as skipped", () => {
+    const missingModelData = target("missing-model-data", {
+      source: "test",
+      variable: "missing model data",
+      level: "national",
+      geography: "United States",
+      calibration_status: "not_materialized",
+      calibration_status_label: "Not materialized",
+      calibration_status_reason: "The required measure column was not generated.",
+    });
+
+    const filtered = applyExplorerFilters([missingModelData], {
+      ...EMPTY_FILTERS,
+      calibrationStatuses: ["skipped"],
+    });
+    expect(filtered).toEqual([missingModelData]);
+
+    const tree = buildCalibrationTree(
+      [missingModelData],
+      state({
+        source: "test",
+        program: "missing model data",
+        geography: "United States",
+        dimensions: [],
+      }),
+    );
+    expect(tree.filterOptions.calibrationStatuses).toEqual(["included", "skipped"]);
+    expect(tree.groups[0].nodes[0].target).toEqual(
+      expect.objectContaining({
+        calibration_status: "skipped",
+        calibration_status_label: "Skipped",
+        calibration_status_reason: "The required measure column was not generated.",
+      }),
+    );
+  });
+
   test("falls back to target count when the selected sizing metric is all zero", () => {
     const nodes = buildCalibrationTree(
       rows.map((row) => ({ ...row, abs_relative_error: null })),

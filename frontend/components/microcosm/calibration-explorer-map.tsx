@@ -74,7 +74,6 @@ const FIT_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   included: "Included",
   skipped: "Skipped",
-  not_materialized: "Not materialized",
 };
 
 function displayValue(value: string): string {

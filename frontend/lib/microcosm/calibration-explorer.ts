@@ -8,7 +8,7 @@ export const FIT_BANDS = [
 ] as const;
 
 export type FitBand = (typeof FIT_BANDS)[number];
-export type CalibrationStatus = "included" | "skipped" | "not_materialized";
+export type CalibrationStatus = "included" | "skipped";
 export type ExplorerBreakdown = "program" | "geography";
 
 export interface ExplorerDimensionSelection {
