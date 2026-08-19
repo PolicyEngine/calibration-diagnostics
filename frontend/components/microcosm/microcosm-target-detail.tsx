@@ -585,7 +585,10 @@ export function MicrocosmTargetDetail({
 
             <DetailSection title="Scope">
               <DefinitionItem label="Geography" value={usStateName(row.geography)} />
-              <DefinitionItem label="Geography level" value={chronicle?.geography_level || row.level} />
+              <DefinitionItem
+                label="Geography level"
+                value={canonicalLabel(chronicle?.geography_level || row.level)}
+              />
               <DefinitionItem label="Period" value={periodText(row)} />
             </DetailSection>
 

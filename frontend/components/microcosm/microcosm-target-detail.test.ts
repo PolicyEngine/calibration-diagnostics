@@ -83,6 +83,18 @@ describe("MicrocosmTargetDetail", () => {
     expect(markup).toContain("Not available");
   });
 
+  test("renders the geography level in sentence case", () => {
+    const markup = render({
+      ...TARGET,
+      level: "congressional_district",
+      chronicle: { geography_level: "congressional_district" },
+    });
+
+    expect(markup).toContain(
+      'Geography level</dt><dd class="mt-0.5 break-words text-sm text-foreground">Congressional district</dd>',
+    );
+  });
+
   test("omits the generated PolicyEngine formula summary", () => {
     const markup = render({
       ...TARGET,
