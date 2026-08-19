@@ -55,12 +55,11 @@ describe("MicrocosmTargetDetail", () => {
       "href=\"https://chronicle.institute/sources/soi-table-2-5-eitc-agi-children-2023\"",
     );
     expect(markup).toContain("Target details");
-    expect(markup).toContain("Measure, source, geography, period, and model mapping");
+    expect(markup).toContain("Measure, source, geography, and period");
     for (const section of [
       "Target definition",
       "Scope",
       "Official source",
-      "Model representation",
     ]) {
       expect(markup).toContain(`>${section}</h3>`);
     }
@@ -68,6 +67,7 @@ describe("MicrocosmTargetDetail", () => {
       'class="text-xs font-semibold uppercase tracking-[0.12em] text-primary"',
     );
     expect(markup).not.toContain(">Implementation</h3>");
+    expect(markup).not.toContain(">Model representation</h3>");
     expect(markup).not.toContain("PolicyEngine calculation");
     expect(markup).not.toContain("Source and calculation details");
   });

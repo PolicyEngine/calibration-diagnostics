@@ -566,7 +566,7 @@ export function MicrocosmTargetDetail({
       <div className="border-t border-border/80">
         <Disclosure
           title="Target details"
-          description="Measure, source, geography, period, and model mapping"
+          description="Measure, source, geography, and period"
         >
           <div>
             <DetailSection title="Target definition">
@@ -610,10 +610,6 @@ export function MicrocosmTargetDetail({
               />
             </DetailSection>
 
-            <DetailSection title="Model representation">
-              <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
-              <DefinitionItem label="Filter variable" value={row.policyengine_filter_variable} />
-            </DetailSection>
           </div>
         </Disclosure>
       </div>
