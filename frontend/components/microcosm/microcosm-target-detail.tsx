@@ -614,8 +614,6 @@ export function MicrocosmTargetDetail({
                 )
               }
             />
-            <DefinitionItem label="Measure concept" value={chronicle?.measure_concept} />
-            <DefinitionItem label="Source concept" value={chronicle?.source_concept} />
             <DefinitionItem
               label="Model variables"
               value={policyengineVariables.length ? <CodeChips values={policyengineVariables} /> : null}
@@ -624,22 +622,6 @@ export function MicrocosmTargetDetail({
             <DefinitionItem label="Filter variable" value={row.policyengine_filter_variable} />
             <DefinitionItem label="Target role" value={row.target_role} />
             <DefinitionItem label="Materializer" value={row.materializer} />
-          </dl>
-        </Disclosure>
-
-        <Disclosure
-          title="Technical identifiers and lineage"
-          description="Canonical keys for debugging and reproducibility"
-        >
-          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-            <DefinitionItem label="Target name" value={row.name} />
-            <DefinitionItem label="Source record ID" value={chronicle?.source_record_id} />
-            <DefinitionItem label="Record set" value={chronicle?.layout_record_set_id} />
-            <DefinitionItem label="Dimension set" value={chronicle?.dimension_set_key} />
-            <DefinitionItem label="Universe constraints" value={chronicle?.universe_constraint_set_key} />
-            <DefinitionItem label="Group-by dimension" value={chronicle?.layout_groupby_dimension} />
-            <DefinitionItem label="Group-by value" value={chronicle?.layout_groupby_value_id} />
-            <DefinitionItem label="Measure name" value={row.measure_name} />
           </dl>
         </Disclosure>
       </div>

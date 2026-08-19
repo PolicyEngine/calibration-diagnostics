@@ -81,7 +81,7 @@ describe("MicrocosmTargetDetail", () => {
     expect(markup).toContain("Model entity and filters used to produce the estimate");
   });
 
-  test("omits retired calculation and lineage fields", () => {
+  test("omits retired calculation and lineage content", () => {
     const markup = render({
       ...TARGET,
       measure_mode: "indicator_sum",
@@ -100,6 +100,8 @@ describe("MicrocosmTargetDetail", () => {
     for (const label of [
       "Operation",
       "Aggregation",
+      "Measure concept",
+      "Source concept",
       "Geography ID",
       "Source measure ID",
       "Layout measure",
@@ -110,5 +112,6 @@ describe("MicrocosmTargetDetail", () => {
     ]) {
       expect(markup).not.toContain(`>${label}</dt>`);
     }
+    expect(markup).not.toContain("Technical identifiers and lineage");
   });
 });
