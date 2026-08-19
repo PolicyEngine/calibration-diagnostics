@@ -70,4 +70,35 @@ describe("MicrocosmTargetDetail", () => {
     expect(markup).toContain("Chronicle entry</dt><dd");
     expect(markup).toContain("Not available");
   });
+
+  test("omits retired calculation and lineage fields", () => {
+    const markup = render({
+      ...TARGET,
+      measure_mode: "indicator_sum",
+      source_measure_id: "returns_count",
+      metadata: {
+        chronicle_fact_key: "fact-key",
+        chronicle_semantic_fact_key: "semantic-fact-key",
+        chronicle_aggregate_fact_key: "aggregate-fact-key",
+        chronicle_legacy_fact_key: "legacy-fact-key",
+        chronicle_layout_measure_id: "layout-measure",
+        chronicle_geography_id: "11",
+        chronicle_value_operation: "sum",
+      },
+    });
+
+    for (const label of [
+      "Operation",
+      "Aggregation",
+      "Geography ID",
+      "Source measure ID",
+      "Layout measure",
+      "Semantic fact key",
+      "Aggregate fact key",
+      "Legacy fact key",
+      "Fact key",
+    ]) {
+      expect(markup).not.toContain(`>${label}</dt>`);
+    }
+  });
 });

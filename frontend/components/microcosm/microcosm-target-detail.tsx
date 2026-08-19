@@ -608,10 +608,6 @@ export function MicrocosmTargetDetail({
           )}
           <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3">
             <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
-            <DefinitionItem
-              label="Aggregation"
-              value={canonicalLabel(row.measure_mode || row.aggregation)}
-            />
             <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
             <DefinitionItem label="Filter" value={row.policyengine_filter_variable} />
           </dl>
@@ -643,16 +639,8 @@ export function MicrocosmTargetDetail({
             <DefinitionItem label="Measure concept" value={chronicle?.measure_concept} />
             <DefinitionItem label="Source concept" value={chronicle?.source_concept} />
             <DefinitionItem
-              label="Operation"
-              value={canonicalLabel(chronicle?.value_operation)}
-            />
-            <DefinitionItem
               label="Model variables"
               value={policyengineVariables.length ? <CodeChips values={policyengineVariables} /> : null}
-            />
-            <DefinitionItem
-              label="Aggregation"
-              value={canonicalLabel(row.measure_mode || row.aggregation)}
             />
             <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
             <DefinitionItem label="Filter variable" value={row.policyengine_filter_variable} />
@@ -667,20 +655,13 @@ export function MicrocosmTargetDetail({
         >
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
             <DefinitionItem label="Target name" value={row.name} />
-            <DefinitionItem label="Fact key" value={chronicle?.fact_key} />
             <DefinitionItem label="Source record ID" value={chronicle?.source_record_id} />
-            <DefinitionItem label="Semantic fact key" value={chronicle?.semantic_fact_key} />
-            <DefinitionItem label="Aggregate fact key" value={chronicle?.aggregate_fact_key} />
-            <DefinitionItem label="Legacy fact key" value={chronicle?.legacy_fact_key} />
             <DefinitionItem label="Record set" value={chronicle?.layout_record_set_id} />
             <DefinitionItem label="Dimension set" value={chronicle?.dimension_set_key} />
             <DefinitionItem label="Universe constraints" value={chronicle?.universe_constraint_set_key} />
             <DefinitionItem label="Group-by dimension" value={chronicle?.layout_groupby_dimension} />
             <DefinitionItem label="Group-by value" value={chronicle?.layout_groupby_value_id} />
-            <DefinitionItem label="Layout measure" value={chronicle?.layout_measure_id} />
-            <DefinitionItem label="Source measure ID" value={row.source_measure_id} />
             <DefinitionItem label="Measure name" value={row.measure_name} />
-            <DefinitionItem label="Geography ID" value={chronicle?.geography_id} />
           </dl>
         </Disclosure>
       </div>
