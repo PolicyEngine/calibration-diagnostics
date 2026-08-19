@@ -560,8 +560,8 @@ export function MicrocosmTargetDetail({
 
       <div className="border-t border-border/80">
         <Disclosure
-          title="What this target measures"
-          description="Topic, geography, period, and target dimensions"
+          title="Target details"
+          description="Measure, source, geography, period, and model mapping"
         >
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
             <DefinitionItem label="Measure" value={measure} />
@@ -570,32 +570,6 @@ export function MicrocosmTargetDetail({
             <DefinitionItem label="Geography" value={usStateName(row.geography)} />
             <DefinitionItem label="Geography level" value={chronicle?.geography_level || row.level} />
             <DefinitionItem label="Period" value={periodText(row)} />
-            {shownDimensions.map((dimension) => (
-              <DefinitionItem
-                key={`definition:${dimension.label}:${dimension.value}`}
-                label={dimension.label}
-                value={cleanDimensionValue(dimension.value)}
-              />
-            ))}
-          </dl>
-        </Disclosure>
-
-        <Disclosure
-          title="PolicyEngine calculation"
-          description="Model entity and filters used to produce the estimate"
-        >
-          <dl className="grid grid-cols-2 gap-x-5 gap-y-3">
-            <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
-            <DefinitionItem label="Counted per" value={row.policyengine_map_to} />
-            <DefinitionItem label="Filter" value={row.policyengine_filter_variable} />
-          </dl>
-        </Disclosure>
-
-        <Disclosure
-          title="Source and calculation details"
-          description="Chronicle source entry and model mapping used for the estimate"
-        >
-          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
             <DefinitionItem label="Source" value={sourceName} />
             <DefinitionItem
               label="Chronicle entry"
@@ -614,6 +588,7 @@ export function MicrocosmTargetDetail({
                 )
               }
             />
+            <DefinitionItem label="Entity" value={canonicalLabel(row.entity)} />
             <DefinitionItem
               label="Model variables"
               value={policyengineVariables.length ? <CodeChips values={policyengineVariables} /> : null}
@@ -622,6 +597,13 @@ export function MicrocosmTargetDetail({
             <DefinitionItem label="Filter variable" value={row.policyengine_filter_variable} />
             <DefinitionItem label="Target role" value={row.target_role} />
             <DefinitionItem label="Materializer" value={row.materializer} />
+            {shownDimensions.map((dimension) => (
+              <DefinitionItem
+                key={`definition:${dimension.label}:${dimension.value}`}
+                label={dimension.label}
+                value={cleanDimensionValue(dimension.value)}
+              />
+            ))}
           </dl>
         </Disclosure>
       </div>

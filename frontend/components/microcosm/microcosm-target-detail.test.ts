@@ -46,7 +46,7 @@ describe("MicrocosmTargetDetail", () => {
     expect(markup).not.toContain("sm:grid-cols-3");
   });
 
-  test("publishes both plot values and the resolved Chronicle entry in the markup", () => {
+  test("publishes plot values and consolidated target details in the markup", () => {
     const markup = render();
 
     expect(markup).toContain("aria-label=\"Before calibration:");
@@ -54,9 +54,10 @@ describe("MicrocosmTargetDetail", () => {
     expect(markup).toContain(
       "href=\"https://chronicle.institute/sources/soi-table-2-5-eitc-agi-children-2023\"",
     );
-    expect(markup).toContain(
-      "Chronicle source entry and model mapping used for the estimate",
-    );
+    expect(markup).toContain("Target details");
+    expect(markup).toContain("Measure, source, geography, period, and model mapping");
+    expect(markup).not.toContain("PolicyEngine calculation");
+    expect(markup).not.toContain("Source and calculation details");
   });
 
   test("renders an explicit Chronicle fallback when optional metadata is absent", () => {
@@ -78,7 +79,7 @@ describe("MicrocosmTargetDetail", () => {
 
     expect(markup).not.toContain("sum(taxable_interest_income)");
     expect(markup).not.toContain("aggregated across calibrated weights");
-    expect(markup).toContain("Model entity and filters used to produce the estimate");
+    expect(markup).toContain("Model variables</dt><dd");
   });
 
   test("omits retired calculation and lineage content", () => {
