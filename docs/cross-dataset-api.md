@@ -38,19 +38,33 @@ snapshot IDs and has a SHA-256 recorded in the manifest.
 
 ## Configure the application
 
-For local use, point the server at the generated bundle and optionally pin the
-expected content-addressed run ID:
+Set exactly one of `CROSS_DATASET_ARTIFACT_DIR` or
+`CROSS_DATASET_ARTIFACT_BASE_URL` before starting the application for
+Cross-dataset work. The Cross-dataset API has no default artifact location: if
+neither variable is set, the application process starts, but the Cross-dataset
+page is unavailable and its API returns HTTP 503. Setting both variables is
+also invalid.
+
+For a bundle on the local filesystem, set `CROSS_DATASET_ARTIFACT_DIR` to the
+generated frontend bundle directory. `CROSS_DATASET_EXPECTED_RUN_ID` is
+optional and rejects a bundle whose content-addressed run ID does not match:
 
 ```bash
 export CROSS_DATASET_ARTIFACT_DIR=/path/to/evaluation-run/frontend
 export CROSS_DATASET_EXPECTED_RUN_ID=evaluation-...
-npm run dev
+make dev
 ```
 
-Hosted deployments can instead set `CROSS_DATASET_ARTIFACT_BASE_URL` to an
-HTTP(S) directory containing the same files. Configure exactly one local or
-remote location. A missing, stale, partial, malformed, or hash-mismatched
-bundle returns HTTP 503 rather than serving mixed results.
+For a remotely hosted bundle, set `CROSS_DATASET_ARTIFACT_BASE_URL` to the
+HTTP(S) directory containing the same files before starting the application:
+
+```bash
+export CROSS_DATASET_ARTIFACT_BASE_URL=https://example.org/evaluation-run/frontend/
+make dev
+```
+
+A missing, stale, partial, malformed, or hash-mismatched bundle returns HTTP
+503 rather than serving mixed results.
 
 ## Read the API
 
