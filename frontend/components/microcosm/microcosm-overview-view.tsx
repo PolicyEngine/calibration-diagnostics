@@ -9,7 +9,7 @@ import {
 } from "@/components/microcosm/calibration-explorer-map";
 import { ArtifactDescriptionBanner } from "@/components/microcosm/artifact-description-banner";
 import { WEIGHTED_TARGET_ERROR_HELP } from "@/components/microcosm/calibration-explorer-view";
-import { useCountry, type Country } from "@/components/layout/country-context";
+import { useCountry } from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -23,6 +23,7 @@ import {
   useMicrocosm,
   useMicrocosmReleases,
 } from "@/lib/api/hooks/use-microcosm";
+import type { MicrocosmCountry } from "@/lib/microcosm/countries";
 import {
   microcosmPublicationUrl,
   microcosmSourceAttribution,
@@ -40,9 +41,11 @@ function formatPublishedAt(value: string | null | undefined): string {
   });
 }
 
-const COUNTRY_OVERVIEW_COPY: Record<
-  Country,
-  { authorities: string; examples: string }
+// Legacy per-country intro copy for releases published before a typed
+// `release_manifest.presentation` block; countries without an entry get the
+// generic sentences below.
+const COUNTRY_OVERVIEW_COPY: Partial<
+  Record<MicrocosmCountry, { authorities: string; examples: string }>
 > = {
   us: {
     authorities: "the IRS, the Census Bureau, and CMS",
@@ -120,7 +123,11 @@ export function MicrocosmOverviewView() {
   const normalizedLoss = isNormalizedLoss(lossKind);
   const diagnosticsStatus = cal.diagnostics_status ?? "ok";
   const isNonDefault = cal.is_local_area === true || cal.is_default === false;
-  const sourceAttribution = microcosmSourceAttribution(country, data.source_repo);
+  const sourceAttribution = microcosmSourceAttribution(
+    country,
+    data.source_repo,
+    cal.country?.repository_visibility,
+  );
   const publicationUrl = microcosmPublicationUrl(data.source_repo, data.release_id);
   const overviewCopy = COUNTRY_OVERVIEW_COPY[country];
 
@@ -133,12 +140,13 @@ export function MicrocosmOverviewView() {
         description={
           <>
             Microcosm reweights survey microdata so it matches official statistics
-            from agencies like{" "}
-            {overviewCopy.authorities}.
-            Each tile in the Calibration fit explorer below is a category we calibrate to,
-            including{" "}
-            {overviewCopy.examples}
-            . Data is built live from{" "}
+            from{" "}
+            {overviewCopy
+              ? `agencies like ${overviewCopy.authorities}`
+              : "national statistical agencies and administrative sources"}
+            . Each tile in the Calibration fit explorer below is a category we
+            calibrate to{overviewCopy ? `, including ${overviewCopy.examples}` : ""}.
+            Data is built live from{" "}
             {sourceAttribution.href ? (
               <a
                 className="underline decoration-dotted underline-offset-2"

@@ -10,6 +10,7 @@ import {
   loadRelease,
   microcosmCountryGeography,
 } from "@/lib/microcosm/latest-artifact";
+import { hasCapability } from "@/lib/microcosm/countries";
 import {
   type ReformValidation,
   buildReformValidation,
@@ -26,8 +27,10 @@ export const MICROCOSM_STAGING_HF_REPO =
 export const MICROCOSM_STAGING_HF_REVISION =
   process.env[MICROCOSM_STAGING_HF_REVISION_ENV] ?? "main";
 
+// Staging telemetry is served for countries registered with the `staging`
+// capability; the single staging repository above is the one they read.
 export function stagingUnavailableReason(country: MicrocosmCountry): string | null {
-  return country === "us"
+  return hasCapability(country, "staging")
     ? null
     : `${microcosmCountryGeography(country)} has no staging repository.`;
 }

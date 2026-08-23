@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { hasCapability } from "@/lib/microcosm/countries";
 import {
   loadPointerReleaseId,
   parseCountry,
@@ -17,11 +18,11 @@ export async function GET(request: Request) {
   const country = parseCountry(url.searchParams.get("country"));
   const runId = url.searchParams.get("run")?.trim();
   let release = url.searchParams.get("release")?.trim() || "latest";
-  if (!runId && country === "us") {
+  if (!runId && hasCapability(country, "staging")) {
     return NextResponse.json({ detail: "Provide a staging run id via ?run=." }, { status: 400 });
   }
   try {
-    if (release === "latest" && country === "us") {
+    if (release === "latest" && hasCapability(country, "staging")) {
       release = (await loadPointerReleaseId(300, country)).release_id;
     }
     return NextResponse.json(

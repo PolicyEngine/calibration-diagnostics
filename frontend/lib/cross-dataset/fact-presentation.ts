@@ -4,6 +4,7 @@ import type {
   SourceSummary,
 } from "./artifact";
 import type { Country } from "@/components/layout/country-context";
+import { DEFAULT_COUNTRY, isCountry } from "@/lib/microcosm/countries";
 import { sourceDisplayLabel } from "./presentation";
 import { sourceAuthorityLabel } from "../source-labels";
 
@@ -87,7 +88,7 @@ export interface FactDetailView {
 }
 
 const DEFAULT_PARAMS: FactCatalogParams = {
-  country: "us",
+  country: DEFAULT_COUNTRY,
   source: "",
   status: "",
   chronicleSource: "",
@@ -103,7 +104,6 @@ const DEFAULT_PARAMS: FactCatalogParams = {
 };
 
 const SORTS = new Set<FactSort>(["fact_key", "label", "error_desc"]);
-const COUNTRIES = new Set<Country>(["us", "uk", "be"]);
 
 function boundedPositiveInteger(value: string | null, fallback: number, maximum: number): number {
   if (!value || !/^\d+$/.test(value)) return fallback;
@@ -119,10 +119,7 @@ export function parseFactCatalogParams(
   const countryValue = params.get("country");
   return {
     country:
-      currentCountry ??
-      (countryValue && COUNTRIES.has(countryValue as Country)
-        ? (countryValue as Country)
-        : DEFAULT_PARAMS.country),
+      currentCountry ?? (isCountry(countryValue) ? countryValue : DEFAULT_PARAMS.country),
     source: params.get("source")?.trim() ?? "",
     status: params.get("status")?.trim() ?? "",
     chronicleSource: params.get("ledger_source")?.trim() ?? "",

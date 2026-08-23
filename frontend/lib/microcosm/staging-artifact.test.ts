@@ -16,6 +16,9 @@ test("names the country when staging is unavailable", () => {
   expect(stagingUnavailableReason("be")).toBe(
     "Belgium has no staging repository.",
   );
+  expect(stagingUnavailableReason("zz")).toBe(
+    "Zedland has no staging repository.",
+  );
 });
 
 test("Belgium staging loaders return an empty state before resolving artifacts", async () => {
