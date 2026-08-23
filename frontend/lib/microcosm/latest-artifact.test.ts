@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
 
+import beDiagnosticsFixture from "./fixtures/be-release/calibration_diagnostics.json";
+import beReleaseManifestFixture from "./fixtures/be-release/release_manifest.json";
+
 // Deprecated upstream identifiers: fixtures mirror current Microcosm release
 // names and its `ledger_*` Chronicle metadata contract.
 
@@ -8,11 +11,17 @@ import {
   buildComparison,
   MICROCOSM_HF_REPO_ENV,
   MICROCOSM_HF_REVISION_ENV,
+  MICROCOSM_BE_HF_REPO_ENV,
+  MICROCOSM_BE_HF_REVISION_ENV,
   MICROCOSM_UK_HF_REPO_ENV,
   MICROCOSM_UK_HF_REVISION_ENV,
+  hfResolveUrl,
   latestMicrocosmCalibrationHighlights,
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
+  microcosmRepo,
+  microcosmRevision,
+  parseCountry,
   releasePublishedAtFromTree,
   releaseRole,
   type Calibration,
@@ -25,11 +34,117 @@ test("keeps Microcosm deployment configuration on its published Populace env con
     MICROCOSM_HF_REVISION_ENV,
     MICROCOSM_UK_HF_REPO_ENV,
     MICROCOSM_UK_HF_REVISION_ENV,
+    MICROCOSM_BE_HF_REPO_ENV,
+    MICROCOSM_BE_HF_REVISION_ENV,
   ]).toEqual([
     "POPULACE_HF_REPO",
     "POPULACE_HF_REVISION",
     "POPULACE_UK_HF_REPO",
     "POPULACE_UK_HF_REVISION",
+    "POPULACE_BE_HF_REPO",
+    "POPULACE_BE_HF_REVISION",
+  ]);
+});
+
+test("coerces supported country parameters and defaults unknown values to US", () => {
+  expect(parseCountry("be")).toBe("be");
+  expect(parseCountry("uk")).toBe("uk");
+  expect(parseCountry("us")).toBe("us");
+  expect(parseCountry("BE")).toBe("us");
+  expect(parseCountry("fr")).toBe("us");
+  expect(parseCountry(null)).toBe("us");
+});
+
+test("uses the private Belgium repository and country revision", () => {
+  expect(microcosmRepo("be")).toBe("policyengine/populace-be-private");
+  expect(microcosmRevision("be")).toBe("main");
+  expect(hfResolveUrl("latest.json", "be")).toBe(
+    "https://huggingface.co/datasets/policyengine/populace-be-private/resolve/main/latest.json",
+  );
+});
+
+test("loads trimmed Belgium diagnostics without optional US artifact fields", () => {
+  expect("loss_trajectory" in beDiagnosticsFixture).toBe(false);
+  expect("past_cap_census" in beDiagnosticsFixture).toBe(false);
+  expect(beDiagnosticsFixture.targets.every((row) => !("registry" in row))).toBe(true);
+  const cal = buildCalibration(
+    beDiagnosticsFixture,
+    "microcosm-be-2026-chronicle-3cef97b-20260823T134247Z",
+    null,
+    {},
+    beReleaseManifestFixture,
+    {},
+    "be",
+  );
+
+  expect(cal.country).toBe("be");
+  expect(cal.diagnostics_status).toBe("ok");
+  expect(cal.included_target_count).toBe(3);
+  expect(cal.loss_trajectory).toEqual([]);
+  expect(cal.description).toBe(
+    "DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata.",
+  );
+  expect(cal.rows.every((row) => row.registry == null)).toBe(true);
+
+  expect(cal.rows[0]).toMatchObject({
+    source: "statbel",
+    variable: "population",
+    family: "statbel/population",
+    geography: "Brussels",
+    level: "region",
+    breakdown: "Male · 0–17",
+    target_dimensions: [
+      expect.objectContaining({ key: "bd_sex", label: "Sex", value: "Male" }),
+      expect.objectContaining({ key: "bd_age_band", label: "Age band", value: "0–17" }),
+    ],
+  });
+  expect(cal.rows[1]).toMatchObject({
+    source: "jrc",
+    variable: "national income tax amount",
+    geography: "Belgium",
+    level: "national",
+  });
+  expect(cal.rows[2]).toMatchObject({
+    source: "nasa",
+    variable: "taxable movable income analogue",
+    geography: "Belgium",
+    level: "national",
+  });
+});
+
+test("derives Belgium population region, sex, and age-band browser facets", () => {
+  const first = beDiagnosticsFixture.targets[0];
+  const target = (name: string) => ({
+    ...first,
+    name: `${name}@2026`,
+    target_name: name,
+  });
+  const cal = buildCalibration(
+    {
+      ...beDiagnosticsFixture,
+      targets: [
+        target("statbel_population_be1_male_0_17"),
+        target("statbel_population_be2_female_18_64"),
+        target("statbel_population_be3_male_65_plus"),
+      ],
+    },
+    "be-facets",
+    null,
+    {},
+    beReleaseManifestFixture,
+    {},
+    "be",
+  );
+  const result = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics?variable=statbel%20%2F%20population",
+    cal,
+  );
+
+  expect(result.sources).toEqual(["statbel"]);
+  expect(result.dimensions).toEqual([
+    { key: "geography", label: "Region", values: ["Brussels", "Flanders", "Wallonia"] },
+    { key: "bd_sex", label: "Sex", values: ["Female", "Male"] },
+    { key: "bd_age_band", label: "Age band", values: ["0–17", "18–64", "65+"] },
   ]);
 });
 

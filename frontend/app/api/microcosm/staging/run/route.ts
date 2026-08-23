@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { scrub } from "@/lib/microcosm/latest-artifact";
+import { parseCountry, scrub } from "@/lib/microcosm/latest-artifact";
 import { loadStagingRun } from "@/lib/microcosm/staging-artifact";
 
 export const dynamic = "force-dynamic";
@@ -9,12 +9,14 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
-  const runId = new URL(request.url).searchParams.get("id")?.trim();
-  if (!runId) {
+  const params = new URL(request.url).searchParams;
+  const country = parseCountry(params.get("country"));
+  const runId = params.get("id")?.trim();
+  if (!runId && country === "us") {
     return NextResponse.json({ detail: "Provide a staging run id via ?id=." }, { status: 400 });
   }
   try {
-    return NextResponse.json(scrub(await loadStagingRun(runId, revalidate)), {
+    return NextResponse.json(scrub(await loadStagingRun(runId ?? "", revalidate, country)), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

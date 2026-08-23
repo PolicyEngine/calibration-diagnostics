@@ -5,9 +5,10 @@ const DASHBOARD_URL = "https://microcosm.institute/calibration/dashboard/microco
 const COUNTRY_LABEL: Record<MicrocosmCountry, string> = {
   us: "🇺🇸 US",
   uk: "🇬🇧 UK",
+  be: "🇧🇪 BE",
 };
 
-const WEBHOOK_ENV: Record<MicrocosmCountry, string> = {
+const WEBHOOK_ENV: Partial<Record<MicrocosmCountry, string>> = {
   // Deprecated upstream identifiers: the configured webhook variables still
   // use the former Populace names.
   us: "SLACK_WEBHOOK_POPULACE_US",
@@ -22,7 +23,9 @@ export async function postReleaseAlert(opts: {
   repo: string;
   updatedAt?: string | null;
 }): Promise<boolean> {
-  const webhookUrl = process.env[WEBHOOK_ENV[opts.country]];
+  const webhookEnv = WEBHOOK_ENV[opts.country];
+  if (!webhookEnv) return false;
+  const webhookUrl = process.env[webhookEnv];
   if (!webhookUrl) return false;
 
   const label = COUNTRY_LABEL[opts.country];

@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { loadStagingRuns } from "@/lib/microcosm/staging-artifact";
-import { scrub } from "@/lib/microcosm/latest-artifact";
+import { parseCountry, scrub } from "@/lib/microcosm/latest-artifact";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const country = parseCountry(new URL(request.url).searchParams.get("country"));
   try {
-    return NextResponse.json(scrub(await loadStagingRuns(revalidate)), {
+    return NextResponse.json(scrub(await loadStagingRuns(revalidate, country)), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

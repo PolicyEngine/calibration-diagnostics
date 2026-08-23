@@ -1,6 +1,7 @@
 "use client";
 
 import { GlobalLoader } from "./global-loader";
+import { useCountry } from "./country-context";
 import { NavSidebar } from "./nav-sidebar";
 import { SiteHeader } from "./site-header";
 import { SiteFooter } from "./site-footer";
@@ -12,6 +13,7 @@ import { SiteFooter } from "./site-footer";
 // (app/globals.css body::before + .site-grain) shows through, and the header /
 // footer come from the microcosm.institute-style components.
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { country } = useCountry();
   return (
     <div className="flex min-h-screen flex-col text-foreground">
       <GlobalLoader />
@@ -21,7 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <NavSidebar />
         </aside>
         <main className="flex flex-1 flex-col overflow-auto">
-          <div className="flex-1 p-6 pt-0">{children}</div>
+          <div key={country} className="flex-1 p-6 pt-0">{children}</div>
           <SiteFooter />
         </main>
       </div>

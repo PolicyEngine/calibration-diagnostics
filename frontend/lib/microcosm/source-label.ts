@@ -10,7 +10,12 @@ const SOURCE_LABELS: Record<string, string> = {
   hhs_acf_tanf: "HHS · TANF",
   irs_soi: "IRS Statistics of Income",
   jct: "JCT",
+  jrc: "JRC",
+  nasa: "NASA",
+  onss: "ONSS",
+  sfpd: "SFPD",
   ssa: "SSA",
+  statbel: "Statbel",
   state_income_tax: "State income tax",
   usda_snap: "USDA · SNAP",
 };

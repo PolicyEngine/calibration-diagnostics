@@ -1,7 +1,7 @@
-// Pure-HF data layer for the Microcosm US dashboard. No committed snapshot:
-// every release's manifests and per-target calibration diagnostics are read
-// live from the policyengine/populace-us Hugging Face dataset, resolved through
-// latest.json (current release) or by id (any release, for version compare).
+// Pure-HF data layer for the country-selectable Microcosm dashboard. No
+// committed snapshot: every release's manifests and per-target calibration
+// diagnostics are read live from its country's Hugging Face dataset, resolved
+// through latest.json (current release) or by id (version compare).
 
 import { sourceAuthorityLabel } from "@/lib/source-labels";
 
@@ -26,13 +26,15 @@ export const MICROCOSM_HF_REPO_ENV = "POPULACE_HF_REPO";
 export const MICROCOSM_HF_REVISION_ENV = "POPULACE_HF_REVISION";
 export const MICROCOSM_UK_HF_REPO_ENV = "POPULACE_UK_HF_REPO";
 export const MICROCOSM_UK_HF_REVISION_ENV = "POPULACE_UK_HF_REVISION";
+export const MICROCOSM_BE_HF_REPO_ENV = "POPULACE_BE_HF_REPO";
+export const MICROCOSM_BE_HF_REVISION_ENV = "POPULACE_BE_HF_REVISION";
 export const MICROCOSM_HF_REPO =
   process.env[MICROCOSM_HF_REPO_ENV] ?? "policyengine/populace-us";
 export const MICROCOSM_HF_REVISION = process.env[MICROCOSM_HF_REVISION_ENV] ?? "main";
 
-// Microcosm ships one HF dataset per country. US is public; UK is private and
-// needs an HF token on the server.
-export type MicrocosmCountry = "us" | "uk";
+// Microcosm ships one HF dataset per country. US is public; UK and Belgium are
+// private and need an HF token on the server.
+export type MicrocosmCountry = "us" | "uk" | "be";
 
 const COUNTRY_REPO: Record<MicrocosmCountry, { repo: string; revision: string }> = {
   us: { repo: MICROCOSM_HF_REPO, revision: MICROCOSM_HF_REVISION },
@@ -40,10 +42,20 @@ const COUNTRY_REPO: Record<MicrocosmCountry, { repo: string; revision: string }>
     repo: process.env[MICROCOSM_UK_HF_REPO_ENV] ?? "policyengine/populace-uk-private",
     revision: process.env[MICROCOSM_UK_HF_REVISION_ENV] ?? "main",
   },
+  be: {
+    repo: process.env[MICROCOSM_BE_HF_REPO_ENV] ?? "policyengine/populace-be-private",
+    revision: process.env[MICROCOSM_BE_HF_REVISION_ENV] ?? "main",
+  },
+};
+
+const COUNTRY_GEOGRAPHY: Record<MicrocosmCountry, string> = {
+  us: "United States",
+  uk: "United Kingdom",
+  be: "Belgium",
 };
 
 export function parseCountry(value: string | null | undefined): MicrocosmCountry {
-  return value === "uk" ? "uk" : "us";
+  return value === "uk" || value === "be" ? value : "us";
 }
 
 // Release/run ids are interpolated into HuggingFace URLs that carry the
@@ -77,6 +89,10 @@ export function classifyApiError(error: unknown): { status: number; body: { deta
 
 export function microcosmRepo(country: MicrocosmCountry): string {
   return COUNTRY_REPO[country].repo;
+}
+
+export function microcosmRevision(country: MicrocosmCountry): string {
+  return COUNTRY_REPO[country].revision;
 }
 
 function hfAuthHeaders(): HeadersInit | undefined {
@@ -560,7 +576,88 @@ function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
   return dimensions;
 }
 
-function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
+const BELGIUM_PUBLISHERS = ["statbel", "onss", "jrc", "sfpd", "nasa"] as const;
+const BELGIUM_REGIONS: Readonly<Record<string, string>> = {
+  be1: "Brussels",
+  be2: "Flanders",
+  be3: "Wallonia",
+};
+const BELGIUM_SEXES: Readonly<Record<string, string>> = {
+  male: "Male",
+  female: "Female",
+};
+const BELGIUM_AGE_BANDS: Readonly<Record<string, string>> = {
+  "0_17": "0–17",
+  "18_64": "18–64",
+  "65_plus": "65+",
+};
+const BELGIUM_POPULATION_RE =
+  /^statbel_population_(be[123])_(male|female)_(0_17|18_64|65_plus)$/;
+
+function belgiumPublisher(name: string): string | null {
+  return BELGIUM_PUBLISHERS.find((publisher) => name.startsWith(`${publisher}_`)) ?? null;
+}
+
+function belgiumPopulationParts(name: string) {
+  const match = BELGIUM_POPULATION_RE.exec(name);
+  if (!match) return null;
+  return {
+    region: BELGIUM_REGIONS[match[1]],
+    sex: BELGIUM_SEXES[match[2]],
+    ageBand: BELGIUM_AGE_BANDS[match[3]],
+    rawSex: match[2],
+    rawAgeBand: match[3],
+  };
+}
+
+function parseBelgiumTarget(name: string): ParsedTarget | null {
+  const publisher = belgiumPublisher(name);
+  if (!publisher) return null;
+  const population = belgiumPopulationParts(name);
+  if (population) {
+    return {
+      geography: population.region,
+      level: "region",
+      source: publisher,
+      variable: "population",
+      breakdown: `${population.sex} · ${population.ageBand}`,
+    };
+  }
+  return {
+    geography: COUNTRY_GEOGRAPHY.be,
+    level: "national",
+    source: publisher,
+    variable: readableToken(name.slice(publisher.length + 1)) ?? "",
+    breakdown: "",
+  };
+}
+
+function belgiumTargetDimensions(name: string): TargetBreakdownDimension[] | null {
+  const population = belgiumPopulationParts(name);
+  if (!population) return null;
+  return [
+    {
+      key: dimensionKey("Sex"),
+      label: "Sex",
+      value: population.sex,
+      source_key: "target_name",
+      raw_value: population.rawSex,
+    },
+    {
+      key: dimensionKey("Age band"),
+      label: "Age band",
+      value: population.ageBand,
+      source_key: "target_name",
+      raw_value: population.rawAgeBand,
+    },
+  ];
+}
+
+function parseDottedTarget(
+  name: string,
+  row: TargetRow,
+  country: MicrocosmCountry,
+): ParsedTarget | null {
   if (!name.includes(".")) return null;
   const metadata = asObject(row.metadata);
   const registry = asObject(row.registry);
@@ -570,7 +667,7 @@ function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
   const geoId = stringValue(metadata.ledger_geography_id);
   const geography =
     geoLevel === "country"
-      ? "United States"
+      ? COUNTRY_GEOGRAPHY[country]
       : geoLevel === "congressional_district"
         ? districtFromGeoId(geoId) ?? ""
         : stateFromGeoId(geoId) ?? stringValue(metadata.state) ?? "";
@@ -602,7 +699,11 @@ function parseDottedTarget(name: string, row: TargetRow): ParsedTarget | null {
   return { geography, level, source, variable, breakdown };
 }
 
-function parseTarget(name: string): ParsedTarget {
+function parseTarget(name: string, country: MicrocosmCountry): ParsedTarget {
+  if (country === "be") {
+    const belgium = parseBelgiumTarget(name);
+    if (belgium) return belgium;
+  }
   const parts = name.split("/");
   const p0 = parts[0] ?? "";
   const fips = /^US(\d{2})$/.exec(p0);
@@ -637,7 +738,7 @@ function parseTarget(name: string): ParsedTarget {
   }
   if (p0 === "nation" || p0 === "national" || p0 === "us") {
     return {
-      geography: "United States", level: "national", source: parts[1] ?? "",
+      geography: COUNTRY_GEOGRAPHY[country], level: "national", source: parts[1] ?? "",
       variable: parts[2] ?? "", breakdown: parts.slice(3).join(" · "),
     };
   }
@@ -787,8 +888,12 @@ export interface TargetDimension {
 }
 
 function computeDimensions(rows: TargetRow[]): TargetDimension[] {
+  const geographyLabel =
+    rows.length > 0 && rows.every((row) => row.level === "region")
+      ? "Region"
+      : "Geography";
   const candidates: { key: string; label?: string }[] = [
-    { key: "geography", label: "Geography" },
+    { key: "geography", label: geographyLabel },
   ];
   const seenDimensionKeys = new Set<string>();
   for (const row of rows) {
@@ -813,7 +918,14 @@ function computeDimensions(rows: TargetRow[]): TargetDimension[] {
   return facets;
 }
 
-function deriveFamily(name: string): string {
+function deriveFamily(
+  name: string,
+  country: MicrocosmCountry,
+  parsed: ParsedTarget,
+): string {
+  if (country === "be") {
+    return [parsed.source, parsed.variable].filter(Boolean).join("/");
+  }
   const parts = name.split("/");
   if (parts.length < 2) return name;
   const [geo, second] = parts;
@@ -901,6 +1013,7 @@ function enrichTargetRow(
   rawRow: TargetRow,
   skippedByName: Map<string, string> = new Map(),
   droppedTargetNames: Set<string> = new Set(),
+  country: MicrocosmCountry = "us",
 ): TargetRow {
   const metadata = normalizeChronicleMetadata(rawRow.metadata);
   const row: TargetRow = { ...rawRow, metadata };
@@ -939,12 +1052,14 @@ function enrichTargetRow(
     initialError == null || finalError == null
       ? null
       : Math.abs(initialError) - Math.abs(finalError);
-  const parsed = parseDottedTarget(baseName, row) ?? parseTarget(baseName);
+  const parsed = parseDottedTarget(baseName, row, country) ?? parseTarget(baseName, country);
   const hasGeography = Boolean(parsed.geography.trim());
-  const geography = hasGeography ? parsed.geography : DEFAULT_GEOGRAPHY;
+  const geography = hasGeography ? parsed.geography : COUNTRY_GEOGRAPHY[country];
   const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
   const measureCol = asObject(row.measure);
-  const metadataTargetDimensions = metadataDimensions(row);
+  const countryTargetDimensions =
+    country === "be" ? belgiumTargetDimensions(baseName) : null;
+  const metadataTargetDimensions = countryTargetDimensions ?? metadataDimensions(row);
   const targetDimensions =
     metadataTargetDimensions ??
     splitBreakdown(parsed.breakdown).map((value, index) => ({
@@ -970,7 +1085,7 @@ function enrichTargetRow(
     ...row,
     name: fullName,
     base_name: baseName,
-    family: deriveFamily(baseName),
+    family: deriveFamily(baseName, country, parsed),
     state: stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography,
     level,
@@ -1522,6 +1637,8 @@ export function microcosmTargetTreemap(
 // --- the calibration source (one release) -----------------------------------
 export interface Calibration {
   source: "huggingface_live";
+  country: MicrocosmCountry;
+  description: string | null;
   diagnostics_status: DiagnosticsStatus;
   release_id: string;
   updated_at: string | null;
@@ -1664,6 +1781,7 @@ export function buildCalibration(
   buildManifest: JsonObject = {},
   releaseManifest: JsonObject = {},
   demographics: JsonObject = {},
+  country: MicrocosmCountry = "us",
 ): Calibration {
   const targets = (Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : []).map(
     normalizeDiagnosticsRow,
@@ -1678,7 +1796,7 @@ export function buildCalibration(
   const skippedByName = skippedTargetReasons(skipped);
   const dropped = new Set(droppedTargetNames);
   const enrichedRows = addEstimateScopeWarnings(
-    targets.map((row) => enrichTargetRow(row, skippedByName, dropped)),
+    targets.map((row) => enrichTargetRow(row, skippedByName, dropped, country)),
   );
   const role = releaseRole(releaseManifest);
   const normalizedAttribution = normalizeTargetLossAttribution({
@@ -1692,6 +1810,11 @@ export function buildCalibration(
   const includedTargetCount = rows.filter((row) => row.calibration_status === "included").length;
   return {
     source: "huggingface_live",
+    country,
+    description:
+      stringValue(diag.description) ??
+      stringValue(releaseManifest.description) ??
+      stringValue(buildManifest.description),
     diagnostics_status: diagnosticsStatus(diag, rows),
     release_id: String(diag.release_id ?? releaseId),
     updated_at: updatedAt,
@@ -1923,7 +2046,15 @@ async function loadReleaseUncached(
       ? Promise.resolve(updatedAt)
       : loadReleasePublishedAt(id, revalidate, country).catch(() => null),
   ]);
-  return buildCalibration(diag, id, updatedAt ?? publishedAt, buildManifest, releaseManifest, demographics);
+  return buildCalibration(
+    diag,
+    id,
+    updatedAt ?? publishedAt,
+    buildManifest,
+    releaseManifest,
+    demographics,
+    country,
+  );
 }
 
 function targetDiagnosticsMetadata(rows: TargetRow[]): TargetDiagnosticsMetadata {
@@ -2134,8 +2265,8 @@ function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
     release_id: cal.release_id,
     target: targetResponseRow(row),
     source_artifact: {
-      hf_repo: MICROCOSM_HF_REPO,
-      hf_revision: MICROCOSM_HF_REVISION,
+      hf_repo: microcosmRepo(cal.country),
+      hf_revision: microcosmRevision(cal.country),
       calibration_diagnostics_path: `releases/${cal.release_id}/calibration_diagnostics.json`,
       build_manifest_path: `releases/${cal.release_id}/build_manifest.json`,
       release_manifest_path: `releases/${cal.release_id}/release_manifest.json`,
@@ -2161,6 +2292,7 @@ function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
 export function latestMicrocosmCalibrationSummary(cal: Calibration) {
   return {
     available: true,
+    description: cal.description,
     diagnostics_status: cal.diagnostics_status,
     ...releaseRole(cal.release_manifest),
     source: cal.source,
@@ -2339,6 +2471,7 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
 
   return {
     available: true,
+    description: cal.description,
     diagnostics_status: cal.diagnostics_status,
     ...releaseRole(cal.release_manifest),
     source: cal.source,
@@ -2551,6 +2684,7 @@ export function buildComparison(a: Calibration, b: Calibration) {
   return {
     a: {
       release_id: a.release_id,
+      description: a.description,
       total_targets: a.rows.length,
       initial_loss: a.initial_loss,
       final_loss: a.final_loss,
@@ -2559,6 +2693,7 @@ export function buildComparison(a: Calibration, b: Calibration) {
     },
     b: {
       release_id: b.release_id,
+      description: b.description,
       total_targets: b.rows.length,
       initial_loss: b.initial_loss,
       final_loss: b.final_loss,

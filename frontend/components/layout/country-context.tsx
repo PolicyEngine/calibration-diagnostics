@@ -8,9 +8,23 @@ import {
   type ReactNode,
 } from "react";
 
-export type Country = "us" | "uk";
+export type Country = "us" | "uk" | "be";
+
+const COUNTRIES = new Set<Country>(["us", "uk", "be"]);
+
+function isCountry(value: string | null): value is Country {
+  return value != null && COUNTRIES.has(value as Country);
+}
 
 const STORAGE_KEY = "microcosm-country";
+
+function persistCountry(country: Country) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, country);
+  } catch {
+    // Ignore storage failures (private mode, etc.).
+  }
+}
 
 interface CountryContextValue {
   country: Country;
@@ -26,17 +40,22 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   const [country, setCountryState] = useState<Country>("us");
 
   useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("country");
+    if (isCountry(requested)) {
+      setCountryState(requested);
+      persistCountry(requested);
+      return;
+    }
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "uk" || stored === "us") setCountryState(stored);
+    if (isCountry(stored)) setCountryState(stored);
   }, []);
 
   const setCountry = (next: Country) => {
     setCountryState(next);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Ignore storage failures (private mode, etc.).
-    }
+    persistCountry(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("country", next);
+    window.history.replaceState(window.history.state, "", url);
   };
 
   return (
