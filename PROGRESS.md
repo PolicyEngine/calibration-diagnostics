@@ -2,8 +2,9 @@
 
 ## State
 
-B1-B6 implementation and contract documentation are complete. The legacy US
-name and UK/BE filter paths remain intact and are selected per row.
+B1-B6 implementation, views, tests, and contract documentation are complete.
+All required post-merge gates pass. The legacy US name and UK/BE filter paths
+remain intact and are selected per row.
 
 ## Done
 
@@ -54,7 +55,16 @@ name and UK/BE filter paths remain intact and are selected per row.
 - Documented every implemented JSON block, validation and precedence rule,
   per-row adapter selection, response metadata, compatibility behavior, and the
   producer publication checklist.
+- Merged the externally advanced PR A review commit `4392561` without rebasing
+  or modifying it; this branch remains based on the required `9bf2fd4` history
+  and is now directly ahead of the current `spec-countries-registry` ref.
+- Passed the final post-merge gates: `263 pass`, `0 fail`, `1040 expect()` calls
+  across 32 files; the dedicated conformance file has `9 pass`, `0 fail`, and
+  no todos; `tsc --noEmit` passed; and the production build completed all 20
+  static pages.
+- Recorded the exact handoff, changed files, gate tails, deliberate exclusions,
+  and build-environment deviation in `FINAL_REPORT.md`.
 
 ## Next
 
-- Run the full test suite, then the required lint and production-build gates.
+- None.
