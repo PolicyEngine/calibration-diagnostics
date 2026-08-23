@@ -2,11 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import {
-  countryRegistration,
-  selectableCountries,
-  type MicrocosmCountry,
-} from "@/lib/microcosm/countries";
+import { selectableCountries, type MicrocosmCountry } from "@/lib/microcosm/countries";
+import { microcosmRepo } from "@/lib/microcosm/latest-artifact";
 import { postReleaseAlert } from "@/lib/slack";
 
 export const runtime = "nodejs";
@@ -33,13 +30,12 @@ const TAG_PREFIX = "refs/tags/";
 // Only the registered country repositories may trigger a release alert. The
 // webhook secret is shared across countries, so without an allowlist a valid
 // caller could spoof an arbitrary repo name into any Slack channel. Fixture
-// registrations are never allowlisted. (Hugging Face webhook payloads carry
-// the repositories' former Populace names, as registered.)
+// registrations are never allowlisted. Repositories are the env-resolved ones
+// the dashboard actually reads (a POPULACE_*_HF_REPO override moves the
+// allowlist with it); Hugging Face webhook payloads carry the repositories'
+// former Populace names, as registered.
 const ALLOWED_REPOS = new Map<string, MicrocosmCountry>(
-  selectableCountries().map((country) => [
-    countryRegistration(country).repo.toLowerCase(),
-    country,
-  ]),
+  selectableCountries().map((country) => [microcosmRepo(country).toLowerCase(), country]),
 );
 
 function countryForRepo(repoName: string): MicrocosmCountry | null {

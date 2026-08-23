@@ -1983,6 +1983,14 @@ test("releaseCountry ignores a block whose code names another country", () => {
   expect(releaseCountry({ country: { code: 7, label: "Seven" } }, "be")).toEqual(
     BE_COUNTRY_DEFAULTS,
   );
+  // An explicit `code: null` is a present, malformed field — the whole block
+  // is ignored, exactly like a mismatched code.
+  expect(
+    releaseCountry(
+      { country: { code: null, label: "Wrong label", geography_label: "Wrong geography" } },
+      "be",
+    ),
+  ).toEqual(BE_COUNTRY_DEFAULTS);
 });
 
 test("releaseCountry narrows capabilities to the registration and never widens them", () => {

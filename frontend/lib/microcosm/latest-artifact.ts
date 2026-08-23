@@ -2173,8 +2173,10 @@ export function releaseCountry(
     capabilities: [...registration.capabilities],
   };
   const block = asObject(releaseManifest.country);
+  // Presence, not nullishness: an explicit `code: null` is a malformed block,
+  // not an absent field, and must not slip past the whole-block rejection.
   if (
-    block.code != null &&
+    Object.hasOwn(block, "code") &&
     (typeof block.code !== "string" || block.code.trim().toLowerCase() !== country)
   ) {
     return defaults;
