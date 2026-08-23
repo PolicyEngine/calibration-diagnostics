@@ -767,3 +767,55 @@ def test_script_imports_without_huggingface_hub(tmp_path: Path) -> None:
 
     assert completed.returncode == 0, completed.stderr
     assert "be/latest.json" in completed.stdout
+
+
+def test_non_dry_cli_fails_without_huggingface_hub_before_network(
+    tmp_path: Path,
+) -> None:
+    import importlib
+    import os
+    import subprocess
+    import sys
+
+    script = importlib.import_module("scripts.publish_evaluation_bundle_to_hf").__file__
+    bundle = write_bundle(tmp_path / "frontend")
+    network_marker = tmp_path / "network-attempted"
+    code = (
+        "import builtins, pathlib, socket, sys\n"
+        f"marker = pathlib.Path({str(network_marker)!r})\n"
+        "def network_attempt(*args, **kwargs):\n"
+        "    marker.write_text('attempted')\n"
+        "    raise AssertionError('network attempted')\n"
+        "class GuardedSocket(socket.socket):\n"
+        "    connect = network_attempt\n"
+        "    connect_ex = network_attempt\n"
+        "socket.socket = GuardedSocket\n"
+        "socket.create_connection = network_attempt\n"
+        "socket.getaddrinfo = network_attempt\n"
+        "real_import = builtins.__import__\n"
+        "def guarded(name, *args, **kwargs):\n"
+        "    if name.split('.')[0] == 'huggingface_hub':\n"
+        "        raise ImportError('huggingface_hub is not installed')\n"
+        "    return real_import(name, *args, **kwargs)\n"
+        "builtins.__import__ = guarded\n"
+        "import runpy\n"
+        f"sys.argv = ['publish', '--bundle', {str(bundle)!r}, "
+        "'--jurisdiction', 'BE']\n"
+        f"runpy.run_path({script!r}, run_name='__main__')\n"
+    )
+    environment = os.environ.copy()
+    environment.pop("HUGGINGFACE_TOKEN", None)
+    environment["HF_TOKEN"] = "not-a-credential"
+
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(script).resolve().parents[1],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert "uv run --extra publish" in completed.stderr
+    assert not network_marker.exists()

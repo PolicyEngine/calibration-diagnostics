@@ -2,8 +2,8 @@
 
 ## State
 
-Verified bundle files are immutable byte snapshots, and remote skips now
-require both size and hash identity. Missing-extra coverage remains.
+All five review findings are implemented with focused regression coverage.
+The required full-suite and BE dry-run gates remain.
 
 ## Done
 
@@ -15,9 +15,9 @@ require both size and hash identity. Missing-extra coverage remains.
 - Replaced mutable upload paths with descriptor-validated byte snapshots.
 - Added a pre-commit disk-mutation regression test.
 - Required a present, equal remote size before either hash form can skip.
+- Covered the missing publish extra in a non-dry subprocess with network guards.
 
 ## Next
 
-- Cover a missing `huggingface_hub` install in a subprocess test.
 - Run the complete test suite and required BE dry run.
 - Write the final report to the requested output file.
