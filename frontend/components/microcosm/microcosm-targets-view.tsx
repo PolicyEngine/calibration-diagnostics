@@ -694,7 +694,8 @@ export function MicrocosmTargetsView({
     ],
   );
 
-  const { data, isLoading, isFetching, error } = useMicrocosmTargetDiagnostics(params);
+  const { data, isLoading, isFetching, error, isPlaceholderData } =
+    useMicrocosmTargetDiagnostics(params);
 
   const variables = data?.variables ?? [];
   const sources = data?.sources ?? [];
@@ -709,7 +710,10 @@ export function MicrocosmTargetsView({
   const filteredTotal = data?.filtered_total ?? 0;
   const allTargets = data?.total_targets ?? null;
   // The healthcare focus is offered when the release has healthcare targets.
-  const hasHealthcareTargets = (data?.scope_counts?.healthcare ?? 0) > 0;
+  // Kept-previous placeholder data belongs to the prior country/release, so it
+  // must not decide the card.
+  const hasHealthcareTargets =
+    !isPlaceholderData && (data?.scope_counts?.healthcare ?? 0) > 0;
   const pageCount = Math.max(Math.ceil(filteredTotal / PAGE_SIZE), 1);
   const activeVariable = variables.find((v) => v.variable_key === variable);
 
