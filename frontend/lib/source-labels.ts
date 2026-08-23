@@ -13,6 +13,7 @@ const SOURCE_LABELS: Record<string, string> = {
   cms_medicaid: "CMS · Medicaid / CHIP",
   cms_medicare: "CMS · Medicare",
   cms_nhe: "CMS · National Health Expenditure Accounts",
+  eurostat: "Eurostat",
   federal_reserve: "Federal Reserve",
   hhs_acf_liheap: "HHS · LIHEAP",
   hhs_acf_tanf: "HHS · TANF",

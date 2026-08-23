@@ -32,30 +32,45 @@ export const MICROCOSM_HF_REPO =
   process.env[MICROCOSM_HF_REPO_ENV] ?? "policyengine/populace-us";
 export const MICROCOSM_HF_REVISION = process.env[MICROCOSM_HF_REVISION_ENV] ?? "main";
 
-// Microcosm ships one HF dataset per country. US is public; UK and Belgium are
-// private and need an HF token on the server.
-export type MicrocosmCountry = "us" | "uk" | "be";
+interface MicrocosmCountryRepository {
+  repo: string;
+  revision: string;
+  geography: string;
+}
 
-const COUNTRY_REPO: Record<MicrocosmCountry, { repo: string; revision: string }> = {
-  us: { repo: MICROCOSM_HF_REPO, revision: MICROCOSM_HF_REVISION },
+// A repository entry is the server-side registration point for a country. Keep
+// its national geography beside the repository so downstream shaping does not
+// require a second exhaustive country table.
+export const COUNTRY_REPO = {
+  us: {
+    repo: MICROCOSM_HF_REPO,
+    revision: MICROCOSM_HF_REVISION,
+    geography: "United States",
+  },
   uk: {
     repo: process.env[MICROCOSM_UK_HF_REPO_ENV] ?? "policyengine/populace-uk-private",
     revision: process.env[MICROCOSM_UK_HF_REVISION_ENV] ?? "main",
+    geography: "United Kingdom",
   },
   be: {
     repo: process.env[MICROCOSM_BE_HF_REPO_ENV] ?? "policyengine/populace-be-private",
     revision: process.env[MICROCOSM_BE_HF_REVISION_ENV] ?? "main",
+    geography: "Belgium",
   },
-};
+  // Synthetic repository used only by the third-country conformance fixture.
+  zz: {
+    repo: "policyengine/microcosm-zz-fixture",
+    revision: "main",
+    geography: "Zedland",
+  },
+} satisfies Record<string, MicrocosmCountryRepository>;
 
-const COUNTRY_GEOGRAPHY: Record<MicrocosmCountry, string> = {
-  us: "United States",
-  uk: "United Kingdom",
-  be: "Belgium",
-};
+export type MicrocosmCountry = keyof typeof COUNTRY_REPO;
 
 export function parseCountry(value: string | null | undefined): MicrocosmCountry {
-  return value === "uk" || value === "be" ? value : "us";
+  return value != null && Object.hasOwn(COUNTRY_REPO, value)
+    ? (value as MicrocosmCountry)
+    : "us";
 }
 
 // Release/run ids are interpolated into HuggingFace URLs that carry the
@@ -93,6 +108,10 @@ export function microcosmRepo(country: MicrocosmCountry): string {
 
 export function microcosmRevision(country: MicrocosmCountry): string {
   return COUNTRY_REPO[country].revision;
+}
+
+export function microcosmCountryGeography(country: MicrocosmCountry): string {
+  return COUNTRY_REPO[country].geography;
 }
 
 function hfAuthHeaders(): HeadersInit | undefined {
@@ -576,81 +595,119 @@ function metadataDimensions(row: TargetRow): TargetBreakdownDimension[] | null {
   return dimensions;
 }
 
-const BELGIUM_PUBLISHERS = ["statbel", "onss", "jrc", "sfpd", "nasa"] as const;
-const BELGIUM_REGIONS: Readonly<Record<string, string>> = {
-  be1: "Brussels",
-  be2: "Flanders",
-  be3: "Wallonia",
-};
-const BELGIUM_SEXES: Readonly<Record<string, string>> = {
-  male: "Male",
-  female: "Female",
-};
-const BELGIUM_AGE_BANDS: Readonly<Record<string, string>> = {
-  "0_17": "0–17",
-  "18_64": "18–64",
-  "65_plus": "65+",
-};
-const BELGIUM_POPULATION_RE =
-  /^statbel_population_(be[123])_(male|female)_(0_17|18_64|65_plus)$/;
-
-function belgiumPublisher(name: string): string | null {
-  return BELGIUM_PUBLISHERS.find((publisher) => name.startsWith(`${publisher}_`)) ?? null;
+interface FilterDimensionSpec {
+  capture: number;
+  label: string;
+  role?: "geography";
+  valueLabels?: Readonly<Record<string, string>>;
 }
 
-function belgiumPopulationParts(name: string) {
-  const match = BELGIUM_POPULATION_RE.exec(name);
-  if (!match) return null;
-  return {
-    region: BELGIUM_REGIONS[match[1]],
-    sex: BELGIUM_SEXES[match[2]],
-    ageBand: BELGIUM_AGE_BANDS[match[3]],
-    rawSex: match[2],
-    rawAgeBand: match[3],
-  };
+interface FilterDecompositionSpec {
+  pattern: RegExp;
+  geographyLevel: string;
+  dimensions: readonly FilterDimensionSpec[];
 }
 
-function parseBelgiumTarget(name: string): ParsedTarget | null {
-  const publisher = belgiumPublisher(name);
-  if (!publisher) return null;
-  const population = belgiumPopulationParts(name);
-  if (population) {
-    return {
-      geography: population.region,
-      level: "region",
-      source: publisher,
-      variable: "population",
-      breakdown: `${population.sex} · ${population.ageBand}`,
-    };
+// Legacy artifacts encode some dimensions in a compiled filter name. The
+// adapter is selected by the filter pattern, never by country; future artifacts
+// should publish structured target dimensions instead.
+const FILTER_DECOMPOSITION_SPECS: readonly FilterDecompositionSpec[] = [
+  {
+    pattern: /^cell_([a-z][a-z0-9-]*)_(male|female)_(\d+_(?:\d+|plus))$/,
+    geographyLevel: "region",
+    dimensions: [
+      {
+        capture: 1,
+        label: "Region",
+        role: "geography",
+        valueLabels: {
+          be1: "Brussels",
+          be2: "Flanders",
+          be3: "Wallonia",
+        },
+      },
+      { capture: 2, label: "Sex" },
+      { capture: 3, label: "Age band" },
+    ],
+  },
+];
+
+interface DecomposedTargetFilter {
+  geography: string;
+  level: string;
+  dimensions: TargetBreakdownDimension[];
+}
+
+function filterDimensionValue(spec: FilterDimensionSpec, rawValue: string): string {
+  const explicit = spec.valueLabels?.[rawValue];
+  if (explicit) return explicit;
+  if (spec.label === "Age band") {
+    const range = /^(\d+)_(\d+)$/.exec(rawValue);
+    if (range) return `${range[1]}–${range[2]}`;
+    const openEnded = /^(\d+)_plus$/.exec(rawValue);
+    if (openEnded) return `${openEnded[1]}+`;
   }
-  return {
-    geography: COUNTRY_GEOGRAPHY.be,
-    level: "national",
-    source: publisher,
-    variable: readableToken(name.slice(publisher.length + 1)) ?? "",
-    breakdown: "",
-  };
+  return titleCase(rawValue);
 }
 
-function belgiumTargetDimensions(name: string): TargetBreakdownDimension[] | null {
-  const population = belgiumPopulationParts(name);
-  if (!population) return null;
-  return [
-    {
-      key: dimensionKey("Sex"),
-      label: "Sex",
-      value: population.sex,
-      source_key: "target_name",
-      raw_value: population.rawSex,
-    },
-    {
-      key: dimensionKey("Age band"),
-      label: "Age band",
-      value: population.ageBand,
-      source_key: "target_name",
-      raw_value: population.rawAgeBand,
-    },
-  ];
+function decomposeTargetFilter(value: unknown): DecomposedTargetFilter | null {
+  const filter = stringValue(value);
+  if (!filter) return null;
+  for (const spec of FILTER_DECOMPOSITION_SPECS) {
+    const match = spec.pattern.exec(filter);
+    if (!match) continue;
+    let geography = "";
+    const dimensions: TargetBreakdownDimension[] = [];
+    for (const dimension of spec.dimensions) {
+      const rawValue = match[dimension.capture];
+      if (!rawValue) continue;
+      const valueLabel = filterDimensionValue(dimension, rawValue);
+      if (dimension.role === "geography") {
+        geography = valueLabel;
+        continue;
+      }
+      dimensions.push({
+        key: dimensionKey(dimension.label),
+        label: dimension.label,
+        value: valueLabel,
+        source_key: "filter",
+        raw_value: rawValue,
+      });
+    }
+    if (geography) {
+      return { geography, level: spec.geographyLevel, dimensions };
+    }
+  }
+  return null;
+}
+
+function chroniclePublisherFromMetadata(metadata: JsonObject): string | null {
+  if (!Array.isArray(metadata.chronicle_record_ids)) return null;
+  const first = metadata.chronicle_record_ids.find(
+    (value): value is string => typeof value === "string" && Boolean(value.trim()),
+  );
+  return first?.trim().split(".", 1)[0] || null;
+}
+
+function artifactVariable(
+  name: string,
+  row: TargetRow,
+  decomposition: DecomposedTargetFilter | null,
+): string | null {
+  const metadata = asObject(row.metadata);
+  const published = stringValue(metadata.variable) ?? stringValue(row.variable);
+  if (published) return readableToken(published);
+  if (!name.includes("_") || name.includes("/")) return null;
+
+  let identifier = name;
+  const filter = decomposition ? stringValue(row.filter) : null;
+  const filterSuffix = filter?.replace(/^cell_/, "");
+  if (filterSuffix && identifier.endsWith(`_${filterSuffix}`)) {
+    identifier = identifier.slice(0, -(filterSuffix.length + 1));
+  }
+  const separator = identifier.indexOf("_");
+  if (separator >= 0) identifier = identifier.slice(separator + 1);
+  return readableToken(identifier);
 }
 
 function parseDottedTarget(
@@ -667,7 +724,7 @@ function parseDottedTarget(
   const geoId = stringValue(metadata.ledger_geography_id);
   const geography =
     geoLevel === "country"
-      ? COUNTRY_GEOGRAPHY[country]
+      ? microcosmCountryGeography(country)
       : geoLevel === "congressional_district"
         ? districtFromGeoId(geoId) ?? ""
         : stateFromGeoId(geoId) ?? stringValue(metadata.state) ?? "";
@@ -700,10 +757,6 @@ function parseDottedTarget(
 }
 
 function parseTarget(name: string, country: MicrocosmCountry): ParsedTarget {
-  if (country === "be") {
-    const belgium = parseBelgiumTarget(name);
-    if (belgium) return belgium;
-  }
   const parts = name.split("/");
   const p0 = parts[0] ?? "";
   const fips = /^US(\d{2})$/.exec(p0);
@@ -738,7 +791,7 @@ function parseTarget(name: string, country: MicrocosmCountry): ParsedTarget {
   }
   if (p0 === "nation" || p0 === "national" || p0 === "us") {
     return {
-      geography: COUNTRY_GEOGRAPHY[country], level: "national", source: parts[1] ?? "",
+      geography: microcosmCountryGeography(country), level: "national", source: parts[1] ?? "",
       variable: parts[2] ?? "", breakdown: parts.slice(3).join(" · "),
     };
   }
@@ -920,10 +973,10 @@ function computeDimensions(rows: TargetRow[]): TargetDimension[] {
 
 function deriveFamily(
   name: string,
-  country: MicrocosmCountry,
   parsed: ParsedTarget,
+  usesArtifactFamily: boolean,
 ): string {
-  if (country === "be") {
+  if (usesArtifactFamily) {
     return [parsed.source, parsed.variable].filter(Boolean).join("/");
   }
   const parts = name.split("/");
@@ -1052,14 +1105,30 @@ function enrichTargetRow(
     initialError == null || finalError == null
       ? null
       : Math.abs(initialError) - Math.abs(finalError);
-  const parsed = parseDottedTarget(baseName, row, country) ?? parseTarget(baseName, country);
+  const filterDecomposition = decomposeTargetFilter(row.filter);
+  const publisher = chroniclePublisherFromMetadata(metadata);
+  const parsedFromName =
+    parseDottedTarget(baseName, row, country) ?? parseTarget(baseName, country);
+  const parsed: ParsedTarget = {
+    ...parsedFromName,
+    geography: filterDecomposition?.geography ?? parsedFromName.geography,
+    level: filterDecomposition?.level ?? parsedFromName.level,
+    source: publisher ?? parsedFromName.source,
+    variable:
+      artifactVariable(baseName, row, filterDecomposition) ??
+      parsedFromName.variable,
+    breakdown: filterDecomposition
+      ? filterDecomposition.dimensions.map((dimension) => dimension.value).join(" · ")
+      : parsedFromName.breakdown,
+  };
   const hasGeography = Boolean(parsed.geography.trim());
-  const geography = hasGeography ? parsed.geography : COUNTRY_GEOGRAPHY[country];
+  const geography = hasGeography
+    ? parsed.geography
+    : microcosmCountryGeography(country);
   const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
   const measureCol = asObject(row.measure);
-  const countryTargetDimensions =
-    country === "be" ? belgiumTargetDimensions(baseName) : null;
-  const metadataTargetDimensions = countryTargetDimensions ?? metadataDimensions(row);
+  const metadataTargetDimensions =
+    filterDecomposition?.dimensions ?? metadataDimensions(row);
   const targetDimensions =
     metadataTargetDimensions ??
     splitBreakdown(parsed.breakdown).map((value, index) => ({
@@ -1081,11 +1150,18 @@ function enrichTargetRow(
     : measureFromMetadata(metadata);
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
+  // Underscore identifiers and filter-decomposed targets use the structured
+  // publisher/variable identity supplied by the artifact. Dotted identifiers
+  // without filter dimensions retain their legacy family so US/UK releases do
+  // not regroup merely because they also carry Chronicle record IDs.
+  const usesArtifactFamily =
+    filterDecomposition != null ||
+    (publisher != null && !baseName.includes("/") && !baseName.includes("."));
   return {
     ...row,
     name: fullName,
     base_name: baseName,
-    family: deriveFamily(baseName, country, parsed),
+    family: deriveFamily(baseName, parsed, usesArtifactFamily),
     state: stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography,
     level,

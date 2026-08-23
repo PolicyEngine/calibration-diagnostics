@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "effective_sample_size": 812.5,
+  "final_loss": 0.0125,
+  "fraction_within_10pct": 0.75,
+  "fraction_within_tolerance": 0.75,
+  "initial_loss": 0.25,
+  "l0_lambda": 0.0,
+  "n_nonzero": 2400,
+  "n_records": 2500,
+  "options": {
+    "method": "adam",
+    "epochs": 500,
+    "seed": 7
+  },
+  "weight_entity": "household",
+  "skipped": [],
+  "targets": [
+    {
+      "name": "fixture.population.north.female.0_17@2026",
+      "target_name": "fixture.population.north.female.0_17",
+      "period": 2026,
+      "entity": "person",
+      "measure": {
+        "kind": "column",
+        "name": "person"
+      },
+      "filter": "cell_north_female_0_17",
+      "source": "ZZ official population table",
+      "metadata": {
+        "chronicle_record_ids": [
+          "novastat_agency.population.cy2026.people.by_region_age_sex.north_female_0_17.people"
+        ],
+        "concept": "resident population",
+        "variable": "population",
+        "source_measure_id": "population_count"
+      },
+      "target": 1000,
+      "initial_estimate": 850,
+      "final_estimate": 980,
+      "relative_error": -0.02,
+      "within_tolerance": true
+    },
+    {
+      "name": "fixture.population.south.male.18_64@2026",
+      "target_name": "fixture.population.south.male.18_64",
+      "period": 2026,
+      "entity": "person",
+      "measure": {
+        "kind": "column",
+        "name": "person"
+      },
+      "filter": "cell_south_male_18_64",
+      "source": "ZZ official population table",
+      "metadata": {
+        "chronicle_record_ids": [
+          "novastat_agency.population.cy2026.people.by_region_age_sex.south_male_18_64.people"
+        ],
+        "concept": "resident population",
+        "variable": "population",
+        "source_measure_id": "population_count"
+      },
+      "target": 4000,
+      "initial_estimate": 4600,
+      "final_estimate": 4200,
+      "relative_error": 0.05,
+      "within_tolerance": true
+    },
+    {
+      "name": "fixture.population.north.male.65_plus@2026",
+      "target_name": "fixture.population.north.male.65_plus",
+      "period": 2026,
+      "entity": "person",
+      "measure": {
+        "kind": "column",
+        "name": "person"
+      },
+      "filter": "cell_north_male_65_plus",
+      "source": "ZZ official population table",
+      "metadata": {
+        "chronicle_record_ids": [
+          "novastat_agency.population.cy2026.people.by_region_age_sex.north_male_65_plus.people"
+        ],
+        "concept": "resident population",
+        "variable": "population",
+        "source_measure_id": "population_count"
+      },
+      "target": 900,
+      "initial_estimate": 700,
+      "final_estimate": 1035,
+      "relative_error": 0.15,
+      "within_tolerance": false
+    },
+    {
+      "name": "fixture_revenue_personal_income_tax@2025",
+      "target_name": "fixture_revenue_personal_income_tax",
+      "period": 2025,
+      "entity": "person",
+      "measure": {
+        "kind": "column",
+        "name": "income_tax"
+      },
+      "filter": null,
+      "source": "ZZ official revenue table",
+      "metadata": {
+        "chronicle_record_ids": [
+          "novastat_agency.revenue.cy2025.personal_income_tax.country.total.amount"
+        ],
+        "concept": "personal income tax",
+        "variable": "personal_income_tax",
+        "source_measure_id": "personal_income_tax_amount"
+      },
+      "target": 5000000000,
+      "initial_estimate": 4250000000,
+      "final_estimate": 4950000000,
+      "relative_error": -0.01,
+      "within_tolerance": true
+    }
+  ]
+}

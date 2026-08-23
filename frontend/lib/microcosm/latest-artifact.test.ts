@@ -105,7 +105,7 @@ test("loads trimmed Belgium diagnostics without optional US artifact fields", ()
     level: "national",
   });
   expect(cal.rows[2]).toMatchObject({
-    source: "nasa",
+    source: "eurostat",
     variable: "taxable movable income analogue",
     geography: "Belgium",
     level: "national",
@@ -118,6 +118,7 @@ test("derives Belgium population region, sex, and age-band browser facets", () =
     ...first,
     name: `${name}@2026`,
     target_name: name,
+    filter: `cell_${name.replace(/^statbel_population_/, "")}`,
   });
   const cal = buildCalibration(
     {
@@ -146,6 +147,39 @@ test("derives Belgium population region, sex, and age-band browser facets", () =
     { key: "bd_sex", label: "Sex", values: ["Female", "Male"] },
     { key: "bd_age_band", label: "Age band", values: ["0–17", "18–64", "65+"] },
   ]);
+});
+
+test("keeps legacy US dotted target families when Chronicle publisher metadata is present", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        {
+          name: "irs.population.total@2024",
+          target_name: "irs.population.total",
+          period: 2024,
+          entity: "person",
+          measure: { kind: "column", name: "person" },
+          source: "IRS SOI",
+          metadata: {
+            chronicle_record_ids: ["irs.population.cy2024.total"],
+            variable: "population",
+          },
+          target: 100,
+          initial_estimate: 95,
+          final_estimate: 99,
+          relative_error: -0.01,
+          within_tolerance: true,
+        },
+      ],
+    },
+    "us-dotted-family",
+  );
+
+  expect(cal.rows[0]).toMatchObject({
+    source: "irs",
+    variable: "population",
+    family: "irs.population.total",
+  });
 });
 
 // A v2-shaped target: AGI bracket × return type × filing status, with @period.

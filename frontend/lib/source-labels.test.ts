@@ -18,3 +18,11 @@ test("uses curated authority names for Chronicle and calibration sources", () =>
 test("uses the calibration-fit acronym-aware fallback for unknown sources", () => {
   expect(sourceAuthorityLabel("new_api_source")).toBe("New API Source");
 });
+
+test("shares publisher labels across country dashboards", () => {
+  expect(
+    ["statbel", "onss", "jrc", "sfpd", "nasa", "eurostat"].map(
+      sourceAuthorityLabel,
+    ),
+  ).toEqual(["Statbel", "ONSS", "JRC", "SFPD", "NASA", "Eurostat"]);
+});

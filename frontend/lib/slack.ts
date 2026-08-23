@@ -2,7 +2,7 @@ import type { MicrocosmCountry } from "@/lib/microcosm/latest-artifact";
 
 const DASHBOARD_URL = "https://microcosm.institute/calibration/dashboard/microcosm";
 
-const COUNTRY_LABEL: Record<MicrocosmCountry, string> = {
+const COUNTRY_LABEL: Partial<Record<MicrocosmCountry, string>> = {
   us: "🇺🇸 US",
   uk: "🇬🇧 UK",
   be: "🇧🇪 BE",
@@ -28,7 +28,7 @@ export async function postReleaseAlert(opts: {
   const webhookUrl = process.env[webhookEnv];
   if (!webhookUrl) return false;
 
-  const label = COUNTRY_LABEL[opts.country];
+  const label = COUNTRY_LABEL[opts.country] ?? opts.country.toUpperCase();
   const context = [
     opts.repo,
     opts.updatedAt ? `published ${opts.updatedAt}` : "",

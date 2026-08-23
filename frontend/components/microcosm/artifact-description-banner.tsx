@@ -1,9 +1,5 @@
-import { StatusPill } from "@/components/shared/status-pill";
-
-// Provenance banner: renders the release's own description verbatim whenever
-// the artifact carries one (Belgium states its US-survey donor support pool
-// and Chronicle-fact target rule here). Releases without a description render
-// nothing.
+// Provenance note: render the release's own description verbatim whenever the
+// artifact carries one. Releases without a description render nothing.
 export function ArtifactDescriptionBanner({
   description,
 }: {
@@ -14,10 +10,12 @@ export function ArtifactDescriptionBanner({
   return (
     <div
       role="note"
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-[var(--warn)] bg-card px-4 py-3 shadow-[var(--elev-1)]"
+      className="rounded-lg border border-border/80 bg-card px-4 py-3 shadow-[var(--elev-1)]"
     >
-      <StatusPill tone="warning">Provenance</StatusPill>
-      <p className="text-sm font-medium text-foreground">{description}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Provenance
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
     </div>
   );
 }
