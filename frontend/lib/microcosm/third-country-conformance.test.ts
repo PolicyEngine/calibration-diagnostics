@@ -227,7 +227,7 @@ describe("synthetic third-country conformance", () => {
       expect(overview.presentation).toEqual(presentation);
     },
   );
-  test.todo(
+  test(
     "zz can override a publisher display name: treemap shaping ignores release_manifest.publisher_labels",
     () => {
       const futureCalibration = buildCalibration(

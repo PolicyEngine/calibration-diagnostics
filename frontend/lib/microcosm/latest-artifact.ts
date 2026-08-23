@@ -168,6 +168,12 @@ export function asObject(value: unknown): JsonObject {
     : {};
 }
 
+function isPlainObject(value: unknown): value is JsonObject {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 export function scrub(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(scrub);
   if (value && typeof value === "object") {
@@ -1073,6 +1079,7 @@ function enrichTargetRow(
   skippedByName: Map<string, string>,
   droppedTargetNames: Set<string>,
   artifactCountry: ArtifactCountry,
+  publisherLabels: Record<string, string>,
 ): TargetRow {
   const nationalGeography = artifactCountry.geography_label;
   const metadata = normalizeChronicleMetadata(rawRow.metadata);
@@ -1172,6 +1179,10 @@ function enrichTargetRow(
     geography,
     level,
     source: parsed.source,
+    source_label:
+      (Object.hasOwn(publisherLabels, parsed.source)
+        ? publisherLabels[parsed.source]
+        : undefined) ?? sourceAuthorityLabel(parsed.source),
     variable: parsed.variable,
     measure,
     target_role: targetRole,
@@ -1483,6 +1494,9 @@ export function microcosmVariableSummary(rows: TargetRow[]) {
       return {
         variable_key,
         source: String(first.source ?? ""),
+        source_label: String(
+          first.source_label ?? sourceAuthorityLabel(String(first.source ?? "")),
+        ),
         variable: String(first.variable ?? ""),
         measure: first.measure ? String(first.measure) : null,
         level: String(first.level ?? ""),
@@ -1689,9 +1703,16 @@ export function microcosmTargetTreemap(
       const scored = children.reduce((s, c) => s + c.scored, 0);
       const within_10pct = children.reduce((s, c) => s + c.within_10pct, 0);
       const loss = children.reduce((s, c) => s + c.loss, 0);
+      const rowSourceLabel = [...byVar.values()]
+        .flat()
+        .map((row) => stringValue(row.source_label))
+        .find((label): label is string => label != null);
       return {
         source,
-        label: source === "geography" ? "Geography" : sourceAuthorityLabel(source),
+        label:
+          source === "geography"
+            ? "Geography"
+            : rowSourceLabel ?? sourceAuthorityLabel(source),
         n_targets,
         scored,
         within_10pct,
@@ -1723,6 +1744,7 @@ export interface Calibration {
   // Typed `release_manifest.country` merged over the registration.
   country_info: ArtifactCountry;
   presentation: ArtifactPresentation | null;
+  publisher_labels: Record<string, string>;
   description: string | null;
   diagnostics_status: DiagnosticsStatus;
   release_id: string;
@@ -1857,6 +1879,20 @@ export function releasePresentation(
   };
 }
 
+export function releasePublisherLabels(
+  releaseManifest: JsonObject,
+): Record<string, string> {
+  const block = releaseManifest.publisher_labels;
+  if (!isPlainObject(block)) return {};
+  return Object.fromEntries(
+    Object.entries(block).flatMap(([key, value]) => {
+      if (!/^[a-z][a-z0-9_]*$/i.test(key) || typeof value !== "string") return [];
+      const label = value.trim();
+      return label ? [[key, label]] : [];
+    }),
+  );
+}
+
 export interface ReleaseRole {
   dataset_role: string | null;
   is_default: boolean;
@@ -1964,8 +2000,17 @@ export function buildCalibration(
   const dropped = new Set(droppedTargetNames);
   const artifactCountry = releaseCountry(releaseManifest, country);
   const presentation = releasePresentation(releaseManifest);
+  const publisherLabels = releasePublisherLabels(releaseManifest);
   const enrichedRows = addEstimateScopeWarnings(
-    targets.map((row) => enrichTargetRow(row, skippedByName, dropped, artifactCountry)),
+    targets.map((row) =>
+      enrichTargetRow(
+        row,
+        skippedByName,
+        dropped,
+        artifactCountry,
+        publisherLabels,
+      ),
+    ),
   );
   const role = releaseRole(releaseManifest);
   const normalizedAttribution = normalizeTargetLossAttribution({
@@ -1982,6 +2027,7 @@ export function buildCalibration(
     country,
     country_info: artifactCountry,
     presentation,
+    publisher_labels: publisherLabels,
     description:
       stringValue(diag.description) ??
       stringValue(releaseManifest.description) ??
@@ -2256,6 +2302,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     geography: row.geography,
     level: row.level,
     source: row.source,
+    source_label: row.source_label,
     variable: row.variable,
     measure: row.measure,
     target_role: row.target_role,

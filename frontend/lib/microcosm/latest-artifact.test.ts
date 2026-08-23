@@ -21,9 +21,11 @@ import {
   latestMicrocosmTargetDiagnosticsPage,
   microcosmRepo,
   microcosmRevision,
+  microcosmTargetTreemap,
   parseCountry,
   releaseCountry,
   releasePresentation,
+  releasePublisherLabels,
   releasePublishedAtFromTree,
   releaseRole,
   type ArtifactCountry,
@@ -1314,6 +1316,87 @@ test("presentation flows through calibration, summary, and target responses", ()
       cal,
     ).presentation,
   ).toEqual(presentation);
+});
+
+test("releasePublisherLabels keeps valid keys and trimmed non-empty labels", () => {
+  expect(releasePublisherLabels({})).toEqual({});
+  expect(releasePublisherLabels({ publisher_labels: [] })).toEqual({});
+  expect(releasePublisherLabels({ publisher_labels: "labels" })).toEqual({});
+  expect(
+    releasePublisherLabels({
+      publisher_labels: {
+        novastat_agency: "  Nova Statistics Agency  ",
+        IRS2: "IRS second series",
+        "bad-key": "Dropped",
+        _bad: "Dropped",
+        blank: "  ",
+        numeric: 12,
+      },
+    }),
+  ).toEqual({
+    novastat_agency: "Nova Statistics Agency",
+    IRS2: "IRS second series",
+  });
+});
+
+test("publisher labels flow through rows, variables, target responses, and treemaps", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        {
+          name: "fixture_population@2026",
+          target_name: "fixture_population",
+          source: "ZZ official population table",
+          metadata: {
+            chronicle_record_ids: ["novastat_agency.population.cy2026.total"],
+            variable: "population",
+            source_measure_id: "population_count",
+          },
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 100,
+        },
+      ],
+    },
+    "publisher-labels",
+    null,
+    {},
+    { publisher_labels: { novastat_agency: "Nova Statistics Agency" } },
+  );
+
+  expect(cal.publisher_labels).toEqual({
+    novastat_agency: "Nova Statistics Agency",
+  });
+  expect(cal.rows[0].source_label).toBe("Nova Statistics Agency");
+  const page = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics",
+    cal,
+  );
+  expect(page.targets[0].source_label).toBe("Nova Statistics Agency");
+  expect(page.variables[0].source_label).toBe("Nova Statistics Agency");
+  expect(microcosmTargetTreemap(cal.rows, cal.release_id).groups[0].label).toBe(
+    "Nova Statistics Agency",
+  );
+});
+
+test("publisher label lookup does not read inherited object properties", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        {
+          name: "constructor.population.total@2026",
+          source: "Citation",
+          metadata: { chronicle_record_ids: ["constructor.population.total"] },
+          target: 1,
+          initial_estimate: 1,
+          final_estimate: 1,
+        },
+      ],
+    },
+    "publisher-prototype",
+  );
+
+  expect(cal.rows[0].source_label).toBe("Constructor");
 });
 
 const BE_COUNTRY_DEFAULTS: ArtifactCountry = {

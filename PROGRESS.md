@@ -2,9 +2,9 @@
 
 ## State
 
-The typed presentation reader and response contract are implemented. The
-implementation preserves the legacy name/filter paths while selecting new
-adapters from artifact shape.
+The typed presentation and publisher-label contracts are implemented. The
+legacy name/filter paths remain intact while new adapters are added by artifact
+shape.
 
 ## Done
 
@@ -25,11 +25,15 @@ adapters from artifact shape.
   types.
 - Enabled the existing ZZ presentation conformance assertion unchanged and
   added reader/response tests.
+- Added validated `release_manifest.publisher_labels`, stamped every enriched
+  row with `source_label`, and propagated labels through variable summaries,
+  target responses, treemap groups, and client types.
+- Enabled the existing ZZ publisher-label conformance assertion unchanged.
 
 ## Next
 
-- Implement publisher labels, structured dimensions, and structured
-  source/variable identifiers in separately committed steps.
+- Implement structured dimensions and structured source/variable identifiers
+  in separately committed steps.
 - Add the artifact → legacy → generic presentation fallbacks to both views.
 - Enable and extend conformance tests, add regressions, and document B1-B6.
 - Run the full frontend test, type-check, and production-build gates.

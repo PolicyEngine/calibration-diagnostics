@@ -17,6 +17,7 @@ test("uses curated authority names for Chronicle and calibration sources", () =>
 
 test("uses the calibration-fit acronym-aware fallback for unknown sources", () => {
   expect(sourceAuthorityLabel("new_api_source")).toBe("New API Source");
+  expect(sourceAuthorityLabel("constructor")).toBe("Constructor");
 });
 
 test("shares publisher labels across country dashboards", () => {

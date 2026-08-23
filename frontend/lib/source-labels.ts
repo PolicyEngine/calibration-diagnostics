@@ -58,7 +58,7 @@ const SOURCE_ACRONYMS = new Set([
 ]);
 
 export function sourceAuthorityLabel(source: string): string {
-  if (SOURCE_LABELS[source]) return SOURCE_LABELS[source];
+  if (Object.hasOwn(SOURCE_LABELS, source)) return SOURCE_LABELS[source];
   return source
     .split("_")
     .map((word) =>

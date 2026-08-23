@@ -50,6 +50,7 @@ export interface MicrocosmTargetRow {
   geography?: string | null;
   level?: string | null;
   source?: string | null;
+  source_label?: string | null;
   variable?: string | null;
   measure?: string | null;
   target_role?: string | null;
@@ -137,6 +138,7 @@ export interface MicrocosmTargetRow {
 export interface MicrocosmVariableRow {
   variable_key: string;
   source: string;
+  source_label: string;
   variable: string;
   measure: string | null;
   level: string;
