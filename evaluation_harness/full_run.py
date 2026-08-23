@@ -10,13 +10,16 @@ from typing import Any, Iterable
 
 from .contracts import (
     AlignedFact,
+    AlignmentQuality,
     CalibrationExposure,
     CapabilityResult,
     ExecutionMethod,
     FactContract,
+    MappingQuality,
     PeriodTreatment,
     PrecomputedCapabilitySpec,
     TypedPeriod,
+    UNSUPPORTED_CAPABILITY_STATUSES,
 )
 from .execution import EvaluationResult, validate_results
 from .mappings import MappingRegistry
@@ -195,6 +198,7 @@ def apply_precomputed_capability_specs(
             continue
         matched.add(cell)
         had_mapping = capability.mapping_id is not None
+        unsupported = spec.status in UNSUPPORTED_CAPABILITY_STATUSES
         materialized.append(
             CapabilityResult(
                 snapshot_id=capability.snapshot_id,
@@ -207,31 +211,53 @@ def apply_precomputed_capability_specs(
                     else spec.mapping_release
                 ),
                 status=spec.status,
-                reason_code=None,
-                reason_detail=None,
-                execution_method=ExecutionMethod.PRECOMPUTED,
-                mapping_id=(
-                    capability.mapping_id
-                    if spec.preserve_existing_mapping and had_mapping
-                    else spec.mapping_id
+                reason_code=spec.reason_code if unsupported else None,
+                reason_detail=spec.reason_detail if unsupported else None,
+                execution_method=(
+                    ExecutionMethod.NONE
+                    if unsupported
+                    else ExecutionMethod.PRECOMPUTED
                 ),
-                mapping_quality=spec.mapping_quality,
+                mapping_id=(
+                    None
+                    if unsupported
+                    else (
+                        capability.mapping_id
+                        if spec.preserve_existing_mapping and had_mapping
+                        else spec.mapping_id
+                    )
+                ),
+                mapping_quality=(
+                    MappingQuality.NONE if unsupported else spec.mapping_quality
+                ),
                 fact_period=capability.fact_period,
-                population_period=spec.population_period,
-                policy_period=spec.policy_period,
-                period_treatment=spec.period_treatment,
-                alignment_id=spec.alignment_id,
-                alignment_quality=spec.alignment_quality,
+                population_period=(None if unsupported else spec.population_period),
+                policy_period=None if unsupported else spec.policy_period,
+                period_treatment=(
+                    PeriodTreatment.UNSUPPORTED
+                    if unsupported
+                    else spec.period_treatment
+                ),
+                alignment_id=None if unsupported else spec.alignment_id,
+                alignment_quality=(
+                    AlignmentQuality.NONE
+                    if unsupported
+                    else spec.alignment_quality
+                ),
                 entity=capability.entity,
                 weight_variable=None,
                 required_variables=(),
-                geography_method=spec.geography_method,
+                geography_method=None if unsupported else spec.geography_method,
                 query=None,
                 calibration_exposure=spec.calibration_exposure,
                 score_eligible=(
-                    capability.score_eligible
-                    if spec.preserve_mapped_score_eligibility and had_mapping
-                    else spec.score_eligible
+                    False
+                    if unsupported
+                    else (
+                        capability.score_eligible
+                        if spec.preserve_mapped_score_eligibility and had_mapping
+                        else spec.score_eligible
+                    )
                 ),
             )
         )

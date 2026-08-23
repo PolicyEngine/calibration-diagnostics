@@ -42,17 +42,6 @@ UK_SOURCES = {
     "obr",
     "ons",
 }
-BELGIUM_SOURCES = {
-    "bfp",
-    "jrc",
-    "nbb",
-    "onem_rva",
-    "onss",
-    "opgroeien",
-    "sfpd",
-    "spf_finances",
-    "statbel",
-}
 
 
 @dataclass(frozen=True)
@@ -94,11 +83,47 @@ def _canonical_json(payload: Any) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
 
-def _jurisdiction(source_name: str, geography_id: str) -> str:
+def _source_package_id(source: dict[str, Any]) -> str | None:
+    """Return Chronicle's source id from consumer-export source metadata.
+
+    Newer producer rows may expose ``source_id`` directly.  The current
+    consumer export omits it, but retains the same value as the namespace in
+    its canonical ``raw/{source_id}/...`` artifact key.
+    """
+
+    source_id = source.get("source_id")
+    if isinstance(source_id, str) and source_id:
+        return source_id
+    raw_key = source.get("raw_r2_key")
+    if not isinstance(raw_key, str):
+        return None
+    parts = raw_key.split("/")
+    if len(parts) >= 2 and parts[0] == "raw" and parts[1]:
+        return parts[1]
+    return None
+
+
+def _jurisdiction(
+    source_name: str,
+    source: dict[str, Any],
+    geography: dict[str, Any],
+    dimensions: dict[str, Any],
+) -> str:
+    geography_id = str(geography["id"])
     source_root = source_name.split(".", 1)[0]
     if source_root in UK_SOURCES or geography_id.startswith(("K0", "E0", "W0", "S0", "N0")):
         return "UK"
-    if source_root in BELGIUM_SOURCES or geography_id.startswith("BE"):
+    # Belgium is inferred only from evidence carried by Chronicle's producer
+    # contracts: the package source id, Eurostat's geo dimension, or a Belgian
+    # NIS geography vintage.  In particular, neither a source-name guess nor a
+    # bare geography-id prefix is sufficient.
+    source_package_id = _source_package_id(source)
+    geography_vintage = str(geography.get("vintage", ""))
+    if (
+        source_package_id == "belgium"
+        or (source_root == "eurostat" and dimensions.get("geo") == "BE")
+        or geography_vintage.casefold().startswith("nis_")
+    ):
         return "BE"
     if "US" in geography_id:
         return "US"
@@ -134,7 +159,7 @@ def _normalize_row(row: dict[str, Any], line_number: int) -> FactContract:
         fact_key=row["aggregate_fact_key"],
         semantic_fact_key=row["semantic_fact_key"],
         source=source_name,
-        jurisdiction=_jurisdiction(source_name, geography["id"]),
+        jurisdiction=_jurisdiction(source_name, source, geography, row["dimensions"]),
         period=TypedPeriod(kind=period["type"], value=str(period["value"])),
         geography_level=geography["level"],
         geography_id=geography["id"],

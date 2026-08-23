@@ -4,19 +4,36 @@
 > `populace_calibration_sample`, and the `populace_us_policyengine_us_2024`
 > source ID; responses label those concepts Chronicle and Microcosm.
 
-The Cross-dataset API serves immutable evaluation artifacts; an HTTP request
-never imports or runs a microsimulation model. The current approved run
-contains Microcosm + PolicyEngine-US, Public CPS + Tax-Calculator, Yale
-Tax-Data + Tax-Simulator (reconstruction), and raw 2024 ACS PUMS. The Yale item
-is a byte-pinned, precomputed reconstruction checkpoint, not official Yale
-output and not a claim that the underlying PUF-based run can be reproduced from
-public inputs alone.
+The Cross-dataset API serves immutable, jurisdiction-scoped evaluation
+artifacts; an HTTP request never imports or runs a microsimulation model. Every
+bundle records its explicit `jurisdictions` list, and the runner selects that
+jurisdiction's source-plan registry before loading any source adapter. The
+default remains `US`. A `--jurisdictions BE` run selects only the Belgium
+registry, so it does not authenticate or execute any US source.
 
-This page is explicitly US-only. The run records `jurisdictions: [US]` and
-filters the immutable Chronicle source snapshot before capability
-classification. Its current scope is 46,241 US facts. The pinned snapshot
-contains no non-US facts; future snapshots will still exclude any non-US rows
-before capability classification.
+The US registry contains Microcosm + PolicyEngine-US, Public CPS +
+Tax-Calculator, Yale Tax-Data + Tax-Simulator (reconstruction), and raw 2024 ACS
+PUMS. The Yale item is a byte-pinned, precomputed reconstruction checkpoint,
+not official Yale output and not a claim that the underlying PUF-based run can
+be reproduced from public inputs alone. The US run filters its immutable
+Chronicle snapshot to US facts and explicitly excludes unsupported territory
+geography IDs.
+
+The Belgium registry contains these three immutable precomputed sources:
+
+- `microcosm_be_v04_axiom` — Microcosm-BE v0.4 × Axiom rules engine. Provenance:
+  Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade.
+- `microcosm_be_v04_euromod` — Microcosm-BE v0.4 × EUROMOD BE_2025. Provenance:
+  Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade.
+- `euromod_be2025_jrc_silc` — EUROMOD BE_2025 on EU-SILC (JRC country report
+  2025). Provenance:
+  Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade.
+
+Belgium jurisdiction is derived only from Chronicle producer evidence: source
+package ID `belgium`, Eurostat `geo=BE`, or a NIS geography vintage. Unknown or
+foreign comparator rows are not defaulted to Belgium. Each checkpoint row joins
+to snapshot facts through `lineage.source_record_id`; multi-record rows use one
+score-eligible anchor and a semantic alignment to the exact Chronicle sum.
 
 ## Publish frontend partitions
 
@@ -102,10 +119,13 @@ to exactly one display bucket: green for absolute relative error at or below
 10%, yellow for error above 10% through 25%, red for error above 25%, and dark
 gray when no comparable relative error exists (including unmapped facts).
 
-The performance section's Sample selector is defined once from Microcosm's
-capability rows. `in_sample` is the set of Chronicle facts marked
-`direct_calibration_target` for Microcosm; `out_of_sample` is its complement in
-the run's US fact catalog. The publisher materializes both sets, and their
-geography intersections, for every source. Selecting a sample therefore scores
-all models and standalone datasets against the same facts rather than applying
-each source's own calibration-exposure labels.
+The performance section's Sample selector is defined once from the Microcosm
+capability rows. `in_sample` is the union of Chronicle facts marked
+`direct_calibration_target` across the run's Microcosm sources;
+`out_of_sample` is its complement in that jurisdiction's fact catalog. With the
+single US Microcosm source this is byte-for-byte the former rule; Belgium uses
+the union of its Axiom and EUROMOD Microcosm source rows. The publisher
+materializes both sets, and their geography intersections, for every source.
+Selecting a sample therefore scores all models and standalone datasets against
+the same facts rather than applying each source's own calibration-exposure
+labels.

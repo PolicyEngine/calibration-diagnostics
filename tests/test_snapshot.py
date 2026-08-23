@@ -121,10 +121,78 @@ def test_load_consumer_rows_supports_real_chronicle_shape(tmp_path: Path) -> Non
     assert len(facts) == 2
     assert facts[0].fact_key.startswith("ledger.aggregate_fact.v2:")
     assert facts[0].source == "irs_soi"
+    assert [fact.jurisdiction for fact in facts] == ["US", "US"]
     assert facts[0].lineage["source_record_id"] == "table.row.measure"
     assert facts[1].period.canonical == "month:2024-12"
     assert facts[1].geography_level == "state"
     assert metadata["chronicle_commit"] == "chronicle-commit-1"
+
+
+def test_load_consumer_rows_derives_be_from_authoritative_evidence(
+    tmp_path: Path,
+) -> None:
+    package_source_id = consumer_row(
+        "ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+        geography_id="opaque-country-code",
+        source_name="opaque_source",
+    )
+    package_source_id["source"]["source_id"] = "belgium"
+
+    current_export_package_id = consumer_row(
+        "ledger.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+        geography_id="opaque-country-code",
+        source_name="opaque_source",
+    )
+    current_export_package_id["source"]["raw_r2_key"] = (
+        "raw/belgium/example-package/2025/sha256/source.csv"
+    )
+
+    eurostat_geo = consumer_row(
+        "ledger.aggregate_fact.v2:cccccccccccccccccccccccc",
+        geography_id="BE",
+        source_name="eurostat",
+    )
+    eurostat_geo["dimensions"]["geo"] = "BE"
+
+    nis_geography = consumer_row(
+        "ledger.aggregate_fact.v2:dddddddddddddddddddddddd",
+        geography_level="commune",
+        geography_id="11001",
+        source_name="opaque_source",
+    )
+    nis_geography["geography"]["vintage"] = "nis_2025"
+
+    bundle = write_bundle(
+        tmp_path / "bundle",
+        [package_source_id, current_export_package_id, eurostat_geo, nis_geography],
+        with_manifest=False,
+    )
+    facts, _ = load_consumer_rows(bundle)
+    assert [fact.jurisdiction for fact in facts] == ["BE", "BE", "BE", "BE"]
+
+
+def test_load_consumer_rows_does_not_default_unknown_facts_to_be(
+    tmp_path: Path,
+) -> None:
+    source_name_guess = consumer_row(
+        "ledger.aggregate_fact.v2:aaaaaaaaaaaaaaaaaaaaaaaa",
+        geography_id="BE_UNKNOWN",
+        source_name="statbel",
+    )
+    non_be_eurostat_geo = consumer_row(
+        "ledger.aggregate_fact.v2:bbbbbbbbbbbbbbbbbbbbbbbb",
+        geography_id="FR",
+        source_name="eurostat",
+    )
+    non_be_eurostat_geo["dimensions"]["geo"] = "FR"
+
+    bundle = write_bundle(
+        tmp_path / "bundle",
+        [source_name_guess, non_be_eurostat_geo],
+        with_manifest=False,
+    )
+    facts, _ = load_consumer_rows(bundle)
+    assert [fact.jurisdiction for fact in facts] == ["unknown", "unknown"]
 
 
 def test_load_rejects_unknown_consumer_schema(tmp_path: Path) -> None:

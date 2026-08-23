@@ -9,6 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
 
+from .adapters.precomputed_checkpoint import materialize_precomputed_results
 from .contracts import (
     AlignedFact,
     AlignmentQuality,
@@ -304,31 +305,24 @@ def materialize_yale_reconstruction_results(
 ) -> tuple[tuple[CapabilityResult, ...], tuple[EvaluationResult, ...]]:
     """Replace reviewed Yale cells with immutable precomputed model results."""
 
-    from .full_run import apply_precomputed_capability_specs
-
     entry_by_fact = {entry.fact_key: entry for entry in checkpoint.entries}
-    materialized_capabilities = apply_precomputed_capability_specs(
-        capabilities,
-        yale_checkpoint_capability_specs(
-            facts,
-            checkpoint,
-            aligned_facts=aligned_facts,
-            source=source,
-        ),
+    specs = yale_checkpoint_capability_specs(
+        facts,
+        checkpoint,
+        aligned_facts=aligned_facts,
+        source=source,
     )
-    results: list[EvaluationResult] = []
-    for materialized in materialized_capabilities:
-        entry = entry_by_fact.get(materialized.fact_key)
-        if materialized.source_id != source.source_id or entry is None:
-            continue
-        results.append(
-            EvaluationResult.from_capability(
-                materialized,
-                estimate=entry.estimate,
-                dataset_version=source.dataset_version,
-                model_version=source.model_version,
-                estimate_basis=ESTIMATE_BASIS,
-            )
-        )
-
-    return materialized_capabilities, tuple(results)
+    fact_keys = {spec.fact_key for spec in specs}
+    return materialize_precomputed_results(
+        capabilities,
+        specs,
+        source_id=source.source_id,
+        estimates_by_fact_key={
+            fact_key: entry_by_fact[fact_key].estimate for fact_key in fact_keys
+        },
+        estimate_bases_by_fact_key={
+            fact_key: ESTIMATE_BASIS for fact_key in fact_keys
+        },
+        dataset_version=source.dataset_version,
+        model_version=source.model_version,
+    )
