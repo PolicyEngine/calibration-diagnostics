@@ -50,7 +50,10 @@ export interface MicrocosmTargetRow {
   geography?: string | null;
   level?: string | null;
   source?: string | null;
+  source_label?: string | null;
+  source_url?: string | null;
   variable?: string | null;
+  variable_label?: string | null;
   measure?: string | null;
   target_role?: string | null;
   source_measure_id?: string | null;
@@ -75,7 +78,9 @@ export interface MicrocosmTargetRow {
     value: string;
     source_key?: string;
     raw_value?: string;
+    rank?: number;
   }[] | null;
+  dimension_adapter?: "structured" | "legacy_filter" | "legacy_name" | null;
   variable_key?: string | null;
   // schema v2 published registry metadata (null on v1).
   source_citation?: string | null;
@@ -137,7 +142,9 @@ export interface MicrocosmTargetRow {
 export interface MicrocosmVariableRow {
   variable_key: string;
   source: string;
+  source_label: string;
   variable: string;
+  variable_label?: string | null;
   measure: string | null;
   level: string;
   policyengine_variables?: string[];
@@ -193,9 +200,21 @@ export interface MicrocosmArtifactCountry {
   capabilities: CountryCapability[];
 }
 
+export interface MicrocosmArtifactPresentation {
+  overview_intro?: string;
+  targets_intro?: string;
+}
+
+export interface MicrocosmTargetSchema {
+  diagnostics_schema_version: number | null;
+  structured_dimensions: boolean;
+}
+
 export interface MicrocosmCalibration {
   available: boolean;
   country?: MicrocosmArtifactCountry;
+  presentation?: MicrocosmArtifactPresentation | null;
+  target_schema?: MicrocosmTargetSchema;
   description?: string | null;
   diagnostics_status?: MicrocosmDiagnosticsStatus;
   dataset_role?: string | null;
@@ -317,6 +336,8 @@ export interface MicrocosmResponse {
 export interface MicrocosmTargetDiagnostics {
   available: boolean;
   country?: MicrocosmArtifactCountry;
+  presentation?: MicrocosmArtifactPresentation | null;
+  target_schema?: MicrocosmTargetSchema;
   description?: string | null;
   path?: string | null;
   release_id?: string | null;
@@ -369,6 +390,7 @@ export interface MicrocosmComparisonRow {
     value: string;
     source_key?: string;
     raw_value?: string;
+    rank?: number;
   }[] | null;
   geography?: string | null;
   a_target?: number | null;

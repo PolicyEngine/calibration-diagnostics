@@ -47,6 +47,7 @@ function periodText(row: MicrocosmTargetRow): string {
 function measureText(row: MicrocosmTargetRow): string {
   return (
     titleFromIdentifier(row.chronicle?.measure_concept) ||
+    row.variable_label ||
     canonicalLabel(row.variable as string) ||
     titleFromIdentifier(row.chronicle?.layout_measure_id) ||
     canonicalLabel(row.measure_name)
@@ -427,11 +428,15 @@ export function MicrocosmTargetDetail({
       ? row.abs_relative_error <= 0.1
       : null;
   const chronicle = row.chronicle;
-  const chronicleEntryUrl = chronicleSourceEntryUrl(
-    row.source_citation,
-    chronicle?.layout_record_set_id,
-  );
-  const sourceName = row.source ? sourceLabel(row.source) : "Source not specified";
+  const officialSourceUrl =
+    row.source_url ??
+    chronicleSourceEntryUrl(
+      row.source_citation,
+      chronicle?.layout_record_set_id,
+    );
+  const sourceName =
+    row.source_label ??
+    (row.source ? sourceLabel(row.source) : "Source not specified");
   const measure = measureText(row) || titleFromIdentifier(row.name) || "Calibration target";
 
   const rootRef = useRef<HTMLElement>(null);
@@ -595,16 +600,18 @@ export function MicrocosmTargetDetail({
             <DetailSection title="Official source">
               <DefinitionItem label="Source" value={sourceName} />
               <DefinitionItem
-                label="Chronicle entry"
+                label={row.source_url ? "Source link" : "Chronicle entry"}
                 value={
-                  chronicleEntryUrl ? (
+                  officialSourceUrl ? (
                     <a
-                      href={chronicleEntryUrl}
+                      href={officialSourceUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="text-primary hover:underline"
                     >
-                      View Chronicle entry ↗
+                      {row.source_url
+                        ? "View official source ↗"
+                        : "View Chronicle entry ↗"}
                     </a>
                   ) : (
                     "Not available"

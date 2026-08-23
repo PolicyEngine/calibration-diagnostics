@@ -219,6 +219,21 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     );
   });
 
+  test("prefers artifact publisher labels for source groups", () => {
+    const tree = buildCalibrationTree(
+      [
+        target("artifact-labelled", {
+          source: "novastat_agency",
+          source_label: "Nova Statistics Agency",
+          variable: "population",
+        }),
+      ],
+      state({ dimensions: [] }),
+    );
+
+    expect(tree.groups[0].label).toBe("Nova Statistics Agency");
+  });
+
   test("renders geography first, then programs grouped by their source", () => {
     const overview = buildCalibrationTree(
       rows,

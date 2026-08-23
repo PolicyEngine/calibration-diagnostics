@@ -22,6 +22,7 @@ export interface CalibrationTreeTarget {
   name?: string | null;
   base_name?: string | null;
   source?: string | null;
+  source_label?: string | null;
   variable?: string | null;
   variable_key?: string | null;
   measure?: string | null;
@@ -409,6 +410,9 @@ function programGroups(rows: CalibrationTreeTarget[]): CalibrationTreeGroup[] {
   );
   return [...bySource.entries()]
     .map(([source, sourceRows]) => {
+      const artifactSourceLabel = sourceRows
+        .map((row) => row.source_label?.trim())
+        .find((label): label is string => Boolean(label));
       const byProgram = groupRows(sourceRows, programId);
       const nodes = sortNodes(
         [...byProgram.entries()].map(([program, programRows]) =>
@@ -423,7 +427,7 @@ function programGroups(rows: CalibrationTreeTarget[]): CalibrationTreeGroup[] {
       );
       return {
         id: source,
-        label: sourceLabel(source),
+        label: artifactSourceLabel ?? sourceLabel(source),
         nodes,
         metrics: calibrationTreeMetrics(sourceRows),
       };

@@ -9,6 +9,7 @@ import beReleaseManifestFixture from "./fixtures/be-release/release_manifest.jso
 import {
   buildCalibration,
   buildComparison,
+  diagnosticsDimensions,
   MICROCOSM_HF_REPO_ENV,
   MICROCOSM_HF_REVISION_ENV,
   MICROCOSM_BE_HF_REPO_ENV,
@@ -21,8 +22,11 @@ import {
   latestMicrocosmTargetDiagnosticsPage,
   microcosmRepo,
   microcosmRevision,
+  microcosmTargetTreemap,
   parseCountry,
   releaseCountry,
+  releasePresentation,
+  releasePublisherLabels,
   releasePublishedAtFromTree,
   releaseRole,
   type ArtifactCountry,
@@ -99,6 +103,7 @@ test("loads trimmed Belgium diagnostics without optional US artifact fields", ()
     family: "statbel/population",
     geography: "Brussels",
     level: "region",
+    dimension_adapter: "legacy_filter",
     breakdown: "Male · 0–17",
     target_dimensions: [
       expect.objectContaining({ key: "bd_sex", label: "Sex", value: "Male" }),
@@ -110,6 +115,7 @@ test("loads trimmed Belgium diagnostics without optional US artifact fields", ()
     variable: "national income tax amount",
     geography: "Belgium",
     level: "national",
+    dimension_adapter: "legacy_name",
   });
   expect(cal.rows[2]).toMatchObject({
     source: "eurostat",
@@ -156,6 +162,319 @@ test("derives Belgium population region, sex, and age-band browser facets", () =
   ]);
 });
 
+test("diagnosticsDimensions drops malformed entries and normalizes optional metadata", () => {
+  expect(diagnosticsDimensions({ dimensions: [] })).toEqual({});
+  expect(
+    diagnosticsDimensions({
+      dimensions: {
+        region: {
+          label: "  Region  ",
+          role: "geography",
+          level: "  region  ",
+          values: { north: "  North  ", south: " ", broken: 3 },
+          order: [" south ", 3, "north", " "],
+        },
+        sex: { label: "Sex", role: "category", values: { female: "Female" } },
+        missing_label: { values: { value: "Value" } },
+        scalar: "Region",
+      },
+    }),
+  ).toEqual({
+    region: {
+      label: "Region",
+      role: "geography",
+      level: "region",
+      values: { north: "North" },
+      order: ["south", "north"],
+    },
+    sex: { label: "Sex", values: { female: "Female" } },
+  });
+});
+
+test("structured dimensions shape rows and honor artifact value order", () => {
+  const target = (
+    suffix: string,
+    dimensions: Record<string, string>,
+  ) => ({
+    name: `fixture.population.${suffix}@2026`,
+    target_name: `fixture.population.${suffix}`,
+    source: "ZZ official population table",
+    metadata: {
+      chronicle_record_ids: [`novastat_agency.population.${suffix}`],
+      variable: "population",
+      source_measure_id: "population_count",
+    },
+    dimensions,
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 100,
+  });
+  const cal = buildCalibration(
+    {
+      schema_version: 7,
+      dimensions: {
+        region: {
+          label: "Region",
+          role: "geography",
+          level: "region",
+          values: { north: "North", south: "South" },
+        },
+        sex: {
+          label: "Sex",
+          values: { female: "Female", male: "Male" },
+          order: ["male", "female"],
+        },
+        age_band: {
+          label: "Age band",
+          values: { "65_plus": "65+", "0_17": "0–17", "18_64": "18–64" },
+        },
+      },
+      targets: [
+        target("north_female_0_17", {
+          region: "north",
+          sex: "female",
+          age_band: "0_17",
+          settlement_type: "urban_core",
+        }),
+        target("south_male_65_plus", {
+          region: "south",
+          sex: "male",
+          age_band: "65_plus",
+          settlement_type: "urban_core",
+        }),
+        target("north_male_18_64", {
+          region: "north",
+          sex: "male",
+          age_band: "18_64",
+          settlement_type: "urban_core",
+        }),
+      ],
+    },
+    "structured-dimensions",
+  );
+
+  expect(cal.target_schema).toEqual({
+    diagnostics_schema_version: 7,
+    structured_dimensions: true,
+  });
+  expect(cal.rows.every((row) => row.dimension_adapter === "structured")).toBe(true);
+  expect(cal.rows[0]).toMatchObject({
+    family: "novastat_agency/population",
+    geography: "North",
+    level: "region",
+    breakdown: "Female · 0–17 · Urban Core",
+    target_dimensions: [
+      {
+        key: "bd_sex",
+        label: "Sex",
+        value: "Female",
+        source_key: "sex",
+        raw_value: "female",
+        rank: 1,
+      },
+      {
+        key: "bd_age_band",
+        label: "Age band",
+        value: "0–17",
+        source_key: "age_band",
+        raw_value: "0_17",
+        rank: 1,
+      },
+      {
+        key: "bd_settlement_type",
+        label: "Settlement Type",
+        value: "Urban Core",
+        source_key: "settlement_type",
+        raw_value: "urban_core",
+      },
+    ],
+  });
+  const page = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics?variable=novastat_agency%20%2F%20population%20%C2%B7%20count",
+    cal,
+  );
+  expect(page.target_schema).toEqual(cal.target_schema);
+  expect(page.dimensions).toEqual([
+    { key: "geography", label: "Region", values: ["North", "South"] },
+    { key: "bd_sex", label: "Sex", values: ["Male", "Female"] },
+    { key: "bd_age_band", label: "Age band", values: ["65+", "0–17", "18–64"] },
+  ]);
+});
+
+test("structured facet ordering falls back when any displayed value lacks a rank", () => {
+  const target = (suffix: string, category: string) => ({
+    name: `fixture.population.${suffix}@2026`,
+    source: "Citation",
+    metadata: {
+      chronicle_record_ids: ["novastat_agency.population.total"],
+      variable: "population",
+      source_measure_id: "population_count",
+    },
+    dimensions: { category },
+    target: 1,
+    initial_estimate: 1,
+    final_estimate: 1,
+  });
+  const cal = buildCalibration(
+    {
+      dimensions: {
+        category: {
+          label: "Category",
+          values: { zeta: "Zeta" },
+          order: ["zeta"],
+        },
+      },
+      targets: [target("zeta", "zeta"), target("beta", "beta")],
+    },
+    "partial-dimension-order",
+  );
+  const page = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics?variable=novastat_agency%20%2F%20population%20%C2%B7%20count",
+    cal,
+  );
+
+  expect(page.dimensions).toEqual([
+    { key: "bd_category", label: "Category", values: ["Beta", "Zeta"] },
+  ]);
+});
+
+test("dimension adapters are selected per row and structured values beat legacy filters", () => {
+  const base = {
+    source: "ZZ official population table",
+    metadata: {
+      chronicle_record_ids: ["novastat_agency.population.total"],
+      variable: "population",
+      source_measure_id: "population_count",
+    },
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 100,
+  };
+  const cal = buildCalibration(
+    {
+      schema_version: 7,
+      dimensions: {
+        region: {
+          label: "Region",
+          role: "geography",
+          values: { north: "North", south: "South" },
+        },
+        sex: { label: "Sex" },
+        age_band: { label: "Age band" },
+      },
+      targets: [
+        {
+          ...base,
+          name: "fixture_population_north_female_0_17@2026",
+          filter: "cell_south_male_65_plus",
+          dimensions: { region: "north", sex: "female", age_band: "0_17" },
+        },
+        {
+          ...base,
+          name: "fixture_population_south_male_18_64@2026",
+          filter: "cell_south_male_18_64",
+        },
+        {
+          ...base,
+          name: "novastat_agency.population.total@2026",
+          filter: null,
+        },
+      ],
+    },
+    "mixed-dimension-adapters",
+  );
+
+  expect(cal.rows.map((row) => row.dimension_adapter)).toEqual([
+    "structured",
+    "legacy_filter",
+    "legacy_name",
+  ]);
+  expect(cal.rows[0]).toMatchObject({
+    geography: "North",
+    level: "region",
+    breakdown: "Female · 0–17",
+  });
+  expect(latestMicrocosmCalibrationSummary(cal).target_schema).toEqual(
+    cal.target_schema,
+  );
+});
+
+test("structured rows do not require a dimensions dictionary, including empty objects", () => {
+  const base = {
+    source: "Citation",
+    metadata: { variable: "population", source_measure_id: "population_count" },
+    filter: "cell_south_male_18_64",
+    target: 1,
+    initial_estimate: 1,
+    final_estimate: 1,
+  };
+  const cal = buildCalibration(
+    {
+      targets: [
+        {
+          ...base,
+          name: "fixture_population_age@2026",
+          dimensions: { age_band: "65_plus" },
+        },
+        {
+          ...base,
+          name: "fixture_population_total@2026",
+          dimensions: {},
+        },
+      ],
+    },
+    "dictionary-free-dimensions",
+  );
+
+  expect(cal.target_schema.structured_dimensions).toBe(false);
+  expect(cal.rows[0]).toMatchObject({
+    dimension_adapter: "structured",
+    geography: "United States",
+    breakdown: "65+",
+    target_dimensions: [
+      expect.objectContaining({
+        key: "bd_age_band",
+        label: "Age Band",
+        value: "65+",
+      }),
+    ],
+  });
+  expect(cal.rows[1]).toMatchObject({
+    dimension_adapter: "structured",
+    geography: "United States",
+    breakdown: "",
+    target_dimensions: [],
+  });
+});
+
+test("structured dimensions prevent whole-population estimate-scope warnings", () => {
+  const target = (recordSet: string, category: string, targetValue: number) => ({
+    name: `source.example.${category}.amount@2026`,
+    source: "Citation",
+    metadata: {
+      variable: "example",
+      source_measure_id: "example_amount",
+      ledger_layout_record_set_id: recordSet,
+    },
+    dimensions: { category },
+    target: targetValue,
+    initial_estimate: 100,
+    final_estimate: 80,
+  });
+  const cal = buildCalibration(
+    {
+      dimensions: { category: { label: "Category" } },
+      targets: [
+        target("source.example.slice_a", "a", 10),
+        target("source.example.slice_b", "b", 20),
+      ],
+    },
+    "structured-scope",
+  );
+
+  expect(cal.rows.every((row) => row.estimate_warning == null)).toBe(true);
+});
+
 test("keeps legacy US dotted target families when Chronicle publisher metadata is present", () => {
   const cal = buildCalibration(
     {
@@ -186,6 +505,137 @@ test("keeps legacy US dotted target families when Chronicle publisher metadata i
     source: "irs",
     variable: "population",
     family: "irs.population.total",
+  });
+});
+
+test("live-US-shaped schema 5 rows preserve the legacy dotted contract", () => {
+  const sourceCitation =
+    "Bureau of Economic Analysis, National Income and Product Accounts, Table 1.12";
+  const cal = buildCalibration(
+    {
+      schema_version: 5,
+      targets: [
+        {
+          name: "bea_nipa.cy2023.proprietors_income.a041rc.amount@2024",
+          filter: null,
+          source: sourceCitation,
+          metadata: {
+            chronicle_record_ids: [
+              "bea_nipa.cy2023.proprietors_income.a041rc.amount",
+            ],
+            variable: "proprietors_income",
+            source_measure_id: "proprietors_income_amount",
+            ledger_geography_level: "country",
+            ledger_geography_id: "0100000US",
+            ledger_layout_groupby_dimension: "bea_nipa.line_code",
+            ledger_layout_groupby_value_id: "a041rc",
+            ledger_measure_unit: "usd",
+          },
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 99,
+          relative_error: -0.01,
+          within_tolerance: true,
+        },
+      ],
+    },
+    "live-us-shaped",
+  );
+  const responseRow = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics",
+    cal,
+  ).targets[0];
+
+  // JSON round-tripping matches the API boundary and locks every legacy field;
+  // the four new contract fields are strictly additive.
+  expect(JSON.parse(JSON.stringify(responseRow))).toEqual({
+    name: "bea_nipa.cy2023.proprietors_income.a041rc.amount@2024",
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 99,
+    relative_error: -0.01,
+    within_tolerance: true,
+    base_name: "bea_nipa.cy2023.proprietors_income.a041rc.amount",
+    family: "bea_nipa.cy2023.proprietors_income.a041rc.amount",
+    state: null,
+    geography: "United States",
+    level: "national",
+    source: "bea_nipa",
+    source_label: "BEA Nipa",
+    variable: "proprietors income",
+    variable_label: null,
+    measure: "total",
+    target_role: null,
+    source_measure_id: "proprietors_income_amount",
+    policyengine_variables: [],
+    policyengine_map_to: null,
+    policyengine_filter_variable: null,
+    materializer: null,
+    measure_mode: null,
+    error_kind: "relative",
+    initial_error: -0.1,
+    final_error: -0.01,
+    initial_miss: -10,
+    final_miss: -1,
+    abs_final_miss: 1,
+    absolute_improvement: 9,
+    abs_error: 0.01,
+    breakdown: "a041rc",
+    dims: ["a041rc"],
+    target_dimensions: [
+      {
+        key: "bd_line_code",
+        label: "Line Code",
+        value: "a041rc",
+        source_key: "ledger_layout_groupby_value_id",
+        raw_value: "a041rc",
+      },
+    ],
+    dimension_adapter: "legacy_name",
+    variable_key: "bea_nipa / proprietors income · total",
+    source_citation: sourceCitation,
+    source_url: null,
+    entity: null,
+    aggregation: null,
+    measure_name: null,
+    period: null,
+    chronicle: {
+      fact_key: null,
+      source_record_id: null,
+      semantic_fact_key: null,
+      aggregate_fact_key: null,
+      legacy_fact_key: null,
+      period_type: null,
+      source_period: null,
+      target_period: null,
+      geography_level: "country",
+      geography_id: "0100000US",
+      geography_vintage: null,
+      domain: null,
+      entity_name: null,
+      entity_role: null,
+      measure_concept: null,
+      source_concept: null,
+      concept_relation: null,
+      concept_authority: null,
+      measure_unit: "usd",
+      value_operation: null,
+      layout_record_set_id: null,
+      layout_groupby_dimension: "bea_nipa.line_code",
+      layout_groupby_value_id: "a041rc",
+      layout_measure_id: null,
+      dimension_set_key: null,
+      universe_constraint_set_key: null,
+      universe_constraint_count: null,
+      filters: [],
+    },
+    calibration_status: "included",
+    calibration_status_label: "Included",
+    calibration_status_reason: null,
+    initial_relative_error: -0.1,
+    abs_relative_error: 0.01,
+    improvement: 0.09000000000000001,
+    direction: "under",
   });
 });
 
@@ -1258,6 +1708,212 @@ test("releaseRole classifies national default vs non-default local-area", () => 
     dataset_role: "non_default_local_area",
     is_default: false,
     is_local_area: true,
+  });
+});
+
+test("releasePresentation keeps only trimmed, capped intro slots", () => {
+  const longIntro = `  ${"x".repeat(610)}  `;
+  expect(
+    releasePresentation({
+      presentation: {
+        overview_intro: "  Artifact overview.  ",
+        targets_intro: longIntro,
+        arbitrary_section: "Ignored",
+      },
+    }),
+  ).toEqual({
+    overview_intro: "Artifact overview.",
+    targets_intro: "x".repeat(600),
+  });
+});
+
+test("releasePresentation returns null when no valid intro slot exists", () => {
+  expect(releasePresentation({})).toBeNull();
+  expect(releasePresentation({ presentation: [] })).toBeNull();
+  expect(releasePresentation({ presentation: "copy" })).toBeNull();
+  expect(
+    releasePresentation({
+      presentation: {
+        overview_intro: "   ",
+        targets_intro: 12,
+        unknown: "Ignored",
+      },
+    }),
+  ).toBeNull();
+});
+
+test("presentation flows through calibration, summary, and target responses", () => {
+  const presentation = {
+    overview_intro: "Artifact overview.",
+    targets_intro: "Artifact target prompt.",
+  };
+  const cal = buildCalibration(
+    { targets: [] },
+    "presentation-release",
+    null,
+    {},
+    { presentation },
+  );
+
+  expect(cal.presentation).toEqual(presentation);
+  expect(latestMicrocosmCalibrationSummary(cal).presentation).toEqual(presentation);
+  expect(
+    latestMicrocosmTargetDiagnosticsPage(
+      "http://x/api/microcosm/target-diagnostics",
+      cal,
+    ).presentation,
+  ).toEqual(presentation);
+});
+
+test("releasePublisherLabels keeps valid keys and trimmed non-empty labels", () => {
+  expect(releasePublisherLabels({})).toEqual({});
+  expect(releasePublisherLabels({ publisher_labels: [] })).toEqual({});
+  expect(releasePublisherLabels({ publisher_labels: "labels" })).toEqual({});
+  expect(
+    releasePublisherLabels({
+      publisher_labels: {
+        novastat_agency: "  Nova Statistics Agency  ",
+        IRS2: "IRS second series",
+        "bad-key": "Dropped",
+        _bad: "Dropped",
+        blank: "  ",
+        numeric: 12,
+      },
+    }),
+  ).toEqual({
+    novastat_agency: "Nova Statistics Agency",
+    IRS2: "IRS second series",
+  });
+});
+
+test("publisher labels flow through rows, variables, target responses, and treemaps", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        {
+          name: "fixture_population@2026",
+          target_name: "fixture_population",
+          source: "ZZ official population table",
+          metadata: {
+            chronicle_record_ids: ["novastat_agency.population.cy2026.total"],
+            variable: "population",
+            source_measure_id: "population_count",
+          },
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 100,
+        },
+      ],
+    },
+    "publisher-labels",
+    null,
+    {},
+    { publisher_labels: { novastat_agency: "Nova Statistics Agency" } },
+  );
+
+  expect(cal.publisher_labels).toEqual({
+    novastat_agency: "Nova Statistics Agency",
+  });
+  expect(cal.rows[0].source_label).toBe("Nova Statistics Agency");
+  const page = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics",
+    cal,
+  );
+  expect(page.targets[0].source_label).toBe("Nova Statistics Agency");
+  expect(page.variables[0].source_label).toBe("Nova Statistics Agency");
+  expect(microcosmTargetTreemap(cal.rows, cal.release_id).groups[0].label).toBe(
+    "Nova Statistics Agency",
+  );
+});
+
+test("publisher label lookup does not read inherited object properties", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        {
+          name: "constructor.population.total@2026",
+          source: "Citation",
+          metadata: { chronicle_record_ids: ["constructor.population.total"] },
+          target: 1,
+          initial_estimate: 1,
+          final_estimate: 1,
+        },
+      ],
+    },
+    "publisher-prototype",
+  );
+
+  expect(cal.rows[0].source_label).toBe("Constructor");
+});
+
+test("structured source and variable fields follow artifact precedence", () => {
+  const target = {
+    name: "legacy.publisher.population.total@2026",
+    source: {
+      id: "artifact_agency",
+      citation: "Official population table",
+      label: "Row agency label",
+      url: "https://stats.example/population",
+    },
+    variable: {
+      id: "resident_population",
+      label: "Resident population",
+      measure: "mean",
+    },
+    metadata: {
+      chronicle_record_ids: ["chronicle_agency.population.total"],
+      variable: "legacy_population",
+      source_measure_id: "legacy_population_count",
+    },
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 100,
+  };
+  const cal = buildCalibration(
+    { targets: [target] },
+    "structured-identifiers",
+    null,
+    {},
+    { publisher_labels: { chronicle_agency: "Manifest agency label" } },
+  );
+
+  expect(cal.rows[0]).toMatchObject({
+    source: "chronicle_agency",
+    source_label: "Manifest agency label",
+    source_citation: "Official population table",
+    source_url: "https://stats.example/population",
+    variable: "resident_population",
+    variable_label: "Resident population",
+    measure: "mean",
+    variable_key: "chronicle_agency / resident_population · mean",
+  });
+  const response = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics",
+    cal,
+  );
+  expect(response.targets[0]).toMatchObject({
+    source_url: "https://stats.example/population",
+    variable_label: "Resident population",
+  });
+  expect(response.variables[0].variable_label).toBe("Resident population");
+
+  const withoutChronicle = buildCalibration(
+    {
+      targets: [
+        {
+          ...target,
+          metadata: {
+            variable: "legacy_population",
+            source_measure_id: "legacy_population_count",
+          },
+        },
+      ],
+    },
+    "structured-source-fallback",
+  );
+  expect(withoutChronicle.rows[0]).toMatchObject({
+    source: "artifact_agency",
+    source_label: "Row agency label",
   });
 });
 
