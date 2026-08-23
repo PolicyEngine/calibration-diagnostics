@@ -7,6 +7,11 @@ import {
 import { withBasePath } from "@/lib/base-path";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
+import {
+  hasCapability,
+  type CountryCapability,
+  type RepositoryVisibility,
+} from "@/lib/microcosm/countries";
 import { apiGet } from "../client";
 
 export interface MicrocosmGates {
@@ -177,8 +182,20 @@ export interface GeographyCoverageBlock {
   counts?: Record<string, number>;
 }
 
+// Typed `release_manifest.country` merged over the country registration
+// (server: releaseCountry in lib/microcosm/latest-artifact.ts).
+export interface MicrocosmArtifactCountry {
+  code: Country;
+  label: string;
+  geography_id: string | null;
+  geography_label: string;
+  repository_visibility: RepositoryVisibility;
+  capabilities: CountryCapability[];
+}
+
 export interface MicrocosmCalibration {
   available: boolean;
+  country?: MicrocosmArtifactCountry;
   description?: string | null;
   diagnostics_status?: MicrocosmDiagnosticsStatus;
   dataset_role?: string | null;
@@ -299,6 +316,7 @@ export interface MicrocosmResponse {
 
 export interface MicrocosmTargetDiagnostics {
   available: boolean;
+  country?: MicrocosmArtifactCountry;
   description?: string | null;
   path?: string | null;
   release_id?: string | null;
@@ -310,6 +328,8 @@ export interface MicrocosmTargetDiagnostics {
   geographies?: string[];
   variables?: MicrocosmVariableRow[];
   dimensions?: MicrocosmTargetDimension[];
+  // Targets per named scope in the release (the `scope` query parameter).
+  scope_counts?: { healthcare?: number };
   summary: {
     diagnostics_status?: MicrocosmDiagnosticsStatus;
     total_targets?: number | null;
@@ -607,18 +627,20 @@ export function useMicrocosmCompare(a?: string, b?: string, enabled = true) {
 
 export function useMicrocosmStagingRuns() {
   const { country } = useCountry();
+  const staging = hasCapability(country, "staging");
   return useQuery({
     queryKey: ["microcosm", "staging", "runs", country],
     queryFn: () =>
       apiGet<MicrocosmStagingRunsResponse>("/microcosm/staging/runs", { country }),
-    enabled: country === "us",
+    enabled: staging,
     staleTime: 15 * 1000,
-    refetchInterval: country === "us" ? 30 * 1000 : false,
+    refetchInterval: staging ? 30 * 1000 : false,
   });
 }
 
 export function useMicrocosmStagingRun(runId?: string) {
   const { country } = useCountry();
+  const staging = hasCapability(country, "staging");
   return useQuery({
     queryKey: ["microcosm", "staging", "run", country, runId],
     queryFn: () =>
@@ -626,10 +648,10 @@ export function useMicrocosmStagingRun(runId?: string) {
         id: runId,
         country,
       }),
-    enabled: country === "us" && Boolean(runId),
+    enabled: staging && Boolean(runId),
     placeholderData: keepPreviousData,
     staleTime: 10 * 1000,
-    refetchInterval: country === "us" ? 30 * 1000 : false,
+    refetchInterval: staging ? 30 * 1000 : false,
   });
 }
 
@@ -642,7 +664,7 @@ export function useMicrocosmStagingCompare(runId?: string, release = "latest") {
         "/microcosm/staging/compare",
         { run: runId, release, country },
       ),
-    enabled: country === "us" && Boolean(runId),
+    enabled: hasCapability(country, "staging") && Boolean(runId),
     placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
   });

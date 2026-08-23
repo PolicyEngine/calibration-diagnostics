@@ -3,26 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { useCountry, type Country } from "@/components/layout/country-context";
+import { useCountry } from "@/components/layout/country-context";
 import {
   isActive,
   navGroupsForCountry,
   navItemHref,
   navLinkAttributes,
 } from "@/components/layout/nav-items";
-
-const DATASET: Record<Country, { label: string; repo?: string }> = {
-  // Deprecated upstream identifiers: Microcosm's HF repositories retain the
-  // former Populace slugs.
-  us: { label: "Microcosm US", repo: "policyengine/populace-us" },
-  uk: { label: "Microcosm UK" },
-  be: { label: "Microcosm Belgium" },
-};
+import {
+  countryRegistration,
+  selectableCountries,
+} from "@/lib/microcosm/countries";
 
 export function NavSidebar() {
   const pathname = usePathname();
   const { country, setCountry } = useCountry();
-  const dataset = DATASET[country];
+  const dataset = countryRegistration(country);
   const groups = navGroupsForCountry(country);
   return (
     <div className="flex flex-col gap-5 py-5">
@@ -37,7 +33,7 @@ export function NavSidebar() {
           aria-label="Country"
           className="mt-1.5 inline-flex rounded-lg bg-muted p-0.5"
         >
-          {(["us", "uk", "be"] as const).map((value) => {
+          {selectableCountries().map((value) => {
             const active = country === value;
             return (
               <button
@@ -57,8 +53,10 @@ export function NavSidebar() {
             );
           })}
         </div>
-        <div className="mt-1.5 text-sm font-semibold text-foreground">{dataset.label}</div>
-        {dataset.repo ? (
+        <div className="mt-1.5 text-sm font-semibold text-foreground">
+          {dataset.dataset_label}
+        </div>
+        {dataset.visibility === "public" ? (
           <div className="font-mono text-xs text-muted-foreground">{dataset.repo}</div>
         ) : null}
       </div>

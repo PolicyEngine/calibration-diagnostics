@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 
+import { hasCapability, selectableCountries } from "@/lib/microcosm/countries";
+
 import {
   isActive,
   navGroupsForCountry,
@@ -78,11 +80,28 @@ test("preserves the Cross-dataset navigation label and route", () => {
   expect(item).toEqual({
     href: "/microcosm/datasets",
     label: "Cross-dataset",
+    capability: "cross_dataset",
   });
   expect(isActive("/microcosm/datasets", item!)).toBe(true);
 });
 
-test("Belgium navigation keeps country-ready pages and hides US-only tools", () => {
+test("every navigation item is gated by a capability, never by a country code", () => {
+  const items = NAV_GROUPS.flatMap((group) => group.items);
+  expect(items.every((item) => item.capability != null)).toBe(true);
+  expect(items.find((item) => item.href === "/microcosm/staging")?.capability).toBe("staging");
+  expect(items.find((item) => item.href === "/microcosm/model-coverage")?.capability).toBe(
+    "model_coverage",
+  );
+  expect(items.find((item) => item.href === "/microcosm/pipeline")?.capability).toBe("pipeline");
+  expect(items.find((item) => item.href === "/microcosm/variables")?.capability).toBe(
+    "variables",
+  );
+  expect(items.find((item) => item.label === "External checks")?.capability).toBe(
+    "external_checks",
+  );
+});
+
+test("Belgium navigation keeps country-ready pages and hides pages it lacks capabilities for", () => {
   const items = navGroupsForCountry("be").flatMap((group) => group.items);
   expect(items.map((item) => item.href)).toEqual([
     "/microcosm",
@@ -90,7 +109,7 @@ test("Belgium navigation keeps country-ready pages and hides US-only tools", () 
     "/microcosm/datasets",
     "/microcosm/compare",
   ]);
-  expect(items.every((item) => item.usOnly !== true)).toBe(true);
+  expect(items.every((item) => hasCapability("be", item.capability!))).toBe(true);
   expect(items.map((item) => navItemHref(item, "be"))).toEqual([
     "/microcosm?country=be",
     "/microcosm/targets?country=be",
@@ -99,8 +118,23 @@ test("Belgium navigation keeps country-ready pages and hides US-only tools", () 
   ]);
 });
 
+test("US navigation lists every page", () => {
+  expect(navGroupsForCountry("us").flatMap((group) => group.items)).toEqual(
+    NAV_GROUPS.flatMap((group) => group.items),
+  );
+});
+
+test("artifact-narrowed capabilities hide pages the release does not serve", () => {
+  const groups = navGroupsForCountry("us", ["calibration", "targets"]);
+  expect(groups.map((group) => group.label)).toEqual(["Dataset accuracy"]);
+  expect(groups[0].items.map((item) => item.href)).toEqual([
+    "/microcosm",
+    "/microcosm/targets",
+  ]);
+});
+
 test("shows Cross-dataset navigation for every selectable country", () => {
-  for (const country of ["us", "uk", "be"] as const) {
+  for (const country of selectableCountries()) {
     expect(
       navGroupsForCountry(country)
         .flatMap((group) => group.items)

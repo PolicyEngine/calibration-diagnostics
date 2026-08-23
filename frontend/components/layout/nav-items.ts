@@ -1,11 +1,17 @@
 import type { Country } from "@/components/layout/country-context";
+import {
+  countryCapabilities,
+  type CountryCapability,
+} from "@/lib/microcosm/countries";
 
-// usOnly pages run on US-specific data/runtimes (JCT scores, the PolicyEngine-US
-// variable runtime) and aren't wired for UK yet.
+// A page is shown when the country (or the release artifact, which can narrow
+// a registration) serves its capability. Pages that run on country-specific
+// data/runtimes (JCT scores, the PolicyEngine-US variable runtime, the staging
+// repository) are granted only to the countries wired for them.
 export interface NavItem {
   href: string;
   label: string;
-  usOnly?: boolean;
+  capability?: CountryCapability;
   external?: boolean;
   // Extra path prefixes that keep this item highlighted (drill-down views).
   also?: string[];
@@ -17,17 +23,21 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Dataset accuracy",
     items: [
-      { href: "/microcosm", label: "Calibration fit" },
-      { href: "/microcosm/targets", label: "Calibration targets" },
-      { href: "/microcosm/model-coverage", label: "Validation reach", usOnly: true },
+      { href: "/microcosm", label: "Calibration fit", capability: "calibration" },
+      { href: "/microcosm/targets", label: "Calibration targets", capability: "targets" },
+      {
+        href: "/microcosm/model-coverage",
+        label: "Validation reach",
+        capability: "model_coverage",
+      },
       // External checks (reform scores vs JCT/fiscal notes/admin actuals)
       // moved to the PolicyEngine scorecard, which owns all external
       // comparisons; per-release history was ingested there (issue #15).
-      { href: "/microcosm/datasets", label: "Cross-dataset" },
+      { href: "/microcosm/datasets", label: "Cross-dataset", capability: "cross_dataset" },
       {
         href: "https://www.policyengine.org/scorecard",
         label: "External checks",
-        usOnly: true,
+        capability: "external_checks",
         external: true,
       },
     ],
@@ -35,23 +45,28 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Releases",
     items: [
-      { href: "/microcosm/compare", label: "Compare versions" },
-      { href: "/microcosm/staging", label: "Staging candidates", usOnly: true },
+      { href: "/microcosm/compare", label: "Compare versions", capability: "compare" },
+      { href: "/microcosm/staging", label: "Staging candidates", capability: "staging" },
     ],
   },
   {
     label: "Reference",
     items: [
-      { href: "/microcosm/pipeline", label: "Pipeline", usOnly: true },
-      { href: "/microcosm/variables", label: "Variable lookup", usOnly: true },
+      { href: "/microcosm/pipeline", label: "Pipeline", capability: "pipeline" },
+      { href: "/microcosm/variables", label: "Variable lookup", capability: "variables" },
     ],
   },
 ];
 
-export function navGroupsForCountry(country: Country) {
+export function navGroupsForCountry(
+  country: Country,
+  capabilities: readonly CountryCapability[] = countryCapabilities(country),
+) {
   return NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => country === "us" || !item.usOnly),
+    items: group.items.filter(
+      (item) => item.capability == null || capabilities.includes(item.capability),
+    ),
   })).filter((group) => group.items.length > 0);
 }
 

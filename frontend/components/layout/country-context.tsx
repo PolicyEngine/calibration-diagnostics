@@ -8,13 +8,15 @@ import {
   type ReactNode,
 } from "react";
 
-export type Country = "us" | "uk" | "be";
+import {
+  DEFAULT_COUNTRY,
+  isCountry,
+  type MicrocosmCountry,
+} from "@/lib/microcosm/countries";
 
-const COUNTRIES = new Set<Country>(["us", "uk", "be"]);
+export type Country = MicrocosmCountry;
 
-export function isCountry(value: string | null): value is Country {
-  return value != null && COUNTRIES.has(value as Country);
-}
+export { isCountry };
 
 const STORAGE_KEY = "microcosm-country";
 
@@ -41,12 +43,12 @@ interface CountryContextValue {
 }
 
 const CountryContext = createContext<CountryContextValue>({
-  country: "us",
+  country: DEFAULT_COUNTRY,
   setCountry: () => {},
 });
 
 export function CountryProvider({ children }: { children: ReactNode }) {
-  const [country, setCountryState] = useState<Country>("us");
+  const [country, setCountryState] = useState<Country>(DEFAULT_COUNTRY);
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("country");

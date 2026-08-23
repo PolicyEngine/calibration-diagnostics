@@ -36,3 +36,22 @@ test("does not expose the private Belgium Hugging Face dataset", () => {
     href: null,
   });
 });
+
+test("the release artifact's repository visibility overrides the registration", () => {
+  expect(
+    microcosmSourceAttribution("be", "policyengine/populace-be", "public"),
+  ).toEqual({
+    label: "Microcosm",
+    href: "https://huggingface.co/datasets/policyengine/populace-be",
+  });
+  expect(
+    microcosmSourceAttribution("us", "policyengine/populace-us", "private"),
+  ).toEqual({
+    label: "Microcosm",
+    href: null,
+  });
+  expect(microcosmSourceAttribution("us", "policyengine/populace-us", undefined)).toEqual({
+    label: "Microcosm",
+    href: "https://huggingface.co/datasets/policyengine/populace-us",
+  });
+});

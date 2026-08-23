@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
-import { useCountry, type Country } from "@/components/layout/country-context";
+import { useCountry } from "@/components/layout/country-context";
 import { ArtifactDescriptionBanner } from "@/components/microcosm/artifact-description-banner";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -13,6 +13,7 @@ import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { withBasePath } from "@/lib/base-path";
+import { hasCapability, type MicrocosmCountry } from "@/lib/microcosm/countries";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 import {
   releaseSelectOptions,
@@ -26,7 +27,10 @@ import {
 
 const PAGE_SIZE = 50;
 
-const COUNTRY_BROWSE_COPY: Record<Country, string> = {
+// Legacy per-country browse prompt for releases published before a typed
+// `release_manifest.presentation` block; countries without an entry get the
+// generic prompt.
+const COUNTRY_BROWSE_COPY: Partial<Record<MicrocosmCountry, string>> = {
   us:
     "Pick a measure like EITC, population, or AGI and see how each breakdown is calibrated.",
   uk:
@@ -34,6 +38,7 @@ const COUNTRY_BROWSE_COPY: Record<Country, string> = {
   be:
     "Pick a measure like population, income tax, or pension recipients and see how each breakdown is calibrated.",
 };
+const GENERIC_BROWSE_COPY = "Pick a measure and see how each breakdown is calibrated.";
 
 interface SortState {
   by: string;
@@ -571,8 +576,9 @@ export function MicrocosmTargetsView({
   const releaseOptions = useMemo(
     () => [
       ...releaseSelectOptions(releaseData),
-      // Candidate staging runs (US-only), reviewable like a release pre-publish.
-      ...(country === "us" ? (stagingData?.runs ?? []) : []).map((r) => ({
+      // Candidate staging runs (countries with the staging capability),
+      // reviewable like a release pre-publish.
+      ...(hasCapability(country, "staging") ? (stagingData?.runs ?? []) : []).map((r) => ({
         value: `staging:${r.run_id}`,
         label: `candidate · ${releaseLabel(r.run_id, r.updated_at)}${
           r.status && r.status !== "completed" ? ` (${r.status})` : ""
@@ -702,6 +708,8 @@ export function MicrocosmTargetsView({
   );
   const filteredTotal = data?.filtered_total ?? 0;
   const allTargets = data?.total_targets ?? null;
+  // The healthcare focus is offered when the release has healthcare targets.
+  const hasHealthcareTargets = (data?.scope_counts?.healthcare ?? 0) > 0;
   const pageCount = Math.max(Math.ceil(filteredTotal / PAGE_SIZE), 1);
   const activeVariable = variables.find((v) => v.variable_key === variable);
 
@@ -1072,12 +1080,12 @@ export function MicrocosmTargetsView({
             <WizardCard
               eyebrow="Browse"
               title="Explore a statistic"
-              body={COUNTRY_BROWSE_COPY[country]}
+              body={COUNTRY_BROWSE_COPY[country] ?? GENERIC_BROWSE_COPY}
               stat={variableGroupCount ? `${fmt(variableGroupCount, { digits: 0 })} statistics` : "Browse measures"}
               accent="teal"
               onClick={startExplore}
             />
-            {country === "us" ? (
+            {hasHealthcareTargets ? (
               <WizardCard
                 eyebrow="Focus"
                 title="Healthcare programs"
