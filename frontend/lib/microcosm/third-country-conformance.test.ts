@@ -305,4 +305,84 @@ describe("synthetic third-country conformance", () => {
       ]);
     },
   );
+
+  test("structured source and variable identifiers replace name parsing", () => {
+    const structuredSource = {
+      id: "novastat_agency",
+      citation: "ZZ official population table",
+      url: "https://stats.example/zz/pop",
+    };
+    const structuredVariable = {
+      id: "population",
+      label: "Resident population",
+      measure: "count",
+    };
+    const futureDiagnostics = {
+      ...diagnosticsFixture,
+      dimensions: {
+        region: {
+          label: "Region",
+          role: "geography",
+          level: "region",
+          values: { north: "North", south: "South" },
+        },
+        sex: { label: "Sex", values: { female: "Female", male: "Male" } },
+        age_band: { label: "Age band" },
+      },
+      targets: diagnosticsFixture.targets.map((target, index) => {
+        const metadata = Object.fromEntries(
+          Object.entries(target.metadata).filter(([key]) => key !== "variable"),
+        );
+        return {
+          ...target,
+          ...(index === 0
+            ? {
+                filter: null,
+                dimensions: {
+                  region: "north",
+                  sex: "female",
+                  age_band: "0_17",
+                },
+              }
+            : {}),
+          source: structuredSource,
+          variable: structuredVariable,
+          metadata,
+        };
+      }),
+    };
+    const futureCalibration = buildCalibration(
+      futureDiagnostics,
+      RELEASE_ID,
+      "2026-08-23T18:00:00Z",
+      {},
+      releaseManifestFixture,
+      {},
+      COUNTRY,
+    );
+
+    expect(futureCalibration.rows.map((row) => row.dimension_adapter)).toEqual([
+      "structured",
+      "legacy_filter",
+      "legacy_filter",
+      "legacy_name",
+    ]);
+    const page = latestMicrocosmTargetDiagnosticsPage(
+      `http://x/api/microcosm/target-diagnostics?variable=${encodeURIComponent("novastat_agency / population · count")}`,
+      futureCalibration,
+    );
+    const structuredRow = page.targets.find(
+      (row) => row.dimension_adapter === "structured",
+    );
+    expect(structuredRow).toMatchObject({
+      source: "novastat_agency",
+      source_citation: "ZZ official population table",
+      source_url: "https://stats.example/zz/pop",
+      variable: "population",
+      variable_label: "Resident population",
+      measure: "count",
+      variable_key: "novastat_agency / population · count",
+      dimension_adapter: "structured",
+    });
+  });
 });

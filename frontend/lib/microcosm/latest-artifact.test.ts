@@ -508,6 +508,137 @@ test("keeps legacy US dotted target families when Chronicle publisher metadata i
   });
 });
 
+test("live-US-shaped schema 5 rows preserve the legacy dotted contract", () => {
+  const sourceCitation =
+    "Bureau of Economic Analysis, National Income and Product Accounts, Table 1.12";
+  const cal = buildCalibration(
+    {
+      schema_version: 5,
+      targets: [
+        {
+          name: "bea_nipa.cy2023.proprietors_income.a041rc.amount@2024",
+          filter: null,
+          source: sourceCitation,
+          metadata: {
+            chronicle_record_ids: [
+              "bea_nipa.cy2023.proprietors_income.a041rc.amount",
+            ],
+            variable: "proprietors_income",
+            source_measure_id: "proprietors_income_amount",
+            ledger_geography_level: "country",
+            ledger_geography_id: "0100000US",
+            ledger_layout_groupby_dimension: "bea_nipa.line_code",
+            ledger_layout_groupby_value_id: "a041rc",
+            ledger_measure_unit: "usd",
+          },
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 99,
+          relative_error: -0.01,
+          within_tolerance: true,
+        },
+      ],
+    },
+    "live-us-shaped",
+  );
+  const responseRow = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics",
+    cal,
+  ).targets[0];
+
+  // JSON round-tripping matches the API boundary and locks every legacy field;
+  // the four new contract fields are strictly additive.
+  expect(JSON.parse(JSON.stringify(responseRow))).toEqual({
+    name: "bea_nipa.cy2023.proprietors_income.a041rc.amount@2024",
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 99,
+    relative_error: -0.01,
+    within_tolerance: true,
+    base_name: "bea_nipa.cy2023.proprietors_income.a041rc.amount",
+    family: "bea_nipa.cy2023.proprietors_income.a041rc.amount",
+    state: null,
+    geography: "United States",
+    level: "national",
+    source: "bea_nipa",
+    source_label: "BEA Nipa",
+    variable: "proprietors income",
+    variable_label: null,
+    measure: "total",
+    target_role: null,
+    source_measure_id: "proprietors_income_amount",
+    policyengine_variables: [],
+    policyengine_map_to: null,
+    policyengine_filter_variable: null,
+    materializer: null,
+    measure_mode: null,
+    error_kind: "relative",
+    initial_error: -0.1,
+    final_error: -0.01,
+    initial_miss: -10,
+    final_miss: -1,
+    abs_final_miss: 1,
+    absolute_improvement: 9,
+    abs_error: 0.01,
+    breakdown: "a041rc",
+    dims: ["a041rc"],
+    target_dimensions: [
+      {
+        key: "bd_line_code",
+        label: "Line Code",
+        value: "a041rc",
+        source_key: "ledger_layout_groupby_value_id",
+        raw_value: "a041rc",
+      },
+    ],
+    dimension_adapter: "legacy_name",
+    variable_key: "bea_nipa / proprietors income · total",
+    source_citation: sourceCitation,
+    source_url: null,
+    entity: null,
+    aggregation: null,
+    measure_name: null,
+    period: null,
+    chronicle: {
+      fact_key: null,
+      source_record_id: null,
+      semantic_fact_key: null,
+      aggregate_fact_key: null,
+      legacy_fact_key: null,
+      period_type: null,
+      source_period: null,
+      target_period: null,
+      geography_level: "country",
+      geography_id: "0100000US",
+      geography_vintage: null,
+      domain: null,
+      entity_name: null,
+      entity_role: null,
+      measure_concept: null,
+      source_concept: null,
+      concept_relation: null,
+      concept_authority: null,
+      measure_unit: "usd",
+      value_operation: null,
+      layout_record_set_id: null,
+      layout_groupby_dimension: "bea_nipa.line_code",
+      layout_groupby_value_id: "a041rc",
+      layout_measure_id: null,
+      dimension_set_key: null,
+      universe_constraint_set_key: null,
+      universe_constraint_count: null,
+      filters: [],
+    },
+    calibration_status: "included",
+    calibration_status_label: "Included",
+    calibration_status_reason: null,
+    initial_relative_error: -0.1,
+    abs_relative_error: 0.01,
+    improvement: 0.09000000000000001,
+    direction: "under",
+  });
+});
+
 // A v2-shaped target: AGI bracket × return type × filing status, with @period.
 function agiTarget(band: string, ret: string, filing: string, rel: number) {
   return {
@@ -1713,6 +1844,77 @@ test("publisher label lookup does not read inherited object properties", () => {
   );
 
   expect(cal.rows[0].source_label).toBe("Constructor");
+});
+
+test("structured source and variable fields follow artifact precedence", () => {
+  const target = {
+    name: "legacy.publisher.population.total@2026",
+    source: {
+      id: "artifact_agency",
+      citation: "Official population table",
+      label: "Row agency label",
+      url: "https://stats.example/population",
+    },
+    variable: {
+      id: "resident_population",
+      label: "Resident population",
+      measure: "mean",
+    },
+    metadata: {
+      chronicle_record_ids: ["chronicle_agency.population.total"],
+      variable: "legacy_population",
+      source_measure_id: "legacy_population_count",
+    },
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 100,
+  };
+  const cal = buildCalibration(
+    { targets: [target] },
+    "structured-identifiers",
+    null,
+    {},
+    { publisher_labels: { chronicle_agency: "Manifest agency label" } },
+  );
+
+  expect(cal.rows[0]).toMatchObject({
+    source: "chronicle_agency",
+    source_label: "Manifest agency label",
+    source_citation: "Official population table",
+    source_url: "https://stats.example/population",
+    variable: "resident_population",
+    variable_label: "Resident population",
+    measure: "mean",
+    variable_key: "chronicle_agency / resident_population · mean",
+  });
+  const response = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics",
+    cal,
+  );
+  expect(response.targets[0]).toMatchObject({
+    source_url: "https://stats.example/population",
+    variable_label: "Resident population",
+  });
+  expect(response.variables[0].variable_label).toBe("Resident population");
+
+  const withoutChronicle = buildCalibration(
+    {
+      targets: [
+        {
+          ...target,
+          metadata: {
+            variable: "legacy_population",
+            source_measure_id: "legacy_population_count",
+          },
+        },
+      ],
+    },
+    "structured-source-fallback",
+  );
+  expect(withoutChronicle.rows[0]).toMatchObject({
+    source: "artifact_agency",
+    source_label: "Row agency label",
+  });
 });
 
 const BE_COUNTRY_DEFAULTS: ArtifactCountry = {

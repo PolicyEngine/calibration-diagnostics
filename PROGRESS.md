@@ -2,8 +2,8 @@
 
 ## State
 
-Presentation, publisher labels, and structured dimensions are implemented. The
-legacy US name and UK/BE filter paths remain intact and are selected per row.
+All server-side B1-B4 artifact readers and adapters are implemented. The legacy
+US name and UK/BE filter paths remain intact and are selected per row.
 
 ## Done
 
@@ -36,10 +36,17 @@ legacy US name and UK/BE filter paths remain intact and are selected per row.
 - Enabled the existing ZZ structured-facet conformance assertion unchanged;
   the focused artifact/conformance suite now has `67 pass`, `0 todo`, and
   `0 fail`.
+- Added structured source/variable object readers with Chronicle/source/name
+  and variable/metadata/name precedence, plus source citation/URL and variable
+  label/measure propagation.
+- Added the fifth ZZ conformance test (`9 pass`, `0 todo`) and an exact
+  JSON-shaped schema-5 US regression for the dotted BEA NIPA row.
+- The focused artifact/conformance suite now has `70 pass`, `0 fail`, and
+  `267 expect()` calls.
 
 ## Next
 
-- Implement structured source/variable identifiers and their response fields.
 - Add the artifact → legacy → generic presentation fallbacks to both views.
+- Make every row-aware publisher/variable display prefer artifact labels.
 - Enable and extend conformance tests, add regressions, and document B1-B6.
 - Run the full frontend test, type-check, and production-build gates.

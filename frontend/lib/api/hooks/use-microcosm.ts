@@ -51,7 +51,9 @@ export interface MicrocosmTargetRow {
   level?: string | null;
   source?: string | null;
   source_label?: string | null;
+  source_url?: string | null;
   variable?: string | null;
+  variable_label?: string | null;
   measure?: string | null;
   target_role?: string | null;
   source_measure_id?: string | null;
@@ -142,6 +144,7 @@ export interface MicrocosmVariableRow {
   source: string;
   source_label: string;
   variable: string;
+  variable_label?: string | null;
   measure: string | null;
   level: string;
   policyengine_variables?: string[];

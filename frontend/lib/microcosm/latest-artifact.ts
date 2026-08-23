@@ -801,13 +801,51 @@ function chroniclePublisherFromMetadata(metadata: JsonObject): string | null {
   return first?.trim().split(".", 1)[0] || null;
 }
 
+interface StructuredTargetSource {
+  id: string | null;
+  citation: string | null;
+  label: string | null;
+  url: string | null;
+}
+
+interface StructuredTargetVariable {
+  id: string;
+  label: string | null;
+  measure: string | null;
+}
+
+function structuredTargetSource(value: unknown): StructuredTargetSource | null {
+  if (!isPlainObject(value)) return null;
+  return {
+    id: stringValue(value.id)?.trim() ?? null,
+    citation: stringValue(value.citation)?.trim() ?? null,
+    label: stringValue(value.label)?.trim() ?? null,
+    url: stringValue(value.url)?.trim() ?? null,
+  };
+}
+
+function structuredTargetVariable(value: unknown): StructuredTargetVariable | null {
+  if (!isPlainObject(value)) return null;
+  const id = stringValue(value.id)?.trim();
+  if (!id) return null;
+  return {
+    id,
+    label: stringValue(value.label)?.trim() ?? null,
+    measure: stringValue(value.measure)?.trim() ?? null,
+  };
+}
+
 function artifactVariable(
   name: string,
   row: TargetRow,
   decomposition: DecomposedTargetFilter | null,
+  structuredVariable: StructuredTargetVariable | null,
 ): string | null {
   const metadata = asObject(row.metadata);
-  const published = stringValue(metadata.variable) ?? stringValue(row.variable);
+  if (structuredVariable) return structuredVariable.id;
+  const published =
+    stringValue(metadata.variable) ??
+    (typeof row.variable === "string" ? stringValue(row.variable) : null);
   if (published) return readableToken(published);
   if (!name.includes("_") || name.includes("/")) return null;
 
@@ -1247,6 +1285,8 @@ function enrichTargetRow(
     initialError == null || finalError == null
       ? null
       : Math.abs(initialError) - Math.abs(finalError);
+  const publishedSource = structuredTargetSource(row.source);
+  const publishedVariable = structuredTargetVariable(row.variable);
   const structuredDecomposition = isPlainObject(row.dimensions)
     ? decomposeStructuredDimensions(row.dimensions, dimensionDefinitions)
     : null;
@@ -1258,7 +1298,8 @@ function enrichTargetRow(
     : filterDecomposition
       ? "legacy_filter"
       : "legacy_name";
-  const publisher = chroniclePublisherFromMetadata(metadata);
+  const publisher =
+    chroniclePublisherFromMetadata(metadata) ?? publishedSource?.id ?? null;
   const parsedFromName =
     parseDottedTarget(baseName, row, nationalGeography) ??
     parseTarget(baseName, nationalGeography);
@@ -1274,7 +1315,12 @@ function enrichTargetRow(
       parsedFromName.level,
     source: publisher ?? parsedFromName.source,
     variable:
-      artifactVariable(baseName, row, filterDecomposition) ??
+      artifactVariable(
+        baseName,
+        row,
+        filterDecomposition,
+        publishedVariable,
+      ) ??
       parsedFromName.variable,
     breakdown: structuredDecomposition
       ? structuredDecomposition.dimensions
@@ -1310,9 +1356,11 @@ function enrichTargetRow(
   // IRS variables publish both a total (dollar amount) and a count (number of
   // returns), so the measure is part of the variable's identity, not a
   // breakdown within it — fold it into variable_key so they're distinct things.
-  const measure = dims[0] && MEASURES.has(dims[0])
-    ? dims[0]
-    : measureFromMetadata(metadata);
+  const measure =
+    publishedVariable?.measure ??
+    (dims[0] && MEASURES.has(dims[0])
+      ? dims[0]
+      : measureFromMetadata(metadata));
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
   // Underscore identifiers and filter-decomposed targets use the structured
@@ -1320,6 +1368,8 @@ function enrichTargetRow(
   // without filter dimensions retain their legacy family so US/UK releases do
   // not regroup merely because they also carry Chronicle record IDs.
   const usesArtifactFamily =
+    publishedSource?.id != null ||
+    publishedVariable != null ||
     structuredDecomposition != null ||
     filterDecomposition != null ||
     (publisher != null && !baseName.includes("/") && !baseName.includes("."));
@@ -1335,8 +1385,11 @@ function enrichTargetRow(
     source_label:
       (Object.hasOwn(publisherLabels, parsed.source)
         ? publisherLabels[parsed.source]
-        : undefined) ?? sourceAuthorityLabel(parsed.source),
+        : undefined) ??
+      publishedSource?.label ??
+      sourceAuthorityLabel(parsed.source),
     variable: parsed.variable,
+    variable_label: publishedVariable?.label ?? null,
     measure,
     target_role: targetRole,
     source_measure_id: sourceMeasureId,
@@ -1361,7 +1414,11 @@ function enrichTargetRow(
     dimension_adapter: dimensionAdapter,
     variable_key: variableKey,
     // v2 published metadata (null on v1).
-    source_citation: typeof row.source === "string" ? (row.source as string) : null,
+    source_citation:
+      typeof row.source === "string"
+        ? (row.source as string)
+        : publishedSource?.citation ?? null,
+    source_url: publishedSource?.url ?? null,
     entity: typeof row.entity === "string" ? (row.entity as string) : null,
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
@@ -1652,6 +1709,7 @@ export function microcosmVariableSummary(rows: TargetRow[]) {
           first.source_label ?? sourceAuthorityLabel(String(first.source ?? "")),
         ),
         variable: String(first.variable ?? ""),
+        variable_label: uniqueString("variable_label"),
         measure: first.measure ? String(first.measure) : null,
         level: String(first.level ?? ""),
         policyengine_variables: policyengineVariables,
@@ -2470,6 +2528,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     source: row.source,
     source_label: row.source_label,
     variable: row.variable,
+    variable_label: row.variable_label,
     measure: row.measure,
     target_role: row.target_role,
     source_measure_id: row.source_measure_id,
@@ -2492,6 +2551,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     dimension_adapter: row.dimension_adapter,
     variable_key: row.variable_key,
     source_citation: row.source_citation,
+    source_url: row.source_url,
     entity: row.entity,
     aggregation: row.aggregation,
     measure_name: row.measure_name,
