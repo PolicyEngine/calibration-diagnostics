@@ -76,7 +76,9 @@ export interface MicrocosmTargetRow {
     value: string;
     source_key?: string;
     raw_value?: string;
+    rank?: number;
   }[] | null;
+  dimension_adapter?: "structured" | "legacy_filter" | "legacy_name" | null;
   variable_key?: string | null;
   // schema v2 published registry metadata (null on v1).
   source_citation?: string | null;
@@ -200,10 +202,16 @@ export interface MicrocosmArtifactPresentation {
   targets_intro?: string;
 }
 
+export interface MicrocosmTargetSchema {
+  diagnostics_schema_version: number | null;
+  structured_dimensions: boolean;
+}
+
 export interface MicrocosmCalibration {
   available: boolean;
   country?: MicrocosmArtifactCountry;
   presentation?: MicrocosmArtifactPresentation | null;
+  target_schema?: MicrocosmTargetSchema;
   description?: string | null;
   diagnostics_status?: MicrocosmDiagnosticsStatus;
   dataset_role?: string | null;
@@ -326,6 +334,7 @@ export interface MicrocosmTargetDiagnostics {
   available: boolean;
   country?: MicrocosmArtifactCountry;
   presentation?: MicrocosmArtifactPresentation | null;
+  target_schema?: MicrocosmTargetSchema;
   description?: string | null;
   path?: string | null;
   release_id?: string | null;
@@ -378,6 +387,7 @@ export interface MicrocosmComparisonRow {
     value: string;
     source_key?: string;
     raw_value?: string;
+    rank?: number;
   }[] | null;
   geography?: string | null;
   a_target?: number | null;

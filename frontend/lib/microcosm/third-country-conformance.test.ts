@@ -252,7 +252,7 @@ describe("synthetic third-country conformance", () => {
       expect(treemap.groups[0]?.label).toBe("Nova Statistics Agency");
     },
   );
-  test.todo(
+  test(
     "zz can supply structured facets: target shaping ignores calibration_diagnostics dimensions blocks",
     () => {
       const facetValues = [

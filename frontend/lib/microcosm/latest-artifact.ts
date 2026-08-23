@@ -239,6 +239,7 @@ interface TargetBreakdownDimension {
   value: string;
   source_key?: string;
   raw_value?: string;
+  rank?: number;
 }
 
 interface ChronicleFilter {
@@ -620,6 +621,55 @@ interface FilterDecompositionSpec {
   dimensions: readonly FilterDimensionSpec[];
 }
 
+export interface DiagnosticsDimension {
+  label: string;
+  role?: "geography";
+  level?: string;
+  values?: Record<string, string>;
+  order?: string[];
+}
+
+export function diagnosticsDimensions(
+  diag: JsonObject,
+): Record<string, DiagnosticsDimension> {
+  if (!isPlainObject(diag.dimensions)) return {};
+  return Object.fromEntries(
+    Object.entries(diag.dimensions).flatMap(([id, rawDefinition]) => {
+      if (!id || !isPlainObject(rawDefinition)) return [];
+      const label = stringValue(rawDefinition.label)?.trim();
+      if (!label) return [];
+      const role = rawDefinition.role === "geography" ? "geography" : undefined;
+      const level = stringValue(rawDefinition.level)?.trim();
+      const values = isPlainObject(rawDefinition.values)
+        ? Object.fromEntries(
+            Object.entries(rawDefinition.values).flatMap(([rawValue, rawLabel]) => {
+              if (!rawValue || typeof rawLabel !== "string") return [];
+              const valueLabel = rawLabel.trim();
+              return valueLabel ? [[rawValue, valueLabel]] : [];
+            }),
+          )
+        : undefined;
+      const order = Array.isArray(rawDefinition.order)
+        ? rawDefinition.order.flatMap((rawValue) => {
+            if (typeof rawValue !== "string") return [];
+            const value = rawValue.trim();
+            return value ? [value] : [];
+          })
+        : undefined;
+      return [[
+        id,
+        {
+          label,
+          ...(role ? { role } : {}),
+          ...(level ? { level } : {}),
+          ...(values ? { values } : {}),
+          ...(order ? { order } : {}),
+        },
+      ]];
+    }),
+  );
+}
+
 // Legacy artifacts encode some dimensions in a compiled filter name. The
 // adapter is selected by the filter pattern, never by country; future artifacts
 // should publish structured target dimensions instead.
@@ -650,16 +700,66 @@ interface DecomposedTargetFilter {
   dimensions: TargetBreakdownDimension[];
 }
 
-function filterDimensionValue(spec: FilterDimensionSpec, rawValue: string): string {
-  const explicit = spec.valueLabels?.[rawValue];
+interface DecomposedStructuredDimensions {
+  geography: string | null;
+  level: string | null;
+  dimensions: TargetBreakdownDimension[];
+}
+
+function dimensionValue(
+  label: string,
+  rawValue: string,
+  valueLabels?: Readonly<Record<string, string>>,
+): string {
+  const explicit =
+    valueLabels && Object.hasOwn(valueLabels, rawValue)
+      ? valueLabels[rawValue]
+      : undefined;
   if (explicit) return explicit;
-  if (spec.label === "Age band") {
+  if (label.toLowerCase() === "age band") {
     const range = /^(\d+)_(\d+)$/.exec(rawValue);
     if (range) return `${range[1]}–${range[2]}`;
     const openEnded = /^(\d+)_plus$/.exec(rawValue);
     if (openEnded) return `${openEnded[1]}+`;
   }
   return titleCase(rawValue);
+}
+
+function filterDimensionValue(spec: FilterDimensionSpec, rawValue: string): string {
+  return dimensionValue(spec.label, rawValue, spec.valueLabels);
+}
+
+function decomposeStructuredDimensions(
+  values: JsonObject,
+  definitions: Record<string, DiagnosticsDimension>,
+): DecomposedStructuredDimensions {
+  let geography: string | null = null;
+  let level: string | null = null;
+  const dimensions: TargetBreakdownDimension[] = [];
+  for (const [id, raw] of Object.entries(values)) {
+    const rawValue = stringValue(raw)?.trim();
+    if (!rawValue) continue;
+    const definition = definitions[id];
+    const label = definition?.label ?? dimensionLabel(id);
+    const value = dimensionValue(label, rawValue, definition?.values);
+    const rankOrder = definition?.order ??
+      (definition?.values ? Object.keys(definition.values) : undefined);
+    const rank = rankOrder?.indexOf(rawValue) ?? -1;
+    if (definition?.role === "geography") {
+      geography ??= value;
+      level ??= definition.level ?? "region";
+      continue;
+    }
+    dimensions.push({
+      key: dimensionKey(label),
+      label,
+      value,
+      source_key: id,
+      raw_value: rawValue,
+      ...(rank >= 0 ? { rank } : {}),
+    });
+  }
+  return { geography, level, dimensions };
 }
 
 function decomposeTargetFilter(value: unknown): DecomposedTargetFilter | null {
@@ -978,7 +1078,34 @@ function computeDimensions(rows: TargetRow[]): TargetDimension[] {
     ];
     if (values.length <= 1) continue;
     const label = candidate.label ?? classifyDimension(values);
-    facets.push({ key: candidate.key, label, values: sortFacetValues(label, values) });
+    const ranks = new Map<string, number>();
+    let everyValueRanked = candidate.key !== "geography";
+    for (const value of values) {
+      const matchingDimensions = rows.flatMap((row) =>
+        ((row.target_dimensions as TargetBreakdownDimension[] | undefined) ?? [])
+          .filter((dimension) =>
+            dimension.key === candidate.key && dimension.value === value,
+          ),
+      );
+      if (
+        !matchingDimensions.length ||
+        matchingDimensions.some((dimension) => typeof dimension.rank !== "number")
+      ) {
+        everyValueRanked = false;
+        break;
+      }
+      ranks.set(
+        value,
+        Math.min(...matchingDimensions.map((dimension) => dimension.rank as number)),
+      );
+    }
+    const sortedValues = everyValueRanked
+      ? [...values].sort(
+          (a, b) =>
+            (ranks.get(a) ?? 0) - (ranks.get(b) ?? 0) || a.localeCompare(b),
+        )
+      : sortFacetValues(label, values);
+    facets.push({ key: candidate.key, label, values: sortedValues });
   }
   return facets;
 }
@@ -1080,6 +1207,7 @@ function enrichTargetRow(
   droppedTargetNames: Set<string>,
   artifactCountry: ArtifactCountry,
   publisherLabels: Record<string, string>,
+  dimensionDefinitions: Record<string, DiagnosticsDimension>,
 ): TargetRow {
   const nationalGeography = artifactCountry.geography_label;
   const metadata = normalizeChronicleMetadata(rawRow.metadata);
@@ -1119,29 +1247,53 @@ function enrichTargetRow(
     initialError == null || finalError == null
       ? null
       : Math.abs(initialError) - Math.abs(finalError);
-  const filterDecomposition = decomposeTargetFilter(row.filter);
+  const structuredDecomposition = isPlainObject(row.dimensions)
+    ? decomposeStructuredDimensions(row.dimensions, dimensionDefinitions)
+    : null;
+  const filterDecomposition = structuredDecomposition
+    ? null
+    : decomposeTargetFilter(row.filter);
+  const dimensionAdapter = structuredDecomposition
+    ? "structured"
+    : filterDecomposition
+      ? "legacy_filter"
+      : "legacy_name";
   const publisher = chroniclePublisherFromMetadata(metadata);
   const parsedFromName =
     parseDottedTarget(baseName, row, nationalGeography) ??
     parseTarget(baseName, nationalGeography);
   const parsed: ParsedTarget = {
     ...parsedFromName,
-    geography: filterDecomposition?.geography ?? parsedFromName.geography,
-    level: filterDecomposition?.level ?? parsedFromName.level,
+    geography:
+      structuredDecomposition?.geography ??
+      filterDecomposition?.geography ??
+      parsedFromName.geography,
+    level:
+      structuredDecomposition?.level ??
+      filterDecomposition?.level ??
+      parsedFromName.level,
     source: publisher ?? parsedFromName.source,
     variable:
       artifactVariable(baseName, row, filterDecomposition) ??
       parsedFromName.variable,
-    breakdown: filterDecomposition
-      ? filterDecomposition.dimensions.map((dimension) => dimension.value).join(" · ")
-      : parsedFromName.breakdown,
+    breakdown: structuredDecomposition
+      ? structuredDecomposition.dimensions
+          .map((dimension) => dimension.value)
+          .join(" · ")
+      : filterDecomposition
+        ? filterDecomposition.dimensions
+            .map((dimension) => dimension.value)
+            .join(" · ")
+        : parsedFromName.breakdown,
   };
   const hasGeography = Boolean(parsed.geography.trim());
   const geography = hasGeography ? parsed.geography : nationalGeography;
   const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
   const measureCol = asObject(row.measure);
   const metadataTargetDimensions =
-    filterDecomposition?.dimensions ?? metadataDimensions(row);
+    structuredDecomposition?.dimensions ??
+    filterDecomposition?.dimensions ??
+    metadataDimensions(row);
   const targetDimensions =
     metadataTargetDimensions ??
     splitBreakdown(parsed.breakdown).map((value, index) => ({
@@ -1168,6 +1320,7 @@ function enrichTargetRow(
   // without filter dimensions retain their legacy family so US/UK releases do
   // not regroup merely because they also carry Chronicle record IDs.
   const usesArtifactFamily =
+    structuredDecomposition != null ||
     filterDecomposition != null ||
     (publisher != null && !baseName.includes("/") && !baseName.includes("."));
   return {
@@ -1205,6 +1358,7 @@ function enrichTargetRow(
     breakdown,
     dims,
     target_dimensions: targetDimensions,
+    dimension_adapter: dimensionAdapter,
     variable_key: variableKey,
     // v2 published metadata (null on v1).
     source_citation: typeof row.source === "string" ? (row.source as string) : null,
@@ -1223,7 +1377,7 @@ function enrichTargetRow(
 }
 
 function estimateScopeKey(row: TargetRow): string | null {
-  if (row.filter != null) return null;
+  if (row.filter != null || row.dimensions != null) return null;
   const metadata = asObject(row.metadata);
   const recordSet = stringValue(metadata.ledger_layout_record_set_id);
   const initial = numberOrNull(row.initial_estimate);
@@ -1738,6 +1892,11 @@ export function microcosmTargetTreemap(
 }
 
 // --- the calibration source (one release) -----------------------------------
+export interface TargetSchema {
+  diagnostics_schema_version: number | null;
+  structured_dimensions: boolean;
+}
+
 export interface Calibration {
   source: "huggingface_live";
   country: MicrocosmCountry;
@@ -1745,6 +1904,7 @@ export interface Calibration {
   country_info: ArtifactCountry;
   presentation: ArtifactPresentation | null;
   publisher_labels: Record<string, string>;
+  target_schema: TargetSchema;
   description: string | null;
   diagnostics_status: DiagnosticsStatus;
   release_id: string;
@@ -2001,6 +2161,7 @@ export function buildCalibration(
   const artifactCountry = releaseCountry(releaseManifest, country);
   const presentation = releasePresentation(releaseManifest);
   const publisherLabels = releasePublisherLabels(releaseManifest);
+  const dimensionDefinitions = diagnosticsDimensions(diag);
   const enrichedRows = addEstimateScopeWarnings(
     targets.map((row) =>
       enrichTargetRow(
@@ -2009,6 +2170,7 @@ export function buildCalibration(
         dropped,
         artifactCountry,
         publisherLabels,
+        dimensionDefinitions,
       ),
     ),
   );
@@ -2028,6 +2190,10 @@ export function buildCalibration(
     country_info: artifactCountry,
     presentation,
     publisher_labels: publisherLabels,
+    target_schema: {
+      diagnostics_schema_version: numberOrNull(diag.schema_version),
+      structured_dimensions: isPlainObject(diag.dimensions),
+    },
     description:
       stringValue(diag.description) ??
       stringValue(releaseManifest.description) ??
@@ -2323,6 +2489,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     breakdown: row.breakdown,
     dims: row.dims,
     target_dimensions: row.target_dimensions,
+    dimension_adapter: row.dimension_adapter,
     variable_key: row.variable_key,
     source_citation: row.source_citation,
     entity: row.entity,
@@ -2513,6 +2680,7 @@ export function latestMicrocosmCalibrationSummary(cal: Calibration) {
     available: true,
     country: cal.country_info,
     presentation: cal.presentation,
+    target_schema: cal.target_schema,
     description: cal.description,
     diagnostics_status: cal.diagnostics_status,
     ...releaseRole(cal.release_manifest),
@@ -2694,6 +2862,7 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
     available: true,
     country: cal.country_info,
     presentation: cal.presentation,
+    target_schema: cal.target_schema,
     description: cal.description,
     diagnostics_status: cal.diagnostics_status,
     ...releaseRole(cal.release_manifest),

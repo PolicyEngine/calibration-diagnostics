@@ -2,9 +2,8 @@
 
 ## State
 
-The typed presentation and publisher-label contracts are implemented. The
-legacy name/filter paths remain intact while new adapters are added by artifact
-shape.
+Presentation, publisher labels, and structured dimensions are implemented. The
+legacy US name and UK/BE filter paths remain intact and are selected per row.
 
 ## Done
 
@@ -29,11 +28,18 @@ shape.
   row with `source_label`, and propagated labels through variable summaries,
   target responses, treemap groups, and client types.
 - Enabled the existing ZZ publisher-label conformance assertion unchanged.
+- Added the defensive diagnostics-dimension reader, structured geography and
+  breakdown shaping, dictionary value labels/order, unknown-id humanization,
+  rank-aware facet sorting, and dimensioned-scope handling.
+- Recorded `dimension_adapter` per row and `target_schema` per calibration and
+  response, with matching client types.
+- Enabled the existing ZZ structured-facet conformance assertion unchanged;
+  the focused artifact/conformance suite now has `67 pass`, `0 todo`, and
+  `0 fail`.
 
 ## Next
 
-- Implement structured dimensions and structured source/variable identifiers
-  in separately committed steps.
+- Implement structured source/variable identifiers and their response fields.
 - Add the artifact → legacy → generic presentation fallbacks to both views.
 - Enable and extend conformance tests, add regressions, and document B1-B6.
 - Run the full frontend test, type-check, and production-build gates.
