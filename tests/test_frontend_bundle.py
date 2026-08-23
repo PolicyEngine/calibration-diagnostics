@@ -24,7 +24,9 @@ from evaluation_harness.frontend_bundle import (
     FRONTEND_BUNDLE_SCHEMA,
     _build_groups,
     _performance_buckets,
+    frontend_bundle_partitions,
     publish_frontend_bundle,
+    verify_frontend_bundle,
 )
 from evaluation_harness.full_run import build_run_summary, build_scored_results
 from evaluation_harness.publisher import publish_run
@@ -512,3 +514,52 @@ def test_frontend_bundle_verifies_source_hashes_and_is_immutable(tmp_path: Path)
     publish_frontend_bundle(snapshot, run, output)
     with pytest.raises(FileExistsError):
         publish_frontend_bundle(snapshot, run, output)
+
+
+def test_verify_frontend_bundle_accepts_published_output(tmp_path: Path) -> None:
+    snapshot, run = published_inputs(tmp_path)
+    output = tmp_path / "frontend"
+    manifest = publish_frontend_bundle(snapshot, run, output, page_size=2)
+
+    verified = verify_frontend_bundle(output)
+
+    assert verified == manifest
+    assert [part["path"] for part in frontend_bundle_partitions(verified)] == [
+        "summary.json",
+        "groups.json",
+        "fact-index.json",
+        "facts/00001.json",
+        "facts/00002.json",
+    ]
+
+
+def test_verify_frontend_bundle_rejects_tampering(tmp_path: Path) -> None:
+    snapshot, run = published_inputs(tmp_path)
+    output = tmp_path / "frontend"
+    publish_frontend_bundle(snapshot, run, output, page_size=2)
+    page = output / "facts" / "00002.json"
+    original = page.read_bytes()
+
+    page.write_bytes(b'{"rows": []}\n')
+    with pytest.raises(ValueError, match="hash mismatch for facts/00002.json"):
+        verify_frontend_bundle(output)
+
+    page.write_bytes(original)
+    manifest = json.loads((output / "manifest.json").read_text())
+    manifest["run_id"] = "evaluation-other"
+    (output / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="belongs to another run or snapshot"):
+        verify_frontend_bundle(output)
+
+    manifest["partitions"]["facts"].pop()
+    (output / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="sequence is incomplete"):
+        verify_frontend_bundle(output)
+
+    manifest["schema_version"] = "cross_dataset.frontend_bundle.v0"
+    (output / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="unsupported frontend bundle schema"):
+        verify_frontend_bundle(output)
+
+    with pytest.raises(ValueError, match="no manifest.json"):
+        verify_frontend_bundle(tmp_path / "missing")
