@@ -1,6 +1,12 @@
 import { expect, test } from "bun:test";
 
-import { isActive, navLinkAttributes, NAV_GROUPS } from "./nav-items";
+import {
+  isActive,
+  navGroupsForCountry,
+  navItemHref,
+  navLinkAttributes,
+  NAV_GROUPS,
+} from "./nav-items";
 
 function datasetAccuracyItems() {
   const group = NAV_GROUPS.find((item) => item.label === "Dataset accuracy");
@@ -75,4 +81,19 @@ test("preserves the Cross-dataset navigation label and route", () => {
     usOnly: true,
   });
   expect(isActive("/microcosm/datasets", item!)).toBe(true);
+});
+
+test("Belgium navigation keeps country-ready pages and hides US-only tools", () => {
+  const items = navGroupsForCountry("be").flatMap((group) => group.items);
+  expect(items.map((item) => item.href)).toEqual([
+    "/microcosm",
+    "/microcosm/targets",
+    "/microcosm/compare",
+  ]);
+  expect(items.every((item) => item.usOnly !== true)).toBe(true);
+  expect(items.map((item) => navItemHref(item, "be"))).toEqual([
+    "/microcosm?country=be",
+    "/microcosm/targets?country=be",
+    "/microcosm/compare?country=be",
+  ]);
 });

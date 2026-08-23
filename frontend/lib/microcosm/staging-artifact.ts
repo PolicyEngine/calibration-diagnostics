@@ -1,5 +1,6 @@
 import {
   type Calibration,
+  type MicrocosmCountry,
   asObject,
   assertSafeReleaseId,
   buildCalibration,
@@ -23,6 +24,27 @@ export const MICROCOSM_STAGING_HF_REPO =
   process.env[MICROCOSM_STAGING_HF_REPO_ENV] ?? "policyengine/populace-us-staging";
 export const MICROCOSM_STAGING_HF_REVISION =
   process.env[MICROCOSM_STAGING_HF_REVISION_ENV] ?? "main";
+
+const COUNTRY_NAME: Record<MicrocosmCountry, string> = {
+  us: "United States",
+  uk: "United Kingdom",
+  be: "Belgium",
+};
+
+export function stagingUnavailableReason(country: MicrocosmCountry): string | null {
+  return country === "us" ? null : `${COUNTRY_NAME[country]} has no staging repository.`;
+}
+
+function unavailableStaging(country: MicrocosmCountry) {
+  const detail = stagingUnavailableReason(country);
+  if (!detail) return null;
+  return {
+    available: false as const,
+    source_repo: null,
+    revision: null,
+    detail,
+  };
+}
 
 class StagingFetchError extends Error {
   constructor(
@@ -108,8 +130,9 @@ export interface StagingRunSummary {
 
 export interface StagingRunDetail {
   available: boolean;
-  source_repo: string;
-  revision: string;
+  source_repo: string | null;
+  revision: string | null;
+  detail?: string | null;
   run_id: string;
   candidate_release_id: string | null;
   progress: JsonObject | null;
@@ -147,7 +170,18 @@ function sortRuns(a: StagingRunSummary, b: StagingRunSummary): number {
   );
 }
 
-export async function loadStagingRuns(revalidate: number) {
+export async function loadStagingRuns(
+  revalidate: number,
+  country: MicrocosmCountry = "us",
+) {
+  const unavailable = unavailableStaging(country);
+  if (unavailable) {
+    return {
+      ...unavailable,
+      truncated: false,
+      runs: [] as StagingRunSummary[],
+    };
+  }
   const index = await stagingJsonOrNull("runs.json", revalidate);
   const indexedRuns = Array.isArray(index?.runs)
     ? (index.runs as JsonObject[])
@@ -255,7 +289,9 @@ function parseNdjson(text: string | null): JsonObject[] {
 export async function loadStagingCalibration(
   runId: string,
   revalidate: number,
+  country: MicrocosmCountry = "us",
 ): Promise<Calibration | null> {
+  if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
   const progress = await stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate);
   const candidateReleaseId = stringValue(progress?.candidate_release_id) ?? runId;
@@ -274,10 +310,33 @@ export async function loadStagingCalibration(
     stringValue(progress?.updated_at),
     buildManifest ?? {},
     releaseManifest ?? {},
+    {},
+    country,
   );
 }
 
-export async function loadStagingRun(runId: string, revalidate: number): Promise<StagingRunDetail> {
+export async function loadStagingRun(
+  runId: string,
+  revalidate: number,
+  country: MicrocosmCountry = "us",
+): Promise<StagingRunDetail> {
+  const unavailable = unavailableStaging(country);
+  if (unavailable) {
+    return {
+      ...unavailable,
+      run_id: runId,
+      candidate_release_id: null,
+      progress: null,
+      run_manifest: null,
+      calibration_progress: null,
+      events: [],
+      has_calibration: false,
+      calibration: null,
+      reform_validation: null,
+      build_manifest: null,
+      release_manifest: null,
+    };
+  }
   assertSafeReleaseId(runId, "run");
   const [
     progress,
@@ -291,7 +350,7 @@ export async function loadStagingRun(runId: string, revalidate: number): Promise
     stagingJsonOrNull(`runs/${runId}/run_manifest.json`, revalidate),
     stagingJsonOrNull(`runs/${runId}/calibration_progress.json`, revalidate),
     stagingTextOrNull(`runs/${runId}/events.ndjson`, revalidate),
-    loadStagingCalibration(runId, revalidate),
+    loadStagingCalibration(runId, revalidate, country),
     stagingJsonOrNull(`runs/${runId}/reform_validation.json`, revalidate),
   ]);
   const candidateReleaseId =
@@ -325,7 +384,9 @@ export async function loadStagingRun(runId: string, revalidate: number): Promise
 export async function loadStagingReformValidationRaw(
   runId: string,
   revalidate: number,
+  country: MicrocosmCountry = "us",
 ): Promise<JsonObject | null> {
+  if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
   return stagingJsonOrNull(`runs/${runId}/reform_validation.json`, revalidate);
 }
@@ -334,8 +395,11 @@ export async function loadStagingTargetDiagnostics(
   requestUrl: string,
   runId: string,
   revalidate: number,
+  country: MicrocosmCountry = "us",
 ) {
-  const cal = await loadStagingCalibration(runId, revalidate);
+  const unavailable = unavailableStaging(country);
+  if (unavailable) return { ...unavailable, run_id: runId };
+  const cal = await loadStagingCalibration(runId, revalidate, country);
   if (!cal) {
     return {
       available: false,
@@ -350,10 +414,13 @@ export async function loadStagingComparison(
   runId: string,
   releaseId: string,
   revalidate: number,
+  country: MicrocosmCountry = "us",
 ) {
+  const unavailable = unavailableStaging(country);
+  if (unavailable) return { ...unavailable, run_id: runId };
   const [release, staging] = await Promise.all([
-    loadRelease(releaseId || "latest", revalidate),
-    loadStagingCalibration(runId, revalidate),
+    loadRelease(releaseId || "latest", revalidate, country),
+    loadStagingCalibration(runId, revalidate, country),
   ]);
   if (!staging) {
     return {

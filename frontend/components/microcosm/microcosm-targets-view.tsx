@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
-import { useCountry } from "@/components/layout/country-context";
+import { useCountry, type Country } from "@/components/layout/country-context";
+import { ArtifactDescriptionBanner } from "@/components/microcosm/artifact-description-banner";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -24,6 +25,15 @@ import {
 } from "@/lib/api/hooks/use-microcosm";
 
 const PAGE_SIZE = 50;
+
+const COUNTRY_BROWSE_COPY: Record<Country, string> = {
+  us:
+    "Pick a measure like EITC, population, or AGI and see how each breakdown is calibrated.",
+  uk:
+    "Pick a measure like population, household type, or tax receipts and see how each breakdown is calibrated.",
+  be:
+    "Pick a measure like population, income tax, or pension recipients and see how each breakdown is calibrated.",
+};
 
 interface SortState {
   by: string;
@@ -357,7 +367,7 @@ function VariableBrowser({
         <input
           type="search"
           value={query}
-          placeholder="Search statistics — e.g. EITC, Medicaid, income…"
+          placeholder="Search statistics by name, source, or concept…"
           onChange={(event) => setQuery(event.target.value)}
           className="h-10 w-full rounded-lg border border-border bg-card px-3.5 text-sm focus:border-primary/60 focus:outline-none"
         />
@@ -1032,7 +1042,10 @@ export function MicrocosmTargetsView({
           <>
             See how closely the calibrated weights reproduce each official statistic — by
             source, measure, and breakdown. This is the drill-down behind the{" "}
-            <a href={withBasePath("/microcosm")} className="text-primary hover:underline">
+            <a
+              href={withBasePath(`/microcosm?country=${country}`)}
+              className="text-primary hover:underline"
+            >
               calibration map
             </a>
             .
@@ -1048,6 +1061,8 @@ export function MicrocosmTargetsView({
         }
       />
 
+      <ArtifactDescriptionBanner description={data?.description} />
+
       {step === "home" && (
         <div className="flex flex-col gap-4">
           <h2 className="text-base font-semibold text-foreground">
@@ -1057,19 +1072,21 @@ export function MicrocosmTargetsView({
             <WizardCard
               eyebrow="Browse"
               title="Explore a statistic"
-              body="Pick a measure like EITC, population, or AGI and see how each breakdown is calibrated."
+              body={COUNTRY_BROWSE_COPY[country]}
               stat={variableGroupCount ? `${fmt(variableGroupCount, { digits: 0 })} statistics` : "Browse measures"}
               accent="teal"
               onClick={startExplore}
             />
-            <WizardCard
-              eyebrow="Focus"
-              title="Healthcare programs"
-              body="ACA marketplace, Medicaid, CHIP, and Medicare enrollment and premium targets."
-              stat="ACA · Medicaid · Medicare"
-              accent="teal"
-              onClick={startHealthcare}
-            />
+            {country === "us" ? (
+              <WizardCard
+                eyebrow="Focus"
+                title="Healthcare programs"
+                body="ACA marketplace, Medicaid, CHIP, and Medicare enrollment and premium targets."
+                stat="ACA · Medicaid · Medicare"
+                accent="teal"
+                onClick={startHealthcare}
+              />
+            ) : null}
             <WizardCard
               eyebrow="Everything"
               title="See everything"

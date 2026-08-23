@@ -29,3 +29,10 @@ test("does not expose the private UK Hugging Face dataset", () => {
     href: null,
   });
 });
+
+test("does not expose the private Belgium Hugging Face dataset", () => {
+  expect(microcosmSourceAttribution("be", "policyengine/populace-be-private")).toEqual({
+    label: "Microcosm",
+    href: null,
+  });
+});

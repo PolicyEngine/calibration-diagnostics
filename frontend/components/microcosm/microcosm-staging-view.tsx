@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  useCountry,
+  type Country,
+} from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
   fmtUnitValue,
@@ -315,7 +319,30 @@ function ScoreRow({
   );
 }
 
+const STAGING_UNAVAILABLE_REASON: Record<Exclude<Country, "us">, string> = {
+  uk: "United Kingdom has no staging repository.",
+  be: "Belgium has no staging repository.",
+};
+
 export function MicrocosmStagingView() {
+  const { country } = useCountry();
+
+  if (country !== "us") {
+    return (
+      <div className="flex flex-col gap-5">
+        <PageHeader eyebrow="Microcosm · staging" title="Staging candidates" />
+        <EmptyState
+          title="Staging unavailable"
+          description={STAGING_UNAVAILABLE_REASON[country]}
+        />
+      </div>
+    );
+  }
+
+  return <MicrocosmUsStagingView />;
+}
+
+function MicrocosmUsStagingView() {
   const { data: runsData, isLoading: runsLoading, error: runsError } = useMicrocosmStagingRuns();
   const runs = runsData?.runs ?? [];
   const [selectedRun, setSelectedRun] = useState("");

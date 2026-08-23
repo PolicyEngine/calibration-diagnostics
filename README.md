@@ -1,8 +1,9 @@
 # Microcosm calibration diagnostics
 
-Interactive dashboard for the **microcosm-US** synthetic population — PolicyEngine's
-calibrated microdataset published on Hugging Face at
-[`policyengine/populace-us`](https://huggingface.co/datasets/policyengine/populace-us).
+Interactive dashboard for PolicyEngine's calibrated **Microcosm** synthetic
+populations for the US, UK, and Belgium. Each country is published as its own
+Hugging Face dataset; the US repository is public, while the UK and Belgium
+repositories require a server-side Hugging Face token.
 
 > Deprecated upstream identifiers: Microcosm's current Hugging Face slugs,
 > release/file names, deployment variables, and Chronicle wire contracts still
@@ -28,9 +29,10 @@ separate service layer — the Next.js API routes are the API layer.
 - **Compare versions** (`/microcosm/compare`) — diff two releases: targets matched
   by name, common targets get a fit change, and added/removed targets are
   surfaced.
-- **Staging runs** (`/microcosm/staging`) — monitor pre-release Microcosm build
+- **Staging runs** (`/microcosm/staging`) — monitor pre-release US Microcosm build
   runs from the staging Hub repo: current stage, calibration loss progress,
   final candidate diagnostics once uploaded, and candidate-vs-latest fit.
+  Countries without a staging repository show an explicit unavailable state.
 - **Calibration target investigations** (`docs/ai/`) — tool-independent procedures,
   specialist review responsibilities, and a reusable checklist for identifying
   the cause of a discrepant target from release artifacts and relevant source
@@ -39,6 +41,8 @@ separate service layer — the Next.js API routes are the API layer.
 ## API
 
 The Next.js route handlers are the API layer; all read live from Hugging Face:
+
+Published-release endpoints accept `country=us|uk|be` (default `us`).
 
 | Endpoint | Purpose |
 |---|---|
@@ -89,6 +93,9 @@ See [the Chronicle update workflow](docs/chronicle-update-workflow.md) for the
 optional Microcosm and ACS inputs and the separate full-artifact command.
 
 Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different
-published dataset/revision. Staging defaults to `policyengine/populace-us-staging`;
-set `POPULACE_STAGING_HF_REPO`, `POPULACE_STAGING_HF_REVISION`, and `HF_TOKEN`
-if the staging dataset is private.
+US dataset/revision; `POPULACE_UK_HF_REPO`, `POPULACE_UK_HF_REVISION` for the UK;
+and `POPULACE_BE_HF_REPO`, `POPULACE_BE_HF_REVISION` for Belgium. The Belgium
+repository defaults in code to `policyengine/populace-be-private`. Set `HF_TOKEN`
+or `HUGGINGFACE_TOKEN` to read private datasets. US staging defaults to
+`policyengine/populace-us-staging`; override it with `POPULACE_STAGING_HF_REPO`
+and `POPULACE_STAGING_HF_REVISION`.

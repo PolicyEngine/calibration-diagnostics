@@ -7,6 +7,7 @@ import { useCountry, type Country } from "@/components/layout/country-context";
 import {
   isActive,
   navGroupsForCountry,
+  navItemHref,
   navLinkAttributes,
 } from "@/components/layout/nav-items";
 
@@ -15,6 +16,7 @@ const DATASET: Record<Country, { label: string; repo?: string }> = {
   // former Populace slugs.
   us: { label: "Microcosm US", repo: "policyengine/populace-us" },
   uk: { label: "Microcosm UK" },
+  be: { label: "Microcosm Belgium" },
 };
 
 export function NavSidebar() {
@@ -35,7 +37,7 @@ export function NavSidebar() {
           aria-label="Country"
           className="mt-1.5 inline-flex rounded-lg bg-muted p-0.5"
         >
-          {(["us", "uk"] as const).map((value) => {
+          {(["us", "uk", "be"] as const).map((value) => {
             const active = country === value;
             return (
               <button
@@ -72,7 +74,7 @@ export function NavSidebar() {
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    href={navItemHref(item, country)}
                     {...navLinkAttributes(item)}
                     className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-[13px] leading-tight transition-colors ${
                       active

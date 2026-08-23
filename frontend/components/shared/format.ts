@@ -35,7 +35,12 @@ function releaseDateFromId(releaseId: string): string {
 export function releaseLabel(releaseId: string, date?: string | null): string {
   // Deprecated upstream identifier: Microcosm release IDs still use the former
   // Populace prefix.
-  const sha = releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0];
+  const belgiumChronicleSha =
+    /^(?:microcosm|populace)-be-\d{4}-chronicle-([0-9a-f]{7,40})(?:-|$)/i.exec(
+      releaseId,
+    )?.[1];
+  const sha =
+    belgiumChronicleSha ?? releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0];
   const formatted = formatReleaseDate(date || releaseDateFromId(releaseId));
   return formatted ? `${formatted} · ${sha}` : sha;
 }

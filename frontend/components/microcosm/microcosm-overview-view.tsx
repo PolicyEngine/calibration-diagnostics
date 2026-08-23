@@ -7,8 +7,10 @@ import {
   CalibrationExplorerDataPrefetch,
   CalibrationExplorerMap,
 } from "@/components/microcosm/calibration-explorer-map";
+import { ArtifactDescriptionBanner } from "@/components/microcosm/artifact-description-banner";
+import { ExternalValidationsPanel } from "@/components/microcosm/external-validations-panel";
 import { WEIGHTED_TARGET_ERROR_HELP } from "@/components/microcosm/calibration-explorer-view";
-import { useCountry } from "@/components/layout/country-context";
+import { useCountry, type Country } from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -38,6 +40,24 @@ function formatPublishedAt(value: string | null | undefined): string {
     day: "numeric",
   });
 }
+
+const COUNTRY_OVERVIEW_COPY: Record<
+  Country,
+  { authorities: string; examples: string }
+> = {
+  us: {
+    authorities: "the IRS, the Census Bureau, and CMS",
+    examples: "EITC statistics, population, and Medicaid enrollment",
+  },
+  uk: {
+    authorities: "the ONS, OBR, and HMRC",
+    examples: "population by region and age, household types, and tax receipts",
+  },
+  be: {
+    authorities: "Statbel, ONSS, JRC, and SFPD",
+    examples: "population by region, sex, and age band, tax receipts, and benefit totals",
+  },
+};
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
 
@@ -103,6 +123,7 @@ export function MicrocosmOverviewView() {
   const isNonDefault = cal.is_local_area === true || cal.is_default === false;
   const sourceAttribution = microcosmSourceAttribution(country, data.source_repo);
   const publicationUrl = microcosmPublicationUrl(data.source_repo, data.release_id);
+  const overviewCopy = COUNTRY_OVERVIEW_COPY[country];
 
   return (
     <div className="flex flex-col gap-5">
@@ -112,14 +133,12 @@ export function MicrocosmOverviewView() {
         title="What the data is anchored to"
         description={
           <>
-            Microcosm reweights survey microdata so it matches thousands of official
-            statistics from agencies like{" "}
-            {country === "uk" ? "the ONS, OBR, and HMRC" : "the IRS, the Census Bureau, and CMS"}.
+            Microcosm reweights survey microdata so it matches official statistics
+            from agencies like{" "}
+            {overviewCopy.authorities}.
             Each tile in the Calibration fit explorer below is a category we calibrate to,
             including{" "}
-            {country === "uk"
-              ? "population by region and age, household types, and tax receipts"
-              : "EITC stats, population, and Medicaid enrollment"}
+            {overviewCopy.examples}
             . Data is built live from{" "}
             {sourceAttribution.href ? (
               <a
@@ -157,6 +176,8 @@ export function MicrocosmOverviewView() {
         }
         onHeightChange={setPageIntroHeight}
       />
+
+      <ArtifactDescriptionBanner description={cal.description} />
 
       {isNonDefault ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/80 bg-card px-4 py-3 shadow-[var(--elev-1)]">
@@ -236,6 +257,8 @@ export function MicrocosmOverviewView() {
           <OverviewMetric label="Published" value={formatPublishedAt(data.updated_at)} />
         </div>
       </SectionCard>
+
+      <ExternalValidationsPanel releaseManifest={data.release_manifest} />
 
       <SectionCard title="Calibration map">
         <CalibrationExplorerMap

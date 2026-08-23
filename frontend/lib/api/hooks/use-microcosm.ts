@@ -179,6 +179,7 @@ export interface GeographyCoverageBlock {
 
 export interface MicrocosmCalibration {
   available: boolean;
+  description?: string | null;
   diagnostics_status?: MicrocosmDiagnosticsStatus;
   dataset_role?: string | null;
   is_default?: boolean;
@@ -298,6 +299,7 @@ export interface MicrocosmResponse {
 
 export interface MicrocosmTargetDiagnostics {
   available: boolean;
+  description?: string | null;
   path?: string | null;
   release_id?: string | null;
   schema_version?: number | null;
@@ -382,6 +384,7 @@ export interface MicrocosmComparisonVariableRow {
 export interface MicrocosmComparison {
   a: {
     release_id: string;
+    description?: string | null;
     total_targets: number;
     initial_loss: number | null;
     final_loss: number | null;
@@ -390,6 +393,7 @@ export interface MicrocosmComparison {
   };
   b: {
     release_id: string;
+    description?: string | null;
     total_targets: number;
     initial_loss: number | null;
     final_loss: number | null;
@@ -423,16 +427,17 @@ export interface MicrocosmStagingRunSummary {
 
 export interface MicrocosmStagingRunsResponse {
   available: boolean;
-  source_repo: string;
-  revision: string;
+  source_repo: string | null;
+  revision: string | null;
   detail?: string | null;
   runs: MicrocosmStagingRunSummary[];
 }
 
 export interface MicrocosmStagingRunResponse {
   available: boolean;
-  source_repo: string;
-  revision: string;
+  source_repo: string | null;
+  revision: string | null;
+  detail?: string | null;
   run_id: string;
   candidate_release_id?: string | null;
   progress?: Record<string, unknown> | null;
@@ -601,34 +606,43 @@ export function useMicrocosmCompare(a?: string, b?: string, enabled = true) {
 }
 
 export function useMicrocosmStagingRuns() {
+  const { country } = useCountry();
   return useQuery({
-    queryKey: ["microcosm", "staging", "runs"],
-    queryFn: () => apiGet<MicrocosmStagingRunsResponse>("/microcosm/staging/runs"),
+    queryKey: ["microcosm", "staging", "runs", country],
+    queryFn: () =>
+      apiGet<MicrocosmStagingRunsResponse>("/microcosm/staging/runs", { country }),
+    enabled: country === "us",
     staleTime: 15 * 1000,
-    refetchInterval: 30 * 1000,
+    refetchInterval: country === "us" ? 30 * 1000 : false,
   });
 }
 
 export function useMicrocosmStagingRun(runId?: string) {
+  const { country } = useCountry();
   return useQuery({
-    queryKey: ["microcosm", "staging", "run", runId],
-    queryFn: () => apiGet<MicrocosmStagingRunResponse>("/microcosm/staging/run", { id: runId }),
-    enabled: Boolean(runId),
+    queryKey: ["microcosm", "staging", "run", country, runId],
+    queryFn: () =>
+      apiGet<MicrocosmStagingRunResponse>("/microcosm/staging/run", {
+        id: runId,
+        country,
+      }),
+    enabled: country === "us" && Boolean(runId),
     placeholderData: keepPreviousData,
     staleTime: 10 * 1000,
-    refetchInterval: 30 * 1000,
+    refetchInterval: country === "us" ? 30 * 1000 : false,
   });
 }
 
 export function useMicrocosmStagingCompare(runId?: string, release = "latest") {
+  const { country } = useCountry();
   return useQuery({
-    queryKey: ["microcosm", "staging", "compare", runId, release],
+    queryKey: ["microcosm", "staging", "compare", country, runId, release],
     queryFn: () =>
       apiGet<MicrocosmComparison & { available?: boolean; detail?: string }>(
         "/microcosm/staging/compare",
-        { run: runId, release },
+        { run: runId, release, country },
       ),
-    enabled: Boolean(runId),
+    enabled: country === "us" && Boolean(runId),
     placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
   });

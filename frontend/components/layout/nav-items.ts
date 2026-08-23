@@ -67,3 +67,9 @@ export function navLinkAttributes(
   const external = item.href.startsWith("https://") || item.href.startsWith("http://");
   return external ? { target: "_blank", rel: "noopener noreferrer" } : {};
 }
+
+export function navItemHref(item: NavItem, country: Country): string {
+  if (item.external || /^https?:\/\//.test(item.href)) return item.href;
+  const separator = item.href.includes("?") ? "&" : "?";
+  return `${item.href}${separator}country=${country}`;
+}

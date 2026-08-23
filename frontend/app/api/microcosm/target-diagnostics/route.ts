@@ -22,7 +22,12 @@ export async function GET(request: Request) {
     if (release.startsWith("staging:")) {
       return NextResponse.json(
         scrub(
-          await loadStagingTargetDiagnostics(request.url, release.slice("staging:".length), 0),
+          await loadStagingTargetDiagnostics(
+            request.url,
+            release.slice("staging:".length),
+            0,
+            country,
+          ),
         ),
         { headers: { "Cache-Control": "no-store" } },
       );

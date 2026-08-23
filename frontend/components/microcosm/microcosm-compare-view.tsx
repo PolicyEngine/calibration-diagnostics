@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
+import { ArtifactDescriptionBanner } from "@/components/microcosm/artifact-description-banner";
 import { fmt, fmtCompact, fmtSigned, humanizeName, releaseLabel } from "@/components/shared/format";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -629,8 +630,18 @@ export function MicrocosmCompareView() {
       <PageHeader
         eyebrow="Microcosm · release comparison"
         title="Compare versions"
-        description="Diff two published microcosm-US releases. Targets are matched by name; common targets get a fit change (negative = release B fits it better), and targets present in only one release are counted as added/removed."
+        description="Diff two published Microcosm releases for the selected country. Targets are matched by name; common targets get a fit change (negative = release B fits it better), and targets present in only one release are counted as added/removed."
       />
+
+      {[
+        ...new Set(
+          [data?.a.description, data?.b.description].filter(
+            (description): description is string => Boolean(description),
+          ),
+        ),
+      ].map((description) => (
+        <ArtifactDescriptionBanner key={description} description={description} />
+      ))}
 
       <SectionCard title="Releases">
         {releasesLoading ? (

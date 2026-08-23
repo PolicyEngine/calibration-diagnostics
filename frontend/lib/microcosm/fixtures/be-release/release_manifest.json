@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "description": "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
+  "build": {
+    "schema_version": 1,
+    "description": "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
+    "build_id": "microcosm-be-2026-chronicle-3cef97b-20260823T134247Z",
+    "built_at": "2026-08-23T13:42:47.070381+00:00",
+    "lineage": "microcosm_be_v04",
+    "population_year": 2026,
+    "chronicle": {
+      "repo": "PolicyEngine/chronicle",
+      "commit": "3cef97b4ece3a70601fca84fe121ffbb1a62388d",
+      "merged_as": "PR #190"
+    }
+  },
+  "data_package": {
+    "name": "microcosm-be",
+    "version": "0.4.0"
+  },
+  "default_datasets": {
+    "national": "microcosm_be_v04_2026"
+  },
+  "external_validations": {
+    "euromod": {
+      "comparator": "EUROMOD BE_2025 (JRC), plain baseline run",
+      "description": "Cross-engine column ledger: every EUROMOD BE_2025 output column computed on this population by both EUROMOD and the Axiom rules engine, classified matched / explained (named mechanism) / gap (named owner). Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
+      "column_ledger": {
+        "total_columns": 558,
+        "substantive_columns": 182,
+        "matched": 10,
+        "explained": 143,
+        "gap": 29,
+        "unclassified": 0,
+        "tolerance_eur": 0.01,
+        "key_rows": [
+          {
+            "column": "tin_s",
+            "label": "income tax",
+            "euromod_eur": 68393536598.46828,
+            "axiom_eur": 68581762491.69119,
+            "delta_axiom_minus_euromod_eur": 188225893.22291565,
+            "classification": "GAP",
+            "explanation_class": "unencoded_corpus_blocked"
+          },
+          {
+            "column": "ils_origy",
+            "label": null,
+            "euromod_eur": 236840063794.08032,
+            "axiom_eur": 236840063794.08026,
+            "delta_axiom_minus_euromod_eur": -0.00006103515625,
+            "classification": "MATCHED",
+            "explanation_class": null
+          },
+          {
+            "column": "bsa_s",
+            "label": "Income support",
+            "euromod_eur": 20866361321.659664,
+            "axiom_eur": 11063297817.463074,
+            "delta_axiom_minus_euromod_eur": -9803063504.19659,
+            "classification": "EXPLAINED",
+            "explanation_class": "population_basis_construct"
+          }
+        ]
+      },
+      "validation_surface": [
+        {
+          "name": "onem_complete_unemployment_recipients",
+          "concept": "complete-unemployment monthly-average recipients",
+          "value": 323029.0,
+          "year": 2024,
+          "role": "validation",
+          "chronicle_record_ids": [
+            "onem_rva.unemployment.cy2024.complete_unemployment.country.country_total.receives_unemployment_benefit"
+          ]
+        },
+        {
+          "name": "jrc_employment_income_amount",
+          "concept": "administrative employment income",
+          "value": 175998000000.0,
+          "year": 2023,
+          "role": "validation",
+          "chronicle_record_ids": [
+            "jrc.euromod_be.cy2023.macrovalidation.external_amounts.a3_2_employment_income_external_2023.value"
+          ]
+        },
+        {
+          "name": "nasa_b3g_paid",
+          "concept": "ESA national-accounts B3G PAID",
+          "value": 39700000000.0,
+          "year": 2024,
+          "role": "validation",
+          "chronicle_record_ids": [
+            "eurostat.nasa_10_nf_tr.cy2024.household_non_financial_transactions.paid.be.belgium_household_mixed_income_gross.amount"
+          ]
+        },
+        {
+          "name": "nbb_household_disposable_income_2024",
+          "concept": "household gross disposable income",
+          "value": 362214800000.0,
+          "year": 2024,
+          "role": "validation",
+          "chronicle_record_ids": [
+            "nbb.national_accounts.cy2024.household_disposable_income.country.country_total.household_disposable_income"
+          ]
+        }
+      ]
+    }
+  }
+}

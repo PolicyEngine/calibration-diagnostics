@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { loadPointerReleaseId, scrub } from "@/lib/microcosm/latest-artifact";
+import {
+  loadPointerReleaseId,
+  parseCountry,
+  scrub,
+} from "@/lib/microcosm/latest-artifact";
 import { loadStagingComparison } from "@/lib/microcosm/staging-artifact";
 
 export const dynamic = "force-dynamic";
@@ -10,18 +14,20 @@ export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  const country = parseCountry(url.searchParams.get("country"));
   const runId = url.searchParams.get("run")?.trim();
   let release = url.searchParams.get("release")?.trim() || "latest";
-  if (!runId) {
+  if (!runId && country === "us") {
     return NextResponse.json({ detail: "Provide a staging run id via ?run=." }, { status: 400 });
   }
   try {
-    if (release === "latest") {
-      release = (await loadPointerReleaseId(300)).release_id;
+    if (release === "latest" && country === "us") {
+      release = (await loadPointerReleaseId(300, country)).release_id;
     }
-    return NextResponse.json(scrub(await loadStagingComparison(runId, release, revalidate)), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      scrub(await loadStagingComparison(runId ?? "", release, revalidate, country)),
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     return NextResponse.json(
       { detail: error instanceof Error ? error.message : String(error) },
