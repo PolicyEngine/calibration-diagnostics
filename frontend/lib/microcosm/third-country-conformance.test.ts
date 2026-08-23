@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import { isCountry as isClientCountry } from "@/components/layout/country-context";
+import { navGroupsForCountry } from "@/components/layout/nav-items";
+import { countryCapabilities, selectableCountries } from "@/lib/microcosm/countries";
 import { sourceAuthorityLabel } from "@/lib/source-labels";
 
 import diagnosticsFixture from "./fixtures/zz-release/calibration_diagnostics.json";
@@ -36,7 +38,7 @@ const calibration = buildCalibration(
 );
 
 describe("synthetic third-country conformance", () => {
-  test("one COUNTRY_REPO registration supplies repository and national geography behavior", () => {
+  test("one country registration supplies repository, national geography, and country block behavior", () => {
     expect(parseCountry(COUNTRY)).toBe(COUNTRY);
     expect(microcosmRepo(COUNTRY)).toBe("policyengine/microcosm-zz-fixture");
     expect(microcosmRevision(COUNTRY)).toBe("main");
@@ -51,6 +53,56 @@ describe("synthetic third-country conformance", () => {
       geography: "Zedland",
       level: "national",
     });
+
+    // The summary's typed country block comes from the registration alone.
+    expect(latestMicrocosmCalibrationSummary(calibration).country).toEqual({
+      code: COUNTRY,
+      label: "Zedland",
+      geography_id: null,
+      geography_label: "Zedland",
+      repository_visibility: "private",
+      capabilities: [...countryCapabilities(COUNTRY)],
+    });
+
+    // A release_manifest.country block overrides the registration's labels and
+    // flows through buildCalibration into the summary and the row geography.
+    const overridden = buildCalibration(
+      diagnosticsFixture,
+      RELEASE_ID,
+      "2026-08-23T18:00:00Z",
+      {},
+      {
+        ...releaseManifestFixture,
+        country: {
+          code: "zz",
+          label: "Republic of Zedland",
+          geography_label: "Zedland (national)",
+        },
+      },
+      {},
+      COUNTRY,
+    );
+    expect(latestMicrocosmCalibrationSummary(overridden).country).toMatchObject({
+      code: COUNTRY,
+      label: "Republic of Zedland",
+      geography_label: "Zedland (national)",
+      capabilities: [...countryCapabilities(COUNTRY)],
+    });
+    const overriddenPage = latestMicrocosmTargetDiagnosticsPage(
+      "http://x/api/microcosm/target-diagnostics?level=national",
+      overridden,
+    );
+    expect(overriddenPage.country?.label).toBe("Republic of Zedland");
+    expect(overriddenPage.targets.map((row) => row.geography)).toEqual(["Zedland (national)"]);
+    expect(
+      overridden.rows.find((row) => row.base_name === "fixture_revenue_personal_income_tax"),
+    ).toMatchObject({ geography: "Zedland (national)", level: "national" });
+    expect(
+      overridden.rows
+        .filter((row) => row.level === "region")
+        .map((row) => row.geography)
+        .sort(),
+    ).toEqual(["North", "North", "South"]);
   });
 
   test("release artifacts produce the common overview response shape", () => {
@@ -142,12 +194,16 @@ describe("synthetic third-country conformance", () => {
     );
   });
 
-  test.todo(
-    "zz can enter the shared client views: the client country parser still uses a closed country table",
-    () => {
-      expect(isClientCountry(COUNTRY)).toBe(true);
-    },
-  );
+  test("zz can enter the shared client views through the registry without being selectable", () => {
+    expect(isClientCountry(COUNTRY)).toBe(true);
+    expect(selectableCountries()).not.toContain(COUNTRY);
+    // Navigation is gated by the registration's capabilities, not a country code.
+    expect(
+      navGroupsForCountry(COUNTRY)
+        .flatMap((group) => group.items)
+        .map((item) => item.href),
+    ).toEqual(["/microcosm", "/microcosm/targets", "/microcosm/compare"]);
+  });
   test.todo(
     "zz overview data can carry artifact-provided intro copy: the summary omits a typed presentation contract",
     () => {

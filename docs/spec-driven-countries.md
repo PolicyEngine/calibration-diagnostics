@@ -20,10 +20,11 @@ from `cross_dataset.frontend_bundle.v1`.
 
 ## Code-owned metadata that remains
 
-`COUNTRY_REPO` should be the only required registration point, but today adding a
-country also touches closed country unions/parsers and selector lists, dataset and
-national-geography labels, overview and target-browser copy, public/private link
-behavior, and feature checks such as US-only staging and navigation. Publisher
+`COUNTRY_REGISTRY` in `frontend/lib/microcosm/countries.ts` is the only required
+registration point: country unions and parsers, selector lists, dataset and
+national-geography labels, public/private link behavior, and page gating read
+the registration or the artifact `country` block. Overview and target-browser
+copy still sit in legacy per-country tables with a generic fallback. Publisher
 display names remain in a shared TypeScript map. Target decomposition still has a
 generic filter-pattern table plus legacy US name grammar (FIPS/state, filing
 status, return type, income band, and qualifying-child rules).
@@ -36,8 +37,9 @@ should not grow another country branch.
 `frontend/lib/microcosm/third-country-conformance.test.ts` defines a synthetic
 fourth country, `zz`, with four targets, filter-coded facets, a release
 description, and Chronicle record IDs whose publisher prefix is unknown to the
-label map. Registering its repository in `COUNTRY_REPO` must be the only country
-specific code change. The same builders used by US/UK/BE must then produce:
+label map. Registering its repository in `COUNTRY_REGISTRY` must be the only
+country specific code change. The same builders used by US/UK/BE must then
+produce:
 
 - the normal overview and targets response shapes and section order;
 - the artifact description in the existing provenance-note slot;
@@ -58,6 +60,45 @@ be enabled without adding `zz` conditionals or tables.
 | Shared publisher-label map | `release_manifest.publisher_labels`, keyed by the first Chronicle record-ID segment. Artifact labels override the generic humanizer; unknown prefixes remain valid. |
 | Filter-pattern decomposition, region/sex/age value maps, and legacy US target-name parsing | A `dimensions` dictionary in `calibration_diagnostics` (label, semantic role, value labels, ordering) plus `targets[].dimensions` values. Geography dimensions also declare their level/id so no country geography fallback is needed. |
 | Source/variable guesses from flat target names | Structured `targets[].source` and `targets[].variable` identifiers, with the publisher still traceable to `metadata.chronicle_record_ids`. |
+
+### Implemented: the `country` block
+
+`release_manifest.country` is read by `releaseCountry` in
+`frontend/lib/microcosm/latest-artifact.ts` and served as `country` on the
+overview summary and the target-diagnostics page (client type
+`MicrocosmArtifactCountry`). Registration lives in
+`frontend/lib/microcosm/countries.ts`; adding a country is one entry there.
+
+```json
+{
+  "country": {
+    "code": "be",
+    "label": "Belgium",
+    "geography_id": null,
+    "geography_label": "Belgium",
+    "repository_visibility": "private",
+    "capabilities": ["calibration", "targets", "compare", "cross_dataset"]
+  }
+}
+```
+
+Merge rule: every field defaults to the registration; a well-typed string
+field in the block overrides it (`label`, `geography_id`, `geography_label`,
+and `repository_visibility` as `"public"` or `"private"`). `code`, when
+present, must equal the selected country after lower-casing, otherwise the whole
+block is ignored: the dashboard is selected by registry and an artifact cannot
+re-route it. `capabilities` is filtered to the enumerated set and intersected
+with the registration, so an artifact can narrow what a deployment serves but
+never widen it. Unknown keys are ignored. The resolved `geography_label` is the
+national geography for rows that carry none.
+
+Capabilities: `calibration`, `targets`, `compare`, `cross_dataset`, `staging`,
+`model_coverage`, `pipeline`, `variables`, `external_checks`. Navigation, the
+staging loaders and hooks, and the staging page gate on capability membership.
+
+A registration with `fixture: true` (the conformance country `zz`) is a valid
+country for parsers and builders but is never listed in selectors or the
+release-alert allowlist.
 
 Schema readers must remain backward-compatible while published releases migrate.
 After migration, name/filter parsing is a legacy adapter selected by artifact
