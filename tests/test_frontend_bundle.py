@@ -588,9 +588,7 @@ def test_verify_frontend_bundle_rejects_attested_invalid_fact_pages(
     page.update(updates)
     content = json.dumps(page).encode()
     page_path.write_bytes(content)
-    manifest["partitions"]["facts"][0]["sha256"] = hashlib.sha256(
-        content
-    ).hexdigest()
+    manifest["partitions"]["facts"][0]["sha256"] = hashlib.sha256(content).hexdigest()
     manifest_path.write_text(json.dumps(manifest))
 
     with pytest.raises(ValueError, match=message):

@@ -2,8 +2,7 @@
 
 ## State
 
-All five review findings are implemented with focused regression coverage.
-The required full-suite and BE dry-run gates remain.
+Complete. All five review findings are implemented, covered, and gated.
 
 ## Done
 
@@ -16,8 +15,11 @@ The required full-suite and BE dry-run gates remain.
 - Added a pre-commit disk-mutation regression test.
 - Required a present, equal remote size before either hash form can skip.
 - Covered the missing publish extra in a non-dry subprocess with network guards.
+- Passed `ruff check` on all changed Python files.
+- Passed the full suite with `.venv/bin/python -m pytest -q`: 441 tests.
+- Passed the required BE dry run: 12 files and 2,668,113 bytes verified.
+- Used the permitted pytest fallback because the sandbox blocked the uv cache.
 
 ## Next
 
-- Run the complete test suite and required BE dry run.
-- Write the final report to the requested output file.
+- None.
