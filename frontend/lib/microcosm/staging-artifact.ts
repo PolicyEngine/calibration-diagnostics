@@ -8,6 +8,7 @@ import {
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
   loadRelease,
+  microcosmCountryGeography,
 } from "@/lib/microcosm/latest-artifact";
 import {
   type ReformValidation,
@@ -25,14 +26,10 @@ export const MICROCOSM_STAGING_HF_REPO =
 export const MICROCOSM_STAGING_HF_REVISION =
   process.env[MICROCOSM_STAGING_HF_REVISION_ENV] ?? "main";
 
-const COUNTRY_NAME: Record<MicrocosmCountry, string> = {
-  us: "United States",
-  uk: "United Kingdom",
-  be: "Belgium",
-};
-
 export function stagingUnavailableReason(country: MicrocosmCountry): string | null {
-  return country === "us" ? null : `${COUNTRY_NAME[country]} has no staging repository.`;
+  return country === "us"
+    ? null
+    : `${microcosmCountryGeography(country)} has no staging repository.`;
 }
 
 function unavailableStaging(country: MicrocosmCountry) {

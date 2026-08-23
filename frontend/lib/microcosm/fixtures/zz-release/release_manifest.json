@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "description": "Synthetic ZZ release whose dashboard presentation comes from release artifacts.",
+  "build": {
+    "schema_version": 1,
+    "build_id": "microcosm-zz-2026-conformance",
+    "built_at": "2026-08-23T18:00:00Z",
+    "population_year": 2026
+  },
+  "data_package": {
+    "name": "microcosm-zz",
+    "version": "1.0.0"
+  },
+  "default_datasets": {
+    "national": "microcosm_zz_2026"
+  }
+}

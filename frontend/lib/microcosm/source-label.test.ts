@@ -12,7 +12,7 @@ describe("sourceLabel", () => {
   test("formats an unknown source without changing its identifier", () => {
     const source = "new_data_source";
 
-    expect(sourceLabel(source)).toBe("NEW Data Source");
+    expect(sourceLabel(source)).toBe("New Data Source");
     expect(source).toBe("new_data_source");
   });
 });

@@ -8,7 +8,6 @@ import {
   CalibrationExplorerMap,
 } from "@/components/microcosm/calibration-explorer-map";
 import { ArtifactDescriptionBanner } from "@/components/microcosm/artifact-description-banner";
-import { ExternalValidationsPanel } from "@/components/microcosm/external-validations-panel";
 import { WEIGHTED_TARGET_ERROR_HELP } from "@/components/microcosm/calibration-explorer-view";
 import { useCountry, type Country } from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -257,8 +256,6 @@ export function MicrocosmOverviewView() {
           <OverviewMetric label="Published" value={formatPublishedAt(data.updated_at)} />
         </div>
       </SectionCard>
-
-      <ExternalValidationsPanel releaseManifest={data.release_manifest} />
 
       <SectionCard title="Calibration map">
         <CalibrationExplorerMap

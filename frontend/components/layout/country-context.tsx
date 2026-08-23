@@ -12,7 +12,7 @@ export type Country = "us" | "uk" | "be";
 
 const COUNTRIES = new Set<Country>(["us", "uk", "be"]);
 
-function isCountry(value: string | null): value is Country {
+export function isCountry(value: string | null): value is Country {
   return value != null && COUNTRIES.has(value as Country);
 }
 
