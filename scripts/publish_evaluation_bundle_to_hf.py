@@ -68,7 +68,7 @@ class BundleFile:
     """One local file attested by the bundle manifest."""
 
     relative_path: str
-    local_path: Path
+    content: bytes
     size: int
     sha256: str
     git_blob_id: str
@@ -107,7 +107,7 @@ class RemoteFile:
 @dataclass(frozen=True)
 class Upload:
     path_in_repo: str
-    source: Path | bytes
+    source: bytes
     size: int
     sha256: str
 
@@ -222,10 +222,26 @@ def load_bundle(bundle_path: str | Path, jurisdiction: str) -> LocalBundle:
     bundle = Path(bundle_path)
     if not bundle.is_dir():
         raise PublishError(f"bundle directory does not exist: {bundle}")
+    manifest_path = bundle / "manifest.json"
+    try:
+        manifest_content = manifest_path.read_bytes()
+    except OSError as error:
+        raise PublishError(
+            "bundle verification failed: frontend bundle has no manifest.json: "
+            f"{bundle}"
+        ) from error
     try:
         manifest = verify_frontend_bundle(bundle)
     except ValueError as error:
         raise PublishError(f"bundle verification failed: {error}") from error
+    try:
+        manifest_changed = manifest_path.read_bytes() != manifest_content
+    except OSError as error:
+        raise PublishError(
+            "bundle manifest changed while it was being loaded"
+        ) from error
+    if manifest_changed:
+        raise PublishError("bundle manifest changed while it was being loaded")
     jurisdictions = manifest.get("jurisdictions") or []
     if jurisdiction not in jurisdictions:
         listed = ", ".join(jurisdictions) or "(none)"
@@ -235,19 +251,30 @@ def load_bundle(bundle_path: str | Path, jurisdiction: str) -> LocalBundle:
         )
     if not _RUN_ID.match(manifest["run_id"]):
         raise PublishError(f"run_id is not a safe path segment: {manifest['run_id']!r}")
-    files: list[BundleFile] = []
-    for relative_path in (
-        "manifest.json",
-        *(descriptor["path"] for descriptor in frontend_bundle_partitions(manifest)),
-    ):
+    files = [
+        BundleFile(
+            relative_path="manifest.json",
+            content=manifest_content,
+            size=len(manifest_content),
+            sha256=_sha256(manifest_content),
+            git_blob_id=git_blob_id(manifest_content),
+        )
+    ]
+    for descriptor in frontend_bundle_partitions(manifest):
+        relative_path = descriptor["path"]
         local_path = bundle / relative_path
         content = local_path.read_bytes()
+        sha256 = _sha256(content)
+        if sha256 != descriptor["sha256"]:
+            raise PublishError(
+                f"bundle partition {relative_path} changed while it was being loaded"
+            )
         files.append(
             BundleFile(
                 relative_path=relative_path,
-                local_path=local_path,
+                content=content,
                 size=len(content),
-                sha256=_sha256(content),
+                sha256=sha256,
                 git_blob_id=git_blob_id(content),
             )
         )
@@ -317,7 +344,7 @@ def build_plan(
         uploads = [
             Upload(
                 path_in_repo=base_path + item.relative_path,
-                source=item.local_path,
+                source=item.content,
                 size=item.size,
                 sha256=item.sha256,
             )
@@ -354,7 +381,7 @@ def build_plan(
             uploads.append(
                 Upload(
                     path_in_repo=path_in_repo,
-                    source=item.local_path,
+                    source=item.content,
                     size=item.size,
                     sha256=item.sha256,
                 )

@@ -139,9 +139,7 @@ class FakeHub:
         parent_commit: str | None = None,
     ) -> str:
         for upload in uploads:
-            source = upload.source
-            content = source if isinstance(source, bytes) else Path(source).read_bytes()
-            self.files[upload.path_in_repo] = content
+            self.files[upload.path_in_repo] = upload.source
         self.commits.append(
             {
                 "message": message,
@@ -286,6 +284,41 @@ def test_publish_uploads_the_run_and_points_latest_at_it(tmp_path: Path) -> None
         f"CROSS_DATASET_ARTIFACT_BASE_URL_BE={HUB_URL}/datasets/{DEFAULT_REPO}"
         f"/resolve/main/{prefix}"
     ) in text
+
+
+def test_publish_uses_attested_bytes_if_a_file_changes_before_commit(
+    tmp_path: Path,
+) -> None:
+    bundle = write_bundle(tmp_path / "frontend")
+    page = bundle / "facts" / "00002.json"
+    attested = page.read_bytes()
+    tampered = b'{"tampered":true}\n'
+
+    class MutatingHub(FakeHub):
+        def commit(
+            self,
+            uploads: list[Upload],
+            *,
+            message: str,
+            description: str | None = None,
+            parent_commit: str | None = None,
+        ) -> str:
+            page.write_bytes(tampered)
+            return super().commit(
+                uploads,
+                message=message,
+                description=description,
+                parent_commit=parent_commit,
+            )
+
+    hub = MutatingHub()
+
+    run_publish(bundle, hub)
+
+    published = hub.files[f"be/{RUN_ID}/frontend/facts/00002.json"]
+    assert page.read_bytes() == tampered
+    assert published == attested
+    assert published != tampered
 
 
 def test_rerun_of_a_published_bundle_is_a_no_op(tmp_path: Path) -> None:
@@ -643,7 +676,7 @@ class FakeHfApi:
         return type("CommitInfo", (), {"commit_url": "https://huggingface.co/c/1"})()
 
 
-def test_hf_hub_client_adapts_hfapi_calls(tmp_path: Path) -> None:
+def test_hf_hub_client_adapts_hfapi_calls() -> None:
     pytest.importorskip("huggingface_hub")
     from huggingface_hub import CommitOperationAdd
 
@@ -676,11 +709,9 @@ def test_hf_hub_client_adapts_hfapi_calls(tmp_path: Path) -> None:
     assert listing[1]["revision"] == "main"
     assert listing[1]["recursive"] is True
 
-    page = tmp_path / "00001.json"
-    page.write_bytes(b"{}\n")
     url = client.commit(
         [
-            Upload("be/run/frontend/facts/00001.json", page, 3, "0" * 64),
+            Upload("be/run/frontend/facts/00001.json", b"{}\n", 3, "0" * 64),
             Upload("be/latest.json", b"{}", 2, "1" * 64),
         ],
         message="Publish be evaluation bundle run",
@@ -702,6 +733,7 @@ def test_hf_hub_client_adapts_hfapi_calls(tmp_path: Path) -> None:
         "be/run/frontend/facts/00001.json",
         "be/latest.json",
     ]
+    assert [operation.path_or_fileobj for operation in operations] == [b"{}\n", b"{}"]
 
 
 def test_script_imports_without_huggingface_hub(tmp_path: Path) -> None:

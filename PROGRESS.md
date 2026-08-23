@@ -2,8 +2,8 @@
 
 ## State
 
-The harness now rejects noncanonical partition manifests and fact pages whose
-attested bodies disagree with their descriptors. Publisher hardening remains.
+Verified bundle files are now immutable byte snapshots from loading through
+commit. Remote comparison and missing-extra coverage remain.
 
 ## Done
 
@@ -12,10 +12,11 @@ attested bodies disagree with their descriptors. Publisher hardening remains.
 - Rejected unknown partition keys, dot path components, and duplicate paths.
 - Mirrored frontend fact-page metadata and row-count validation.
 - Added correctly hashed corrupt-page and noncanonical-manifest tests.
+- Replaced mutable upload paths with descriptor-validated byte snapshots.
+- Added a pre-commit disk-mutation regression test.
 
 ## Next
 
-- Snapshot verified bundle bytes and publish those immutable snapshots.
 - Require remote size equality for idempotent skips.
 - Cover a missing `huggingface_hub` install in a subprocess test.
 - Run the complete test suite and required BE dry run.
