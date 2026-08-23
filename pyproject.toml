@@ -12,6 +12,7 @@ microcosm = [
   "tables>=3.10,<4",
 ]
 taxcalc-cps = ["taxcalc==6.7.1"]
+publish = ["huggingface-hub>=0.27,<2"]
 
 [project.scripts]
 evaluation-harness = "evaluation_harness.cli:main"
