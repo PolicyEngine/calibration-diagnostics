@@ -83,7 +83,9 @@ The command refuses to use an integration reviewed against another snapshot.
 It classifies every fact for every registered source, runs Microcosm +
 PolicyEngine-US, Public CPS + Tax-Calculator, and Raw ACS PUMS, incorporates the
 reviewed Yale reconstruction checkpoint, scores the results, and publishes the
-frontend partitions.
+frontend partitions. Upload the resulting bundle to the Hugging Face dataset
+with `scripts/publish_evaluation_bundle_to_hf.py`, described in
+[the Cross-dataset artifact API](cross-dataset-api.md#publish-a-bundle-to-hugging-face).
 
 ## 4. Manual harness verification
 

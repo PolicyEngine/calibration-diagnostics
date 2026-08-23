@@ -121,6 +121,9 @@ microcosm = [
     { name = "policyengine-us" },
     { name = "tables" },
 ]
+publish = [
+    { name = "huggingface-hub" },
+]
 taxcalc-cps = [
     { name = "taxcalc" },
 ]
@@ -132,6 +135,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "huggingface-hub", marker = "extra == 'publish'", specifier = ">=0.27,<2" },
     { name = "numpy", specifier = ">=1.26,<3" },
     { name = "pandas", marker = "extra == 'microcosm'", specifier = ">=2.2,<3" },
     { name = "policyengine-core", marker = "extra == 'microcosm'", specifier = "==3.26.11" },
@@ -141,7 +145,7 @@ requires-dist = [
     { name = "tables", marker = "extra == 'microcosm'", specifier = ">=3.10,<4" },
     { name = "taxcalc", marker = "extra == 'taxcalc-cps'", specifier = "==6.7.1" },
 ]
-provides-extras = ["microcosm", "taxcalc-cps"]
+provides-extras = ["microcosm", "taxcalc-cps", "publish"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.3,<9" }]

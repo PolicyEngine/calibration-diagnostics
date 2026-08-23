@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from collections import Counter
 from decimal import Decimal
 from pathlib import Path
@@ -21,6 +22,10 @@ from .scoring import ScoreObservation, build_group_score
 FRONTEND_BUNDLE_SCHEMA = "cross_dataset.frontend_bundle.v1"
 WITHIN_BOUNDS_RELATIVE_ERROR = Decimal("0.10")
 FAR_OUTSIDE_BOUNDS_RELATIVE_ERROR = Decimal("0.25")
+# Mirrors the web reader's partition descriptor rules (frontend/lib/cross-dataset/
+# artifact.ts) so a bundle that passes here is one the dashboard will accept.
+_PARTITION_PATH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
+_SHA256_HEX = re.compile(r"^[a-f0-9]{64}$")
 
 DEFAULT_SOURCE_LABELS = {
     "census_acs_pums_2024": "Raw ACS PUMS",
@@ -807,4 +812,149 @@ def publish_frontend_bundle(
         },
     }
     (output / "manifest.json").write_bytes(_document(manifest))
+    return manifest
+
+
+def _partition_descriptor(value: Any, field: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"frontend bundle partition descriptor {field} is missing")
+    path = value.get("path")
+    sha256 = value.get("sha256")
+    if not isinstance(path, str) or not path:
+        raise ValueError(f"frontend bundle partition {field} has no path")
+    if (
+        path.startswith("/")
+        or "\\" in path
+        or any(part in ("", ".", "..") for part in path.split("/"))
+        or not _PARTITION_PATH.match(path)
+    ):
+        raise ValueError(
+            f"frontend bundle partition {field} has an unsafe path: {path!r}"
+        )
+    if not isinstance(sha256, str) or not _SHA256_HEX.match(sha256):
+        raise ValueError(f"frontend bundle partition {field} has no SHA-256")
+    return value
+
+
+def frontend_bundle_partitions(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the manifest's partition descriptors in a stable order.
+
+    The order is summary, groups, fact index, then fact pages. Every descriptor
+    carries a safe relative ``path`` and a hex ``sha256``; malformed manifests
+    raise ``ValueError``.
+    """
+
+    partitions = manifest.get("partitions")
+    if not isinstance(partitions, dict):
+        raise ValueError("frontend bundle manifest has no partitions")
+    expected_keys = {"summary", "groups", "fact_index", "facts"}
+    unknown_keys = set(partitions) - expected_keys
+    if unknown_keys:
+        unknown = ", ".join(sorted(str(key) for key in unknown_keys))
+        raise ValueError(f"frontend bundle manifest has unknown partitions: {unknown}")
+    for field, minimum in (("fact_count", 0), ("page_count", 0), ("page_size", 1)):
+        value = manifest.get(field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+            raise ValueError(f"frontend bundle manifest has no valid {field}")
+    descriptors = [
+        _partition_descriptor(partitions.get(key), f"partitions.{key}")
+        for key in ("summary", "groups", "fact_index")
+    ]
+    facts = partitions.get("facts")
+    if not isinstance(facts, list):
+        raise ValueError("frontend bundle manifest has no fact partitions")
+    for index, value in enumerate(facts):
+        descriptor = _partition_descriptor(value, f"partitions.facts[{index}]")
+        page = descriptor.get("page")
+        if not isinstance(page, int) or isinstance(page, bool) or page != index + 1:
+            raise ValueError("frontend bundle fact partition sequence is incomplete")
+        count = descriptor.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            raise ValueError(f"frontend bundle fact partition {index + 1} has no count")
+        descriptors.append(descriptor)
+    if len(facts) != manifest.get("page_count"):
+        raise ValueError("frontend bundle fact partition sequence is incomplete")
+    if sum(descriptor["count"] for descriptor in facts) != manifest.get("fact_count"):
+        raise ValueError("frontend bundle fact partition counts do not reconcile")
+    paths = [descriptor["path"] for descriptor in descriptors]
+    if len(paths) != len(set(paths)):
+        raise ValueError("frontend bundle partition paths must be unique")
+    return descriptors
+
+
+def verify_frontend_bundle(bundle_path: str | Path) -> dict[str, Any]:
+    """Verify a published frontend bundle directory and return its manifest.
+
+    Checks the manifest schema, recomputes the SHA-256 of every partition the
+    manifest lists, and confirms each partition carries the manifest's schema,
+    run ID, and snapshot ID. Raises ``ValueError`` on any mismatch.
+    """
+
+    bundle = Path(bundle_path)
+    manifest_path = bundle / "manifest.json"
+    if not manifest_path.is_file():
+        raise ValueError(f"frontend bundle has no manifest.json: {bundle}")
+    try:
+        manifest = json.loads(manifest_path.read_bytes())
+    except json.JSONDecodeError as error:
+        raise ValueError("frontend bundle manifest.json is not valid JSON") from error
+    if not isinstance(manifest, dict):
+        raise ValueError("frontend bundle manifest.json is not an object")
+    if manifest.get("schema_version") != FRONTEND_BUNDLE_SCHEMA:
+        raise ValueError(
+            f"unsupported frontend bundle schema: {manifest.get('schema_version')!r}"
+        )
+    for field in ("run_id", "snapshot_id"):
+        if not isinstance(manifest.get(field), str) or not manifest[field]:
+            raise ValueError(f"frontend bundle manifest has no {field}")
+    jurisdictions = manifest.get("jurisdictions")
+    if jurisdictions is not None and (
+        not isinstance(jurisdictions, list)
+        or any(not isinstance(value, str) or not value for value in jurisdictions)
+    ):
+        raise ValueError("frontend bundle manifest jurisdictions must be strings")
+    descriptors = frontend_bundle_partitions(manifest)
+    for index, descriptor in enumerate(descriptors):
+        path = bundle / descriptor["path"]
+        if not path.is_file():
+            raise ValueError(f"frontend bundle is missing {descriptor['path']}")
+        content = path.read_bytes()
+        if _sha256(content) != descriptor["sha256"]:
+            raise ValueError(f"frontend bundle hash mismatch for {descriptor['path']}")
+        try:
+            document = json.loads(content)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                f"frontend bundle partition {descriptor['path']} is not valid JSON"
+            ) from error
+        if not isinstance(document, dict) or any(
+            document.get(field) != manifest[field]
+            for field in ("schema_version", "run_id", "snapshot_id")
+        ):
+            raise ValueError(
+                f"frontend bundle partition {descriptor['path']} belongs to "
+                "another run or snapshot"
+            )
+        if index >= 3:
+            integer_fields = {
+                "page": descriptor["page"],
+                "page_size": manifest["page_size"],
+                "total": manifest["fact_count"],
+            }
+            if any(
+                not isinstance(document.get(field), int)
+                or isinstance(document[field], bool)
+                or document[field] != expected
+                for field, expected in integer_fields.items()
+            ):
+                raise ValueError(
+                    f"frontend bundle fact partition {descriptor['path']} has "
+                    "inconsistent page metadata"
+                )
+            rows = document.get("rows")
+            if not isinstance(rows, list) or len(rows) != descriptor["count"]:
+                raise ValueError(
+                    f"frontend bundle fact partition {descriptor['path']} has "
+                    "an inconsistent row count"
+                )
     return manifest

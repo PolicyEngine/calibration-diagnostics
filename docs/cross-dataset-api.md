@@ -53,6 +53,65 @@ run before writing. It emits a manifest, summary and group partitions, a fact
 index, and bounded fact pages. Every partition carries the immutable run and
 snapshot IDs and has a SHA-256 recorded in the manifest.
 
+## Publish a bundle to Hugging Face
+
+Publish the verified bundle to the
+[`policyengine/microcosm-evaluation`](https://huggingface.co/datasets/policyengine/microcosm-evaluation)
+dataset with one command. It reproduces the layout of the Belgium bundle
+referenced below:
+
+```bash
+export HF_TOKEN=...   # or HUGGINGFACE_TOKEN; a write token for the dataset
+uv run --extra publish python scripts/publish_evaluation_bundle_to_hf.py \
+  --bundle /path/to/evaluation-run/frontend \
+  --jurisdiction BE
+```
+
+Options: `--repo <owner/name>` targets another dataset, `--dry-run` verifies the
+bundle and prints the upload plan without any network call (and without the
+`publish` extra or a token), and `--no-latest` leaves the country's pointer
+alone. The dataset layout is:
+
+```text
+<cc>/<run_id>/frontend/{manifest,summary,groups,fact-index}.json
+<cc>/<run_id>/frontend/facts/NNNNN.json
+<cc>/latest.json
+```
+
+`<cc>` is the dashboard country code: the lower-case jurisdiction (`us`, `uk`,
+`be`), with `GB`-coded bundles published under `uk`. The command:
+
+1. verifies the bundle locally: `schema_version` must be
+   `cross_dataset.frontend_bundle.v1`, the manifest's `jurisdictions` must
+   contain `--jurisdiction`, every listed partition must match its recorded
+   SHA-256, and every partition must carry the manifest's run and snapshot IDs;
+2. compares the bundle with `<cc>/<run_id>/frontend/` on the Hub. Files that
+   already exist with the same size and content are skipped, so a re-run is a
+   no-op. A file that differs under an existing run ID aborts the publish
+   before anything is uploaded: run directories are immutable;
+3. uploads the missing files and, unless `--no-latest`, writes
+   `<cc>/latest.json` in one commit:
+
+   ```json
+   {
+    "schema_version": 1,
+    "jurisdiction": "BE",
+    "run_id": "evaluation-f28ca06a0b0d2baf13c87f2f",
+    "snapshot_id": "chronicle-82b574e3a8526ce0718ad08d",
+    "base_path": "be/evaluation-f28ca06a0b0d2baf13c87f2f/frontend/"
+   }
+   ```
+
+4. re-downloads `manifest.json` and `summary.json` (and `latest.json` when
+   written) through the public resolve URL, exactly as the dashboard reads
+   them, and checks their hashes against the local bundle;
+5. prints the variable to set for the dashboard, for example
+   `CROSS_DATASET_ARTIFACT_BASE_URL_BE=https://huggingface.co/datasets/policyengine/microcosm-evaluation/resolve/main/be/<run_id>/frontend/`.
+
+The token is read only from `HF_TOKEN` or `HUGGINGFACE_TOKEN`; the script never
+reads a keychain or a cached login. Files in the bundle directory that the
+manifest does not list are reported and never uploaded.
+
 ## Configure the application
 
 Configure at most one local directory or remote base URL for each country. The
@@ -89,7 +148,9 @@ export CROSS_DATASET_ARTIFACT_BASE_URL=https://example.org/evaluation-run/fronte
 make dev
 ```
 
-For example, the published Belgium bundle can be selected with:
+A bundle published with `scripts/publish_evaluation_bundle_to_hf.py` is
+selected with the base URL the command prints; `<cc>/latest.json` on the
+dataset names the current run. For the published Belgium bundle:
 
 ```bash
 export CROSS_DATASET_ARTIFACT_BASE_URL_BE=https://huggingface.co/datasets/policyengine/microcosm-evaluation/resolve/main/be/evaluation-f28ca06a0b0d2baf13c87f2f/frontend/
