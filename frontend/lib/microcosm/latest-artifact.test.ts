@@ -22,8 +22,10 @@ import {
   microcosmRepo,
   microcosmRevision,
   parseCountry,
+  releaseCountry,
   releasePublishedAtFromTree,
   releaseRole,
+  type ArtifactCountry,
   type Calibration,
 } from "./latest-artifact";
 import { buildCalibrationTree } from "./calibration-tree";
@@ -53,6 +55,11 @@ test("coerces supported country parameters and defaults unknown values to US", (
   expect(parseCountry("BE")).toBe("us");
   expect(parseCountry("fr")).toBe("us");
   expect(parseCountry(null)).toBe("us");
+});
+
+test("accepts the conformance fixture country only as a registered code", () => {
+  expect(parseCountry("zz")).toBe("zz");
+  expect(parseCountry("ZZ")).toBe("us");
 });
 
 test("uses the private Belgium repository and country revision", () => {
@@ -734,6 +741,11 @@ test("healthcare scope includes ACA, Medicaid, Medicare, and PTC targets", () =>
 
   expect(result.total_targets).toBe(4);
   expect(result.filtered_total).toBe(4);
+  expect(result.scope_counts).toEqual({ healthcare: 4 });
+  expect(
+    latestMicrocosmTargetDiagnosticsPage("http://x/api/microcosm/target-diagnostics", cal)
+      .scope_counts,
+  ).toEqual({ healthcare: 4 });
   expect(result.summary.fraction_within_10pct).toBe(0.5);
   expect(result.targets.map((row) => row.name)).not.toContain(
     "nation/irs/adjusted gross income/total/AGI in 30k-40k/taxable/All@2024",
@@ -1247,4 +1259,139 @@ test("releaseRole classifies national default vs non-default local-area", () => 
     is_default: false,
     is_local_area: true,
   });
+});
+
+const BE_COUNTRY_DEFAULTS: ArtifactCountry = {
+  code: "be",
+  label: "Belgium",
+  geography_id: null,
+  geography_label: "Belgium",
+  repository_visibility: "private",
+  capabilities: ["calibration", "targets", "compare", "cross_dataset"],
+};
+
+test("releaseCountry falls back to the registration when the manifest has no country block", () => {
+  expect(releaseCountry({}, "be")).toEqual(BE_COUNTRY_DEFAULTS);
+  expect(releaseCountry({ country: "BE" }, "be")).toEqual(BE_COUNTRY_DEFAULTS);
+  expect(releaseCountry({}, "us")).toEqual({
+    code: "us",
+    label: "United States",
+    geography_id: "0100000US",
+    geography_label: "United States",
+    repository_visibility: "public",
+    capabilities: [
+      "calibration",
+      "targets",
+      "compare",
+      "cross_dataset",
+      "staging",
+      "model_coverage",
+      "pipeline",
+      "variables",
+      "external_checks",
+    ],
+  });
+});
+
+test("releaseCountry lets well-typed string fields override the registration", () => {
+  expect(
+    releaseCountry(
+      {
+        country: {
+          code: "BE",
+          label: "Kingdom of Belgium",
+          geography_id: "BE",
+          geography_label: "Belgium (national)",
+          repository_visibility: "public",
+          presentation: { ignored: true },
+        },
+      },
+      "be",
+    ),
+  ).toEqual({
+    ...BE_COUNTRY_DEFAULTS,
+    label: "Kingdom of Belgium",
+    geography_id: "BE",
+    geography_label: "Belgium (national)",
+    repository_visibility: "public",
+  });
+});
+
+test("releaseCountry ignores a block whose code names another country", () => {
+  expect(
+    releaseCountry(
+      { country: { code: "us", label: "United States", repository_visibility: "public" } },
+      "be",
+    ),
+  ).toEqual(BE_COUNTRY_DEFAULTS);
+  expect(releaseCountry({ country: { code: 7, label: "Seven" } }, "be")).toEqual(
+    BE_COUNTRY_DEFAULTS,
+  );
+});
+
+test("releaseCountry narrows capabilities to the registration and never widens them", () => {
+  expect(
+    releaseCountry(
+      { country: { code: "be", capabilities: ["targets", "staging", "calibration", "bogus", 3] } },
+      "be",
+    ).capabilities,
+  ).toEqual(["calibration", "targets"]);
+  expect(releaseCountry({ country: { capabilities: [] } }, "be").capabilities).toEqual([]);
+  expect(releaseCountry({ country: { capabilities: "all" } }, "be").capabilities).toEqual(
+    BE_COUNTRY_DEFAULTS.capabilities,
+  );
+});
+
+test("releaseCountry ignores malformed field values", () => {
+  expect(
+    releaseCountry(
+      {
+        country: {
+          label: "",
+          geography_label: 12,
+          geography_id: { id: "x" },
+          repository_visibility: "open",
+        },
+      },
+      "be",
+    ),
+  ).toEqual(BE_COUNTRY_DEFAULTS);
+});
+
+test("the calibration summary and target page carry the typed country block", () => {
+  const cal = buildCalibration(
+    beDiagnosticsFixture,
+    "be-country",
+    null,
+    {},
+    { ...beReleaseManifestFixture, country: { code: "be", label: "Kingdom of Belgium" } },
+    {},
+    "be",
+  );
+  expect(cal.country_info).toEqual({ ...BE_COUNTRY_DEFAULTS, label: "Kingdom of Belgium" });
+  expect(latestMicrocosmCalibrationSummary(cal).country).toEqual(cal.country_info);
+  expect(
+    latestMicrocosmTargetDiagnosticsPage("http://x/api/microcosm/target-diagnostics", cal).country,
+  ).toEqual(cal.country_info);
+});
+
+test("the artifact's national geography label shapes rows without a geography", () => {
+  const cal = buildCalibration(
+    beDiagnosticsFixture,
+    "be-geography",
+    null,
+    {},
+    { ...beReleaseManifestFixture, country: { geography_label: "Belgium (national)" } },
+    {},
+    "be",
+  );
+  const national = cal.rows.filter((row) => row.level === "national");
+  expect(national.length).toBeGreaterThan(0);
+  expect(national.every((row) => row.geography === "Belgium (national)")).toBe(true);
+  expect(cal.rows[0]).toMatchObject({ geography: "Brussels", level: "region" });
+});
+
+test("the target page reports scope target counts for the release", () => {
+  expect(page("").scope_counts).toEqual({ healthcare: 0 });
+  expect(page("?scope=healthcare").scope_counts).toEqual({ healthcare: 0 });
 });

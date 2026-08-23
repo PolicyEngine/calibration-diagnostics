@@ -7,30 +7,44 @@ import { sourceAuthorityLabel } from "@/lib/source-labels";
 
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
 import {
+  COUNTRY_REGISTRY,
+  DEFAULT_COUNTRY,
+  countryRegistration,
+  isCountry,
+  isCountryCapability,
+  parseCountry,
+  type CountryCapability,
+  type MicrocosmCountry,
+  type RepositoryVisibility,
+} from "./countries";
+import {
   normalizeTargetLossAttribution,
   targetLossAttributionSummary,
   type FinalTargetLossAttribution,
   type TargetLossDiagnosticWarning,
 } from "./target-loss-attribution";
 
+// The registry is the registration point; these re-exports keep the server
+// modules and routes that import country helpers from here working.
+export { isCountry, parseCountry, type MicrocosmCountry };
+
 type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
 export type CalibrationLossKind = "normalized_target_loss" | "raw_optimizer_objective";
 
-const DEFAULT_GEOGRAPHY = "United States";
+const DEFAULT_GEOGRAPHY = countryRegistration(DEFAULT_COUNTRY).geography;
 const DEFAULT_GEOGRAPHY_LEVEL = "national";
 
 // Deprecated upstream identifiers: Microcosm's published HF repositories and
-// deployment variables still use the former Populace names.
-export const MICROCOSM_HF_REPO_ENV = "POPULACE_HF_REPO";
-export const MICROCOSM_HF_REVISION_ENV = "POPULACE_HF_REVISION";
-export const MICROCOSM_UK_HF_REPO_ENV = "POPULACE_UK_HF_REPO";
-export const MICROCOSM_UK_HF_REVISION_ENV = "POPULACE_UK_HF_REVISION";
-export const MICROCOSM_BE_HF_REPO_ENV = "POPULACE_BE_HF_REPO";
-export const MICROCOSM_BE_HF_REVISION_ENV = "POPULACE_BE_HF_REVISION";
-export const MICROCOSM_HF_REPO =
-  process.env[MICROCOSM_HF_REPO_ENV] ?? "policyengine/populace-us";
-export const MICROCOSM_HF_REVISION = process.env[MICROCOSM_HF_REVISION_ENV] ?? "main";
+// deployment variables still use the former Populace names. The names live on
+// each country's registration; they are re-exported here for deployment docs
+// and tests.
+export const MICROCOSM_HF_REPO_ENV = COUNTRY_REGISTRY.us.repo_env;
+export const MICROCOSM_HF_REVISION_ENV = COUNTRY_REGISTRY.us.revision_env;
+export const MICROCOSM_UK_HF_REPO_ENV = COUNTRY_REGISTRY.uk.repo_env;
+export const MICROCOSM_UK_HF_REVISION_ENV = COUNTRY_REGISTRY.uk.revision_env;
+export const MICROCOSM_BE_HF_REPO_ENV = COUNTRY_REGISTRY.be.repo_env;
+export const MICROCOSM_BE_HF_REVISION_ENV = COUNTRY_REGISTRY.be.revision_env;
 
 interface MicrocosmCountryRepository {
   repo: string;
@@ -38,40 +52,32 @@ interface MicrocosmCountryRepository {
   geography: string;
 }
 
-// A repository entry is the server-side registration point for a country. Keep
-// its national geography beside the repository so downstream shaping does not
-// require a second exhaustive country table.
-export const COUNTRY_REPO = {
-  us: {
-    repo: MICROCOSM_HF_REPO,
-    revision: MICROCOSM_HF_REVISION,
-    geography: "United States",
-  },
-  uk: {
-    repo: process.env[MICROCOSM_UK_HF_REPO_ENV] ?? "policyengine/populace-uk-private",
-    revision: process.env[MICROCOSM_UK_HF_REVISION_ENV] ?? "main",
-    geography: "United Kingdom",
-  },
-  be: {
-    repo: process.env[MICROCOSM_BE_HF_REPO_ENV] ?? "policyengine/populace-be-private",
-    revision: process.env[MICROCOSM_BE_HF_REVISION_ENV] ?? "main",
-    geography: "Belgium",
-  },
-  // Synthetic repository used only by the third-country conformance fixture.
-  zz: {
-    repo: "policyengine/microcosm-zz-fixture",
-    revision: "main",
-    geography: "Zedland",
-  },
-} satisfies Record<string, MicrocosmCountryRepository>;
-
-export type MicrocosmCountry = keyof typeof COUNTRY_REPO;
-
-export function parseCountry(value: string | null | undefined): MicrocosmCountry {
-  return value != null && Object.hasOwn(COUNTRY_REPO, value)
-    ? (value as MicrocosmCountry)
-    : "us";
+function envOverride(name: string | undefined): string | undefined {
+  return name == null ? undefined : process.env[name];
 }
+
+// Server-side view of a registration: the registry defaults with this
+// deployment's repository/revision overrides applied. Keep the national
+// geography beside the repository so downstream shaping does not require a
+// second exhaustive country table.
+function resolveCountryRepository(country: MicrocosmCountry): MicrocosmCountryRepository {
+  const registration = countryRegistration(country);
+  return {
+    repo: envOverride(registration.repo_env) ?? registration.repo,
+    revision: envOverride(registration.revision_env) ?? registration.revision,
+    geography: registration.geography,
+  };
+}
+
+export const COUNTRY_REPO = Object.fromEntries(
+  (Object.keys(COUNTRY_REGISTRY) as MicrocosmCountry[]).map((country) => [
+    country,
+    resolveCountryRepository(country),
+  ]),
+) as Record<MicrocosmCountry, MicrocosmCountryRepository>;
+
+export const MICROCOSM_HF_REPO = COUNTRY_REPO.us.repo;
+export const MICROCOSM_HF_REVISION = COUNTRY_REPO.us.revision;
 
 // Release/run ids are interpolated into HuggingFace URLs that carry the
 // server's HF token, so an unvalidated id ("../../..") could redirect the
@@ -713,7 +719,7 @@ function artifactVariable(
 function parseDottedTarget(
   name: string,
   row: TargetRow,
-  country: MicrocosmCountry,
+  nationalGeography: string,
 ): ParsedTarget | null {
   if (!name.includes(".")) return null;
   const metadata = asObject(row.metadata);
@@ -724,7 +730,7 @@ function parseDottedTarget(
   const geoId = stringValue(metadata.ledger_geography_id);
   const geography =
     geoLevel === "country"
-      ? microcosmCountryGeography(country)
+      ? nationalGeography
       : geoLevel === "congressional_district"
         ? districtFromGeoId(geoId) ?? ""
         : stateFromGeoId(geoId) ?? stringValue(metadata.state) ?? "";
@@ -756,7 +762,7 @@ function parseDottedTarget(
   return { geography, level, source, variable, breakdown };
 }
 
-function parseTarget(name: string, country: MicrocosmCountry): ParsedTarget {
+function parseTarget(name: string, nationalGeography: string): ParsedTarget {
   const parts = name.split("/");
   const p0 = parts[0] ?? "";
   const fips = /^US(\d{2})$/.exec(p0);
@@ -791,7 +797,7 @@ function parseTarget(name: string, country: MicrocosmCountry): ParsedTarget {
   }
   if (p0 === "nation" || p0 === "national" || p0 === "us") {
     return {
-      geography: microcosmCountryGeography(country), level: "national", source: parts[1] ?? "",
+      geography: nationalGeography, level: "national", source: parts[1] ?? "",
       variable: parts[2] ?? "", breakdown: parts.slice(3).join(" · "),
     };
   }
@@ -1064,10 +1070,11 @@ function calibrationStatus(
 // published metadata alongside. v1 rows simply lack those extra fields.
 function enrichTargetRow(
   rawRow: TargetRow,
-  skippedByName: Map<string, string> = new Map(),
-  droppedTargetNames: Set<string> = new Set(),
-  country: MicrocosmCountry = "us",
+  skippedByName: Map<string, string>,
+  droppedTargetNames: Set<string>,
+  artifactCountry: ArtifactCountry,
 ): TargetRow {
+  const nationalGeography = artifactCountry.geography_label;
   const metadata = normalizeChronicleMetadata(rawRow.metadata);
   const row: TargetRow = { ...rawRow, metadata };
   const fullName = String(row.name ?? "");
@@ -1108,7 +1115,8 @@ function enrichTargetRow(
   const filterDecomposition = decomposeTargetFilter(row.filter);
   const publisher = chroniclePublisherFromMetadata(metadata);
   const parsedFromName =
-    parseDottedTarget(baseName, row, country) ?? parseTarget(baseName, country);
+    parseDottedTarget(baseName, row, nationalGeography) ??
+    parseTarget(baseName, nationalGeography);
   const parsed: ParsedTarget = {
     ...parsedFromName,
     geography: filterDecomposition?.geography ?? parsedFromName.geography,
@@ -1122,9 +1130,7 @@ function enrichTargetRow(
       : parsedFromName.breakdown,
   };
   const hasGeography = Boolean(parsed.geography.trim());
-  const geography = hasGeography
-    ? parsed.geography
-    : microcosmCountryGeography(country);
+  const geography = hasGeography ? parsed.geography : nationalGeography;
   const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
   const measureCol = asObject(row.measure);
   const metadataTargetDimensions =
@@ -1714,6 +1720,8 @@ export function microcosmTargetTreemap(
 export interface Calibration {
   source: "huggingface_live";
   country: MicrocosmCountry;
+  // Typed `release_manifest.country` merged over the registration.
+  country_info: ArtifactCountry;
   description: string | null;
   diagnostics_status: DiagnosticsStatus;
   release_id: string;
@@ -1757,6 +1765,9 @@ interface TargetDiagnosticsMetadata {
   levels: string[];
   geographies: string[];
   variables: ReturnType<typeof microcosmVariableSummary>;
+  // Targets per named scope (the `scope` query parameter); a scope with no
+  // targets in the release has nothing to focus on.
+  scope_counts: { healthcare: number };
 }
 
 interface InvestigationSignal {
@@ -1850,6 +1861,61 @@ export function releaseRole(releaseManifest: JsonObject): ReleaseRole {
   };
 }
 
+// The country a release presents as, typed: registry defaults, overridden by
+// the string fields of `release_manifest.country` when present and well-typed.
+// The dashboard is selected by registry, so the artifact cannot re-route it: a
+// block whose `code` names another country is ignored whole. Capabilities can
+// only narrow what a deployment serves (intersection with the registration),
+// never widen it. Unknown keys are ignored.
+export interface ArtifactCountry {
+  code: MicrocosmCountry;
+  label: string;
+  geography_id: string | null;
+  geography_label: string;
+  repository_visibility: RepositoryVisibility;
+  capabilities: CountryCapability[];
+}
+
+function visibilityValue(value: unknown): RepositoryVisibility | null {
+  return value === "public" || value === "private" ? value : null;
+}
+
+export function releaseCountry(
+  releaseManifest: JsonObject,
+  country: MicrocosmCountry,
+): ArtifactCountry {
+  const registration = countryRegistration(country);
+  const defaults: ArtifactCountry = {
+    code: country,
+    label: registration.label,
+    geography_id: registration.geography_id,
+    geography_label: registration.geography,
+    repository_visibility: registration.visibility,
+    capabilities: [...registration.capabilities],
+  };
+  const block = asObject(releaseManifest.country);
+  if (
+    block.code != null &&
+    (typeof block.code !== "string" || block.code.trim().toLowerCase() !== country)
+  ) {
+    return defaults;
+  }
+  const capabilities = Array.isArray(block.capabilities)
+    ? new Set(block.capabilities.filter(isCountryCapability))
+    : null;
+  return {
+    code: country,
+    label: stringValue(block.label)?.trim() ?? defaults.label,
+    geography_id: stringValue(block.geography_id)?.trim() ?? defaults.geography_id,
+    geography_label: stringValue(block.geography_label)?.trim() ?? defaults.geography_label,
+    repository_visibility:
+      visibilityValue(block.repository_visibility) ?? defaults.repository_visibility,
+    capabilities: capabilities
+      ? defaults.capabilities.filter((capability) => capabilities.has(capability))
+      : defaults.capabilities,
+  };
+}
+
 export function buildCalibration(
   diag: JsonObject,
   releaseId: string,
@@ -1871,8 +1937,9 @@ export function buildCalibration(
     : [];
   const skippedByName = skippedTargetReasons(skipped);
   const dropped = new Set(droppedTargetNames);
+  const artifactCountry = releaseCountry(releaseManifest, country);
   const enrichedRows = addEstimateScopeWarnings(
-    targets.map((row) => enrichTargetRow(row, skippedByName, dropped, country)),
+    targets.map((row) => enrichTargetRow(row, skippedByName, dropped, artifactCountry)),
   );
   const role = releaseRole(releaseManifest);
   const normalizedAttribution = normalizeTargetLossAttribution({
@@ -1887,6 +1954,7 @@ export function buildCalibration(
   return {
     source: "huggingface_live",
     country,
+    country_info: artifactCountry,
     description:
       stringValue(diag.description) ??
       stringValue(releaseManifest.description) ??
@@ -2141,6 +2209,7 @@ function targetDiagnosticsMetadata(rows: TargetRow[]): TargetDiagnosticsMetadata
     levels: microcosmTargetLevels(rows),
     geographies: microcosmTargetGeographies(rows),
     variables: microcosmVariableSummary(rows),
+    scope_counts: { healthcare: rows.filter(isHealthcareTarget).length },
   };
   targetDiagnosticsMetadataCache.set(rows, metadata);
   return metadata;
@@ -2368,6 +2437,7 @@ function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
 export function latestMicrocosmCalibrationSummary(cal: Calibration) {
   return {
     available: true,
+    country: cal.country_info,
     description: cal.description,
     diagnostics_status: cal.diagnostics_status,
     ...releaseRole(cal.release_manifest),
@@ -2547,6 +2617,7 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
 
   return {
     available: true,
+    country: cal.country_info,
     description: cal.description,
     diagnostics_status: cal.diagnostics_status,
     ...releaseRole(cal.release_manifest),
@@ -2560,6 +2631,7 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
     geographies: metadata.geographies,
     variables: metadata.variables,
     dimensions,
+    scope_counts: metadata.scope_counts,
     summary: {
       diagnostics_status: cal.diagnostics_status,
       total_targets: scopedRows.length,

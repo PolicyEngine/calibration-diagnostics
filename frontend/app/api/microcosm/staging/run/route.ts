@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { hasCapability } from "@/lib/microcosm/countries";
 import { parseCountry, scrub } from "@/lib/microcosm/latest-artifact";
 import { loadStagingRun } from "@/lib/microcosm/staging-artifact";
 
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const country = parseCountry(params.get("country"));
   const runId = params.get("id")?.trim();
-  if (!runId && country === "us") {
+  if (!runId && hasCapability(country, "staging")) {
     return NextResponse.json({ detail: "Provide a staging run id via ?id=." }, { status: 400 });
   }
   try {

@@ -2,7 +2,11 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { ArtifactError, CrossDatasetArtifactReader } from "./artifact";
-import type { MicrocosmCountry } from "../microcosm/latest-artifact";
+import {
+  DEFAULT_COUNTRY,
+  countryRegistration,
+  type MicrocosmCountry,
+} from "../microcosm/countries";
 
 interface CountryArtifactConfig {
   countryCode: string;
@@ -19,15 +23,18 @@ interface CachedReader {
 
 const cachedReaders = new Map<MicrocosmCountry, CachedReader>();
 
+// The unsuffixed variables remain the default country's configuration so
+// existing deployments keep working; every other country uses its code as a
+// suffix.
 function countryArtifactConfig(country: MicrocosmCountry): CountryArtifactConfig {
   const countryCode = country.toUpperCase();
-  const suffix = country === "us" ? "" : `_${countryCode}`;
+  const suffix = country === DEFAULT_COUNTRY ? "" : `_${countryCode}`;
   return {
     countryCode,
     directoryEnv: `CROSS_DATASET_ARTIFACT_DIR${suffix}`,
     baseUrlEnv: `CROSS_DATASET_ARTIFACT_BASE_URL${suffix}`,
     expectedRunIdEnv: `CROSS_DATASET_EXPECTED_RUN_ID${suffix}`,
-    jurisdictionAliases: country === "uk" ? ["GB"] : [],
+    jurisdictionAliases: countryRegistration(country).jurisdiction_aliases ?? [],
   };
 }
 
