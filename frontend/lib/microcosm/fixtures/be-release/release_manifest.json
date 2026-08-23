@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "description": "DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata.",
+  "description": "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
   "build": {
     "schema_version": 1,
-    "description": "DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata.",
+    "description": "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
     "build_id": "microcosm-be-2026-chronicle-3cef97b-20260823T134247Z",
     "built_at": "2026-08-23T13:42:47.070381+00:00",
     "lineage": "microcosm_be_v04",
@@ -24,7 +24,7 @@
   "external_validations": {
     "euromod": {
       "comparator": "EUROMOD BE_2025 (JRC), plain baseline run",
-      "description": "Cross-engine column ledger: every EUROMOD BE_2025 output column computed on this population by both EUROMOD and the Axiom rules engine, classified matched / explained (named mechanism) / gap (named owner). DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata.",
+      "description": "Cross-engine column ledger: every EUROMOD BE_2025 output column computed on this population by both EUROMOD and the Axiom rules engine, classified matched / explained (named mechanism) / gap (named owner). Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
       "column_ledger": {
         "total_columns": 558,
         "substantive_columns": 182,

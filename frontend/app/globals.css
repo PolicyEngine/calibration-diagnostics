@@ -72,15 +72,15 @@
   --text-success: #2c5a45;
   --text-warning: #c2410c; /* functional */
 
-  /* Fonts — prefer the Microcosm faces when installed and fall back to
-     platform families. Keeping this stack local makes production builds
-     deterministic in network-isolated environments. */
+  /* Fonts — Inter (display + body), IBM Plex Mono (labels), and Urbanist
+     (wordmark only). Loaded self-hosted via next/font in app/layout.tsx and
+     exposed as --font-inter / --font-plex / --font-urbanist. */
   --font-sans:
-    Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --font-mono: var(--font-plex), ui-monospace, Menlo, monospace;
   --font-wordmark:
-    Urbanist, "Avenir Next", "Century Gothic", Futura, sans-serif;
+    var(--font-urbanist), "Avenir Next", "Century Gothic", Futura, sans-serif;
 
   /* microcosm.institute semantic aliases (verbatim mapping from microcosm.institute/style.css).
      "amber" is the site's historical accent name; it resolves to verdigris. */

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata.",
+  "description": "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
   "effective_sample_size": 560.7099759427821,
   "final_loss": 0.006225265748969901,
   "fraction_within_10pct": 1.0,
@@ -53,8 +53,8 @@
         ],
         "classification": "hard_chronicle_statbel",
         "concept": "population by NUTS1, sex, and age band",
-        "demo_grade": true,
-        "disclaimer": "DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata."
+        "support_pool": "us_survey_donor",
+        "disclaimer": "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings."
       },
       "target": 134606.0,
       "compiled_target": 134606.0,
@@ -82,8 +82,8 @@
         ],
         "classification": "hard_chronicle_fact_sum",
         "concept": "national personal income tax",
-        "demo_grade": true,
-        "disclaimer": "DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata."
+        "support_pool": "us_survey_donor",
+        "disclaimer": "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings."
       },
       "target": 69325000000.0,
       "compiled_target": 69325000000.0,
@@ -112,8 +112,8 @@
         ],
         "classification": "hard_chronicle_fact_sum",
         "concept": "taxable-movable-income analogue (D41 + D42 received)",
-        "demo_grade": true,
-        "disclaimer": "DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata."
+        "support_pool": "us_survey_donor",
+        "disclaimer": "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings."
       },
       "target": 40087000000.0,
       "compiled_target": 40087000000.0,

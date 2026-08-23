@@ -8,7 +8,7 @@ import {
 } from "./external-validations";
 
 const DISCLAIMER =
-  "DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata.";
+  "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.";
 
 describe("external validation shaping", () => {
   test("shapes the real BE EUROMOD headline without losing producer labels or zeroes", () => {

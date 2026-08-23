@@ -82,7 +82,7 @@ test("loads trimmed Belgium diagnostics without optional US artifact fields", ()
   expect(cal.included_target_count).toBe(3);
   expect(cal.loss_trajectory).toEqual([]);
   expect(cal.description).toBe(
-    "DEMO-GRADE: US survey support records reweighted to Belgian Chronicle facts — not Belgian microdata.",
+    "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
   );
   expect(cal.rows.every((row) => row.registry == null)).toBe(true);
 
