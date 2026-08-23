@@ -83,6 +83,23 @@ describe("MicrocosmTargetDetail", () => {
     expect(markup).toContain("Not available");
   });
 
+  test("prefers artifact labels and direct source URLs", () => {
+    const markup = render({
+      ...TARGET,
+      source: "novastat_agency",
+      source_label: "Nova Statistics Agency",
+      source_url: "https://stats.example/zz/pop",
+      variable: "population",
+      variable_label: "Resident population",
+    });
+
+    expect(markup).toContain(">Resident population</h2>");
+    expect(markup).toContain("Nova Statistics Agency");
+    expect(markup).toContain("Source link</dt><dd");
+    expect(markup).toContain('href="https://stats.example/zz/pop"');
+    expect(markup).toContain("View official source");
+  });
+
   test("renders the geography level in sentence case", () => {
     const markup = render({
       ...TARGET,

@@ -23,7 +23,7 @@ import {
   useMicrocosm,
   useMicrocosmReleases,
 } from "@/lib/api/hooks/use-microcosm";
-import type { MicrocosmCountry } from "@/lib/microcosm/countries";
+import { microcosmOverviewIntro } from "@/lib/microcosm/presentation";
 import {
   microcosmPublicationUrl,
   microcosmSourceAttribution,
@@ -40,26 +40,6 @@ function formatPublishedAt(value: string | null | undefined): string {
     day: "numeric",
   });
 }
-
-// Legacy per-country intro copy for releases published before a typed
-// `release_manifest.presentation` block; countries without an entry get the
-// generic sentences below.
-const COUNTRY_OVERVIEW_COPY: Partial<
-  Record<MicrocosmCountry, { authorities: string; examples: string }>
-> = {
-  us: {
-    authorities: "the IRS, the Census Bureau, and CMS",
-    examples: "EITC statistics, population, and Medicaid enrollment",
-  },
-  uk: {
-    authorities: "the ONS, OBR, and HMRC",
-    examples: "population by region and age, household types, and tax receipts",
-  },
-  be: {
-    authorities: "Statbel, ONSS, JRC, and SFPD",
-    examples: "population by region, sex, and age band, tax receipts, and benefit totals",
-  },
-};
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
 
@@ -129,7 +109,7 @@ export function MicrocosmOverviewView() {
     cal.country?.repository_visibility,
   );
   const publicationUrl = microcosmPublicationUrl(data.source_repo, data.release_id);
-  const overviewCopy = COUNTRY_OVERVIEW_COPY[country];
+  const overviewIntro = microcosmOverviewIntro(country, cal.presentation);
 
   return (
     <div className="flex flex-col gap-5">
@@ -139,14 +119,7 @@ export function MicrocosmOverviewView() {
         title="What the data is anchored to"
         description={
           <>
-            Microcosm reweights survey microdata so it matches official statistics
-            from{" "}
-            {overviewCopy
-              ? `agencies like ${overviewCopy.authorities}`
-              : "national statistical agencies and administrative sources"}
-            . Each tile in the Calibration fit explorer below is a category we
-            calibrate to{overviewCopy ? `, including ${overviewCopy.examples}` : ""}.
-            Data is built live from{" "}
+            {overviewIntro} Data is built live from{" "}
             {sourceAttribution.href ? (
               <a
                 className="underline decoration-dotted underline-offset-2"

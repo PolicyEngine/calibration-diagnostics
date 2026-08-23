@@ -2,8 +2,8 @@
 
 ## State
 
-All server-side B1-B4 artifact readers and adapters are implemented. The legacy
-US name and UK/BE filter paths remain intact and are selected per row.
+All B1-B4 readers/adapters and their client presentation paths are implemented.
+The legacy US name and UK/BE filter paths remain intact and are selected per row.
 
 ## Done
 
@@ -43,10 +43,16 @@ US name and UK/BE filter paths remain intact and are selected per row.
   JSON-shaped schema-5 US regression for the dotted BEA NIPA row.
 - The focused artifact/conformance suite now has `70 pass`, `0 fail`, and
   `267 expect()` calls.
+- Added tested artifact → legacy → generic presentation helpers and wired them
+  into the overview and targets views while keeping the live-source sentence
+  code-owned.
+- Updated target browsing, target detail, treemap, and calibration-tree displays
+  with artifact publisher/variable labels; structured source URLs now link to
+  the official source.
+- Verified the completed code paths with the full suite and type-check:
+  `263 pass`, `0 todo`, `0 fail`, `1039 expect()` calls; `tsc --noEmit` passed.
 
 ## Next
 
-- Add the artifact → legacy → generic presentation fallbacks to both views.
-- Make every row-aware publisher/variable display prefer artifact labels.
-- Enable and extend conformance tests, add regressions, and document B1-B6.
-- Run the full frontend test, type-check, and production-build gates.
+- Document the implemented B1-B6 contract and producer follow-ups.
+- Run the full test suite, then the required lint and production-build gates.

@@ -13,7 +13,8 @@ import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { withBasePath } from "@/lib/base-path";
-import { hasCapability, type MicrocosmCountry } from "@/lib/microcosm/countries";
+import { hasCapability } from "@/lib/microcosm/countries";
+import { microcosmTargetsIntro } from "@/lib/microcosm/presentation";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 import {
   releaseSelectOptions,
@@ -26,19 +27,6 @@ import {
 } from "@/lib/api/hooks/use-microcosm";
 
 const PAGE_SIZE = 50;
-
-// Legacy per-country browse prompt for releases published before a typed
-// `release_manifest.presentation` block; countries without an entry get the
-// generic prompt.
-const COUNTRY_BROWSE_COPY: Partial<Record<MicrocosmCountry, string>> = {
-  us:
-    "Pick a measure like EITC, population, or AGI and see how each breakdown is calibrated.",
-  uk:
-    "Pick a measure like population, household type, or tax receipts and see how each breakdown is calibrated.",
-  be:
-    "Pick a measure like population, income tax, or pension recipients and see how each breakdown is calibrated.",
-};
-const GENERIC_BROWSE_COPY = "Pick a measure and see how each breakdown is calibrated.";
 
 interface SortState {
   by: string;
@@ -62,7 +50,9 @@ interface VariableMeasureOption {
 interface VariableGroup {
   groupKey: string;
   source: string;
+  sourceLabel: string;
   variable: string;
+  variableLabel: string | null;
   level: string;
   options: VariableMeasureOption[];
   defaultKey: string;
@@ -103,6 +93,7 @@ function titleFromIdentifier(value: string | null | undefined): string {
 function measureTitle(row: MicrocosmTargetRow): string {
   return (
     titleFromIdentifier(row.chronicle?.measure_concept) ||
+    row.variable_label ||
     humanizeName(row.variable as string) ||
     titleFromIdentifier(row.chronicle?.layout_measure_id) ||
     "—"
@@ -190,7 +181,9 @@ const OVERVIEW_COLUMNS: Column[] = [
     sortable: true,
     render: (row) => (
       <div className="max-w-[11rem]" title={row.chronicle?.source_record_id ?? String(row.name ?? "")}>
-        <div className="font-medium text-foreground">{row.source || "—"}</div>
+        <div className="font-medium text-foreground">
+          {row.source_label ?? row.source ?? "—"}
+        </div>
         <div className="truncate text-xs text-muted-foreground">
           {titleFromIdentifier(row.chronicle?.domain)}
         </div>
@@ -293,7 +286,9 @@ function groupVariables(variables: MicrocosmVariableRow[]): VariableGroup[] {
       return {
         groupKey,
         source: first.source,
+        sourceLabel: first.source_label || sourceLabel(first.source),
         variable: first.variable,
+        variableLabel: first.variable_label ?? null,
         level: first.level,
         options,
         defaultKey: defaultOption.key,
@@ -345,7 +340,12 @@ function VariableBrowser({
   const q = query.trim().toLowerCase();
   const filtered = q
     ? groups.filter((group) =>
-        [group.variable, sourceLabel(group.source), group.source]
+        [
+          group.variableLabel,
+          group.variable,
+          group.sourceLabel,
+          group.source,
+        ]
           .join(" ")
           .toLowerCase()
           .includes(q),
@@ -360,6 +360,7 @@ function VariableBrowser({
     return [...map.entries()]
       .map(([source, items]) => ({
         source,
+        sourceLabel: items[0]?.sourceLabel ?? sourceLabel(source),
         items: [...items].sort((a, b) => b.nTargets - a.nTargets),
         total: items.reduce((sum, item) => sum + item.nTargets, 0),
       }))
@@ -389,7 +390,9 @@ function VariableBrowser({
         sections.map((section) => (
           <div key={section.source}>
             <div className="mb-3 flex items-baseline justify-between gap-3 border-b border-border/70 pb-2">
-              <h3 className="text-sm font-semibold text-foreground">{sourceLabel(section.source)}</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                {section.sourceLabel}
+              </h3>
               <span className="shrink-0 text-xs text-muted-foreground">
                 {fmt(section.items.length, { digits: 0 })} statistics · {fmt(section.total, { digits: 0 })} targets
               </span>
@@ -410,7 +413,7 @@ function VariableBrowser({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                        {humanizeName(group.variable)}
+                        {group.variableLabel ?? humanizeName(group.variable)}
                       </span>
                       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                         {fmt(group.nTargets, { digits: 0 })}
@@ -1080,7 +1083,7 @@ export function MicrocosmTargetsView({
             <WizardCard
               eyebrow="Browse"
               title="Explore a statistic"
-              body={COUNTRY_BROWSE_COPY[country] ?? GENERIC_BROWSE_COPY}
+              body={microcosmTargetsIntro(country, data?.presentation)}
               stat={variableGroupCount ? `${fmt(variableGroupCount, { digits: 0 })} statistics` : "Browse measures"}
               accent="teal"
               onClick={startExplore}
