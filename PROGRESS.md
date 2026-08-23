@@ -2,8 +2,8 @@
 
 ## State
 
-All B1-B4 readers/adapters and their client presentation paths are implemented.
-The legacy US name and UK/BE filter paths remain intact and are selected per row.
+B1-B6 implementation and contract documentation are complete. The legacy US
+name and UK/BE filter paths remain intact and are selected per row.
 
 ## Done
 
@@ -51,8 +51,10 @@ The legacy US name and UK/BE filter paths remain intact and are selected per row
   the official source.
 - Verified the completed code paths with the full suite and type-check:
   `263 pass`, `0 todo`, `0 fail`, `1039 expect()` calls; `tsc --noEmit` passed.
+- Documented every implemented JSON block, validation and precedence rule,
+  per-row adapter selection, response metadata, compatibility behavior, and the
+  producer publication checklist.
 
 ## Next
 
-- Document the implemented B1-B6 contract and producer follow-ups.
 - Run the full test suite, then the required lint and production-build gates.
