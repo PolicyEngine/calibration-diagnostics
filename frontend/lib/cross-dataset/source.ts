@@ -2,14 +2,45 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { ArtifactError, CrossDatasetArtifactReader } from "./artifact";
+import type { MicrocosmCountry } from "../microcosm/latest-artifact";
 
-let cachedKey = "";
-let cachedReader: CrossDatasetArtifactReader | null = null;
+interface CountryArtifactConfig {
+  countryCode: string;
+  directoryEnv: string;
+  baseUrlEnv: string;
+  expectedRunIdEnv: string;
+  jurisdictionAliases: readonly string[];
+}
 
-function directoryReader(directory: string, expectedRunId?: string) {
+interface CachedReader {
+  key: string;
+  reader: CrossDatasetArtifactReader;
+}
+
+const cachedReaders = new Map<MicrocosmCountry, CachedReader>();
+
+function countryArtifactConfig(country: MicrocosmCountry): CountryArtifactConfig {
+  const countryCode = country.toUpperCase();
+  const suffix = country === "us" ? "" : `_${countryCode}`;
+  return {
+    countryCode,
+    directoryEnv: `CROSS_DATASET_ARTIFACT_DIR${suffix}`,
+    baseUrlEnv: `CROSS_DATASET_ARTIFACT_BASE_URL${suffix}`,
+    expectedRunIdEnv: `CROSS_DATASET_EXPECTED_RUN_ID${suffix}`,
+    jurisdictionAliases: country === "uk" ? ["GB"] : [],
+  };
+}
+
+function directoryReader(
+  directory: string,
+  expectedRunId: string | undefined,
+  config: CountryArtifactConfig,
+) {
   const root = path.resolve(directory);
   return new CrossDatasetArtifactReader({
     expectedRunId,
+    expectedJurisdiction: config.countryCode,
+    jurisdictionAliases: config.jurisdictionAliases,
     readText: async (relativePath) => {
       const resolved = path.resolve(root, relativePath);
       if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
@@ -20,13 +51,31 @@ function directoryReader(directory: string, expectedRunId?: string) {
   });
 }
 
-function remoteReader(baseUrl: string, expectedRunId?: string) {
-  const base = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+function remoteReader(
+  baseUrl: string,
+  expectedRunId: string | undefined,
+  config: CountryArtifactConfig,
+) {
+  let base: URL;
+  try {
+    base = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+  } catch (error) {
+    throw new ArtifactError(
+      "malformed_artifact",
+      `${config.baseUrlEnv} must be a valid HTTP(S) URL.`,
+      { cause: error },
+    );
+  }
   if (!/^https?:$/.test(base.protocol)) {
-    throw new ArtifactError("malformed_artifact", "CROSS_DATASET_ARTIFACT_BASE_URL must use HTTP(S).");
+    throw new ArtifactError(
+      "malformed_artifact",
+      `${config.baseUrlEnv} must use HTTP(S).`,
+    );
   }
   return new CrossDatasetArtifactReader({
     expectedRunId,
+    expectedJurisdiction: config.countryCode,
+    jurisdictionAliases: config.jurisdictionAliases,
     readText: async (relativePath) => {
       const url = new URL(relativePath, base);
       if (url.origin !== base.origin || !url.pathname.startsWith(base.pathname)) {
@@ -39,27 +88,31 @@ function remoteReader(baseUrl: string, expectedRunId?: string) {
   });
 }
 
-export function configuredCrossDatasetReader(): CrossDatasetArtifactReader {
-  const directory = process.env.CROSS_DATASET_ARTIFACT_DIR?.trim() || "";
-  const baseUrl = process.env.CROSS_DATASET_ARTIFACT_BASE_URL?.trim() || "";
-  const expectedRunId = process.env.CROSS_DATASET_EXPECTED_RUN_ID?.trim() || undefined;
+export function configuredCrossDatasetReader(
+  country: MicrocosmCountry,
+): CrossDatasetArtifactReader {
+  const config = countryArtifactConfig(country);
+  const directory = process.env[config.directoryEnv]?.trim() || "";
+  const baseUrl = process.env[config.baseUrlEnv]?.trim() || "";
+  const expectedRunId = process.env[config.expectedRunIdEnv]?.trim() || undefined;
   if (directory && baseUrl) {
     throw new ArtifactError(
       "malformed_artifact",
-      "Configure only one of CROSS_DATASET_ARTIFACT_DIR and CROSS_DATASET_ARTIFACT_BASE_URL.",
+      `Configure only one of ${config.directoryEnv} and ${config.baseUrlEnv} for ${config.countryCode}.`,
     );
   }
   if (!directory && !baseUrl) {
     throw new ArtifactError(
       "partial_artifact",
-      "Cross-dataset artifacts are not configured. Set CROSS_DATASET_ARTIFACT_DIR or CROSS_DATASET_ARTIFACT_BASE_URL.",
+      `Cross-dataset artifacts are not configured for ${config.countryCode}. Set ${config.directoryEnv} or ${config.baseUrlEnv}.`,
     );
   }
   const key = `${directory}\0${baseUrl}\0${expectedRunId ?? ""}`;
-  if (cachedReader && cachedKey === key) return cachedReader;
-  cachedReader = directory
-    ? directoryReader(directory, expectedRunId)
-    : remoteReader(baseUrl, expectedRunId);
-  cachedKey = key;
-  return cachedReader;
+  const cached = cachedReaders.get(country);
+  if (cached?.key === key) return cached.reader;
+  const reader = directory
+    ? directoryReader(directory, expectedRunId, config)
+    : remoteReader(baseUrl, expectedRunId, config);
+  cachedReaders.set(country, { key, reader });
+  return reader;
 }

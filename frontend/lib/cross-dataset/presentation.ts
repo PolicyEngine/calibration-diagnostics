@@ -4,7 +4,7 @@ import type {
   PerformanceBuckets,
   SourceSummary,
 } from "./artifact";
-import { sourceAuthorityLabel } from "../source-labels";
+import type { Country } from "@/components/layout/country-context";
 
 export const CROSS_DATASET_PAGE_TITLE = "Cross-dataset comparison";
 
@@ -53,12 +53,13 @@ export interface SourceOverview {
   calibrationExposures: LabeledCount[];
 }
 
-export type OverviewGeographyFilter =
-  | "all"
-  | "country"
-  | "state"
-  | "congressional_district";
-export type OverviewSampleFilter = "all" | "in_sample" | "out_of_sample";
+export type OverviewGeographyFilter = string;
+export type OverviewSampleFilter = string;
+
+export interface OverviewFilterOption {
+  key: string;
+  label: string;
+}
 
 export interface SourceOverviewFilter {
   geography: OverviewGeographyFilter;
@@ -96,22 +97,6 @@ export function crossDatasetUiState(input: {
   if (input.error || !input.summary) return "error";
   return input.summary.sources.length > 0 ? "ready" : "empty";
 }
-
-const PERIOD_TREATMENT_LABELS: Record<string, string> = {
-  native: "Native-period comparisons",
-  aligned_fact: "Chronicle facts transformed to model-comparable benchmarks",
-  advanced_population: "CPS population advanced to 2024",
-  build_target_reproduction: "Administrative-period targets used by the 2024 build",
-  unsupported: "Period treatment unavailable",
-};
-
-const CALIBRATION_EXPOSURE_LABELS: Record<string, string> = {
-  direct_calibration_target: "Direct calibration targets (in-sample)",
-  used_in_imputation_or_reweighting:
-    "Used in source weighting/reweighting (not independent)",
-  external_validation: "External validation",
-  unknown_exposure: "Not evaluated",
-};
 
 function titleCase(value: string): string {
   const words = value.replaceAll("_", " ");
@@ -172,15 +157,11 @@ function sourceCategories(
   dimension: "period_treatment" | "calibration_exposure",
   sourceId: string,
 ): LabeledCount[] {
-  const labels =
-    dimension === "period_treatment"
-      ? PERIOD_TREATMENT_LABELS
-      : CALIBRATION_EXPOSURE_LABELS;
   return groups
     .filter((group) => group.dimension === dimension)
     .map((group) => ({
       key: group.key,
-      label: labels[group.key] ?? group.label,
+      label: group.label,
       count: groupCellCount(group, sourceId),
     }))
     .filter((item) => item.count > 0)
@@ -265,44 +246,48 @@ export function buildSourceOverviews(
 }
 
 export function sourceDisplayLabel(source: SourceSummary): string {
-  if (
-    source.source_id === "taxcalc_public_cps_2024" ||
-    source.source_id === "cps"
-  ) {
-    return "Public CPS + Tax-Calculator";
-  }
   return source.label;
 }
 
 export function sourceCompactLabel(source: SourceSummary): string {
-  const sourceId = source.source_id.toLowerCase();
-  // Deprecated artifact identifier: existing Microcosm rows retain their
-  // former `populace` source ID.
-  if (sourceId.includes("populace") || sourceId.includes("microcosm")) return "Microcosm";
-  if (sourceId === "taxcalc_public_cps_2024" || sourceId === "cps") {
-    return "Public CPS";
-  }
-  if (sourceId.includes("yale_reconstruction")) return "Yale reconstruction";
-  if (sourceId.includes("acs_pums") || sourceId === "acs") return "Raw ACS";
-  return sourceDisplayLabel(source);
+  return source.label;
 }
 
 export function orderSourceSummaries(sources: SourceSummary[]): SourceSummary[] {
-  const sourcePriority = (source: SourceSummary): number => {
-    const sourceId = source.source_id.toLowerCase();
-    if (sourceId.includes("populace") || sourceId.includes("microcosm")) return 0;
-    if (sourceId === "taxcalc_public_cps_2024" || sourceId === "cps") return 1;
-    if (sourceId === "yale_reconstruction_2024") return 2;
-    return 3;
-  };
-  return sources
-    .map((source, index) => ({ source, index }))
-    .sort((left, right) => {
-      const priorityDifference = sourcePriority(left.source) - sourcePriority(right.source);
-      if (priorityDifference !== 0) return priorityDifference;
-      return left.index - right.index;
-    })
-    .map(({ source }) => source);
+  return [...sources];
+}
+
+function optionsForDimension(
+  groups: CrossDatasetGroup[],
+  dimension: string,
+): OverviewFilterOption[] {
+  const options = new Map<string, string>();
+  for (const group of groups) {
+    if (group.dimension === dimension && !options.has(group.key)) {
+      options.set(group.key, group.label);
+    }
+  }
+  return [...options].map(([key, label]) => ({ key, label }));
+}
+
+export function availableGroupDimensions(
+  groups: CrossDatasetGroup[],
+): (typeof GROUP_DIMENSIONS)[number][] {
+  return GROUP_DIMENSIONS.filter((option) =>
+    groups.some((group) => group.dimension === option.key),
+  );
+}
+
+export function geographyFilterOptions(
+  groups: CrossDatasetGroup[],
+): OverviewFilterOption[] {
+  return optionsForDimension(groups, "geography");
+}
+
+export function sampleFilterOptions(
+  groups: CrossDatasetGroup[],
+): OverviewFilterOption[] {
+  return optionsForDimension(groups, "populace_calibration_sample");
 }
 
 const DIMENSION_QUERY_KEYS: Record<GroupDimension, string> = {
@@ -318,8 +303,10 @@ export function groupFactsHref(
   dimension: GroupDimension,
   key: string,
   sourceId: string,
+  country: Country = "us",
 ): string {
   const params = new URLSearchParams();
+  params.set("country", country);
   params.set("view", "facts");
   params.set("source", sourceId);
   params.set(DIMENSION_QUERY_KEYS[dimension], key);
@@ -330,6 +317,7 @@ function sourceGroupView(
   group: CrossDatasetGroup,
   dimension: GroupDimension,
   source: SourceSummary,
+  country: Country,
 ): GroupSourceView {
   const cell = group.sources[source.source_id] ?? {
     evaluable: 0,
@@ -359,7 +347,7 @@ function sourceGroupView(
     scoredCount: cell.scored,
     unsupportedCount: unsupported,
     topUnsupportedReasons: labeledCounts(cell.reason_codes).slice(0, 2),
-    factHref: groupFactsHref(dimension, group.key, source.source_id),
+    factHref: groupFactsHref(dimension, group.key, source.source_id, country),
   };
 }
 
@@ -367,21 +355,19 @@ export function buildGroupRows(
   groups: CrossDatasetGroup[],
   dimension: GroupDimension,
   sources: SourceSummary[],
+  country: Country = "us",
 ): GroupRowView[] {
   return groups
     .filter((group) => group.dimension === dimension)
     .map((group) => ({
       dimension,
       key: group.key,
-      label:
-        dimension === "ledger_source"
-          ? sourceAuthorityLabel(group.key)
-          : group.label,
+      label: group.label,
       factCount: group.fact_count,
       sources: Object.fromEntries(
         sources.map((source) => [
           source.source_id,
-          sourceGroupView(group, dimension, source),
+          sourceGroupView(group, dimension, source, country),
         ]),
       ),
     }))

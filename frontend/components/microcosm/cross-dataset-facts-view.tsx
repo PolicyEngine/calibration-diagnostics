@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
+import {
+  useCountry,
+  type Country,
+} from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -58,6 +62,7 @@ const SORT_OPTIONS = [
 function apiFactParams(params: FactCatalogParams): Record<string, string | number | undefined> {
   return {
     view: "facts",
+    country: params.country,
     source: params.source || undefined,
     status: params.status || undefined,
     ledger_source: params.chronicleSource || undefined,
@@ -75,10 +80,13 @@ function apiFactParams(params: FactCatalogParams): Record<string, string | numbe
 
 function useFactCatalog(params: FactCatalogParams) {
   return useQuery({
-    queryKey: ["cross-dataset", "facts", params],
+    queryKey: ["cross-dataset", "facts", params.country, params],
     queryFn: async (): Promise<CatalogResponse> => {
       const [summary, page] = await Promise.all([
-        apiGet<CrossDatasetSummary>("/microcosm/cross-dataset", { view: "summary" }),
+        apiGet<CrossDatasetSummary>("/microcosm/cross-dataset", {
+          view: "summary",
+          country: params.country,
+        }),
         apiGet<FactsPage>("/microcosm/cross-dataset", apiFactParams(params)),
       ]);
       if (summary.run_id !== page.run_id || summary.snapshot_id !== page.snapshot_id) {
@@ -86,7 +94,6 @@ function useFactCatalog(params: FactCatalogParams) {
       }
       return { summary, page };
     },
-    placeholderData: (previous) => previous,
     staleTime: Infinity,
     retry: false,
   });
@@ -157,9 +164,10 @@ function sourceTone(supported: boolean): "success" | "neutral" {
 
 export function CrossDatasetFactsView({ search }: { search: string }) {
   const router = useRouter();
+  const { country } = useCountry();
   const params = useMemo(
-    () => parseFactCatalogParams(new URLSearchParams(search)),
-    [search],
+    () => parseFactCatalogParams(new URLSearchParams(search), country),
+    [country, search],
   );
   const query = useFactCatalog(params);
   const [searchInput, setSearchInput] = useState(params.search);
@@ -227,7 +235,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
         description="Browse every Chronicle observation and the corresponding capability cell for each model. Unsupported cells remain visible with a specific reason."
         actions={
           <Link
-            href="/microcosm/datasets"
+            href={`/microcosm/datasets?country=${country}`}
             className="rounded-md border border-border bg-card px-3 py-2 text-xs font-medium hover:bg-muted"
           >
             ← Overview
@@ -327,7 +335,7 @@ export function CrossDatasetFactsView({ search }: { search: string }) {
               />
             ))}
             <Link
-              href="/microcosm/datasets?view=facts"
+              href={`/microcosm/datasets?view=facts&country=${country}`}
               className="ml-auto text-xs font-medium text-primary underline underline-offset-2"
             >
               Clear all
@@ -482,15 +490,19 @@ function FieldList({ fields, empty }: { fields: DisplayField[]; empty: string })
   );
 }
 
-function useFactDetail(factKey: string) {
+function useFactDetail(factKey: string, country: Country) {
   return useQuery({
-    queryKey: ["cross-dataset", "fact", factKey],
+    queryKey: ["cross-dataset", "fact", country, factKey],
     queryFn: async () => {
       const [summary, response] = await Promise.all([
-        apiGet<CrossDatasetSummary>("/microcosm/cross-dataset", { view: "summary" }),
+        apiGet<CrossDatasetSummary>("/microcosm/cross-dataset", {
+          view: "summary",
+          country,
+        }),
         apiGet<FactResponse>("/microcosm/cross-dataset", {
           view: "fact",
           fact_key: factKey,
+          country,
         }),
       ]);
       return { summary, fact: response.fact };
@@ -508,11 +520,12 @@ export function CrossDatasetFactDetailView({
   factKey: string;
   search: string;
 }) {
+  const { country } = useCountry();
   const context = useMemo(
-    () => parseFactCatalogParams(new URLSearchParams(search)),
-    [search],
+    () => parseFactCatalogParams(new URLSearchParams(search), country),
+    [country, search],
   );
-  const query = useFactDetail(factKey);
+  const query = useFactDetail(factKey, country);
   if (!factKey) {
     return (
       <EmptyState

@@ -7,11 +7,14 @@ import type {
 import {
   CROSS_DATASET_PAGE_TITLE,
   GROUP_DIMENSIONS,
+  availableGroupDimensions,
   buildGroupRows,
   buildSourceOverviews,
   crossDatasetUiState,
+  geographyFilterOptions,
   groupFactsHref,
   orderSourceSummaries,
+  sampleFilterOptions,
   sourceCompactLabel,
   sourceDisplayLabel,
 } from "./presentation";
@@ -453,6 +456,17 @@ test("keeps the page title and exposes only the requested group controls", () =>
     { key: "period", label: "Period" },
     { key: "geography", label: "Geography" },
   ]);
+  expect(availableGroupDimensions(groups)).toEqual([
+    { key: "ledger_source", label: "Chronicle source" },
+    { key: "geography", label: "Geography" },
+  ]);
+  expect(geographyFilterOptions(groups)).toEqual([
+    { key: "state", label: "State" },
+  ]);
+  expect(sampleFilterOptions(groups)).toEqual([
+    { key: "in_sample", label: "In sample" },
+    { key: "out_of_sample", label: "Out of sample" },
+  ]);
 });
 
 test("classifies loading, error, empty, and ready overview states", () => {
@@ -497,17 +511,17 @@ test("source metric rows keep performance inseparable from Chronicle coverage co
   });
 });
 
-test("legacy Tax-Calculator artifacts display the current Public CPS label", () => {
+test("source labels come directly from the bundle", () => {
   expect(
     sourceDisplayLabel({
       ...summary.sources[1],
       source_id: "taxcalc_public_cps_2024",
       label: "Tax-Calculator + public CPS",
     }),
-  ).toBe("Public CPS + Tax-Calculator");
+  ).toBe("Tax-Calculator + public CPS");
 });
 
-test("compact source labels fit the group comparison matrix", () => {
+test("group comparison headers retain bundle-authored source labels", () => {
   const rawAcs = {
     ...summary.sources[1],
     source_id: "census_acs_pums_2024",
@@ -523,14 +537,14 @@ test("compact source labels fit the group comparison matrix", () => {
     source_id: "populace_us_policyengine_us_2024",
   };
 
-  expect(sourceCompactLabel(summary.sources[0])).toBe("Microcosm");
-  expect(sourceCompactLabel(publishedMicrocosm)).toBe("Microcosm");
-  expect(sourceCompactLabel(summary.sources[1])).toBe("Public CPS");
-  expect(sourceCompactLabel(yale)).toBe("Yale reconstruction");
-  expect(sourceCompactLabel(rawAcs)).toBe("Raw ACS");
+  expect(sourceCompactLabel(summary.sources[0])).toBe("Microcosm + PolicyEngine-US");
+  expect(sourceCompactLabel(publishedMicrocosm)).toBe("Microcosm + PolicyEngine-US");
+  expect(sourceCompactLabel(summary.sources[1])).toBe("Public CPS + Tax-Calculator");
+  expect(sourceCompactLabel(yale)).toBe("Yale Tax-Data + Tax-Simulator (reconstruction)");
+  expect(sourceCompactLabel(rawAcs)).toBe("Raw ACS PUMS");
 });
 
-test("orders Microcosm, Public CPS, Yale reconstruction, then Raw ACS", () => {
+test("preserves the bundle's source order", () => {
   const rawAcs = {
     ...summary.sources[1],
     source_id: "census_acs_pums_2024",
@@ -544,20 +558,20 @@ test("orders Microcosm, Public CPS, Yale reconstruction, then Raw ACS", () => {
   const mixedSources = [rawAcs, yale, ...summary.sources];
 
   expect(orderSourceSummaries(mixedSources).map((source) => source.source_id)).toEqual([
+    "census_acs_pums_2024",
+    "yale_reconstruction_2024",
     "microcosm",
     "cps",
-    "yale_reconstruction_2024",
-    "census_acs_pums_2024",
   ]);
   expect(
     buildSourceOverviews({ ...summary, sources: mixedSources }, groups).map(
       (source) => source.sourceId,
     ),
   ).toEqual([
+    "census_acs_pums_2024",
+    "yale_reconstruction_2024",
     "microcosm",
     "cps",
-    "yale_reconstruction_2024",
-    "census_acs_pums_2024",
   ]);
 });
 
@@ -619,17 +633,17 @@ test("source scorecards identify aligned, advanced, and in-sample comparisons", 
 
   expect(microcosm.periodTreatments).toContainEqual({
     key: "aligned_fact",
-    label: "Chronicle facts transformed to model-comparable benchmarks",
+    label: "Aligned fact",
     count: 116,
   });
   expect(microcosm.calibrationExposures).toContainEqual({
     key: "direct_calibration_target",
-    label: "Direct calibration targets (in-sample)",
+    label: "Direct calibration target",
     count: 152,
   });
   expect(cps.periodTreatments).toContainEqual({
     key: "advanced_population",
-    label: "CPS population advanced to 2024",
+    label: "Advanced population",
     count: 38,
   });
   expect(cps.calibrationExposures).toContainEqual({
@@ -640,9 +654,9 @@ test("source scorecards identify aligned, advanced, and in-sample comparisons", 
 });
 
 test("group rows expose score, coverage, unsupported counts, and fact links", () => {
-  const rows = buildGroupRows(groups, "ledger_source", summary.sources);
+  const rows = buildGroupRows(groups, "ledger_source", summary.sources, "be");
   expect(rows).toHaveLength(1);
-  expect(rows[0].label).toBe("IRS Statistics of Income");
+  expect(rows[0].label).toBe("IRS SOI");
   expect(rows[0].sources.microcosm).toMatchObject({
     scoreLabel: "7.0% mean error",
     coverageRateLabel: "0.5% coverage",
@@ -663,25 +677,25 @@ test("group rows expose score, coverage, unsupported counts, and fact links", ()
     unsupportedCount: 33_008,
   });
   expect(rows[0].sources.cps.factHref).toBe(
-    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi",
+    "/microcosm/datasets?country=be&view=facts&source=cps&ledger_source=irs_soi",
   );
   expect("coveragePercent" in rows[0].sources.microcosm).toBe(false);
 });
 
-test("every supported grouping maps to a stable fact-catalog URL", () => {
-  expect(groupFactsHref("concept", "irs_soi.wages", "cps")).toBe(
-    "/microcosm/datasets?view=facts&source=cps&measure=irs_soi.wages",
+test("every supported grouping maps to a stable country-scoped fact-catalog URL", () => {
+  expect(groupFactsHref("concept", "irs_soi.wages", "cps", "be")).toBe(
+    "/microcosm/datasets?country=be&view=facts&source=cps&measure=irs_soi.wages",
   );
-  expect(groupFactsHref("period", "tax_year:2024", "cps")).toBe(
-    "/microcosm/datasets?view=facts&source=cps&period=tax_year%3A2024",
+  expect(groupFactsHref("period", "tax_year:2024", "cps", "be")).toBe(
+    "/microcosm/datasets?country=be&view=facts&source=cps&period=tax_year%3A2024",
   );
-  expect(groupFactsHref("geography", "country", "cps")).toBe(
-    "/microcosm/datasets?view=facts&source=cps&geography=country",
+  expect(groupFactsHref("geography", "country", "cps", "be")).toBe(
+    "/microcosm/datasets?country=be&view=facts&source=cps&geography=country",
   );
-  expect(groupFactsHref("period_treatment", "advanced_population", "cps")).toBe(
-    "/microcosm/datasets?view=facts&source=cps&period_treatment=advanced_population",
+  expect(groupFactsHref("period_treatment", "advanced_population", "cps", "be")).toBe(
+    "/microcosm/datasets?country=be&view=facts&source=cps&period_treatment=advanced_population",
   );
-  expect(groupFactsHref("calibration_exposure", "external_validation", "cps")).toBe(
-    "/microcosm/datasets?view=facts&source=cps&calibration_exposure=external_validation",
+  expect(groupFactsHref("calibration_exposure", "external_validation", "cps", "be")).toBe(
+    "/microcosm/datasets?country=be&view=facts&source=cps&calibration_exposure=external_validation",
   );
 });

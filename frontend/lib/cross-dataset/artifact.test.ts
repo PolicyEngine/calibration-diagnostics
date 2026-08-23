@@ -26,6 +26,7 @@ function fixture() {
     schema_version: SCHEMA,
     run_id: RUN_ID,
     snapshot_id: SNAPSHOT_ID,
+    jurisdictions: ["US"],
     fact_count: 3,
     matrix_complete: true,
     sources: [
@@ -193,6 +194,7 @@ function fixture() {
     schema_version: SCHEMA,
     run_id: RUN_ID,
     snapshot_id: SNAPSHOT_ID,
+    jurisdictions: ["US"],
     fact_count: 3,
     source_ids: ["microcosm", "cps"],
     page_size: 2,
@@ -223,14 +225,66 @@ function fixture() {
   return { files, reads, reader };
 }
 
+function jurisdictionReader(
+  jurisdictions: unknown,
+  expectedJurisdiction?: string,
+  jurisdictionAliases: readonly string[] = [],
+) {
+  const { files } = fixture();
+  const manifest = JSON.parse(files["manifest.json"]) as Record<string, unknown>;
+  if (jurisdictions === undefined) delete manifest.jurisdictions;
+  else manifest.jurisdictions = jurisdictions;
+  files["manifest.json"] = serialized(manifest);
+  return new CrossDatasetArtifactReader({
+    expectedJurisdiction,
+    jurisdictionAliases,
+    readText: async (path) => files[path],
+  });
+}
+
 test("summary validates immutable IDs and keeps score beside coverage", async () => {
   const { reader } = fixture();
   const summary = await reader.summary();
   expect(summary.run_id).toBe(RUN_ID);
+  expect((await reader.manifest()).jurisdictions).toEqual(["US"]);
   expect(summary.fact_count).toBe(3);
   expect(summary.sources[1].label).toBe("Public CPS + Tax-Calculator");
   expect(summary.sources[1].result_count).toBe(1);
   expect(summary.sources[1].score.display_score).toBe("90");
+});
+
+test("manifest jurisdiction checks accept exact codes and configured aliases", async () => {
+  await expect(jurisdictionReader(["BE"], "BE").manifest()).resolves.toMatchObject({
+    jurisdictions: ["BE"],
+  });
+  await expect(jurisdictionReader(["UK"], "UK", ["GB"]).manifest()).resolves.toMatchObject({
+    jurisdictions: ["UK"],
+  });
+  await expect(jurisdictionReader(["GB"], "UK", ["GB"]).manifest()).resolves.toMatchObject({
+    jurisdictions: ["GB"],
+  });
+});
+
+test("manifest jurisdiction checks fail closed for mismatches and missing metadata", async () => {
+  await expect(jurisdictionReader(["BE"], "US").manifest()).rejects.toMatchObject({
+    code: "stale_artifact",
+    message: "Cross-dataset bundle is for jurisdictions BE, not US.",
+  });
+  await expect(jurisdictionReader(undefined, "BE").manifest()).rejects.toMatchObject({
+    code: "stale_artifact",
+    message: "Cross-dataset bundle is for jurisdictions (none), not BE.",
+  });
+
+  expect((await jurisdictionReader(undefined).manifest()).jurisdictions).toBeUndefined();
+});
+
+test("malformed manifest jurisdictions are rejected even without an expected country", async () => {
+  await expect(jurisdictionReader(["BE", ""]).manifest()).rejects.toMatchObject({
+    code: "malformed_artifact",
+  });
+  await expect(jurisdictionReader("BE").manifest()).rejects.toMatchObject({
+    code: "malformed_artifact",
+  });
 });
 
 test("group and source responses filter without loading fact pages", async () => {

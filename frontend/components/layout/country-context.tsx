@@ -18,6 +18,15 @@ export function isCountry(value: string | null): value is Country {
 
 const STORAGE_KEY = "microcosm-country";
 
+export function countrySwitchUrl(currentUrl: string, next: Country): string {
+  const url = new URL(currentUrl);
+  if (url.pathname.endsWith("/microcosm/datasets")) {
+    url.search = "";
+  }
+  url.searchParams.set("country", next);
+  return url.toString();
+}
+
 function persistCountry(country: Country) {
   try {
     window.localStorage.setItem(STORAGE_KEY, country);
@@ -51,11 +60,14 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setCountry = (next: Country) => {
+    if (next === country) return;
     setCountryState(next);
     persistCountry(next);
-    const url = new URL(window.location.href);
-    url.searchParams.set("country", next);
-    window.history.replaceState(window.history.state, "", url);
+    window.history.replaceState(
+      window.history.state,
+      "",
+      countrySwitchUrl(window.location.href, next),
+    );
   };
 
   return (

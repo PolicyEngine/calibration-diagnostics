@@ -55,12 +55,21 @@ snapshot IDs and has a SHA-256 recorded in the manifest.
 
 ## Configure the application
 
-Set exactly one of `CROSS_DATASET_ARTIFACT_DIR` or
-`CROSS_DATASET_ARTIFACT_BASE_URL` before starting the application for
-Cross-dataset work. The Cross-dataset API has no default artifact location: if
-neither variable is set, the application process starts, but the Cross-dataset
-page is unavailable and its API returns HTTP 503. Setting both variables is
-also invalid.
+Configure at most one local directory or remote base URL for each country. The
+unsuffixed variables remain the US configuration so existing deployments keep
+working; UK and Belgium use country suffixes:
+
+| Country | Local bundle | Remote bundle | Optional pinned run |
+| --- | --- | --- | --- |
+| US | `CROSS_DATASET_ARTIFACT_DIR` | `CROSS_DATASET_ARTIFACT_BASE_URL` | `CROSS_DATASET_EXPECTED_RUN_ID` |
+| UK | `CROSS_DATASET_ARTIFACT_DIR_UK` | `CROSS_DATASET_ARTIFACT_BASE_URL_UK` | `CROSS_DATASET_EXPECTED_RUN_ID_UK` |
+| Belgium | `CROSS_DATASET_ARTIFACT_DIR_BE` | `CROSS_DATASET_ARTIFACT_BASE_URL_BE` | `CROSS_DATASET_EXPECTED_RUN_ID_BE` |
+
+Setting both the directory and URL for the same country is invalid. Configuring
+different countries at the same time is valid. If neither location is set for
+the selected country, the application process still starts, but that country's
+Cross-dataset page is unavailable and its API returns HTTP 503 naming the
+applicable variables.
 
 For a bundle on the local filesystem, set `CROSS_DATASET_ARTIFACT_DIR` to the
 generated frontend bundle directory. `CROSS_DATASET_EXPECTED_RUN_ID` is
@@ -80,12 +89,22 @@ export CROSS_DATASET_ARTIFACT_BASE_URL=https://example.org/evaluation-run/fronte
 make dev
 ```
 
+For example, the published Belgium bundle can be selected with:
+
+```bash
+export CROSS_DATASET_ARTIFACT_BASE_URL_BE=https://huggingface.co/datasets/policyengine/microcosm-evaluation/resolve/main/be/evaluation-f28ca06a0b0d2baf13c87f2f/frontend/
+make dev
+```
+
 A missing, stale, partial, malformed, or hash-mismatched bundle returns HTTP
-503 rather than serving mixed results.
+503 rather than serving mixed results. The API also verifies the selected
+country against the manifest and fails closed on a mismatch: US requires `US`,
+Belgium requires `BE`, and UK accepts either `UK` or `GB`.
 
 ## Read the API
 
-`GET /api/microcosm/cross-dataset` accepts these views:
+`GET /api/microcosm/cross-dataset` accepts `country=us|uk|be` (default `us`)
+and these views:
 
 - `view=summary` (default): source-level score, coverage, capability statuses,
   unsupported reasons, period treatments, and target-performance buckets.

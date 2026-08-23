@@ -78,7 +78,6 @@ test("preserves the Cross-dataset navigation label and route", () => {
   expect(item).toEqual({
     href: "/microcosm/datasets",
     label: "Cross-dataset",
-    usOnly: true,
   });
   expect(isActive("/microcosm/datasets", item!)).toBe(true);
 });
@@ -88,12 +87,24 @@ test("Belgium navigation keeps country-ready pages and hides US-only tools", () 
   expect(items.map((item) => item.href)).toEqual([
     "/microcosm",
     "/microcosm/targets",
+    "/microcosm/datasets",
     "/microcosm/compare",
   ]);
   expect(items.every((item) => item.usOnly !== true)).toBe(true);
   expect(items.map((item) => navItemHref(item, "be"))).toEqual([
     "/microcosm?country=be",
     "/microcosm/targets?country=be",
+    "/microcosm/datasets?country=be",
     "/microcosm/compare?country=be",
   ]);
+});
+
+test("shows Cross-dataset navigation for every selectable country", () => {
+  for (const country of ["us", "uk", "be"] as const) {
+    expect(
+      navGroupsForCountry(country)
+        .flatMap((group) => group.items)
+        .some((item) => item.href === "/microcosm/datasets"),
+    ).toBe(true);
+  }
 });
