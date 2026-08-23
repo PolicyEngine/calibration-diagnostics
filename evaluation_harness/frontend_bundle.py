@@ -825,7 +825,7 @@ def _partition_descriptor(value: Any, field: str) -> dict[str, Any]:
     if (
         path.startswith("/")
         or "\\" in path
-        or any(part in ("", "..") for part in path.split("/"))
+        or any(part in ("", ".", "..") for part in path.split("/"))
         or not _PARTITION_PATH.match(path)
     ):
         raise ValueError(
@@ -847,6 +847,15 @@ def frontend_bundle_partitions(manifest: dict[str, Any]) -> list[dict[str, Any]]
     partitions = manifest.get("partitions")
     if not isinstance(partitions, dict):
         raise ValueError("frontend bundle manifest has no partitions")
+    expected_keys = {"summary", "groups", "fact_index", "facts"}
+    unknown_keys = set(partitions) - expected_keys
+    if unknown_keys:
+        unknown = ", ".join(sorted(str(key) for key in unknown_keys))
+        raise ValueError(f"frontend bundle manifest has unknown partitions: {unknown}")
+    for field, minimum in (("fact_count", 0), ("page_count", 0), ("page_size", 1)):
+        value = manifest.get(field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+            raise ValueError(f"frontend bundle manifest has no valid {field}")
     descriptors = [
         _partition_descriptor(partitions.get(key), f"partitions.{key}")
         for key in ("summary", "groups", "fact_index")
@@ -856,15 +865,20 @@ def frontend_bundle_partitions(manifest: dict[str, Any]) -> list[dict[str, Any]]
         raise ValueError("frontend bundle manifest has no fact partitions")
     for index, value in enumerate(facts):
         descriptor = _partition_descriptor(value, f"partitions.facts[{index}]")
-        if descriptor.get("page") != index + 1:
+        page = descriptor.get("page")
+        if not isinstance(page, int) or isinstance(page, bool) or page != index + 1:
             raise ValueError("frontend bundle fact partition sequence is incomplete")
-        if not isinstance(descriptor.get("count"), int) or descriptor["count"] < 0:
+        count = descriptor.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
             raise ValueError(f"frontend bundle fact partition {index + 1} has no count")
         descriptors.append(descriptor)
     if len(facts) != manifest.get("page_count"):
         raise ValueError("frontend bundle fact partition sequence is incomplete")
     if sum(descriptor["count"] for descriptor in facts) != manifest.get("fact_count"):
         raise ValueError("frontend bundle fact partition counts do not reconcile")
+    paths = [descriptor["path"] for descriptor in descriptors]
+    if len(paths) != len(set(paths)):
+        raise ValueError("frontend bundle partition paths must be unique")
     return descriptors
 
 
@@ -899,7 +913,8 @@ def verify_frontend_bundle(bundle_path: str | Path) -> dict[str, Any]:
         or any(not isinstance(value, str) or not value for value in jurisdictions)
     ):
         raise ValueError("frontend bundle manifest jurisdictions must be strings")
-    for descriptor in frontend_bundle_partitions(manifest):
+    descriptors = frontend_bundle_partitions(manifest)
+    for index, descriptor in enumerate(descriptors):
         path = bundle / descriptor["path"]
         if not path.is_file():
             raise ValueError(f"frontend bundle is missing {descriptor['path']}")
@@ -920,4 +935,26 @@ def verify_frontend_bundle(bundle_path: str | Path) -> dict[str, Any]:
                 f"frontend bundle partition {descriptor['path']} belongs to "
                 "another run or snapshot"
             )
+        if index >= 3:
+            integer_fields = {
+                "page": descriptor["page"],
+                "page_size": manifest["page_size"],
+                "total": manifest["fact_count"],
+            }
+            if any(
+                not isinstance(document.get(field), int)
+                or isinstance(document[field], bool)
+                or document[field] != expected
+                for field, expected in integer_fields.items()
+            ):
+                raise ValueError(
+                    f"frontend bundle fact partition {descriptor['path']} has "
+                    "inconsistent page metadata"
+                )
+            rows = document.get("rows")
+            if not isinstance(rows, list) or len(rows) != descriptor["count"]:
+                raise ValueError(
+                    f"frontend bundle fact partition {descriptor['path']} has "
+                    "an inconsistent row count"
+                )
     return manifest

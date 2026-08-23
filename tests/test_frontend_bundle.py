@@ -3,6 +3,7 @@ import json
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -563,3 +564,57 @@ def test_verify_frontend_bundle_rejects_tampering(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="no manifest.json"):
         verify_frontend_bundle(tmp_path / "missing")
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"page": 999}, "inconsistent page metadata"),
+        ({"page": True}, "inconsistent page metadata"),
+        ({"rows": []}, "inconsistent row count"),
+        ({"rows": {}}, "inconsistent row count"),
+    ],
+)
+def test_verify_frontend_bundle_rejects_attested_invalid_fact_pages(
+    tmp_path: Path, updates: dict[str, Any], message: str
+) -> None:
+    snapshot, run = published_inputs(tmp_path)
+    output = tmp_path / "frontend"
+    publish_frontend_bundle(snapshot, run, output, page_size=2)
+    manifest_path = output / "manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    page_path = output / "facts" / "00001.json"
+    page = json.loads(page_path.read_bytes())
+    page.update(updates)
+    content = json.dumps(page).encode()
+    page_path.write_bytes(content)
+    manifest["partitions"]["facts"][0]["sha256"] = hashlib.sha256(
+        content
+    ).hexdigest()
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match=message):
+        verify_frontend_bundle(output)
+
+
+def test_frontend_bundle_partitions_rejects_noncanonical_manifests(
+    tmp_path: Path,
+) -> None:
+    snapshot, run = published_inputs(tmp_path)
+    output = tmp_path / "frontend"
+    original = publish_frontend_bundle(snapshot, run, output, page_size=2)
+
+    manifest = json.loads(json.dumps(original))
+    manifest["partitions"]["extra"] = manifest["partitions"]["summary"]
+    with pytest.raises(ValueError, match="unknown partitions: extra"):
+        frontend_bundle_partitions(manifest)
+
+    manifest = json.loads(json.dumps(original))
+    manifest["partitions"]["facts"][0]["path"] = "facts/./00001.json"
+    with pytest.raises(ValueError, match="unsafe path"):
+        frontend_bundle_partitions(manifest)
+
+    manifest = json.loads(json.dumps(original))
+    manifest["partitions"]["groups"]["path"] = "summary.json"
+    with pytest.raises(ValueError, match="paths must be unique"):
+        frontend_bundle_partitions(manifest)
