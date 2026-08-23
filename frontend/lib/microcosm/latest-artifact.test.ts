@@ -23,6 +23,7 @@ import {
   microcosmRevision,
   parseCountry,
   releaseCountry,
+  releasePresentation,
   releasePublishedAtFromTree,
   releaseRole,
   type ArtifactCountry,
@@ -1259,6 +1260,60 @@ test("releaseRole classifies national default vs non-default local-area", () => 
     is_default: false,
     is_local_area: true,
   });
+});
+
+test("releasePresentation keeps only trimmed, capped intro slots", () => {
+  const longIntro = `  ${"x".repeat(610)}  `;
+  expect(
+    releasePresentation({
+      presentation: {
+        overview_intro: "  Artifact overview.  ",
+        targets_intro: longIntro,
+        arbitrary_section: "Ignored",
+      },
+    }),
+  ).toEqual({
+    overview_intro: "Artifact overview.",
+    targets_intro: "x".repeat(600),
+  });
+});
+
+test("releasePresentation returns null when no valid intro slot exists", () => {
+  expect(releasePresentation({})).toBeNull();
+  expect(releasePresentation({ presentation: [] })).toBeNull();
+  expect(releasePresentation({ presentation: "copy" })).toBeNull();
+  expect(
+    releasePresentation({
+      presentation: {
+        overview_intro: "   ",
+        targets_intro: 12,
+        unknown: "Ignored",
+      },
+    }),
+  ).toBeNull();
+});
+
+test("presentation flows through calibration, summary, and target responses", () => {
+  const presentation = {
+    overview_intro: "Artifact overview.",
+    targets_intro: "Artifact target prompt.",
+  };
+  const cal = buildCalibration(
+    { targets: [] },
+    "presentation-release",
+    null,
+    {},
+    { presentation },
+  );
+
+  expect(cal.presentation).toEqual(presentation);
+  expect(latestMicrocosmCalibrationSummary(cal).presentation).toEqual(presentation);
+  expect(
+    latestMicrocosmTargetDiagnosticsPage(
+      "http://x/api/microcosm/target-diagnostics",
+      cal,
+    ).presentation,
+  ).toEqual(presentation);
 });
 
 const BE_COUNTRY_DEFAULTS: ArtifactCountry = {

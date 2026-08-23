@@ -2,9 +2,9 @@
 
 ## State
 
-Pre-edit review is complete on `spec-artifact-contract`, based exactly on
-`spec-countries-registry` at `9bf2fd4`. The implementation will preserve the
-legacy name/filter paths while selecting new adapters from artifact shape.
+The typed presentation reader and response contract are implemented. The
+implementation preserves the legacy name/filter paths while selecting new
+adapters from artifact shape.
 
 ## Done
 
@@ -20,12 +20,16 @@ legacy name/filter paths while selecting new adapters from artifact shape.
   local index, but sandboxed home-directory registry access prevented queries;
   repository-wide symbol/import searches supplied the fallback blast-radius
   review, and the generated index was removed.
+- Added the validated, length-capped `release_manifest.presentation` reader and
+  propagated it through calibration, summary, diagnostics-page, and client
+  types.
+- Enabled the existing ZZ presentation conformance assertion unchanged and
+  added reader/response tests.
 
 ## Next
 
-- Implement and test the typed `presentation` reader and artifact → legacy →
-  generic view-copy fallbacks.
 - Implement publisher labels, structured dimensions, and structured
   source/variable identifiers in separately committed steps.
+- Add the artifact → legacy → generic presentation fallbacks to both views.
 - Enable and extend conformance tests, add regressions, and document B1-B6.
 - Run the full frontend test, type-check, and production-build gates.

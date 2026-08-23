@@ -204,7 +204,7 @@ describe("synthetic third-country conformance", () => {
         .map((item) => item.href),
     ).toEqual(["/microcosm", "/microcosm/targets", "/microcosm/compare"]);
   });
-  test.todo(
+  test(
     "zz overview data can carry artifact-provided intro copy: the summary omits a typed presentation contract",
     () => {
       const presentation = {

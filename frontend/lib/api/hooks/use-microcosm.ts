@@ -193,9 +193,15 @@ export interface MicrocosmArtifactCountry {
   capabilities: CountryCapability[];
 }
 
+export interface MicrocosmArtifactPresentation {
+  overview_intro?: string;
+  targets_intro?: string;
+}
+
 export interface MicrocosmCalibration {
   available: boolean;
   country?: MicrocosmArtifactCountry;
+  presentation?: MicrocosmArtifactPresentation | null;
   description?: string | null;
   diagnostics_status?: MicrocosmDiagnosticsStatus;
   dataset_role?: string | null;
@@ -317,6 +323,7 @@ export interface MicrocosmResponse {
 export interface MicrocosmTargetDiagnostics {
   available: boolean;
   country?: MicrocosmArtifactCountry;
+  presentation?: MicrocosmArtifactPresentation | null;
   description?: string | null;
   path?: string | null;
   release_id?: string | null;

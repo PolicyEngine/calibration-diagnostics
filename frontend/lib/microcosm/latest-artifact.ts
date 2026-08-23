@@ -1722,6 +1722,7 @@ export interface Calibration {
   country: MicrocosmCountry;
   // Typed `release_manifest.country` merged over the registration.
   country_info: ArtifactCountry;
+  presentation: ArtifactPresentation | null;
   description: string | null;
   diagnostics_status: DiagnosticsStatus;
   release_id: string;
@@ -1832,6 +1833,30 @@ function diagnosticsStatus(diag: JsonObject, rows: TargetRow[]): DiagnosticsStat
   return anyUsable ? "ok" : "incompatible";
 }
 
+export interface ArtifactPresentation {
+  overview_intro?: string;
+  targets_intro?: string;
+}
+
+function presentationText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, 600) : null;
+}
+
+export function releasePresentation(
+  releaseManifest: JsonObject,
+): ArtifactPresentation | null {
+  const block = asObject(releaseManifest.presentation);
+  const overviewIntro = presentationText(block.overview_intro);
+  const targetsIntro = presentationText(block.targets_intro);
+  if (!overviewIntro && !targetsIntro) return null;
+  return {
+    ...(overviewIntro ? { overview_intro: overviewIntro } : {}),
+    ...(targetsIntro ? { targets_intro: targetsIntro } : {}),
+  };
+}
+
 export interface ReleaseRole {
   dataset_role: string | null;
   is_default: boolean;
@@ -1938,6 +1963,7 @@ export function buildCalibration(
   const skippedByName = skippedTargetReasons(skipped);
   const dropped = new Set(droppedTargetNames);
   const artifactCountry = releaseCountry(releaseManifest, country);
+  const presentation = releasePresentation(releaseManifest);
   const enrichedRows = addEstimateScopeWarnings(
     targets.map((row) => enrichTargetRow(row, skippedByName, dropped, artifactCountry)),
   );
@@ -1955,6 +1981,7 @@ export function buildCalibration(
     source: "huggingface_live",
     country,
     country_info: artifactCountry,
+    presentation,
     description:
       stringValue(diag.description) ??
       stringValue(releaseManifest.description) ??
@@ -2438,6 +2465,7 @@ export function latestMicrocosmCalibrationSummary(cal: Calibration) {
   return {
     available: true,
     country: cal.country_info,
+    presentation: cal.presentation,
     description: cal.description,
     diagnostics_status: cal.diagnostics_status,
     ...releaseRole(cal.release_manifest),
@@ -2618,6 +2646,7 @@ export function latestMicrocosmTargetDiagnosticsPage(requestUrl: string, cal: Ca
   return {
     available: true,
     country: cal.country_info,
+    presentation: cal.presentation,
     description: cal.description,
     diagnostics_status: cal.diagnostics_status,
     ...releaseRole(cal.release_manifest),
