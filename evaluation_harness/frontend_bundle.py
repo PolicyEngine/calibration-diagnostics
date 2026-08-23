@@ -31,6 +31,11 @@ DEFAULT_SOURCE_LABELS = {
     "yale_reconstruction_2024": (
         "Yale Tax-Data + Tax-Simulator (reconstruction)"
     ),
+    "microcosm_be_v04_axiom": "Microcosm-BE v0.4 × Axiom rules engine",
+    "microcosm_be_v04_euromod": "Microcosm-BE v0.4 × EUROMOD BE_2025",
+    "euromod_be2025_jrc_silc": (
+        "EUROMOD BE_2025 on EU-SILC (JRC country report 2025)"
+    ),
 }
 
 
@@ -447,16 +452,16 @@ def _build_groups(
         for source_id in source_ids
         if any(name in source_id.lower() for name in ("populace", "microcosm"))
     ]
-    if len(microcosm_source_ids) != 1:
+    if not microcosm_source_ids:
         raise ValueError(
-            "frontend bundle requires exactly one Microcosm source to define the "
+            "frontend bundle requires a Microcosm source to define the "
             "shared calibration sample"
         )
-    microcosm_source_id = microcosm_source_ids[0]
     all_fact_keys = {fact.fact_key for fact in fact_values}
     in_sample_fact_keys = {
         row["fact_key"]
-        for row in capabilities_by_source[microcosm_source_id]
+        for source_id in microcosm_source_ids
+        for row in capabilities_by_source[source_id]
         if row.get("calibration_exposure") == "direct_calibration_target"
     }
     sample_fact_keys = {

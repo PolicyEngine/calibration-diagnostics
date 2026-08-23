@@ -63,9 +63,23 @@ class CalibrationExposure(StringEnum):
     DIRECT_CALIBRATION_TARGET = "direct_calibration_target"
     USED_IN_IMPUTATION_OR_REWEIGHTING = "used_in_imputation_or_reweighting"
     RELATED_CALIBRATION_FAMILY = "related_calibration_family"
+    OUT_OF_SAMPLE = "out_of_sample"
     HOLDOUT = "holdout"
     EXTERNAL_VALIDATION = "external_validation"
     UNKNOWN_EXPOSURE = "unknown_exposure"
+
+
+UNSUPPORTED_CAPABILITY_STATUSES = frozenset(
+    {
+        CapabilityStatus.UNSUPPORTED_PERIOD,
+        CapabilityStatus.UNSUPPORTED_GEOGRAPHY,
+        CapabilityStatus.UNSUPPORTED_ENTITY,
+        CapabilityStatus.UNSUPPORTED_CONCEPT,
+        CapabilityStatus.UNSUPPORTED_CONSTRAINT,
+        CapabilityStatus.PRIVATE_INPUT,
+        CapabilityStatus.NOT_APPLICABLE,
+    }
+)
 
 
 PERIOD_PATTERNS = {
@@ -219,6 +233,8 @@ class PrecomputedCapabilitySpec:
     score_eligible: bool
     preserve_existing_mapping: bool = False
     preserve_mapped_score_eligibility: bool = False
+    reason_code: str | None = None
+    reason_detail: str | None = None
 
     def __post_init__(self) -> None:
         if not self.source_id or not self.fact_key or not self.mapping_id:
@@ -229,6 +245,22 @@ class PrecomputedCapabilitySpec:
         ):
             raise ValueError(
                 "aligned precomputed capability requires alignment provenance"
+            )
+        unsupported = self.status in UNSUPPORTED_CAPABILITY_STATUSES
+        if unsupported and (
+            not self.reason_code
+            or not self.reason_detail
+            or self.score_eligible
+        ):
+            raise ValueError(
+                "unsupported precomputed capability requires a reason and must "
+                "not be score eligible"
+            )
+        if not unsupported and (
+            self.reason_code is not None or self.reason_detail is not None
+        ):
+            raise ValueError(
+                "evaluable precomputed capability cannot contain an unsupported reason"
             )
 
 
@@ -274,15 +306,7 @@ class CapabilityResult:
         if self.period_treatment is PeriodTreatment.ALIGNED_FACT:
             if not self.alignment_id or self.alignment_quality is AlignmentQuality.NONE:
                 raise ValueError("aligned fact capability requires alignment provenance")
-        if self.status in {
-            CapabilityStatus.UNSUPPORTED_PERIOD,
-            CapabilityStatus.UNSUPPORTED_GEOGRAPHY,
-            CapabilityStatus.UNSUPPORTED_ENTITY,
-            CapabilityStatus.UNSUPPORTED_CONCEPT,
-            CapabilityStatus.UNSUPPORTED_CONSTRAINT,
-            CapabilityStatus.PRIVATE_INPUT,
-            CapabilityStatus.NOT_APPLICABLE,
-        } and evaluated:
+        if self.status in UNSUPPORTED_CAPABILITY_STATUSES and evaluated:
             raise ValueError("unsupported capability cannot be executable")
 
     @classmethod

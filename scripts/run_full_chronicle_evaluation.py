@@ -10,6 +10,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from evaluation_harness.adapters.acs_pums import ACSPUMSRunner, execute_acs_pums
+from evaluation_harness.adapters.precomputed_checkpoint import (
+    MAPPING_RELEASE as PRECOMPUTED_MAPPING_RELEASE,
+    PrecomputedCheckpoint,
+    load_precomputed_checkpoint,
+    materialize_precomputed_checkpoint_results,
+    precomputed_checkpoint_capability_specs,
+)
 from evaluation_harness.adapters.microcosm import (
     MICROCOSM_RELEASE,
     MicrocosmRelease,
@@ -19,7 +26,7 @@ from evaluation_harness.adapters.microcosm import (
     verify_release_dataset,
 )
 from evaluation_harness.adapters.taxcalc_cps import TaxCalcCPSRunner
-from evaluation_harness.contracts import CalibrationExposure
+from evaluation_harness.contracts import CalibrationExposure, SourceType
 from evaluation_harness.execution import build_run_groups, execute_groups
 from evaluation_harness.full_run import (
     SourcePlan,
@@ -45,12 +52,18 @@ from evaluation_harness.microcosm_bea_wages import (
     transform_chronicle_bea_wage_facts,
 )
 from evaluation_harness.microcosm_old_cd import load_old_cd_assignments
+from evaluation_harness.microcosm_release import (
+    BELGIUM_MICROCOSM_REPOSITORY,
+    ResolvedMicrocosmRelease,
+    resolve_microcosm_release,
+)
 from evaluation_harness.microcosm_release_targets import (
     compile_release_target_alignments,
     materialize_release_target_results,
     release_target_capability_specs,
 )
 from evaluation_harness.publisher import publish_run
+from evaluation_harness.planner import EvaluationSourceManifest
 from evaluation_harness.yale_reconstruction_checkpoint import (
     ESTIMATE_BASIS as YALE_ESTIMATE_BASIS,
     load_yale_reconstruction_checkpoint,
@@ -82,6 +95,21 @@ EVALUATION_EXCLUDED_GEOGRAPHY_IDS = frozenset(
         "0400000US78",
     }
 )
+
+BE_SOURCE_IDS = (
+    "microcosm_be_v04_axiom",
+    "microcosm_be_v04_euromod",
+    "euromod_be2025_jrc_silc",
+)
+SOURCE_PLAN_REGISTRY = {
+    "US": (
+        "populace_us_policyengine_us_2024",
+        "taxcalc_public_cps_2024",
+        "yale_reconstruction_2024",
+        "census_acs_pums_2024",
+    ),
+    "BE": BE_SOURCE_IDS,
+}
 
 
 @dataclass(frozen=True)
@@ -132,7 +160,7 @@ def _source_counts(capabilities, source_id: str) -> dict[str, int]:
     )
 
 
-def run(
+def _run_us(
     snapshot: Path,
     microcosm_dataset: Path,
     acs_pums_aggregates: Path,
@@ -700,13 +728,364 @@ def run(
     return manifest
 
 
+def _be_source_manifest(
+    checkpoint: PrecomputedCheckpoint,
+    facts,
+) -> EvaluationSourceManifest:
+    """Build a non-executing source manifest around a reviewed checkpoint."""
+
+    fact_values = tuple(facts)
+    return EvaluationSourceManifest(
+        source_id=checkpoint.source_id,
+        source_type=SourceType.MODEL_DATASET_PAIR,
+        dataset_version=checkpoint.dataset,
+        model_version=checkpoint.engine,
+        jurisdictions=frozenset({checkpoint.jurisdiction}),
+        population_period=checkpoint.population_period,
+        policy_period=None,
+        native_fact_periods=frozenset(
+            fact.period.canonical for fact in fact_values
+        ),
+        advanced_fact_periods=frozenset(),
+        geographies=frozenset(fact.geography_level for fact in fact_values),
+        entities=frozenset(fact.entity for fact in fact_values),
+        weights={},
+        geography_methods={
+            geography: "precomputed_chronicle_record_alignment"
+            for geography in {fact.geography_level for fact in fact_values}
+        },
+        available=True,
+    )
+
+
+def _load_be_checkpoints(
+    checkpoint_paths,
+    facts,
+    release: ResolvedMicrocosmRelease,
+) -> tuple[PrecomputedCheckpoint, ...]:
+    paths = tuple(Path(path) for path in checkpoint_paths)
+    if len(paths) != len(BE_SOURCE_IDS):
+        raise ValueError(
+            "Belgium evaluation requires exactly three --precomputed-checkpoint "
+            "artifacts"
+        )
+    loaded_by_source: dict[str, PrecomputedCheckpoint] = {}
+    for path in paths:
+        checkpoint = load_precomputed_checkpoint(
+            path,
+            facts,
+            calibration_target_record_ids=(
+                release.calibration_target_record_ids
+            ),
+        )
+        if checkpoint.source_id in loaded_by_source:
+            raise ValueError(
+                "Belgium evaluation has duplicate checkpoint source_id: "
+                f"{checkpoint.source_id}"
+            )
+        loaded_by_source[checkpoint.source_id] = checkpoint
+
+    missing = sorted(set(BE_SOURCE_IDS) - set(loaded_by_source))
+    unexpected = sorted(set(loaded_by_source) - set(BE_SOURCE_IDS))
+    if missing or unexpected:
+        raise ValueError(
+            "Belgium checkpoint source IDs do not match the source-plan registry; "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+    checkpoints = tuple(loaded_by_source[source_id] for source_id in BE_SOURCE_IDS)
+
+    reference_surface: dict[str, tuple[str, ...] | None] | None = None
+    for checkpoint in checkpoints:
+        if checkpoint.jurisdiction != "BE":
+            raise ValueError(
+                f"Belgium checkpoint {checkpoint.source_id} declares "
+                f"{checkpoint.jurisdiction}"
+            )
+        surface = {
+            **{
+                entry.row_key: entry.chronicle_record_ids
+                for entry in checkpoint.entries
+            },
+            **{row_key: None for row_key in checkpoint.unresolved_rows},
+        }
+        if len(surface) != checkpoint.row_count:
+            raise ValueError(
+                f"Belgium checkpoint {checkpoint.source_id} row audit does not "
+                "reconcile"
+            )
+        if reference_surface is None:
+            reference_surface = surface
+        elif surface != reference_surface:
+            raise ValueError(
+                "Belgium checkpoints do not describe the same Chronicle row surface"
+            )
+
+    release_commit = release.build_manifest.get("chronicle", {}).get("commit")
+    if release_commit:
+        for checkpoint in checkpoints:
+            checkpoint_commit = checkpoint.inputs.get("chronicle_commit")
+            if checkpoint_commit and checkpoint_commit != release_commit:
+                raise ValueError(
+                    f"checkpoint {checkpoint.source_id} Chronicle commit "
+                    f"{checkpoint_commit} differs from release {release_commit}"
+                )
+    return checkpoints
+
+
+def run_be(
+    snapshot: Path,
+    checkpoint_paths,
+    output: Path,
+    *,
+    microcosm_release_dir: Path | None = None,
+    microcosm_release_repository: str = BELGIUM_MICROCOSM_REPOSITORY,
+    microcosm_release_revision: str = "main",
+) -> dict:
+    """Run the Belgium registry using only reviewed precomputed checkpoints."""
+
+    snapshot_facts, snapshot_manifest = load_snapshot_facts(snapshot)
+    facts = scope_facts_to_jurisdictions(snapshot_facts, {"BE"})
+    snapshot_id = snapshot_manifest["snapshot_id"]
+    print(
+        f"Loaded {len(facts):,} BE facts from immutable snapshot {snapshot_id}; "
+        f"excluded {len(snapshot_facts) - len(facts):,} non-BE or unknown facts.",
+        flush=True,
+    )
+
+    release = resolve_microcosm_release(
+        microcosm_release_dir,
+        repository=microcosm_release_repository,
+        revision=microcosm_release_revision,
+    )
+    checkpoints = _load_be_checkpoints(checkpoint_paths, facts, release)
+    source_manifests = {
+        checkpoint.source_id: _be_source_manifest(checkpoint, facts)
+        for checkpoint in checkpoints
+    }
+    plans = tuple(
+        SourcePlan(
+            source=source_manifests[checkpoint.source_id],
+            mappings=MappingRegistry(
+                mapping_release=PRECOMPUTED_MAPPING_RELEASE,
+                mappings=(),
+            ),
+            alignments=checkpoint.declarations,
+            precomputed_capabilities=(
+                precomputed_checkpoint_capability_specs(
+                    checkpoint,
+                    source=source_manifests[checkpoint.source_id],
+                )
+            ),
+        )
+        for checkpoint in checkpoints
+    )
+    capabilities = build_full_capability_matrix(
+        facts,
+        plans,
+        snapshot_id=snapshot_id,
+    )
+    results = []
+    for checkpoint in checkpoints:
+        capabilities, source_results = materialize_precomputed_checkpoint_results(
+            capabilities,
+            checkpoint,
+            source=source_manifests[checkpoint.source_id],
+        )
+        results.extend(source_results)
+    results = tuple(results)
+    aligned_facts = tuple(
+        alignment
+        for checkpoint in checkpoints
+        for alignment in checkpoint.aligned_facts
+    )
+    print(
+        "Classified every BE fact/source pair: "
+        + json.dumps(
+            {
+                source_id: _source_counts(capabilities, source_id)
+                for source_id in BE_SOURCE_IDS
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+    print(
+        "Loaded precomputed Belgium estimates: "
+        + json.dumps(
+            dict(sorted(Counter(row.source_id for row in results).items())),
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+
+    scores = build_scored_results(facts, capabilities, results, aligned_facts)
+    summary = build_run_summary(facts, capabilities, results, scores)
+    summary["evaluation_scope"] = {
+        "jurisdictions": ["BE"],
+        "source_snapshot_fact_count": len(snapshot_facts),
+        "included_fact_count": len(facts),
+        "excluded_fact_count": len(snapshot_facts) - len(facts),
+        "excluded_geography_ids": [],
+        "excluded_geography_fact_count": 0,
+    }
+    summary["microcosm_be_release"] = {
+        "release_id": release.release_id,
+        "resolver_provenance": release.provenance,
+        "artifact_paths": release.artifact_paths,
+        "artifact_sha256": release.artifact_sha256,
+        "calibration_target_count": len(
+            release.calibration_diagnostics.get("targets", ())
+        ),
+        "calibration_target_record_id_count": len(
+            release.calibration_target_record_ids
+        ),
+        "role": (
+            "Defines calibration exposure only; checkpoint estimates remain "
+            "the authoritative source values."
+        ),
+    }
+    summary["precomputed_checkpoints"] = {
+        checkpoint.source_id: {
+            "label": checkpoint.label,
+            "provenance": checkpoint.provenance,
+            "checkpoint_sha256": checkpoint.checkpoint_sha256,
+            "surface_row_count": checkpoint.row_count,
+            "resolved_row_count": checkpoint.resolved_row_count,
+            "supported_row_count": checkpoint.supported_row_count,
+            "unsupported_row_count": sum(
+                not entry.supported for entry in checkpoint.entries
+            ),
+            "estimate_basis_counts": dict(
+                sorted(
+                    Counter(
+                        entry.estimate_basis for entry in checkpoint.entries
+                    ).items()
+                )
+            ),
+            "calibration_exposure_counts": dict(
+                sorted(
+                    Counter(
+                        entry.calibration_exposure.value
+                        for entry in checkpoint.entries
+                    ).items()
+                )
+            ),
+            "unresolved_record_ids": dict(
+                sorted(checkpoint.unresolved_record_ids.items())
+            ),
+            "unresolved_rows": dict(sorted(checkpoint.unresolved_rows.items())),
+        }
+        for checkpoint in checkpoints
+    }
+
+    manifest = publish_run(
+        output,
+        capabilities,
+        results,
+        aligned_facts,
+        scores=scores,
+        summary=summary,
+    )
+    frontend_manifest = publish_frontend_bundle(
+        snapshot,
+        output,
+        output / "frontend",
+        source_labels={
+            checkpoint.source_id: checkpoint.label
+            for checkpoint in checkpoints
+        },
+    )
+    print(
+        f"Published immutable run {manifest['run_id']} to {output}.",
+        flush=True,
+    )
+    print(
+        "Published Cross-dataset frontend bundle "
+        f"({frontend_manifest['page_count']} fact partitions) to "
+        f"{output / 'frontend'}.",
+        flush=True,
+    )
+    print(json.dumps(summary, indent=2, sort_keys=True), flush=True)
+    return manifest
+
+
+def run(
+    snapshot: Path,
+    microcosm_dataset: Path | None,
+    acs_pums_aggregates: Path | None,
+    output: Path,
+    microcosm_calibration_diagnostics: Path | None = None,
+    microcosm_old_cd_assignments: Path | None = None,
+    *,
+    jurisdictions=("US",),
+    precomputed_checkpoints=(),
+    microcosm_release_dir: Path | None = None,
+    microcosm_release_repository: str = BELGIUM_MICROCOSM_REPOSITORY,
+    microcosm_release_revision: str = "main",
+) -> dict:
+    """Dispatch one jurisdiction's registered source plan without cross-running."""
+
+    selected = (
+        frozenset({jurisdictions})
+        if isinstance(jurisdictions, str)
+        else frozenset(jurisdictions)
+    )
+    unknown = sorted(selected - set(SOURCE_PLAN_REGISTRY))
+    if unknown:
+        raise ValueError(f"unregistered evaluation jurisdictions: {unknown}")
+    if len(selected) != 1:
+        raise ValueError(
+            "full Chronicle evaluation currently runs one jurisdiction at a time"
+        )
+    jurisdiction = next(iter(selected))
+    if jurisdiction == "BE":
+        return run_be(
+            snapshot,
+            precomputed_checkpoints,
+            output,
+            microcosm_release_dir=microcosm_release_dir,
+            microcosm_release_repository=microcosm_release_repository,
+            microcosm_release_revision=microcosm_release_revision,
+        )
+    if microcosm_dataset is None or acs_pums_aggregates is None:
+        raise ValueError(
+            "US evaluation requires --microcosm-dataset and --acs-pums-aggregates"
+        )
+    return _run_us(
+        snapshot,
+        microcosm_dataset,
+        acs_pums_aggregates,
+        output,
+        microcosm_calibration_diagnostics,
+        microcosm_old_cd_assignments,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot", required=True, type=Path)
-    parser.add_argument("--microcosm-dataset", required=True, type=Path)
+    parser.add_argument(
+        "--jurisdictions",
+        nargs="+",
+        choices=sorted(SOURCE_PLAN_REGISTRY),
+        default=["US"],
+    )
+    parser.add_argument("--microcosm-dataset", type=Path)
     parser.add_argument("--microcosm-calibration-diagnostics", type=Path)
     parser.add_argument("--microcosm-old-cd-assignments", type=Path)
-    parser.add_argument("--acs-pums-aggregates", required=True, type=Path)
+    parser.add_argument("--acs-pums-aggregates", type=Path)
+    parser.add_argument(
+        "--precomputed-checkpoint",
+        action="append",
+        type=Path,
+        default=[],
+    )
+    parser.add_argument("--microcosm-release-dir", type=Path)
+    parser.add_argument(
+        "--microcosm-release-repository",
+        default=BELGIUM_MICROCOSM_REPOSITORY,
+    )
+    parser.add_argument("--microcosm-release-revision", default="main")
     parser.add_argument("--output", required=True, type=Path)
     arguments = parser.parse_args()
     run(
@@ -716,6 +1095,13 @@ def main() -> None:
         arguments.output,
         arguments.microcosm_calibration_diagnostics,
         arguments.microcosm_old_cd_assignments,
+        jurisdictions=arguments.jurisdictions,
+        precomputed_checkpoints=arguments.precomputed_checkpoint,
+        microcosm_release_dir=arguments.microcosm_release_dir,
+        microcosm_release_repository=(
+            arguments.microcosm_release_repository
+        ),
+        microcosm_release_revision=arguments.microcosm_release_revision,
     )
 
 

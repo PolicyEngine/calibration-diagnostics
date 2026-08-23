@@ -22,6 +22,7 @@ from evaluation_harness.contracts import (
 from evaluation_harness.execution import EvaluationResult
 from evaluation_harness.frontend_bundle import (
     FRONTEND_BUNDLE_SCHEMA,
+    _build_groups,
     _performance_buckets,
     publish_frontend_bundle,
 )
@@ -288,6 +289,49 @@ def test_performance_buckets_use_ten_and_twenty_five_percent_boundaries() -> Non
         "unavailable": 1,
         "total": 5,
     }
+
+
+def test_shared_calibration_sample_unions_multiple_microcosm_sources() -> None:
+    facts = (fact("fact-a"), fact("fact-b"))
+    source_ids = [
+        "microcosm_be_v04_axiom",
+        "microcosm_be_v04_euromod",
+        "euromod_be2025_jrc_silc",
+    ]
+    direct_by_source = {
+        "microcosm_be_v04_axiom": {"fact-a"},
+        "microcosm_be_v04_euromod": {"fact-b"},
+        "euromod_be2025_jrc_silc": set(),
+    }
+    capabilities = [
+        {
+            "source_id": source_id,
+            "fact_key": chronicle_fact.fact_key,
+            "execution_method": "precomputed",
+            "period_treatment": "native",
+            "calibration_exposure": (
+                "direct_calibration_target"
+                if chronicle_fact.fact_key in direct_by_source[source_id]
+                else "out_of_sample"
+            ),
+            "reason_code": None,
+        }
+        for source_id in source_ids
+        for chronicle_fact in facts
+    ]
+
+    groups = _build_groups(facts, source_ids, capabilities, [])
+
+    in_sample = next(
+        row
+        for row in groups
+        if row["dimension"] == "populace_calibration_sample"
+        and row["key"] == "in_sample"
+    )
+    assert in_sample["fact_count"] == 2
+    assert all(
+        value["evaluable"] == 2 for value in in_sample["sources"].values()
+    )
 
 
 def test_frontend_bundle_is_partitioned_complete_and_sparse(tmp_path: Path) -> None:
