@@ -23,7 +23,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       // External checks (reform scores vs JCT/fiscal notes/admin actuals)
       // moved to the PolicyEngine scorecard, which owns all external
       // comparisons; per-release history was ingested there (issue #15).
-      { href: "/microcosm/datasets", label: "Cross-dataset", usOnly: true },
+      { href: "/microcosm/datasets", label: "Cross-dataset" },
       {
         href: "https://www.policyengine.org/scorecard",
         label: "External checks",

@@ -3,10 +3,12 @@ import type {
   FactSort,
   SourceSummary,
 } from "./artifact";
+import type { Country } from "@/components/layout/country-context";
 import { sourceDisplayLabel } from "./presentation";
 import { sourceAuthorityLabel } from "../source-labels";
 
 export interface FactCatalogParams {
+  country: Country;
   source: string;
   status: string;
   chronicleSource: string;
@@ -85,6 +87,7 @@ export interface FactDetailView {
 }
 
 const DEFAULT_PARAMS: FactCatalogParams = {
+  country: "us",
   source: "",
   status: "",
   chronicleSource: "",
@@ -100,6 +103,7 @@ const DEFAULT_PARAMS: FactCatalogParams = {
 };
 
 const SORTS = new Set<FactSort>(["fact_key", "label", "error_desc"]);
+const COUNTRIES = new Set<Country>(["us", "uk", "be"]);
 
 function boundedPositiveInteger(value: string | null, fallback: number, maximum: number): number {
   if (!value || !/^\d+$/.test(value)) return fallback;
@@ -107,9 +111,18 @@ function boundedPositiveInteger(value: string | null, fallback: number, maximum:
   return Number.isSafeInteger(parsed) && parsed > 0 && parsed <= maximum ? parsed : fallback;
 }
 
-export function parseFactCatalogParams(params: URLSearchParams): FactCatalogParams {
+export function parseFactCatalogParams(
+  params: URLSearchParams,
+  currentCountry?: Country,
+): FactCatalogParams {
   const sortValue = params.get("sort") as FactSort | null;
+  const countryValue = params.get("country");
   return {
+    country:
+      currentCountry ??
+      (countryValue && COUNTRIES.has(countryValue as Country)
+        ? (countryValue as Country)
+        : DEFAULT_PARAMS.country),
     source: params.get("source")?.trim() ?? "",
     status: params.get("status")?.trim() ?? "",
     chronicleSource: params.get("ledger_source")?.trim() ?? "",
@@ -131,6 +144,7 @@ function serializeCatalogParams(
 ): URLSearchParams {
   const query = new URLSearchParams();
   if (options.includeView) query.set("view", "facts");
+  query.set("country", params.country);
   const values: [string, string][] = [
     ["source", params.source],
     ["status", params.status],

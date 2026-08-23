@@ -9,6 +9,10 @@ import {
   CrossDatasetFactDetailView,
   CrossDatasetFactsView,
 } from "@/components/microcosm/cross-dataset-facts-view";
+import {
+  useCountry,
+  type Country,
+} from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -21,11 +25,13 @@ import type {
 } from "@/lib/cross-dataset/artifact";
 import {
   CROSS_DATASET_PAGE_TITLE,
-  GROUP_DIMENSIONS,
+  availableGroupDimensions,
   buildGroupRows,
   buildSourceOverviews,
   crossDatasetUiState,
+  geographyFilterOptions,
   orderSourceSummaries,
+  sampleFilterOptions,
   sourceCompactLabel,
   sourceDisplayLabel,
   type GroupDimension,
@@ -42,13 +48,19 @@ interface OverviewResponse {
   groups: CrossDatasetGroupsDocument;
 }
 
-function useCrossDatasetOverview() {
+function useCrossDatasetOverview(country: Country) {
   return useQuery({
-    queryKey: ["cross-dataset", "overview", "v3"],
+    queryKey: ["cross-dataset", "overview", "v4", country],
     queryFn: async (): Promise<OverviewResponse> => {
       const [summary, groups] = await Promise.all([
-        apiGet<CrossDatasetSummary>("/microcosm/cross-dataset", { view: "summary" }),
-        apiGet<CrossDatasetGroupsDocument>("/microcosm/cross-dataset", { view: "groups" }),
+        apiGet<CrossDatasetSummary>("/microcosm/cross-dataset", {
+          view: "summary",
+          country,
+        }),
+        apiGet<CrossDatasetGroupsDocument>("/microcosm/cross-dataset", {
+          view: "groups",
+          country,
+        }),
       ]);
       if (summary.run_id !== groups.run_id || summary.snapshot_id !== groups.snapshot_id) {
         throw new Error("Cross-dataset summary and group data belong to different runs.");
@@ -219,8 +231,8 @@ function PerformanceLegend() {
   );
 }
 
-function CrossDatasetOverviewView() {
-  const query = useCrossDatasetOverview();
+function CrossDatasetOverviewView({ country }: { country: Country }) {
+  const query = useCrossDatasetOverview(country);
   const [dimension, setDimension] = useState<GroupDimension>("ledger_source");
   const [performanceFilter, setPerformanceFilter] = useState<SourceOverviewFilter>({
     geography: "all",
@@ -231,28 +243,71 @@ function CrossDatasetOverviewView() {
     error: query.error,
     summary: query.data?.summary,
   });
-
+  const orderedSources = useMemo(
+    () => (query.data ? orderSourceSummaries(query.data.summary.sources) : []),
+    [query.data],
+  );
+  const groupDimensions = useMemo(
+    () =>
+      query.data
+        ? availableGroupDimensions(query.data.groups.groups)
+        : [],
+    [query.data],
+  );
+  const activeDimension = groupDimensions.some((option) => option.key === dimension)
+    ? dimension
+    : (groupDimensions[0]?.key ?? dimension);
+  const geographyOptions = useMemo(
+    () =>
+      query.data
+        ? geographyFilterOptions(query.data.groups.groups)
+        : [],
+    [query.data],
+  );
+  const sampleOptions = useMemo(
+    () =>
+      query.data
+        ? sampleFilterOptions(query.data.groups.groups)
+        : [],
+    [query.data],
+  );
+  const activePerformanceFilter = useMemo<SourceOverviewFilter>(
+    () => ({
+      geography:
+        performanceFilter.geography === "all" ||
+        geographyOptions.some((option) => option.key === performanceFilter.geography)
+          ? performanceFilter.geography
+          : "all",
+      sample:
+        performanceFilter.sample === "all" ||
+        sampleOptions.some((option) => option.key === performanceFilter.sample)
+          ? performanceFilter.sample
+          : "all",
+    }),
+    [geographyOptions, performanceFilter, sampleOptions],
+  );
   const sourceOverviews = useMemo(
     () =>
       query.data
         ? buildSourceOverviews(
             query.data.summary,
             query.data.groups.groups,
-            performanceFilter,
+            activePerformanceFilter,
           )
         : [],
-    [performanceFilter, query.data],
-  );
-  const orderedSources = useMemo(
-    () => (query.data ? orderSourceSummaries(query.data.summary.sources) : []),
-    [query.data],
+    [activePerformanceFilter, query.data],
   );
   const groupRows = useMemo(
     () =>
       query.data
-        ? buildGroupRows(query.data.groups.groups, dimension, orderedSources)
+        ? buildGroupRows(
+            query.data.groups.groups,
+            activeDimension,
+            orderedSources,
+            country,
+          )
         : [],
-    [dimension, orderedSources, query.data],
+    [activeDimension, country, orderedSources, query.data],
   );
 
   if (state === "loading") return <LoadingBlock label="Loading Cross-dataset results…" />;
@@ -286,6 +341,9 @@ function CrossDatasetOverviewView() {
     );
   }
 
+  const jurisdictionLabel = query.data.summary.jurisdictions?.join(", ") ||
+    "the selected jurisdiction";
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -293,10 +351,10 @@ function CrossDatasetOverviewView() {
         title={CROSS_DATASET_PAGE_TITLE}
         description={
           <>
-            Every model or standalone dataset is classified against the complete US Chronicle
-            fact catalog. Non-US facts are excluded before classification. Error measures
-            closeness only among comparable facts executed by the current adapter, using the
-            same fact-level 100%-capped approach as the calibration fit view.
+            Every model or standalone dataset is classified against the complete Chronicle fact
+            catalog published for {jurisdictionLabel}. Error measures closeness only among
+            comparable facts executed by the current adapter, using the same fact-level
+            100%-capped approach as the calibration fit view.
           </>
         }
       />
@@ -308,11 +366,9 @@ function CrossDatasetOverviewView() {
           error capped at 100% before averaging. Lower is better. Microcosm results marked{" "}
           <strong>direct calibration target</strong> are in-sample calibration fit, not
           independent validation. The Sample selector uses that Microcosm membership as
-          one shared fact set for every model and dataset. Results marked{" "}
-          <strong>2023 facts aligned to 2024</strong> compare against the 2024 transformation
-          produced by the same aging and uprating logic used in the Microcosm build—not a native
-          2023 society-wide run. Tax-Calculator’s public CPS rows use its population advanced to
-          2024.
+          one shared fact set for every model and dataset. Source names, geography levels, and
+          period treatments are read from this bundle; fact details show any transformation used
+          to create a comparable benchmark.
         </p>
         <PerformanceLegend />
       </div>
@@ -325,7 +381,7 @@ function CrossDatasetOverviewView() {
             <label className="text-xs text-muted-foreground">
               Geography
               <select
-                value={performanceFilter.geography}
+                value={activePerformanceFilter.geography}
                 onChange={(event) =>
                   setPerformanceFilter((current) => ({
                     ...current,
@@ -336,15 +392,17 @@ function CrossDatasetOverviewView() {
                 aria-label="Filter all models by geography"
               >
                 <option value="all">All geographies</option>
-                <option value="country">National</option>
-                <option value="state">State</option>
-                <option value="congressional_district">Congressional district</option>
+                {geographyOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="text-xs text-muted-foreground">
               Sample
               <select
-                value={performanceFilter.sample}
+                value={activePerformanceFilter.sample}
                 onChange={(event) =>
                   setPerformanceFilter((current) => ({
                     ...current,
@@ -355,8 +413,11 @@ function CrossDatasetOverviewView() {
                 aria-label="Filter all models by sample"
               >
                 <option value="all">All targets</option>
-                <option value="in_sample">In Microcosm sample</option>
-                <option value="out_of_sample">Out of Microcosm sample</option>
+                {sampleOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -403,12 +464,12 @@ function CrossDatasetOverviewView() {
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             Group by
             <select
-              value={dimension}
+              value={activeDimension}
               onChange={(event) => setDimension(event.target.value as GroupDimension)}
               className="rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground"
               aria-label="Group Cross-dataset results"
             >
-              {GROUP_DIMENSIONS.map((option) => (
+              {groupDimensions.map((option) => (
                 <option key={option.key} value={option.key}>
                   {option.label}
                 </option>
@@ -530,6 +591,7 @@ function CrossDatasetOverviewView() {
 }
 
 export function CrossDatasetView() {
+  const { country } = useCountry();
   const searchParams = useSearchParams();
   const view = searchParams.get("view");
   const search = searchParams.toString();
@@ -542,5 +604,5 @@ export function CrossDatasetView() {
       />
     );
   }
-  return <CrossDatasetOverviewView />;
+  return <CrossDatasetOverviewView country={country} />;
 }

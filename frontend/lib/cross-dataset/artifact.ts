@@ -215,6 +215,8 @@ export interface FactsPage {
 interface ReaderOptions {
   readText: (path: string) => Promise<string>;
   expectedRunId?: string;
+  expectedJurisdiction?: string;
+  jurisdictionAliases?: readonly string[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -233,6 +235,20 @@ function requiredInteger(value: unknown, field: string, minimum = 0): number {
     throw new ArtifactError("malformed_artifact", `Artifact field ${field} must be an integer >= ${minimum}.`);
   }
   return value as number;
+}
+
+function optionalStringArray(value: unknown, field: string): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !Array.isArray(value) ||
+    value.some((item) => typeof item !== "string" || item.length === 0)
+  ) {
+    throw new ArtifactError(
+      "malformed_artifact",
+      `Artifact field ${field} must be an array of non-empty strings.`,
+    );
+  }
+  return value as string[];
 }
 
 function parseJson(text: string, path: string): unknown {
@@ -304,6 +320,7 @@ function validateManifest(value: unknown): CrossDatasetBundleManifest {
     schema_version: CROSS_DATASET_BUNDLE_SCHEMA,
     run_id: requiredString(value.run_id, "run_id"),
     snapshot_id: requiredString(value.snapshot_id, "snapshot_id"),
+    jurisdictions: optionalStringArray(value.jurisdictions, "jurisdictions"),
     fact_count: factCount,
     source_ids: value.source_ids as string[],
     page_size: pageSize,
@@ -333,12 +350,16 @@ function validateDocumentIdentity(
 export class CrossDatasetArtifactReader {
   private readonly readText: ReaderOptions["readText"];
   private readonly expectedRunId?: string;
+  private readonly expectedJurisdiction?: string;
+  private readonly jurisdictionAliases: readonly string[];
   private readonly documentCache = new Map<string, Promise<unknown>>();
   private manifestPromise?: Promise<CrossDatasetBundleManifest>;
 
   constructor(options: ReaderOptions) {
     this.readText = options.readText;
     this.expectedRunId = options.expectedRunId;
+    this.expectedJurisdiction = options.expectedJurisdiction;
+    this.jurisdictionAliases = options.jurisdictionAliases ?? [];
   }
 
   async manifest(): Promise<CrossDatasetBundleManifest> {
@@ -357,6 +378,16 @@ export class CrossDatasetArtifactReader {
           "stale_artifact",
           `Expected Cross-dataset run ${this.expectedRunId}, found ${manifest.run_id}.`,
         );
+      }
+      if (this.expectedJurisdiction) {
+        const accepted = [this.expectedJurisdiction, ...this.jurisdictionAliases];
+        if (!manifest.jurisdictions?.some((jurisdiction) => accepted.includes(jurisdiction))) {
+          const actual = manifest.jurisdictions?.join(", ") || "(none)";
+          throw new ArtifactError(
+            "stale_artifact",
+            `Cross-dataset bundle is for jurisdictions ${actual}, not ${this.expectedJurisdiction}.`,
+          );
+        }
       }
       return manifest;
     })();

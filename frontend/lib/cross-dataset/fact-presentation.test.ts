@@ -118,10 +118,12 @@ test("catalog query parser accepts supported filters and normalizes unsafe pagin
     new URLSearchParams(
       "view=facts&source=microcosm&ledger_source=irs_soi&period=tax_year%3A2023" +
         "&period_treatment=aligned_fact&calibration_exposure=direct_calibration_target" +
-        "&status=evaluable_projected&search=dividend&page=-2&page_size=999&sort=error_desc",
+        "&status=evaluable_projected&search=dividend&page=-2&page_size=999&sort=error_desc" +
+        "&country=be",
     ),
   );
   expect(parsed).toEqual({
+    country: "be",
     source: "microcosm",
     status: "evaluable_projected",
     chronicleSource: "irs_soi",
@@ -139,17 +141,22 @@ test("catalog query parser accepts supported filters and normalizes unsafe pagin
 
 test("catalog and detail URLs preserve stable filters and encode fact keys", () => {
   const current = parseFactCatalogParams(
-    new URLSearchParams("source=cps&ledger_source=irs_soi&search=income&page=3"),
+    new URLSearchParams("country=be&source=cps&ledger_source=irs_soi&search=income&page=3"),
   );
   expect(factCatalogHref(current, { page: 4 })).toBe(
-    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi&search=income&page=4",
+    "/microcosm/datasets?view=facts&country=be&source=cps&ledger_source=irs_soi&search=income&page=4",
   );
   expect(factCatalogHref(current, { search: "", page: 1 })).toBe(
-    "/microcosm/datasets?view=facts&source=cps&ledger_source=irs_soi",
+    "/microcosm/datasets?view=facts&country=be&source=cps&ledger_source=irs_soi",
   );
   expect(factDetailHref("irs/soi fact", current)).toBe(
-    "/microcosm/datasets?view=fact&fact_key=irs%2Fsoi+fact&source=cps&ledger_source=irs_soi&search=income&page=3",
+    "/microcosm/datasets?view=fact&fact_key=irs%2Fsoi+fact&country=be&source=cps&ledger_source=irs_soi&search=income&page=3",
   );
+});
+
+test("catalog parsing defaults to US and lets the selected country override stale URL state", () => {
+  expect(parseFactCatalogParams(new URLSearchParams()).country).toBe("us");
+  expect(parseFactCatalogParams(new URLSearchParams("country=us"), "uk").country).toBe("uk");
 });
 
 test("fact rows show sparse supported and unsupported cells accessibly", () => {
@@ -157,7 +164,7 @@ test("fact rows show sparse supported and unsupported cells accessibly", () => {
   expect(row.observedValue).toBe("$1.00B");
   expect(row.observedPeriod).toBe("Tax year 2023");
   expect(row.detailHref).toBe(
-    "/microcosm/datasets?view=fact&fact_key=irs-soi-dividends-2023",
+    "/microcosm/datasets?view=fact&fact_key=irs-soi-dividends-2023&country=us",
   );
   expect(row.sourceCells.microcosm).toMatchObject({
     statusLabel: "Evaluable · projected",
