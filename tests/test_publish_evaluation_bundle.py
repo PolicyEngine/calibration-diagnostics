@@ -561,7 +561,8 @@ def test_remote_identity_uses_size_with_lfs_sha256_or_git_blob_id() -> None:
 
     assert matches(RemoteFile("x", size, blob_id=blob_id))
     assert matches(RemoteFile("x", size, sha256=sha256))
-    assert matches(RemoteFile("x", None, sha256=sha256))
+    assert not matches(RemoteFile("x", None, blob_id=blob_id))
+    assert not matches(RemoteFile("x", None, sha256=sha256))
     assert not matches(RemoteFile("x", size + 1, blob_id=blob_id))
     assert not matches(RemoteFile("x", size, blob_id="0" * 40))
     assert not matches(RemoteFile("x", size, blob_id=blob_id, sha256="0" * 64))

@@ -2,8 +2,8 @@
 
 ## State
 
-Verified bundle files are now immutable byte snapshots from loading through
-commit. Remote comparison and missing-extra coverage remain.
+Verified bundle files are immutable byte snapshots, and remote skips now
+require both size and hash identity. Missing-extra coverage remains.
 
 ## Done
 
@@ -14,10 +14,10 @@ commit. Remote comparison and missing-extra coverage remain.
 - Added correctly hashed corrupt-page and noncanonical-manifest tests.
 - Replaced mutable upload paths with descriptor-validated byte snapshots.
 - Added a pre-commit disk-mutation regression test.
+- Required a present, equal remote size before either hash form can skip.
 
 ## Next
 
-- Require remote size equality for idempotent skips.
 - Cover a missing `huggingface_hub` install in a subprocess test.
 - Run the complete test suite and required BE dry run.
 - Write the final report to the requested output file.

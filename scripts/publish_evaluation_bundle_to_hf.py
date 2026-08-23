@@ -296,7 +296,7 @@ def _remote_matches(
 ) -> bool:
     """Identical on the Hub: same size and the same LFS SHA-256 or git blob id."""
 
-    if remote.size is not None and remote.size != size:
+    if remote.size is None or remote.size != size:
         return False
     if remote.sha256 is not None:
         return remote.sha256 == sha256
