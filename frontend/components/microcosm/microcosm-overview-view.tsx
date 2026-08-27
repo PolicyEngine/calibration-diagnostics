@@ -7,6 +7,7 @@ import {
   CalibrationExplorerDataPrefetch,
   CalibrationExplorerMap,
 } from "@/components/microcosm/calibration-explorer-map";
+import { CalibrationTargetNavigationCards } from "@/components/microcosm/calibration-target-navigation-cards";
 import { ArtifactDescriptionBanner } from "@/components/microcosm/artifact-description-banner";
 import { WEIGHTED_TARGET_ERROR_HELP } from "@/components/microcosm/calibration-explorer-view";
 import { useCountry } from "@/components/layout/country-context";
@@ -70,9 +71,9 @@ function OverviewMetric({ label, value }: { label: ReactNode; value: string }) {
   );
 }
 
-export function MicrocosmOverviewView() {
+export function MicrocosmOverviewView({ initialRelease = "" }: { initialRelease?: string }) {
   const { country } = useCountry();
-  const [release, setRelease] = useState("");
+  const [release, setRelease] = useState(initialRelease);
   const [pageIntroHeight, setPageIntroHeight] = useState(0);
   const { data: releaseData } = useMicrocosmReleases();
   const { data, isLoading, error } = useMicrocosm(release || undefined);
@@ -243,6 +244,10 @@ export function MicrocosmOverviewView() {
           release={release || undefined}
           pageIntroHeight={pageIntroHeight}
         />
+      </SectionCard>
+
+      <SectionCard title="Calibration target details">
+        <CalibrationTargetNavigationCards release={release || undefined} />
       </SectionCard>
 
       <SectionCard title="Limitations">

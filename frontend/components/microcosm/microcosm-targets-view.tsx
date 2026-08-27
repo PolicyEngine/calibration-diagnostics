@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
@@ -14,7 +15,6 @@ import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { withBasePath } from "@/lib/base-path";
 import { hasCapability } from "@/lib/microcosm/countries";
-import { microcosmTargetsIntro } from "@/lib/microcosm/presentation";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 import {
   releaseSelectOptions,
@@ -476,87 +476,22 @@ function VariableBrowser({
   );
 }
 
-type WizardStep = "home" | "pick" | "refine" | "results";
-type WizardAccent = "teal" | "amber" | "slate";
-
-const ACCENTS: Record<
-  WizardAccent,
-  { chip: string; ink: string; border: string; glow: string }
-> = {
-  teal: {
-    chip: "bg-primary/10 text-primary",
-    ink: "text-primary",
-    border: "hover:border-primary/50",
-    glow: "wiz-glow-teal",
-  },
-  amber: {
-    chip: "pill-warn",
-    ink: "tone-warn",
-    border: "hover:border-[var(--warn)]",
-    glow: "wiz-glow-warn",
-  },
-  slate: {
-    chip: "pill-neutral",
-    ink: "text-muted-foreground",
-    border: "hover:border-border-dark",
-    glow: "wiz-glow-neutral",
-  },
-};
-
-function WizardCard({
-  eyebrow,
-  title,
-  body,
-  stat,
-  accent,
-  onClick,
-}: {
-  eyebrow: string;
-  title: string;
-  body: string;
-  stat: string;
-  accent: WizardAccent;
-  onClick: () => void;
-}) {
-  const a = ACCENTS[accent];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group relative flex h-full flex-col gap-5 rounded-2xl border border-border bg-card p-6 text-left shadow-[var(--elev-2)] transition-all duration-200 hover:-translate-y-1 ${a.border} ${a.glow} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary`}
-    >
-      <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${a.ink}`}>
-        {eyebrow}
-      </span>
-      <div className="flex-1">
-        <h3 className="text-xl font-semibold leading-snug tracking-tight text-foreground">
-          {title}
-        </h3>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-      </div>
-      <div className="flex items-center justify-between border-t border-border/60 pt-4">
-        <span className={`text-sm font-semibold tabular-nums ${a.ink}`}>{stat}</span>
-        <span
-          className={`grid h-8 w-8 place-items-center rounded-full border border-border text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:border-current ${a.ink}`}
-          aria-hidden
-        >
-          →
-        </span>
-      </div>
-    </button>
-  );
-}
+type WizardStep = "pick" | "refine" | "results";
 
 export function MicrocosmTargetsView({
   initialScope = "all",
   initialSource = "",
   initialLevel = "",
+  initialRelease = "",
+  initialStep = "results",
 }: {
   initialScope?: TargetScope;
   initialSource?: string;
   initialLevel?: string;
+  initialRelease?: string;
+  initialStep?: "pick" | "results";
 }) {
-  const [release, setRelease] = useState("");
+  const [release, setRelease] = useState(initialRelease);
   const [scope, setScope] = useState<TargetScope>(initialScope);
   const [variable, setVariable] = useState("");
   const [source, setSource] = useState(initialSource);
@@ -569,11 +504,12 @@ export function MicrocosmTargetsView({
   const [selected, setSelected] = useState<MicrocosmTargetRow | null>(null);
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<SortState>({ by: "abs_relative_error", dir: "desc" });
-  const [step, setStep] = useState<WizardStep>(initialSource ? "results" : "home");
+  const [step, setStep] = useState<WizardStep>(initialSource ? "results" : initialStep);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [refineIndex, setRefineIndex] = useState(0);
 
   const { country } = useCountry();
+  const router = useRouter();
   const { data: releaseData } = useMicrocosmReleases();
   const { data: stagingData } = useMicrocosmStagingRuns();
   const releaseOptions = useMemo(
@@ -621,28 +557,14 @@ export function MicrocosmTargetsView({
     setPage(0);
   }
 
-  function startOver() {
+  function returnToCalibrationFit() {
     resetFilters();
-    setStep("home");
+    const query = new URLSearchParams({ country });
+    if (release) query.set("release", release);
+    router.push(`/microcosm?${query.toString()}`);
   }
 
-  function startExplore() {
-    resetFilters();
-    setStep("pick");
-  }
-
-  function startHealthcare() {
-    resetFilters();
-    setScope("healthcare");
-    setStep("results");
-  }
-
-  function startEverything() {
-    resetFilters();
-    setStep("results");
-  }
-
-  // Step back one level toward the starting cards.
+  // Step back one level toward the statistic picker.
   function goBack() {
     if (step === "results" && activeVariable) {
       setStep("refine");
@@ -652,7 +574,7 @@ export function MicrocosmTargetsView({
       setStep("pick");
       return;
     }
-    startOver();
+    returnToCalibrationFit();
   }
 
   const facetParam = useMemo(
@@ -697,7 +619,7 @@ export function MicrocosmTargetsView({
     ],
   );
 
-  const { data, isLoading, isFetching, error, isPlaceholderData } =
+  const { data, isLoading, isFetching, error } =
     useMicrocosmTargetDiagnostics(params);
 
   const variables = data?.variables ?? [];
@@ -711,12 +633,6 @@ export function MicrocosmTargetsView({
     [scope, variables],
   );
   const filteredTotal = data?.filtered_total ?? 0;
-  const allTargets = data?.total_targets ?? null;
-  // The healthcare focus is offered when the release has healthcare targets.
-  // Kept-previous placeholder data belongs to the prior country/release, so it
-  // must not decide the card.
-  const hasHealthcareTargets =
-    !isPlaceholderData && (data?.scope_counts?.healthcare ?? 0) > 0;
   const pageCount = Math.max(Math.ceil(filteredTotal / PAGE_SIZE), 1);
   const activeVariable = variables.find((v) => v.variable_key === variable);
 
@@ -1078,42 +994,6 @@ export function MicrocosmTargetsView({
 
       <ArtifactDescriptionBanner description={data?.description} />
 
-      {step === "home" && (
-        <div className="flex flex-col gap-4">
-          <h2 className="text-base font-semibold text-foreground">
-            Where would you like to start?
-          </h2>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <WizardCard
-              eyebrow="Browse"
-              title="Explore a statistic"
-              body={microcosmTargetsIntro(country, data?.presentation)}
-              stat={variableGroupCount ? `${fmt(variableGroupCount, { digits: 0 })} statistics` : "Browse measures"}
-              accent="teal"
-              onClick={startExplore}
-            />
-            {hasHealthcareTargets ? (
-              <WizardCard
-                eyebrow="Focus"
-                title="Healthcare programs"
-                body="ACA marketplace, Medicaid, CHIP, and Medicare enrollment and premium targets."
-                stat="ACA · Medicaid · Medicare"
-                accent="teal"
-                onClick={startHealthcare}
-              />
-            ) : null}
-            <WizardCard
-              eyebrow="Everything"
-              title="See everything"
-              body="Browse the full target surface with all filters and column sorting."
-              stat={allTargets != null ? `${fmt(allTargets, { digits: 0 })} targets` : "All targets"}
-              accent="slate"
-              onClick={startEverything}
-            />
-          </div>
-        </div>
-      )}
-
       {step === "pick" && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm shadow-[var(--elev-2)]">
@@ -1151,7 +1031,7 @@ export function MicrocosmTargetsView({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={startOver}
+                onClick={returnToCalibrationFit}
                 className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               >
                 Start over
@@ -1307,7 +1187,7 @@ export function MicrocosmTargetsView({
               )}
               <button
                 type="button"
-                onClick={startOver}
+                onClick={returnToCalibrationFit}
                 className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               >
                 Start over
