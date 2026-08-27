@@ -9,7 +9,7 @@ import {
 } from "@/lib/microcosm/latest-artifact";
 import { loadStagingTargetDiagnostics } from "@/lib/microcosm/staging-artifact";
 
-export const revalidate = 300;
+export const revalidate = 21_600;
 export const runtime = "nodejs";
 export const maxDuration = 300;
 

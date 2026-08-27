@@ -4,6 +4,7 @@ import {
   useCountry,
   type Country,
 } from "@/components/layout/country-context";
+import { PUBLISHED_RELEASE_STALE_TIME_MS } from "@/lib/api/cache-policy";
 import { withBasePath } from "@/lib/base-path";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
@@ -698,7 +699,7 @@ export function useMicrocosmReleases() {
   return useQuery({
     queryKey: ["microcosm", "releases", country],
     queryFn: () => apiGet<MicrocosmReleasesResponse>("/microcosm/releases", { country }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
   });
 }
 
@@ -739,7 +740,7 @@ export function useMicrocosm(release?: string) {
     queryKey: ["microcosm", country, release ?? "latest"],
     queryFn: () =>
       apiGet<MicrocosmResponse>("/microcosm", { release: release || undefined, country }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
   });
 }
 
@@ -794,7 +795,7 @@ export function useMicrocosmTargetTreemap(release?: string, breakdown?: "program
         breakdown: breakdown || undefined,
         country,
       }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
   });
 }
 
@@ -846,7 +847,7 @@ export function microcosmCalibrationTreeQueryOptions(
         release: release || undefined,
         country,
       }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
   };
 }
 

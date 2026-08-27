@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
 
 import { CountryProvider } from "@/components/layout/country-context";
+import { PUBLISHED_RELEASE_STALE_TIME_MS } from "@/lib/api/cache-policy";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -12,7 +13,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5 * 60 * 1000,
+            staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
             refetchOnWindowFocus: false,
             retry: 2,
           },

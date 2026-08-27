@@ -2030,7 +2030,9 @@ export function hfResolveUrl(path: string, country: MicrocosmCountry = "us"): st
 }
 
 // A hung HF request would otherwise block the function for the whole route
-// maxDuration and pin the shared in-flight cache promise; cap each fetch.
+// maxDuration and pin the shared in-flight cache promise. The calibration
+// diagnostics artifact is large enough that a cold authenticated download can
+// exceed 20 seconds, so leave adequate room below the routes' 300-second limit.
 const MICROCOSM_RELEASE_FETCH_TIMEOUT_MS = 120_000;
 
 async function hfFetch(url: string, revalidate: number): Promise<Response> {

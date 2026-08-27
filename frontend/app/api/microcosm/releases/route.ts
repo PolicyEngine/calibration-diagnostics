@@ -7,7 +7,7 @@ import {
   scrub,
 } from "@/lib/microcosm/latest-artifact";
 
-export const revalidate = 300;
+export const revalidate = 21_600;
 
 export async function GET(request: Request) {
   const country = parseCountry(new URL(request.url).searchParams.get("country"));
