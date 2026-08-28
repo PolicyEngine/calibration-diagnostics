@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "node scripts/dev.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:dev-port": "node --test scripts/available-port.node-test.mjs"
   },
   "dependencies": {
     "@policyengine/ui-kit": "^0.9.0",

@@ -76,11 +76,18 @@ combining their evidence into one report.
 
 ```bash
 make install   # cd frontend && bun install
-make dev       # next dev (http://localhost:3000)
+make dev       # first available loopback port, starting at 3000
 make typecheck # tsc --noEmit
-make test      # bun test (data-layer suite)
+make test      # frontend data and development-launcher tests
 make build     # next build
 ```
+
+The development launcher prints the selected dashboard URL and records its port
+in `frontend/.next/dev-port`. Set `PORT` to begin the search at a different
+port; if that port is occupied on the IPv4 or IPv6 loopback address, the
+launcher increments by one until it finds a port that is free on both network
+families. Next.js binds to `127.0.0.1`, and the launcher prints that exact URL
+to avoid hostname resolution selecting a different local process.
 
 Run the Python Chronicle evaluation harness and its public numerical adapter
 gate manually when reviewing Chronicle or dependency updates:

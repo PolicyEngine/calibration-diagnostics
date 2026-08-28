@@ -673,7 +673,6 @@ export function useMicrocosmStagingRun(runId?: string) {
         country,
       }),
     enabled: staging && Boolean(runId),
-    placeholderData: keepPreviousData,
     staleTime: 10 * 1000,
     refetchInterval: staging ? 30 * 1000 : false,
   });
@@ -689,7 +688,6 @@ export function useMicrocosmStagingCompare(runId?: string, release = "latest") {
         { run: runId, release, country },
       ),
     enabled: hasCapability(country, "staging") && Boolean(runId),
-    placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
   });
 }

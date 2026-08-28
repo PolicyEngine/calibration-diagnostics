@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { fmtUnitValue, releaseLabel } from "./format";
+import { fmtUnitValue, releaseLabel, shortReleaseId } from "./format";
 
 test("percent-unit values render as percentages from decimal fractions", () => {
   expect(fmtUnitValue(0.134, "percent")).toBe("13.4%");
@@ -19,4 +19,11 @@ test("Belgium Chronicle release labels expose the distinguishing commit", () => 
   expect(
     releaseLabel("microcosm-be-2026-chronicle-3cef97b-20260823T134247Z"),
   ).toBe("2026-08-23 13:42Z · 3cef97b");
+});
+
+test("short release ids use six characters from the varying identifier", () => {
+  expect(
+    shortReleaseId("populace-us-2024-32fcf6b-480cc7c54024-20260702T134754Z"),
+  ).toBe("32fcf6");
+  expect(shortReleaseId("rel-1")).toBe("rel");
 });

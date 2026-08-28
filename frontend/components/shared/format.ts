@@ -31,6 +31,13 @@ function releaseDateFromId(releaseId: string): string {
   return releaseId.match(/-(\d{8}(?:T\d{6}Z)?)$/)?.[1] ?? "";
 }
 
+// Release identifiers begin with a stable product/year prefix. Return the
+// varying identifier segment so compact labels distinguish one release from
+// another instead of all beginning with "popula".
+export function shortReleaseId(releaseId: string, length = 6): string {
+  return releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0].slice(0, length);
+}
+
 // A readable label for a release: "2026-06-14 · f32c2e5".
 export function releaseLabel(releaseId: string, date?: string | null): string {
   // Deprecated upstream identifier: Microcosm release IDs still use the former
