@@ -16,6 +16,7 @@ import {
   MICROCOSM_BE_HF_REVISION_ENV,
   MICROCOSM_UK_HF_REPO_ENV,
   MICROCOSM_UK_HF_REVISION_ENV,
+  MICROCOSM_RELEASE_FETCH_TIMEOUT_MS,
   hfResolveUrl,
   latestMicrocosmCalibrationHighlights,
   latestMicrocosmCalibrationSummary,
@@ -50,6 +51,10 @@ test("keeps Microcosm deployment configuration on its published Populace env con
     "POPULACE_BE_HF_REPO",
     "POPULACE_BE_HF_REVISION",
   ]);
+});
+
+test("allows Microcosm release files 120 seconds to load", () => {
+  expect(MICROCOSM_RELEASE_FETCH_TIMEOUT_MS).toBe(120_000);
 });
 
 test("coerces supported country parameters and defaults unknown values to US", () => {
