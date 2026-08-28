@@ -8,6 +8,8 @@ import { PUBLISHED_RELEASE_STALE_TIME_MS } from "@/lib/api/cache-policy";
 import { withBasePath } from "@/lib/base-path";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
+import type { TargetChangeMode } from "@/lib/microcosm/target-change";
+import type { TargetChangeTreeApiResponse } from "@/lib/microcosm/target-change-tree";
 import {
   hasCapability,
   type CountryCapability,
@@ -688,6 +690,47 @@ export function useMicrocosmStagingCompare(runId?: string, release = "latest") {
         { run: runId, release, country },
       ),
     enabled: hasCapability(country, "staging") && Boolean(runId),
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useMicrocosmStagingTargetChangeTree({
+  runId,
+  releaseId,
+  mode,
+  state,
+}: {
+  runId?: string;
+  releaseId?: string;
+  mode: TargetChangeMode;
+  state: ExplorerState;
+}) {
+  const { country } = useCountry();
+  return useQuery({
+    queryKey: [
+      "microcosm",
+      "staging",
+      "target-change-tree",
+      country,
+      runId,
+      releaseId,
+      mode,
+      state,
+    ],
+    queryFn: () =>
+      apiGet<TargetChangeTreeApiResponse>(
+        "/microcosm/staging/target-change-tree",
+        {
+          ...explorerApiParams(state),
+          run: runId,
+          release: releaseId,
+          mode,
+          country,
+        },
+      ),
+    enabled:
+      hasCapability(country, "staging") &&
+      Boolean(runId && releaseId && releaseId !== "latest"),
     staleTime: 30 * 1000,
   });
 }

@@ -75,6 +75,21 @@ export function aggregateCalibrationTreeMetrics(
     (sum, item) => sum + item.targetLossWeightShare,
     0,
   );
+  const changeMetrics = metrics
+    .map((item) => item.change)
+    .filter((item): item is NonNullable<CalibrationTreeMetrics["change"]> => item != null);
+  const change = changeMetrics.length
+    ? {
+        increasedError: changeMetrics.reduce((sum, item) => sum + item.increasedError, 0),
+        reducedError: changeMetrics.reduce((sum, item) => sum + item.reducedError, 0),
+        netChange: changeMetrics.reduce((sum, item) => sum + item.netChange, 0),
+        changedTargets: changeMetrics.reduce((sum, item) => sum + item.changedTargets, 0),
+        unchangedTargets: changeMetrics.reduce((sum, item) => sum + item.unchangedTargets, 0),
+        sharedTargets: changeMetrics.reduce((sum, item) => sum + item.sharedTargets, 0),
+        addedTargets: changeMetrics.reduce((sum, item) => sum + item.addedTargets, 0),
+        removedTargets: changeMetrics.reduce((sum, item) => sum + item.removedTargets, 0),
+      }
+    : undefined;
   return {
     nTargets: metrics.reduce((sum, item) => sum + item.nTargets, 0),
     scored,
@@ -86,6 +101,7 @@ export function aggregateCalibrationTreeMetrics(
       : null,
     meanAbsRelativeError: weightedError(metrics, "meanAbsRelativeError"),
     medianAbsRelativeError: weightedError(metrics, "medianAbsRelativeError"),
+    change,
   };
 }
 

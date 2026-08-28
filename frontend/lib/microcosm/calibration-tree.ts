@@ -34,9 +34,22 @@ export interface CalibrationTreeTarget {
   target_loss_weight_share?: number | null;
   final_capped_scaled_error?: number | null;
   final_loss_contribution?: number | null;
+  target_change?: number | null;
+  comparison_status?: "shared" | "added" | "removed" | null;
   calibration_status?: CalibrationStatus | "not_materialized" | null;
   target_dimensions?: CalibrationTreeDimension[] | null;
   [key: string]: unknown;
+}
+
+export interface CalibrationTreeChangeMetrics {
+  increasedError: number;
+  reducedError: number;
+  netChange: number;
+  changedTargets: number;
+  unchangedTargets: number;
+  sharedTargets: number;
+  addedTargets: number;
+  removedTargets: number;
 }
 
 export interface CalibrationTreeMetrics {
@@ -48,6 +61,7 @@ export interface CalibrationTreeMetrics {
   weightedAverageCappedError: number | null;
   meanAbsRelativeError: number | null;
   medianAbsRelativeError: number | null;
+  change?: CalibrationTreeChangeMetrics;
 }
 
 export interface CalibrationTreeNode {
@@ -88,6 +102,10 @@ export interface CalibrationTreeResponse {
 }
 
 export type CalibrationTreeSizeMode = "targets" | "weight" | "loss";
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
 
 function finiteError(row: CalibrationTreeTarget): number | null {
   const value = row.abs_relative_error;
@@ -156,6 +174,23 @@ export function calibrationTreeMetrics(
     (sum, row) => sum + (finiteTargetLossWeightShare(row) ?? 0),
     0,
   );
+  const changes = rows
+    .map((row) => finiteNumber(row.target_change))
+    .filter((value): value is number => value != null);
+  const increasedError = changes.reduce((sum, value) => sum + Math.max(value, 0), 0);
+  const reducedError = changes.reduce((sum, value) => sum + Math.max(-value, 0), 0);
+  const change = changes.length
+    ? {
+        increasedError,
+        reducedError,
+        netChange: changes.reduce((sum, value) => sum + value, 0),
+        changedTargets: changes.filter((value) => Math.abs(value) > 1e-12).length,
+        unchangedTargets: changes.filter((value) => Math.abs(value) <= 1e-12).length,
+        sharedTargets: rows.filter((row) => row.comparison_status === "shared").length,
+        addedTargets: rows.filter((row) => row.comparison_status === "added").length,
+        removedTargets: rows.filter((row) => row.comparison_status === "removed").length,
+      }
+    : undefined;
   return {
     nTargets: rows.length,
     scored: errors.length,
@@ -169,6 +204,7 @@ export function calibrationTreeMetrics(
       ? errors.reduce((sum, error) => sum + error, 0) / errors.length
       : null,
     medianAbsRelativeError: median(errors),
+    change,
   };
 }
 

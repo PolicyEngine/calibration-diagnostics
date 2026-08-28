@@ -78,6 +78,25 @@ function targetKey(row: TargetRow): string {
   return String(row.base_name ?? row.name ?? "");
 }
 
+function hierarchyFields(row: TargetRow): Record<string, unknown> {
+  return {
+    source: row.source ?? null,
+    source_label: row.source_label ?? null,
+    variable: row.variable ?? null,
+    variable_key: row.variable_key ?? null,
+    measure: row.measure ?? null,
+    source_measure_id: row.source_measure_id ?? null,
+    level: row.level ?? null,
+    geography: row.geography ?? null,
+    family: row.family ?? null,
+    breakdown: row.breakdown ?? null,
+    dims: row.dims ?? null,
+    target_dimensions: row.target_dimensions ?? null,
+    calibration_status: row.calibration_status ?? null,
+    abs_relative_error: row.abs_relative_error ?? null,
+  };
+}
+
 function attributionSide(calibration: Calibration): TargetChangeAttributionSide {
   const attribution = calibration.target_loss_attribution;
   return {
@@ -247,14 +266,14 @@ export function buildTargetChangeDataset(
         `Weighted target-error attribution is incomplete for target ${name}.`,
       );
     }
-    const categoryRow = candidateRow ?? currentRow ?? {};
+    const categoryRow = candidateRow ?? currentRow;
     const comparisonStatus: TargetSurfaceStatus = currentRow && candidateRow
       ? "shared"
       : candidateRow
         ? "added"
         : "removed";
     rows.push({
-      ...categoryRow,
+      ...(categoryRow ? hierarchyFields(categoryRow) : {}),
       name,
       base_name: name,
       comparison_status: comparisonStatus,
