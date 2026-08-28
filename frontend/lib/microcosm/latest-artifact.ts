@@ -23,6 +23,10 @@ import {
   type FinalTargetLossAttribution,
   type TargetLossDiagnosticWarning,
 } from "./target-loss-attribution";
+import {
+  classifyTargetRepresentation,
+  type TargetRepresentation,
+} from "./target-representation";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
@@ -1953,6 +1957,7 @@ export function microcosmTargetTreemap(
 export interface TargetSchema {
   diagnostics_schema_version: number | null;
   structured_dimensions: boolean;
+  target_representation: TargetRepresentation;
 }
 
 export interface Calibration {
@@ -2253,6 +2258,7 @@ export function buildCalibration(
     target_schema: {
       diagnostics_schema_version: numberOrNull(diag.schema_version),
       structured_dimensions: isPlainObject(diag.dimensions),
+      target_representation: classifyTargetRepresentation(targets),
     },
     description:
       stringValue(diag.description) ??

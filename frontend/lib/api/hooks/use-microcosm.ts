@@ -208,6 +208,7 @@ export interface MicrocosmArtifactPresentation {
 export interface MicrocosmTargetSchema {
   diagnostics_schema_version: number | null;
   structured_dimensions: boolean;
+  target_representation: "legacy" | "structured" | "mixed" | "unknown";
 }
 
 export interface MicrocosmCalibration {

@@ -256,6 +256,7 @@ test("structured dimensions shape rows and honor artifact value order", () => {
   expect(cal.target_schema).toEqual({
     diagnostics_schema_version: 7,
     structured_dimensions: true,
+    target_representation: "mixed",
   });
   expect(cal.rows.every((row) => row.dimension_adapter === "structured")).toBe(true);
   expect(cal.rows[0]).toMatchObject({
