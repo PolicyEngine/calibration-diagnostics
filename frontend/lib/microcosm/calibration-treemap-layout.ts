@@ -39,11 +39,15 @@ function metricValue(
   return metrics.loss;
 }
 
+export type CalibrationTreemapMetricSelector = (
+  metrics: CalibrationTreeMetrics,
+) => number;
+
 function effectiveMetricValues(
   items: Array<{ metrics: CalibrationTreeMetrics }>,
-  mode: CalibrationTreeSizeMode,
+  metric: CalibrationTreemapMetricSelector,
 ): number[] {
-  const values = items.map((item) => metricValue(item.metrics, mode));
+  const values = items.map((item) => metric(item.metrics));
   return values.some((value) => value > 0)
     ? values
     : items.map((item) => item.metrics.nTargets);
@@ -121,10 +125,10 @@ function groupedNode(
 
 function condenseNodes(
   group: CalibrationTreeGroup,
-  mode: CalibrationTreeSizeMode,
+  metric: CalibrationTreemapMetricSelector,
   projectedGroupArea: number,
 ): CalibrationTreemapNode[] {
-  const values = effectiveMetricValues(group.nodes, mode);
+  const values = effectiveMetricValues(group.nodes, metric);
   const total = values.reduce((sum, value) => sum + value, 0);
   if (total <= 0) return group.nodes;
 
@@ -162,8 +166,22 @@ export function condenseCalibrationTreemap(
   width: number,
   height: number,
 ): CalibrationTreemapGroup[] {
+  return condenseCalibrationTreemapByMetric(
+    groups,
+    (metrics) => metricValue(metrics, mode),
+    width,
+    height,
+  );
+}
+
+export function condenseCalibrationTreemapByMetric(
+  groups: CalibrationTreeGroup[],
+  metric: CalibrationTreemapMetricSelector,
+  width: number,
+  height: number,
+): CalibrationTreemapGroup[] {
   const canvasArea = Math.max(width, 0) * Math.max(height, 0);
-  const groupValues = effectiveMetricValues(groups, mode);
+  const groupValues = effectiveMetricValues(groups, metric);
   const total = groupValues.reduce((sum, value) => sum + value, 0);
   if (total <= 0 || canvasArea <= 0) return groups;
 
@@ -180,7 +198,7 @@ export function condenseCalibrationTreemap(
 
   const kept: CalibrationTreemapGroup[] = large.map(({ group, value }) => ({
     ...group,
-    nodes: condenseNodes(group, mode, (value / total) * canvasArea),
+    nodes: condenseNodes(group, metric, (value / total) * canvasArea),
   }));
 
   if (small.length < 2) {
@@ -190,7 +208,7 @@ export function condenseCalibrationTreemap(
         ...group,
         nodes: condenseNodes(
           group,
-          mode,
+          metric,
           (groupValues[groups.indexOf(group)] / total) * canvasArea,
         ),
       })),
