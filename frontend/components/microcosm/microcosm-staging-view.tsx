@@ -12,6 +12,7 @@ import {
   fmtSignedMoney,
   shortReleaseId,
 } from "@/components/shared/format";
+import { HelpHint } from "@/components/shared/help-hint";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import {
@@ -599,6 +600,21 @@ interface SideStats {
   mean: number | null;
 }
 
+const VALIDATION_METHOD_HELP = {
+  targetWithin10:
+    "Measures the share of targets present in both releases whose absolute relative error is at most 10% of the benchmark value; higher is better. This metric is restricted to shared targets to ensure direct comparability.",
+  targetMedianAbsoluteError:
+    "Calculates the median absolute relative error across targets present in both releases. Lower is better.",
+  targetMeanAbsoluteError:
+    "Calculates the mean absolute relative error across targets present in both releases. Lower is better.",
+  reformMeanAbsoluteError:
+    "Calculates the mean absolute relative error between the candidate's estimated reform effects and the external benchmarks for out-of-sample reforms. Out-of-sample means that the reform includes values that are not used as calibration targets; lower is better.",
+  reformWithin10:
+    "Measures the share of scored out-of-sample reforms whose estimated effect is within 10% of the external benchmark. Out-of-sample means that the reform includes values that are not used as calibration targets; higher is better.",
+  targetCoverage:
+    "Counts the complete set of calibration targets available in each release, including targets that are not shared. The verdict reports how many targets the candidate adds and removes relative to the current release.",
+} as const;
+
 function sideStats(errors: number[]): SideStats {
   if (!errors.length) return { n: 0, within10: 0, median: null, mean: null };
   const sorted = [...errors].sort((a, b) => a - b);
@@ -614,12 +630,14 @@ function sideStats(errors: number[]): SideStats {
 // One row of the validation scorecard: a metric on both sides plus a verdict.
 function ScoreRow({
   label,
+  about,
   currentRelease,
   candidate,
   higherBetter,
   render = pct,
 }: {
   label: string;
+  about: string;
   currentRelease: number | null;
   candidate: number | null;
   higherBetter: boolean;
@@ -638,20 +656,28 @@ function ScoreRow({
         : candidate > currentRelease + 1e-6
       : null;
   return (
-    <tr className="border-b border-border/60 last:border-b-0">
-      <td className="px-5 py-1.5 font-medium">{label}</td>
-      <td className="whitespace-nowrap px-5 py-1.5 text-right tabular-nums text-muted-foreground">
+    <tr className="col-span-full grid grid-cols-subgrid border-b border-border/60 last:border-b-0">
+      <td className="whitespace-nowrap py-1.5 font-medium">{label}</td>
+      <td className="whitespace-nowrap py-1.5 text-right tabular-nums text-muted-foreground">
         {render(currentRelease)}
       </td>
-      <td className="whitespace-nowrap px-5 py-1.5 text-right font-medium tabular-nums">
+      <td className="whitespace-nowrap py-1.5 text-right font-medium tabular-nums">
         {render(candidate)}
       </td>
       <td
-        className={`whitespace-nowrap px-5 py-1.5 text-right text-xs font-semibold ${
+        className={`whitespace-nowrap py-1.5 text-right text-xs font-semibold ${
           better ? "tone-pos" : worse ? "tone-neg" : "text-muted-foreground"
         }`}
       >
         {better ? "candidate better" : worse ? "candidate worse" : currentRelease == null || candidate == null ? "—" : "tie"}
+      </td>
+      <td className="whitespace-nowrap py-1.5 text-center">
+        <HelpHint
+          label={<span className="sr-only">About {label}</span>}
+          tooltip={about}
+          interaction="click"
+          underline={false}
+        />
       </td>
     </tr>
   );
@@ -861,21 +887,23 @@ function MicrocosmStagingRunsView() {
                   title="Candidate validation"
                   padded={false}
                 >
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
-                        <th className="px-5 py-2 font-semibold">Validation point</th>
-                        <th className="px-5 py-2 text-right font-semibold">Current release</th>
-                        <th className="px-5 py-2 text-right font-semibold">Candidate</th>
-                        <th className="px-5 py-2 text-right font-semibold">Verdict</th>
+                  <div className="overflow-x-auto px-5">
+                    <table className="grid w-full grid-cols-[max-content_max-content_max-content_max-content_max-content] justify-between gap-x-2 text-left text-xs">
+                    <thead className="col-span-full grid grid-cols-subgrid">
+                      <tr className="col-span-full grid grid-cols-subgrid border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <th className="whitespace-nowrap py-2 font-semibold">Validation point</th>
+                        <th className="whitespace-nowrap py-2 text-right font-semibold">Current release</th>
+                        <th className="whitespace-nowrap py-2 text-right font-semibold">Candidate</th>
+                        <th className="whitespace-nowrap py-2 text-right font-semibold">Verdict</th>
+                        <th className="whitespace-nowrap py-2 text-center font-semibold">About</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="col-span-full grid grid-cols-subgrid">
                       {targetComparisonPending && (
-                        <tr className="border-b border-border/60">
+                        <tr className="col-span-full grid grid-cols-subgrid border-b border-border/60">
                           <td
-                            colSpan={4}
-                            className="px-5 py-3 text-muted-foreground"
+                            colSpan={5}
+                            className="col-span-full py-3 text-muted-foreground"
                           >
                             Loading target comparison…
                           </td>
@@ -885,18 +913,21 @@ function MicrocosmStagingRunsView() {
                         <>
                           <ScoreRow
                             label="Targets within 10% of benchmark (shared)"
+                            about={VALIDATION_METHOD_HELP.targetWithin10}
                             currentRelease={commonStats.a.n ? commonStats.a.within10 / commonStats.a.n : null}
                             candidate={commonStats.b.n ? commonStats.b.within10 / commonStats.b.n : null}
                             higherBetter
                           />
                           <ScoreRow
                             label="Target median absolute error (shared)"
+                            about={VALIDATION_METHOD_HELP.targetMedianAbsoluteError}
                             currentRelease={commonStats.a.median}
                             candidate={commonStats.b.median}
                             higherBetter={false}
                           />
                           <ScoreRow
                             label="Target mean absolute error (shared)"
+                            about={VALIDATION_METHOD_HELP.targetMeanAbsoluteError}
                             currentRelease={commonStats.a.mean}
                             candidate={commonStats.b.mean}
                             higherBetter={false}
@@ -907,6 +938,7 @@ function MicrocosmStagingRunsView() {
                         <>
                           <ScoreRow
                             label="Reform out-of-sample mean absolute error"
+                            about={VALIDATION_METHOD_HELP.reformMeanAbsoluteError}
                             currentRelease={null}
                             candidate={
                               runData.reform_validation.summary
@@ -916,6 +948,7 @@ function MicrocosmStagingRunsView() {
                           />
                           <ScoreRow
                             label="Reform out-of-sample within 10% of benchmark"
+                            about={VALIDATION_METHOD_HELP.reformWithin10}
                             currentRelease={null}
                             candidate={
                               (runData.reform_validation.summary?.n_out_of_sample_scored ?? 0) > 0
@@ -929,22 +962,31 @@ function MicrocosmStagingRunsView() {
                         </>
                       )}
                       {compareData?.summary && (
-                        <tr className="border-b border-border/60 last:border-b-0">
-                          <td className="px-5 py-1.5 font-medium">Coverage target surface</td>
-                          <td className="whitespace-nowrap px-5 py-1.5 text-right tabular-nums text-muted-foreground">
+                        <tr className="col-span-full grid grid-cols-subgrid border-b border-border/60 last:border-b-0">
+                          <td className="whitespace-nowrap py-1.5 font-medium">Coverage target surface</td>
+                          <td className="whitespace-nowrap py-1.5 text-right tabular-nums text-muted-foreground">
                             {fmt(compareData.a.total_targets, { digits: 0 })}
                           </td>
-                          <td className="whitespace-nowrap px-5 py-1.5 text-right font-medium tabular-nums">
+                          <td className="whitespace-nowrap py-1.5 text-right font-medium tabular-nums">
                             {fmt(compareData.b.total_targets, { digits: 0 })}
                           </td>
-                          <td className="whitespace-nowrap px-5 py-1.5 text-right text-xs text-muted-foreground">
+                          <td className="whitespace-nowrap py-1.5 text-right text-xs text-muted-foreground">
                             +{fmt(compareData.summary.added, { digits: 0 })} new / -
                             {fmt(compareData.summary.removed, { digits: 0 })} dropped
+                          </td>
+                          <td className="whitespace-nowrap py-1.5 text-center">
+                            <HelpHint
+                              label={<span className="sr-only">About Coverage target surface</span>}
+                              tooltip={VALIDATION_METHOD_HELP.targetCoverage}
+                              interaction="click"
+                              underline={false}
+                            />
                           </td>
                         </tr>
                       )}
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                   {compareData?.summary && (
                     <div className="border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
                       <span className="tone-pos">
