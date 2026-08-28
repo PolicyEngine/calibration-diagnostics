@@ -747,6 +747,7 @@ export interface MicrocosmTreemapLeaf {
   key: string;
   source: string;
   variable: string;
+  label: string | null;
   measure: string | null;
   measure_counts: { measure: string | null; n_targets: number }[];
   filters?: {

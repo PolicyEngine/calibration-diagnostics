@@ -34,6 +34,7 @@ import {
   classifyTargetRepresentation,
   type TargetRepresentation,
 } from "./target-representation";
+import { readStructuredTarget } from "./structured-target-reader";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
@@ -1088,53 +1089,70 @@ function enrichTargetRow(
     initialError == null || finalError == null
       ? null
       : Math.abs(initialError) - Math.abs(finalError);
-  const permitsStructuredFields = targetRepresentation !== "legacy";
-  const publishedSource = permitsStructuredFields
+  const structuredIdentity = targetRepresentation === "structured"
+    ? readStructuredTarget(row, dimensionDefinitions, nationalGeography)
+    : null;
+  const permitsCompatibilityFields = targetRepresentation === "mixed";
+  const publishedSource = permitsCompatibilityFields
     ? structuredTargetSource(row.source)
     : null;
-  const publishedVariable = permitsStructuredFields
+  const publishedVariable = permitsCompatibilityFields
     ? structuredTargetVariable(row.variable)
     : null;
-  const structuredDecomposition = permitsStructuredFields && isPlainObject(row.dimensions)
+  const structuredDecomposition = permitsCompatibilityFields && isPlainObject(row.dimensions)
     ? decomposeStructuredDimensions(row.dimensions, dimensionDefinitions)
     : null;
-  const filterDecomposition = structuredDecomposition
+  const filterDecomposition = structuredIdentity || structuredDecomposition
     ? null
     : decomposeTargetFilter(row.filter);
-  const dimensionAdapter = structuredDecomposition
+  const dimensionAdapter = structuredIdentity || structuredDecomposition
     ? "structured"
     : filterDecomposition
       ? "legacy_filter"
       : "legacy_name";
   const publisher =
-    chroniclePublisherFromMetadata(metadata) ?? publishedSource?.id ?? null;
-  const legacyParsed = readLegacyTarget(
-    baseName,
-    row,
-    nationalGeography,
-    filterDecomposition,
-  );
-  const parsed: ParsedTarget = {
-    ...legacyParsed,
-    geography:
-      structuredDecomposition?.geography ??
-      legacyParsed.geography,
-    level:
-      structuredDecomposition?.level ??
-      legacyParsed.level,
-    source: publisher ?? legacyParsed.source,
-    variable: publishedVariable?.id ?? legacyParsed.variable,
-    breakdown: structuredDecomposition
-      ? structuredDecomposition.dimensions
-          .map((dimension) => dimension.value)
-          .join(" · ")
-      : legacyParsed.breakdown,
-  };
+    structuredIdentity?.source ??
+    chroniclePublisherFromMetadata(metadata) ??
+    publishedSource?.id ??
+    null;
+  const legacyParsed = structuredIdentity
+    ? null
+    : readLegacyTarget(
+        baseName,
+        row,
+        nationalGeography,
+        filterDecomposition,
+      );
+  const parsed: ParsedTarget = structuredIdentity
+    ? {
+        geography: structuredIdentity.geography,
+        level: structuredIdentity.level,
+        source: structuredIdentity.source,
+        variable: structuredIdentity.variable,
+        breakdown: structuredIdentity.breakdown,
+      }
+    : {
+        ...legacyParsed!,
+        geography:
+          structuredDecomposition?.geography ??
+          legacyParsed!.geography,
+        level:
+          structuredDecomposition?.level ??
+          legacyParsed!.level,
+        source: publisher ?? legacyParsed!.source,
+        variable: publishedVariable?.id ?? legacyParsed!.variable,
+        breakdown: structuredDecomposition
+          ? structuredDecomposition.dimensions
+              .map((dimension) => dimension.value)
+              .join(" · ")
+          : legacyParsed!.breakdown,
+      };
   const hasGeography = Boolean(parsed.geography.trim());
   const geography = hasGeography ? parsed.geography : nationalGeography;
   const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
   const measureCol = asObject(row.measure);
   const metadataTargetDimensions =
+    structuredIdentity?.dimensions ??
     structuredDecomposition?.dimensions ??
     filterDecomposition?.dimensions ??
     metadataDimensions(row);
@@ -1155,10 +1173,13 @@ function enrichTargetRow(
   // returns), so the measure is part of the variable's identity, not a
   // breakdown within it — fold it into variable_key so they're distinct things.
   const measure =
-    publishedVariable?.measure ??
-    (dims[0] && MEASURES.has(dims[0])
-      ? dims[0]
-      : measureFromMetadata(metadata));
+    structuredIdentity?.measure ??
+    (structuredIdentity
+      ? null
+      : publishedVariable?.measure ??
+        (dims[0] && MEASURES.has(dims[0])
+          ? dims[0]
+          : measureFromMetadata(metadata)));
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
   // Underscore identifiers and filter-decomposed targets use the structured
@@ -1166,6 +1187,7 @@ function enrichTargetRow(
   // without filter dimensions retain their legacy family so US/UK releases do
   // not regroup merely because they also carry Chronicle record IDs.
   const usesArtifactFamily =
+    structuredIdentity != null ||
     publishedSource?.id != null ||
     publishedVariable != null ||
     structuredDecomposition != null ||
@@ -1176,7 +1198,9 @@ function enrichTargetRow(
     name: fullName,
     base_name: baseName,
     family: deriveFamily(baseName, parsed, usesArtifactFamily),
-    state: stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
+    state: structuredIdentity
+      ? null
+      : stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography,
     level,
     source: parsed.source,
@@ -1184,10 +1208,14 @@ function enrichTargetRow(
       (Object.hasOwn(publisherLabels, parsed.source)
         ? publisherLabels[parsed.source]
         : undefined) ??
+      structuredIdentity?.sourceLabel ??
       publishedSource?.label ??
       sourceAuthorityLabel(parsed.source),
     variable: parsed.variable,
-    variable_label: publishedVariable?.label ?? null,
+    variable_label:
+      structuredIdentity?.variableLabel ??
+      publishedVariable?.label ??
+      null,
     measure,
     target_role: targetRole,
     source_measure_id: sourceMeasureId,
@@ -1213,10 +1241,14 @@ function enrichTargetRow(
     variable_key: variableKey,
     // v2 published metadata (null on v1).
     source_citation:
-      typeof row.source === "string"
+      structuredIdentity?.sourceCitation ??
+      (typeof row.source === "string"
         ? (row.source as string)
-        : publishedSource?.citation ?? null,
-    source_url: publishedSource?.url ?? null,
+        : publishedSource?.citation ?? null),
+    source_url:
+      structuredIdentity?.sourceUrl ??
+      publishedSource?.url ??
+      null,
     entity: typeof row.entity === "string" ? (row.entity as string) : null,
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
@@ -1568,6 +1600,7 @@ export interface TreemapLeaf {
   key: string;
   source: string;
   variable: string;
+  label: string | null;
   measure: string | null;
   measure_counts: { measure: string | null; n_targets: number }[];
   filters: TreemapFilters;
@@ -1672,6 +1705,13 @@ export function microcosmTargetTreemap(
       .map((row) => numberOrNull(row.abs_relative_error))
       .filter((v): v is number => v != null && Number.isFinite(v));
     const first = group[0];
+    const variableLabels = [
+      ...new Set(
+        group
+          .map((row) => stringValue(row.variable_label)?.trim())
+          .filter((label): label is string => Boolean(label)),
+      ),
+    ];
     const filters: TreemapFilters =
       breakdown === "geography"
         ? { geography: key }
@@ -1683,6 +1723,10 @@ export function microcosmTargetTreemap(
         breakdown === "geography"
           ? key
           : String(first.variable ?? key),
+      label:
+        breakdown === "geography" || variableLabels.length !== 1
+          ? null
+          : variableLabels[0],
       measure: null,
       measure_counts: measureCounts(group),
       filters,

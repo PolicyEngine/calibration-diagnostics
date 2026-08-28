@@ -1847,6 +1847,95 @@ test("publisher label lookup does not read inherited object properties", () => {
   expect(cal.rows[0].source_label).toBe("Constructor");
 });
 
+test("fully structured targets ignore conflicting legacy identity fields", () => {
+  const cal = buildCalibration(
+    {
+      dimensions: {
+        region: {
+          label: "Region",
+          role: "geography",
+          level: "region",
+          values: { north: "North" },
+        },
+        sex: { label: "Sex", values: { female: "Female" } },
+      },
+      targets: [
+        {
+          name: "legacy.publisher.incorrect_variable.total@2026",
+          source: {
+            id: "novastat_agency",
+            citation: "Official population table",
+            label: "Nova Statistics Agency",
+            url: "https://stats.example/population",
+          },
+          variable: {
+            id: "resident_population",
+            label: "Resident population",
+            measure: "count",
+          },
+          dimensions: { region: "north", sex: "female" },
+          filter: "cell_be1_male_65_plus",
+          metadata: {
+            chronicle_record_ids: ["legacy_agency.incorrect.total"],
+            variable: "incorrect_variable",
+            ledger_geography_level: "state",
+            ledger_geography_id: "0400000US06",
+            ledger_layout_groupby_value_id: "incorrect_breakdown",
+          },
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 100,
+        },
+      ],
+    },
+    "structured-only",
+  );
+
+  expect(cal.target_schema.target_representation).toBe("structured");
+  expect(cal.rows[0]).toMatchObject({
+    family: "novastat_agency/resident_population",
+    source: "novastat_agency",
+    source_label: "Nova Statistics Agency",
+    source_citation: "Official population table",
+    source_url: "https://stats.example/population",
+    variable: "resident_population",
+    variable_label: "Resident population",
+    measure: "count",
+    geography: "North",
+    level: "region",
+    state: null,
+    breakdown: "Female",
+    dimension_adapter: "structured",
+    variable_key: "novastat_agency / resident_population · count",
+    target_dimensions: [
+      expect.objectContaining({ key: "bd_sex", label: "Sex", value: "Female" }),
+    ],
+  });
+  const map = microcosmTargetTreemap(cal.rows, cal.release_id);
+  expect(map.groups[0]).toMatchObject({
+    source: "novastat_agency",
+    label: "Nova Statistics Agency",
+  });
+  expect(map.groups[0].children[0]).toMatchObject({
+    variable: "resident_population",
+    label: "Resident population",
+  });
+  const tree = buildCalibrationTree(cal.rows, {
+    breakdown: "program",
+    path: { dimensions: [] },
+    filters: {
+      geographyLevels: [],
+      geographies: [],
+      fitBands: [],
+      calibrationStatuses: [],
+    },
+  });
+  expect(tree.groups[0].nodes[0]).toMatchObject({
+    id: "resident_population",
+    label: "Resident population",
+  });
+});
+
 test("structured source and variable fields follow artifact precedence", () => {
   const target = {
     name: "legacy.publisher.population.total@2026",
