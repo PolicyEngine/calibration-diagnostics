@@ -8,24 +8,21 @@ export interface MicrocosmPresentationSlots {
 // Legacy copy for releases published before `release_manifest.presentation`;
 // delete once US/UK/BE publish the block.
 const LEGACY_OVERVIEW_COPY: Partial<
-  Record<MicrocosmCountry, { authorities: string; examples: string }>
+  Record<MicrocosmCountry, { authorities: string }>
 > = {
   us: {
     authorities: "the IRS, the Census Bureau, and CMS",
-    examples: "EITC statistics, population, and Medicaid enrollment",
   },
   uk: {
     authorities: "the ONS, OBR, and HMRC",
-    examples: "population by region and age, household types, and tax receipts",
   },
   be: {
     authorities: "Statbel, ONSS, JRC, and SFPD",
-    examples: "population by region, sex, and age band, tax receipts, and benefit totals",
   },
 };
 
 const GENERIC_OVERVIEW_INTRO =
-  "Microcosm reweights survey microdata so it matches official statistics from national statistical agencies and administrative sources. Each tile in the Calibration fit explorer below is a category we calibrate to.";
+  "Microcosm reweights survey microdata so it matches official statistics from national statistical agencies and administrative sources. Each of these official statistics is a calibration target, grouped by category in the calibration fit explorer below.";
 
 // Legacy copy for releases published before `release_manifest.presentation`;
 // delete once US/UK/BE publish the block.
@@ -48,7 +45,7 @@ export function microcosmOverviewIntro(
   if (presentation?.overview_intro) return presentation.overview_intro;
   const legacy = LEGACY_OVERVIEW_COPY[country];
   return legacy
-    ? `Microcosm reweights survey microdata so it matches official statistics from agencies like ${legacy.authorities}. Each tile in the Calibration fit explorer below is a category we calibrate to, including ${legacy.examples}.`
+    ? `Microcosm reweights survey microdata so it matches official statistics from agencies like ${legacy.authorities}. Each of these official statistics is a calibration target, grouped by category in the calibration fit explorer below.`
     : GENERIC_OVERVIEW_INTRO;
 }
 
