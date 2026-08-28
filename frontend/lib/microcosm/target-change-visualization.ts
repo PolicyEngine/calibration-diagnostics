@@ -7,6 +7,10 @@ import type {
 
 export type TargetChangeDirection = "increase" | "reduction";
 
+export function targetChangeMapIdentity(runId: string, releaseId: string): string {
+  return `${runId}:${releaseId}`;
+}
+
 export interface TargetChangeDirectionData {
   direction: TargetChangeDirection;
   label: string;

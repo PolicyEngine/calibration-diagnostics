@@ -31,7 +31,8 @@ separate service layer — the Next.js API routes are the API layer.
   surfaced.
 - **Staging runs** (`/microcosm/staging`) — monitor pre-release US Microcosm build
   runs from the staging Hub repo: current stage, calibration loss progress,
-  final candidate diagnostics once uploaded, and candidate-vs-latest fit.
+  final candidate diagnostics once uploaded, candidate-vs-current-release fit,
+  and a hierarchical map of weighted target-error increases and reductions.
   Countries without a staging repository show an explicit unavailable state.
 - **Calibration target investigations** (`docs/ai/`) — tool-independent procedures,
   specialist review responsibilities, and a reusable checklist for identifying
@@ -55,6 +56,13 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 | `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and uploaded candidate diagnostics |
 | `GET /api/microcosm/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
 | `GET /api/microcosm/staging/compare?run=<run_id>&release=latest` | Diff staging candidate against a published release |
+| `GET /api/microcosm/staging/target-change-tree?run=<run_id>&release=<resolved_id>&mode=reported\|shared&...` | One hierarchy level of weighted target-error changes for a staging candidate and an explicit current release |
+
+The staging target-change route supports two comparison modes. `reported` uses
+each release's actual target weights and complete target surface, including
+added and removed targets. `shared` restricts the calculation to shared targets,
+normalizes each release's weights over that shared set, averages the two shares
+target by target, and applies the resulting pooled weights to both releases.
 
 ## Calibration target investigations
 

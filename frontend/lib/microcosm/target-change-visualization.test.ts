@@ -5,6 +5,7 @@ import {
   formatTargetChange,
   targetChangeDetailValues,
   targetChangeDirectionAreas,
+  targetChangeMapIdentity,
 } from "./target-change-visualization";
 
 describe("target change visualization data", () => {
@@ -46,6 +47,15 @@ describe("target change visualization data", () => {
     expect(formatTargetChange(-0.004)).toBe("−0.40 pp");
     expect(formatTargetChange(0)).toBe("±0.00 pp");
     expect(formatTargetChange(null)).toBe("—");
+  });
+
+  test("changes visual identity when the run or resolved release changes", () => {
+    expect(targetChangeMapIdentity("run-a", "release-a")).not.toBe(
+      targetChangeMapIdentity("run-b", "release-a"),
+    );
+    expect(targetChangeMapIdentity("run-a", "release-a")).not.toBe(
+      targetChangeMapIdentity("run-a", "release-b"),
+    );
   });
 
   test("selects actual or pooled contributions for target detail", () => {

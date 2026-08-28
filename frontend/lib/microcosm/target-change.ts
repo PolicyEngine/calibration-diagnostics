@@ -151,7 +151,7 @@ function methodology(
     comparable,
     warning: comparable
       ? null
-      : "The current release and candidate use different target-loss caps or weighting methods. The reported change remains additive, but it includes that methodology difference.",
+      : "The current release and candidate use different target-loss caps or weighting methods. The comparison still uses each artifact's verified values, but it includes that methodology difference.",
   };
 }
 
@@ -292,6 +292,19 @@ export function buildTargetChangeDataset(
   const sharedRows = rows.filter(
     (row) => row.comparison_status === "shared" && row.current && row.candidate,
   );
+  const reportedSummary = summarize(
+    rows,
+    "reported",
+    current.aggregate,
+    candidate.aggregate,
+  );
+  if (Math.abs(reportedSummary.reconciliationDifference) > TARGET_CHANGE_EPSILON) {
+    return unavailableDataset(
+      current,
+      candidate,
+      "Per-target weighted error changes do not reconcile to the two attribution aggregates.",
+    );
+  }
   const currentSharedWeight = sharedRows.reduce(
     (sum, row) => sum + (row.current?.weightShare ?? 0),
     0,
@@ -343,7 +356,7 @@ export function buildTargetChangeDataset(
     methodology: methodology(current, candidate),
     rows,
     summaries: {
-      reported: summarize(rows, "reported", current.aggregate, candidate.aggregate),
+      reported: reportedSummary,
       shared: sharedSummary,
     },
     modeReasons: { reported: null, shared: sharedReason },

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useCountry } from "@/components/layout/country-context";
+import { StagingTargetChangeMap } from "@/components/microcosm/staging-target-change-map";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
   fmtUnitValue,
@@ -35,6 +36,7 @@ import {
   formatStagingCurrentStatus,
   formatStagingStatus,
 } from "@/lib/microcosm/staging-status";
+import { targetChangeMapIdentity } from "@/lib/microcosm/target-change-visualization";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
 
@@ -1016,6 +1018,20 @@ function MicrocosmStagingRunsView() {
               </div>
 
               <div className="contents">
+                {compareData?.summary && runData.has_calibration && (
+                  <SectionCard
+                    title="Target error change"
+                    className="lg:col-span-2 lg:col-start-1"
+                    description="Shows which parts of the target surface account for the candidate's increase or reduction in weighted target error."
+                  >
+                    <StagingTargetChangeMap
+                      key={targetChangeMapIdentity(selectedRun, compareData.a.release_id)}
+                      runId={selectedRun}
+                      releaseId={compareData.a.release_id}
+                    />
+                  </SectionCard>
+                )}
+
                 {(compareData?.rows ?? []).length > 0 && (
                 <SectionCard
                   title="Target breakdown"

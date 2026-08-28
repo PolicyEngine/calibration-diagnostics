@@ -152,6 +152,19 @@ describe("target change attribution", () => {
     expect(incomplete.reason).toContain("incomplete");
   });
 
+  test("fails closed when matched rows cannot reconcile to both aggregates", () => {
+    const current = calibration("current", [
+      { name: "duplicate", contribution: 0.1, share: 0.5, error: 0.2 },
+      { name: "duplicate", contribution: 0.2, share: 0.5, error: 0.4 },
+    ]);
+    const candidate = calibration("candidate", [
+      { name: "duplicate", contribution: 0.2, share: 1, error: 0.2 },
+    ]);
+    const result = buildTargetChangeDataset(current, candidate);
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain("do not reconcile");
+  });
+
   test("retains additive results while warning about methodology differences", () => {
     const current = calibration("current", [
       { name: "shared", contribution: 0.1, share: 1, error: 0.1 },
