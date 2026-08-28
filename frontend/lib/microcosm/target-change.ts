@@ -1,0 +1,332 @@
+import type { Calibration } from "./latest-artifact";
+
+type TargetRow = Calibration["rows"][number];
+
+export const TARGET_CHANGE_EPSILON = 1e-12;
+
+export type TargetChangeMode = "reported" | "shared";
+export type TargetSurfaceStatus = "shared" | "added" | "removed";
+
+export interface TargetChangeSide {
+  target: number | null;
+  finalEstimate: number | null;
+  weight: number;
+  weightShare: number;
+  scale: number;
+  cappedError: number;
+  contribution: number;
+}
+
+export interface TargetChangeRow extends Record<string, unknown> {
+  name: string;
+  base_name: string;
+  comparison_status: TargetSurfaceStatus;
+  current: TargetChangeSide | null;
+  candidate: TargetChangeSide | null;
+  reported_change: number;
+  pooled_weight_share: number | null;
+  shared_current_contribution: number | null;
+  shared_candidate_contribution: number | null;
+  shared_change: number | null;
+}
+
+export interface TargetChangeAttributionSide {
+  releaseId: string;
+  status: Calibration["target_loss_attribution"]["status"];
+  aggregate: number | null;
+  cap: number | null;
+  basisIdentifier: string | null;
+}
+
+export interface TargetChangeMethodology {
+  comparable: boolean;
+  warning: string | null;
+}
+
+export interface TargetChangeSummary {
+  mode: TargetChangeMode;
+  currentScore: number;
+  candidateScore: number;
+  netChange: number;
+  grossIncrease: number;
+  grossReduction: number;
+  reconciliationDifference: number;
+  comparisonTargets: number;
+  shared: number;
+  added: number;
+  removed: number;
+  changed: number;
+  unchanged: number;
+}
+
+export interface TargetChangeDataset {
+  available: boolean;
+  reason: string | null;
+  current: TargetChangeAttributionSide;
+  candidate: TargetChangeAttributionSide;
+  methodology: TargetChangeMethodology;
+  rows: TargetChangeRow[];
+  summaries: Record<TargetChangeMode, TargetChangeSummary | null>;
+  modeReasons: Record<TargetChangeMode, string | null>;
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function targetKey(row: TargetRow): string {
+  return String(row.base_name ?? row.name ?? "");
+}
+
+function attributionSide(calibration: Calibration): TargetChangeAttributionSide {
+  const attribution = calibration.target_loss_attribution;
+  return {
+    releaseId: calibration.release_id,
+    status: attribution.status,
+    aggregate: finiteNumber(attribution.aggregate),
+    cap: finiteNumber(attribution.cap),
+    basisIdentifier: attribution.basis_identifier,
+  };
+}
+
+function targetSide(row: TargetRow | undefined): TargetChangeSide | null {
+  if (!row) return null;
+  const weight = finiteNumber(row.target_loss_weight);
+  const weightShare = finiteNumber(row.target_loss_weight_share);
+  const scale = finiteNumber(row.target_loss_scale);
+  const cappedError = finiteNumber(row.final_capped_scaled_error);
+  const contribution = finiteNumber(row.final_loss_contribution);
+  if (
+    weight == null || weight < 0 ||
+    weightShare == null || weightShare < 0 ||
+    scale == null || scale <= 0 ||
+    cappedError == null || cappedError < 0 ||
+    contribution == null || contribution < 0
+  ) {
+    return null;
+  }
+  return {
+    target: finiteNumber(row.target ?? row.value),
+    finalEstimate: finiteNumber(row.final_estimate ?? row.estimate),
+    weight,
+    weightShare,
+    scale,
+    cappedError,
+    contribution,
+  };
+}
+
+function close(left: number | null, right: number | null): boolean {
+  if (left == null || right == null) return left === right;
+  return Math.abs(left - right) <= TARGET_CHANGE_EPSILON;
+}
+
+function methodology(
+  current: TargetChangeAttributionSide,
+  candidate: TargetChangeAttributionSide,
+): TargetChangeMethodology {
+  const capMatches = close(current.cap, candidate.cap);
+  const basisMatches = current.basisIdentifier === candidate.basisIdentifier;
+  const comparable = capMatches && basisMatches;
+  return {
+    comparable,
+    warning: comparable
+      ? null
+      : "The current release and candidate use different target-loss caps or weighting methods. The reported change remains additive, but it includes that methodology difference.",
+  };
+}
+
+function summarize(
+  rows: TargetChangeRow[],
+  mode: TargetChangeMode,
+  currentScore: number,
+  candidateScore: number,
+): TargetChangeSummary {
+  const included = mode === "reported"
+    ? rows
+    : rows.filter((row) => row.comparison_status === "shared");
+  const changeOf = (row: TargetChangeRow) =>
+    mode === "reported" ? row.reported_change : row.shared_change ?? 0;
+  const rowTotal = included.reduce((sum, row) => sum + changeOf(row), 0);
+  const grossIncrease = included.reduce(
+    (sum, row) => sum + Math.max(changeOf(row), 0),
+    0,
+  );
+  const grossReduction = included.reduce(
+    (sum, row) => sum + Math.max(-changeOf(row), 0),
+    0,
+  );
+  const shared = rows.filter((row) => row.comparison_status === "shared").length;
+  const added = rows.filter((row) => row.comparison_status === "added").length;
+  const removed = rows.filter((row) => row.comparison_status === "removed").length;
+  const changed = included.filter(
+    (row) => Math.abs(changeOf(row)) > TARGET_CHANGE_EPSILON,
+  ).length;
+  return {
+    mode,
+    currentScore,
+    candidateScore,
+    netChange: candidateScore - currentScore,
+    grossIncrease,
+    grossReduction,
+    reconciliationDifference: rowTotal - (candidateScore - currentScore),
+    comparisonTargets: included.length,
+    shared,
+    added,
+    removed,
+    changed,
+    unchanged: included.length - changed,
+  };
+}
+
+function unavailableDataset(
+  current: TargetChangeAttributionSide,
+  candidate: TargetChangeAttributionSide,
+  reason: string,
+): TargetChangeDataset {
+  return {
+    available: false,
+    reason,
+    current,
+    candidate,
+    methodology: methodology(current, candidate),
+    rows: [],
+    summaries: { reported: null, shared: null },
+    modeReasons: { reported: reason, shared: reason },
+  };
+}
+
+export function targetChangeForMode(
+  row: TargetChangeRow,
+  mode: TargetChangeMode,
+): number | null {
+  return mode === "reported" ? row.reported_change : row.shared_change;
+}
+
+export function buildTargetChangeDataset(
+  currentCalibration: Calibration,
+  candidateCalibration: Calibration,
+): TargetChangeDataset {
+  const current = attributionSide(currentCalibration);
+  const candidate = attributionSide(candidateCalibration);
+  if (current.status === "unavailable" || current.aggregate == null) {
+    return unavailableDataset(
+      current,
+      candidate,
+      "Weighted target-error attribution is unavailable for the current release.",
+    );
+  }
+  if (candidate.status === "unavailable" || candidate.aggregate == null) {
+    return unavailableDataset(
+      current,
+      candidate,
+      "Weighted target-error attribution is unavailable for the candidate.",
+    );
+  }
+
+  const currentByName = new Map(
+    currentCalibration.rows.map((row) => [targetKey(row), row]),
+  );
+  const candidateByName = new Map(
+    candidateCalibration.rows.map((row) => [targetKey(row), row]),
+  );
+  const names = [...new Set([...currentByName.keys(), ...candidateByName.keys()])]
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
+  const rows: TargetChangeRow[] = [];
+
+  for (const name of names) {
+    const currentRow = currentByName.get(name);
+    const candidateRow = candidateByName.get(name);
+    const currentTarget = targetSide(currentRow);
+    const candidateTarget = targetSide(candidateRow);
+    if ((currentRow && !currentTarget) || (candidateRow && !candidateTarget)) {
+      return unavailableDataset(
+        current,
+        candidate,
+        `Weighted target-error attribution is incomplete for target ${name}.`,
+      );
+    }
+    const categoryRow = candidateRow ?? currentRow ?? {};
+    const comparisonStatus: TargetSurfaceStatus = currentRow && candidateRow
+      ? "shared"
+      : candidateRow
+        ? "added"
+        : "removed";
+    rows.push({
+      ...categoryRow,
+      name,
+      base_name: name,
+      comparison_status: comparisonStatus,
+      current: currentTarget,
+      candidate: candidateTarget,
+      reported_change:
+        (candidateTarget?.contribution ?? 0) -
+        (currentTarget?.contribution ?? 0),
+      pooled_weight_share: null,
+      shared_current_contribution: null,
+      shared_candidate_contribution: null,
+      shared_change: null,
+    });
+  }
+
+  const sharedRows = rows.filter(
+    (row) => row.comparison_status === "shared" && row.current && row.candidate,
+  );
+  const currentSharedWeight = sharedRows.reduce(
+    (sum, row) => sum + (row.current?.weightShare ?? 0),
+    0,
+  );
+  const candidateSharedWeight = sharedRows.reduce(
+    (sum, row) => sum + (row.candidate?.weightShare ?? 0),
+    0,
+  );
+  let sharedReason: string | null = null;
+  let sharedSummary: TargetChangeSummary | null = null;
+  if (!sharedRows.length) {
+    sharedReason = "The current release and candidate have no shared targets.";
+  } else if (currentSharedWeight <= 0 || candidateSharedWeight <= 0) {
+    sharedReason = "Shared targets do not have positive total weight on both sides.";
+  } else {
+    for (const row of sharedRows) {
+      const pooledShare = (
+        (row.current?.weightShare ?? 0) / currentSharedWeight +
+        (row.candidate?.weightShare ?? 0) / candidateSharedWeight
+      ) / 2;
+      const currentContribution = pooledShare * (row.current?.cappedError ?? 0);
+      const candidateContribution = pooledShare * (row.candidate?.cappedError ?? 0);
+      row.pooled_weight_share = pooledShare;
+      row.shared_current_contribution = currentContribution;
+      row.shared_candidate_contribution = candidateContribution;
+      row.shared_change = candidateContribution - currentContribution;
+    }
+    const currentSharedScore = sharedRows.reduce(
+      (sum, row) => sum + (row.shared_current_contribution ?? 0),
+      0,
+    );
+    const candidateSharedScore = sharedRows.reduce(
+      (sum, row) => sum + (row.shared_candidate_contribution ?? 0),
+      0,
+    );
+    sharedSummary = summarize(
+      rows,
+      "shared",
+      currentSharedScore,
+      candidateSharedScore,
+    );
+  }
+
+  return {
+    available: true,
+    reason: null,
+    current,
+    candidate,
+    methodology: methodology(current, candidate),
+    rows,
+    summaries: {
+      reported: summarize(rows, "reported", current.aggregate, candidate.aggregate),
+      shared: sharedSummary,
+    },
+    modeReasons: { reported: null, shared: sharedReason },
+  };
+}
