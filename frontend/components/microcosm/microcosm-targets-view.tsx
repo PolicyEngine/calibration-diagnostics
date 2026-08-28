@@ -13,7 +13,6 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
-import { withBasePath } from "@/lib/base-path";
 import { hasCapability } from "@/lib/microcosm/countries";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 import {
@@ -969,19 +968,7 @@ export function MicrocosmTargetsView({
       <PageHeader
         eyebrow="Microcosm · calibration fit"
         title="Target diagnostics"
-        description={
-          <>
-            See how closely the calibrated weights reproduce each official statistic — by
-            source, measure, and breakdown. This is the drill-down behind the{" "}
-            <a
-              href={withBasePath(`/microcosm?country=${country}`)}
-              className="text-primary hover:underline"
-            >
-              calibration map
-            </a>
-            .
-          </>
-        }
+        description="See how closely the calibrated weights reproduce each official statistic by source, measure, and breakdown."
         actions={
           <ToolbarSelect
             label="Release"
@@ -1000,19 +987,28 @@ export function MicrocosmTargetsView({
             <button
               type="button"
               onClick={goBack}
-              className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+              className="flex cursor-pointer items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
             >
               <span aria-hidden>←</span> Back
             </button>
             <span className="text-muted-foreground/50">/</span>
             <span className="font-semibold text-foreground">Pick a statistic</span>
           </div>
-          <SectionCard
-            title="Which statistic?"
-            description={`${fmt(variableGroupCount, { digits: 0 })} measures in this release — pick one to see its breakdowns.`}
-          >
-            <VariableBrowser variables={variables} active={variable} onPick={pickVariable} />
-          </SectionCard>
+          {isLoading ? (
+            <LoadingBlock label="Loading target diagnostics…" />
+          ) : error || !data ? (
+            <EmptyState
+              title="Target diagnostics unavailable"
+              description={error instanceof Error ? error.message : "Unknown error."}
+            />
+          ) : (
+            <SectionCard
+              title="Which statistic?"
+              description={`${fmt(variableGroupCount, { digits: 0 })} measures in this release — pick one to see its breakdowns.`}
+            >
+              <VariableBrowser variables={variables} active={variable} onPick={pickVariable} />
+            </SectionCard>
+          )}
         </div>
       )}
 
@@ -1020,7 +1016,7 @@ export function MicrocosmTargetsView({
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 shadow-[var(--elev-2)]">
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
-              <button type="button" onClick={goBack} className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground">
+              <button type="button" onClick={goBack} className="flex cursor-pointer items-center gap-1 font-medium text-muted-foreground hover:text-foreground">
                 <span aria-hidden>←</span> Back
               </button>
               <span className="text-muted-foreground/50">/</span>
@@ -1155,7 +1151,7 @@ export function MicrocosmTargetsView({
               <button
                 type="button"
                 onClick={goBack}
-                className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+                className="flex cursor-pointer items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
               >
                 <span aria-hidden>←</span> Back
               </button>
