@@ -1936,6 +1936,64 @@ test("fully structured targets ignore conflicting legacy identity fields", () =>
   });
 });
 
+test("mixed diagnostics preserve legacy rows and isolate partial-field precedence", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        {
+          name: "bea_nipa.cy2023.proprietors_income.a041rc.amount@2024",
+          source: "BEA citation",
+          metadata: {
+            chronicle_record_ids: ["bea.nipa.proprietors_income.amount"],
+            source_measure_id: "amount",
+            ledger_geography_level: "country",
+          },
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 99,
+        },
+        {
+          name: "legacy.publisher.population.total@2026",
+          source: {
+            id: "artifact_agency",
+            citation: "Official population table",
+            label: "Artifact agency",
+          },
+          variable: {
+            id: "resident_population",
+            label: "Resident population",
+            measure: "count",
+          },
+          metadata: {
+            chronicle_record_ids: ["chronicle_agency.population.total"],
+            variable: "legacy_population",
+          },
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 100,
+        },
+      ],
+    },
+    "mixed-identities",
+  );
+
+  expect(cal.target_schema.target_representation).toBe("mixed");
+  expect(cal.rows[0]).toMatchObject({
+    source: "bea",
+    variable: "amount",
+    dimension_adapter: "legacy_name",
+  });
+  expect(cal.rows[1]).toMatchObject({
+    source: "chronicle_agency",
+    source_label: "Artifact agency",
+    source_citation: "Official population table",
+    variable: "resident_population",
+    variable_label: "Resident population",
+    measure: "count",
+    dimension_adapter: "legacy_name",
+  });
+});
+
 test("structured source and variable fields follow artifact precedence", () => {
   const target = {
     name: "legacy.publisher.population.total@2026",

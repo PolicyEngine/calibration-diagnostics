@@ -13,6 +13,7 @@ import {
   stateFromGeoId,
   type ParsedLegacyTarget,
 } from "./legacy-target-reader";
+import { readMixedTarget } from "./mixed-target-reader";
 import {
   COUNTRY_REGISTRY,
   DEFAULT_COUNTRY,
@@ -720,40 +721,6 @@ function decomposeTargetFilter(value: unknown): DecomposedTargetFilter | null {
   return null;
 }
 
-interface StructuredTargetSource {
-  id: string | null;
-  citation: string | null;
-  label: string | null;
-  url: string | null;
-}
-
-interface StructuredTargetVariable {
-  id: string;
-  label: string | null;
-  measure: string | null;
-}
-
-function structuredTargetSource(value: unknown): StructuredTargetSource | null {
-  if (!isPlainObject(value)) return null;
-  return {
-    id: stringValue(value.id)?.trim() ?? null,
-    citation: stringValue(value.citation)?.trim() ?? null,
-    label: stringValue(value.label)?.trim() ?? null,
-    url: stringValue(value.url)?.trim() ?? null,
-  };
-}
-
-function structuredTargetVariable(value: unknown): StructuredTargetVariable | null {
-  if (!isPlainObject(value)) return null;
-  const id = stringValue(value.id)?.trim();
-  if (!id) return null;
-  return {
-    id,
-    label: stringValue(value.label)?.trim() ?? null,
-    measure: stringValue(value.measure)?.trim() ?? null,
-  };
-}
-
 function variableKeyOf(parsed: ParsedTarget): string {
   return [parsed.source, parsed.variable].filter(Boolean).join(" / ");
 }
@@ -1093,12 +1060,6 @@ function enrichTargetRow(
     ? readStructuredTarget(row, dimensionDefinitions, nationalGeography)
     : null;
   const permitsCompatibilityFields = targetRepresentation === "mixed";
-  const publishedSource = permitsCompatibilityFields
-    ? structuredTargetSource(row.source)
-    : null;
-  const publishedVariable = permitsCompatibilityFields
-    ? structuredTargetVariable(row.variable)
-    : null;
   const structuredDecomposition = permitsCompatibilityFields && isPlainObject(row.dimensions)
     ? decomposeStructuredDimensions(row.dimensions, dimensionDefinitions)
     : null;
@@ -1110,11 +1071,6 @@ function enrichTargetRow(
     : filterDecomposition
       ? "legacy_filter"
       : "legacy_name";
-  const publisher =
-    structuredIdentity?.source ??
-    chroniclePublisherFromMetadata(metadata) ??
-    publishedSource?.id ??
-    null;
   const legacyParsed = structuredIdentity
     ? null
     : readLegacyTarget(
@@ -1123,6 +1079,9 @@ function enrichTargetRow(
         nationalGeography,
         filterDecomposition,
       );
+  const mixedIdentity = permitsCompatibilityFields
+    ? readMixedTarget(row, legacyParsed!, structuredDecomposition)
+    : null;
   const parsed: ParsedTarget = structuredIdentity
     ? {
         geography: structuredIdentity.geography,
@@ -1131,22 +1090,7 @@ function enrichTargetRow(
         variable: structuredIdentity.variable,
         breakdown: structuredIdentity.breakdown,
       }
-    : {
-        ...legacyParsed!,
-        geography:
-          structuredDecomposition?.geography ??
-          legacyParsed!.geography,
-        level:
-          structuredDecomposition?.level ??
-          legacyParsed!.level,
-        source: publisher ?? legacyParsed!.source,
-        variable: publishedVariable?.id ?? legacyParsed!.variable,
-        breakdown: structuredDecomposition
-          ? structuredDecomposition.dimensions
-              .map((dimension) => dimension.value)
-              .join(" · ")
-          : legacyParsed!.breakdown,
-      };
+    : mixedIdentity?.parsed ?? legacyParsed!;
   const hasGeography = Boolean(parsed.geography.trim());
   const geography = hasGeography ? parsed.geography : nationalGeography;
   const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
@@ -1176,7 +1120,7 @@ function enrichTargetRow(
     structuredIdentity?.measure ??
     (structuredIdentity
       ? null
-      : publishedVariable?.measure ??
+      : mixedIdentity?.variableMeasure ??
         (dims[0] && MEASURES.has(dims[0])
           ? dims[0]
           : measureFromMetadata(metadata)));
@@ -1188,11 +1132,13 @@ function enrichTargetRow(
   // not regroup merely because they also carry Chronicle record IDs.
   const usesArtifactFamily =
     structuredIdentity != null ||
-    publishedSource?.id != null ||
-    publishedVariable != null ||
+    mixedIdentity?.hasStructuredSource === true ||
+    mixedIdentity?.hasStructuredVariable === true ||
     structuredDecomposition != null ||
     filterDecomposition != null ||
-    (publisher != null && !baseName.includes("/") && !baseName.includes("."));
+    (chroniclePublisherFromMetadata(metadata) != null &&
+      !baseName.includes("/") &&
+      !baseName.includes("."));
   return {
     ...row,
     name: fullName,
@@ -1209,12 +1155,12 @@ function enrichTargetRow(
         ? publisherLabels[parsed.source]
         : undefined) ??
       structuredIdentity?.sourceLabel ??
-      publishedSource?.label ??
+      mixedIdentity?.sourceLabel ??
       sourceAuthorityLabel(parsed.source),
     variable: parsed.variable,
     variable_label:
       structuredIdentity?.variableLabel ??
-      publishedVariable?.label ??
+      mixedIdentity?.variableLabel ??
       null,
     measure,
     target_role: targetRole,
@@ -1244,10 +1190,10 @@ function enrichTargetRow(
       structuredIdentity?.sourceCitation ??
       (typeof row.source === "string"
         ? (row.source as string)
-        : publishedSource?.citation ?? null),
+        : mixedIdentity?.sourceCitation ?? null),
     source_url:
       structuredIdentity?.sourceUrl ??
-      publishedSource?.url ??
+      mixedIdentity?.sourceUrl ??
       null,
     entity: typeof row.entity === "string" ? (row.entity as string) : null,
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
