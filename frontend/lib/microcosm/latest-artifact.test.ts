@@ -1941,6 +1941,101 @@ test("fully structured targets ignore conflicting legacy identity fields", () =>
   });
 });
 
+test("structured dimension ids remain independent when display labels repeat", () => {
+  const structuredTargets = [
+    ["north", "east"],
+    ["north", "west"],
+    ["south", "east"],
+    ["south", "west"],
+  ].map(([origin, destination], index) => ({
+    name: `population-${index}`,
+    source: { id: "agency" },
+    variable: { id: "population", measure: "count" },
+    dimensions: { origin, destination },
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 100,
+  }));
+  const diagnostics = {
+    dimensions: {
+      origin: {
+        label: "Region",
+        values: { north: "North", south: "South" },
+      },
+      destination: {
+        label: "Region",
+        values: { east: "East", west: "West" },
+      },
+    },
+    targets: structuredTargets,
+  };
+  const cal = buildCalibration(diagnostics, "repeated-dimension-labels");
+
+  expect(cal.rows[0].target_dimensions).toEqual([
+    expect.objectContaining({ key: "bd_origin", label: "Region", value: "North" }),
+    expect.objectContaining({ key: "bd_destination", label: "Region", value: "East" }),
+  ]);
+
+  const requestUrl = new URL("http://x/api/microcosm/target-diagnostics");
+  requestUrl.searchParams.set("variable", "agency / population · count");
+  requestUrl.searchParams.append("facet", "bd_origin:North");
+  requestUrl.searchParams.append("facet", "bd_destination:East");
+  const page = latestMicrocosmTargetDiagnosticsPage(requestUrl.toString(), cal);
+  expect(page.dimensions).toEqual([
+    { key: "bd_origin", label: "Region", values: ["North", "South"] },
+    { key: "bd_destination", label: "Region", values: ["East", "West"] },
+  ]);
+  expect(page.filtered_total).toBe(1);
+
+  const treeState = {
+    breakdown: "program" as const,
+    path: {
+      source: "agency",
+      program: "population",
+      geography: "United States",
+      dimensions: [],
+    },
+    filters: {
+      geographyLevels: [],
+      geographies: [],
+      fitBands: [],
+      calibrationStatuses: [],
+    },
+  };
+  const tree = buildCalibrationTree(cal.rows, treeState);
+  expect(tree.dimensionOrder).toEqual([
+    { key: "bd_destination", label: "Region" },
+    { key: "bd_origin", label: "Region" },
+  ]);
+  expect(tree.groups[0]?.id).toBe("bd_destination");
+  const destinationTree = buildCalibrationTree(cal.rows, {
+    ...treeState,
+    path: {
+      ...treeState.path,
+      dimensions: [{ key: "bd_destination", label: "Region", value: "East" }],
+    },
+  });
+  expect(destinationTree.groups[0]?.id).toBe("bd_origin");
+
+  const mixed = buildCalibration(
+    {
+      ...diagnostics,
+      targets: [
+        ...structuredTargets,
+        {
+          name: "nation/legacy/population",
+          target: 1,
+          initial_estimate: 1,
+          final_estimate: 1,
+        },
+      ],
+    },
+    "mixed-repeated-dimension-labels",
+  );
+  expect(mixed.target_schema.target_representation).toBe("mixed");
+  expect(mixed.rows[0].target_dimensions).toEqual(cal.rows[0].target_dimensions);
+});
+
 test("mixed diagnostics preserve legacy rows and isolate partial-field precedence", () => {
   const cal = buildCalibration(
     {

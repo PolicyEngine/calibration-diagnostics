@@ -212,6 +212,10 @@ artifact label, range values such as `0_17` and `65_plus` become `0–17` and
 A geography-role dimension sets `row.geography` and uses its declared `level`
 or `"region"`. Other dimensions become `target_dimensions` with `key`,
 `label`, `value`, `source_key`, `raw_value`, and an optional zero-based `rank`.
+The published dimension ID, not its display label, determines `key`. Simple
+lowercase IDs retain keys such as `bd_age_band`; IDs containing other
+characters receive a lossless query-safe encoding. Consequently, two distinct
+dimensions may share a display label without merging into one facet.
 Facet values use rank order only when every displayed value has a rank;
 otherwise the legacy facet sorter remains in force. Structured rows are also
 excluded from whole-population estimate-scope inference.

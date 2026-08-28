@@ -35,6 +35,7 @@ import {
   classifyTargetRepresentation,
   type TargetRepresentation,
 } from "./target-representation";
+import { readStructuredDimensions } from "./structured-dimension-reader";
 import { readStructuredTarget } from "./structured-target-reader";
 
 // The registry is the registration point; these re-exports keep the server
@@ -628,12 +629,6 @@ interface DecomposedTargetFilter {
   dimensions: TargetBreakdownDimension[];
 }
 
-interface DecomposedStructuredDimensions {
-  geography: string | null;
-  level: string | null;
-  dimensions: TargetBreakdownDimension[];
-}
-
 function dimensionValue(
   label: string,
   rawValue: string,
@@ -655,39 +650,6 @@ function dimensionValue(
 
 function filterDimensionValue(spec: FilterDimensionSpec, rawValue: string): string {
   return dimensionValue(spec.label, rawValue, spec.valueLabels);
-}
-
-function decomposeStructuredDimensions(
-  values: JsonObject,
-  definitions: Record<string, DiagnosticsDimension>,
-): DecomposedStructuredDimensions {
-  let geography: string | null = null;
-  let level: string | null = null;
-  const dimensions: TargetBreakdownDimension[] = [];
-  for (const [id, raw] of Object.entries(values)) {
-    const rawValue = stringValue(raw)?.trim();
-    if (!rawValue) continue;
-    const definition = definitions[id];
-    const label = definition?.label ?? dimensionLabel(id);
-    const value = dimensionValue(label, rawValue, definition?.values);
-    const rankOrder = definition?.order ??
-      (definition?.values ? Object.keys(definition.values) : undefined);
-    const rank = rankOrder?.indexOf(rawValue) ?? -1;
-    if (definition?.role === "geography") {
-      geography ??= value;
-      level ??= definition.level ?? "region";
-      continue;
-    }
-    dimensions.push({
-      key: dimensionKey(label),
-      label,
-      value,
-      source_key: id,
-      raw_value: rawValue,
-      ...(rank >= 0 ? { rank } : {}),
-    });
-  }
-  return { geography, level, dimensions };
 }
 
 function decomposeTargetFilter(value: unknown): DecomposedTargetFilter | null {
@@ -1061,7 +1023,7 @@ function enrichTargetRow(
     : null;
   const permitsCompatibilityFields = targetRepresentation === "mixed";
   const structuredDecomposition = permitsCompatibilityFields && isPlainObject(row.dimensions)
-    ? decomposeStructuredDimensions(row.dimensions, dimensionDefinitions)
+    ? readStructuredDimensions(row.dimensions, dimensionDefinitions)
     : null;
   const filterDecomposition = structuredIdentity || structuredDecomposition
     ? null

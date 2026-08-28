@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
-import { useCountry } from "@/components/layout/country-context";
+import {
+  selectedReleaseForCountry,
+  useCountry,
+  type Country,
+} from "@/components/layout/country-context";
 import { ArtifactDescriptionBanner } from "@/components/microcosm/artifact-description-banner";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -481,16 +485,21 @@ export function MicrocosmTargetsView({
   initialScope = "all",
   initialSource = "",
   initialLevel = "",
+  initialCountry = "us",
   initialRelease = "",
   initialStep = "results",
 }: {
   initialScope?: TargetScope;
   initialSource?: string;
   initialLevel?: string;
+  initialCountry?: Country;
   initialRelease?: string;
   initialStep?: "pick" | "results";
 }) {
-  const [release, setRelease] = useState(initialRelease);
+  const [releaseSelection, setReleaseSelection] = useState({
+    country: initialCountry,
+    value: initialRelease,
+  });
   const [scope, setScope] = useState<TargetScope>(initialScope);
   const [variable, setVariable] = useState("");
   const [source, setSource] = useState(initialSource);
@@ -508,6 +517,7 @@ export function MicrocosmTargetsView({
   const [refineIndex, setRefineIndex] = useState(0);
 
   const { country } = useCountry();
+  const release = selectedReleaseForCountry(country, releaseSelection);
   const router = useRouter();
   const { data: releaseData } = useMicrocosmReleases();
   const { data: stagingData } = useMicrocosmStagingRuns();
@@ -528,7 +538,7 @@ export function MicrocosmTargetsView({
 
   function pickRelease(value: string) {
     // A different release is a different surface — reset everything below it.
-    setRelease(value);
+    setReleaseSelection({ country, value });
     setVariable("");
     setFacetFilters({});
     setSource("");

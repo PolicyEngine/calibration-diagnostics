@@ -10,7 +10,11 @@ import {
 import { CalibrationTargetNavigationCards } from "@/components/microcosm/calibration-target-navigation-cards";
 import { ArtifactDescriptionBanner } from "@/components/microcosm/artifact-description-banner";
 import { WEIGHTED_TARGET_ERROR_HELP } from "@/components/microcosm/calibration-explorer-view";
-import { useCountry } from "@/components/layout/country-context";
+import {
+  selectedReleaseForCountry,
+  useCountry,
+  type Country,
+} from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -71,9 +75,19 @@ function OverviewMetric({ label, value }: { label: ReactNode; value: string }) {
   );
 }
 
-export function MicrocosmOverviewView({ initialRelease = "" }: { initialRelease?: string }) {
+export function MicrocosmOverviewView({
+  initialCountry = "us",
+  initialRelease = "",
+}: {
+  initialCountry?: Country;
+  initialRelease?: string;
+}) {
   const { country } = useCountry();
-  const [release, setRelease] = useState(initialRelease);
+  const [releaseSelection, setReleaseSelection] = useState({
+    country: initialCountry,
+    value: initialRelease,
+  });
+  const release = selectedReleaseForCountry(country, releaseSelection);
   const [pageIntroHeight, setPageIntroHeight] = useState(0);
   const { data: releaseData } = useMicrocosmReleases();
   const { data, isLoading, error } = useMicrocosm(release || undefined);
@@ -141,7 +155,7 @@ export function MicrocosmOverviewView({ initialRelease = "" }: { initialRelease?
             <ToolbarSelect
               label="Release"
               value={release}
-              onChange={setRelease}
+              onChange={(value) => setReleaseSelection({ country, value })}
               options={releaseOptions}
             />
             <Button
