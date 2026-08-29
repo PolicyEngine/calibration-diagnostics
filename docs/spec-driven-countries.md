@@ -302,6 +302,32 @@ variable parsing; structured dimensions, then known filter dimensions, then
 legacy metadata and name dimensions. This prevents one partially migrated row
 from changing unrelated legacy rows in the same file.
 
+### Cross-release target matching
+
+The legacy and structured readers normalize each row independently. Candidate
+validation and weighted target-error comparisons then use one collection-level
+matcher with this order:
+
+1. Exact, non-empty `base_name`, which uses `target_name` when supplied and
+   otherwise removes the period suffix from `name`.
+2. Exact, non-empty Chronicle `fact_key`.
+3. For two structured rows, an exact tuple of source ID, variable ID, measure,
+   and raw dimension ID/value pairs sorted by dimension ID.
+
+At each step, a key is used only when it identifies exactly one still-unmatched
+row in each release. Duplicate and many-to-one keys remain unmatched unless a
+later identity uniquely resolves them. Chronicle semantic keys, source-record
+IDs, display labels, benchmark values, and inferred identifiers are not used.
+The current artifact contract does not publish an independent producer target
+ID beyond `target_name`/`base_name`, so the dashboard does not invent one.
+
+Comparison rows include `comparison_id`, `match_kind`, both original target
+names, and both per-row representations. Comparison summaries include collection
+representations, counts matched by each method, and ambiguous key-group counts.
+The pinned production artifact remains legacy-format; structured cross-release
+matching is therefore covered with synthetic fixtures until a production pair
+using the structured representation is available.
+
 ### Producer follow-up
 
 Microcosm release producers must publish all of the following before the legacy

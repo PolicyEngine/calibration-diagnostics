@@ -64,6 +64,13 @@ added and removed targets. `shared` restricts the calculation to shared targets,
 normalizes each release's weights over that shared set, averages the two shares
 target by target, and applies the resulting pooled weights to both releases.
 
+Version and staging comparisons use the same normalized target matcher. It first
+matches an exact period-normalized target name, then a unique Chronicle fact key,
+then an exact structured source/statistic/measure/dimensions identity. A key must
+identify one remaining target on each side; ambiguous keys are reported and left
+unmatched. Comparison responses include the representation of each target, the
+matching method, both release identifiers, and counts by matching method.
+
 ## Calibration target investigations
 
 The dashboard identifies discrepancies. Determine their cause from a target
