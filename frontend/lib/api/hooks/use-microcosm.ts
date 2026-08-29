@@ -381,6 +381,12 @@ export interface MicrocosmTargetDiagnostics {
 
 export interface MicrocosmComparisonRow {
   name: string;
+  comparison_id?: string;
+  match_kind?: "base_name" | "chronicle_fact_key" | "structured_identity" | null;
+  current_name?: string | null;
+  candidate_name?: string | null;
+  current_representation?: "legacy" | "structured" | null;
+  candidate_representation?: "legacy" | "structured" | null;
   target_label?: string | null;
   source?: string | null;
   variable_key?: string | null;
@@ -456,6 +462,20 @@ export interface MicrocosmComparison {
     unchanged: number;
     losses_comparable: boolean;
     loss_kind: "normalized_target_loss" | "raw_optimizer_objective" | "mixed";
+    matching: {
+      current_representation: "legacy" | "structured" | "mixed" | "unknown";
+      candidate_representation: "legacy" | "structured" | "mixed" | "unknown";
+      matched_by: {
+        base_name: number;
+        chronicle_fact_key: number;
+        structured_identity: number;
+      };
+      ambiguous_key_groups: {
+        base_name: number;
+        chronicle_fact_key: number;
+        structured_identity: number;
+      };
+    };
   };
   variables: MicrocosmComparisonVariableRow[];
   rows: MicrocosmComparisonRow[];

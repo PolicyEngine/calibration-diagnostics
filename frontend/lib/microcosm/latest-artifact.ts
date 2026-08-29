@@ -36,6 +36,7 @@ import {
   type TargetRepresentation,
 } from "./target-representation";
 import { readStructuredTarget } from "./structured-target-reader";
+import { matchTargetSurfaces } from "./target-surface-matcher";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
@@ -2801,67 +2802,63 @@ function comparisonVariableRows(rows: TargetRow[]) {
     });
 }
 
-// Diff two releases' calibration by matching targets on name. Common targets
-// get a fit delta (|b rel err| - |a rel err|; negative = b fits better);
-// targets present in only one release are listed as added/removed. Losses
-// across releases are NOT comparable when the surfaces differ — flagged.
+// Diff two releases' calibration using normalized target identities. Shared
+// targets get a fit delta (|b rel err| - |a rel err|; negative = b fits
+// better); targets present in only one release are listed as added/removed.
+// Losses across releases are not comparable when the surfaces differ.
 export function buildComparison(a: Calibration, b: Calibration) {
-  // Match on base_name (the period-stripped name) so v1 and v2 releases align —
-  // v2 appends an @<period> suffix the older convention lacks.
-  const key = (r: TargetRow) => String(r.base_name ?? r.name);
-  const aByName = new Map(a.rows.map((r) => [key(r), r]));
-  const bByName = new Map(b.rows.map((r) => [key(r), r]));
-  const names = new Set([...aByName.keys(), ...bByName.keys()]);
-
+  const matched = matchTargetSurfaces(a, b);
   const common: TargetRow[] = [];
-  let added = 0;
-  let removed = 0;
+  const added = matched.matches.filter((match) => match.comparison_status === "added").length;
+  const removed = matched.matches.filter((match) => match.comparison_status === "removed").length;
   let improved = 0;
   let regressed = 0;
-  for (const name of names) {
-    const ar = aByName.get(name);
-    const br = bByName.get(name);
-    if (ar && br) {
-      const aAbs = absRel(ar);
-      const bAbs = absRel(br);
-      const delta = aAbs != null && bAbs != null ? bAbs - aAbs : null;
-      if (delta != null && delta < -1e-9) improved += 1;
-      else if (delta != null && delta > 1e-9) regressed += 1;
-      const aRelative = comparableRelative(ar);
-      const bRelative = comparableRelative(br);
-      const errorKind = aRelative != null && bRelative != null ? "relative" : "absolute";
-      common.push({
-        name,
-        target_label: [br.geography ?? ar.geography, br.breakdown ?? ar.breakdown]
-          .filter(Boolean)
-          .join(" · "),
-        source: br.source ?? ar.source,
-        variable_key: br.variable_key ?? ar.variable_key,
-        variable: br.variable ?? ar.variable,
-        measure: br.measure ?? ar.measure,
-        level: br.level ?? ar.level,
-        breakdown: br.breakdown ?? ar.breakdown,
-        dims: br.dims ?? ar.dims,
-        target_dimensions: br.target_dimensions ?? ar.target_dimensions,
-        geography: br.geography ?? ar.geography,
-        a_target: numberOrNull(ar.target),
-        b_target: numberOrNull(br.target),
-        a_final_estimate: ar.final_estimate ?? null,
-        b_final_estimate: br.final_estimate ?? null,
-        error_kind: errorKind,
-        a_error: errorKind === "relative" ? aRelative : absoluteMiss(ar),
-        b_error: errorKind === "relative" ? bRelative : absoluteMiss(br),
-        a_relative_error: aRelative,
-        b_relative_error: bRelative,
-        a_within_tolerance: ar.within_tolerance ?? null,
-        b_within_tolerance: br.within_tolerance ?? null,
-        abs_rel_delta: delta,
-      });
-    } else if (ar) {
-      removed += 1;
-    } else {
-      added += 1;
-    }
+  for (const match of matched.matches) {
+    if (!match.current || !match.candidate) continue;
+    const ar = match.current;
+    const br = match.candidate;
+    const name = String(br.base_name ?? br.name ?? ar.base_name ?? ar.name ?? "");
+    const aAbs = absRel(ar);
+    const bAbs = absRel(br);
+    const delta = aAbs != null && bAbs != null ? bAbs - aAbs : null;
+    if (delta != null && delta < -1e-9) improved += 1;
+    else if (delta != null && delta > 1e-9) regressed += 1;
+    const aRelative = comparableRelative(ar);
+    const bRelative = comparableRelative(br);
+    const errorKind = aRelative != null && bRelative != null ? "relative" : "absolute";
+    common.push({
+      comparison_id: match.comparison_id,
+      match_kind: match.match_kind,
+      current_name: match.current_name,
+      candidate_name: match.candidate_name,
+      current_representation: match.current_representation,
+      candidate_representation: match.candidate_representation,
+      name,
+      target_label: [br.geography ?? ar.geography, br.breakdown ?? ar.breakdown]
+        .filter(Boolean)
+        .join(" · "),
+      source: br.source ?? ar.source,
+      variable_key: br.variable_key ?? ar.variable_key,
+      variable: br.variable ?? ar.variable,
+      measure: br.measure ?? ar.measure,
+      level: br.level ?? ar.level,
+      breakdown: br.breakdown ?? ar.breakdown,
+      dims: br.dims ?? ar.dims,
+      target_dimensions: br.target_dimensions ?? ar.target_dimensions,
+      geography: br.geography ?? ar.geography,
+      a_target: numberOrNull(ar.target),
+      b_target: numberOrNull(br.target),
+      a_final_estimate: ar.final_estimate ?? null,
+      b_final_estimate: br.final_estimate ?? null,
+      error_kind: errorKind,
+      a_error: errorKind === "relative" ? aRelative : absoluteMiss(ar),
+      b_error: errorKind === "relative" ? bRelative : absoluteMiss(br),
+      a_relative_error: aRelative,
+      b_relative_error: bRelative,
+      a_within_tolerance: ar.within_tolerance ?? null,
+      b_within_tolerance: br.within_tolerance ?? null,
+      abs_rel_delta: delta,
+    });
   }
   common.sort(
     (x, y) =>
@@ -2899,6 +2896,7 @@ export function buildComparison(a: Calibration, b: Calibration) {
       unchanged: common.length - improved - regressed,
       losses_comparable: !surfacesDiffer && a.loss_kind === b.loss_kind,
       loss_kind: a.loss_kind === b.loss_kind ? a.loss_kind : "mixed",
+      matching: matched.matching,
     },
     variables: comparisonVariableRows(common),
     rows: common,

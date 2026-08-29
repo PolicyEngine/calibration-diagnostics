@@ -1250,6 +1250,82 @@ test("comparison matches on base_name across the @period boundary", () => {
   expect(Array.isArray(cmp.rows[0].target_dimensions)).toBe(true);
 });
 
+test("comparison matches renamed legacy and structured targets by Chronicle fact key", () => {
+  const current = calibration([
+    {
+      name: "legacy.population.total@2024",
+      target_name: "legacy.population.total",
+      metadata: { ledger_fact_key: "agency.population.total" },
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 95,
+    },
+  ], "legacy-current");
+  const candidate = calibration([
+    {
+      name: "resident-population@2024",
+      source: { id: "agency", label: "Statistical agency" },
+      variable: { id: "resident_population", measure: "count" },
+      dimensions: {},
+      metadata: { ledger_fact_key: "agency.population.total" },
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 99,
+    },
+  ], "structured-candidate");
+
+  const cmp = buildComparison(current, candidate);
+  expect(cmp.summary).toMatchObject({
+    common: 1,
+    added: 0,
+    removed: 0,
+    improved: 1,
+    matching: {
+      current_representation: "legacy",
+      candidate_representation: "structured",
+      matched_by: { chronicle_fact_key: 1 },
+    },
+  });
+  expect(cmp.rows[0]).toMatchObject({
+    match_kind: "chronicle_fact_key",
+    current_name: "legacy.population.total@2024",
+    candidate_name: "resident-population@2024",
+    current_representation: "legacy",
+    candidate_representation: "structured",
+  });
+});
+
+test("comparison preserves duplicate names and resolves them by unique fallback keys", () => {
+  const row = (name: string, targetName: string, factKey: string) => ({
+    name,
+    target_name: targetName,
+    metadata: { ledger_fact_key: factKey },
+    target: 100,
+    initial_estimate: 100,
+    final_estimate: 100,
+  });
+  const current = calibration([
+    row("same@2024", "same", "fact-a"),
+    row("same@2025", "same", "fact-b"),
+  ], "duplicate-current");
+  const candidate = calibration([
+    row("renamed-a@2026", "renamed-a", "fact-a"),
+    row("renamed-b@2026", "renamed-b", "fact-b"),
+  ], "duplicate-candidate");
+
+  const cmp = buildComparison(current, candidate);
+  expect(cmp.summary).toMatchObject({
+    common: 2,
+    added: 0,
+    removed: 0,
+    matching: {
+      matched_by: { chronicle_fact_key: 2 },
+      ambiguous_key_groups: { base_name: 0 },
+    },
+  });
+  expect(new Set(cmp.rows.map((comparison) => comparison.comparison_id)).size).toBe(2);
+});
+
 test("new target loss weighting metadata marks loss as normalized", () => {
   const normalized = buildCalibration(
     {
