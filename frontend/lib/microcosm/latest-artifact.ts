@@ -2031,7 +2031,7 @@ export function hfResolveUrl(path: string, country: MicrocosmCountry = "us"): st
 
 // A hung HF request would otherwise block the function for the whole route
 // maxDuration and pin the shared in-flight cache promise; cap each fetch.
-export const MICROCOSM_RELEASE_FETCH_TIMEOUT_MS = 120_000;
+const MICROCOSM_RELEASE_FETCH_TIMEOUT_MS = 120_000;
 
 async function hfFetch(url: string, revalidate: number): Promise<Response> {
   return fetch(url, {
