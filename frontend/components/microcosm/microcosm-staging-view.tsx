@@ -723,7 +723,11 @@ function MicrocosmStagingRunsView() {
 
   const { data: runData, isLoading: runLoading, error: runError } =
     useMicrocosmStagingRun(selectedRun);
-  const { data: compareData, isLoading: compareLoading } = useMicrocosmStagingCompare(
+  const {
+    data: compareData,
+    isLoading: compareLoading,
+    error: compareError,
+  } = useMicrocosmStagingCompare(
     runData?.has_calibration ? selectedRun : undefined,
     "latest",
   );
@@ -1024,17 +1028,35 @@ function MicrocosmStagingRunsView() {
               </div>
 
               <div className="contents">
-                {compareData?.summary && runData.has_calibration && (
+                {runData.has_calibration && (
                   <SectionCard
                     title="Target error change"
                     className="lg:col-span-2 lg:col-start-1"
                     description="Shows which parts of the target surface account for the candidate's increase or reduction in weighted target error."
                   >
-                    <StagingTargetChangeMap
-                      key={targetChangeMapIdentity(selectedRun, compareData.a.release_id)}
-                      runId={selectedRun}
-                      releaseId={compareData.a.release_id}
-                    />
+                    {compareData?.summary ? (
+                      <StagingTargetChangeMap
+                        key={targetChangeMapIdentity(selectedRun, compareData.a.release_id)}
+                        runId={selectedRun}
+                        releaseId={compareData.a.release_id}
+                      />
+                    ) : compareLoading ? (
+                      <LoadingBlock
+                        label="Loading calibration diagnostics for the target error comparison…"
+                        height="h-40"
+                      />
+                    ) : (
+                      <EmptyState
+                        title="Target error comparison unavailable"
+                        description={
+                          compareError instanceof Error
+                            ? compareError.message
+                            : compareData?.detail ??
+                              "The calibration diagnostics are available, but the comparison could not be loaded."
+                        }
+                        variant="compact"
+                      />
+                    )}
                   </SectionCard>
                 )}
 
