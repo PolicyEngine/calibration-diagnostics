@@ -1,11 +1,16 @@
 import type { Calibration } from "./latest-artifact";
+import {
+  matchTargetSurfaces,
+  type TargetMatchingSummary,
+  type TargetSurfaceStatus,
+} from "./target-surface-matcher";
 
 type TargetRow = Calibration["rows"][number];
 
 export const TARGET_CHANGE_EPSILON = 1e-12;
 
 export type TargetChangeMode = "reported" | "shared";
-export type TargetSurfaceStatus = "shared" | "added" | "removed";
+export type { TargetSurfaceStatus } from "./target-surface-matcher";
 
 export interface TargetChangeSide {
   target: number | null;
@@ -20,6 +25,12 @@ export interface TargetChangeSide {
 export interface TargetChangeRow extends Record<string, unknown> {
   name: string;
   base_name: string;
+  comparison_id: string;
+  match_kind: "base_name" | "chronicle_fact_key" | "structured_identity" | null;
+  current_name: string | null;
+  candidate_name: string | null;
+  current_representation: "legacy" | "structured" | null;
+  candidate_representation: "legacy" | "structured" | null;
   comparison_status: TargetSurfaceStatus;
   current: TargetChangeSide | null;
   candidate: TargetChangeSide | null;
@@ -65,6 +76,7 @@ export interface TargetChangeDataset {
   current: TargetChangeAttributionSide;
   candidate: TargetChangeAttributionSide;
   methodology: TargetChangeMethodology;
+  matching: TargetMatchingSummary;
   rows: TargetChangeRow[];
   summaries: Record<TargetChangeMode, TargetChangeSummary | null>;
   modeReasons: Record<TargetChangeMode, string | null>;
@@ -72,10 +84,6 @@ export interface TargetChangeDataset {
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function targetKey(row: TargetRow): string {
-  return String(row.base_name ?? row.name ?? "");
 }
 
 function hierarchyFields(row: TargetRow): Record<string, unknown> {
@@ -201,6 +209,7 @@ function summarize(
 function unavailableDataset(
   current: TargetChangeAttributionSide,
   candidate: TargetChangeAttributionSide,
+  matching: TargetMatchingSummary,
   reason: string,
 ): TargetChangeDataset {
   return {
@@ -209,6 +218,7 @@ function unavailableDataset(
     current,
     candidate,
     methodology: methodology(current, candidate),
+    matching,
     rows: [],
     summaries: { reported: null, shared: null },
     modeReasons: { reported: reason, shared: reason },
@@ -228,10 +238,12 @@ export function buildTargetChangeDataset(
 ): TargetChangeDataset {
   const current = attributionSide(currentCalibration);
   const candidate = attributionSide(candidateCalibration);
+  const matched = matchTargetSurfaces(currentCalibration, candidateCalibration);
   if (current.status === "unavailable" || current.aggregate == null) {
     return unavailableDataset(
       current,
       candidate,
+      matched.matching,
       "Weighted target-error attribution is unavailable for the current release.",
     );
   }
@@ -239,44 +251,43 @@ export function buildTargetChangeDataset(
     return unavailableDataset(
       current,
       candidate,
+      matched.matching,
       "Weighted target-error attribution is unavailable for the candidate.",
     );
   }
 
-  const currentByName = new Map(
-    currentCalibration.rows.map((row) => [targetKey(row), row]),
-  );
-  const candidateByName = new Map(
-    candidateCalibration.rows.map((row) => [targetKey(row), row]),
-  );
-  const names = [...new Set([...currentByName.keys(), ...candidateByName.keys()])]
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right));
   const rows: TargetChangeRow[] = [];
 
-  for (const name of names) {
-    const currentRow = currentByName.get(name);
-    const candidateRow = candidateByName.get(name);
+  for (const match of matched.matches) {
+    const currentRow = match.current ?? undefined;
+    const candidateRow = match.candidate ?? undefined;
+    const name = String(
+      candidateRow?.base_name ?? candidateRow?.name ??
+      currentRow?.base_name ?? currentRow?.name ??
+      match.comparison_id,
+    );
     const currentTarget = targetSide(currentRow);
     const candidateTarget = targetSide(candidateRow);
     if ((currentRow && !currentTarget) || (candidateRow && !candidateTarget)) {
       return unavailableDataset(
         current,
         candidate,
+        matched.matching,
         `Weighted target-error attribution is incomplete for target ${name}.`,
       );
     }
     const categoryRow = candidateRow ?? currentRow;
-    const comparisonStatus: TargetSurfaceStatus = currentRow && candidateRow
-      ? "shared"
-      : candidateRow
-        ? "added"
-        : "removed";
     rows.push({
       ...(categoryRow ? hierarchyFields(categoryRow) : {}),
       name,
       base_name: name,
-      comparison_status: comparisonStatus,
+      comparison_id: match.comparison_id,
+      match_kind: match.match_kind,
+      current_name: match.current_name,
+      candidate_name: match.candidate_name,
+      current_representation: match.current_representation,
+      candidate_representation: match.candidate_representation,
+      comparison_status: match.comparison_status,
       current: currentTarget,
       candidate: candidateTarget,
       reported_change:
@@ -302,6 +313,7 @@ export function buildTargetChangeDataset(
     return unavailableDataset(
       current,
       candidate,
+      matched.matching,
       "Per-target weighted error changes do not reconcile to the two attribution aggregates.",
     );
   }
@@ -354,6 +366,7 @@ export function buildTargetChangeDataset(
     current,
     candidate,
     methodology: methodology(current, candidate),
+    matching: matched.matching,
     rows,
     summaries: {
       reported: reportedSummary,

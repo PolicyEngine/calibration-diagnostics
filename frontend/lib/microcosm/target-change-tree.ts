@@ -13,6 +13,7 @@ import {
   type TargetChangeRow,
   type TargetChangeSummary,
 } from "./target-change";
+import type { TargetMatchingSummary } from "./target-surface-matcher";
 
 export interface TargetChangeTreeResponse extends CalibrationTreeResponse {
   available: boolean;
@@ -21,6 +22,7 @@ export interface TargetChangeTreeResponse extends CalibrationTreeResponse {
   current: TargetChangeAttributionSide;
   candidate: TargetChangeAttributionSide;
   methodology: TargetChangeMethodology;
+  matching: TargetMatchingSummary;
   summary: TargetChangeSummary | null;
   selectedTarget: TargetChangeRow | null;
 }
@@ -73,6 +75,7 @@ export function buildTargetChangeTree(
     current: dataset.current,
     candidate: dataset.candidate,
     methodology: dataset.methodology,
+    matching: dataset.matching,
     summary,
     selectedTarget,
   };

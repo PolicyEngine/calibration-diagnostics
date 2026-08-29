@@ -130,6 +130,36 @@ describe("target change attribution", () => {
     expect(result.rows.find((row) => row.name === "removed")?.source).toBe("old");
   });
 
+  test("uses cross-format Chronicle matches without changing contribution arithmetic", () => {
+    const current = calibration("current", [
+      { name: "legacy-name", contribution: 0.1, share: 1, error: 0.1 },
+    ]);
+    const candidate = calibration("candidate", [
+      { name: "structured-name", contribution: 0.2, share: 1, error: 0.2 },
+    ]);
+    current.rows[0].chronicle = { fact_key: "agency.population.total" };
+    candidate.rows[0].chronicle = { fact_key: "agency.population.total" };
+    candidate.rows[0].target_representation = "structured";
+    candidate.rows[0].dimension_adapter = "structured";
+    candidate.rows[0].dimensions = {};
+
+    const result = buildTargetChangeDataset(current, candidate);
+    expect(result.available).toBe(true);
+    expect(result.matching).toMatchObject({
+      current_representation: "legacy",
+      candidate_representation: "structured",
+      matched_by: { chronicle_fact_key: 1 },
+    });
+    expect(result.rows[0]).toMatchObject({
+      comparison_status: "shared",
+      match_kind: "chronicle_fact_key",
+      current_name: "legacy-name@2024",
+      candidate_name: "structured-name@2024",
+      reported_change: 0.1,
+    });
+    expect(result.summaries.reported?.reconciliationDifference).toBeCloseTo(0);
+  });
+
   test("fails closed when attribution is unavailable or a row is incomplete", () => {
     const unavailable = buildTargetChangeDataset(
       calibration("current", [], { status: "unavailable" }),
@@ -152,7 +182,7 @@ describe("target change attribution", () => {
     expect(incomplete.reason).toContain("incomplete");
   });
 
-  test("fails closed when matched rows cannot reconcile to both aggregates", () => {
+  test("preserves ambiguous duplicate rows as additions and removals", () => {
     const current = calibration("current", [
       { name: "duplicate", contribution: 0.1, share: 0.5, error: 0.2 },
       { name: "duplicate", contribution: 0.2, share: 0.5, error: 0.4 },
@@ -161,8 +191,16 @@ describe("target change attribution", () => {
       { name: "duplicate", contribution: 0.2, share: 1, error: 0.2 },
     ]);
     const result = buildTargetChangeDataset(current, candidate);
-    expect(result.available).toBe(false);
-    expect(result.reason).toContain("do not reconcile");
+    expect(result.available).toBe(true);
+    expect(result.rows).toHaveLength(3);
+    expect(result.summaries.reported).toMatchObject({
+      shared: 0,
+      added: 1,
+      removed: 2,
+      reconciliationDifference: 0,
+    });
+    expect(result.matching.ambiguous_key_groups.base_name).toBe(1);
+    expect(result.modeReasons.shared).toContain("no shared targets");
   });
 
   test("retains additive results while warning about methodology differences", () => {
