@@ -1060,23 +1060,25 @@ function MicrocosmStagingRunsView() {
                   </SectionCard>
                 )}
 
-                {(compareData?.rows ?? []).length > 0 && (
+                {runData.has_calibration && (
                 <SectionCard
                   title="Target breakdown"
                   className="lg:col-span-2 lg:col-start-1"
                   description="Every target both sides share, worst movement first. Search by statistic, variable, or geography."
                   actions={
-                    <input
-                      type="search"
-                      value={targetSearch}
-                      placeholder="Search targets…"
-                      onChange={(e) => setTargetSearch(e.target.value)}
-                      className="h-8 w-56 rounded-md border border-border bg-card px-2.5 text-sm focus:border-primary/60 focus:outline-none"
-                    />
+                    compareData?.summary ? (
+                      <input
+                        type="search"
+                        value={targetSearch}
+                        placeholder="Search targets…"
+                        onChange={(e) => setTargetSearch(e.target.value)}
+                        className="h-8 w-56 rounded-md border border-border bg-card px-2.5 text-sm focus:border-primary/60 focus:outline-none"
+                      />
+                    ) : undefined
                   }
                   padded={false}
                 >
-                  {(() => {
+                  {compareData?.summary ? (() => {
                     const q = targetSearch.trim().toLowerCase();
                     const usable = (compareData?.rows ?? []).filter(
                       (row) =>
@@ -1179,7 +1181,23 @@ function MicrocosmStagingRunsView() {
                         </div>
                       </>
                     );
-                  })()}
+                  })() : compareLoading ? (
+                    <LoadingBlock
+                      label="Loading calibration diagnostics for the target breakdown…"
+                      height="h-40"
+                    />
+                  ) : (
+                    <EmptyState
+                      title="Target breakdown unavailable"
+                      description={
+                        compareError instanceof Error
+                          ? compareError.message
+                          : compareData?.detail ??
+                            "The calibration diagnostics are available, but the target breakdown could not be loaded."
+                      }
+                      variant="compact"
+                    />
+                  )}
                 </SectionCard>
               )}
 
