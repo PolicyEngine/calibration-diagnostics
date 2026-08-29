@@ -260,6 +260,7 @@ test("structured dimensions shape rows and honor artifact value order", () => {
     target_representation: "structured",
   });
   expect(cal.rows.every((row) => row.dimension_adapter === "structured")).toBe(true);
+  expect(cal.rows.every((row) => row.target_representation === "structured")).toBe(true);
   expect(cal.rows[0]).toMatchObject({
     family: "novastat_agency/population",
     geography: "North",
@@ -554,7 +555,7 @@ test("live-US-shaped schema 5 rows preserve the legacy dotted contract", () => {
   ).targets[0];
 
   // JSON round-tripping matches the API boundary and locks every legacy field;
-  // the four new contract fields are strictly additive.
+  // the additional contract fields are strictly additive.
   expect(JSON.parse(JSON.stringify(responseRow))).toEqual({
     name: "bea_nipa.cy2023.proprietors_income.a041rc.amount@2024",
     target: 100,
@@ -599,6 +600,7 @@ test("live-US-shaped schema 5 rows preserve the legacy dotted contract", () => {
       },
     ],
     dimension_adapter: "legacy_name",
+    target_representation: "legacy",
     variable_key: "bea_nipa / proprietors income · total",
     source_citation: sourceCitation,
     source_url: null,
@@ -2084,6 +2086,7 @@ test("mixed diagnostics dispatch complete legacy and structured rows independent
     source: "bea",
     variable: "amount",
     dimension_adapter: "legacy_name",
+    target_representation: "legacy",
   });
   expect(cal.rows[1]).toMatchObject({
     source: "artifact_agency",
@@ -2093,6 +2096,7 @@ test("mixed diagnostics dispatch complete legacy and structured rows independent
     variable_label: "Resident population",
     measure: "count",
     dimension_adapter: "structured",
+    target_representation: "structured",
   });
 });
 

@@ -1127,6 +1127,7 @@ function enrichTargetRow(
     dims,
     target_dimensions: targetDimensions,
     dimension_adapter: dimensionAdapter,
+    target_representation: rowRepresentation,
     variable_key: variableKey,
     // v2 published metadata (null on v1).
     source_citation:
@@ -2284,6 +2285,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     dims: row.dims,
     target_dimensions: row.target_dimensions,
     dimension_adapter: row.dimension_adapter,
+    target_representation: row.target_representation,
     variable_key: row.variable_key,
     source_citation: row.source_citation,
     source_url: row.source_url,

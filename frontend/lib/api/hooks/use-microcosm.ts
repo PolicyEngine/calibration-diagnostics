@@ -84,6 +84,7 @@ export interface MicrocosmTargetRow {
     rank?: number;
   }[] | null;
   dimension_adapter?: "structured" | "legacy_filter" | "legacy_name" | null;
+  target_representation?: "legacy" | "structured" | null;
   variable_key?: string | null;
   // schema v2 published registry metadata (null on v1).
   source_citation?: string | null;

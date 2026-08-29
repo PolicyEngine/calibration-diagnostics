@@ -52,6 +52,7 @@ test("the pinned US release retains its legacy source and statistic grouping", (
   );
 
   expect(calibration.target_schema.target_representation).toBe("legacy");
+  expect(calibration.rows.every((row) => row.target_representation === "legacy")).toBe(true);
   expect(calibration.rows).toHaveLength(5_659);
   expect(tree.groups).toHaveLength(15);
   expect(Object.values(nodeCounts).reduce((sum, count) => sum + count, 0)).toBe(53);
