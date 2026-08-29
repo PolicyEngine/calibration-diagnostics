@@ -113,10 +113,11 @@ describe("target change hierarchy", () => {
   });
 
   test("returns selected compact target detail at the target level", () => {
+    const dataset = fixture();
     const state = programState();
     state.path.geography = "CA";
-    state.path.target = "one";
-    const tree = buildTargetChangeTree(fixture(), state, "reported");
+    state.path.target = dataset.rows.find((row) => row.name === "one")?.comparison_id;
+    const tree = buildTargetChangeTree(dataset, state, "reported");
     expect(tree.currentLevel.kind).toBe("target");
     expect(tree.selectedTarget).toEqual(expect.objectContaining({
       name: "one",
@@ -129,6 +130,31 @@ describe("target change hierarchy", () => {
     expect(tree.selectedTarget?.candidate).toEqual(expect.objectContaining({
       contribution: 0.2,
     }));
+  });
+
+  test("selects a shared target whose release identifiers differ", () => {
+    const current = calibration("current", [
+      { name: "old-name", contribution: 0.1, share: 1, error: 0.1 },
+    ]);
+    const candidate = calibration("candidate", [
+      { name: "new-name", contribution: 0.2, share: 1, error: 0.2 },
+    ]);
+    current.rows[0].chronicle = { fact_key: "agency.population.total" };
+    candidate.rows[0].chronicle = { fact_key: "agency.population.total" };
+    const dataset = buildTargetChangeDataset(current, candidate);
+    const state = programState();
+    state.path.geography = "United States";
+    state.path.target = dataset.rows[0].comparison_id;
+
+    const tree = buildTargetChangeTree(dataset, state, "reported");
+    expect(tree.selectedTarget).toMatchObject({
+      current_name: "old-name@2024",
+      candidate_name: "new-name@2024",
+      match_kind: "chronicle_fact_key",
+    });
+    expect(tree.groups.flatMap((group) => group.nodes)[0]?.id).toBe(
+      dataset.rows[0].comparison_id,
+    );
   });
 
   test("shared mode excludes added and removed target leaves", () => {

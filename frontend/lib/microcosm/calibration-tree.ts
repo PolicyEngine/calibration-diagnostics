@@ -21,6 +21,7 @@ export interface CalibrationTreeDimension {
 export interface CalibrationTreeTarget {
   name?: string | null;
   base_name?: string | null;
+  comparison_id?: string | null;
   source?: string | null;
   source_label?: string | null;
   variable?: string | null;
@@ -646,7 +647,7 @@ export function buildCalibrationTree(
   const visibleTargets = partition.targets.filter((row) => visibleRows.has(row));
   const targetNodes = visibleTargets
     .map((row, index) => {
-      const id = String(row.name ?? row.base_name ?? `target-${index}`);
+      const id = String(row.comparison_id ?? row.name ?? row.base_name ?? `target-${index}`);
       return node(
         id,
         targetLabel(row),

@@ -63,7 +63,7 @@ export function buildTargetChangeTree(
   );
   const selectedTarget = state.path.target
     ? dataset.rows.find((row) => {
-        if (row.name !== state.path.target) return false;
+        if (row.comparison_id !== state.path.target) return false;
         return mode === "reported" || row.comparison_status === "shared";
       }) ?? null
     : null;

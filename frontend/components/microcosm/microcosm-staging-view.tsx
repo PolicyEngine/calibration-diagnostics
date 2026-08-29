@@ -36,6 +36,7 @@ import {
   formatStagingCurrentStatus,
   formatStagingStatus,
 } from "@/lib/microcosm/staging-status";
+import { targetMatchingSummaryText } from "@/lib/microcosm/target-matching-presentation";
 import { targetChangeMapIdentity } from "@/lib/microcosm/target-change-visualization";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
@@ -991,13 +992,18 @@ function MicrocosmStagingRunsView() {
                   </div>
                   {compareData?.summary && (
                     <div className="border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
-                      <span className="tone-pos">
-                        {fmt(compareData.summary.improved, { digits: 0 })} targets improved
-                      </span>
-                      {" · "}
-                      <span className="tone-neg">
-                        {fmt(compareData.summary.regressed, { digits: 0 })} regressed
-                      </span>
+                      <div>
+                        <span className="tone-pos">
+                          {fmt(compareData.summary.improved, { digits: 0 })} targets improved
+                        </span>
+                        {" · "}
+                        <span className="tone-neg">
+                          {fmt(compareData.summary.regressed, { digits: 0 })} regressed
+                        </span>
+                      </div>
+                      <p className="mt-1 leading-relaxed">
+                        {targetMatchingSummaryText(compareData.summary.matching)}
+                      </p>
                     </div>
                   )}
                 </SectionCard>

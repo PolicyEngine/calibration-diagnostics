@@ -38,6 +38,11 @@ import type {
 } from "@/lib/microcosm/target-change";
 import type { TargetChangeTreeResponse } from "@/lib/microcosm/target-change-tree";
 import {
+  targetMatchingSummaryText,
+  targetMatchKindExplanation,
+  targetRepresentationPairLabel,
+} from "@/lib/microcosm/target-matching-presentation";
+import {
   formatTargetChange,
   formatWeightedTargetError,
   targetChangeDetailValues,
@@ -290,6 +295,11 @@ function TargetChangeDetail({
   const detail = targetChangeDetailValues(target, mode);
   const rows = [
     {
+      label: "Target identifier",
+      current: target.current_name ?? "—",
+      candidate: target.candidate_name ?? "—",
+    },
+    {
       label: "Benchmark",
       current: nullableNumber(target.current?.target),
       candidate: nullableNumber(target.candidate?.target),
@@ -325,7 +335,12 @@ function TargetChangeDetail({
             </h4>
             {targetStatus(target)}
           </div>
-          <p className="mt-1 break-all text-xs text-muted-foreground">{target.name}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {targetRepresentationPairLabel(
+              target.current_representation,
+              target.candidate_representation,
+            )}
+          </p>
         </div>
         <button
           type="button"
@@ -338,6 +353,11 @@ function TargetChangeDetail({
       {mode === "shared" && detail.comparisonWeight != null ? (
         <div className="border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
           Shared comparison weight: {formatWeightedTargetError(detail.comparisonWeight)} on both sides.
+        </div>
+      ) : null}
+      {target.match_kind ? (
+        <div className="border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
+          {targetMatchKindExplanation(target.match_kind)}
         </div>
       ) : null}
       <div className="overflow-x-auto">
@@ -353,8 +373,8 @@ function TargetChangeDetail({
             {rows.map((row) => (
               <tr key={row.label} className="border-b border-border/50 last:border-b-0">
                 <td className="px-4 py-2 font-medium">{row.label}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{row.current}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{row.candidate}</td>
+                <td className="max-w-[18rem] break-all px-4 py-2 text-right tabular-nums text-muted-foreground">{row.current}</td>
+                <td className="max-w-[18rem] break-all px-4 py-2 text-right tabular-nums">{row.candidate}</td>
               </tr>
             ))}
           </tbody>
@@ -514,6 +534,10 @@ export function StagingTargetChangeMap({
           </>
         ) : null}
       </div>
+
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        {targetMatchingSummaryText(data.matching)}
+      </p>
 
       {data.methodology.warning ? (
         <div className="rounded-lg border border-[var(--warn)] bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
