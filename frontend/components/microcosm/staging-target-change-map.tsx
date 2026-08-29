@@ -38,7 +38,6 @@ import type {
 } from "@/lib/microcosm/target-change";
 import type { TargetChangeTreeResponse } from "@/lib/microcosm/target-change-tree";
 import {
-  targetMatchingSummaryText,
   targetMatchKindExplanation,
   targetRepresentationPairLabel,
 } from "@/lib/microcosm/target-matching-presentation";
@@ -554,10 +553,6 @@ export function StagingTargetChangeMap({
           </>
         ) : null}
       </div>
-
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        {targetMatchingSummaryText(data.matching)}
-      </p>
 
       {data.methodology.warning ? (
         <div className="rounded-lg border border-[var(--warn)] bg-muted/10 px-3 py-2 text-xs text-muted-foreground">

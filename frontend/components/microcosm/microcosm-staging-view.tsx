@@ -36,7 +36,6 @@ import {
   formatStagingCurrentStatus,
   formatStagingStatus,
 } from "@/lib/microcosm/staging-status";
-import { targetMatchingSummaryText } from "@/lib/microcosm/target-matching-presentation";
 import { targetChangeMapIdentity } from "@/lib/microcosm/target-change-visualization";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
@@ -1005,9 +1004,6 @@ function MicrocosmStagingRunsView() {
                           {fmt(compareData.summary.regressed, { digits: 0 })} regressed
                         </span>
                       </div>
-                      <p className="mt-1 leading-relaxed">
-                        {targetMatchingSummaryText(compareData.summary.matching)}
-                      </p>
                     </div>
                   )}
                 </SectionCard>
