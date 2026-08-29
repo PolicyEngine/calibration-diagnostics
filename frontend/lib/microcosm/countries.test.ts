@@ -66,10 +66,20 @@ test("keeps the live registrations on their published repositories and labels", 
     geography: "Belgium",
     visibility: "private",
   });
+  expect(countryRegistration("nz")).toMatchObject({
+    repo: "policyengine/populace-nz",
+    repo_env: "POPULACE_NZ_HF_REPO",
+    revision_env: "POPULACE_NZ_HF_REVISION",
+    label: "New Zealand",
+    dataset_label: "Microcosm NZ",
+    geography: "New Zealand",
+    geography_id: null,
+    visibility: "public",
+  });
 });
 
 test("selectable countries follow registry order and exclude fixtures", () => {
-  expect(selectableCountries()).toEqual(["us", "uk", "be"]);
+  expect(selectableCountries()).toEqual(["us", "uk", "be", "nz"]);
   expect(countryRegistration("zz").fixture).toBe(true);
   expect(selectableCountries()).not.toContain("zz");
 });
@@ -82,6 +92,7 @@ test("fixture registrations are valid countries without being selectable", () =>
 test("country parsing is exact and defaults to the registry default", () => {
   expect(DEFAULT_COUNTRY).toBe("us");
   expect(parseCountry("be")).toBe("be");
+  expect(parseCountry("nz")).toBe("nz");
   expect(parseCountry("uk")).toBe("uk");
   expect(parseCountry("us")).toBe("us");
   expect(parseCountry("BE")).toBe(DEFAULT_COUNTRY);
@@ -100,6 +111,8 @@ test("capability gates read the registration", () => {
   expect(hasCapability("uk", "staging")).toBe(false);
   expect(hasCapability("be", "pipeline")).toBe(false);
   expect(hasCapability("be", "cross_dataset")).toBe(true);
+  expect(hasCapability("nz", "cross_dataset")).toBe(false);
+  expect(hasCapability("nz", "model_coverage")).toBe(false);
   expect(countryCapabilities("be")).toEqual([
     "calibration",
     "targets",
@@ -107,6 +120,7 @@ test("capability gates read the registration", () => {
     "cross_dataset",
   ]);
   expect(countryCapabilities("zz")).toEqual(["calibration", "targets", "compare"]);
+  expect(countryCapabilities("nz")).toEqual(["calibration", "targets", "compare"]);
   expect(isCountryCapability("staging")).toBe(true);
   expect(isCountryCapability("dashboard_admin")).toBe(false);
   expect(isCountryCapability(7)).toBe(false);

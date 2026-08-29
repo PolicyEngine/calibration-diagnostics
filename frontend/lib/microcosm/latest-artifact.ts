@@ -58,6 +58,8 @@ export const MICROCOSM_UK_HF_REPO_ENV = COUNTRY_REGISTRY.uk.repo_env;
 export const MICROCOSM_UK_HF_REVISION_ENV = COUNTRY_REGISTRY.uk.revision_env;
 export const MICROCOSM_BE_HF_REPO_ENV = COUNTRY_REGISTRY.be.repo_env;
 export const MICROCOSM_BE_HF_REVISION_ENV = COUNTRY_REGISTRY.be.revision_env;
+export const MICROCOSM_NZ_HF_REPO_ENV = COUNTRY_REGISTRY.nz.repo_env;
+export const MICROCOSM_NZ_HF_REVISION_ENV = COUNTRY_REGISTRY.nz.revision_env;
 
 interface MicrocosmCountryRepository {
   repo: string;

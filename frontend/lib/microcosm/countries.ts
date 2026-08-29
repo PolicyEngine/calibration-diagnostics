@@ -94,6 +94,18 @@ export const COUNTRY_REGISTRY = {
     visibility: "private",
     capabilities: CALIBRATION_CAPABILITIES,
   },
+  nz: {
+    repo: "policyengine/populace-nz",
+    revision: "main",
+    repo_env: "POPULACE_NZ_HF_REPO",
+    revision_env: "POPULACE_NZ_HF_REVISION",
+    label: "New Zealand",
+    dataset_label: "Microcosm NZ",
+    geography: "New Zealand",
+    geography_id: null,
+    visibility: "public",
+    capabilities: ["calibration", "targets", "compare"],
+  },
   // Synthetic repository used only by the third-country conformance fixture.
   zz: {
     repo: "policyengine/microcosm-zz-fixture",

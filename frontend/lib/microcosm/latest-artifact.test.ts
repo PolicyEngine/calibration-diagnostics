@@ -14,6 +14,8 @@ import {
   MICROCOSM_HF_REVISION_ENV,
   MICROCOSM_BE_HF_REPO_ENV,
   MICROCOSM_BE_HF_REVISION_ENV,
+  MICROCOSM_NZ_HF_REPO_ENV,
+  MICROCOSM_NZ_HF_REVISION_ENV,
   MICROCOSM_UK_HF_REPO_ENV,
   MICROCOSM_UK_HF_REVISION_ENV,
   hfResolveUrl,
@@ -42,6 +44,8 @@ test("keeps Microcosm deployment configuration on its published Populace env con
     MICROCOSM_UK_HF_REVISION_ENV,
     MICROCOSM_BE_HF_REPO_ENV,
     MICROCOSM_BE_HF_REVISION_ENV,
+    MICROCOSM_NZ_HF_REPO_ENV,
+    MICROCOSM_NZ_HF_REVISION_ENV,
   ]).toEqual([
     "POPULACE_HF_REPO",
     "POPULACE_HF_REVISION",
@@ -49,11 +53,14 @@ test("keeps Microcosm deployment configuration on its published Populace env con
     "POPULACE_UK_HF_REVISION",
     "POPULACE_BE_HF_REPO",
     "POPULACE_BE_HF_REVISION",
+    "POPULACE_NZ_HF_REPO",
+    "POPULACE_NZ_HF_REVISION",
   ]);
 });
 
 test("coerces supported country parameters and defaults unknown values to US", () => {
   expect(parseCountry("be")).toBe("be");
+  expect(parseCountry("nz")).toBe("nz");
   expect(parseCountry("uk")).toBe("uk");
   expect(parseCountry("us")).toBe("us");
   expect(parseCountry("BE")).toBe("us");
@@ -71,6 +78,14 @@ test("uses the private Belgium repository and country revision", () => {
   expect(microcosmRevision("be")).toBe("main");
   expect(hfResolveUrl("latest.json", "be")).toBe(
     "https://huggingface.co/datasets/policyengine/populace-be-private/resolve/main/latest.json",
+  );
+});
+
+test("uses the public New Zealand repository and country revision", () => {
+  expect(microcosmRepo("nz")).toBe("policyengine/populace-nz");
+  expect(microcosmRevision("nz")).toBe("main");
+  expect(hfResolveUrl("latest.json", "nz")).toBe(
+    "https://huggingface.co/datasets/policyengine/populace-nz/resolve/main/latest.json",
   );
 });
 
