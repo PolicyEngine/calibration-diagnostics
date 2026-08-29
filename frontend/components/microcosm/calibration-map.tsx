@@ -38,7 +38,9 @@ function isSynthetic(key: string): boolean {
 }
 
 function variableName(leaf: MicrocosmTreemapLeaf): string {
-  return isSynthetic(leaf.key) ? leaf.variable : humanizeName(leaf.variable) || leaf.variable;
+  return isSynthetic(leaf.key)
+    ? leaf.variable
+    : leaf.label ?? (humanizeName(leaf.variable) || leaf.variable);
 }
 
 function measureLabel(measure: string | null): string | null {
@@ -89,6 +91,7 @@ function aggregateLeaves(
     key,
     source,
     variable,
+    label: null,
     measure: null,
     measure_counts: [],
     n_targets: leaves.reduce((a, c) => a + c.n_targets, 0),

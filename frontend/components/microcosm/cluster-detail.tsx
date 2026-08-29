@@ -141,7 +141,9 @@ export function ClusterDetail({
     .filter((d) => d.values.length > 0);
   const filteredTotal = data?.filtered_total ?? rows.length;
   const within = leaf.scored > 0 ? leaf.within_10pct / leaf.scored : null;
-  const name = synthetic ? leaf.variable : humanizeName(leaf.variable) || leaf.variable;
+  const name = synthetic
+    ? leaf.variable
+    : leaf.label ?? (humanizeName(leaf.variable) || leaf.variable);
   const measureOptions = (leaf.measure_counts ?? []).filter((option) => option.measure);
   const showMeasureFilter = !synthetic && Boolean(filters.program) && measureOptions.length > 1;
   const hasFilters =

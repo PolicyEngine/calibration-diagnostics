@@ -24,6 +24,7 @@ export interface CalibrationTreeTarget {
   source?: string | null;
   source_label?: string | null;
   variable?: string | null;
+  variable_label?: string | null;
   variable_key?: string | null;
   measure?: string | null;
   source_measure_id?: string | null;
@@ -415,15 +416,22 @@ function programGroups(rows: CalibrationTreeTarget[]): CalibrationTreeGroup[] {
         .find((label): label is string => Boolean(label));
       const byProgram = groupRows(sourceRows, programId);
       const nodes = sortNodes(
-        [...byProgram.entries()].map(([program, programRows]) =>
-          node(
+        [...byProgram.entries()].map(([program, programRows]) => {
+          const labels = [
+            ...new Set(
+              programRows
+                .map((row) => row.variable_label?.trim())
+                .filter((label): label is string => Boolean(label)),
+            ),
+          ];
+          return node(
             program,
-            programLabel(program),
+            programLabel(program, labels.length === 1 ? labels[0] : null),
             "program",
             { kind: "program", source, value: program },
             programRows,
-          ),
-        ),
+          );
+        }),
       );
       return {
         id: source,

@@ -16,15 +16,11 @@ function datasetAccuracyItems() {
   return group.items;
 }
 
-test("shows calibration targets directly under calibration fit", () => {
+test("keeps calibration targets out of the sidebar", () => {
   const items = datasetAccuracyItems();
-  const labels = items.map((item) => item.label);
-  const calibrationFitIndex = labels.indexOf("Calibration fit");
-  const calibrationTargetsIndex = labels.indexOf("Calibration targets");
 
-  expect(calibrationFitIndex).toBeGreaterThanOrEqual(0);
-  expect(calibrationTargetsIndex).toBe(calibrationFitIndex + 1);
-  expect(items[calibrationTargetsIndex]?.href).toBe("/microcosm/targets");
+  expect(items.some((item) => item.label === "Calibration targets")).toBe(false);
+  expect(items.some((item) => item.href === "/microcosm/targets")).toBe(false);
 });
 
 test("places external checks at the bottom of dataset accuracy", () => {
@@ -43,19 +39,17 @@ test("models the external checks icon separately from its label", () => {
   expect(externalChecks?.external).toBe(true);
 });
 
-test("targets path activates calibration targets instead of calibration fit", () => {
+test("targets path does not activate calibration fit", () => {
   const items = datasetAccuracyItems();
   const calibrationFit = items.find((item) => item.label === "Calibration fit");
-  const calibrationTargets = items.find((item) => item.label === "Calibration targets");
 
-  if (!calibrationFit || !calibrationTargets) {
-    throw new Error("Calibration nav items not found");
+  if (!calibrationFit) {
+    throw new Error("Calibration fit nav item not found");
   }
 
   expect(calibrationFit.also ?? []).not.toContain("/microcosm/targets");
   expect(isActive("/microcosm", calibrationFit)).toBe(true);
   expect(isActive("/microcosm/targets", calibrationFit)).toBe(false);
-  expect(isActive("/microcosm/targets", calibrationTargets)).toBe(true);
 });
 test("opens external navigation in a new tab without changing internal navigation", () => {
   const items = datasetAccuracyItems();
@@ -105,14 +99,12 @@ test("Belgium navigation keeps country-ready pages and hides pages it lacks capa
   const items = navGroupsForCountry("be").flatMap((group) => group.items);
   expect(items.map((item) => item.href)).toEqual([
     "/microcosm",
-    "/microcosm/targets",
     "/microcosm/datasets",
     "/microcosm/compare",
   ]);
   expect(items.every((item) => hasCapability("be", item.capability!))).toBe(true);
   expect(items.map((item) => navItemHref(item, "be"))).toEqual([
     "/microcosm?country=be",
-    "/microcosm/targets?country=be",
     "/microcosm/datasets?country=be",
     "/microcosm/compare?country=be",
   ]);
@@ -127,10 +119,7 @@ test("US navigation lists every page", () => {
 test("artifact-narrowed capabilities hide pages the release does not serve", () => {
   const groups = navGroupsForCountry("us", ["calibration", "targets"]);
   expect(groups.map((group) => group.label)).toEqual(["Dataset accuracy"]);
-  expect(groups[0].items.map((item) => item.href)).toEqual([
-    "/microcosm",
-    "/microcosm/targets",
-  ]);
+  expect(groups[0].items.map((item) => item.href)).toEqual(["/microcosm"]);
 });
 
 test("shows Cross-dataset navigation for every selectable country", () => {

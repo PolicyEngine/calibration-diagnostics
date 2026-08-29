@@ -208,6 +208,7 @@ export interface MicrocosmArtifactPresentation {
 export interface MicrocosmTargetSchema {
   diagnostics_schema_version: number | null;
   structured_dimensions: boolean;
+  target_representation: "legacy" | "structured" | "mixed" | "unknown";
 }
 
 export interface MicrocosmCalibration {
@@ -746,6 +747,7 @@ export interface MicrocosmTreemapLeaf {
   key: string;
   source: string;
   variable: string;
+  label: string | null;
   measure: string | null;
   measure_counts: { measure: string | null; n_targets: number }[];
   filters?: {

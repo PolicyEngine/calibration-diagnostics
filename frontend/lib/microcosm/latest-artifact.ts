@@ -7,6 +7,13 @@ import { sourceAuthorityLabel } from "@/lib/source-labels";
 
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
 import {
+  chroniclePublisherFromMetadata,
+  qualifyingChildrenFromRecordSet,
+  readLegacyTarget,
+  stateFromGeoId,
+  type ParsedLegacyTarget,
+} from "./legacy-target-reader";
+import {
   COUNTRY_REGISTRY,
   DEFAULT_COUNTRY,
   countryRegistration,
@@ -23,6 +30,12 @@ import {
   type FinalTargetLossAttribution,
   type TargetLossDiagnosticWarning,
 } from "./target-loss-attribution";
+import {
+  classifyTargetRow,
+  classifyTargetRepresentation,
+  type TargetRepresentation,
+} from "./target-representation";
+import { readStructuredTarget } from "./structured-target-reader";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
@@ -125,24 +138,6 @@ function hfAuthHeaders(): HeadersInit | undefined {
   return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
-// --- name decomposition (matches microcosm.institute's parse_target) ---------------
-const FIPS_TO_ABBR: Record<string, string> = {
-  "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO",
-  "09": "CT", "10": "DE", "11": "DC", "12": "FL", "13": "GA", "15": "HI",
-  "16": "ID", "17": "IL", "18": "IN", "19": "IA", "20": "KS", "21": "KY",
-  "22": "LA", "23": "ME", "24": "MD", "25": "MA", "26": "MI", "27": "MN",
-  "28": "MS", "29": "MO", "30": "MT", "31": "NE", "32": "NV", "33": "NH",
-  "34": "NJ", "35": "NM", "36": "NY", "37": "NC", "38": "ND", "39": "OH",
-  "40": "OK", "41": "OR", "42": "PA", "44": "RI", "45": "SC", "46": "SD",
-  "47": "TN", "48": "TX", "49": "UT", "50": "VT", "51": "VA", "53": "WA",
-  "54": "WV", "55": "WI", "56": "WY",
-};
-const STATE_ABBRS = new Set([
-  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID",
-  "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO",
-  "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA",
-  "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "US",
-]);
 const FILING_MODIFIERS = new Set(["Surviving Spouse"]);
 const FILING_STATUSES = new Set([
   "All", "Single", "Head of Household", "Married Filing Jointly",
@@ -225,13 +220,7 @@ function relativeError(estimate: number | null, target: number | null): number |
   return (estimate - target) / Math.abs(target);
 }
 
-interface ParsedTarget {
-  geography: string;
-  level: string;
-  source: string;
-  variable: string;
-  breakdown: string;
-}
+type ParsedTarget = ParsedLegacyTarget;
 
 interface TargetBreakdownDimension {
   key: string;
@@ -287,22 +276,6 @@ function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
-function stateFromGeoId(value: string | null): string | null {
-  if (!value) return null;
-  const match = /US(\d{2})$/.exec(value);
-  return match ? FIPS_TO_ABBR[match[1]] ?? null : null;
-}
-
-// Census CD geo ids end in SSDD (state FIPS + district number), e.g.
-// 5001700US0101 -> AL-01.
-function districtFromGeoId(value: string | null): string | null {
-  if (!value) return null;
-  const match = /US(\d{2})(\d{2})$/.exec(value);
-  if (!match) return null;
-  const state = FIPS_TO_ABBR[match[1]];
-  return state ? `${state}-${match[2]}` : null;
-}
-
 function readableToken(value: string | null): string | null {
   if (!value) return null;
   return value.replace(/_/g, " ");
@@ -339,51 +312,6 @@ function addDimension(
     source_key: sourceKey,
     raw_value: rawValue ?? undefined,
   });
-}
-
-function variableFromMeasure(value: string | null): string | null {
-  if (!value) return null;
-  return value.replace(/_(amount|returns|claims|count|total|collections|projected_amount)$/, "");
-}
-
-function breakdownFromSourceMeasure(
-  variable: string | null,
-  measureId: string | null,
-): string | null {
-  if (!variable || !measureId) return null;
-  const variablePrefix = variable.replace(/\s+/g, "_").toLowerCase();
-  const measure = measureId.toLowerCase();
-  if (!measure.startsWith(`${variablePrefix}_`)) return null;
-  const detail = measure
-    .slice(variablePrefix.length + 1)
-    .replace(/_(amount|returns|claims|count|total|collections|projected_amount)$/, "");
-  if (
-    variablePrefix === "eitc" &&
-    ["amount", "returns", "claims", "count", "total"].includes(detail)
-  ) {
-    return "all children";
-  }
-  if (
-    ["amount", "returns", "claims", "count", "total", "collections", "projected_amount"].includes(detail)
-  ) {
-    return null;
-  }
-  if (!detail || MEASURES.has(detail)) return null;
-  return readableToken(detail);
-}
-
-function qualifyingChildrenFromRecordSet(value: string | null): string | null {
-  if (!value) return null;
-  const match = /\.eitc_by_agi_children\.([^.]+)$/.exec(value);
-  if (!match) return null;
-  const childGroup = match[1];
-  if (childGroup === "no_qualifying_children") return "no qualifying children";
-  if (childGroup === "one_qualifying_child") return "one qualifying child";
-  if (childGroup === "two_qualifying_children") return "two qualifying children";
-  if (childGroup === "three_or_more_qualifying_children") {
-    return "three or more qualifying children";
-  }
-  return readableToken(childGroup);
 }
 
 function qualifyingChildrenFromCount(value: string | null): string | null {
@@ -700,12 +628,6 @@ interface DecomposedTargetFilter {
   dimensions: TargetBreakdownDimension[];
 }
 
-interface DecomposedStructuredDimensions {
-  geography: string | null;
-  level: string | null;
-  dimensions: TargetBreakdownDimension[];
-}
-
 function dimensionValue(
   label: string,
   rawValue: string,
@@ -727,39 +649,6 @@ function dimensionValue(
 
 function filterDimensionValue(spec: FilterDimensionSpec, rawValue: string): string {
   return dimensionValue(spec.label, rawValue, spec.valueLabels);
-}
-
-function decomposeStructuredDimensions(
-  values: JsonObject,
-  definitions: Record<string, DiagnosticsDimension>,
-): DecomposedStructuredDimensions {
-  let geography: string | null = null;
-  let level: string | null = null;
-  const dimensions: TargetBreakdownDimension[] = [];
-  for (const [id, raw] of Object.entries(values)) {
-    const rawValue = stringValue(raw)?.trim();
-    if (!rawValue) continue;
-    const definition = definitions[id];
-    const label = definition?.label ?? dimensionLabel(id);
-    const value = dimensionValue(label, rawValue, definition?.values);
-    const rankOrder = definition?.order ??
-      (definition?.values ? Object.keys(definition.values) : undefined);
-    const rank = rankOrder?.indexOf(rawValue) ?? -1;
-    if (definition?.role === "geography") {
-      geography ??= value;
-      level ??= definition.level ?? "region";
-      continue;
-    }
-    dimensions.push({
-      key: dimensionKey(label),
-      label,
-      value,
-      source_key: id,
-      raw_value: rawValue,
-      ...(rank >= 0 ? { rank } : {}),
-    });
-  }
-  return { geography, level, dimensions };
 }
 
 function decomposeTargetFilter(value: unknown): DecomposedTargetFilter | null {
@@ -791,164 +680,6 @@ function decomposeTargetFilter(value: unknown): DecomposedTargetFilter | null {
     }
   }
   return null;
-}
-
-function chroniclePublisherFromMetadata(metadata: JsonObject): string | null {
-  if (!Array.isArray(metadata.chronicle_record_ids)) return null;
-  const first = metadata.chronicle_record_ids.find(
-    (value): value is string => typeof value === "string" && Boolean(value.trim()),
-  );
-  return first?.trim().split(".", 1)[0] || null;
-}
-
-interface StructuredTargetSource {
-  id: string | null;
-  citation: string | null;
-  label: string | null;
-  url: string | null;
-}
-
-interface StructuredTargetVariable {
-  id: string;
-  label: string | null;
-  measure: string | null;
-}
-
-function structuredTargetSource(value: unknown): StructuredTargetSource | null {
-  if (!isPlainObject(value)) return null;
-  return {
-    id: stringValue(value.id)?.trim() ?? null,
-    citation: stringValue(value.citation)?.trim() ?? null,
-    label: stringValue(value.label)?.trim() ?? null,
-    url: stringValue(value.url)?.trim() ?? null,
-  };
-}
-
-function structuredTargetVariable(value: unknown): StructuredTargetVariable | null {
-  if (!isPlainObject(value)) return null;
-  const id = stringValue(value.id)?.trim();
-  if (!id) return null;
-  return {
-    id,
-    label: stringValue(value.label)?.trim() ?? null,
-    measure: stringValue(value.measure)?.trim() ?? null,
-  };
-}
-
-function artifactVariable(
-  name: string,
-  row: TargetRow,
-  decomposition: DecomposedTargetFilter | null,
-  structuredVariable: StructuredTargetVariable | null,
-): string | null {
-  const metadata = asObject(row.metadata);
-  if (structuredVariable) return structuredVariable.id;
-  const published =
-    stringValue(metadata.variable) ??
-    (typeof row.variable === "string" ? stringValue(row.variable) : null);
-  if (published) return readableToken(published);
-  if (!name.includes("_") || name.includes("/")) return null;
-
-  let identifier = name;
-  const filter = decomposition ? stringValue(row.filter) : null;
-  const filterSuffix = filter?.replace(/^cell_/, "");
-  if (filterSuffix && identifier.endsWith(`_${filterSuffix}`)) {
-    identifier = identifier.slice(0, -(filterSuffix.length + 1));
-  }
-  const separator = identifier.indexOf("_");
-  if (separator >= 0) identifier = identifier.slice(separator + 1);
-  return readableToken(identifier);
-}
-
-function parseDottedTarget(
-  name: string,
-  row: TargetRow,
-  nationalGeography: string,
-): ParsedTarget | null {
-  if (!name.includes(".")) return null;
-  const metadata = asObject(row.metadata);
-  const registry = asObject(row.registry);
-  const parts = name.split(".");
-  const source = stringValue(registry.family) ?? parts[0] ?? "";
-  const geoLevel = stringValue(metadata.ledger_geography_level);
-  const geoId = stringValue(metadata.ledger_geography_id);
-  const geography =
-    geoLevel === "country"
-      ? nationalGeography
-      : geoLevel === "congressional_district"
-        ? districtFromGeoId(geoId) ?? ""
-        : stateFromGeoId(geoId) ?? stringValue(metadata.state) ?? "";
-  const level =
-    geoLevel === "country"
-      ? "national"
-      : geoLevel === "state"
-        ? "state"
-        : geoLevel === "congressional_district"
-          ? "congressional_district"
-          : "";
-  const measureId = stringValue(metadata.source_measure_id) ?? parts.at(-1) ?? "";
-  const variable =
-    readableToken(stringValue(metadata.variable)) ??
-    readableToken(variableFromMeasure(measureId)) ??
-    readableToken(parts.at(-2) ?? null) ??
-    "";
-  const childBreakdown = qualifyingChildrenFromRecordSet(
-    stringValue(metadata.ledger_layout_record_set_id),
-  );
-  const breakdown = [
-    readableToken(stringValue(metadata.ledger_layout_groupby_value_id)),
-    childBreakdown ?? breakdownFromSourceMeasure(variable, measureId),
-    readableToken(stringValue(metadata.filing_status)),
-  ]
-    .filter((value): value is string => Boolean(value && value !== variable))
-    .join(" · ");
-
-  return { geography, level, source, variable, breakdown };
-}
-
-function parseTarget(name: string, nationalGeography: string): ParsedTarget {
-  const parts = name.split("/");
-  const p0 = parts[0] ?? "";
-  const fips = /^US(\d{2})$/.exec(p0);
-  if (fips) {
-    return {
-      geography: FIPS_TO_ABBR[fips[1]] ?? p0,
-      level: "state",
-      source: "admin",
-      variable: parts[1] ?? "",
-      breakdown: parts.slice(2).join(" · "),
-    };
-  }
-  if (p0 === "state") {
-    const second = parts[1] ?? "";
-    if (STATE_ABBRS.has(second) && second !== "US") {
-      return {
-        geography: second, level: "state", source: "state",
-        variable: parts[2] ?? "", breakdown: parts.slice(3).join(" · "),
-      };
-    }
-    const last = parts[parts.length - 1];
-    if (parts.length >= 4 && STATE_ABBRS.has(last)) {
-      return {
-        geography: last, level: "state", source: parts[1] ?? "",
-        variable: parts[2] ?? "", breakdown: parts.slice(3, -1).join(" · "),
-      };
-    }
-    return {
-      geography: "state", level: "state", source: parts[1] ?? "",
-      variable: parts[2] ?? "", breakdown: parts.slice(3).join(" · "),
-    };
-  }
-  if (p0 === "nation" || p0 === "national" || p0 === "us") {
-    return {
-      geography: nationalGeography, level: "national", source: parts[1] ?? "",
-      variable: parts[2] ?? "", breakdown: parts.slice(3).join(" · "),
-    };
-  }
-  return {
-    geography: "", level: "", source: p0,
-    variable: parts[1] ?? "", breakdown: parts.slice(2).join(" · "),
-  };
 }
 
 function variableKeyOf(parsed: ParsedTarget): string {
@@ -1285,59 +1016,41 @@ function enrichTargetRow(
     initialError == null || finalError == null
       ? null
       : Math.abs(initialError) - Math.abs(finalError);
-  const publishedSource = structuredTargetSource(row.source);
-  const publishedVariable = structuredTargetVariable(row.variable);
-  const structuredDecomposition = isPlainObject(row.dimensions)
-    ? decomposeStructuredDimensions(row.dimensions, dimensionDefinitions)
+  const rowRepresentation = classifyTargetRow(row);
+  const structuredIdentity = rowRepresentation === "structured"
+    ? readStructuredTarget(row, dimensionDefinitions, nationalGeography)
     : null;
-  const filterDecomposition = structuredDecomposition
+  const filterDecomposition = structuredIdentity
     ? null
     : decomposeTargetFilter(row.filter);
-  const dimensionAdapter = structuredDecomposition
+  const dimensionAdapter = structuredIdentity
     ? "structured"
     : filterDecomposition
       ? "legacy_filter"
       : "legacy_name";
-  const publisher =
-    chroniclePublisherFromMetadata(metadata) ?? publishedSource?.id ?? null;
-  const parsedFromName =
-    parseDottedTarget(baseName, row, nationalGeography) ??
-    parseTarget(baseName, nationalGeography);
-  const parsed: ParsedTarget = {
-    ...parsedFromName,
-    geography:
-      structuredDecomposition?.geography ??
-      filterDecomposition?.geography ??
-      parsedFromName.geography,
-    level:
-      structuredDecomposition?.level ??
-      filterDecomposition?.level ??
-      parsedFromName.level,
-    source: publisher ?? parsedFromName.source,
-    variable:
-      artifactVariable(
+  const legacyParsed = structuredIdentity
+    ? null
+    : readLegacyTarget(
         baseName,
         row,
+        nationalGeography,
         filterDecomposition,
-        publishedVariable,
-      ) ??
-      parsedFromName.variable,
-    breakdown: structuredDecomposition
-      ? structuredDecomposition.dimensions
-          .map((dimension) => dimension.value)
-          .join(" · ")
-      : filterDecomposition
-        ? filterDecomposition.dimensions
-            .map((dimension) => dimension.value)
-            .join(" · ")
-        : parsedFromName.breakdown,
-  };
+      );
+  const parsed: ParsedTarget = structuredIdentity
+    ? {
+        geography: structuredIdentity.geography,
+        level: structuredIdentity.level,
+        source: structuredIdentity.source,
+        variable: structuredIdentity.variable,
+        breakdown: structuredIdentity.breakdown,
+      }
+    : legacyParsed!;
   const hasGeography = Boolean(parsed.geography.trim());
   const geography = hasGeography ? parsed.geography : nationalGeography;
   const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
   const measureCol = asObject(row.measure);
   const metadataTargetDimensions =
-    structuredDecomposition?.dimensions ??
+    structuredIdentity?.dimensions ??
     filterDecomposition?.dimensions ??
     metadataDimensions(row);
   const targetDimensions =
@@ -1356,11 +1069,11 @@ function enrichTargetRow(
   // IRS variables publish both a total (dollar amount) and a count (number of
   // returns), so the measure is part of the variable's identity, not a
   // breakdown within it — fold it into variable_key so they're distinct things.
-  const measure =
-    publishedVariable?.measure ??
-    (dims[0] && MEASURES.has(dims[0])
+  const measure = structuredIdentity
+    ? structuredIdentity.measure
+    : dims[0] && MEASURES.has(dims[0])
       ? dims[0]
-      : measureFromMetadata(metadata));
+      : measureFromMetadata(metadata);
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
   // Underscore identifiers and filter-decomposed targets use the structured
@@ -1368,17 +1081,19 @@ function enrichTargetRow(
   // without filter dimensions retain their legacy family so US/UK releases do
   // not regroup merely because they also carry Chronicle record IDs.
   const usesArtifactFamily =
-    publishedSource?.id != null ||
-    publishedVariable != null ||
-    structuredDecomposition != null ||
+    structuredIdentity != null ||
     filterDecomposition != null ||
-    (publisher != null && !baseName.includes("/") && !baseName.includes("."));
+    (chroniclePublisherFromMetadata(metadata) != null &&
+      !baseName.includes("/") &&
+      !baseName.includes("."));
   return {
     ...row,
     name: fullName,
     base_name: baseName,
     family: deriveFamily(baseName, parsed, usesArtifactFamily),
-    state: stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
+    state: structuredIdentity
+      ? null
+      : stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography,
     level,
     source: parsed.source,
@@ -1386,10 +1101,10 @@ function enrichTargetRow(
       (Object.hasOwn(publisherLabels, parsed.source)
         ? publisherLabels[parsed.source]
         : undefined) ??
-      publishedSource?.label ??
+      structuredIdentity?.sourceLabel ??
       sourceAuthorityLabel(parsed.source),
     variable: parsed.variable,
-    variable_label: publishedVariable?.label ?? null,
+    variable_label: structuredIdentity?.variableLabel ?? null,
     measure,
     target_role: targetRole,
     source_measure_id: sourceMeasureId,
@@ -1415,10 +1130,11 @@ function enrichTargetRow(
     variable_key: variableKey,
     // v2 published metadata (null on v1).
     source_citation:
-      typeof row.source === "string"
+      structuredIdentity?.sourceCitation ??
+      (typeof row.source === "string"
         ? (row.source as string)
-        : publishedSource?.citation ?? null,
-    source_url: publishedSource?.url ?? null,
+        : null),
+    source_url: structuredIdentity?.sourceUrl ?? null,
     entity: typeof row.entity === "string" ? (row.entity as string) : null,
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
@@ -1770,6 +1486,7 @@ export interface TreemapLeaf {
   key: string;
   source: string;
   variable: string;
+  label: string | null;
   measure: string | null;
   measure_counts: { measure: string | null; n_targets: number }[];
   filters: TreemapFilters;
@@ -1874,6 +1591,13 @@ export function microcosmTargetTreemap(
       .map((row) => numberOrNull(row.abs_relative_error))
       .filter((v): v is number => v != null && Number.isFinite(v));
     const first = group[0];
+    const variableLabels = [
+      ...new Set(
+        group
+          .map((row) => stringValue(row.variable_label)?.trim())
+          .filter((label): label is string => Boolean(label)),
+      ),
+    ];
     const filters: TreemapFilters =
       breakdown === "geography"
         ? { geography: key }
@@ -1885,6 +1609,10 @@ export function microcosmTargetTreemap(
         breakdown === "geography"
           ? key
           : String(first.variable ?? key),
+      label:
+        breakdown === "geography" || variableLabels.length !== 1
+          ? null
+          : variableLabels[0],
       measure: null,
       measure_counts: measureCounts(group),
       filters,
@@ -1953,6 +1681,7 @@ export function microcosmTargetTreemap(
 export interface TargetSchema {
   diagnostics_schema_version: number | null;
   structured_dimensions: boolean;
+  target_representation: TargetRepresentation;
 }
 
 export interface Calibration {
@@ -2209,6 +1938,7 @@ export function buildCalibration(
   const targets = (Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : []).map(
     normalizeDiagnosticsRow,
   );
+  const targetRepresentation = classifyTargetRepresentation(targets);
   const skipped = Array.isArray(diag.skipped) ? (diag.skipped as JsonObject[]) : [];
   const targetCompilation = asObject(asObject(buildManifest.gates).target_compilation);
   const droppedTargetNames = Array.isArray(targetCompilation.dropped_target_names)
@@ -2253,6 +1983,7 @@ export function buildCalibration(
     target_schema: {
       diagnostics_schema_version: numberOrNull(diag.schema_version),
       structured_dimensions: isPlainObject(diag.dimensions),
+      target_representation: targetRepresentation,
     },
     description:
       stringValue(diag.description) ??
@@ -2300,13 +2031,13 @@ export function hfResolveUrl(path: string, country: MicrocosmCountry = "us"): st
 
 // A hung HF request would otherwise block the function for the whole route
 // maxDuration and pin the shared in-flight cache promise; cap each fetch.
-const HF_FETCH_TIMEOUT_MS = 20_000;
+const MICROCOSM_RELEASE_FETCH_TIMEOUT_MS = 120_000;
 
 async function hfFetch(url: string, revalidate: number): Promise<Response> {
   return fetch(url, {
     next: { revalidate },
     headers: hfAuthHeaders(),
-    signal: AbortSignal.timeout(HF_FETCH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(MICROCOSM_RELEASE_FETCH_TIMEOUT_MS),
   });
 }
 

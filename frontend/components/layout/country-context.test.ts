@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
 
-import { countrySwitchUrl, isCountry } from "./country-context";
+import {
+  countrySwitchUrl,
+  isCountry,
+  selectedReleaseForCountry,
+} from "./country-context";
 
 test("country switching clears bundle-specific Cross-dataset state", () => {
   const switched = new URL(
@@ -14,16 +18,24 @@ test("country switching clears bundle-specific Cross-dataset state", () => {
   expect(switched.searchParams.toString()).toBe("country=be");
 });
 
-test("country switching preserves route state outside Cross-dataset", () => {
+test("country switching preserves route filters but clears the selected release", () => {
   const switched = new URL(
     countrySwitchUrl(
-      "https://example.test/microcosm/targets?country=us&variable=income_tax",
+      "https://example.test/microcosm/targets?country=us&release=us-build&variable=income_tax",
       "uk",
     ),
   );
 
   expect(switched.pathname).toBe("/microcosm/targets");
   expect(switched.searchParams.toString()).toBe("country=uk&variable=income_tax");
+  expect(switched.searchParams.has("release")).toBe(false);
+});
+
+test("a release selection is used only by the country that supplied it", () => {
+  const selection = { country: "us" as const, value: "us-build" };
+
+  expect(selectedReleaseForCountry("us", selection)).toBe("us-build");
+  expect(selectedReleaseForCountry("be", selection)).toBe("");
 });
 
 test("the client country parser accepts every registered country and nothing else", () => {

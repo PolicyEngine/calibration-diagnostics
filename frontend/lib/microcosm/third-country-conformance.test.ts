@@ -202,7 +202,7 @@ describe("synthetic third-country conformance", () => {
       navGroupsForCountry(COUNTRY)
         .flatMap((group) => group.items)
         .map((item) => item.href),
-    ).toEqual(["/microcosm", "/microcosm/targets", "/microcosm/compare"]);
+    ).toEqual(["/microcosm", "/microcosm/compare"]);
   });
   test(
     "zz overview data can carry artifact-provided intro copy: the summary omits a typed presentation contract",
@@ -280,7 +280,13 @@ describe("synthetic third-country conformance", () => {
         },
         targets: diagnosticsFixture.targets.map((target, index) =>
           index < facetValues.length
-            ? { ...target, filter: null, dimensions: facetValues[index] }
+            ? {
+                ...target,
+                source: { id: PUBLISHER, citation: "ZZ official population table" },
+                variable: { id: "population", measure: "count" },
+                filter: null,
+                dimensions: facetValues[index],
+              }
             : target,
         ),
       };
@@ -335,16 +341,14 @@ describe("synthetic third-country conformance", () => {
         );
         return {
           ...target,
-          ...(index === 0
+          filter: index === 0 ? null : target.filter,
+          dimensions: index === 0
             ? {
-                filter: null,
-                dimensions: {
-                  region: "north",
-                  sex: "female",
-                  age_band: "0_17",
-                },
+                region: "north",
+                sex: "female",
+                age_band: "0_17",
               }
-            : {}),
+            : {},
           source: structuredSource,
           variable: structuredVariable,
           metadata,
@@ -361,12 +365,8 @@ describe("synthetic third-country conformance", () => {
       COUNTRY,
     );
 
-    expect(futureCalibration.rows.map((row) => row.dimension_adapter)).toEqual([
-      "structured",
-      "legacy_filter",
-      "legacy_filter",
-      "legacy_name",
-    ]);
+    expect(futureCalibration.rows.every((row) => row.dimension_adapter === "structured"))
+      .toBe(true);
     const page = latestMicrocosmTargetDiagnosticsPage(
       `http://x/api/microcosm/target-diagnostics?variable=${encodeURIComponent("novastat_agency / population · count")}`,
       futureCalibration,

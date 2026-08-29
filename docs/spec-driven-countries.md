@@ -212,37 +212,57 @@ artifact label, range values such as `0_17` and `65_plus` become `0–17` and
 A geography-role dimension sets `row.geography` and uses its declared `level`
 or `"region"`. Other dimensions become `target_dimensions` with `key`,
 `label`, `value`, `source_key`, `raw_value`, and an optional zero-based `rank`.
+The published dimension ID, not its display label, determines `key`. Simple
+lowercase IDs retain keys such as `bd_age_band`; IDs containing other
+characters receive a lossless query-safe encoding. Consequently, two distinct
+dimensions may share a display label without merging into one facet.
 Facet values use rank order only when every displayed value has a rank;
 otherwise the legacy facet sorter remains in force. Structured rows are also
 excluded from whole-population estimate-scope inference.
 
-Adapter selection is per row and never by country:
+### Target representation classification
 
-1. A plain-object `targets[].dimensions` selects `structured`, even when the
-   dictionary is absent or the row object is empty.
-2. Otherwise, a filter matched by the shared filter-decomposition specs selects
-   `legacy_filter`.
-3. Every other row selects `legacy_name`, preserving dotted/slash name parsing
-   and Chronicle metadata dimensions.
+The dashboard classifies each target row by structure before normalizing it,
+then summarizes the complete `targets` array. Diagnostics schema versions do
+not identify the target representation: published schema 5 and schema 6 files
+can both contain legacy string fields. The structural classification is:
 
-Each target response records this choice as `dimension_adapter`. Calibration
-summary and target-diagnostics responses include:
+1. `structured` when every row has a plain-object `source` with a non-empty
+   `id`, a plain-object `variable` with a non-empty `id`, and a plain-object
+   `dimensions` field. Use `{}` when a target has no dimensions.
+2. `legacy` when no row has object-valued `source`, `variable`, or `dimensions`
+   fields.
+3. `mixed` when complete structured rows and complete legacy rows occur together.
+4. `unknown` when there are no target rows.
+
+Every target row must independently satisfy either the structured or legacy
+shape. Partially structured rows are invalid. In a mixed file, each complete
+structured row uses the structured reader and each complete legacy row uses the
+legacy reader; the file-level `mixed` value is descriptive and does not select a
+third normalization strategy.
+
+Calibration summary and target-diagnostics responses report the classification:
 
 ```json
 {
   "target_schema": {
     "diagnostics_schema_version": 7,
-    "structured_dimensions": true
+    "structured_dimensions": true,
+    "target_representation": "structured"
   }
 }
 ```
 
 `structured_dimensions` reports whether the diagnostics published a plain
-dimension dictionary; it does not choose every row's adapter.
+dimension dictionary. `target_representation` summarizes the collection. The
+existing per-row `dimension_adapter` response field remains for compatibility
+and describes only whether that row's dimensions came from a structured object,
+a known legacy filter, or legacy name and metadata parsing.
 
 ### Structured source and variable identifiers
 
-Targets accept their legacy strings or the following objects:
+Fully structured targets use the following objects together. The `dimensions`
+object is required and may be empty:
 
 ```json
 {
@@ -258,34 +278,38 @@ Targets accept their legacy strings or the following objects:
         "id": "population",
         "label": "Resident population",
         "measure": "count"
-      }
+      },
+      "dimensions": {}
     }
   ]
 }
 ```
 
-Publisher-key precedence is Chronicle metadata, then `source.id`, then legacy
-name grammar. `source_citation` is the legacy source string or
-`source.citation`; `source_url` is the structured URL or `null`. The publisher
-label precedence is the manifest map, `source.label`, then the shared
-humanizer.
+For a `structured` file, navigation identity comes only from `source`,
+`variable`, and `dimensions`. Legacy names, filters, registry families, and
+Chronicle metadata cannot change its source, statistic, geography, or
+breakdown dimensions. The source and variable IDs remain stable selection
+keys; their labels are returned separately for display.
 
-Variable-ID precedence is `variable.id`, `metadata.variable`, then the existing
-artifact/name fallbacks. A structured ID remains an identifier; its display
-name is separately returned as `variable_label`. Measure precedence is
-`variable.measure`, then the existing first-dimension and Chronicle metadata
-logic. Legacy string sources and variables retain their existing values,
-families, citations, facets, and grouping. The new response fields are
-additive: `source_label`, `source_url`, `variable_label`, and
-`dimension_adapter`.
+For a `legacy` file, the isolated legacy reader handles the established dotted,
+slash, Chronicle metadata, and known filter encodings. It does not interpret an
+arbitrary underscore as a structural separator.
+
+For a `mixed` file, fully legacy rows retain legacy behavior. Partially
+structured rows use the compatibility precedence: Chronicle publisher ID,
+then `source.id`, then legacy source parsing; `variable.id`, then legacy
+variable parsing; structured dimensions, then known filter dimensions, then
+legacy metadata and name dimensions. This prevents one partially migrated row
+from changing unrelated legacy rows in the same file.
 
 ### Producer follow-up
 
 Microcosm release producers must publish all of the following before the legacy
-presentation and parsing adapters can be retired:
+presentation and normalization readers can be retired:
 
 - `release_manifest.country`;
 - `release_manifest.presentation`;
 - `release_manifest.publisher_labels`;
-- `calibration_diagnostics.dimensions` and `targets[].dimensions`; and
-- structured `targets[].source` and `targets[].variable` objects.
+- `calibration_diagnostics.dimensions`;
+- a `targets[].dimensions` object on every row, including `{}` where empty; and
+- structured `targets[].source` and `targets[].variable` objects on every row.
