@@ -554,12 +554,6 @@ export function StagingTargetChangeMap({
         ) : null}
       </div>
 
-      {data.methodology.warning ? (
-        <div className="rounded-lg border border-[var(--warn)] bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
-          {data.methodology.warning}
-        </div>
-      ) : null}
-
       <div className="flex min-w-0 items-center gap-3 text-xs">
         {upLabel ? (
           <button
