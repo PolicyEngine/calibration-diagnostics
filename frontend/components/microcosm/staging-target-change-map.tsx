@@ -202,7 +202,7 @@ function Control<T extends string>({
 }: {
   label: string;
   value: T;
-  options: Array<{ value: T; label: string }>;
+  options: Array<{ value: T; label: string; tooltip?: string }>;
   onChange: (value: T) => void;
 }) {
   return (
@@ -216,20 +216,38 @@ function Control<T extends string>({
         className="flex rounded-lg border border-border bg-muted/40 p-1"
       >
         {options.map((option) => (
-          <button
+          <div
             key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={value === option.value}
-            onClick={() => onChange(option.value)}
-            className={`h-8 rounded-md px-3 text-[13px] font-medium ${
+            role="presentation"
+            className={`flex h-8 items-center rounded-md text-[13px] font-medium ${
               value === option.value
                 ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground"
             }`}
           >
-            {option.label}
-          </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={value === option.value}
+              onClick={() => onChange(option.value)}
+              className={`h-full cursor-pointer hover:text-foreground ${
+                option.tooltip ? "pl-3 pr-1" : "px-3"
+              }`}
+            >
+              {option.label}
+            </button>
+            {option.tooltip ? (
+              <span className="mr-2 inline-flex">
+                <HelpHint
+                  label={<span className="sr-only">About {option.label}</span>}
+                  tooltip={option.tooltip}
+                  interaction="click"
+                  underline={false}
+                  inheritTypography
+                />
+              </span>
+            ) : null}
+          </div>
         ))}
       </div>
     </div>
@@ -481,8 +499,16 @@ export function StagingTargetChangeMap({
             label="Comparison"
             value={mode}
             options={[
-              { value: "reported", label: "Reported error change" },
-              { value: "shared", label: "Shared-target comparison" },
+              {
+                value: "reported",
+                label: "Reported error change",
+                tooltip: MODE_HELP.reported,
+              },
+              {
+                value: "shared",
+                label: "Shared-target comparison",
+                tooltip: MODE_HELP.shared,
+              },
             ]}
             onChange={(nextMode) => {
               setExpanded(null);
@@ -503,12 +529,6 @@ export function StagingTargetChangeMap({
             }}
           />
         </div>
-        <HelpHint
-          label={mode === "reported" ? "About reported change" : "About shared comparison"}
-          tooltip={MODE_HELP[mode]}
-          interaction="click"
-          underline={false}
-        />
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
