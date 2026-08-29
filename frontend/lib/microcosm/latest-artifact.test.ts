@@ -203,7 +203,8 @@ test("structured dimensions shape rows and honor artifact value order", () => {
   ) => ({
     name: `fixture.population.${suffix}@2026`,
     target_name: `fixture.population.${suffix}`,
-    source: "ZZ official population table",
+    source: { id: "novastat_agency", citation: "ZZ official population table" },
+    variable: { id: "population", measure: "count" },
     metadata: {
       chronicle_record_ids: [`novastat_agency.population.${suffix}`],
       variable: "population",
@@ -261,7 +262,7 @@ test("structured dimensions shape rows and honor artifact value order", () => {
   expect(cal.target_schema).toEqual({
     diagnostics_schema_version: 7,
     structured_dimensions: true,
-    target_representation: "mixed",
+    target_representation: "structured",
   });
   expect(cal.rows.every((row) => row.dimension_adapter === "structured")).toBe(true);
   expect(cal.rows[0]).toMatchObject({
@@ -310,7 +311,8 @@ test("structured dimensions shape rows and honor artifact value order", () => {
 test("structured facet ordering falls back when any displayed value lacks a rank", () => {
   const target = (suffix: string, category: string) => ({
     name: `fixture.population.${suffix}@2026`,
-    source: "Citation",
+    source: { id: "novastat_agency", citation: "Citation" },
+    variable: { id: "population", measure: "count" },
     metadata: {
       chronicle_record_ids: ["novastat_agency.population.total"],
       variable: "population",
@@ -344,7 +346,7 @@ test("structured facet ordering falls back when any displayed value lacks a rank
   ]);
 });
 
-test("dimension adapters are selected per row and structured values beat legacy filters", () => {
+test("mixed files select the dimension adapter from each complete row representation", () => {
   const base = {
     source: "ZZ official population table",
     metadata: {
@@ -372,6 +374,8 @@ test("dimension adapters are selected per row and structured values beat legacy 
         {
           ...base,
           name: "fixture_population_north_female_0_17@2026",
+          source: { id: "novastat_agency", citation: "ZZ official population table" },
+          variable: { id: "population", measure: "count" },
           filter: "cell_south_male_65_plus",
           dimensions: { region: "north", sex: "female", age_band: "0_17" },
         },
@@ -407,7 +411,8 @@ test("dimension adapters are selected per row and structured values beat legacy 
 
 test("structured rows do not require a dimensions dictionary, including empty objects", () => {
   const base = {
-    source: "Citation",
+    source: { id: "novastat_agency", citation: "Citation" },
+    variable: { id: "population", measure: "count" },
     metadata: { variable: "population", source_measure_id: "population_count" },
     filter: "cell_south_male_18_64",
     target: 1,
@@ -456,7 +461,8 @@ test("structured rows do not require a dimensions dictionary, including empty ob
 test("structured dimensions prevent whole-population estimate-scope warnings", () => {
   const target = (recordSet: string, category: string, targetValue: number) => ({
     name: `source.example.${category}.amount@2026`,
-    source: "Citation",
+    source: { id: "source", citation: "Citation" },
+    variable: { id: "example", measure: "amount" },
     metadata: {
       variable: "example",
       source_measure_id: "example_amount",
@@ -2036,7 +2042,7 @@ test("structured dimension ids remain independent when display labels repeat", (
   expect(mixed.rows[0].target_dimensions).toEqual(cal.rows[0].target_dimensions);
 });
 
-test("mixed diagnostics preserve legacy rows and isolate partial-field precedence", () => {
+test("mixed diagnostics dispatch complete legacy and structured rows independently", () => {
   const cal = buildCalibration(
     {
       targets: [
@@ -2064,6 +2070,7 @@ test("mixed diagnostics preserve legacy rows and isolate partial-field precedenc
             label: "Resident population",
             measure: "count",
           },
+          dimensions: {},
           metadata: {
             chronicle_record_ids: ["chronicle_agency.population.total"],
             variable: "legacy_population",
@@ -2084,17 +2091,17 @@ test("mixed diagnostics preserve legacy rows and isolate partial-field precedenc
     dimension_adapter: "legacy_name",
   });
   expect(cal.rows[1]).toMatchObject({
-    source: "chronicle_agency",
+    source: "artifact_agency",
     source_label: "Artifact agency",
     source_citation: "Official population table",
     variable: "resident_population",
     variable_label: "Resident population",
     measure: "count",
-    dimension_adapter: "legacy_name",
+    dimension_adapter: "structured",
   });
 });
 
-test("structured source and variable fields follow artifact precedence", () => {
+test("structured source and variable fields remain authoritative", () => {
   const target = {
     name: "legacy.publisher.population.total@2026",
     source: {
@@ -2108,6 +2115,7 @@ test("structured source and variable fields follow artifact precedence", () => {
       label: "Resident population",
       measure: "mean",
     },
+    dimensions: {},
     metadata: {
       chronicle_record_ids: ["chronicle_agency.population.total"],
       variable: "legacy_population",
@@ -2122,18 +2130,18 @@ test("structured source and variable fields follow artifact precedence", () => {
     "structured-identifiers",
     null,
     {},
-    { publisher_labels: { chronicle_agency: "Manifest agency label" } },
+    { publisher_labels: { artifact_agency: "Manifest agency label" } },
   );
 
   expect(cal.rows[0]).toMatchObject({
-    source: "chronicle_agency",
+    source: "artifact_agency",
     source_label: "Manifest agency label",
     source_citation: "Official population table",
     source_url: "https://stats.example/population",
     variable: "resident_population",
     variable_label: "Resident population",
     measure: "mean",
-    variable_key: "chronicle_agency / resident_population · mean",
+    variable_key: "artifact_agency / resident_population · mean",
   });
   const response = latestMicrocosmTargetDiagnosticsPage(
     "http://x/api/microcosm/target-diagnostics",

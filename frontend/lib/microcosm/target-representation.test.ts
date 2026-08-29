@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  classifyTargetRow,
   classifyTargetRepresentation,
   isCompleteStructuredTarget,
   isLegacyTarget,
@@ -40,13 +41,17 @@ describe("calibration target representation", () => {
     ])).toBe("structured");
   });
 
-  test("classifies combined or partially structured rows as mixed", () => {
+  test("classifies a collection containing complete structured and legacy rows as mixed", () => {
     expect(classifyTargetRepresentation([
       structured,
       { name: "irs.population.total", source: "IRS SOI" },
     ])).toBe("mixed");
-    expect(classifyTargetRepresentation([
-      { source: { id: "novastat" }, variable: "population" },
-    ])).toBe("mixed");
+  });
+
+  test("rejects partially structured rows", () => {
+    expect(() => classifyTargetRow({
+      source: { id: "novastat" },
+      variable: "population",
+    })).toThrow("complete structured identity fields or legacy fields");
   });
 });

@@ -13,7 +13,6 @@ import {
   stateFromGeoId,
   type ParsedLegacyTarget,
 } from "./legacy-target-reader";
-import { readMixedTarget } from "./mixed-target-reader";
 import {
   COUNTRY_REGISTRY,
   DEFAULT_COUNTRY,
@@ -32,10 +31,10 @@ import {
   type TargetLossDiagnosticWarning,
 } from "./target-loss-attribution";
 import {
+  classifyTargetRow,
   classifyTargetRepresentation,
   type TargetRepresentation,
 } from "./target-representation";
-import { readStructuredDimensions } from "./structured-dimension-reader";
 import { readStructuredTarget } from "./structured-target-reader";
 
 // The registry is the registration point; these re-exports keep the server
@@ -978,7 +977,6 @@ function enrichTargetRow(
   artifactCountry: ArtifactCountry,
   publisherLabels: Record<string, string>,
   dimensionDefinitions: Record<string, DiagnosticsDimension>,
-  targetRepresentation: TargetRepresentation,
 ): TargetRow {
   const nationalGeography = artifactCountry.geography_label;
   const metadata = normalizeChronicleMetadata(rawRow.metadata);
@@ -1018,17 +1016,14 @@ function enrichTargetRow(
     initialError == null || finalError == null
       ? null
       : Math.abs(initialError) - Math.abs(finalError);
-  const structuredIdentity = targetRepresentation === "structured"
+  const rowRepresentation = classifyTargetRow(row);
+  const structuredIdentity = rowRepresentation === "structured"
     ? readStructuredTarget(row, dimensionDefinitions, nationalGeography)
     : null;
-  const permitsCompatibilityFields = targetRepresentation === "mixed";
-  const structuredDecomposition = permitsCompatibilityFields && isPlainObject(row.dimensions)
-    ? readStructuredDimensions(row.dimensions, dimensionDefinitions)
-    : null;
-  const filterDecomposition = structuredIdentity || structuredDecomposition
+  const filterDecomposition = structuredIdentity
     ? null
     : decomposeTargetFilter(row.filter);
-  const dimensionAdapter = structuredIdentity || structuredDecomposition
+  const dimensionAdapter = structuredIdentity
     ? "structured"
     : filterDecomposition
       ? "legacy_filter"
@@ -1041,9 +1036,6 @@ function enrichTargetRow(
         nationalGeography,
         filterDecomposition,
       );
-  const mixedIdentity = permitsCompatibilityFields
-    ? readMixedTarget(row, legacyParsed!, structuredDecomposition)
-    : null;
   const parsed: ParsedTarget = structuredIdentity
     ? {
         geography: structuredIdentity.geography,
@@ -1052,14 +1044,13 @@ function enrichTargetRow(
         variable: structuredIdentity.variable,
         breakdown: structuredIdentity.breakdown,
       }
-    : mixedIdentity?.parsed ?? legacyParsed!;
+    : legacyParsed!;
   const hasGeography = Boolean(parsed.geography.trim());
   const geography = hasGeography ? parsed.geography : nationalGeography;
   const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
   const measureCol = asObject(row.measure);
   const metadataTargetDimensions =
     structuredIdentity?.dimensions ??
-    structuredDecomposition?.dimensions ??
     filterDecomposition?.dimensions ??
     metadataDimensions(row);
   const targetDimensions =
@@ -1078,14 +1069,11 @@ function enrichTargetRow(
   // IRS variables publish both a total (dollar amount) and a count (number of
   // returns), so the measure is part of the variable's identity, not a
   // breakdown within it — fold it into variable_key so they're distinct things.
-  const measure =
-    structuredIdentity?.measure ??
-    (structuredIdentity
-      ? null
-      : mixedIdentity?.variableMeasure ??
-        (dims[0] && MEASURES.has(dims[0])
-          ? dims[0]
-          : measureFromMetadata(metadata)));
+  const measure = structuredIdentity
+    ? structuredIdentity.measure
+    : dims[0] && MEASURES.has(dims[0])
+      ? dims[0]
+      : measureFromMetadata(metadata);
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
   // Underscore identifiers and filter-decomposed targets use the structured
@@ -1094,9 +1082,6 @@ function enrichTargetRow(
   // not regroup merely because they also carry Chronicle record IDs.
   const usesArtifactFamily =
     structuredIdentity != null ||
-    mixedIdentity?.hasStructuredSource === true ||
-    mixedIdentity?.hasStructuredVariable === true ||
-    structuredDecomposition != null ||
     filterDecomposition != null ||
     (chroniclePublisherFromMetadata(metadata) != null &&
       !baseName.includes("/") &&
@@ -1117,13 +1102,9 @@ function enrichTargetRow(
         ? publisherLabels[parsed.source]
         : undefined) ??
       structuredIdentity?.sourceLabel ??
-      mixedIdentity?.sourceLabel ??
       sourceAuthorityLabel(parsed.source),
     variable: parsed.variable,
-    variable_label:
-      structuredIdentity?.variableLabel ??
-      mixedIdentity?.variableLabel ??
-      null,
+    variable_label: structuredIdentity?.variableLabel ?? null,
     measure,
     target_role: targetRole,
     source_measure_id: sourceMeasureId,
@@ -1152,11 +1133,8 @@ function enrichTargetRow(
       structuredIdentity?.sourceCitation ??
       (typeof row.source === "string"
         ? (row.source as string)
-        : mixedIdentity?.sourceCitation ?? null),
-    source_url:
-      structuredIdentity?.sourceUrl ??
-      mixedIdentity?.sourceUrl ??
-      null,
+        : null),
+    source_url: structuredIdentity?.sourceUrl ?? null,
     entity: typeof row.entity === "string" ? (row.entity as string) : null,
     aggregation: typeof row.aggregation === "string" ? (row.aggregation as string) : null,
     measure_name: typeof measureCol.name === "string" ? (measureCol.name as string) : null,
@@ -1983,7 +1961,6 @@ export function buildCalibration(
         artifactCountry,
         publisherLabels,
         dimensionDefinitions,
-        targetRepresentation,
       ),
     ),
   );

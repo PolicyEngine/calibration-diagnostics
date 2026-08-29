@@ -222,19 +222,24 @@ excluded from whole-population estimate-scope inference.
 
 ### Target representation classification
 
-The dashboard classifies the complete `targets` array once before normalizing
-any row. Diagnostics schema versions do not identify the target representation:
-published schema 5 and schema 6 files can both contain legacy string fields.
-The structural classification is:
+The dashboard classifies each target row by structure before normalizing it,
+then summarizes the complete `targets` array. Diagnostics schema versions do
+not identify the target representation: published schema 5 and schema 6 files
+can both contain legacy string fields. The structural classification is:
 
 1. `structured` when every row has a plain-object `source` with a non-empty
    `id`, a plain-object `variable` with a non-empty `id`, and a plain-object
    `dimensions` field. Use `{}` when a target has no dimensions.
 2. `legacy` when no row has object-valued `source`, `variable`, or `dimensions`
    fields.
-3. `mixed` when complete structured rows, legacy rows, or partially structured
-   rows occur together.
+3. `mixed` when complete structured rows and complete legacy rows occur together.
 4. `unknown` when there are no target rows.
+
+Every target row must independently satisfy either the structured or legacy
+shape. Partially structured rows are invalid. In a mixed file, each complete
+structured row uses the structured reader and each complete legacy row uses the
+legacy reader; the file-level `mixed` value is descriptive and does not select a
+third normalization strategy.
 
 Calibration summary and target-diagnostics responses report the classification:
 
@@ -249,8 +254,8 @@ Calibration summary and target-diagnostics responses report the classification:
 ```
 
 `structured_dimensions` reports whether the diagnostics published a plain
-dimension dictionary. `target_representation` selects the normalization reader.
-The existing per-row `dimension_adapter` response field remains for compatibility
+dimension dictionary. `target_representation` summarizes the collection. The
+existing per-row `dimension_adapter` response field remains for compatibility
 and describes only whether that row's dimensions came from a structured object,
 a known legacy filter, or legacy name and metadata parsing.
 

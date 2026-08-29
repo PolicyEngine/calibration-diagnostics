@@ -1,4 +1,5 @@
 export type TargetRepresentation = "legacy" | "structured" | "mixed" | "unknown";
+export type TargetRowRepresentation = "legacy" | "structured";
 
 type JsonObject = Record<string, unknown>;
 
@@ -28,11 +29,19 @@ export function isLegacyTarget(row: JsonObject): boolean {
   );
 }
 
+export function classifyTargetRow(row: JsonObject): TargetRowRepresentation {
+  if (isCompleteStructuredTarget(row)) return "structured";
+  if (isLegacyTarget(row)) return "legacy";
+  throw new Error(
+    "Calibration target rows must use either complete structured identity fields or legacy fields.",
+  );
+}
+
 export function classifyTargetRepresentation(
   rows: readonly JsonObject[],
 ): TargetRepresentation {
   if (rows.length === 0) return "unknown";
-  if (rows.every(isCompleteStructuredTarget)) return "structured";
-  if (rows.every(isLegacyTarget)) return "legacy";
-  return "mixed";
+  const representations = new Set(rows.map(classifyTargetRow));
+  if (representations.size > 1) return "mixed";
+  return representations.has("structured") ? "structured" : "legacy";
 }
