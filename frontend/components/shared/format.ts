@@ -31,6 +31,13 @@ function releaseDateFromId(releaseId: string): string {
   return releaseId.match(/-(\d{8}(?:T\d{6}Z)?)$/)?.[1] ?? "";
 }
 
+// Release identifiers begin with a stable product/year prefix. Return the
+// varying identifier segment so compact labels distinguish one release from
+// another instead of all beginning with "popula".
+export function shortReleaseId(releaseId: string, length = 6): string {
+  return releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0].slice(0, length);
+}
+
 // A readable label for a release: "2026-06-14 · f32c2e5".
 export function releaseLabel(releaseId: string, date?: string | null): string {
   // Deprecated upstream identifier: Microcosm release IDs still use the former
@@ -58,6 +65,26 @@ export function fmt(
     return formatNumber(value);
   }
   return value.toFixed(opts.digits ?? 4);
+}
+
+export function differingPercentDigits(
+  left: number | null | undefined,
+  right: number | null | undefined,
+  maxDigits = 10,
+): number {
+  if (
+    left == null || right == null ||
+    !Number.isFinite(left) || !Number.isFinite(right)
+  ) {
+    return 1;
+  }
+  const limit = Math.max(1, Math.floor(maxDigits));
+  for (let digits = 1; digits <= limit; digits += 1) {
+    if (fmt(left, { pct: true, digits }) !== fmt(right, { pct: true, digits })) {
+      return digits;
+    }
+  }
+  return limit;
 }
 
 export function fmtSigned(

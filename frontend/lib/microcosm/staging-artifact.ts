@@ -15,8 +15,22 @@ import {
   type ReformValidation,
   buildReformValidation,
 } from "@/lib/microcosm/reforms";
+import {
+  buildTargetChangeDataset,
+  type TargetChangeDataset,
+} from "@/lib/microcosm/target-change";
 
 type JsonObject = Record<string, unknown>;
+
+interface TargetChangeCacheEntry {
+  expiresAt: number;
+  promise: Promise<TargetChangeDataset | null>;
+}
+
+const TARGET_CHANGE_FINAL_CACHE_SECONDS = 21_600;
+const TARGET_CHANGE_MUTABLE_CACHE_SECONDS = 30;
+const TARGET_CHANGE_CACHE_LIMIT = 8;
+const targetChangeCache = new Map<string, TargetChangeCacheEntry>();
 
 export const MICROCOSM_STAGING_HF_REPO_ENV = "POPULACE_STAGING_HF_REPO";
 export const MICROCOSM_STAGING_HF_REVISION_ENV = "POPULACE_STAGING_HF_REVISION";
@@ -148,6 +162,12 @@ export interface StagingRunDetail {
 
 function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+export function stagingTargetChangeCacheTtlSeconds(status: unknown): number {
+  return ["passed", "published", "failed"].includes(String(status ?? "").trim())
+    ? TARGET_CHANGE_FINAL_CACHE_SECONDS
+    : TARGET_CHANGE_MUTABLE_CACHE_SECONDS;
 }
 
 function summaryFromProgress(runId: string, progress: JsonObject | null): StagingRunSummary {
@@ -313,6 +333,52 @@ export async function loadStagingCalibration(
     {},
     country,
   );
+}
+
+export async function loadStagingTargetChangeDataset(
+  runId: string,
+  releaseId: string,
+  country: MicrocosmCountry = "us",
+): Promise<TargetChangeDataset | null> {
+  if (stagingUnavailableReason(country)) return null;
+  assertSafeReleaseId(runId, "run");
+  assertSafeReleaseId(releaseId, "release");
+  const progress = await stagingJsonOrNull(
+    `runs/${runId}/progress.json`,
+    TARGET_CHANGE_MUTABLE_CACHE_SECONDS,
+  );
+  const ttlSeconds = stagingTargetChangeCacheTtlSeconds(progress?.status);
+  const cacheKey = `${country}:${runId}:${releaseId}`;
+  const now = Date.now();
+  for (const [key, entry] of targetChangeCache) {
+    if (entry.expiresAt <= now) targetChangeCache.delete(key);
+  }
+  const cached = targetChangeCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = Promise.all([
+    loadRelease(releaseId, TARGET_CHANGE_FINAL_CACHE_SECONDS, country),
+    loadStagingCalibration(runId, ttlSeconds, country),
+  ]).then(([release, candidate]) =>
+    candidate ? buildTargetChangeDataset(release, candidate) : null,
+  );
+  targetChangeCache.set(cacheKey, {
+    expiresAt: now + ttlSeconds * 1000,
+    promise,
+  });
+  while (targetChangeCache.size > TARGET_CHANGE_CACHE_LIMIT) {
+    const oldest = targetChangeCache.keys().next().value;
+    if (typeof oldest !== "string") break;
+    targetChangeCache.delete(oldest);
+  }
+  try {
+    const result = await promise;
+    if (!result) targetChangeCache.delete(cacheKey);
+    return result;
+  } catch (error) {
+    targetChangeCache.delete(cacheKey);
+    throw error;
+  }
 }
 
 export async function loadStagingRun(

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@policyengine/ui-kit";
 
 import {
@@ -19,6 +19,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
+import { OverviewMetric } from "@/components/shared/overview-metric";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill } from "@/components/shared/status-pill";
@@ -57,22 +58,6 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (isNormalizedLoss(kind)) return fmt(value, { pct: true, digits: 2 });
   if (value === 0) return "0";
   return value.toExponential(3).replace("e+", "e");
-}
-
-function OverviewMetric({ label, value }: { label: ReactNode; value: string }) {
-  return (
-    <div className="min-w-0 flex-1 px-4 py-3.5 text-center sm:px-5">
-      <div className="flex h-8 items-start justify-center text-[10px] font-semibold uppercase leading-tight tracking-[0.12em] text-muted-foreground">
-        {label}
-      </div>
-      <div
-        className="mt-1 truncate text-2xl font-semibold tabular-nums text-foreground"
-        title={value}
-      >
-        {value}
-      </div>
-    </div>
-  );
 }
 
 export function MicrocosmOverviewView({

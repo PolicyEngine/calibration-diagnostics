@@ -260,6 +260,7 @@ test("structured dimensions shape rows and honor artifact value order", () => {
     target_representation: "structured",
   });
   expect(cal.rows.every((row) => row.dimension_adapter === "structured")).toBe(true);
+  expect(cal.rows.every((row) => row.target_representation === "structured")).toBe(true);
   expect(cal.rows[0]).toMatchObject({
     family: "novastat_agency/population",
     geography: "North",
@@ -554,7 +555,7 @@ test("live-US-shaped schema 5 rows preserve the legacy dotted contract", () => {
   ).targets[0];
 
   // JSON round-tripping matches the API boundary and locks every legacy field;
-  // the four new contract fields are strictly additive.
+  // the additional contract fields are strictly additive.
   expect(JSON.parse(JSON.stringify(responseRow))).toEqual({
     name: "bea_nipa.cy2023.proprietors_income.a041rc.amount@2024",
     target: 100,
@@ -599,6 +600,7 @@ test("live-US-shaped schema 5 rows preserve the legacy dotted contract", () => {
       },
     ],
     dimension_adapter: "legacy_name",
+    target_representation: "legacy",
     variable_key: "bea_nipa / proprietors income · total",
     source_citation: sourceCitation,
     source_url: null,
@@ -1246,6 +1248,111 @@ test("comparison matches on base_name across the @period boundary", () => {
   expect(cmp.variables[0].improved).toBe(1);
   expect(cmp.variables[0].regressed).toBe(1);
   expect(Array.isArray(cmp.rows[0].target_dimensions)).toBe(true);
+});
+
+test("comparison exposes each release's weighted target-error aggregate", () => {
+  const current = {
+    ...SAMPLE,
+    final_loss: 0.91,
+    target_loss_attribution: {
+      ...SAMPLE.target_loss_attribution,
+      status: "reported" as const,
+      aggregate: 0.123,
+    },
+  };
+  const candidate = {
+    ...SAMPLE,
+    release_id: "weighted-candidate",
+    final_loss: 0.82,
+    target_loss_attribution: {
+      ...SAMPLE.target_loss_attribution,
+      status: "reported" as const,
+      aggregate: 0.087,
+    },
+  };
+
+  const cmp = buildComparison(current, candidate);
+
+  expect(cmp.a.weighted_target_error).toBe(0.123);
+  expect(cmp.b.weighted_target_error).toBe(0.087);
+  expect(cmp.a.weighted_target_error).not.toBe(cmp.a.final_loss);
+  expect(cmp.b.weighted_target_error).not.toBe(cmp.b.final_loss);
+});
+
+test("comparison matches renamed legacy and structured targets by Chronicle fact key", () => {
+  const current = calibration([
+    {
+      name: "legacy.population.total@2024",
+      target_name: "legacy.population.total",
+      metadata: { ledger_fact_key: "agency.population.total" },
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 95,
+    },
+  ], "legacy-current");
+  const candidate = calibration([
+    {
+      name: "resident-population@2024",
+      source: { id: "agency", label: "Statistical agency" },
+      variable: { id: "resident_population", measure: "count" },
+      dimensions: {},
+      metadata: { ledger_fact_key: "agency.population.total" },
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 99,
+    },
+  ], "structured-candidate");
+
+  const cmp = buildComparison(current, candidate);
+  expect(cmp.summary).toMatchObject({
+    common: 1,
+    added: 0,
+    removed: 0,
+    improved: 1,
+    matching: {
+      current_representation: "legacy",
+      candidate_representation: "structured",
+      matched_by: { chronicle_fact_key: 1 },
+    },
+  });
+  expect(cmp.rows[0]).toMatchObject({
+    match_kind: "chronicle_fact_key",
+    current_name: "legacy.population.total@2024",
+    candidate_name: "resident-population@2024",
+    current_representation: "legacy",
+    candidate_representation: "structured",
+  });
+});
+
+test("comparison preserves duplicate names and resolves them by unique fallback keys", () => {
+  const row = (name: string, targetName: string, factKey: string) => ({
+    name,
+    target_name: targetName,
+    metadata: { ledger_fact_key: factKey },
+    target: 100,
+    initial_estimate: 100,
+    final_estimate: 100,
+  });
+  const current = calibration([
+    row("same@2024", "same", "fact-a"),
+    row("same@2025", "same", "fact-b"),
+  ], "duplicate-current");
+  const candidate = calibration([
+    row("renamed-a@2026", "renamed-a", "fact-a"),
+    row("renamed-b@2026", "renamed-b", "fact-b"),
+  ], "duplicate-candidate");
+
+  const cmp = buildComparison(current, candidate);
+  expect(cmp.summary).toMatchObject({
+    common: 2,
+    added: 0,
+    removed: 0,
+    matching: {
+      matched_by: { chronicle_fact_key: 2 },
+      ambiguous_key_groups: { base_name: 0 },
+    },
+  });
+  expect(new Set(cmp.rows.map((comparison) => comparison.comparison_id)).size).toBe(2);
 });
 
 test("new target loss weighting metadata marks loss as normalized", () => {
@@ -2084,6 +2191,7 @@ test("mixed diagnostics dispatch complete legacy and structured rows independent
     source: "bea",
     variable: "amount",
     dimension_adapter: "legacy_name",
+    target_representation: "legacy",
   });
   expect(cal.rows[1]).toMatchObject({
     source: "artifact_agency",
@@ -2093,6 +2201,7 @@ test("mixed diagnostics dispatch complete legacy and structured rows independent
     variable_label: "Resident population",
     measure: "count",
     dimension_adapter: "structured",
+    target_representation: "structured",
   });
 });
 

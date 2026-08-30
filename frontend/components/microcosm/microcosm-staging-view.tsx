@@ -1,19 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCountry } from "@/components/layout/country-context";
+import { StagingTargetChangeMap } from "@/components/microcosm/staging-target-change-map";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
+  differingPercentDigits,
   fmtUnitValue,
   fmt,
   fmtCompact,
   fmtMoney,
   fmtSignedMoney,
-  releaseLabel,
+  shortReleaseId,
 } from "@/components/shared/format";
+import { HelpHint } from "@/components/shared/help-hint";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
+import {
+  overviewMetricLabelTypographyClassName,
+  overviewMetricValueClassName,
+} from "@/components/shared/overview-metric";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
@@ -21,10 +28,19 @@ import {
   useMicrocosmStagingCompare,
   useMicrocosmStagingRun,
   useMicrocosmStagingRuns,
+  type MicrocosmStagingRunResponse,
   type MicrocosmStagingRunSummary,
   type ReformValidationRow,
 } from "@/lib/api/hooks/use-microcosm";
 import { countryRegistration, hasCapability } from "@/lib/microcosm/countries";
+import {
+  formatStagingCurrentStatus,
+  formatStagingStatus,
+} from "@/lib/microcosm/staging-status";
+import {
+  formatWeightedTargetError,
+  targetChangeMapIdentity,
+} from "@/lib/microcosm/target-change-visualization";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
 
@@ -65,9 +81,30 @@ function timeLabel(value: string | null | undefined): string {
   });
 }
 
-// A "running" run that hasn't reported for two hours is dead in practice —
-// builds emit events at least every stage, and stages run minutes, not hours.
-const STALL_MS = 2 * 60 * 60 * 1000;
+function timestampFromId(value: string | null | undefined): string | null {
+  const match = value?.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match;
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
+}
+
+function runStartTime(run: MicrocosmStagingRunSummary): string | null | undefined {
+  return (
+    run.started_at ??
+    timestampFromId(run.candidate_release_id) ??
+    timestampFromId(run.run_id) ??
+    run.updated_at
+  );
+}
+
+function runLabel(run: MicrocosmStagingRunSummary): string {
+  return `${timeLabel(runStartTime(run))} · ${shortReleaseId(
+    run.candidate_release_id || run.run_id,
+  )}`;
+}
+
+// Display a running or queued run as stalled after six hours without an update.
+const STALL_MS = 6 * 60 * 60 * 1000;
 
 function effectiveStatus(
   status: string | null | undefined,
@@ -77,6 +114,140 @@ function effectiveStatus(
   const t = updatedAt ? new Date(updatedAt).valueOf() : NaN;
   if (Number.isFinite(t) && Date.now() - t > STALL_MS) return "stalled";
   return status ?? null;
+}
+
+const STATUS_INDICATOR_CLASS: Record<StatusTone, string> = {
+  success: "swatch-pos",
+  warning: "swatch-warn",
+  danger: "swatch-neg",
+  info: "swatch-info",
+  neutral: "swatch-neutral",
+};
+
+function RunSelect({
+  runs,
+  selected,
+  placeholder,
+  onSelect,
+}: {
+  runs: MicrocosmStagingRunSummary[];
+  selected: string;
+  placeholder: string;
+  onSelect: (runId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selectedRun = runs.find((run) => run.run_id === selected);
+  const selectedStatus = effectiveStatus(
+    selectedRun?.status,
+    selectedRun?.updated_at,
+  );
+  const selectedTone = statusTone(selectedStatus);
+  const disabled = !runs.length;
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative w-[28rem] max-w-full">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        className={`flex h-9 w-full min-w-0 items-center gap-1.5 rounded-md border px-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+          selectedRun
+            ? "border-primary bg-primary/5"
+            : "border-border bg-background hover:bg-muted/40"
+        }`}
+      >
+        {selectedRun ? (
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 shrink-0 rounded-full ${STATUS_INDICATOR_CLASS[selectedTone]}`}
+          />
+        ) : null}
+        <span className="min-w-0 flex-1 truncate font-medium">
+          {selectedRun ? runLabel(selectedRun) : placeholder}
+        </span>
+        {selectedRun ? (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {formatStagingStatus(selectedStatus)}
+          </span>
+        ) : null}
+        <svg
+          width="10"
+          height="6"
+          viewBox="0 0 10 6"
+          fill="none"
+          className={`shrink-0 text-muted-foreground transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        >
+          <path
+            d="M1 1l4 4 4-4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-10 z-50 w-full min-w-[22rem] overflow-hidden rounded-md border border-border bg-popover shadow-lg">
+          <ul role="listbox" aria-label="Run" className="max-h-80 overflow-y-auto p-1 text-sm">
+            {runs.map((run) => {
+              const active = run.run_id === selected;
+              const shownStatus = effectiveStatus(run.status, run.updated_at);
+              const tone = statusTone(shownStatus);
+              return (
+                <li key={run.run_id} role="presentation">
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => {
+                      onSelect(run.run_id);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left hover:bg-muted ${
+                      active ? "bg-muted/40" : ""
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`h-2 w-2 shrink-0 rounded-full ${STATUS_INDICATOR_CLASS[tone]}`}
+                    />
+                    <span className="min-w-0 flex-1 truncate font-medium">{runLabel(run)}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatStagingStatus(shownStatus)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function agoLabel(value: string | null | undefined): string {
@@ -114,62 +285,6 @@ function durationLabel(ms: number | null): string {
   return `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
 }
 
-function RunList({
-  runs,
-  selected,
-  onSelect,
-}: {
-  runs: MicrocosmStagingRunSummary[];
-  selected: string;
-  onSelect: (runId: string) => void;
-}) {
-  if (!runs.length) {
-    return (
-      <EmptyState
-        title="No staging runs found."
-        description="Run Microcosm with staging telemetry enabled to publish progress here."
-        variant="compact"
-      />
-    );
-  }
-  return (
-    <div className="max-h-[72vh] overflow-y-auto rounded-md border border-border">
-      <div className="divide-y divide-border/60">
-        {runs.map((run) => {
-          const active = run.run_id === selected;
-          return (
-            <button
-              key={run.run_id}
-              type="button"
-              onClick={() => onSelect(run.run_id)}
-              className={`block w-full px-3 py-2 text-left ${
-                active ? "bg-primary/10" : "hover:bg-muted/40"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground">
-                    {releaseLabel(run.candidate_release_id || run.run_id)}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {run.stage || "—"} · {timeLabel(run.updated_at)}
-                  </div>
-                </div>
-                {(() => {
-                  const shown = effectiveStatus(run.status, run.updated_at);
-                  return (
-                    <StatusPill tone={statusTone(shown)}>{shown || "unknown"}</StatusPill>
-                  );
-                })()}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function LossSparkline({ values }: { values: number[] }) {
   if (!values.length) return <div className="text-sm text-muted-foreground">No loss points yet.</div>;
   const finite = values.filter((value) => Number.isFinite(value));
@@ -190,12 +305,331 @@ function LossSparkline({ values }: { values: number[] }) {
   );
 }
 
+function RunInternalsPanel({
+  runData,
+  lossValues,
+  status,
+  stage,
+  buildManifest,
+  artifacts,
+  open,
+  onOpenChange,
+  className = "",
+}: {
+  runData: MicrocosmStagingRunResponse;
+  lossValues: number[];
+  status: string | null;
+  stage: string | null;
+  buildManifest: Record<string, unknown> | null;
+  artifacts: Record<string, { path?: string; staging_path?: string }>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  className?: string;
+}) {
+  return (
+    <details
+      open={open}
+      onToggle={(event) => onOpenChange(event.currentTarget.open)}
+      className={`group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)] ${className}`}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold leading-tight text-foreground">Run internals</div>
+          <div className="mt-1 max-w-2xl text-xs leading-snug text-muted-foreground">
+            Optimizer progress, stage timeline with logged numbers, build manifest (versions,
+            hashes, validation results), and uploaded artifacts.
+          </div>
+        </div>
+        <span className="shrink-0 text-xs text-muted-foreground transition-transform group-open:rotate-180">
+          ▾
+        </span>
+      </summary>
+      <div className="flex flex-col gap-5 border-t border-border p-4">
+        <SectionCard
+          title="Calibration progress"
+          description="Loss points emitted by the Microcosm calibrator while the staging build runs."
+        >
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <LossSparkline values={lossValues} />
+            <div className="grid gap-2 text-sm">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Latest loss
+                </div>
+                <div className="font-mono">{fmt(lossValues.at(-1), { digits: 4 })}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Best loss
+                </div>
+                <div className="font-mono">
+                  {lossValues.length ? fmt(Math.min(...lossValues), { digits: 4 }) : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">Stage</div>
+                <StatusPill tone={statusTone(status)}>{stage || status || "unknown"}</StatusPill>
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+
+        {runData.calibration ? (
+          <SectionCard
+            title="Candidate calibration"
+            description="Final calibration diagnostics uploaded by this staging run."
+          >
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <KpiCard
+                label="Targets"
+                value={fmt(runData.calibration.total_targets, { digits: 0 })}
+                hint={`${fmt(runData.calibration.included_target_count, { digits: 0 })} included`}
+              />
+              <KpiCard
+                label="Within 10%"
+                value={fmt(runData.calibration.fraction_within_10pct, {
+                  pct: true,
+                  digits: 0,
+                })}
+                hint={`${fmt(runData.calibration.within_tolerance_count, { digits: 0 })} in tolerance`}
+              />
+              <KpiCard
+                label={
+                  runData.calibration.loss_kind === "normalized_target_loss"
+                    ? "Final normalized loss"
+                    : "Final raw loss"
+                }
+                value={fmtLoss(runData.calibration.final_loss, runData.calibration.loss_kind)}
+                hint={`initial ${fmtLoss(
+                  runData.calibration.initial_loss,
+                  runData.calibration.loss_kind,
+                )}`}
+              />
+              <KpiCard
+                label="Non-zero records"
+                value={fmt(runData.calibration.n_nonzero, { digits: 0 })}
+                hint={`${fmt(runData.calibration.n_records, { digits: 0 })} records`}
+              />
+            </div>
+          </SectionCard>
+        ) : (
+          <SectionCard
+            title="Candidate calibration"
+            description="This appears once the run uploads calibration_diagnostics.json."
+          >
+            <EmptyState title="Calibration diagnostics not uploaded yet." variant="compact" />
+          </SectionCard>
+        )}
+
+        <SectionCard
+          title="Stage timeline"
+          description="Every stage the build reported, with how long it ran and the numbers it logged. A run that stops mid-list without a failed event ended without reporting a failure; the last row shows where."
+          padded={false}
+        >
+          {(runData.events ?? []).length ? (
+            <div className="max-h-96 overflow-y-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2 font-semibold">Stage</th>
+                    <th className="px-3 py-2 font-semibold">Started</th>
+                    <th className="px-3 py-2 text-right font-semibold">Duration</th>
+                    <th className="px-3 py-2 font-semibold">Detail</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(runData.events ?? []).map((event, index, all) => {
+                    const time = typeof event.time === "string" ? event.time : null;
+                    const next = all[index + 1];
+                    const nextTime = next && typeof next.time === "string" ? next.time : null;
+                    const duration =
+                      time && nextTime
+                        ? new Date(nextTime).valueOf() - new Date(time).valueOf()
+                        : null;
+                    const chips = detailChips(event.details);
+                    const failed = event.status === "failed";
+                    return (
+                      <tr
+                        key={index}
+                        className={`border-b border-border/60 last:border-b-0 ${
+                          failed ? "row-neg" : ""
+                        }`}
+                      >
+                        <td className="whitespace-nowrap px-3 py-1.5">
+                          <span className={failed ? "font-medium tone-neg" : ""}>
+                            {String(event.stage ?? "—")}
+                          </span>
+                          {failed && <StatusPill tone="danger">failed</StatusPill>}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
+                          {timeLabel(time)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                          {index === all.length - 1 && event.stage !== "complete" && !failed
+                            ? status === "stalled"
+                              ? "⚠ last event"
+                              : "…"
+                            : durationLabel(duration)}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <div className="text-xs text-muted-foreground">
+                            {String(event.message ?? "—")}
+                          </div>
+                          {chips.length > 0 && (
+                            <div className="mt-0.5 flex flex-wrap gap-1">
+                              {chips.map(([key, value]) => (
+                                <span
+                                  key={key}
+                                  className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
+                                >
+                                  {key}={value}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="No stage events yet." variant="compact" />
+          )}
+        </SectionCard>
+
+        {buildManifest && (
+          <SectionCard
+            title="Build manifest"
+            description="The code commit, package versions, artifact hashes, and validation results that produced this candidate."
+          >
+            <div className="flex flex-col gap-4">
+              {(() => {
+                const code = (buildManifest.code ?? {}) as Record<string, unknown>;
+                const runtime = (buildManifest.runtime ?? {}) as Record<string, unknown>;
+                const gates = (buildManifest.gates ?? {}) as Record<string, unknown>;
+                const dataset = (buildManifest.dataset ?? {}) as Record<string, unknown>;
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3 lg:grid-cols-4">
+                      <div className="flex justify-between gap-2 border-b border-border/40 py-1">
+                        <span className="text-muted-foreground">Commit</span>
+                        <a
+                          href={`https://github.com/PolicyEngine/microcosm/commit/${String(code.git_commit ?? "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-primary hover:underline"
+                        >
+                          {String(code.git_commit ?? "—").slice(0, 7)}
+                          {code.git_dirty ? " (dirty)" : ""}
+                        </a>
+                      </div>
+                      {Object.entries(runtime)
+                        .filter(([key]) =>
+                          ["python", "policyengine-us", "policyengine-core", "torch"].includes(
+                            key,
+                          ),
+                        )
+                        .map(([key, value]) => (
+                          <div
+                            key={key}
+                            className="flex justify-between gap-2 border-b border-border/40 py-1"
+                          >
+                            <span className="text-muted-foreground">{key}</span>
+                            <span className="font-mono text-foreground">{String(value)}</span>
+                          </div>
+                        ))}
+                      <div className="flex justify-between gap-2 border-b border-border/40 py-1">
+                        <span className="text-muted-foreground">Dataset sha256</span>
+                        <span className="font-mono text-foreground">
+                          {String(dataset.sha256 ?? "—").slice(0, 12)}…
+                        </span>
+                      </div>
+                    </div>
+                    {Object.keys(gates).length > 0 && (
+                      <div>
+                        <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Validation results
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(gates).map(([name, result]) => {
+                            const validation = (result ?? {}) as Record<string, unknown>;
+                            const passed = validation.passed === true;
+                            const failures = Array.isArray(validation.failures)
+                              ? validation.failures
+                              : [];
+                            return (
+                              <div
+                                key={name}
+                                className={`rounded-md border px-2 py-1 text-xs ${
+                                  passed ? "pill-pos" : "pill-neg"
+                                }`}
+                              >
+                                <span className="font-medium">{name}</span>{" "}
+                                {passed ? "passed" : "failed"}
+                                {failures.length > 0 && (
+                                  <span className="ml-1 font-mono text-[10px]">
+                                    {failures.map((failure) => String(failure)).join("; ")}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </SectionCard>
+        )}
+
+        {Object.keys(artifacts).length > 0 && (
+          <SectionCard
+            title="Uploaded artifacts"
+            description="Files this run has published to the staging repository so far."
+            padded={false}
+          >
+            <table className="w-full text-left text-sm">
+              <tbody>
+                {Object.entries(artifacts).map(([name, metadata]) => (
+                  <tr key={name} className="border-b border-border/60 last:border-b-0">
+                    <td className="px-3 py-1.5 font-medium">{name}</td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                      {metadata.staging_path ? (
+                        <a
+                          href={`https://huggingface.co/datasets/${runData.source_repo}/blob/main/${metadata.staging_path}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline decoration-dotted underline-offset-2 hover:text-primary"
+                        >
+                          {metadata.staging_path}
+                        </a>
+                      ) : (
+                        (metadata.path ?? "—")
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </SectionCard>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
-  const ordered = [...rows]
-    .filter((row) => row.microcosm_estimate != null || row.jct_score != null)
-    .sort((a, b) => Number(a.in_sample ?? false) - Number(b.in_sample ?? false));
+  const ordered = rows.filter(
+    (row) =>
+      !row.in_sample &&
+      (row.microcosm_estimate != null || row.jct_score != null),
+  );
   if (!ordered.length) {
-    return <EmptyState title="No reform validation rows yet." variant="compact" />;
+    return <EmptyState title="No out-of-sample validation rows yet." variant="compact" />;
   }
   return (
     <div className="overflow-x-auto">
@@ -213,12 +647,7 @@ function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
             return (
               <tr key={row.id} className="border-b border-border/60 last:border-b-0">
                 <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">{row.name}</span>
-                    <StatusPill tone={row.in_sample ? "neutral" : "info"}>
-                      {row.in_sample ? "in-sample" : "out-of-sample"}
-                    </StatusPill>
-                  </div>
+                  <span className="font-medium text-foreground">{row.name}</span>
                   <div className="text-xs text-muted-foreground">
                     {row.category || "Reform score"}
                   </div>
@@ -249,69 +678,91 @@ function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
   );
 }
 
-// Common-target fit stats for the candidate-vs-published verdict: computed on
-// the SAME targets, since headline within-10% rates over different target sets
-// (32k national-only vs 4k) are not comparable.
+// Unweighted common-target statistics are computed on the same targets because
+// rates over different target sets are not directly comparable.
 interface SideStats {
   n: number;
   within10: number;
   median: number | null;
-  mean: number | null;
 }
 
+const VALIDATION_METHOD_HELP = {
+  targetWithin10:
+    "Measures the share of targets present in both releases whose absolute relative error is at most 10% of the benchmark value; higher is better. This metric is restricted to shared targets to ensure direct comparability.",
+  targetMedianAbsoluteError:
+    "Calculates the median absolute relative error across targets present in both releases. Lower is better.",
+  weightedTargetError:
+    "Calculates the importance-weighted mean of each release's scaled target errors after applying its target-loss cap. This is the same aggregate used by the Calibration map and the reported Target error change comparison; lower is better.",
+  reformMeanAbsoluteError:
+    "Calculates the mean absolute relative error between the candidate's estimated reform effects and the external benchmarks for out-of-sample reforms. Out-of-sample means that the reform includes values that are not used as calibration targets; lower is better.",
+  reformWithin10:
+    "Measures the share of scored out-of-sample reforms whose estimated effect is within 10% of the external benchmark. Out-of-sample means that the reform includes values that are not used as calibration targets; higher is better.",
+  targetCoverage:
+    "Counts the complete set of calibration targets available in each release, including targets that are not shared. The verdict reports how many targets the candidate adds and removes relative to the current release.",
+} as const;
+
 function sideStats(errors: number[]): SideStats {
-  if (!errors.length) return { n: 0, within10: 0, median: null, mean: null };
+  if (!errors.length) return { n: 0, within10: 0, median: null };
   const sorted = [...errors].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return {
     n: errors.length,
     within10: errors.filter((e) => e <= 0.1).length,
     median: sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2,
-    mean: errors.reduce((s, e) => s + e, 0) / errors.length,
   };
 }
 
 // One row of the validation scorecard: a metric on both sides plus a verdict.
 function ScoreRow({
   label,
-  published,
+  about,
+  currentRelease,
   candidate,
   higherBetter,
   render = pct,
 }: {
   label: string;
-  published: number | null;
+  about: string;
+  currentRelease: number | null;
   candidate: number | null;
   higherBetter: boolean;
   render?: (v: number | null | undefined) => string;
 }) {
   const better =
-    published != null && candidate != null
+    currentRelease != null && candidate != null
       ? higherBetter
-        ? candidate > published + 1e-6
-        : candidate < published - 1e-6
+        ? candidate > currentRelease + 1e-6
+        : candidate < currentRelease - 1e-6
       : null;
   const worse =
-    published != null && candidate != null
+    currentRelease != null && candidate != null
       ? higherBetter
-        ? candidate < published - 1e-6
-        : candidate > published + 1e-6
+        ? candidate < currentRelease - 1e-6
+        : candidate > currentRelease + 1e-6
       : null;
   return (
-    <tr className="border-b border-border/60 last:border-b-0">
-      <td className="px-3 py-1.5 font-medium">{label}</td>
-      <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-        {render(published)}
+    <tr className="col-span-full grid grid-cols-subgrid border-b border-border/60 last:border-b-0">
+      <td className="whitespace-nowrap py-1.5 font-medium">{label}</td>
+      <td className="whitespace-nowrap py-1.5 text-right tabular-nums text-muted-foreground">
+        {render(currentRelease)}
       </td>
-      <td className="whitespace-nowrap px-3 py-1.5 text-right font-medium tabular-nums">
+      <td className="whitespace-nowrap py-1.5 text-right font-medium tabular-nums">
         {render(candidate)}
       </td>
       <td
-        className={`whitespace-nowrap px-3 py-1.5 text-right text-xs font-semibold ${
+        className={`whitespace-nowrap py-1.5 text-right text-xs font-semibold ${
           better ? "tone-pos" : worse ? "tone-neg" : "text-muted-foreground"
         }`}
       >
-        {better ? "candidate better" : worse ? "candidate worse" : published == null || candidate == null ? "—" : "tie"}
+        {better ? "candidate better" : worse ? "candidate worse" : currentRelease == null || candidate == null ? "—" : "tie"}
+      </td>
+      <td className="whitespace-nowrap py-1.5 text-center">
+        <HelpHint
+          label={<span className="sr-only">About {label}</span>}
+          tooltip={about}
+          interaction="click"
+          underline={false}
+        />
       </td>
     </tr>
   );
@@ -340,14 +791,25 @@ function MicrocosmStagingRunsView() {
   const runs = runsData?.runs ?? [];
   const [selectedRun, setSelectedRun] = useState("");
   const [targetSearch, setTargetSearch] = useState("");
+  const [runInternalsOpen, setRunInternalsOpen] = useState(false);
+
+  const resetRunVisualState = useCallback((runId: string) => {
+    setTargetSearch("");
+    setRunInternalsOpen(false);
+    setSelectedRun(runId);
+  }, []);
 
   useEffect(() => {
-    if (!selectedRun && runs[0]) setSelectedRun(runs[0].run_id);
-  }, [runs, selectedRun]);
+    if (!selectedRun && runs[0]) resetRunVisualState(runs[0].run_id);
+  }, [resetRunVisualState, runs, selectedRun]);
 
   const { data: runData, isLoading: runLoading, error: runError } =
     useMicrocosmStagingRun(selectedRun);
-  const { data: compareData, isLoading: compareLoading } = useMicrocosmStagingCompare(
+  const {
+    data: compareData,
+    isLoading: compareLoading,
+    error: compareError,
+  } = useMicrocosmStagingCompare(
     runData?.has_calibration ? selectedRun : undefined,
     "latest",
   );
@@ -367,6 +829,10 @@ function MicrocosmStagingRunsView() {
     }
     return { a: sideStats(a), b: sideStats(b) };
   }, [compareData]);
+  const medianAbsoluteErrorDigits = differingPercentDigits(
+    commonStats.a.median,
+    commonStats.b.median,
+  );
   const calibrationEvents = runData?.calibration_progress?.events ?? [];
   const lossValues = useMemo(
     () =>
@@ -375,18 +841,29 @@ function MicrocosmStagingRunsView() {
         .filter((value): value is number => value != null),
     [calibrationEvents],
   );
-  const lastCalibrationEvent = calibrationEvents.at(-1);
   const progress = runData?.progress ?? {};
   const rawStatus = typeof progress.status === "string" ? progress.status : null;
   const stage = typeof progress.stage === "string" ? progress.stage : null;
-  const message = typeof progress.message === "string" ? progress.message : null;
   const updatedAt = typeof progress.updated_at === "string" ? progress.updated_at : null;
   const status = effectiveStatus(rawStatus, updatedAt);
-  const progressDetails = detailChips(progress.details);
+  const statusLabel = formatStagingStatus(status);
+  const lastUpdate = `${timeLabel(updatedAt)}${agoLabel(updatedAt) ? ` · ${agoLabel(updatedAt)}` : ""}`;
+  const currentStatus = formatStagingCurrentStatus(progress);
   const candidateReleaseId = runData?.candidate_release_id ?? selectedRun;
   const buildManifest = (runData?.build_manifest ?? null) as Record<string, unknown> | null;
   const artifacts = ((runData?.run_manifest as Record<string, unknown> | null)?.artifacts ??
     {}) as Record<string, { path?: string; staging_path?: string }>;
+  const hasCandidateValidation = Boolean(compareData?.summary || runData?.reform_validation);
+  const targetComparisonPending = Boolean(
+    runData?.has_calibration && compareLoading && !compareData,
+  );
+  const candidateValidationPending = targetComparisonPending && !hasCandidateValidation;
+  const showsCandidateValidation = hasCandidateValidation || candidateValidationPending;
+  const runSelectPlaceholder = runsLoading
+    ? "Loading runs…"
+    : runsError || runsData?.available === false
+      ? "Runs unavailable"
+      : "No staging runs";
 
   return (
     <div className="flex flex-col gap-5">
@@ -394,150 +871,179 @@ function MicrocosmStagingRunsView() {
         eyebrow="Microcosm · staging"
         title="Staging candidates"
         description="Monitor Microcosm build candidates before they are promoted to the published Hugging Face release channel."
+        actions={
+          <RunSelect
+            runs={runs}
+            selected={selectedRun}
+            placeholder={runSelectPlaceholder}
+            onSelect={resetRunVisualState}
+          />
+        }
       />
 
-      <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <SectionCard
-          title="Runs"
-          description={
-            runsData
-              ? `${runs.length} ${runs.length === 1 ? "run" : "runs"} from ${runsData.source_repo}`
-              : "Loading staging run index."
-          }
-        >
-          {runsLoading ? (
-            <LoadingBlock label="Loading staging runs…" height="h-40" />
+      <div className="flex flex-col gap-5">
+        {runsLoading && !runs.length ? (
+            <LoadingBlock label="Loading staging runs…" />
           ) : runsError ? (
             <EmptyState
               title="Staging runs unavailable"
               description={runsError instanceof Error ? runsError.message : "Unknown error."}
-              variant="compact"
             />
           ) : runsData && runsData.available === false ? (
             <EmptyState
-              title="Staging repo not reachable"
-              description={runsData.detail || "The staging repo could not be read."}
-              variant="compact"
+              title="Staging repository not reachable"
+              description={runsData.detail || "The staging repository could not be read."}
             />
-          ) : (
-            <RunList runs={runs} selected={selectedRun} onSelect={setSelectedRun} />
-          )}
-        </SectionCard>
-
-        <div className="flex flex-col gap-5">
-          {!selectedRun ? (
-            <EmptyState title="Select a staging run." />
-          ) : runLoading ? (
-            <LoadingBlock label="Loading staging run…" />
-          ) : runError || !runData ? (
+          ) : !runs.length ? (
             <EmptyState
-              title="Staging run unavailable"
-              description={runError instanceof Error ? runError.message : "Unknown error."}
+              title="No staging runs found"
+              description="Run Microcosm with staging telemetry enabled to publish progress here."
             />
+          ) : !selectedRun ? (
+            <div>
+              <EmptyState title="Select a staging run." />
+            </div>
+          ) : runLoading ? (
+            <div>
+              <LoadingBlock label="Loading staging run…" />
+            </div>
+          ) : runError || !runData ? (
+            <div>
+              <EmptyState
+                title="Staging run unavailable"
+                description={runError instanceof Error ? runError.message : "Unknown error."}
+              />
+            </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <KpiCard
-                  label="Status"
-                  value={status || "unknown"}
-                  hint={
-                    status === "stalled"
-                      ? `no update since ${timeLabel(updatedAt)} — died at ${stage ?? "?"}`
-                      : stage || "no stage reported"
-                  }
-                  tone={
-                    status === "failed" || status === "stalled"
-                      ? "negative"
-                      : status === "passed"
-                        ? "positive"
-                        : "neutral"
-                  }
-                />
-                <KpiCard
-                  label="Candidate"
-                  value={releaseLabel(candidateReleaseId)}
-                  hint={selectedRun}
-                />
-                <KpiCard
-                  label="Last update"
-                  value={`${timeLabel(updatedAt)}${agoLabel(updatedAt) ? ` · ${agoLabel(updatedAt)}` : ""}`}
-                  hint={message || "progress.json"}
-                />
-                <KpiCard
-                  label="Calibration points"
-                  value={fmt(calibrationEvents.length, { digits: 0 })}
-                  hint={
-                    lastCalibrationEvent?.epoch && lastCalibrationEvent?.epochs
-                      ? `epoch ${lastCalibrationEvent.epoch} of ${lastCalibrationEvent.epochs}`
-                      : "waiting for calibration"
-                  }
-                />
-              </div>
-
-              {progressDetails.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="font-medium">Last stage detail:</span>
-                  {progressDetails.map(([k, v]) => (
-                    <span
-                      key={k}
-                      className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
-                    >
-                      {k}={v}
-                    </span>
-                  ))}
+              <div className="flex min-w-0 flex-col gap-5">
+              <SectionCard
+                title="Candidate overview"
+                className="w-full"
+                padded={false}
+              >
+                <div className="grid grid-cols-[min-content_minmax(0,1fr)] items-baseline gap-y-3 py-3.5">
+                  <div
+                    className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
+                  >
+                    Candidate
+                  </div>
+                  <div
+                    className={`min-w-0 truncate text-xs ${overviewMetricValueClassName}`}
+                    title={candidateReleaseId}
+                  >
+                    {candidateReleaseId}
+                  </div>
+                  <div
+                    className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
+                  >
+                    Status
+                  </div>
+                  <div
+                    className={`min-w-0 truncate text-xs ${overviewMetricValueClassName}`}
+                    title={statusLabel}
+                  >
+                    {statusLabel}
+                  </div>
+                  <div
+                    className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
+                  >
+                    Last update
+                  </div>
+                  <div
+                    className={`min-w-0 truncate text-xs ${overviewMetricValueClassName}`}
+                    title={lastUpdate}
+                  >
+                    {lastUpdate}
+                  </div>
+                  <div
+                    className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
+                  >
+                    Current status
+                  </div>
+                  <div
+                    className={`min-w-0 truncate text-xs ${overviewMetricValueClassName}`}
+                    title={currentStatus}
+                  >
+                    {currentStatus}
+                  </div>
                 </div>
-              )}
+              </SectionCard>
 
-              {runData.has_calibration && compareLoading && !compareData && (
-                <LoadingBlock
-                  label="Comparing candidate vs published release (loads both calibration packages)…"
-                  height="h-24"
-                />
-              )}
-
-              {(compareData?.summary || runData.reform_validation) && (
+              {candidateValidationPending && (
                 <SectionCard
-                  title="Validation scorecard"
-                  description={`The main validation points, candidate vs the published release${compareData?.a ? ` (${releaseLabel(compareData.a.release_id)})` : ""}. Target fit is scored on the ${fmt(commonStats.a.n, { digits: 0 })} targets both sides share; full-surface rates over different target sets are not comparable.`}
+                  title="Candidate validation"
+                >
+                  <LoadingBlock
+                    label="Comparing candidate vs current release (loads both calibration packages)…"
+                    height="h-24"
+                  />
+                </SectionCard>
+              )}
+
+              {hasCandidateValidation && (
+                <SectionCard
+                  title="Candidate validation"
                   padded={false}
                 >
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                        <th className="px-3 py-2 font-semibold">Validation point</th>
-                        <th className="px-3 py-2 text-right font-semibold">Published</th>
-                        <th className="px-3 py-2 text-right font-semibold">Candidate</th>
-                        <th className="px-3 py-2 text-right font-semibold">Verdict</th>
+                  <div className="overflow-x-auto px-5">
+                    <table className="grid w-full grid-cols-[max-content_max-content_max-content_max-content_max-content] justify-between gap-x-2 text-left text-xs">
+                    <thead className="col-span-full grid grid-cols-subgrid">
+                      <tr className="col-span-full grid grid-cols-subgrid border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <th className="whitespace-nowrap py-2 font-semibold">Validation point</th>
+                        <th className="whitespace-nowrap py-2 text-right font-semibold">Current release</th>
+                        <th className="whitespace-nowrap py-2 text-right font-semibold">Candidate</th>
+                        <th className="whitespace-nowrap py-2 text-right font-semibold">Verdict</th>
+                        <th className="whitespace-nowrap py-2 text-center font-semibold">About</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="col-span-full grid grid-cols-subgrid">
+                      {targetComparisonPending && (
+                        <tr className="col-span-full grid grid-cols-subgrid border-b border-border/60">
+                          <td
+                            colSpan={5}
+                            className="col-span-full py-3 text-muted-foreground"
+                          >
+                            Loading target comparison…
+                          </td>
+                        </tr>
+                      )}
                       {compareData?.summary && (
                         <>
                           <ScoreRow
-                            label="Targets · within 10% (common)"
-                            published={commonStats.a.n ? commonStats.a.within10 / commonStats.a.n : null}
+                            label="Targets within 10% of benchmark (shared)"
+                            about={VALIDATION_METHOD_HELP.targetWithin10}
+                            currentRelease={commonStats.a.n ? commonStats.a.within10 / commonStats.a.n : null}
                             candidate={commonStats.b.n ? commonStats.b.within10 / commonStats.b.n : null}
                             higherBetter
                           />
                           <ScoreRow
-                            label="Targets · median |error| (common)"
-                            published={commonStats.a.median}
+                            label="Target median absolute error (shared)"
+                            about={VALIDATION_METHOD_HELP.targetMedianAbsoluteError}
+                            currentRelease={commonStats.a.median}
                             candidate={commonStats.b.median}
                             higherBetter={false}
+                            render={(value) => fmt(value, {
+                              pct: true,
+                              digits: medianAbsoluteErrorDigits,
+                            })}
                           />
                           <ScoreRow
-                            label="Targets · mean |error| (common)"
-                            published={commonStats.a.mean}
-                            candidate={commonStats.b.mean}
+                            label="Weighted target error"
+                            about={VALIDATION_METHOD_HELP.weightedTargetError}
+                            currentRelease={compareData.a.weighted_target_error}
+                            candidate={compareData.b.weighted_target_error}
                             higherBetter={false}
+                            render={formatWeightedTargetError}
                           />
                         </>
                       )}
                       {runData.reform_validation && (
                         <>
                           <ScoreRow
-                            label="Reforms · out-of-sample mean |error|"
-                            published={null}
+                            label="Reform out-of-sample mean absolute error"
+                            about={VALIDATION_METHOD_HELP.reformMeanAbsoluteError}
+                            currentRelease={null}
                             candidate={
                               runData.reform_validation.summary
                                 ?.out_of_sample_mean_abs_relative_error ?? null
@@ -545,8 +1051,9 @@ function MicrocosmStagingRunsView() {
                             higherBetter={false}
                           />
                           <ScoreRow
-                            label="Reforms · out-of-sample within 10%"
-                            published={null}
+                            label="Reform out-of-sample within 10% of benchmark"
+                            about={VALIDATION_METHOD_HELP.reformWithin10}
+                            currentRelease={null}
                             candidate={
                               (runData.reform_validation.summary?.n_out_of_sample_scored ?? 0) > 0
                                 ? (runData.reform_validation.summary?.out_of_sample_within_10pct ??
@@ -559,53 +1066,110 @@ function MicrocosmStagingRunsView() {
                         </>
                       )}
                       {compareData?.summary && (
-                        <tr className="border-b border-border/60 last:border-b-0">
-                          <td className="px-3 py-1.5 font-medium">Coverage · target surface</td>
-                          <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                        <tr className="col-span-full grid grid-cols-subgrid border-b border-border/60 last:border-b-0">
+                          <td className="whitespace-nowrap py-1.5 font-medium">Coverage target surface</td>
+                          <td className="whitespace-nowrap py-1.5 text-right tabular-nums text-muted-foreground">
                             {fmt(compareData.a.total_targets, { digits: 0 })}
                           </td>
-                          <td className="whitespace-nowrap px-3 py-1.5 text-right font-medium tabular-nums">
+                          <td className="whitespace-nowrap py-1.5 text-right font-medium tabular-nums">
                             {fmt(compareData.b.total_targets, { digits: 0 })}
                           </td>
-                          <td className="whitespace-nowrap px-3 py-1.5 text-right text-xs text-muted-foreground">
+                          <td className="whitespace-nowrap py-1.5 text-right text-xs text-muted-foreground">
                             +{fmt(compareData.summary.added, { digits: 0 })} new / -
                             {fmt(compareData.summary.removed, { digits: 0 })} dropped
+                          </td>
+                          <td className="whitespace-nowrap py-1.5 text-center">
+                            <HelpHint
+                              label={<span className="sr-only">About Coverage target surface</span>}
+                              tooltip={VALIDATION_METHOD_HELP.targetCoverage}
+                              interaction="click"
+                              underline={false}
+                            />
                           </td>
                         </tr>
                       )}
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                   {compareData?.summary && (
-                    <div className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
-                      <span className="tone-pos">
-                        {fmt(compareData.summary.improved, { digits: 0 })} targets improved
-                      </span>
-                      {" · "}
-                      <span className="tone-neg">
-                        {fmt(compareData.summary.regressed, { digits: 0 })} regressed
-                      </span>{" "}
-                      — search the breakdown below for any statistic.
+                    <div className="border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
+                      <div>
+                        <span className="tone-pos">
+                          {fmt(compareData.summary.improved, { digits: 0 })} targets improved
+                        </span>
+                        {" · "}
+                        <span className="tone-neg">
+                          {fmt(compareData.summary.regressed, { digits: 0 })} regressed
+                        </span>
+                      </div>
                     </div>
                   )}
                 </SectionCard>
               )}
 
-              {(compareData?.rows ?? []).length > 0 && (
+              {!showsCandidateValidation && (
+                <RunInternalsPanel
+                  runData={runData}
+                  lossValues={lossValues}
+                  status={status}
+                  stage={stage}
+                  buildManifest={buildManifest}
+                  artifacts={artifacts}
+                  open={runInternalsOpen}
+                  onOpenChange={setRunInternalsOpen}
+                />
+              )}
+              </div>
+
+              <div className="contents">
+                {runData.has_calibration && (
+                  <SectionCard
+                    title="Target error change"
+                  >
+                    {compareData?.summary ? (
+                      <StagingTargetChangeMap
+                        key={targetChangeMapIdentity(selectedRun, compareData.a.release_id)}
+                        runId={selectedRun}
+                        releaseId={compareData.a.release_id}
+                      />
+                    ) : compareLoading ? (
+                      <LoadingBlock
+                        label="Loading calibration diagnostics for the target error comparison…"
+                        height="h-40"
+                      />
+                    ) : (
+                      <EmptyState
+                        title="Target error comparison unavailable"
+                        description={
+                          compareError instanceof Error
+                            ? compareError.message
+                            : compareData?.detail ??
+                              "The calibration diagnostics are available, but the comparison could not be loaded."
+                        }
+                        variant="compact"
+                      />
+                    )}
+                  </SectionCard>
+                )}
+
+                {runData.has_calibration && (
                 <SectionCard
                   title="Target breakdown"
                   description="Every target both sides share, worst movement first. Search by statistic, variable, or geography."
                   actions={
-                    <input
-                      type="search"
-                      value={targetSearch}
-                      placeholder="Search targets…"
-                      onChange={(e) => setTargetSearch(e.target.value)}
-                      className="h-8 w-56 rounded-md border border-border bg-card px-2.5 text-sm focus:border-primary/60 focus:outline-none"
-                    />
+                    compareData?.summary ? (
+                      <input
+                        type="search"
+                        value={targetSearch}
+                        placeholder="Search targets…"
+                        onChange={(e) => setTargetSearch(e.target.value)}
+                        className="h-8 w-56 rounded-md border border-border bg-card px-2.5 text-sm focus:border-primary/60 focus:outline-none"
+                      />
+                    ) : undefined
                   }
                   padded={false}
                 >
-                  {(() => {
+                  {compareData?.summary ? (() => {
                     const q = targetSearch.trim().toLowerCase();
                     const usable = (compareData?.rows ?? []).filter(
                       (row) =>
@@ -644,7 +1208,7 @@ function MicrocosmStagingRunsView() {
                             <thead className="sticky top-0 bg-card shadow-[var(--elev-1)]">
                               <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
                                 <th className="px-3 py-2 font-semibold">Target</th>
-                                <th className="px-3 py-2 text-right font-semibold">Published</th>
+                                <th className="px-3 py-2 text-right font-semibold">Current release</th>
                                 <th className="px-3 py-2 text-right font-semibold">Candidate</th>
                                 <th className="px-3 py-2 text-right font-semibold">Δ</th>
                               </tr>
@@ -708,330 +1272,64 @@ function MicrocosmStagingRunsView() {
                         </div>
                       </>
                     );
-                  })()}
+                  })() : compareLoading ? (
+                    <LoadingBlock
+                      label="Loading calibration diagnostics for the target breakdown…"
+                      height="h-40"
+                    />
+                  ) : (
+                    <EmptyState
+                      title="Target breakdown unavailable"
+                      description={
+                        compareError instanceof Error
+                          ? compareError.message
+                          : compareData?.detail ??
+                            "The calibration diagnostics are available, but the target breakdown could not be loaded."
+                      }
+                      variant="compact"
+                    />
+                  )}
                 </SectionCard>
               )}
 
-              {runData.reform_validation ? (
+              {runData.reform_validation && (
                 <SectionCard
                   title="External checks breakdown"
-                  description="Each score test the run uploaded. Out-of-sample rows are the main signal; in-sample rows were direct or near-direct calibration targets. Cross-release external comparisons live in the PolicyEngine scorecard."
+                  description={
+                    <>
+                      Cross-release external comparisons live in the{" "}
+                      <a
+                        href="https://www.policyengine.org/scorecard"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-dotted underline-offset-2 hover:text-primary"
+                      >
+                        PolicyEngine scorecard
+                      </a>
+                      .
+                    </>
+                  }
                   padded={false}
                 >
                   <ReformValidationTable rows={runData.reform_validation.rows ?? []} />
                 </SectionCard>
-              ) : (
-                <SectionCard
-                  title="External checks breakdown"
-                  description="This appears once the run uploads reform_validation.json."
-                >
-                  <EmptyState title="Reform validation not uploaded yet." variant="compact" />
-                </SectionCard>
               )}
 
-              <details className="group overflow-hidden rounded-lg border border-border/80 bg-card shadow-[var(--elev-1)]">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-muted/20 px-5 py-3 [&::-webkit-details-marker]:hidden">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold leading-tight text-foreground">
-                      Run internals
-                    </div>
-                    <div className="mt-1 max-w-2xl text-xs leading-snug text-muted-foreground">
-                      Optimizer progress, stage timeline with logged numbers, build manifest
-                      (versions, hashes, gates), and uploaded artifacts.
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-xs text-muted-foreground transition-transform group-open:rotate-180">
-                    ▾
-                  </span>
-                </summary>
-                <div className="flex flex-col gap-5 border-t border-border p-4">
-              <SectionCard
-                title="Calibration progress"
-                description="Loss points emitted by the Microcosm calibrator while the staging build runs."
-              >
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-                  <LossSparkline values={lossValues} />
-                  <div className="grid gap-2 text-sm">
-                    <div>
-                      <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Latest loss
-                      </div>
-                      <div className="font-mono">{fmt(lossValues.at(-1), { digits: 4 })}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Best loss
-                      </div>
-                      <div className="font-mono">
-                        {lossValues.length ? fmt(Math.min(...lossValues), { digits: 4 }) : "—"}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Stage
-                      </div>
-                      <StatusPill tone={statusTone(status)}>{stage || status || "unknown"}</StatusPill>
-                    </div>
-                  </div>
-                </div>
-              </SectionCard>
-
-              {runData.calibration ? (
-                <SectionCard
-                  title="Candidate calibration"
-                  description="Final calibration diagnostics uploaded by this staging run."
-                >
-                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <KpiCard
-                      label="Targets"
-                      value={fmt(runData.calibration.total_targets, { digits: 0 })}
-                      hint={`${fmt(runData.calibration.included_target_count, { digits: 0 })} included`}
-                    />
-                    <KpiCard
-                      label="Within 10%"
-                      value={fmt(runData.calibration.fraction_within_10pct, {
-                        pct: true,
-                        digits: 0,
-                      })}
-                      hint={`${fmt(runData.calibration.within_tolerance_count, { digits: 0 })} in tolerance`}
-                    />
-                    <KpiCard
-                      label={
-                        runData.calibration.loss_kind === "normalized_target_loss"
-                          ? "Final normalized loss"
-                          : "Final raw loss"
-                      }
-                      value={fmtLoss(
-                        runData.calibration.final_loss,
-                        runData.calibration.loss_kind,
-                      )}
-                      hint={`initial ${fmtLoss(
-                        runData.calibration.initial_loss,
-                        runData.calibration.loss_kind,
-                      )}`}
-                    />
-                    <KpiCard
-                      label="Non-zero records"
-                      value={fmt(runData.calibration.n_nonzero, { digits: 0 })}
-                      hint={`${fmt(runData.calibration.n_records, { digits: 0 })} records`}
-                    />
-                  </div>
-                </SectionCard>
-              ) : (
-                <SectionCard
-                  title="Candidate calibration"
-                  description="This appears once the run uploads calibration_diagnostics.json."
-                >
-                  <EmptyState title="Calibration diagnostics not uploaded yet." variant="compact" />
-                </SectionCard>
+              {showsCandidateValidation && (
+                <RunInternalsPanel
+                  runData={runData}
+                  lossValues={lossValues}
+                  status={status}
+                  stage={stage}
+                  buildManifest={buildManifest}
+                  artifacts={artifacts}
+                  open={runInternalsOpen}
+                  onOpenChange={setRunInternalsOpen}
+                />
               )}
-
-
-
-              <SectionCard
-                title="Stage timeline"
-                description="Every stage the build reported, with how long it ran and the numbers it logged. A run that stops mid-list without a failed event died silently — the last row is where."
-                padded={false}
-              >
-                {(runData.events ?? []).length ? (
-                  <div className="max-h-96 overflow-y-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                          <th className="px-3 py-2 font-semibold">Stage</th>
-                          <th className="px-3 py-2 font-semibold">Started</th>
-                          <th className="px-3 py-2 text-right font-semibold">Duration</th>
-                          <th className="px-3 py-2 font-semibold">Detail</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(runData.events ?? []).map((event, index, all) => {
-                          const time = typeof event.time === "string" ? event.time : null;
-                          const next = all[index + 1];
-                          const nextTime =
-                            next && typeof next.time === "string" ? next.time : null;
-                          const duration =
-                            time && nextTime
-                              ? new Date(nextTime).valueOf() - new Date(time).valueOf()
-                              : null;
-                          const chips = detailChips(event.details);
-                          const failed = event.status === "failed";
-                          return (
-                            <tr
-                              key={index}
-                              className={`border-b border-border/60 last:border-b-0 ${
-                                failed ? "row-neg" : ""
-                              }`}
-                            >
-                              <td className="whitespace-nowrap px-3 py-1.5">
-                                <span className={failed ? "font-medium tone-neg" : ""}>
-                                  {String(event.stage ?? "—")}
-                                </span>
-                                {failed && (
-                                  <StatusPill tone="danger">failed</StatusPill>
-                                )}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
-                                {timeLabel(time)}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
-                                {index === all.length - 1 &&
-                                event.stage !== "complete" &&
-                                !failed
-                                  ? status === "stalled"
-                                    ? "⚠ last event"
-                                    : "…"
-                                  : durationLabel(duration)}
-                              </td>
-                              <td className="px-3 py-1.5">
-                                <div className="text-xs text-muted-foreground">
-                                  {String(event.message ?? "—")}
-                                </div>
-                                {chips.length > 0 && (
-                                  <div className="mt-0.5 flex flex-wrap gap-1">
-                                    {chips.map(([k, v]) => (
-                                      <span
-                                        key={k}
-                                        className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-foreground/80"
-                                      >
-                                        {k}={v}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <EmptyState title="No stage events yet." variant="compact" />
-                )}
-              </SectionCard>
-
-              {buildManifest && (
-                <SectionCard
-                  title="Build manifest"
-                  description="Exactly what produced this candidate — code commit, package versions, artifact hashes, and gate results."
-                >
-                  <div className="flex flex-col gap-4">
-                    {(() => {
-                      const code = (buildManifest.code ?? {}) as Record<string, unknown>;
-                      const runtime = (buildManifest.runtime ?? {}) as Record<string, unknown>;
-                      const gates = (buildManifest.gates ?? {}) as Record<string, unknown>;
-                      const dataset = (buildManifest.dataset ?? {}) as Record<string, unknown>;
-                      return (
-                        <>
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3 lg:grid-cols-4">
-                            <div className="flex justify-between gap-2 border-b border-border/40 py-1">
-                              <span className="text-muted-foreground">Commit</span>
-                              <a
-                                href={`https://github.com/PolicyEngine/microcosm/commit/${String(code.git_commit ?? "")}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-mono text-primary hover:underline"
-                              >
-                                {String(code.git_commit ?? "—").slice(0, 7)}
-                                {code.git_dirty ? " (dirty)" : ""}
-                              </a>
-                            </div>
-                            {Object.entries(runtime)
-                              .filter(([k]) =>
-                                ["python", "policyengine-us", "policyengine-core", "torch"].includes(k),
-                              )
-                              .map(([k, v]) => (
-                                <div
-                                  key={k}
-                                  className="flex justify-between gap-2 border-b border-border/40 py-1"
-                                >
-                                  <span className="text-muted-foreground">{k}</span>
-                                  <span className="font-mono text-foreground">{String(v)}</span>
-                                </div>
-                              ))}
-                            <div className="flex justify-between gap-2 border-b border-border/40 py-1">
-                              <span className="text-muted-foreground">Dataset sha256</span>
-                              <span className="font-mono text-foreground">
-                                {String(dataset.sha256 ?? "—").slice(0, 12)}…
-                              </span>
-                            </div>
-                          </div>
-                          {Object.keys(gates).length > 0 && (
-                            <div>
-                              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                Gates
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {Object.entries(gates).map(([name, result]) => {
-                                  const r = (result ?? {}) as Record<string, unknown>;
-                                  const passed = r.passed === true;
-                                  const failures = Array.isArray(r.failures) ? r.failures : [];
-                                  return (
-                                    <div
-                                      key={name}
-                                      className={`rounded-md border px-2 py-1 text-xs ${
-                                        passed
-                                          ? "pill-pos"
-                                          : "pill-neg"
-                                      }`}
-                                    >
-                                      <span className="font-medium">{name}</span>{" "}
-                                      {passed ? "passed" : "failed"}
-                                      {failures.length > 0 && (
-                                        <span className="ml-1 font-mono text-[10px]">
-                                          {failures.map((f) => String(f)).join("; ")}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </SectionCard>
-              )}
-
-              {Object.keys(artifacts).length > 0 && (
-                <SectionCard
-                  title="Uploaded artifacts"
-                  description="Files this run has published to the staging repo so far."
-                  padded={false}
-                >
-                  <table className="w-full text-left text-sm">
-                    <tbody>
-                      {Object.entries(artifacts).map(([name, meta]) => (
-                        <tr key={name} className="border-b border-border/60 last:border-b-0">
-                          <td className="px-3 py-1.5 font-medium">{name}</td>
-                          <td className="px-3 py-1.5 text-xs text-muted-foreground">
-                            {meta.staging_path ? (
-                              <a
-                                href={`https://huggingface.co/datasets/${runData.source_repo}/blob/main/${meta.staging_path}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="underline decoration-dotted underline-offset-2 hover:text-primary"
-                              >
-                                {meta.staging_path}
-                              </a>
-                            ) : (
-                              (meta.path ?? "—")
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </SectionCard>
-              )}
-                </div>
-              </details>
+              </div>
             </>
           )}
-        </div>
       </div>
     </div>
   );

@@ -123,6 +123,9 @@ export interface ReformValidation {
 function enrichReform(raw: JsonObject): ReformValidationRow {
   const jct = asObject(raw.jct);
   const microcosm = asObject(raw.microcosm);
+  const calculation = Object.keys(microcosm).length
+    ? microcosm
+    : asObject(raw.populace);
   const jctFy2026 = numberOrNull(jct.score);
   const jctFy2027 = numberOrNull(jct.score_fy2027);
   // Benchmark defaults to JCT's first full fiscal year (FY2027). FY2026 is a
@@ -130,7 +133,7 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
   // overstates the gap against microcosm's calendar-year liability. In-sample
   // rows have no FY2027 figure, so they fall back to their annual (FY2026) one.
   const benchmark = jctFy2027 ?? jctFy2026;
-  const estimate = numberOrNull(microcosm.budget_effect);
+  const estimate = numberOrNull(calculation.budget_effect);
   const absError = benchmark != null && estimate != null ? estimate - benchmark : null;
   // A zero benchmark has no meaningful relative error — leave it unscored
   // rather than storing the raw dollar delta, which would otherwise be treated
@@ -140,7 +143,7 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
       ? (estimate - benchmark) / Math.abs(benchmark)
       : null;
   const absRel = relError == null ? null : Math.abs(relError);
-  const annual = asObject(microcosm.annual);
+  const annual = asObject(calculation.annual);
   const annualClean: Record<string, number> = {};
   for (const [k, v] of Object.entries(annual)) {
     const n = numberOrNull(v);
@@ -163,7 +166,7 @@ function enrichReform(raw: JsonObject): ReformValidationRow {
     jct_source_url: stringOrNull(jct.source_url),
     jct_published: stringOrNull(jct.published),
     microcosm_estimate: estimate,
-    microcosm_window: stringOrNull(microcosm.window),
+    microcosm_window: stringOrNull(calculation.window),
     microcosm_annual: Object.keys(annualClean).length ? annualClean : null,
     abs_error: absError,
     relative_error: relError,

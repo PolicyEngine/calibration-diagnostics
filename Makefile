@@ -13,4 +13,4 @@ typecheck:
 	cd frontend && bun run lint
 
 test:
-	cd frontend && bun test
+	cd frontend && bun test && bun run test:dev-port

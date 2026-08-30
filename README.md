@@ -31,7 +31,8 @@ separate service layer — the Next.js API routes are the API layer.
   surfaced.
 - **Staging runs** (`/microcosm/staging`) — monitor pre-release US Microcosm build
   runs from the staging Hub repo: current stage, calibration loss progress,
-  final candidate diagnostics once uploaded, and candidate-vs-latest fit.
+  final candidate diagnostics once uploaded, candidate-vs-current-release fit,
+  and a hierarchical map of weighted target-error increases and reductions.
   Countries without a staging repository show an explicit unavailable state.
 - **Calibration target investigations** (`docs/ai/`) — tool-independent procedures,
   specialist review responsibilities, and a reusable checklist for identifying
@@ -55,6 +56,20 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 | `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and uploaded candidate diagnostics |
 | `GET /api/microcosm/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
 | `GET /api/microcosm/staging/compare?run=<run_id>&release=latest` | Diff staging candidate against a published release |
+| `GET /api/microcosm/staging/target-change-tree?run=<run_id>&release=<resolved_id>&mode=reported\|shared&...` | One hierarchy level of weighted target-error changes for a staging candidate and an explicit current release |
+
+The staging target-change route supports two comparison modes. `reported` uses
+each release's actual target weights and complete target surface, including
+added and removed targets. `shared` restricts the calculation to shared targets,
+normalizes each release's weights over that shared set, averages the two shares
+target by target, and applies the resulting pooled weights to both releases.
+
+Version and staging comparisons use the same normalized target matcher. It first
+matches an exact period-normalized target name, then a unique Chronicle fact key,
+then an exact structured source/statistic/measure/dimensions identity. A key must
+identify one remaining target on each side; ambiguous keys are reported and left
+unmatched. Comparison responses include the representation of each target, the
+matching method, both release identifiers, and counts by matching method.
 
 ## Calibration target investigations
 
@@ -76,11 +91,18 @@ combining their evidence into one report.
 
 ```bash
 make install   # cd frontend && bun install
-make dev       # next dev (http://localhost:3000)
+make dev       # first available loopback port, starting at 3000
 make typecheck # tsc --noEmit
-make test      # bun test (data-layer suite)
+make test      # frontend data and development-launcher tests
 make build     # next build
 ```
+
+The development launcher prints the selected dashboard URL and records its port
+in `frontend/.next/dev-port`. Set `PORT` to begin the search at a different
+port; if that port is occupied on the IPv4 or IPv6 loopback address, the
+launcher increments by one until it finds a port that is free on both network
+families. Next.js binds to `127.0.0.1`, and the launcher prints that exact URL
+to avoid hostname resolution selecting a different local process.
 
 Run the Python Chronicle evaluation harness and its public numerical adapter
 gate manually when reviewing Chronicle or dependency updates:

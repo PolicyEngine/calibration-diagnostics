@@ -4,9 +4,12 @@ import {
   useCountry,
   type Country,
 } from "@/components/layout/country-context";
+import { PUBLISHED_RELEASE_STALE_TIME_MS } from "@/lib/api/cache-policy";
 import { withBasePath } from "@/lib/base-path";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
+import type { TargetChangeMode } from "@/lib/microcosm/target-change";
+import type { TargetChangeTreeApiResponse } from "@/lib/microcosm/target-change-tree";
 import {
   hasCapability,
   type CountryCapability,
@@ -81,6 +84,7 @@ export interface MicrocosmTargetRow {
     rank?: number;
   }[] | null;
   dimension_adapter?: "structured" | "legacy_filter" | "legacy_name" | null;
+  target_representation?: "legacy" | "structured" | null;
   variable_key?: string | null;
   // schema v2 published registry metadata (null on v1).
   source_citation?: string | null;
@@ -377,6 +381,12 @@ export interface MicrocosmTargetDiagnostics {
 
 export interface MicrocosmComparisonRow {
   name: string;
+  comparison_id?: string;
+  match_kind?: "base_name" | "chronicle_fact_key" | "structured_identity" | null;
+  current_name?: string | null;
+  candidate_name?: string | null;
+  current_representation?: "legacy" | "structured" | null;
+  candidate_representation?: "legacy" | "structured" | null;
   target_label?: string | null;
   source?: string | null;
   variable_key?: string | null;
@@ -432,6 +442,7 @@ export interface MicrocosmComparison {
     initial_loss: number | null;
     final_loss: number | null;
     loss_kind: "normalized_target_loss" | "raw_optimizer_objective";
+    weighted_target_error: number | null;
     fraction_within_10pct: number | null;
   };
   b: {
@@ -441,6 +452,7 @@ export interface MicrocosmComparison {
     initial_loss: number | null;
     final_loss: number | null;
     loss_kind: "normalized_target_loss" | "raw_optimizer_objective";
+    weighted_target_error: number | null;
     fraction_within_10pct: number | null;
   };
   summary: {
@@ -452,6 +464,20 @@ export interface MicrocosmComparison {
     unchanged: number;
     losses_comparable: boolean;
     loss_kind: "normalized_target_loss" | "raw_optimizer_objective" | "mixed";
+    matching: {
+      current_representation: "legacy" | "structured" | "mixed" | "unknown";
+      candidate_representation: "legacy" | "structured" | "mixed" | "unknown";
+      matched_by: {
+        base_name: number;
+        chronicle_fact_key: number;
+        structured_identity: number;
+      };
+      ambiguous_key_groups: {
+        base_name: number;
+        chronicle_fact_key: number;
+        structured_identity: number;
+      };
+    };
   };
   variables: MicrocosmComparisonVariableRow[];
   rows: MicrocosmComparisonRow[];
@@ -672,7 +698,6 @@ export function useMicrocosmStagingRun(runId?: string) {
         country,
       }),
     enabled: staging && Boolean(runId),
-    placeholderData: keepPreviousData,
     staleTime: 10 * 1000,
     refetchInterval: staging ? 30 * 1000 : false,
   });
@@ -688,7 +713,47 @@ export function useMicrocosmStagingCompare(runId?: string, release = "latest") {
         { run: runId, release, country },
       ),
     enabled: hasCapability(country, "staging") && Boolean(runId),
-    placeholderData: keepPreviousData,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useMicrocosmStagingTargetChangeTree({
+  runId,
+  releaseId,
+  mode,
+  state,
+}: {
+  runId?: string;
+  releaseId?: string;
+  mode: TargetChangeMode;
+  state: ExplorerState;
+}) {
+  const { country } = useCountry();
+  return useQuery({
+    queryKey: [
+      "microcosm",
+      "staging",
+      "target-change-tree",
+      country,
+      runId,
+      releaseId,
+      mode,
+      state,
+    ],
+    queryFn: () =>
+      apiGet<TargetChangeTreeApiResponse>(
+        "/microcosm/staging/target-change-tree",
+        {
+          ...explorerApiParams(state),
+          run: runId,
+          release: releaseId,
+          mode,
+          country,
+        },
+      ),
+    enabled:
+      hasCapability(country, "staging") &&
+      Boolean(runId && releaseId && releaseId !== "latest"),
     staleTime: 30 * 1000,
   });
 }
@@ -698,7 +763,7 @@ export function useMicrocosmReleases() {
   return useQuery({
     queryKey: ["microcosm", "releases", country],
     queryFn: () => apiGet<MicrocosmReleasesResponse>("/microcosm/releases", { country }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
   });
 }
 
@@ -739,7 +804,7 @@ export function useMicrocosm(release?: string) {
     queryKey: ["microcosm", country, release ?? "latest"],
     queryFn: () =>
       apiGet<MicrocosmResponse>("/microcosm", { release: release || undefined, country }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
   });
 }
 
@@ -794,7 +859,7 @@ export function useMicrocosmTargetTreemap(release?: string, breakdown?: "program
         breakdown: breakdown || undefined,
         country,
       }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
   });
 }
 
@@ -846,7 +911,7 @@ export function microcosmCalibrationTreeQueryOptions(
         release: release || undefined,
         country,
       }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
   };
 }
 

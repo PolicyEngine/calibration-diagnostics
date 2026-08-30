@@ -9,7 +9,9 @@ type ParamValue = string | number | boolean | undefined | null | (string | numbe
 function apiUrl(path: string): URL {
   if (EXPLICIT_API_BASE) return new URL(path, EXPLICIT_API_BASE);
   const origin =
-    typeof window === "undefined" ? "http://localhost:3000" : window.location.origin;
+    typeof window === "undefined"
+      ? `http://127.0.0.1:${process.env.PORT ?? "3000"}`
+      : window.location.origin;
   // Next.js API route handlers live under the app basePath; the native Python
   // function is routed back to root by a rewrite (see next.config.ts), so all
   // API calls resolve through `${origin}${BASE_PATH}/api`.

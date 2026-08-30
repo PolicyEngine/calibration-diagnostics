@@ -58,10 +58,11 @@ const CONCEPT_BUDGET_WEIGHTING =
   "sqrt_value_concept_budget_weighted_mape_50_50_amount_count_target_scale_cap_100pct";
 
 // This manifest is required because older builds do not expose target-importance
-// weights in their published diagnostic files. It was audited against every US
-// release eligible for the picker on 2026-08-18. These fingerprints cover
-// ordered diagnostic row names, not downloaded files; runtime reconstruction
-// must refuse a release whose target surface changes.
+// weights in their diagnostic files. It was audited against every US release
+// eligible for the picker on 2026-08-18 and includes explicitly verified staging
+// candidates when needed. These fingerprints cover ordered diagnostic row names,
+// not downloaded files; runtime reconstruction must refuse an artifact whose
+// target surface changes.
 export const HISTORICAL_ATTRIBUTION_SUPPORT: readonly HistoricalAttributionSupport[] = [
   {
     releaseId: "populace-us-2024-f32c2e5-20260614",
@@ -210,6 +211,21 @@ export const HISTORICAL_ATTRIBUTION_SUPPORT: readonly HistoricalAttributionSuppo
     producerTargetSurfaceSha256: "13e135245cd069a347a7fad14044a1cb917dd057b66832808e97c24421dcb9f1",
     weightingIdentifier: HISTORICAL_WEIGHTING,
     recipe: "historical_sqrt_value_50_50_v1",
+    expectedStatus: "exact_reconstructed",
+    tolerance: FLOATING_POINT_TOLERANCE,
+  },
+  {
+    releaseId: "populace-us-2024-f0af251-0ad74ed34493-20260619T181855Z",
+    buildId: "populace-us-2024-f0af251-0ad74ed34493-20260619T181855Z",
+    buildSha: "0ad74ed",
+    producerCommit: "0ad74ed344935e29d7c46703ce457ae6e8847b4d",
+    releaseFamily: "national",
+    diagnosticsSchema: 2,
+    targetCount: 4356,
+    orderedTargetNamesSha256: "0f562e9142dd33adb31339b457c6d5959575070b1a53c1dba5d0093b64664d60",
+    producerTargetSurfaceSha256: "67b491fe59f72e4622fd0d13c0f6a71e43e1c6ed74afae4032cb238515bd0269",
+    weightingIdentifier: HISTORICAL_WEIGHTING,
+    recipe: "newer_sqrt_value_50_50_v2",
     expectedStatus: "exact_reconstructed",
     tolerance: FLOATING_POINT_TOLERANCE,
   },

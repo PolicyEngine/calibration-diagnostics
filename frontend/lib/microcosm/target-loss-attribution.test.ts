@@ -144,9 +144,9 @@ describe("schema-version-6 reported target-loss attribution", () => {
 });
 
 describe("audited historical support manifest", () => {
-  test("classifies every picker release from all pinned evidence", () => {
-    expect(HISTORICAL_ATTRIBUTION_SUPPORT).toHaveLength(22);
-    expect(new Set(HISTORICAL_ATTRIBUTION_SUPPORT.map((entry) => entry.releaseId)).size).toBe(22);
+  test("classifies every pinned release and staging candidate from all evidence", () => {
+    expect(HISTORICAL_ATTRIBUTION_SUPPORT).toHaveLength(23);
+    expect(new Set(HISTORICAL_ATTRIBUTION_SUPPORT.map((entry) => entry.releaseId)).size).toBe(23);
 
     for (const entry of HISTORICAL_ATTRIBUTION_SUPPORT) {
       expect(classifyHistoricalAttributionEvidence(evidence(entry))).toEqual({
@@ -159,10 +159,33 @@ describe("audited historical support manifest", () => {
       HISTORICAL_ATTRIBUTION_SUPPORT.filter(
         (entry) => entry.expectedStatus === "exact_reconstructed",
       ),
-    ).toHaveLength(16);
+    ).toHaveLength(17);
     expect(
       HISTORICAL_ATTRIBUTION_SUPPORT.filter((entry) => entry.expectedStatus === "derived"),
     ).toHaveLength(6);
+  });
+
+  test("pins the completed schema-version-2 staging candidate", () => {
+    const entry = HISTORICAL_ATTRIBUTION_SUPPORT.find(
+      (candidate) =>
+        candidate.releaseId ===
+        "populace-us-2024-f0af251-0ad74ed34493-20260619T181855Z",
+    );
+
+    expect(entry).toMatchObject({
+      buildSha: "0ad74ed",
+      diagnosticsSchema: 2,
+      targetCount: 4356,
+      producerTargetSurfaceSha256:
+        "67b491fe59f72e4622fd0d13c0f6a71e43e1c6ed74afae4032cb238515bd0269",
+      recipe: "newer_sqrt_value_50_50_v2",
+      expectedStatus: "exact_reconstructed",
+    });
+    expect(classifyHistoricalAttributionEvidence(evidence(entry!))).toEqual({
+      status: "exact_reconstructed",
+      recipe: "newer_sqrt_value_50_50_v2",
+      reason: null,
+    });
   });
 
   test("refuses a familiar weighting name on an unexpected target surface", () => {

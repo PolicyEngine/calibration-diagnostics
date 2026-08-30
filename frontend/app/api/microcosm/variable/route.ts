@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 
 import { NextResponse } from "next/server";
 
+import { PUBLISHED_RELEASE_CACHE_SECONDS } from "@/lib/api/cache-policy";
 import {
   MICROCOSM_HF_REPO,
   loadPointerReleaseId,
@@ -116,7 +117,7 @@ export async function GET(request: Request) {
   try {
     const release =
       requestedRelease === "latest"
-        ? (await loadPointerReleaseId(300)).release_id
+        ? (await loadPointerReleaseId(PUBLISHED_RELEASE_CACHE_SECONDS)).release_id
         : requestedRelease;
     if (process.env.VERCEL === "1" && !process.env.PYTHON) {
       return NextResponse.redirect(
