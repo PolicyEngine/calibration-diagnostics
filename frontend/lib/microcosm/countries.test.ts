@@ -35,6 +35,18 @@ test("every registration carries the full shape", () => {
       expect(registration.repo_env).toMatch(/^[A-Z][A-Z0-9_]*$/);
       expect(registration.revision_env).toMatch(/^[A-Z][A-Z0-9_]*$/);
     }
+    if (registration.staging) {
+      expect(registration.staging.repo).toMatch(/^[a-z0-9-]+\/[a-z0-9-]+$/);
+      expect(registration.staging.revision.length).toBeGreaterThan(0);
+      if (
+        registration.staging.repo_env != null ||
+        registration.staging.revision_env != null
+      ) {
+        expect(registration.staging.repo_env).toMatch(/^[A-Z][A-Z0-9_]*$/);
+        expect(registration.staging.revision_env).toMatch(/^[A-Z][A-Z0-9_]*$/);
+      }
+    }
+    expect(hasCapability(country, "staging")).toBe(registration.staging != null);
   }
 });
 
@@ -49,6 +61,11 @@ test("keeps the live registrations on their published repositories and labels", 
     geography_id: "0100000US",
     visibility: "public",
     capabilities: COUNTRY_CAPABILITIES,
+    staging: {
+      repo: "policyengine/populace-us-staging",
+      repo_env: "POPULACE_STAGING_HF_REPO",
+      revision_env: "POPULACE_STAGING_HF_REVISION",
+    },
   });
   expect(countryRegistration("uk")).toMatchObject({
     repo: "policyengine/populace-uk-private",
@@ -71,12 +88,15 @@ test("keeps the live registrations on their published repositories and labels", 
 test("selectable countries follow registry order and exclude fixtures", () => {
   expect(selectableCountries()).toEqual(["us", "uk", "be"]);
   expect(countryRegistration("zz").fixture).toBe(true);
+  expect(countryRegistration("am").fixture).toBe(true);
   expect(selectableCountries()).not.toContain("zz");
 });
 
 test("fixture registrations are valid countries without being selectable", () => {
   expect(isCountry("zz")).toBe(true);
+  expect(isCountry("am")).toBe(true);
   expect(parseCountry("zz")).toBe("zz");
+  expect(parseCountry("am")).toBe("am");
 });
 
 test("country parsing is exact and defaults to the registry default", () => {
@@ -96,6 +116,7 @@ test("country parsing is exact and defaults to the registry default", () => {
 
 test("capability gates read the registration", () => {
   expect(hasCapability("us", "staging")).toBe(true);
+  expect(hasCapability("am", "staging")).toBe(true);
   expect(hasCapability("us", "model_coverage")).toBe(true);
   expect(hasCapability("uk", "staging")).toBe(false);
   expect(hasCapability("be", "pipeline")).toBe(false);

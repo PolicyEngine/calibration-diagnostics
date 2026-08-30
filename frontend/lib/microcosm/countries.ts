@@ -38,6 +38,14 @@ export interface CountryRegistration {
   geography_id: string | null;
   visibility: RepositoryVisibility;
   capabilities: readonly CountryCapability[];
+  // Optional staging telemetry repository. A staging-capable country must
+  // declare this instead of inheriting another country's repository.
+  staging?: {
+    repo: string;
+    revision: string;
+    repo_env?: string;
+    revision_env?: string;
+  };
   // Other jurisdiction codes a cross-dataset bundle may use for this country.
   jurisdiction_aliases?: readonly string[];
   // Conformance-only registration: a valid country that is never listed in
@@ -68,6 +76,14 @@ export const COUNTRY_REGISTRY = {
     geography_id: "0100000US",
     visibility: "public",
     capabilities: ALL_CAPABILITIES,
+    staging: {
+      // Deprecated upstream identifier: the US staging publisher still uses
+      // the former Populace repository and deployment-variable names.
+      repo: "policyengine/populace-us-staging",
+      revision: "main",
+      repo_env: "POPULACE_STAGING_HF_REPO",
+      revision_env: "POPULACE_STAGING_HF_REVISION",
+    },
   },
   uk: {
     repo: "policyengine/populace-uk-private",
@@ -104,6 +120,24 @@ export const COUNTRY_REGISTRY = {
     geography_id: null,
     visibility: "private",
     capabilities: ["calibration", "targets", "compare"],
+    fixture: true,
+  },
+  // Synthetic non-US staging registration. It verifies that staging artifact
+  // resolution is country-scoped without exposing an unfinished country in
+  // selectors or treating its fixture repository as a published dataset.
+  am: {
+    repo: "policyengine/microcosm-am-fixture",
+    revision: "main",
+    label: "Armenia",
+    dataset_label: "Microcosm Armenia",
+    geography: "Armenia",
+    geography_id: null,
+    visibility: "private",
+    capabilities: ["calibration", "targets", "compare", "staging"],
+    staging: {
+      repo: "policyengine/microcosm-am-staging-fixture",
+      revision: "main",
+    },
     fixture: true,
   },
 } satisfies Record<string, CountryRegistration>;

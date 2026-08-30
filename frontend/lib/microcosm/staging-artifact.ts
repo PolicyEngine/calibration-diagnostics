@@ -10,7 +10,7 @@ import {
   loadRelease,
   microcosmCountryGeography,
 } from "@/lib/microcosm/latest-artifact";
-import { hasCapability } from "@/lib/microcosm/countries";
+import { countryRegistration, hasCapability } from "@/lib/microcosm/countries";
 import {
   type ReformValidation,
   buildReformValidation,
@@ -34,19 +34,61 @@ const targetChangeCache = new Map<string, TargetChangeCacheEntry>();
 
 export const MICROCOSM_STAGING_HF_REPO_ENV = "POPULACE_STAGING_HF_REPO";
 export const MICROCOSM_STAGING_HF_REVISION_ENV = "POPULACE_STAGING_HF_REVISION";
-export const MICROCOSM_STAGING_HF_REPO =
-  // Deprecated upstream identifier: Microcosm staging still publishes under
-  // the former Populace repository and deployment-variable names.
-  process.env[MICROCOSM_STAGING_HF_REPO_ENV] ?? "policyengine/populace-us-staging";
-export const MICROCOSM_STAGING_HF_REVISION =
-  process.env[MICROCOSM_STAGING_HF_REVISION_ENV] ?? "main";
+export interface StagingRepository {
+  repo: string;
+  revision: string;
+}
 
-// Staging telemetry is served for countries registered with the `staging`
-// capability; the single staging repository above is the one they read.
+// Resolve staging telemetry from the country registry. The exported US values
+// retain the legacy API and deployment-variable behavior for existing callers.
+export function stagingRepository(country: MicrocosmCountry): StagingRepository | null {
+  const staging = countryRegistration(country).staging;
+  if (!hasCapability(country, "staging") || !staging) return null;
+  return {
+    repo:
+      (staging.repo_env ? process.env[staging.repo_env] : undefined) ??
+      staging.repo,
+    revision:
+      (staging.revision_env ? process.env[staging.revision_env] : undefined) ??
+      staging.revision,
+  };
+}
+
+export const MICROCOSM_STAGING_HF_REPO = stagingRepository("us")!.repo;
+export const MICROCOSM_STAGING_HF_REVISION = stagingRepository("us")!.revision;
+
 export function stagingUnavailableReason(country: MicrocosmCountry): string | null {
-  return hasCapability(country, "staging")
+  return stagingRepository(country)
     ? null
     : `${microcosmCountryGeography(country)} has no staging repository.`;
+}
+
+function requiredStagingRepository(country: MicrocosmCountry): StagingRepository {
+  const repository = stagingRepository(country);
+  if (repository) return repository;
+  throw new Error(
+    stagingUnavailableReason(country) ?? "Staging repository is not configured.",
+  );
+}
+
+function stagingResolveUrlFor(repository: StagingRepository, path: string): string {
+  return `https://huggingface.co/datasets/${repository.repo}/resolve/${repository.revision}/${path}`;
+}
+
+export function stagingResolveUrl(path: string, country: MicrocosmCountry = "us"): string {
+  return stagingResolveUrlFor(requiredStagingRepository(country), path);
+}
+
+function stagingTreeUrl(repository: StagingRepository): string {
+  return `https://huggingface.co/api/datasets/${repository.repo}/tree/${repository.revision}/runs?recursive=true`;
+}
+
+function stagingRepoUrl(repository: StagingRepository): string {
+  return `https://huggingface.co/api/datasets/${repository.repo}`;
+}
+
+function stagingSource(country: MicrocosmCountry): StagingRepository {
+  return requiredStagingRepository(country);
 }
 
 function unavailableStaging(country: MicrocosmCountry) {
@@ -64,15 +106,20 @@ class StagingFetchError extends Error {
   constructor(
     public readonly status: number,
     path: string,
+    repository: StagingRepository,
   ) {
-    super(stagingFetchMessage(status, path));
+    super(stagingFetchMessage(status, path, repository));
   }
 }
 
-function stagingFetchMessage(status: number, path: string): string {
+function stagingFetchMessage(
+  status: number,
+  path: string,
+  repository: StagingRepository,
+): string {
   if (status === 401 || status === 403) {
     return (
-      `Staging repo ${MICROCOSM_STAGING_HF_REPO} is not readable by this deployment ` +
+      `Staging repo ${repository.repo} is not readable by this deployment ` +
       `(${status} fetching ${path}). Set HF_TOKEN/HUGGINGFACE_TOKEN on the server, ` +
       "or publish staging telemetry to a public dataset repo."
     );
@@ -88,10 +135,6 @@ function hfHeaders(): HeadersInit | undefined {
   return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
-export function stagingResolveUrl(path: string): string {
-  return `https://huggingface.co/datasets/${MICROCOSM_STAGING_HF_REPO}/resolve/${MICROCOSM_STAGING_HF_REVISION}/${path}`;
-}
-
 function stagingFetchOptions(revalidate: number): RequestInit {
   return {
     headers: hfHeaders(),
@@ -99,34 +142,58 @@ function stagingFetchOptions(revalidate: number): RequestInit {
   };
 }
 
-async function stagingJson(path: string, revalidate: number): Promise<JsonObject> {
-  const res = await fetch(stagingResolveUrl(path), stagingFetchOptions(revalidate));
-  if (!res.ok) throw new StagingFetchError(res.status, path);
+async function stagingJson(
+  path: string,
+  revalidate: number,
+  country: MicrocosmCountry,
+): Promise<JsonObject> {
+  const repository = stagingSource(country);
+  const res = await fetch(
+    stagingResolveUrlFor(repository, path),
+    stagingFetchOptions(revalidate),
+  );
+  if (!res.ok) throw new StagingFetchError(res.status, path, repository);
   return asObject(await res.json());
 }
 
-async function stagingJsonOrNull(path: string, revalidate: number): Promise<JsonObject | null> {
+async function stagingJsonOrNull(
+  path: string,
+  revalidate: number,
+  country: MicrocosmCountry,
+): Promise<JsonObject | null> {
   try {
-    return await stagingJson(path, revalidate);
+    return await stagingJson(path, revalidate, country);
   } catch (error) {
     if (error instanceof StagingFetchError && error.status !== 404) throw error;
     return null;
   }
 }
 
-async function stagingTextOrNull(path: string, revalidate: number): Promise<string | null> {
-  const res = await fetch(stagingResolveUrl(path), stagingFetchOptions(revalidate));
+async function stagingTextOrNull(
+  path: string,
+  revalidate: number,
+  country: MicrocosmCountry,
+): Promise<string | null> {
+  const repository = stagingSource(country);
+  const res = await fetch(
+    stagingResolveUrlFor(repository, path),
+    stagingFetchOptions(revalidate),
+  );
   if (!res.ok) {
     if (res.status === 404) return null;
-    throw new StagingFetchError(res.status, path);
+    throw new StagingFetchError(res.status, path, repository);
   }
   return res.text();
 }
 
-async function stagingTree(revalidate: number): Promise<JsonObject[]> {
-  const url = `https://huggingface.co/api/datasets/${MICROCOSM_STAGING_HF_REPO}/tree/${MICROCOSM_STAGING_HF_REVISION}/runs?recursive=true`;
+async function stagingTree(
+  revalidate: number,
+  country: MicrocosmCountry,
+): Promise<JsonObject[]> {
+  const repository = stagingSource(country);
+  const url = stagingTreeUrl(repository);
   const res = await fetch(url, stagingFetchOptions(revalidate));
-  if (!res.ok) throw new StagingFetchError(res.status, "runs tree");
+  if (!res.ok) throw new StagingFetchError(res.status, "runs tree", repository);
   const tree = await res.json();
   return Array.isArray(tree) ? tree.map(asObject) : [];
 }
@@ -202,7 +269,8 @@ export async function loadStagingRuns(
       runs: [] as StagingRunSummary[],
     };
   }
-  const index = await stagingJsonOrNull("runs.json", revalidate);
+  const repository = stagingSource(country);
+  const index = await stagingJsonOrNull("runs.json", revalidate, country);
   const indexedRuns = Array.isArray(index?.runs)
     ? (index.runs as JsonObject[])
         .map((row) => {
@@ -231,7 +299,7 @@ export async function loadStagingRuns(
   const runIds = new Set(indexedRuns.map((run) => run.run_id));
   let treeMissing = false;
   try {
-    for (const entry of await stagingTree(revalidate)) {
+    for (const entry of await stagingTree(revalidate, country)) {
       if (typeof entry.path !== "string") continue;
       const match = /^runs\/([^/]+)\//.exec(entry.path);
       if (match) runIds.add(match[1]);
@@ -248,16 +316,16 @@ export async function loadStagingRuns(
   // empty list — a silent empty state hides a broken token.
   if (index == null && treeMissing && runIds.size === 0) {
     const repoRes = await fetch(
-      `https://huggingface.co/api/datasets/${MICROCOSM_STAGING_HF_REPO}`,
+      stagingRepoUrl(repository),
       stagingFetchOptions(revalidate),
     );
     if (!repoRes.ok) {
       return {
         available: false,
-        source_repo: MICROCOSM_STAGING_HF_REPO,
-        revision: MICROCOSM_STAGING_HF_REVISION,
+        source_repo: repository.repo,
+        revision: repository.revision,
         detail:
-          `Staging repo ${MICROCOSM_STAGING_HF_REPO} is not visible (HTTP ${repoRes.status}). ` +
+          `Staging repo ${repository.repo} is not visible (HTTP ${repoRes.status}). ` +
           "It is private — a missing or expired HF token reads as 404, not 401.",
         runs: [],
       };
@@ -274,7 +342,11 @@ export async function loadStagingRuns(
   const MAX_UNINDEXED_FETCH = 50;
   const fetched = await Promise.all(
     missing.slice(0, MAX_UNINDEXED_FETCH).map(async (runId) => {
-      const progress = await stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate);
+      const progress = await stagingJsonOrNull(
+        `runs/${runId}/progress.json`,
+        revalidate,
+        country,
+      );
       return summaryFromProgress(runId, progress);
     }),
   );
@@ -283,8 +355,8 @@ export async function loadStagingRuns(
 
   return {
     available: true,
-    source_repo: MICROCOSM_STAGING_HF_REPO,
-    revision: MICROCOSM_STAGING_HF_REVISION,
+    source_repo: repository.repo,
+    revision: repository.revision,
     truncated,
     runs: [...byId.values()].sort(sortRuns),
   };
@@ -313,16 +385,21 @@ export async function loadStagingCalibration(
 ): Promise<Calibration | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
-  const progress = await stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate);
+  const progress = await stagingJsonOrNull(
+    `runs/${runId}/progress.json`,
+    revalidate,
+    country,
+  );
   const candidateReleaseId = stringValue(progress?.candidate_release_id) ?? runId;
   const diag = await stagingJsonOrNull(
     `runs/${runId}/calibration_diagnostics.json`,
     revalidate,
+    country,
   );
   if (!diag) return null;
   const [buildManifest, releaseManifest] = await Promise.all([
-    stagingJsonOrNull(`runs/${runId}/build_manifest.json`, revalidate),
-    stagingJsonOrNull(`runs/${runId}/release_manifest.json`, revalidate),
+    stagingJsonOrNull(`runs/${runId}/build_manifest.json`, revalidate, country),
+    stagingJsonOrNull(`runs/${runId}/release_manifest.json`, revalidate, country),
   ]);
   return buildCalibration(
     diag,
@@ -346,6 +423,7 @@ export async function loadStagingTargetChangeDataset(
   const progress = await stagingJsonOrNull(
     `runs/${runId}/progress.json`,
     TARGET_CHANGE_MUTABLE_CACHE_SECONDS,
+    country,
   );
   const ttlSeconds = stagingTargetChangeCacheTtlSeconds(progress?.status);
   const cacheKey = `${country}:${runId}:${releaseId}`;
@@ -412,21 +490,22 @@ export async function loadStagingRun(
     cal,
     reformValidationRaw,
   ] = await Promise.all([
-    stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate),
-    stagingJsonOrNull(`runs/${runId}/run_manifest.json`, revalidate),
-    stagingJsonOrNull(`runs/${runId}/calibration_progress.json`, revalidate),
-    stagingTextOrNull(`runs/${runId}/events.ndjson`, revalidate),
+    stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate, country),
+    stagingJsonOrNull(`runs/${runId}/run_manifest.json`, revalidate, country),
+    stagingJsonOrNull(`runs/${runId}/calibration_progress.json`, revalidate, country),
+    stagingTextOrNull(`runs/${runId}/events.ndjson`, revalidate, country),
     loadStagingCalibration(runId, revalidate, country),
-    stagingJsonOrNull(`runs/${runId}/reform_validation.json`, revalidate),
+    stagingJsonOrNull(`runs/${runId}/reform_validation.json`, revalidate, country),
   ]);
   const candidateReleaseId =
     stringValue(progress?.candidate_release_id) ??
     stringValue(runManifest?.candidate_release_id) ??
     runId;
+  const repository = stagingSource(country);
   return {
     available: true,
-    source_repo: MICROCOSM_STAGING_HF_REPO,
-    revision: MICROCOSM_STAGING_HF_REVISION,
+    source_repo: repository.repo,
+    revision: repository.revision,
     run_id: runId,
     candidate_release_id: candidateReleaseId,
     progress,
@@ -454,7 +533,11 @@ export async function loadStagingReformValidationRaw(
 ): Promise<JsonObject | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
-  return stagingJsonOrNull(`runs/${runId}/reform_validation.json`, revalidate);
+  return stagingJsonOrNull(
+    `runs/${runId}/reform_validation.json`,
+    revalidate,
+    country,
+  );
 }
 
 export async function loadStagingTargetDiagnostics(
