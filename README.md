@@ -118,6 +118,9 @@ Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different
 US dataset/revision; `POPULACE_UK_HF_REPO`, `POPULACE_UK_HF_REVISION` for the UK;
 and `POPULACE_BE_HF_REPO`, `POPULACE_BE_HF_REVISION` for Belgium. The Belgium
 repository defaults in code to `policyengine/populace-be-private`. Set `HF_TOKEN`
-or `HUGGINGFACE_TOKEN` to read private datasets. US staging defaults to
-`policyengine/populace-us-staging`; override it with `POPULACE_STAGING_HF_REPO`
-and `POPULACE_STAGING_HF_REVISION`.
+or `HUGGINGFACE_TOKEN` to read private datasets. Each country with the
+`staging` capability declares its own staging repository in the country
+registry; it never falls back to another country's repository. US staging
+defaults to `policyengine/populace-us-staging`; override it with the
+backward-compatible `POPULACE_STAGING_HF_REPO` and
+`POPULACE_STAGING_HF_REVISION` variables.
