@@ -26,7 +26,6 @@ import type {
   CalibrationTreeMetrics,
 } from "@/lib/microcosm/calibration-tree";
 import {
-  aggregateCalibrationTreeMetrics,
   condenseCalibrationTreemapByMetric,
   expandedGroupsForNode,
   type CalibrationTreemapGroup,
@@ -46,6 +45,7 @@ import {
   formatWeightedTargetError,
   targetChangeDetailValues,
   targetChangeDirectionAreas,
+  targetChangeGroupsForDirection,
   targetChangeDirectionValue,
   type TargetChangeDirection,
   type TargetChangeDirectionData,
@@ -99,8 +99,9 @@ function layoutGroups(
   rect: Rect,
 ): LaidGroup[] {
   const metric = metricFor(direction);
+  const directionalGroups = targetChangeGroupsForDirection(groups, direction);
   const condensed = condenseCalibrationTreemapByMetric(
-    groups,
+    directionalGroups,
     metric,
     rect.w,
     rect.h,
@@ -148,24 +149,12 @@ function layoutDirections(
     direction: TargetChangeDirection;
   } | null,
 ): LaidDirection[] {
-  const areas: Array<Placed<TargetChangeDirectionData>> = expanded
-    ? [{
-        x: 0,
-        y: 0,
-        w: width,
-        h: height,
-        value: targetChangeDirectionValue(
-          aggregateCalibrationTreeMetrics(expanded.groups),
-          expanded.direction,
-        ),
-        data: {
-          direction: expanded.direction,
-          label: expanded.direction === "increase"
-            ? "Increased weighted target error"
-            : "Reduced weighted target error",
-        },
-      }]
-    : targetChangeDirectionAreas(data.filteredMetrics.change, width, height);
+  const displayedGroups = expanded?.groups ?? data.groups;
+  const areas: Array<Placed<TargetChangeDirectionData>> = targetChangeDirectionAreas(
+    displayedGroups,
+    width,
+    height,
+  ).filter((area) => !expanded || area.data.direction === expanded.direction);
   return areas.map((area) => {
     const directionRect = insetRect(area, DIRECTION_GAP);
     const contentRect = {
@@ -248,35 +237,6 @@ function Control<T extends string>({
             ) : null}
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function SummaryMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "positive" | "negative" | "neutral";
-}) {
-  return (
-    <div className="min-w-0 rounded-lg border border-border/70 bg-muted/15 px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div
-        className={`mt-1 truncate text-sm font-semibold tabular-nums ${
-          tone === "positive"
-            ? "tone-pos"
-            : tone === "negative"
-              ? "tone-neg"
-              : "text-foreground"
-        }`}
-      >
-        {value}
       </div>
     </div>
   );
@@ -484,11 +444,6 @@ export function StagingTargetChangeMap({
   const directions = layoutDirections(data, size.width, size.height, expanded);
   const breadcrumbs = explorerBreadcrumbs(state);
   const upLabel = expanded ? `Up to ${data.currentLevel.label.toLowerCase()}` : explorerUpLabel(state);
-  const netTone = data.summary.netChange > 1e-12
-    ? "negative"
-    : data.summary.netChange < -1e-12
-      ? "positive"
-      : "neutral";
 
   return (
     <div className="flex flex-col gap-4">
@@ -528,30 +483,6 @@ export function StagingTargetChangeMap({
             }}
           />
         </div>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        <SummaryMetric label="Current release" value={formatWeightedTargetError(data.summary.currentScore)} />
-        <SummaryMetric label="Candidate" value={formatWeightedTargetError(data.summary.candidateScore)} />
-        <SummaryMetric label="Net change" value={formatTargetChange(data.summary.netChange)} tone={netTone} />
-        <SummaryMetric label="Gross increase" value={formatTargetChange(data.summary.grossIncrease)} tone="negative" />
-        <SummaryMetric label="Gross reduction" value={formatTargetChange(-data.summary.grossReduction)} tone="positive" />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span>{fmt(data.summary.comparisonTargets, { digits: 0 })} targets compared</span>
-        <span>·</span>
-        <span>{fmt(data.summary.changed, { digits: 0 })} changed</span>
-        <span>·</span>
-        <span>{fmt(data.summary.unchanged, { digits: 0 })} unchanged</span>
-        {mode === "reported" ? (
-          <>
-            <span>·</span>
-            <span>{fmt(data.summary.added, { digits: 0 })} added</span>
-            <span>·</span>
-            <span>{fmt(data.summary.removed, { digits: 0 })} removed</span>
-          </>
-        ) : null}
       </div>
 
       <div className="flex min-w-0 items-center gap-3 text-xs">
@@ -703,7 +634,7 @@ export function StagingTargetChangeMap({
       </div>
 
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Area shows how much each category contributes to the selected mode's gross increase or reduction in weighted target error. Select a category to drill down or select a target to compare its values directly.
+        Area shows each category's absolute net change in weighted target error at the current level. Each category appears once, on the side determined by its net change. Select a category to drill down or select a target to compare its values directly.
       </p>
 
       {data.selectedTarget ? (

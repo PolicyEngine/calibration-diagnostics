@@ -1250,6 +1250,35 @@ test("comparison matches on base_name across the @period boundary", () => {
   expect(Array.isArray(cmp.rows[0].target_dimensions)).toBe(true);
 });
 
+test("comparison exposes each release's weighted target-error aggregate", () => {
+  const current = {
+    ...SAMPLE,
+    final_loss: 0.91,
+    target_loss_attribution: {
+      ...SAMPLE.target_loss_attribution,
+      status: "reported" as const,
+      aggregate: 0.123,
+    },
+  };
+  const candidate = {
+    ...SAMPLE,
+    release_id: "weighted-candidate",
+    final_loss: 0.82,
+    target_loss_attribution: {
+      ...SAMPLE.target_loss_attribution,
+      status: "reported" as const,
+      aggregate: 0.087,
+    },
+  };
+
+  const cmp = buildComparison(current, candidate);
+
+  expect(cmp.a.weighted_target_error).toBe(0.123);
+  expect(cmp.b.weighted_target_error).toBe(0.087);
+  expect(cmp.a.weighted_target_error).not.toBe(cmp.a.final_loss);
+  expect(cmp.b.weighted_target_error).not.toBe(cmp.b.final_loss);
+});
+
 test("comparison matches renamed legacy and structured targets by Chronicle fact key", () => {
   const current = calibration([
     {

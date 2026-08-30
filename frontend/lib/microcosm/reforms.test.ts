@@ -114,6 +114,49 @@ test("derives microcosm-vs-JCT error per reform", () => {
   expect(row.direction).toBe("over"); // microcosm less negative than JCT
 });
 
+test("normalizes legacy populace reform calculations", () => {
+  const v = buildReformValidation(
+    raw([
+      {
+        id: "legacy",
+        name: "Legacy calculation",
+        in_sample: true,
+        jct: { score: 1000 },
+        populace: {
+          budget_effect: 900,
+          window: "FY2024",
+          annual: { "2024": 900 },
+        },
+      },
+    ]),
+    "rel-a",
+  );
+
+  expect(v.rows[0].microcosm_estimate).toBe(900);
+  expect(v.rows[0].microcosm_window).toBe("FY2024");
+  expect(v.rows[0].microcosm_annual).toEqual({ "2024": 900 });
+  expect(v.rows[0].relative_error).toBeCloseTo(-0.1, 6);
+  expect(v.summary.n_scored).toBe(1);
+});
+
+test("prefers current microcosm calculations over legacy populace values", () => {
+  const v = buildReformValidation(
+    raw([
+      {
+        id: "both",
+        name: "Both calculation formats",
+        jct: { score: 1000 },
+        microcosm: { budget_effect: 1100 },
+        populace: { budget_effect: 900 },
+      },
+    ]),
+    "rel-a",
+  );
+
+  expect(v.rows[0].microcosm_estimate).toBe(1100);
+  expect(v.rows[0].relative_error).toBeCloseTo(0.1, 6);
+});
+
 test("summary counts only scored reforms and averages |error|", () => {
   const unscored = { id: "x", name: "No microcosm estimate", in_sample: false, jct: { score: -500 } };
   const v = buildReformValidation(raw([obbba, salt, unscored]), "rel-a");

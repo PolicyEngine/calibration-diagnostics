@@ -1,6 +1,22 @@
 import { expect, test } from "bun:test";
 
-import { fmtUnitValue, releaseLabel, shortReleaseId } from "./format";
+import {
+  differingPercentDigits,
+  fmtUnitValue,
+  releaseLabel,
+  shortReleaseId,
+} from "./format";
+
+test("percent comparison precision increases until the rendered values differ", () => {
+  expect(differingPercentDigits(0.041234, 0.041236)).toBe(3);
+  expect(differingPercentDigits(0.04, 0.05)).toBe(1);
+});
+
+test("percent comparison precision stops at ten decimal places", () => {
+  expect(differingPercentDigits(0.04, 0.04)).toBe(10);
+  expect(differingPercentDigits(0.04, 0.04 + 1e-14)).toBe(10);
+  expect(differingPercentDigits(null, 0.04)).toBe(1);
+});
 
 test("percent-unit values render as percentages from decimal fractions", () => {
   expect(fmtUnitValue(0.134, "percent")).toBe("13.4%");

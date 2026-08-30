@@ -67,6 +67,26 @@ export function fmt(
   return value.toFixed(opts.digits ?? 4);
 }
 
+export function differingPercentDigits(
+  left: number | null | undefined,
+  right: number | null | undefined,
+  maxDigits = 10,
+): number {
+  if (
+    left == null || right == null ||
+    !Number.isFinite(left) || !Number.isFinite(right)
+  ) {
+    return 1;
+  }
+  const limit = Math.max(1, Math.floor(maxDigits));
+  for (let digits = 1; digits <= limit; digits += 1) {
+    if (fmt(left, { pct: true, digits }) !== fmt(right, { pct: true, digits })) {
+      return digits;
+    }
+  }
+  return limit;
+}
+
 export function fmtSigned(
   value: number | null | undefined,
   opts: { pct?: boolean; digits?: number } = {},

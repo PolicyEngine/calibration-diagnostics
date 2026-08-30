@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCountry } from "@/components/layout/country-context";
 import { StagingTargetChangeMap } from "@/components/microcosm/staging-target-change-map";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
+  differingPercentDigits,
   fmtUnitValue,
   fmt,
   fmtCompact,
@@ -36,7 +37,10 @@ import {
   formatStagingCurrentStatus,
   formatStagingStatus,
 } from "@/lib/microcosm/staging-status";
-import { targetChangeMapIdentity } from "@/lib/microcosm/target-change-visualization";
+import {
+  formatWeightedTargetError,
+  targetChangeMapIdentity,
+} from "@/lib/microcosm/target-change-visualization";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
 
@@ -93,9 +97,14 @@ function runStartTime(run: MicrocosmStagingRunSummary): string | null | undefine
   );
 }
 
-// A "running" run that hasn't reported for two hours is dead in practice —
-// builds emit events at least every stage, and stages run minutes, not hours.
-const STALL_MS = 2 * 60 * 60 * 1000;
+function runLabel(run: MicrocosmStagingRunSummary): string {
+  return `${timeLabel(runStartTime(run))} · ${shortReleaseId(
+    run.candidate_release_id || run.run_id,
+  )}`;
+}
+
+// Display a running or queued run as stalled after six hours without an update.
+const STALL_MS = 6 * 60 * 60 * 1000;
 
 function effectiveStatus(
   status: string | null | undefined,
@@ -105,6 +114,140 @@ function effectiveStatus(
   const t = updatedAt ? new Date(updatedAt).valueOf() : NaN;
   if (Number.isFinite(t) && Date.now() - t > STALL_MS) return "stalled";
   return status ?? null;
+}
+
+const STATUS_INDICATOR_CLASS: Record<StatusTone, string> = {
+  success: "swatch-pos",
+  warning: "swatch-warn",
+  danger: "swatch-neg",
+  info: "swatch-info",
+  neutral: "swatch-neutral",
+};
+
+function RunSelect({
+  runs,
+  selected,
+  placeholder,
+  onSelect,
+}: {
+  runs: MicrocosmStagingRunSummary[];
+  selected: string;
+  placeholder: string;
+  onSelect: (runId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selectedRun = runs.find((run) => run.run_id === selected);
+  const selectedStatus = effectiveStatus(
+    selectedRun?.status,
+    selectedRun?.updated_at,
+  );
+  const selectedTone = statusTone(selectedStatus);
+  const disabled = !runs.length;
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative w-[28rem] max-w-full">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        className={`flex h-9 w-full min-w-0 items-center gap-1.5 rounded-md border px-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+          selectedRun
+            ? "border-primary bg-primary/5"
+            : "border-border bg-background hover:bg-muted/40"
+        }`}
+      >
+        {selectedRun ? (
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 shrink-0 rounded-full ${STATUS_INDICATOR_CLASS[selectedTone]}`}
+          />
+        ) : null}
+        <span className="min-w-0 flex-1 truncate font-medium">
+          {selectedRun ? runLabel(selectedRun) : placeholder}
+        </span>
+        {selectedRun ? (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {formatStagingStatus(selectedStatus)}
+          </span>
+        ) : null}
+        <svg
+          width="10"
+          height="6"
+          viewBox="0 0 10 6"
+          fill="none"
+          className={`shrink-0 text-muted-foreground transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        >
+          <path
+            d="M1 1l4 4 4-4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-10 z-50 w-full min-w-[22rem] overflow-hidden rounded-md border border-border bg-popover shadow-lg">
+          <ul role="listbox" aria-label="Run" className="max-h-80 overflow-y-auto p-1 text-sm">
+            {runs.map((run) => {
+              const active = run.run_id === selected;
+              const shownStatus = effectiveStatus(run.status, run.updated_at);
+              const tone = statusTone(shownStatus);
+              return (
+                <li key={run.run_id} role="presentation">
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => {
+                      onSelect(run.run_id);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left hover:bg-muted ${
+                      active ? "bg-muted/40" : ""
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`h-2 w-2 shrink-0 rounded-full ${STATUS_INDICATOR_CLASS[tone]}`}
+                    />
+                    <span className="min-w-0 flex-1 truncate font-medium">{runLabel(run)}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatStagingStatus(shownStatus)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function agoLabel(value: string | null | undefined): string {
@@ -140,60 +283,6 @@ function durationLabel(ms: number | null): string {
   if (s < 60) return `${s}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
   return `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
-}
-
-function RunList({
-  runs,
-  selected,
-  onSelect,
-}: {
-  runs: MicrocosmStagingRunSummary[];
-  selected: string;
-  onSelect: (runId: string) => void;
-}) {
-  if (!runs.length) {
-    return (
-      <EmptyState
-        title="No staging runs found."
-        description="Run Microcosm with staging telemetry enabled to publish progress here."
-        variant="compact"
-      />
-    );
-  }
-  return (
-    <div className="max-h-[72vh] overflow-y-auto rounded-md border border-border">
-      <div className="divide-y divide-border/60">
-        {runs.map((run) => {
-          const active = run.run_id === selected;
-          return (
-            <button
-              key={run.run_id}
-              type="button"
-              onClick={() => onSelect(run.run_id)}
-              className={`block w-full px-3 py-2 text-left ${
-                active ? "bg-primary/10" : "hover:bg-muted/40"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground">
-                    {timeLabel(runStartTime(run))} ·{" "}
-                    {shortReleaseId(run.candidate_release_id || run.run_id)}
-                  </div>
-                </div>
-                {(() => {
-                  const shown = effectiveStatus(run.status, run.updated_at);
-                  return (
-                    <StatusPill tone={statusTone(shown)}>{shown || "unknown"}</StatusPill>
-                  );
-                })()}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 function LossSparkline({ values }: { values: number[] }) {
@@ -534,11 +623,13 @@ function RunInternalsPanel({
 }
 
 function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
-  const ordered = [...rows]
-    .filter((row) => row.microcosm_estimate != null || row.jct_score != null)
-    .sort((a, b) => Number(a.in_sample ?? false) - Number(b.in_sample ?? false));
+  const ordered = rows.filter(
+    (row) =>
+      !row.in_sample &&
+      (row.microcosm_estimate != null || row.jct_score != null),
+  );
   if (!ordered.length) {
-    return <EmptyState title="No reform validation rows yet." variant="compact" />;
+    return <EmptyState title="No out-of-sample validation rows yet." variant="compact" />;
   }
   return (
     <div className="overflow-x-auto">
@@ -556,12 +647,7 @@ function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
             return (
               <tr key={row.id} className="border-b border-border/60 last:border-b-0">
                 <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">{row.name}</span>
-                    <StatusPill tone={row.in_sample ? "neutral" : "info"}>
-                      {row.in_sample ? "in-sample" : "out-of-sample"}
-                    </StatusPill>
-                  </div>
+                  <span className="font-medium text-foreground">{row.name}</span>
                   <div className="text-xs text-muted-foreground">
                     {row.category || "Reform score"}
                   </div>
@@ -592,14 +678,12 @@ function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
   );
 }
 
-// Common-target fit stats for the candidate-vs-current-release verdict: computed on
-// the SAME targets, since headline within-10% rates over different target sets
-// (32k national-only vs 4k) are not comparable.
+// Unweighted common-target statistics are computed on the same targets because
+// rates over different target sets are not directly comparable.
 interface SideStats {
   n: number;
   within10: number;
   median: number | null;
-  mean: number | null;
 }
 
 const VALIDATION_METHOD_HELP = {
@@ -607,8 +691,8 @@ const VALIDATION_METHOD_HELP = {
     "Measures the share of targets present in both releases whose absolute relative error is at most 10% of the benchmark value; higher is better. This metric is restricted to shared targets to ensure direct comparability.",
   targetMedianAbsoluteError:
     "Calculates the median absolute relative error across targets present in both releases. Lower is better.",
-  targetMeanAbsoluteError:
-    "Calculates the mean absolute relative error across targets present in both releases. Lower is better.",
+  weightedTargetError:
+    "Calculates the importance-weighted mean of each release's scaled target errors after applying its target-loss cap. This is the same aggregate used by the Calibration map and the reported Target error change comparison; lower is better.",
   reformMeanAbsoluteError:
     "Calculates the mean absolute relative error between the candidate's estimated reform effects and the external benchmarks for out-of-sample reforms. Out-of-sample means that the reform includes values that are not used as calibration targets; lower is better.",
   reformWithin10:
@@ -618,14 +702,13 @@ const VALIDATION_METHOD_HELP = {
 } as const;
 
 function sideStats(errors: number[]): SideStats {
-  if (!errors.length) return { n: 0, within10: 0, median: null, mean: null };
+  if (!errors.length) return { n: 0, within10: 0, median: null };
   const sorted = [...errors].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return {
     n: errors.length,
     within10: errors.filter((e) => e <= 0.1).length,
     median: sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2,
-    mean: errors.reduce((s, e) => s + e, 0) / errors.length,
   };
 }
 
@@ -746,6 +829,10 @@ function MicrocosmStagingRunsView() {
     }
     return { a: sideStats(a), b: sideStats(b) };
   }, [compareData]);
+  const medianAbsoluteErrorDigits = differingPercentDigits(
+    commonStats.a.median,
+    commonStats.b.median,
+  );
   const calibrationEvents = runData?.calibration_progress?.events ?? [];
   const lossValues = useMemo(
     () =>
@@ -772,6 +859,11 @@ function MicrocosmStagingRunsView() {
   );
   const candidateValidationPending = targetComparisonPending && !hasCandidateValidation;
   const showsCandidateValidation = hasCandidateValidation || candidateValidationPending;
+  const runSelectPlaceholder = runsLoading
+    ? "Loading runs…"
+    : runsError || runsData?.available === false
+      ? "Runs unavailable"
+      : "No staging runs";
 
   return (
     <div className="flex flex-col gap-5">
@@ -779,43 +871,44 @@ function MicrocosmStagingRunsView() {
         eyebrow="Microcosm · staging"
         title="Staging candidates"
         description="Monitor Microcosm build candidates before they are promoted to the published Hugging Face release channel."
+        actions={
+          <RunSelect
+            runs={runs}
+            selected={selectedRun}
+            placeholder={runSelectPlaceholder}
+            onSelect={resetRunVisualState}
+          />
+        }
       />
 
-      <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <SectionCard title="Runs">
-          {runsLoading ? (
-            <LoadingBlock label="Loading staging runs…" height="h-40" />
+      <div className="flex flex-col gap-5">
+        {runsLoading && !runs.length ? (
+            <LoadingBlock label="Loading staging runs…" />
           ) : runsError ? (
             <EmptyState
               title="Staging runs unavailable"
               description={runsError instanceof Error ? runsError.message : "Unknown error."}
-              variant="compact"
             />
           ) : runsData && runsData.available === false ? (
             <EmptyState
-              title="Staging repo not reachable"
-              description={runsData.detail || "The staging repo could not be read."}
-              variant="compact"
+              title="Staging repository not reachable"
+              description={runsData.detail || "The staging repository could not be read."}
             />
-          ) : (
-            <RunList
-              runs={runs}
-              selected={selectedRun}
-              onSelect={resetRunVisualState}
+          ) : !runs.length ? (
+            <EmptyState
+              title="No staging runs found"
+              description="Run Microcosm with staging telemetry enabled to publish progress here."
             />
-          )}
-        </SectionCard>
-
-        {!selectedRun ? (
-            <div className="lg:col-start-2">
+          ) : !selectedRun ? (
+            <div>
               <EmptyState title="Select a staging run." />
             </div>
           ) : runLoading ? (
-            <div className="lg:col-start-2">
+            <div>
               <LoadingBlock label="Loading staging run…" />
             </div>
           ) : runError || !runData ? (
-            <div className="lg:col-start-2">
+            <div>
               <EmptyState
                 title="Staging run unavailable"
                 description={runError instanceof Error ? runError.message : "Unknown error."}
@@ -823,7 +916,7 @@ function MicrocosmStagingRunsView() {
             </div>
           ) : (
             <>
-              <div className="flex min-w-0 flex-col gap-5 lg:col-start-2">
+              <div className="flex min-w-0 flex-col gap-5">
               <SectionCard
                 title="Candidate overview"
                 className="w-full"
@@ -930,13 +1023,18 @@ function MicrocosmStagingRunsView() {
                             currentRelease={commonStats.a.median}
                             candidate={commonStats.b.median}
                             higherBetter={false}
+                            render={(value) => fmt(value, {
+                              pct: true,
+                              digits: medianAbsoluteErrorDigits,
+                            })}
                           />
                           <ScoreRow
-                            label="Target mean absolute error (shared)"
-                            about={VALIDATION_METHOD_HELP.targetMeanAbsoluteError}
-                            currentRelease={commonStats.a.mean}
-                            candidate={commonStats.b.mean}
+                            label="Weighted target error"
+                            about={VALIDATION_METHOD_HELP.weightedTargetError}
+                            currentRelease={compareData.a.weighted_target_error}
+                            candidate={compareData.b.weighted_target_error}
                             higherBetter={false}
+                            render={formatWeightedTargetError}
                           />
                         </>
                       )}
@@ -1027,8 +1125,6 @@ function MicrocosmStagingRunsView() {
                 {runData.has_calibration && (
                   <SectionCard
                     title="Target error change"
-                    className="lg:col-span-2 lg:col-start-1"
-                    description="Shows which parts of the target surface account for the candidate's increase or reduction in weighted target error."
                   >
                     {compareData?.summary ? (
                       <StagingTargetChangeMap
@@ -1059,7 +1155,6 @@ function MicrocosmStagingRunsView() {
                 {runData.has_calibration && (
                 <SectionCard
                   title="Target breakdown"
-                  className="lg:col-span-2 lg:col-start-1"
                   description="Every target both sides share, worst movement first. Search by statistic, variable, or geography."
                   actions={
                     compareData?.summary ? (
@@ -1200,8 +1295,20 @@ function MicrocosmStagingRunsView() {
               {runData.reform_validation && (
                 <SectionCard
                   title="External checks breakdown"
-                  className="lg:col-span-2 lg:col-start-1"
-                  description="Each score test the run uploaded. Out-of-sample rows are the main signal; in-sample rows were direct or near-direct calibration targets. Cross-release external comparisons live in the PolicyEngine scorecard."
+                  description={
+                    <>
+                      Cross-release external comparisons live in the{" "}
+                      <a
+                        href="https://www.policyengine.org/scorecard"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-dotted underline-offset-2 hover:text-primary"
+                      >
+                        PolicyEngine scorecard
+                      </a>
+                      .
+                    </>
+                  }
                   padded={false}
                 >
                   <ReformValidationTable rows={runData.reform_validation.rows ?? []} />
@@ -1218,7 +1325,6 @@ function MicrocosmStagingRunsView() {
                   artifacts={artifacts}
                   open={runInternalsOpen}
                   onOpenChange={setRunInternalsOpen}
-                  className="lg:col-span-2 lg:col-start-1"
                 />
               )}
               </div>

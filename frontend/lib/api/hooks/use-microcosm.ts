@@ -442,6 +442,7 @@ export interface MicrocosmComparison {
     initial_loss: number | null;
     final_loss: number | null;
     loss_kind: "normalized_target_loss" | "raw_optimizer_objective";
+    weighted_target_error: number | null;
     fraction_within_10pct: number | null;
   };
   b: {
@@ -451,6 +452,7 @@ export interface MicrocosmComparison {
     initial_loss: number | null;
     final_loss: number | null;
     loss_kind: "normalized_target_loss" | "raw_optimizer_objective";
+    weighted_target_error: number | null;
     fraction_within_10pct: number | null;
   };
   summary: {

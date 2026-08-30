@@ -1,5 +1,9 @@
-import type { CalibrationTreeChangeMetrics } from "./calibration-tree";
-import { squarify, type Placed } from "@/lib/treemap/squarify";
+import type { Placed } from "@/lib/treemap/squarify";
+import type {
+  CalibrationTreeChangeMetrics,
+  CalibrationTreeGroup,
+} from "./calibration-tree";
+import { aggregateCalibrationTreeMetrics } from "./calibration-treemap-layout";
 import type {
   TargetChangeMode,
   TargetChangeRow,
@@ -20,30 +24,101 @@ export function targetChangeDirectionValue(
   metrics: { change?: CalibrationTreeChangeMetrics },
   direction: TargetChangeDirection,
 ): number {
+  const netChange = metrics.change?.netChange ?? 0;
+  if (Math.abs(netChange) <= 1e-12) return 0;
   return direction === "increase"
-    ? metrics.change?.increasedError ?? 0
-    : metrics.change?.reducedError ?? 0;
+    ? Math.max(netChange, 0)
+    : Math.max(-netChange, 0);
+}
+
+/**
+ * Retains only categories whose net change belongs to the requested direction.
+ * A source group may be present in both results, but each category node is
+ * present in no more than one result.
+ */
+export function targetChangeGroupsForDirection(
+  groups: CalibrationTreeGroup[],
+  direction: TargetChangeDirection,
+): CalibrationTreeGroup[] {
+  return groups.flatMap((group) => {
+    const nodes = group.nodes.filter(
+      (node) => targetChangeDirectionValue(node.metrics, direction) > 0,
+    );
+    if (!nodes.length) return [];
+    return [{
+      ...group,
+      nodes,
+      metrics: aggregateCalibrationTreeMetrics(nodes),
+    }];
+  });
+}
+
+export function targetChangeDirectionTotals(
+  groups: CalibrationTreeGroup[],
+): Record<TargetChangeDirection, number> {
+  return groups.reduce(
+    (totals, group) => {
+      for (const node of group.nodes) {
+        totals.increase += targetChangeDirectionValue(node.metrics, "increase");
+        totals.reduction += targetChangeDirectionValue(node.metrics, "reduction");
+      }
+      return totals;
+    },
+    { increase: 0, reduction: 0 },
+  );
 }
 
 export function targetChangeDirectionAreas(
-  metrics: CalibrationTreeChangeMetrics | undefined,
+  groups: CalibrationTreeGroup[],
   width: number,
   height: number,
 ): Placed<TargetChangeDirectionData>[] {
-  const directions: Array<{ value: number; data: TargetChangeDirectionData }> = [
+  const totals = targetChangeDirectionTotals(groups);
+  const safeWidth = Math.max(width, 0);
+  const safeHeight = Math.max(height, 0);
+  const total = totals.increase + totals.reduction;
+  if (total <= 0 || safeWidth <= 0 || safeHeight <= 0) return [];
+
+  if (totals.increase <= 0) {
+    return [{
+      x: 0,
+      y: 0,
+      w: safeWidth,
+      h: safeHeight,
+      value: totals.reduction,
+      data: { direction: "reduction", label: "Reduced weighted target error" },
+    }];
+  }
+  if (totals.reduction <= 0) {
+    return [{
+      x: 0,
+      y: 0,
+      w: safeWidth,
+      h: safeHeight,
+      value: totals.increase,
+      data: { direction: "increase", label: "Increased weighted target error" },
+    }];
+  }
+
+  const increaseWidth = safeWidth * (totals.increase / total);
+  return [
     {
-      value: metrics?.increasedError ?? 0,
+      x: 0,
+      y: 0,
+      w: increaseWidth,
+      h: safeHeight,
+      value: totals.increase,
       data: { direction: "increase", label: "Increased weighted target error" },
     },
     {
-      value: metrics?.reducedError ?? 0,
+      x: increaseWidth,
+      y: 0,
+      w: safeWidth - increaseWidth,
+      h: safeHeight,
+      value: totals.reduction,
       data: { direction: "reduction", label: "Reduced weighted target error" },
     },
   ];
-  return squarify(
-    directions.filter((item) => item.value > 0),
-    { x: 0, y: 0, w: Math.max(width, 0), h: Math.max(height, 0) },
-  );
 }
 
 export function formatWeightedTargetError(value: number | null | undefined): string {

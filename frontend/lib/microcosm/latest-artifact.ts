@@ -2876,6 +2876,7 @@ export function buildComparison(a: Calibration, b: Calibration) {
       initial_loss: a.initial_loss,
       final_loss: a.final_loss,
       loss_kind: a.loss_kind,
+      weighted_target_error: a.target_loss_attribution.aggregate,
       fraction_within_10pct: a.fraction_within_10pct,
     },
     b: {
@@ -2885,6 +2886,7 @@ export function buildComparison(a: Calibration, b: Calibration) {
       initial_loss: b.initial_loss,
       final_loss: b.final_loss,
       loss_kind: b.loss_kind,
+      weighted_target_error: b.target_loss_attribution.aggregate,
       fraction_within_10pct: b.fraction_within_10pct,
     },
     summary: {
