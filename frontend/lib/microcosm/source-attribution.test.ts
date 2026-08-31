@@ -23,6 +23,13 @@ test("links Microcosm to the public US Hugging Face dataset", () => {
   });
 });
 
+test("links Microcosm to the public New Zealand Hugging Face dataset", () => {
+  expect(microcosmSourceAttribution("nz", "policyengine/populace-nz")).toEqual({
+    label: "Microcosm",
+    href: "https://huggingface.co/datasets/policyengine/populace-nz",
+  });
+});
+
 test("does not expose the private UK Hugging Face dataset", () => {
   expect(microcosmSourceAttribution("uk", "policyengine/populace-uk-private")).toEqual({
     label: "Microcosm",

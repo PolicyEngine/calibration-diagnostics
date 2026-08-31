@@ -122,12 +122,12 @@ test("artifact-narrowed capabilities hide pages the release does not serve", () 
   expect(groups[0].items.map((item) => item.href)).toEqual(["/microcosm"]);
 });
 
-test("shows Cross-dataset navigation for every selectable country", () => {
+test("shows Cross-dataset navigation only for countries with that capability", () => {
   for (const country of selectableCountries()) {
     expect(
       navGroupsForCountry(country)
         .flatMap((group) => group.items)
         .some((item) => item.href === "/microcosm/datasets"),
-    ).toBe(true);
+    ).toBe(hasCapability(country, "cross_dataset"));
   }
 });
