@@ -15,6 +15,9 @@ export interface StructuredTargetIdentity {
   variableLabel: string | null;
   measure: string | null;
   geography: string;
+  geographyId: string | null;
+  geographyDimensionId: string | null;
+  geographyRank: number | null;
   level: string;
   dimensions: StructuredTargetDimension[];
   breakdown: string;
@@ -54,6 +57,9 @@ export function readStructuredTarget(
     variableLabel: stringValue(variable.label),
     measure: stringValue(variable.measure),
     geography,
+    geographyId: structured.geographyId,
+    geographyDimensionId: structured.geographyDimensionId,
+    geographyRank: structured.geographyRank,
     level,
     dimensions,
     breakdown: dimensions.map((dimension) => dimension.value).join(" · "),

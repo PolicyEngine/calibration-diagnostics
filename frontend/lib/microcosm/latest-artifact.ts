@@ -866,8 +866,23 @@ function computeDimensions(rows: TargetRow[]): TargetDimension[] {
     if (values.length <= 1) continue;
     const label = candidate.label ?? classifyDimension(values);
     const ranks = new Map<string, number>();
-    let everyValueRanked = candidate.key !== "geography";
+    let everyValueRanked = true;
     for (const value of values) {
+      if (candidate.key === "geography") {
+        const matchingRows = rows.filter((row) => row.geography === value);
+        if (
+          !matchingRows.length ||
+          matchingRows.some((row) => typeof row.geography_rank !== "number")
+        ) {
+          everyValueRanked = false;
+          break;
+        }
+        ranks.set(
+          value,
+          Math.min(...matchingRows.map((row) => row.geography_rank as number)),
+        );
+        continue;
+      }
       const matchingDimensions = rows.flatMap((row) =>
         ((row.target_dimensions as TargetBreakdownDimension[] | undefined) ?? [])
           .filter((dimension) =>
@@ -1113,6 +1128,10 @@ function enrichTargetRow(
       ? null
       : stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography,
+    geography_id:
+      structuredIdentity?.geographyId ?? stringValue(metadata.ledger_geography_id),
+    geography_dimension_id: structuredIdentity?.geographyDimensionId ?? null,
+    geography_rank: structuredIdentity?.geographyRank ?? null,
     level,
     source: parsed.source,
     source_label:

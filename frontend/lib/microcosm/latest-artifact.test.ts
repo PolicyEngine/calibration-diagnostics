@@ -304,6 +304,228 @@ test("structured dimensions shape rows and honor artifact value order", () => {
   ]);
 });
 
+test("legacy UK geography metadata resolves GSS identifiers across target-name formats", () => {
+  const legacyTarget = (
+    name: string,
+    geographyId: string,
+    geographyName?: string,
+  ) => ({
+    name: `${name}@2025`,
+    target_name: name,
+    period: 2025,
+    entity: "household",
+    measure: { kind: "column", name },
+    filter: null,
+    source: "UK source citation",
+    metadata: {
+      ledger_geography_level: "country",
+      ledger_geography_id: geographyId,
+      ...(geographyName ? { ledger_geography_name: geographyName } : {}),
+    },
+    registry: { family: "uk_source" },
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 100,
+  });
+  const cal = buildCalibration(
+    {
+      schema_version: 6,
+      targets: [
+        legacyTarget("obr.receipts.income_tax", "K02000001"),
+        legacyTarget("dwp/uc/payment_band", "K03000001"),
+        legacyTarget("ons.population.england", "E92000001"),
+        legacyTarget("scotgov.council_tax.band_a", "S92000003"),
+        legacyTarget("ons.population.published", "K02000001", "Published area"),
+        legacyTarget("ons.population.named_uk", "K02000001", "United Kingdom"),
+        legacyTarget("ons.population.unknown", "X00000000"),
+      ],
+    },
+    "uk-legacy-geography",
+    null,
+    {},
+    {},
+    {},
+    "uk",
+  );
+
+  expect(cal.rows.map((row) => [row.geography, row.level])).toEqual([
+    ["United Kingdom", "country"],
+    ["Great Britain", "country"],
+    ["England", "country"],
+    ["Scotland", "country"],
+    ["Published area", "country"],
+    ["United Kingdom", "country"],
+    ["United Kingdom", "national"],
+  ]);
+});
+
+test("legacy US geography normalization remains unchanged", () => {
+  const cal = buildCalibration(
+    {
+      schema_version: 6,
+      targets: [
+        {
+          name: "census.population.total@2025",
+          target_name: "census.population.total",
+          source: "Census citation",
+          metadata: {
+            ledger_geography_level: "country",
+            ledger_geography_id: "0100000US",
+            ledger_geography_name: "United States",
+          },
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 100,
+        },
+      ],
+    },
+    "us-legacy-geography",
+  );
+
+  expect(cal.rows[0]).toMatchObject({
+    geography: "United States",
+    level: "national",
+  });
+});
+
+test("structured UK geography preserves producer identity and ordering", () => {
+  const geographyValues = {
+    K02000001: "United Kingdom",
+    K03000001: "Great Britain",
+    E92000001: "England",
+    S92000003: "Scotland",
+  };
+  const order = ["K02000001", "K03000001", "E92000001", "S92000003"];
+  const targets = order.map((geographyId) => ({
+    name: `ons.population.${geographyId}@2025`,
+    target_name: `ons.population.${geographyId}`,
+    source: { id: "ons", citation: "ONS population table" },
+    variable: { id: "population", measure: "count" },
+    dimensions: { geography_country: geographyId },
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 100,
+  }));
+  const cal = buildCalibration(
+    {
+      schema_version: 7,
+      dimensions: {
+        geography_country: {
+          label: "Geography",
+          role: "geography",
+          level: "country",
+          values: geographyValues,
+          order,
+        },
+      },
+      targets,
+    },
+    "uk-structured-geography",
+    null,
+    {},
+    {},
+    {},
+    "uk",
+  );
+  const page = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics?variable=ons%20%2F%20population%20%C2%B7%20count",
+    cal,
+  );
+
+  expect(cal.rows[3]).toMatchObject({
+    geography: "Scotland",
+    geography_id: "S92000003",
+    geography_dimension_id: "geography_country",
+    geography_rank: 3,
+    level: "country",
+  });
+  expect(page.dimensions[0]).toEqual({
+    key: "geography",
+    label: "Geography",
+    values: ["United Kingdom", "Great Britain", "England", "Scotland"],
+  });
+});
+
+test("structured geography falls back to deterministic sorting when order is incomplete", () => {
+  const cal = buildCalibration(
+    {
+      schema_version: 7,
+      dimensions: {
+        geography_country: {
+          label: "Geography",
+          role: "geography",
+          level: "country",
+          values: { K02000001: "United Kingdom", E92000001: "England" },
+          order: ["K02000001"],
+        },
+      },
+      targets: ["K02000001", "E92000001"].map((geographyId) => ({
+        name: `ons.population.${geographyId}@2025`,
+        source: { id: "ons" },
+        variable: { id: "population" },
+        dimensions: { geography_country: geographyId },
+        target: 100,
+        initial_estimate: 90,
+        final_estimate: 100,
+      })),
+    },
+    "uk-structured-geography-incomplete-order",
+    null,
+    {},
+    {},
+    {},
+    "uk",
+  );
+  const page = latestMicrocosmTargetDiagnosticsPage(
+    "http://x/api/microcosm/target-diagnostics?variable=ons%20%2F%20population",
+    cal,
+  );
+
+  expect(page.dimensions[0]?.values).toEqual(["England", "United Kingdom"]);
+});
+
+test("structured targets reject multiple populated geography dimensions", () => {
+  expect(() =>
+    buildCalibration(
+      {
+        schema_version: 7,
+        dimensions: {
+          geography_country: {
+            label: "Country",
+            role: "geography",
+            level: "country",
+          },
+          geography_region: {
+            label: "Region",
+            role: "geography",
+            level: "region",
+          },
+        },
+        targets: [
+          {
+            name: "ons.population@2025",
+            source: { id: "ons" },
+            variable: { id: "population" },
+            dimensions: {
+              geography_country: "E92000001",
+              geography_region: "north_east",
+            },
+            target: 100,
+            initial_estimate: 90,
+            final_estimate: 100,
+          },
+        ],
+      },
+      "uk-ambiguous-structured-geography",
+      null,
+      {},
+      {},
+      {},
+      "uk",
+    )
+  ).toThrow("at most one populated geography-role dimension");
+});
+
 test("structured facet ordering falls back when any displayed value lacks a rank", () => {
   const target = (suffix: string, category: string) => ({
     name: `fixture.population.${suffix}@2026`,
