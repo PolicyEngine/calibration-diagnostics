@@ -2271,6 +2271,73 @@ test("fully structured targets ignore conflicting legacy identity fields", () =>
   });
 });
 
+test("structured categories group count and total rows by variable identity", () => {
+  const target = (name: string, measure: "count" | "total") => ({
+    name: `${name}@2025`,
+    target_name: name,
+    source: { id: "hmrc", citation: "HMRC SPI" },
+    variable: { id: "spi_employment_income", measure },
+    dimensions: {
+      geography_country: "K02000001",
+      total_income_lower_bound: "100000",
+    },
+    metadata: {},
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 100,
+  });
+  const cal = buildCalibration(
+    {
+      schema_version: 7,
+      dimensions: {
+        geography_country: {
+          label: "Country",
+          role: "geography",
+          level: "country",
+          values: { K02000001: "United Kingdom" },
+          order: ["K02000001"],
+        },
+        total_income_lower_bound: {
+          label: "Total Income Lower Bound",
+          values: { "100000": "100000" },
+          order: ["100000"],
+        },
+      },
+      targets: [
+        target("hmrc/employment_income_amount_band_100000", "total"),
+        target("hmrc/employment_income_count_band_100000", "count"),
+      ],
+    },
+    "uk-schema-7-categories",
+    null,
+    {},
+    {},
+    {},
+    "uk",
+  );
+  const tree = buildCalibrationTree(cal.rows, {
+    breakdown: "program",
+    path: { dimensions: [] },
+    filters: {
+      geographyLevels: [],
+      geographies: [],
+      fitBands: [],
+      calibrationStatuses: [],
+    },
+  });
+
+  expect(cal.target_schema.target_representation).toBe("structured");
+  expect(cal.rows.map((row) => row.measure)).toEqual(["total", "count"]);
+  expect(cal.rows.every((row) => row.dimension_adapter === "structured")).toBe(true);
+  expect(tree.groups).toHaveLength(1);
+  expect(tree.groups[0].nodes).toHaveLength(1);
+  expect(tree.groups[0].nodes[0]).toMatchObject({
+    id: "spi_employment_income",
+    label: "Spi employment income",
+    metrics: { nTargets: 2 },
+  });
+});
+
 test("structured dimension ids remain independent when display labels repeat", () => {
   const structuredTargets = [
     ["north", "east"],
