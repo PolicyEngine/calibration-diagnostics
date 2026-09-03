@@ -234,6 +234,31 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     expect(tree.groups[0].label).toBe("Nova Statistics Agency");
   });
 
+  test("retains artifact source and category labels throughout the selected path", () => {
+    const tree = buildCalibrationTree(
+      [
+        target("obr-income-tax", {
+          source: "obr",
+          source_label: "Office for Budget Responsibility",
+          variable: "efo_receipts",
+          variable_label: "EFO receipts",
+          geography: "United Kingdom",
+        }),
+      ],
+      state({
+        source: "obr",
+        program: "efo_receipts",
+        dimensions: [],
+      }),
+    );
+
+    expect(tree.pathLabels).toEqual({
+      source: "Office for Budget Responsibility",
+      program: "EFO receipts",
+    });
+    expect(tree.groups[0].label).toBe("EFO receipts");
+  });
+
   test("renders geography first, then programs grouped by their source", () => {
     const overview = buildCalibrationTree(
       rows,

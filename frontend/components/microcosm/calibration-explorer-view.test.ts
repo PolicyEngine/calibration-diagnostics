@@ -50,18 +50,18 @@ describe("calibration explorer presentation model", () => {
     );
   });
 
-  test("resolves program labels at the final presentation boundary", () => {
+  test("uses the program label resolved by the tree", () => {
     expect(
       explorerNodeLabel({
         id: "taxable interest income",
-        label: "taxable interest income",
+        label: "Taxable interest income",
         kind: "program",
       }),
     ).toBe("Taxable interest income");
     expect(
       explorerNodeLabel({
         id: "refundable ctc",
-        label: "refundable ctc",
+        label: "Refundable CTC",
         kind: "program",
       }),
     ).toBe("Refundable CTC");
@@ -244,6 +244,56 @@ describe("calibration explorer presentation model", () => {
         dimensions: [],
       },
     });
+  });
+
+  test("prefers artifact source and category labels in breadcrumbs", () => {
+    expect(
+      explorerBreadcrumbs(
+        state({
+          source: "obr",
+          program: "efo_receipts",
+          geography: "United Kingdom",
+          dimensions: [],
+        }),
+        {
+          source: "Office for Budget Responsibility",
+          program: "EFO receipts",
+        },
+      ),
+    ).toEqual([
+      { label: "All targets", path: { dimensions: [] } },
+      {
+        label: "Office for Budget Responsibility",
+        path: { dimensions: [] },
+      },
+      {
+        label: "EFO receipts",
+        path: {
+          source: "obr",
+          program: "efo_receipts",
+          dimensions: [],
+        },
+      },
+      {
+        label: "United Kingdom",
+        path: {
+          source: "obr",
+          program: "efo_receipts",
+          geography: "United Kingdom",
+          dimensions: [],
+        },
+      },
+    ]);
+  });
+
+  test("preserves an artifact category label on a program tile", () => {
+    expect(
+      explorerNodeLabel({
+        id: "efo_receipts",
+        kind: "program",
+        label: "EFO receipts",
+      }),
+    ).toBe("EFO receipts");
   });
 
   test("distinguishes an empty filtered result from an invalid hierarchy scope", () => {

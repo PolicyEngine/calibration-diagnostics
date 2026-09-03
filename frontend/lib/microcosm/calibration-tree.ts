@@ -85,6 +85,10 @@ export interface CalibrationTreeResponse {
   releaseId?: string;
   lossAttributionAvailable: boolean;
   path: ExplorerState["path"];
+  pathLabels: {
+    source?: string;
+    program?: string;
+  };
   currentLevel:
     | { kind: "overview"; label: string }
     | { kind: "geography"; label: string }
@@ -484,6 +488,36 @@ function programGroups(rows: CalibrationTreeTarget[]): CalibrationTreeGroup[] {
     );
 }
 
+function pathLabels(
+  rows: CalibrationTreeTarget[],
+  path: ExplorerState["path"],
+): CalibrationTreeResponse["pathLabels"] {
+  if (!path.source) return {};
+  const sourceRows = rows.filter(
+    (row) => String(row.source ?? "other") === path.source,
+  );
+  const artifactSourceLabel = sourceRows
+    .map((row) => row.source_label?.trim())
+    .find((label): label is string => Boolean(label));
+  const labels: CalibrationTreeResponse["pathLabels"] = {
+    source: artifactSourceLabel ?? sourceLabel(path.source),
+  };
+  if (!path.program) return labels;
+  const programRows = sourceRows.filter((row) => programId(row) === path.program);
+  const artifactProgramLabels = [
+    ...new Set(
+      programRows
+        .map((row) => row.variable_label?.trim())
+        .filter((label): label is string => Boolean(label)),
+    ),
+  ];
+  labels.program = programLabel(
+    path.program,
+    artifactProgramLabels.length === 1 ? artifactProgramLabels[0] : null,
+  );
+  return labels;
+}
+
 function geographyNodes(rows: CalibrationTreeTarget[]): CalibrationTreeNode[] {
   const byGeography = groupRows(rows, geographyId);
   return sortNodes(
@@ -508,6 +542,7 @@ export function buildCalibrationTree(
 ): CalibrationTreeResponse {
   const chartRows = allRows.map(normalizeChartCalibrationStatus);
   const { path } = state;
+  const selectedPathLabels = pathLabels(chartRows, path);
   const options = filterOptions(chartRows);
   const filteredRows = applyExplorerFilters(chartRows, state.filters);
 
@@ -517,6 +552,7 @@ export function buildCalibrationTree(
       releaseId,
       lossAttributionAvailable,
       path,
+      pathLabels: selectedPathLabels,
       currentLevel: { kind: "geography", label: "Geography" },
       groups: [{
         id: "geography",
@@ -542,6 +578,7 @@ export function buildCalibrationTree(
       releaseId,
       lossAttributionAvailable,
       path,
+      pathLabels: selectedPathLabels,
       currentLevel: { kind: "overview", label: "Programs" },
       groups: programGroups(filteredGeographyRows),
       dimensionOrder: [],
@@ -555,6 +592,7 @@ export function buildCalibrationTree(
       releaseId,
       lossAttributionAvailable,
       path,
+      pathLabels: selectedPathLabels,
       currentLevel: { kind: "overview", label: "Programs" },
       groups: programGroups(filteredRows),
       dimensionOrder: [],
@@ -575,10 +613,11 @@ export function buildCalibrationTree(
       releaseId,
       lossAttributionAvailable,
       path,
+      pathLabels: selectedPathLabels,
       currentLevel: { kind: "geography", label: "Geography" },
       groups: [{
         id: path.program,
-        label: path.program,
+        label: selectedPathLabels.program ?? programLabel(path.program),
         nodes,
         metrics: calibrationTreeMetrics(filteredProgramRows),
       }],
@@ -677,6 +716,7 @@ export function buildCalibrationTree(
     releaseId,
     lossAttributionAvailable,
     path,
+    pathLabels: selectedPathLabels,
     currentLevel,
     groups,
     dimensionOrder,

@@ -28,6 +28,7 @@ function response(
   return {
     lossAttributionAvailable: false,
     path: state.path,
+    pathLabels: {},
     currentLevel: { kind: "overview", label: "Test" },
     groups: [{ id: "test", label: "Test", nodes, metrics: EMPTY_METRICS }],
     dimensionOrder: [],

@@ -632,7 +632,7 @@ export function CalibrationExplorerMap({
   const upLabel = expandedView
     ? `Up to all ${data.currentLevel.label.toLowerCase()}`
     : explorerUpLabel(state);
-  const breadcrumbs = explorerBreadcrumbs(state);
+  const breadcrumbs = explorerBreadcrumbs(state, data.pathLabels);
   const selectedTarget = data.groups
     .flatMap((group) => group.nodes)
     .find((item) => item.kind === "target" && item.id === state.path.target)?.target;

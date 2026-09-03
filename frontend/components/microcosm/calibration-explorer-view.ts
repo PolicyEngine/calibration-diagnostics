@@ -53,7 +53,10 @@ export interface ExplorerBreadcrumb {
   path: ExplorerPath;
 }
 
-export function explorerBreadcrumbs(state: ExplorerState): ExplorerBreadcrumb[] {
+export function explorerBreadcrumbs(
+  state: ExplorerState,
+  pathLabels: { source?: string; program?: string } = {},
+): ExplorerBreadcrumb[] {
   const crumbs: ExplorerBreadcrumb[] = [
     { label: "All targets", path: { dimensions: [] } },
   ];
@@ -65,14 +68,14 @@ export function explorerBreadcrumbs(state: ExplorerState): ExplorerBreadcrumb[] 
   }
   if (state.path.source && state.path.program) {
     crumbs.push({
-      label: sourceLabel(state.path.source),
+      label: pathLabels.source ?? sourceLabel(state.path.source),
       path:
         state.breakdown === "geography" && state.path.geography
           ? { geography: state.path.geography, dimensions: [] }
           : { dimensions: [] },
     });
     crumbs.push({
-      label: programLabel(state.path.program),
+      label: pathLabels.program ?? programLabel(state.path.program),
       path: {
         source: state.path.source,
         program: state.path.program,
@@ -183,7 +186,7 @@ export function explorerMapHeight(pageIntroHeight: number): string {
 export function explorerNodeLabel(
   node: Pick<CalibrationTreeNode, "id" | "kind" | "label">,
 ): string {
-  if (node.kind === "program") return programLabel(node.id);
+  if (node.kind === "program") return node.label || programLabel(node.id);
   if (node.kind === "dimension_value") return canonicalLabel(node.label);
   return node.label;
 }
