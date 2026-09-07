@@ -58,6 +58,7 @@ export interface MicrocosmTargetRow {
   source_url?: string | null;
   variable?: string | null;
   variable_label?: string | null;
+  target_label?: string | null;
   measure?: string | null;
   target_role?: string | null;
   source_measure_id?: string | null;
@@ -80,12 +81,18 @@ export interface MicrocosmTargetRow {
     key: string;
     label: string;
     value: string;
+    value_id?: string;
     source_key?: string;
     raw_value?: string;
     rank?: number;
   }[] | null;
-  dimension_adapter?: "structured" | "legacy_filter" | "legacy_name" | null;
-  target_representation?: "legacy" | "structured" | null;
+  dimension_adapter?:
+    | "hierarchy"
+    | "structured"
+    | "legacy_filter"
+    | "legacy_name"
+    | null;
+  target_representation?: "legacy" | "structured" | "hierarchy" | null;
   variable_key?: string | null;
   // schema v2 published registry metadata (null on v1).
   source_citation?: string | null;
@@ -213,7 +220,12 @@ export interface MicrocosmArtifactPresentation {
 export interface MicrocosmTargetSchema {
   diagnostics_schema_version: number | null;
   structured_dimensions: boolean;
-  target_representation: "legacy" | "structured" | "mixed" | "unknown";
+  target_representation:
+    | "legacy"
+    | "structured"
+    | "hierarchy"
+    | "mixed"
+    | "unknown";
 }
 
 export interface MicrocosmCalibration {

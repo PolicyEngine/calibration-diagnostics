@@ -1,4 +1,7 @@
 import { expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import beDiagnosticsFixture from "./fixtures/be-release/calibration_diagnostics.json";
 import beReleaseManifestFixture from "./fixtures/be-release/release_manifest.json";
@@ -20,6 +23,9 @@ import {
   latestMicrocosmCalibrationHighlights,
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
+  loadPointerReleaseId,
+  loadRelease,
+  loadReleases,
   microcosmRepo,
   microcosmRevision,
   microcosmTargetTreemap,
@@ -29,6 +35,7 @@ import {
   releasePublisherLabels,
   releasePublishedAtFromTree,
   releaseRole,
+  UK_LOCAL_CALIBRATION_DIR_ENV,
   type ArtifactCountry,
   type Calibration,
 } from "./latest-artifact";
@@ -74,12 +81,74 @@ test("uses the private Belgium repository and country revision", () => {
   );
 });
 
+test("loads an explicit UK local schema 8 artifact without a network request", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "microcosm-schema-8-"));
+  const prior = process.env[UK_LOCAL_CALIBRATION_DIR_ENV];
+  process.env[UK_LOCAL_CALIBRATION_DIR_ENV] = directory;
+  try {
+    await Promise.all([
+      writeFile(
+        join(directory, "calibration_diagnostics.json"),
+        JSON.stringify({
+          schema_version: 8,
+          release_id: "local-schema-8",
+          targets: [
+            {
+              name: "provider.target@2025",
+              target_name: "provider.target",
+              source: "Citation",
+              target: 100,
+              initial_estimate: 90,
+              final_estimate: 100,
+              hierarchy: {
+                provider: { id: "provider", label: "Provider label" },
+                category: {
+                  id: "provider.category",
+                  label: "Category label",
+                  provider_id: "provider",
+                },
+                geography: {
+                  id: "K02000001",
+                  label: "United Kingdom",
+                  level: "country",
+                },
+                dimensions: [],
+                target: { id: "provider.target", label: "Target label" },
+              },
+            },
+          ],
+        }),
+      ),
+      writeFile(
+        join(directory, "release_manifest.json"),
+        JSON.stringify({ country: { code: "uk" } }),
+      ),
+    ]);
+
+    const pointer = await loadPointerReleaseId(0, "uk");
+    const releases = await loadReleases(0, "uk");
+    const calibration = await loadRelease("latest", 0, "uk");
+
+    expect(pointer.release_id).toBe("local-schema-8");
+    expect(releases.map((release) => release.release_id)).toEqual([
+      "local-schema-8",
+    ]);
+    expect(calibration.source).toBe("local_filesystem");
+    expect(calibration.target_schema.target_representation).toBe("hierarchy");
+    expect(calibration.rows[0].target_label).toBe("Target label");
+  } finally {
+    if (prior == null) delete process.env[UK_LOCAL_CALIBRATION_DIR_ENV];
+    else process.env[UK_LOCAL_CALIBRATION_DIR_ENV] = prior;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("loads trimmed Belgium diagnostics without optional US artifact fields", () => {
   expect("loss_trajectory" in beDiagnosticsFixture).toBe(false);
   expect("past_cap_census" in beDiagnosticsFixture).toBe(false);
   expect(beDiagnosticsFixture.targets.every((row) => !("registry" in row))).toBe(true);
   const cal = buildCalibration(
-    beDiagnosticsFixture,
+    { ...beDiagnosticsFixture, schema_version: 2 },
     "microcosm-be-2026-chronicle-3cef97b-20260823T134247Z",
     null,
     {},
@@ -136,6 +205,7 @@ test("derives Belgium population region, sex, and age-band browser facets", () =
   const cal = buildCalibration(
     {
       ...beDiagnosticsFixture,
+      schema_version: 2,
       targets: [
         target("statbel_population_be1_male_0_17"),
         target("statbel_population_be2_female_18_64"),
@@ -189,6 +259,125 @@ test("diagnosticsDimensions drops malformed entries and normalizes optional meta
     },
     sex: { label: "Sex", values: { female: "Female" } },
   });
+});
+
+test("schema 8 preserves the complete producer-authored hierarchy", () => {
+  const cal = buildCalibration(
+    {
+      schema_version: 8,
+      targets: [
+        {
+          name: "obr.income_tax@2025",
+          target_name: "obr.income_tax",
+          source: "OBR synthetic citation",
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 101,
+          hierarchy: {
+            provider: {
+              id: "obr",
+              label: "Office for Budget Responsibility — authored",
+            },
+            category: {
+              id: "obr.efo_receipts",
+              label: "Economic and fiscal outlook receipts — authored",
+              provider_id: "obr",
+            },
+            geography: {
+              id: "K02000001",
+              label: "United Kingdom — authored",
+              level: "country",
+            },
+            dimensions: [
+              {
+                id: "obr.efo_line",
+                label: "Economic and fiscal outlook line — authored",
+                value_id: "income_tax",
+                value_label: "Income tax receipts — authored",
+              },
+            ],
+            target: {
+              id: "obr.income_tax",
+              label: "Income tax target — authored",
+            },
+          },
+        },
+      ],
+    },
+    "schema-8",
+  );
+
+  expect(cal.target_schema).toEqual({
+    diagnostics_schema_version: 8,
+    structured_dimensions: false,
+    target_representation: "hierarchy",
+  });
+  expect(cal.rows[0]).toMatchObject({
+    family: "obr/obr.efo_receipts",
+    source: "obr",
+    source_label: "Office for Budget Responsibility — authored",
+    variable: "obr.efo_receipts",
+    variable_label: "Economic and fiscal outlook receipts — authored",
+    geography: "United Kingdom — authored",
+    geography_id: "K02000001",
+    level: "country",
+    target_label: "Income tax target — authored",
+    target_representation: "hierarchy",
+    dimension_adapter: "hierarchy",
+    target_dimensions: [
+      {
+        key: "obr.efo_line",
+        label: "Economic and fiscal outlook line — authored",
+        value: "Income tax receipts — authored",
+        value_id: "income_tax",
+        source_key: "obr.efo_line",
+        raw_value: "income_tax",
+        rank: 0,
+      },
+    ],
+  });
+});
+
+test("top-level schema version selects one reader and rejects unsupported versions", () => {
+  expect(
+    buildCalibration(
+      {
+        schema_version: 6,
+        targets: [{
+          name: "legacy.population@2025",
+          target_name: "legacy.population",
+          source: "Citation",
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 100,
+        }],
+      },
+      "schema-6",
+    ).target_schema.target_representation,
+  ).toBe("legacy");
+  expect(() =>
+    buildCalibration(
+      {
+        schema_version: 7,
+        targets: [{ name: "legacy-row", source: "Citation" }],
+      },
+      "invalid-schema-7",
+    ),
+  ).toThrow("Schema 7 target source.id");
+  expect(() =>
+    buildCalibration(
+      { schema_version: 8, targets: [{ name: "missing-hierarchy" }] },
+      "invalid-schema-8",
+    ),
+  ).toThrow("hierarchy must be an object");
+  for (const schemaVersion of [undefined, 1, 9]) {
+    expect(() =>
+      buildCalibration(
+        { schema_version: schemaVersion, targets: [] },
+        "unsupported-schema",
+      ),
+    ).toThrow("schema_version");
+  }
 });
 
 test("structured dimensions shape rows and honor artifact value order", () => {
@@ -543,6 +732,7 @@ test("structured facet ordering falls back when any displayed value lacks a rank
   });
   const cal = buildCalibration(
     {
+      schema_version: 7,
       dimensions: {
         category: {
           label: "Category",
@@ -564,7 +754,7 @@ test("structured facet ordering falls back when any displayed value lacks a rank
   ]);
 });
 
-test("mixed files select the dimension adapter from each complete row representation", () => {
+test("schema 7 rejects a mixture of structured and legacy rows", () => {
   const base = {
     source: "ZZ official population table",
     metadata: {
@@ -576,7 +766,7 @@ test("mixed files select the dimension adapter from each complete row representa
     initial_estimate: 90,
     final_estimate: 100,
   };
-  const cal = buildCalibration(
+  expect(() => buildCalibration(
     {
       schema_version: 7,
       dimensions: {
@@ -610,21 +800,7 @@ test("mixed files select the dimension adapter from each complete row representa
       ],
     },
     "mixed-dimension-adapters",
-  );
-
-  expect(cal.rows.map((row) => row.dimension_adapter)).toEqual([
-    "structured",
-    "legacy_filter",
-    "legacy_name",
-  ]);
-  expect(cal.rows[0]).toMatchObject({
-    geography: "North",
-    level: "region",
-    breakdown: "Female · 0–17",
-  });
-  expect(latestMicrocosmCalibrationSummary(cal).target_schema).toEqual(
-    cal.target_schema,
-  );
+  )).toThrow("Schema 7 target source.id");
 });
 
 test("structured rows do not require a dimensions dictionary, including empty objects", () => {
@@ -639,6 +815,7 @@ test("structured rows do not require a dimensions dictionary, including empty ob
   };
   const cal = buildCalibration(
     {
+      schema_version: 7,
       targets: [
         {
           ...base,
@@ -693,6 +870,7 @@ test("structured dimensions prevent whole-population estimate-scope warnings", (
   });
   const cal = buildCalibration(
     {
+      schema_version: 7,
       dimensions: { category: { label: "Category" } },
       targets: [
         target("source.example.slice_a", "a", 10),
@@ -708,6 +886,7 @@ test("structured dimensions prevent whole-population estimate-scope warnings", (
 test("keeps legacy US dotted target families when Chronicle publisher metadata is present", () => {
   const cal = buildCalibration(
     {
+      schema_version: 2,
       targets: [
         {
           name: "irs.population.total@2024",
@@ -889,7 +1068,15 @@ function agiTarget(band: string, ret: string, filing: string, rel: number) {
 }
 
 function calibration(targets: object[], releaseId = "rel-a"): Calibration {
-  return buildCalibration({ targets, final_loss: 0.02, fraction_within_10pct: 0.9 }, releaseId);
+  return buildCalibration(
+    {
+      schema_version: 2,
+      targets,
+      final_loss: 0.02,
+      fraction_within_10pct: 0.9,
+    },
+    releaseId,
+  );
 }
 
 const SAMPLE = calibration([
@@ -1312,6 +1499,7 @@ test("release highlights split bounded percent fit from absolute miss magnitude"
 test("calibration inclusion status uses skipped and dropped metadata", () => {
   const cal = buildCalibration(
     {
+      schema_version: 2,
       targets: [
         { name: "included@2024", target: 1, initial_estimate: 1, final_estimate: 1 },
         { name: "skipped@2024", target_name: "skipped", target: 1 },
@@ -1512,18 +1700,24 @@ test("comparison matches renamed legacy and structured targets by Chronicle fact
       final_estimate: 95,
     },
   ], "legacy-current");
-  const candidate = calibration([
+  const candidate = buildCalibration(
     {
-      name: "resident-population@2024",
-      source: { id: "agency", label: "Statistical agency" },
-      variable: { id: "resident_population", measure: "count" },
-      dimensions: {},
-      metadata: { ledger_fact_key: "agency.population.total" },
-      target: 100,
-      initial_estimate: 90,
-      final_estimate: 99,
+      schema_version: 7,
+      targets: [
+        {
+          name: "resident-population@2024",
+          source: { id: "agency", label: "Statistical agency" },
+          variable: { id: "resident_population", measure: "count" },
+          dimensions: {},
+          metadata: { ledger_fact_key: "agency.population.total" },
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 99,
+        },
+      ],
     },
-  ], "structured-candidate");
+    "structured-candidate",
+  );
 
   const cmp = buildComparison(current, candidate);
   expect(cmp.summary).toMatchObject({
@@ -1580,6 +1774,7 @@ test("comparison preserves duplicate names and resolves them by unique fallback 
 test("new target loss weighting metadata marks loss as normalized", () => {
   const normalized = buildCalibration(
     {
+      schema_version: 6,
       targets: [],
       initial_loss: 0.42,
       final_loss: 0.39,
@@ -1591,7 +1786,12 @@ test("new target loss weighting metadata marks loss as normalized", () => {
     "normalized-release",
   );
   const raw = buildCalibration(
-    { targets: [], initial_loss: 752_000_000_000, final_loss: 751_000_000_000 },
+    {
+      schema_version: 5,
+      targets: [],
+      initial_loss: 752_000_000_000,
+      final_loss: 751_000_000_000,
+    },
     "raw-release",
   );
 
@@ -1974,6 +2174,7 @@ test("local-area diagnostics (value/estimate schema) render as included targets"
 test("canonical target/final_estimate are never overwritten by value/estimate aliases", () => {
   const cal = buildCalibration(
     {
+      schema_version: 2,
       targets: [
         {
           name: "nation/irs/agi/total@2024",
@@ -1998,6 +2199,7 @@ test("canonical target/final_estimate are never overwritten by value/estimate al
 test("unreadable diagnostics rows report an explicit incompatible status, not a silent zero", () => {
   const cal = buildCalibration(
     {
+      schema_version: 2,
       targets: [
         { name: "source.us.total.mystery-a@2024", target_name: "source.us.total.mystery-a", metadata: {}, unknown_metric: 1 },
         { name: "source.us.total.mystery-b@2024", target_name: "source.us.total.mystery-b", metadata: {} },
@@ -2018,13 +2220,13 @@ test("unreadable diagnostics rows report an explicit incompatible status, not a 
 });
 
 test("diagnostics with an empty targets list report an explicit empty status", () => {
-  const cal = buildCalibration({ targets: [] }, "rel");
+  const cal = buildCalibration({ schema_version: 2, targets: [] }, "rel");
   expect(cal.diagnostics_status).toBe("empty");
   expect(latestMicrocosmCalibrationSummary(cal).diagnostics_status).toBe("empty");
 });
 
 test("diagnostics missing the targets array report incompatible", () => {
-  const cal = buildCalibration({ final_loss: 0.1 }, "rel");
+  const cal = buildCalibration({ schema_version: 2, final_loss: 0.1 }, "rel");
   expect(cal.diagnostics_status).toBe("incompatible");
 });
 
@@ -2084,7 +2286,7 @@ test("presentation flows through calibration, summary, and target responses", ()
     targets_intro: "Artifact target prompt.",
   };
   const cal = buildCalibration(
-    { targets: [] },
+    { schema_version: 2, targets: [] },
     "presentation-release",
     null,
     {},
@@ -2125,6 +2327,7 @@ test("releasePublisherLabels keeps valid keys and trimmed non-empty labels", () 
 test("publisher labels flow through rows, variables, target responses, and treemaps", () => {
   const cal = buildCalibration(
     {
+      schema_version: 2,
       targets: [
         {
           name: "fixture_population@2026",
@@ -2165,6 +2368,7 @@ test("publisher labels flow through rows, variables, target responses, and treem
 test("publisher label lookup does not read inherited object properties", () => {
   const cal = buildCalibration(
     {
+      schema_version: 2,
       targets: [
         {
           name: "constructor.population.total@2026",
@@ -2185,6 +2389,7 @@ test("publisher label lookup does not read inherited object properties", () => {
 test("fully structured targets ignore conflicting legacy identity fields", () => {
   const cal = buildCalibration(
     {
+      schema_version: 7,
       dimensions: {
         region: {
           label: "Region",
@@ -2354,6 +2559,7 @@ test("structured dimension ids remain independent when display labels repeat", (
     final_estimate: 100,
   }));
   const diagnostics = {
+    schema_version: 7,
     dimensions: {
       origin: {
         label: "Region",
@@ -2414,28 +2620,29 @@ test("structured dimension ids remain independent when display labels repeat", (
   });
   expect(destinationTree.groups[0]?.id).toBe("bd_origin");
 
-  const mixed = buildCalibration(
-    {
-      ...diagnostics,
-      targets: [
-        ...structuredTargets,
-        {
-          name: "nation/legacy/population",
-          target: 1,
-          initial_estimate: 1,
-          final_estimate: 1,
-        },
-      ],
-    },
-    "mixed-repeated-dimension-labels",
-  );
-  expect(mixed.target_schema.target_representation).toBe("mixed");
-  expect(mixed.rows[0].target_dimensions).toEqual(cal.rows[0].target_dimensions);
+  expect(() =>
+    buildCalibration(
+      {
+        ...diagnostics,
+        targets: [
+          ...structuredTargets,
+          {
+            name: "nation/legacy/population",
+            target: 1,
+            initial_estimate: 1,
+            final_estimate: 1,
+          },
+        ],
+      },
+      "mixed-repeated-dimension-labels",
+    ),
+  ).toThrow("Schema 7 target source.id");
 });
 
-test("mixed diagnostics dispatch complete legacy and structured rows independently", () => {
-  const cal = buildCalibration(
+test("schema 7 refuses row-shape-based fallback to the legacy reader", () => {
+  expect(() => buildCalibration(
     {
+      schema_version: 7,
       targets: [
         {
           name: "bea_nipa.cy2023.proprietors_income.a041rc.amount@2024",
@@ -2473,25 +2680,7 @@ test("mixed diagnostics dispatch complete legacy and structured rows independent
       ],
     },
     "mixed-identities",
-  );
-
-  expect(cal.target_schema.target_representation).toBe("mixed");
-  expect(cal.rows[0]).toMatchObject({
-    source: "bea",
-    variable: "amount",
-    dimension_adapter: "legacy_name",
-    target_representation: "legacy",
-  });
-  expect(cal.rows[1]).toMatchObject({
-    source: "artifact_agency",
-    source_label: "Artifact agency",
-    source_citation: "Official population table",
-    variable: "resident_population",
-    variable_label: "Resident population",
-    measure: "count",
-    dimension_adapter: "structured",
-    target_representation: "structured",
-  });
+  )).toThrow("Schema 7 target source.id");
 });
 
 test("structured source and variable fields remain authoritative", () => {
@@ -2519,7 +2708,7 @@ test("structured source and variable fields remain authoritative", () => {
     final_estimate: 100,
   };
   const cal = buildCalibration(
-    { targets: [target] },
+    { schema_version: 7, targets: [target] },
     "structured-identifiers",
     null,
     {},
@@ -2548,6 +2737,7 @@ test("structured source and variable fields remain authoritative", () => {
 
   const withoutChronicle = buildCalibration(
     {
+      schema_version: 7,
       targets: [
         {
           ...target,
@@ -2673,7 +2863,7 @@ test("releaseCountry ignores malformed field values", () => {
 
 test("the calibration summary and target page carry the typed country block", () => {
   const cal = buildCalibration(
-    beDiagnosticsFixture,
+    { ...beDiagnosticsFixture, schema_version: 2 },
     "be-country",
     null,
     {},
@@ -2690,7 +2880,7 @@ test("the calibration summary and target page carry the typed country block", ()
 
 test("the artifact's national geography label shapes rows without a geography", () => {
   const cal = buildCalibration(
-    beDiagnosticsFixture,
+    { ...beDiagnosticsFixture, schema_version: 2 },
     "be-geography",
     null,
     {},

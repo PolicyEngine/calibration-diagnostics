@@ -38,11 +38,20 @@ export function readStructuredTarget(
   definitions: Record<string, StructuredDimensionDefinition>,
   nationalGeography: string,
 ): StructuredTargetIdentity {
-  const source = isPlainObject(row.source) ? row.source : {};
-  const variable = isPlainObject(row.variable) ? row.variable : {};
-  const values = isPlainObject(row.dimensions) ? row.dimensions : {};
-  const sourceId = stringValue(source.id) ?? "other";
-  const variableId = stringValue(variable.id) ?? "unknown";
+  if (!isPlainObject(row.source) || !stringValue(row.source.id)) {
+    throw new Error("Schema 7 target source.id must be a non-empty string.");
+  }
+  if (!isPlainObject(row.variable) || !stringValue(row.variable.id)) {
+    throw new Error("Schema 7 target variable.id must be a non-empty string.");
+  }
+  if (!isPlainObject(row.dimensions)) {
+    throw new Error("Schema 7 target dimensions must be an object.");
+  }
+  const source = row.source;
+  const variable = row.variable;
+  const values = row.dimensions;
+  const sourceId = stringValue(source.id)!;
+  const variableId = stringValue(variable.id)!;
   const structured = readStructuredDimensions(values, definitions);
   const geography = structured.geography ?? nationalGeography;
   const level = structured.level ?? "national";

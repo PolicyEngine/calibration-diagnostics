@@ -7,16 +7,38 @@ type Row = Calibration["rows"][number];
 
 function calibration(
   rows: Row[],
-  representation: "legacy" | "structured" | "mixed" = "legacy",
+  representation: "legacy" | "structured" | "hierarchy" | "mixed" = "legacy",
 ): Calibration {
   return {
     rows,
     target_schema: {
-      diagnostics_schema_version: 7,
+      diagnostics_schema_version: representation === "hierarchy" ? 8 : 7,
       structured_dimensions: representation !== "legacy",
       target_representation: representation,
     },
   } as unknown as Calibration;
+}
+
+function hierarchy(name: string, valueId: string): Row {
+  return {
+    name,
+    base_name: name,
+    target_representation: "hierarchy",
+    dimension_adapter: "hierarchy",
+    source: "agency",
+    variable: "agency.population",
+    target_dimensions: [
+      {
+        key: "age",
+        label: "Age",
+        value: "Published age label",
+        value_id: valueId,
+        source_key: "age",
+        raw_value: valueId,
+      },
+    ],
+    chronicle: { fact_key: null },
+  };
 }
 
 function legacy(
@@ -110,6 +132,24 @@ describe("target surface matching", () => {
 
     expect(result.matches[0].match_kind).toBe("structured_identity");
     expect(result.matching.matched_by.structured_identity).toBe(1);
+  });
+
+  test("matches schema 8 identities from raw hierarchy dimension values", () => {
+    const result = matchTargetSurfaces(
+      calibration([hierarchy("old-name", "adult")], "hierarchy"),
+      calibration([hierarchy("new-name", "adult")], "hierarchy"),
+    );
+
+    expect(result.matches[0]).toMatchObject({
+      match_kind: "structured_identity",
+      current_representation: "hierarchy",
+      candidate_representation: "hierarchy",
+    });
+    expect(result.matching).toMatchObject({
+      current_representation: "hierarchy",
+      candidate_representation: "hierarchy",
+      matched_by: { structured_identity: 1 },
+    });
   });
 
   test("lets unique fallback keys resolve a duplicated target name", () => {

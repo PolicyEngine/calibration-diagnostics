@@ -71,6 +71,7 @@ function originalTargetName(row: TargetRow): string | null {
 }
 
 function rowRepresentation(row: TargetRow): TargetRowRepresentation {
+  if (row.target_representation === "hierarchy") return "hierarchy";
   if (row.target_representation === "structured") return "structured";
   if (row.target_representation === "legacy") return "legacy";
   return row.dimension_adapter === "structured" ? "structured" : "legacy";
@@ -81,6 +82,7 @@ function collectionRepresentation(calibration: Calibration): TargetRepresentatio
   if (
     published === "legacy" ||
     published === "structured" ||
+    published === "hierarchy" ||
     published === "mixed" ||
     published === "unknown"
   ) {
@@ -89,6 +91,7 @@ function collectionRepresentation(calibration: Calibration): TargetRepresentatio
   if (!calibration.rows.length) return "unknown";
   const representations = new Set(calibration.rows.map(rowRepresentation));
   if (representations.size > 1) return "mixed";
+  if (representations.has("hierarchy")) return "hierarchy";
   return representations.has("structured") ? "structured" : "legacy";
 }
 
@@ -97,16 +100,28 @@ function chronicleFactKey(row: TargetRow): string | null {
 }
 
 function structuredIdentity(row: TargetRow): string | null {
-  if (rowRepresentation(row) !== "structured") return null;
+  const representation = rowRepresentation(row);
+  if (representation !== "structured" && representation !== "hierarchy") {
+    return null;
+  }
   const source = nonEmptyString(row.source);
   const variable = nonEmptyString(row.variable);
   if (!source || !variable) return null;
-  const dimensions = Object.entries(asObject(row.dimensions))
-    .flatMap(([id, value]) => {
-      const rawValue = nonEmptyString(value);
-      return id && rawValue ? [[id, rawValue] as const] : [];
-    })
-    .sort(([left], [right]) => left.localeCompare(right));
+  const dimensions = representation === "hierarchy"
+    ? (Array.isArray(row.target_dimensions) ? row.target_dimensions : [])
+        .flatMap((dimension) => {
+          const id = nonEmptyString(dimension.source_key ?? dimension.key);
+          const rawValue = nonEmptyString(
+            dimension.raw_value ?? dimension.value_id ?? dimension.value,
+          );
+          return id && rawValue ? [[id, rawValue] as const] : [];
+        })
+    : Object.entries(asObject(row.dimensions))
+        .flatMap(([id, value]) => {
+          const rawValue = nonEmptyString(value);
+          return id && rawValue ? [[id, rawValue] as const] : [];
+        })
+        .sort(([left], [right]) => left.localeCompare(right));
   return JSON.stringify({
     source,
     variable,
