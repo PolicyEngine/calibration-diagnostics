@@ -74,6 +74,14 @@ describe("calibration explorer presentation model", () => {
     ).toBe("Traditional IRA deduction");
     expect(
       explorerNodeLabel({
+        id: "income_tax",
+        label: "Income TAX (GBP) — authored",
+        kind: "dimension_value",
+        authored_label: true,
+      }),
+    ).toBe("Income TAX (GBP) — authored");
+    expect(
+      explorerNodeLabel({
         id: "target-1",
         label: "Published target label",
         kind: "target",
@@ -252,12 +260,13 @@ describe("calibration explorer presentation model", () => {
         state({
           source: "obr",
           program: "efo_receipts",
-          geography: "United Kingdom",
+          geography: "United Kingdom — authored",
           dimensions: [],
         }),
         {
           source: "Office for Budget Responsibility",
           program: "EFO receipts",
+          geography: "United Kingdom — authored",
         },
       ),
     ).toEqual([
@@ -275,15 +284,38 @@ describe("calibration explorer presentation model", () => {
         },
       },
       {
-        label: "United Kingdom",
+        label: "United Kingdom — authored",
         path: {
           source: "obr",
           program: "efo_receipts",
-          geography: "United Kingdom",
+          geography: "United Kingdom — authored",
           dimensions: [],
         },
       },
     ]);
+  });
+
+  test("uses schema 8 value labels instead of formatting navigation ids", () => {
+    const current = state({
+      source: "obr",
+      program: "obr.efo_receipts",
+      geography: "United Kingdom",
+      dimensions: [
+        {
+          key: "obr.efo_line",
+          label: "Economic and fiscal outlook line",
+          value: "income_tax",
+        },
+      ],
+    });
+
+    expect(
+      explorerBreadcrumbs(current, {
+        source: "Office for Budget Responsibility",
+        program: "Economic and fiscal outlook receipts",
+        dimensions: ["Income tax (gross of tax credits)"],
+      }).at(-1)?.label,
+    ).toBe("Income tax (gross of tax credits)");
   });
 
   test("preserves an artifact category label on a program tile", () => {

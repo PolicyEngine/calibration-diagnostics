@@ -14,8 +14,10 @@ export interface CalibrationTreeDimension {
   key: string;
   label: string;
   value: string;
+  value_id?: string;
   source_key?: string;
   raw_value?: string;
+  rank?: number;
 }
 
 export interface CalibrationTreeTarget {
@@ -29,6 +31,8 @@ export interface CalibrationTreeTarget {
   variable_key?: string | null;
   measure?: string | null;
   source_measure_id?: string | null;
+  target_label?: string | null;
+  target_representation?: string | null;
   level?: string | null;
   geography?: string | null;
   abs_relative_error?: number | null;
@@ -72,6 +76,7 @@ export interface CalibrationTreeNode {
   selection: ExplorerNodeSelection;
   metrics: CalibrationTreeMetrics;
   target?: CalibrationTreeTarget;
+  authored_label?: boolean;
 }
 
 export interface CalibrationTreeGroup {
@@ -88,6 +93,8 @@ export interface CalibrationTreeResponse {
   pathLabels: {
     source?: string;
     program?: string;
+    geography?: string;
+    dimensions?: string[];
   };
   currentLevel:
     | { kind: "overview"; label: string }
@@ -317,6 +324,9 @@ function geographyId(row: CalibrationTreeTarget): string {
 }
 
 function targetLabel(row: CalibrationTreeTarget): string {
+  if (row.target_representation === "hierarchy") {
+    return String(row.target_label);
+  }
   const sourceMeasureId = String(row.source_measure_id ?? "").trim();
   if (sourceMeasureId) return humanize(sourceMeasureId);
   const id = String(row.name ?? row.base_name ?? "Target");
@@ -327,6 +337,125 @@ function targetLabel(row: CalibrationTreeTarget): string {
 interface DimensionPartition {
   dimension: BreakdownDimension;
   rows: CalibrationTreeTarget[];
+}
+
+interface HierarchyEntry {
+  row: CalibrationTreeTarget;
+  cursor: number;
+}
+
+interface HierarchyDimensionPartition {
+  dimension: BreakdownDimension;
+  entries: HierarchyEntry[];
+}
+
+function hierarchyDimension(
+  entry: HierarchyEntry,
+): CalibrationTreeDimension | null {
+  return entry.row.target_dimensions?.[entry.cursor] ?? null;
+}
+
+function hierarchyDimensionValueId(
+  dimension: CalibrationTreeDimension,
+): string {
+  return String(
+    dimension.value_id ?? dimension.raw_value ?? dimension.value,
+  ).trim();
+}
+
+function mergeHierarchyPartitions(
+  partitions: HierarchyDimensionPartition[],
+): HierarchyDimensionPartition[] {
+  const merged = new Map<string, HierarchyDimensionPartition>();
+  for (const partition of partitions) {
+    const existing = merged.get(partition.dimension.key);
+    if (existing) {
+      if (existing.dimension.label !== partition.dimension.label) {
+        throw new Error(
+          `Schema 8 dimension ${partition.dimension.key} has inconsistent labels.`,
+        );
+      }
+      existing.entries.push(...partition.entries);
+    } else {
+      merged.set(partition.dimension.key, {
+        dimension: partition.dimension,
+        entries: [...partition.entries],
+      });
+    }
+  }
+  return [...merged.values()];
+}
+
+function hierarchyPartitions(entries: HierarchyEntry[]): {
+  dimensions: HierarchyDimensionPartition[];
+  targets: HierarchyEntry[];
+} {
+  const targets: HierarchyEntry[] = [];
+  const grouped = new Map<string, HierarchyDimensionPartition>();
+  for (const entry of entries) {
+    const dimension = hierarchyDimension(entry);
+    if (!dimension) {
+      targets.push(entry);
+      continue;
+    }
+    const existing = grouped.get(dimension.key);
+    if (existing) {
+      if (existing.dimension.label !== dimension.label) {
+        throw new Error(
+          `Schema 8 dimension ${dimension.key} has inconsistent labels.`,
+        );
+      }
+      existing.entries.push(entry);
+    } else {
+      grouped.set(dimension.key, {
+        dimension: { key: dimension.key, label: dimension.label },
+        entries: [entry],
+      });
+    }
+  }
+
+  const visible: HierarchyDimensionPartition[] = [];
+  for (const partition of grouped.values()) {
+    const values = new Set(
+      partition.entries.map((entry) =>
+        hierarchyDimensionValueId(hierarchyDimension(entry)!),
+      ),
+    );
+    if (values.size > 1) {
+      visible.push(partition);
+      continue;
+    }
+    const nested = hierarchyPartitions(
+      partition.entries.map((entry) => ({ ...entry, cursor: entry.cursor + 1 })),
+    );
+    visible.push(...nested.dimensions);
+    targets.push(...nested.targets);
+  }
+  return {
+    dimensions: mergeHierarchyPartitions(visible),
+    targets,
+  };
+}
+
+function hierarchyDimensionOrder(
+  rows: CalibrationTreeTarget[],
+): BreakdownDimension[] {
+  const order = new Map<string, BreakdownDimension>();
+  for (const row of rows) {
+    for (const dimension of row.target_dimensions ?? []) {
+      const existing = order.get(dimension.key);
+      if (existing && existing.label !== dimension.label) {
+        throw new Error(
+          `Schema 8 dimension ${dimension.key} has inconsistent labels.`,
+        );
+      }
+      order.set(dimension.key, existing ?? {
+        key: dimension.key,
+        label: dimension.label,
+      });
+    }
+  }
+  return [...order.values()];
 }
 
 function partitionRowsByDimension(
@@ -406,8 +535,17 @@ function node(
   selection: ExplorerNodeSelection,
   rows: CalibrationTreeTarget[],
   target?: CalibrationTreeTarget,
+  authoredLabel = false,
 ): CalibrationTreeNode {
-  return { id, label, kind, selection, metrics: calibrationTreeMetrics(rows), target };
+  return {
+    id,
+    label,
+    kind,
+    selection,
+    metrics: calibrationTreeMetrics(rows),
+    target,
+    authored_label: authoredLabel || undefined,
+  };
 }
 
 function sortNodes(nodes: CalibrationTreeNode[]): CalibrationTreeNode[] {
@@ -492,16 +630,30 @@ function pathLabels(
   rows: CalibrationTreeTarget[],
   path: ExplorerState["path"],
 ): CalibrationTreeResponse["pathLabels"] {
-  if (!path.source) return {};
+  const labels: CalibrationTreeResponse["pathLabels"] = {};
+  if (path.geography) {
+    const geographyLabels = [
+      ...new Set(
+        rows
+          .filter(
+            (row) =>
+              row.target_representation === "hierarchy" &&
+              geographyId(row) === path.geography,
+          )
+          .map((row) => row.geography?.trim())
+          .filter((label): label is string => Boolean(label)),
+      ),
+    ];
+    if (geographyLabels.length === 1) labels.geography = geographyLabels[0];
+  }
+  if (!path.source) return labels;
   const sourceRows = rows.filter(
     (row) => String(row.source ?? "other") === path.source,
   );
   const artifactSourceLabel = sourceRows
     .map((row) => row.source_label?.trim())
     .find((label): label is string => Boolean(label));
-  const labels: CalibrationTreeResponse["pathLabels"] = {
-    source: artifactSourceLabel ?? sourceLabel(path.source),
-  };
+  labels.source = artifactSourceLabel ?? sourceLabel(path.source);
   if (!path.program) return labels;
   const programRows = sourceRows.filter((row) => programId(row) === path.program);
   const artifactProgramLabels = [
@@ -531,6 +683,151 @@ function geographyNodes(rows: CalibrationTreeTarget[]): CalibrationTreeNode[] {
       ),
     ),
   );
+}
+
+function hierarchyDimensionTree(
+  geographyRows: CalibrationTreeTarget[],
+  state: ExplorerState,
+  releaseId: string | undefined,
+  lossAttributionAvailable: boolean,
+  selectedPathLabels: CalibrationTreeResponse["pathLabels"],
+  options: CalibrationTreeResponse["filterOptions"],
+): CalibrationTreeResponse {
+  let entries = geographyRows.map((row) => ({ row, cursor: 0 }));
+  const selectedValueLabels: string[] = [];
+  for (const selection of state.path.dimensions) {
+    const partition = hierarchyPartitions(entries).dimensions.find(
+      ({ dimension }) => dimension.key === selection.key,
+    );
+    if (!partition) {
+      entries = [];
+      break;
+    }
+    const matching = partition.entries.filter((entry) => {
+      const dimension = hierarchyDimension(entry);
+      return (
+        dimension != null &&
+        hierarchyDimensionValueId(dimension) === selection.value
+      );
+    });
+    const valueLabels = new Set(
+      matching.map((entry) => hierarchyDimension(entry)!.value),
+    );
+    if (valueLabels.size > 1) {
+      throw new Error(
+        `Schema 8 dimension value ${selection.key}/${selection.value} has inconsistent labels.`,
+      );
+    }
+    selectedValueLabels.push([...valueLabels][0] ?? selection.value);
+    entries = matching.map((entry) => ({
+      ...entry,
+      cursor: entry.cursor + 1,
+    }));
+  }
+
+  const scopedRows = entries.map((entry) => entry.row);
+  const filteredScopedRows = applyExplorerFilters(scopedRows, state.filters);
+  const visibleRows = new Set(filteredScopedRows);
+  const partition = hierarchyPartitions(entries);
+  const groups: CalibrationTreeGroup[] = partition.dimensions.flatMap(
+    ({ dimension, entries: dimensionEntries }) => {
+      const visibleEntries = dimensionEntries.filter((entry) =>
+        visibleRows.has(entry.row),
+      );
+      if (!visibleEntries.length) return [];
+      const byValue = new Map<
+        string,
+        { label: string; rows: CalibrationTreeTarget[] }
+      >();
+      for (const entry of visibleEntries) {
+        const value = hierarchyDimension(entry)!;
+        const valueId = hierarchyDimensionValueId(value);
+        const existing = byValue.get(valueId);
+        if (existing && existing.label !== value.value) {
+          throw new Error(
+            `Schema 8 dimension value ${dimension.key}/${valueId} has inconsistent labels.`,
+          );
+        }
+        if (existing) existing.rows.push(entry.row);
+        else byValue.set(valueId, { label: value.value, rows: [entry.row] });
+      }
+      const nodes = sortNodes(
+        [...byValue.entries()].map(([valueId, value]) =>
+          node(
+            valueId,
+            value.label,
+            "dimension_value",
+            {
+              kind: "dimension_value",
+              key: dimension.key,
+              label: dimension.label,
+              value: valueId,
+            },
+            value.rows,
+            undefined,
+            true,
+          ),
+        ),
+      );
+      return [{
+        id: dimension.key,
+        label: dimension.label,
+        nodes,
+        metrics: calibrationTreeMetrics(visibleEntries.map((entry) => entry.row)),
+      }];
+    },
+  );
+
+  const visibleTargets = partition.targets
+    .map((entry) => entry.row)
+    .filter((row) => visibleRows.has(row));
+  const targetNodes = visibleTargets
+    .map((row, index) => {
+      const id = String(
+        row.comparison_id ?? row.name ?? row.base_name ?? `target-${index}`,
+      );
+      return node(
+        id,
+        targetLabel(row),
+        "target",
+        { kind: "target", value: id },
+        [row],
+        row,
+      );
+    })
+    .sort(
+      (left, right) =>
+        left.label.localeCompare(right.label) || left.id.localeCompare(right.id),
+    );
+  if (targetNodes.length) {
+    groups.push({
+      id: "targets",
+      label: "Targets",
+      nodes: targetNodes,
+      metrics: calibrationTreeMetrics(visibleTargets),
+    });
+  }
+
+  const currentLevel =
+    partition.dimensions.length === 1 && partition.targets.length === 0
+      ? { kind: "dimension" as const, ...partition.dimensions[0].dimension }
+      : partition.dimensions.length === 0
+        ? { kind: "target" as const, label: "Targets" }
+        : { kind: "mixed" as const, label: "Breakdowns and targets" };
+  return {
+    releaseId,
+    lossAttributionAvailable,
+    path: state.path,
+    pathLabels: {
+      ...selectedPathLabels,
+      dimensions: selectedValueLabels,
+    },
+    currentLevel,
+    groups,
+    dimensionOrder: hierarchyDimensionOrder(geographyRows),
+    filterOptions: options,
+    filteredMetrics: calibrationTreeMetrics(filteredScopedRows),
+  };
 }
 
 export function buildCalibrationTree(
@@ -630,6 +927,19 @@ export function buildCalibrationTree(
   const geographyRows = path.geography
     ? programRows.filter((row) => geographyId(row) === path.geography)
     : programRows;
+  if (
+    geographyRows.length > 0 &&
+    geographyRows.every((row) => row.target_representation === "hierarchy")
+  ) {
+    return hierarchyDimensionTree(
+      geographyRows,
+      state,
+      releaseId,
+      lossAttributionAvailable,
+      selectedPathLabels,
+      options,
+    );
+  }
   const dimensionOrder = orderedBreakdownDimensions(geographyRows);
   let scopedRows = geographyRows;
   const selectedKeys = new Set<string>();
