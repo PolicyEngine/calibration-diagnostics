@@ -486,6 +486,11 @@ export interface MicrocosmComparison {
 export interface MicrocosmStagingRunSummary {
   run_id: string;
   candidate_release_id?: string | null;
+  release_id?: string | null;
+  country_code?: string | null;
+  run_kind?: string | null;
+  non_release?: boolean | null;
+  schema_version?: number | null;
   status?: string | null;
   stage?: string | null;
   started_at?: string | null;
@@ -509,6 +514,12 @@ export interface MicrocosmStagingRunResponse {
   detail?: string | null;
   run_id: string;
   candidate_release_id?: string | null;
+  release_id?: string | null;
+  country_code?: string | null;
+  run_kind?: string | null;
+  non_release?: boolean | null;
+  schema_version?: number | null;
+  delivery?: Record<string, unknown> | null;
   progress?: Record<string, unknown> | null;
   run_manifest?: Record<string, unknown> | null;
   calibration_progress?: {

@@ -19,6 +19,13 @@ import {
   buildTargetChangeDataset,
   type TargetChangeDataset,
 } from "@/lib/microcosm/target-change";
+import {
+  parseStagingCalibrationProgress,
+  parseStagingEvents,
+  parseStagingManifest,
+  parseStagingProgress,
+  parseStagingRunIndex,
+} from "@/lib/microcosm/staging-contract";
 
 type JsonObject = Record<string, unknown>;
 
@@ -57,6 +64,9 @@ export function stagingRepository(country: MicrocosmCountry): StagingRepository 
 export const MICROCOSM_STAGING_HF_REPO = stagingRepository("us")!.repo;
 export const MICROCOSM_STAGING_HF_REVISION = stagingRepository("us")!.revision;
 
+// Staging telemetry is served for countries registered with the `staging`
+// capability. Repository and credential selection happens in this server data
+// module and never enters the API response model.
 export function stagingUnavailableReason(country: MicrocosmCountry): string | null {
   return stagingRepository(country)
     ? null
@@ -119,9 +129,8 @@ function stagingFetchMessage(
 ): string {
   if (status === 401 || status === 403) {
     return (
-      `Staging repo ${repository.repo} is not readable by this deployment ` +
-      `(${status} fetching ${path}). Set HF_TOKEN/HUGGINGFACE_TOKEN on the server, ` +
-      "or publish staging telemetry to a public dataset repo."
+      `Staging repository ${repository.repo} is not readable by this deployment ` +
+      `(${status} fetching ${path}). Configure its server-side read credential.`
     );
   }
   if (status === 404) {
@@ -130,14 +139,23 @@ function stagingFetchMessage(
   return `Staging fetch failed ${status}: ${path}`;
 }
 
-function hfHeaders(): HeadersInit | undefined {
-  const token = process.env.HF_TOKEN ?? process.env.HUGGINGFACE_TOKEN;
+function stagingToken(country: MicrocosmCountry): string | undefined {
+  const tokenEnv = countryRegistration(country).staging?.token_env;
+  if (tokenEnv) return process.env[tokenEnv];
+  return process.env.HF_TOKEN ?? process.env.HUGGINGFACE_TOKEN;
+}
+
+function hfHeaders(country: MicrocosmCountry): HeadersInit | undefined {
+  const token = stagingToken(country);
   return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
-function stagingFetchOptions(revalidate: number): RequestInit {
+function stagingFetchOptions(
+  revalidate: number,
+  country: MicrocosmCountry,
+): RequestInit {
   return {
-    headers: hfHeaders(),
+    headers: hfHeaders(country),
     ...(revalidate > 0 ? { next: { revalidate } } : { cache: "no-store" as const }),
   };
 }
@@ -150,7 +168,7 @@ async function stagingJson(
   const repository = stagingSource(country);
   const res = await fetch(
     stagingResolveUrlFor(repository, path),
-    stagingFetchOptions(revalidate),
+    stagingFetchOptions(revalidate, country),
   );
   if (!res.ok) throw new StagingFetchError(res.status, path, repository);
   return asObject(await res.json());
@@ -177,7 +195,7 @@ async function stagingTextOrNull(
   const repository = stagingSource(country);
   const res = await fetch(
     stagingResolveUrlFor(repository, path),
-    stagingFetchOptions(revalidate),
+    stagingFetchOptions(revalidate, country),
   );
   if (!res.ok) {
     if (res.status === 404) return null;
@@ -192,7 +210,7 @@ async function stagingTree(
 ): Promise<JsonObject[]> {
   const repository = stagingSource(country);
   const url = stagingTreeUrl(repository);
-  const res = await fetch(url, stagingFetchOptions(revalidate));
+  const res = await fetch(url, stagingFetchOptions(revalidate, country));
   if (!res.ok) throw new StagingFetchError(res.status, "runs tree", repository);
   const tree = await res.json();
   return Array.isArray(tree) ? tree.map(asObject) : [];
@@ -201,6 +219,11 @@ async function stagingTree(
 export interface StagingRunSummary {
   run_id: string;
   candidate_release_id: string | null;
+  release_id: string | null;
+  country_code: string | null;
+  run_kind: string | null;
+  non_release: boolean | null;
+  schema_version: 1 | 2 | null;
   status: string | null;
   stage: string | null;
   started_at: string | null;
@@ -216,6 +239,12 @@ export interface StagingRunDetail {
   detail?: string | null;
   run_id: string;
   candidate_release_id: string | null;
+  release_id: string | null;
+  country_code: string | null;
+  run_kind: string | null;
+  non_release: boolean | null;
+  schema_version: 1 | 2 | null;
+  delivery: JsonObject | null;
   progress: JsonObject | null;
   run_manifest: JsonObject | null;
   calibration_progress: JsonObject | null;
@@ -231,8 +260,24 @@ function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
+function booleanValue(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function schemaVersionValue(value: unknown): 1 | 2 | null {
+  return value === 1 || value === 2 ? value : null;
+}
+
+function objectOrNull(value: unknown): JsonObject | null {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as JsonObject)
+    : null;
+}
+
 export function stagingTargetChangeCacheTtlSeconds(status: unknown): number {
-  return ["passed", "published", "failed"].includes(String(status ?? "").trim())
+  return ["passed", "published", "completed", "failed"].includes(
+    String(status ?? "").trim(),
+  )
     ? TARGET_CHANGE_FINAL_CACHE_SECONDS
     : TARGET_CHANGE_MUTABLE_CACHE_SECONDS;
 }
@@ -242,6 +287,11 @@ function summaryFromProgress(runId: string, progress: JsonObject | null): Stagin
   return {
     run_id: runId,
     candidate_release_id: candidate,
+    release_id: stringValue(progress?.release_id),
+    country_code: stringValue(progress?.country_code),
+    run_kind: stringValue(progress?.run_kind),
+    non_release: booleanValue(progress?.non_release),
+    schema_version: schemaVersionValue(progress?.schema_version),
     status: stringValue(progress?.status),
     stage: stringValue(progress?.stage),
     started_at: stringValue(progress?.started_at),
@@ -271,27 +321,7 @@ export async function loadStagingRuns(
   }
   const repository = stagingSource(country);
   const index = await stagingJsonOrNull("runs.json", revalidate, country);
-  const indexedRuns = Array.isArray(index?.runs)
-    ? (index.runs as JsonObject[])
-        .map((row) => {
-          const runId = stringValue(row.run_id);
-          return runId
-            ? {
-                run_id: runId,
-                candidate_release_id: stringValue(row.candidate_release_id),
-                status: stringValue(row.status),
-                stage: stringValue(row.stage),
-                started_at: stringValue(row.started_at),
-                updated_at: stringValue(row.updated_at),
-                progress_path:
-                  stringValue(row.progress_path) ?? `runs/${runId}/progress.json`,
-                run_manifest_path:
-                  stringValue(row.run_manifest_path) ?? `runs/${runId}/run_manifest.json`,
-              }
-            : null;
-        })
-        .filter((row): row is StagingRunSummary => row != null)
-    : [];
+  const indexedRuns = index == null ? [] : parseStagingRunIndex(index);
 
   // Always union the index with the actual run directories: runs.json can lag
   // behind (or only carry the latest run), so list runs/ and pick up any run
@@ -317,7 +347,7 @@ export async function loadStagingRuns(
   if (index == null && treeMissing && runIds.size === 0) {
     const repoRes = await fetch(
       stagingRepoUrl(repository),
-      stagingFetchOptions(revalidate),
+      stagingFetchOptions(revalidate, country),
     );
     if (!repoRes.ok) {
       return {
@@ -325,14 +355,16 @@ export async function loadStagingRuns(
         source_repo: repository.repo,
         revision: repository.revision,
         detail:
-          `Staging repo ${repository.repo} is not visible (HTTP ${repoRes.status}). ` +
+          `Staging repository ${repository.repo} is not visible (HTTP ${repoRes.status}). ` +
           "It is private — a missing or expired HF token reads as 404, not 401.",
         runs: [],
       };
     }
   }
 
-  const byId = new Map(indexedRuns.map((run) => [run.run_id, run]));
+  const byId = new Map<string, StagingRunSummary>(
+    indexedRuns.map((run) => [run.run_id, run]),
+  );
   // Run ids are timestamp-prefixed, so descending order is newest-first: if
   // there are more un-indexed runs than the fetch cap, keep the newest rather
   // than dropping them arbitrarily (they'd otherwise silently vanish).
@@ -342,12 +374,12 @@ export async function loadStagingRuns(
   const MAX_UNINDEXED_FETCH = 50;
   const fetched = await Promise.all(
     missing.slice(0, MAX_UNINDEXED_FETCH).map(async (runId) => {
-      const progress = await stagingJsonOrNull(
+      const raw = await stagingJsonOrNull(
         `runs/${runId}/progress.json`,
         revalidate,
         country,
       );
-      return summaryFromProgress(runId, progress);
+      return summaryFromProgress(runId, raw == null ? null : parseStagingProgress(raw));
     }),
   );
   for (const run of fetched) byId.set(run.run_id, run);
@@ -362,22 +394,6 @@ export async function loadStagingRuns(
   };
 }
 
-function parseNdjson(text: string | null): JsonObject[] {
-  if (!text) return [];
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      try {
-        return asObject(JSON.parse(line));
-      } catch {
-        return null;
-      }
-    })
-    .filter((row): row is JsonObject => row != null);
-}
-
 export async function loadStagingCalibration(
   runId: string,
   revalidate: number,
@@ -385,11 +401,12 @@ export async function loadStagingCalibration(
 ): Promise<Calibration | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
-  const progress = await stagingJsonOrNull(
+  const progressRaw = await stagingJsonOrNull(
     `runs/${runId}/progress.json`,
     revalidate,
     country,
   );
+  const progress = progressRaw == null ? null : parseStagingProgress(progressRaw);
   const candidateReleaseId = stringValue(progress?.candidate_release_id) ?? runId;
   const diag = await stagingJsonOrNull(
     `runs/${runId}/calibration_diagnostics.json`,
@@ -425,7 +442,8 @@ export async function loadStagingTargetChangeDataset(
     TARGET_CHANGE_MUTABLE_CACHE_SECONDS,
     country,
   );
-  const ttlSeconds = stagingTargetChangeCacheTtlSeconds(progress?.status);
+  const parsedProgress = progress == null ? null : parseStagingProgress(progress);
+  const ttlSeconds = stagingTargetChangeCacheTtlSeconds(parsedProgress?.status);
   const cacheKey = `${country}:${runId}:${releaseId}`;
   const now = Date.now();
   for (const [key, entry] of targetChangeCache) {
@@ -470,6 +488,12 @@ export async function loadStagingRun(
       ...unavailable,
       run_id: runId,
       candidate_release_id: null,
+      release_id: null,
+      country_code: null,
+      run_kind: null,
+      non_release: null,
+      schema_version: null,
+      delivery: null,
       progress: null,
       run_manifest: null,
       calibration_progress: null,
@@ -482,36 +506,54 @@ export async function loadStagingRun(
     };
   }
   assertSafeReleaseId(runId, "run");
+  const repository = stagingSource(country);
   const [
-    progress,
-    runManifest,
-    calibrationProgress,
+    progressRaw,
+    runManifestRaw,
+    calibrationProgressRaw,
     eventsText,
     cal,
     reformValidationRaw,
   ] = await Promise.all([
     stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate, country),
     stagingJsonOrNull(`runs/${runId}/run_manifest.json`, revalidate, country),
-    stagingJsonOrNull(`runs/${runId}/calibration_progress.json`, revalidate, country),
+    stagingJsonOrNull(
+      `runs/${runId}/calibration_progress.json`,
+      revalidate,
+      country,
+    ),
     stagingTextOrNull(`runs/${runId}/events.ndjson`, revalidate, country),
     loadStagingCalibration(runId, revalidate, country),
     stagingJsonOrNull(`runs/${runId}/reform_validation.json`, revalidate, country),
   ]);
+  const progress = progressRaw == null ? null : parseStagingProgress(progressRaw);
+  const runManifest =
+    runManifestRaw == null ? null : parseStagingManifest(runManifestRaw);
+  const calibrationProgress =
+    calibrationProgressRaw == null
+      ? null
+      : parseStagingCalibrationProgress(calibrationProgressRaw);
   const candidateReleaseId =
     stringValue(progress?.candidate_release_id) ??
     stringValue(runManifest?.candidate_release_id) ??
     runId;
-  const repository = stagingSource(country);
+  const identity = progress ?? runManifest;
   return {
     available: true,
     source_repo: repository.repo,
     revision: repository.revision,
     run_id: runId,
     candidate_release_id: candidateReleaseId,
+    release_id: stringValue(identity?.release_id),
+    country_code: stringValue(identity?.country_code),
+    run_kind: stringValue(identity?.run_kind),
+    non_release: booleanValue(identity?.non_release),
+    schema_version: schemaVersionValue(identity?.schema_version),
+    delivery: objectOrNull(identity?.delivery),
     progress,
     run_manifest: runManifest,
     calibration_progress: calibrationProgress,
-    events: parseNdjson(eventsText),
+    events: parseStagingEvents(eventsText),
     has_calibration: cal != null,
     calibration: cal ? latestMicrocosmCalibrationSummary(cal) : null,
     reform_validation: reformValidationRaw

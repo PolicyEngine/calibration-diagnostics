@@ -123,4 +123,15 @@ or `HUGGINGFACE_TOKEN` to read private datasets. Each country with the
 registry; it never falls back to another country's repository. US staging
 defaults to `policyengine/populace-us-staging`; override it with the
 backward-compatible `POPULACE_STAGING_HF_REPO` and
-`POPULACE_STAGING_HF_REVISION` variables.
+`POPULACE_STAGING_HF_REVISION` variables. UK staging defaults to the private dataset
+`policyengine/populace-uk-staging`; configure its server-only read credential as
+`POPULACE_UK_STAGING_HF_TOKEN`, and optionally override the dataset or revision
+with `POPULACE_UK_STAGING_HF_REPO` or `POPULACE_UK_STAGING_HF_REVISION`. Never
+use a `NEXT_PUBLIC_` variable for a private-repository credential.
+
+The staging contract fixtures under
+`frontend/lib/microcosm/fixtures/staging-contract/` are byte-identical copies
+of Microcosm's canonical producer fixtures. The consumer tests pin each
+version's `SHA256SUMS` digest and verify every listed file. A contract change
+must update the canonical Microcosm fixture, its digest manifest, this copy,
+and both repositories' contract tests in their respective feature branches.

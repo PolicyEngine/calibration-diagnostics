@@ -62,7 +62,9 @@ function validationTone(absRel: number | null | undefined): "positive" | "neutra
 }
 
 function statusTone(status: string | null | undefined): StatusTone {
-  if (status === "passed" || status === "published") return "success";
+  if (status === "passed" || status === "published" || status === "completed") {
+    return "success";
+  }
   if (status === "failed") return "danger";
   if (status === "stalled") return "warning";
   if (status === "running" || status === "queued") return "info";
@@ -600,7 +602,7 @@ function RunInternalsPanel({
                     <td className="px-3 py-1.5 text-xs text-muted-foreground">
                       {metadata.staging_path ? (
                         <a
-                          href={`https://huggingface.co/datasets/${runData.source_repo}/blob/main/${metadata.staging_path}`}
+                          href={`https://huggingface.co/datasets/${runData.source_repo}/blob/${runData.revision ?? "main"}/${metadata.staging_path}`}
                           target="_blank"
                           rel="noreferrer"
                           className="underline decoration-dotted underline-offset-2 hover:text-primary"
