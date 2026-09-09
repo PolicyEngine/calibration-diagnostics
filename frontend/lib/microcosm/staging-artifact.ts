@@ -20,6 +20,7 @@ import {
   type TargetChangeDataset,
 } from "@/lib/microcosm/target-change";
 import {
+  IncompatibleStagingDataError,
   parseStagingCalibrationProgress,
   parseStagingEvents,
   parseStagingManifest,
@@ -209,11 +210,26 @@ async function stagingTree(
   country: MicrocosmCountry,
 ): Promise<JsonObject[]> {
   const repository = stagingSource(country);
-  const url = stagingTreeUrl(repository);
-  const res = await fetch(url, stagingFetchOptions(revalidate, country));
-  if (!res.ok) throw new StagingFetchError(res.status, "runs tree", repository);
-  const tree = await res.json();
-  return Array.isArray(tree) ? tree.map(asObject) : [];
+  const entries: JsonObject[] = [];
+  const visited = new Set<string>();
+  let url: string | null = stagingTreeUrl(repository);
+  while (url) {
+    if (visited.has(url)) {
+      throw new Error("Staging repository tree pagination repeated a page URL.");
+    }
+    visited.add(url);
+    const res: Response = await fetch(
+      url,
+      stagingFetchOptions(revalidate, country),
+    );
+    if (!res.ok) throw new StagingFetchError(res.status, "runs tree", repository);
+    const tree = await res.json();
+    if (Array.isArray(tree)) entries.push(...tree.map(asObject));
+    const link = res.headers.get("link") ?? "";
+    const next = /<([^>]+)>;\s*rel="next"/.exec(link);
+    url = next ? next[1] : null;
+  }
+  return entries;
 }
 
 export interface StagingRunSummary {
@@ -301,11 +317,38 @@ function summaryFromProgress(runId: string, progress: JsonObject | null): Stagin
   };
 }
 
+function summaryFromManifest(
+  runId: string,
+  manifest: JsonObject,
+): StagingRunSummary {
+  return {
+    run_id: runId,
+    candidate_release_id: stringValue(manifest.candidate_release_id),
+    release_id: stringValue(manifest.release_id),
+    country_code: stringValue(manifest.country_code),
+    run_kind: stringValue(manifest.run_kind),
+    non_release: booleanValue(manifest.non_release),
+    schema_version: 2,
+    status: stringValue(manifest.status),
+    stage: stringValue(manifest.stage),
+    started_at: stringValue(manifest.started_at),
+    updated_at: stringValue(manifest.updated_at),
+    progress_path: `runs/${runId}/progress.json`,
+    run_manifest_path: `runs/${runId}/run_manifest.json`,
+  };
+}
+
 function sortRuns(a: StagingRunSummary, b: StagingRunSummary): number {
-  return String(b.updated_at ?? b.started_at ?? b.run_id).localeCompare(
-    String(a.updated_at ?? a.started_at ?? a.run_id),
+  return (
+    String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")) ||
+    String(b.started_at ?? "").localeCompare(String(a.started_at ?? "")) ||
+    b.run_id.localeCompare(a.run_id)
   );
 }
+
+const RUN_PATH = /^runs\/([A-Za-z0-9][A-Za-z0-9._-]*)\//;
+const RUN_MANIFEST_PATH =
+  /^runs\/([A-Za-z0-9][A-Za-z0-9._-]*)\/run_manifest\.json$/;
 
 export async function loadStagingRuns(
   revalidate: number,
@@ -320,31 +363,63 @@ export async function loadStagingRuns(
     };
   }
   const repository = stagingSource(country);
-  const index = await stagingJsonOrNull("runs.json", revalidate, country);
-  const indexedRuns = index == null ? [] : parseStagingRunIndex(index);
-
-  // Always union the index with the actual run directories: runs.json can lag
-  // behind (or only carry the latest run), so list runs/ and pick up any run
-  // folder that isn't already indexed.
-  const runIds = new Set(indexedRuns.map((run) => run.run_id));
   let treeMissing = false;
+  let tree: JsonObject[] = [];
   try {
-    for (const entry of await stagingTree(revalidate, country)) {
-      if (typeof entry.path !== "string") continue;
-      const match = /^runs\/([^/]+)\//.exec(entry.path);
-      if (match) runIds.add(match[1]);
-    }
+    tree = await stagingTree(revalidate, country);
   } catch (error) {
-    if (error instanceof StagingFetchError && error.status !== 404) throw error;
+    if (!(error instanceof StagingFetchError) || error.status !== 404) throw error;
     // A staging repo may exist before any tree listing is public.
     treeMissing = true;
+  }
+
+  const manifestPaths = new Map<string, string>();
+  const listedRunIds = new Set<string>();
+  for (const entry of tree) {
+    if (entry.type !== "file" || typeof entry.path !== "string") continue;
+    const runMatch = RUN_PATH.exec(entry.path);
+    if (runMatch) listedRunIds.add(runMatch[1]);
+    const manifestMatch = RUN_MANIFEST_PATH.exec(entry.path);
+    if (manifestMatch) manifestPaths.set(manifestMatch[1], entry.path);
+  }
+
+  const listedManifests = await Promise.all(
+    [...manifestPaths].map(async ([runId, path]) => {
+      const manifest = parseStagingManifest(
+        await stagingJson(path, revalidate, country),
+      );
+      if (manifest.run_id !== runId) {
+        throw new IncompatibleStagingDataError(
+          `run manifest id ${String(manifest.run_id)} does not match directory ${runId}.`,
+        );
+      }
+      return manifest;
+    }),
+  );
+  const v2Manifests = listedManifests.filter(
+    (manifest) => manifest.schema_version === 2,
+  );
+  const v2ManifestIds = new Set(
+    v2Manifests.map((manifest) => String(manifest.run_id)),
+  );
+  const v1ManifestIds = new Set(
+    listedManifests
+      .filter((manifest) => manifest.schema_version === 1)
+      .map((manifest) => String(manifest.run_id)),
+  );
+
+  let index: JsonObject | null = null;
+  let indexedRuns: StagingRunSummary[] = [];
+  if (treeMissing || v1ManifestIds.size > 0) {
+    index = await stagingJsonOrNull("runs.json", revalidate, country);
+    if (index?.schema_version === 1) indexedRuns = parseStagingRunIndex(index);
   }
 
   // HF answers 404 (not 401/403) for private repos when auth is missing or
   // expired, so "everything 404'd" is ambiguous between "no runs yet" and "we
   // can't see the repo". Disambiguate via the repo API before reporting an
   // empty list — a silent empty state hides a broken token.
-  if (index == null && treeMissing && runIds.size === 0) {
+  if (index == null && treeMissing && listedManifests.length === 0) {
     const repoRes = await fetch(
       stagingRepoUrl(repository),
       stagingFetchOptions(revalidate, country),
@@ -365,10 +440,13 @@ export async function loadStagingRuns(
   const byId = new Map<string, StagingRunSummary>(
     indexedRuns.map((run) => [run.run_id, run]),
   );
-  // Run ids are timestamp-prefixed, so descending order is newest-first: if
-  // there are more un-indexed runs than the fetch cap, keep the newest rather
-  // than dropping them arbitrarily (they'd otherwise silently vanish).
-  const missing = [...runIds]
+  const v1RunIds = new Set(v1ManifestIds);
+  if (index?.schema_version === 1) {
+    for (const runId of listedRunIds) {
+      if (!v2ManifestIds.has(runId)) v1RunIds.add(runId);
+    }
+  }
+  const missing = [...v1RunIds]
     .filter((runId) => !byId.has(runId))
     .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
   const MAX_UNINDEXED_FETCH = 50;
@@ -383,6 +461,10 @@ export async function loadStagingRuns(
     }),
   );
   for (const run of fetched) byId.set(run.run_id, run);
+  for (const manifest of v2Manifests) {
+    const runId = String(manifest.run_id);
+    byId.set(runId, summaryFromManifest(runId, manifest));
+  }
   const truncated = missing.length > MAX_UNINDEXED_FETCH;
 
   return {

@@ -16,7 +16,7 @@ import {
 const FIXTURES = join(import.meta.dir, "fixtures", "staging-contract");
 const MANIFEST_DIGESTS = {
   v1: "165d24caf29b82afdb0ce241b65d088da552abd59d6ddabf4b2183b9a61be75b",
-  v2: "4fb0b6b45782fe18da6eb79513ef788230bf3476bd296bb3e120c9d248c46e5f",
+  v2: "0d54c630088152b4fb4a7b7a9853c851233d0be76579f949331ae4bcd7b455e5",
 };
 
 function bytes(version: "v1" | "v2", path: string): Buffer {
@@ -74,13 +74,22 @@ describe("version 1", () => {
 describe("version 2", () => {
   const runRoot = "completed-spine/runs/uk-spine-v2-fixture";
 
+  test("does not accept the removed shared run index contract", () => {
+    expect(() =>
+      parseStagingRunIndex({
+        schema_name: "microcosm.staging.run-index",
+        schema_version: 2,
+        runs: [],
+      }),
+    ).toThrow(/run index must use schema version 1/);
+  });
+
   test("normalizes identities, lifecycle, sampling, delivery, and events", () => {
-    const runs = parseStagingRunIndex(json("v2", "completed-spine/runs.json"));
     const progress = parseStagingProgress(json("v2", `${runRoot}/progress.json`));
     const manifest = parseStagingManifest(json("v2", `${runRoot}/run_manifest.json`));
     const events = parseStagingEvents(bytes("v2", `${runRoot}/events.ndjson`).toString());
 
-    expect(runs[0]).toMatchObject({
+    expect(manifest).toMatchObject({
       run_id: "uk-spine-v2-fixture",
       candidate_release_id: "uk-spine-v2-fixture",
       release_id: null,

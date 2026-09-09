@@ -10,7 +10,6 @@ export class IncompatibleStagingDataError extends Error {
 }
 
 const V2_SCHEMAS = {
-  index: "microcosm.staging.run-index",
   manifest: "microcosm.staging.run-manifest",
   progress: "microcosm.staging.progress",
   calibration: "microcosm.staging.calibration-progress",
@@ -77,7 +76,7 @@ export interface ParsedStagingRunSummary {
   updated_at: string | null;
   progress_path: string;
   run_manifest_path: string;
-  schema_version: 1 | 2;
+  schema_version: 1;
 }
 
 function optionalString(value: unknown): string | null {
@@ -86,28 +85,28 @@ function optionalString(value: unknown): string | null {
 
 export function parseStagingRunIndex(value: unknown): ParsedStagingRunSummary[] {
   const payload = objectValue(value, "run index");
-  const schemaVersion = version(payload, "index");
+  if (payload.schema_version !== 1 || payload.schema_name != null) {
+    throw new IncompatibleStagingDataError(
+      `run index must use schema version 1, received ${String(payload.schema_version)}.`,
+    );
+  }
   if (!Array.isArray(payload.runs)) {
     throw new IncompatibleStagingDataError("run index runs must be an array.");
   }
   return payload.runs.map((entry, index) => {
     const row = objectValue(entry, `run index row ${index}`);
     const runId = stringValue(row.run_id, `run index row ${index} run_id`);
-    const candidate =
-      schemaVersion === 2
-        ? stringValue(row.candidate_id, `run index row ${index} candidate_id`)
-        : nullableString(
-            row.candidate_release_id,
-            `run index row ${index} candidate_release_id`,
-          );
+    const candidate = nullableString(
+      row.candidate_release_id,
+      `run index row ${index} candidate_release_id`,
+    );
     return {
       run_id: runId,
       candidate_release_id: candidate,
-      release_id: schemaVersion === 2 ? nullableString(row.release_id, "release_id") : null,
-      country_code: schemaVersion === 2 ? stringValue(row.country_code, "country_code") : null,
-      run_kind: schemaVersion === 2 ? stringValue(row.run_kind, "run_kind") : null,
-      non_release:
-        schemaVersion === 2 && typeof row.non_release === "boolean" ? row.non_release : null,
+      release_id: null,
+      country_code: null,
+      run_kind: null,
+      non_release: null,
       status: optionalString(row.status),
       stage: optionalString(row.stage),
       started_at: optionalString(row.started_at),
@@ -116,7 +115,7 @@ export function parseStagingRunIndex(value: unknown): ParsedStagingRunSummary[] 
         optionalString(row.progress_path) ?? `runs/${runId}/progress.json`,
       run_manifest_path:
         optionalString(row.run_manifest_path) ?? `runs/${runId}/run_manifest.json`,
-      schema_version: schemaVersion,
+      schema_version: 1,
     };
   });
 }
@@ -202,10 +201,30 @@ export function parseStagingManifest(value: unknown): JsonObject {
   const runId = stringValue(payload.run_id, "run manifest run_id");
   if (schemaVersion === 1) return { ...payload, run_id: runId };
   const candidateId = stringValue(payload.candidate_id, "run manifest candidate_id");
+  const releaseId = nullableString(payload.release_id, "run manifest release_id");
+  const countryCode = stringValue(payload.country_code, "run manifest country_code");
+  const runKind = stringValue(payload.run_kind, "run manifest run_kind");
+  if (typeof payload.non_release !== "boolean") {
+    throw new IncompatibleStagingDataError(
+      "run manifest non_release must be boolean.",
+    );
+  }
+  if (!new Set(["running", "completed", "failed"]).has(String(payload.status))) {
+    throw new IncompatibleStagingDataError("run manifest status is unsupported.");
+  }
+  const startedAt = stringValue(payload.started_at, "run manifest started_at");
+  const updatedAt = stringValue(payload.updated_at, "run manifest updated_at");
   return {
     ...payload,
     run_id: runId,
     candidate_release_id: candidateId,
+    release_id: releaseId,
+    country_code: countryCode,
+    run_kind: runKind,
+    non_release: payload.non_release,
+    status: payload.status,
+    started_at: startedAt,
+    updated_at: updatedAt,
     stage: stringValue(payload.current_stage, "run manifest current_stage"),
     delivery: parseDelivery(payload.delivery),
     artifacts: parseArtifacts(payload.artifacts, runId),
