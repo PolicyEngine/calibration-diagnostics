@@ -525,3 +525,17 @@ test("orders version 2 runs by date-time instant across UTC offsets", async () =
 
   expect(result.runs.map((run) => run.run_id)).toEqual(["later", "earlier"]);
 });
+
+test("rejects a successful non-array repository tree response", async () => {
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    if (url.includes("/tree/")) {
+      return Response.json({ entries: [] });
+    }
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+
+  await expect(loadStagingRuns(0, "uk")).rejects.toThrow(
+    /Incompatible staging data: runs tree response must be an array/,
+  );
+});

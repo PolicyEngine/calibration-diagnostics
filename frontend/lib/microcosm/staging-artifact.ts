@@ -223,8 +223,13 @@ async function stagingTree(
       stagingFetchOptions(revalidate, country),
     );
     if (!res.ok) throw new StagingFetchError(res.status, "runs tree", repository);
-    const tree = await res.json();
-    if (Array.isArray(tree)) entries.push(...tree.map(asObject));
+    const tree: unknown = await res.json();
+    if (!Array.isArray(tree)) {
+      throw new IncompatibleStagingDataError(
+        "runs tree response must be an array.",
+      );
+    }
+    entries.push(...tree.map(asObject));
     const link = res.headers.get("link") ?? "";
     const next = /<([^>]+)>;\s*rel="next"/.exec(link);
     url = next ? next[1] : null;
