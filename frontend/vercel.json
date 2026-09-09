@@ -3,6 +3,7 @@
   "fluid": true,
   "functions": {
     "api/microcosm_variable.py": {
+      "includeFiles": "scripts/**",
       "maxDuration": 800,
       "memory": 3009
     }

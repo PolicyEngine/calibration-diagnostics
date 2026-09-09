@@ -12,7 +12,13 @@ const nextConfig: NextConfig = {
   output: "standalone",
   ...(BASE_PATH ? { basePath: BASE_PATH } : {}),
   outputFileTracingIncludes: {
-    "/api/microcosm/variable": ["./scripts/microcosm_variable_value.py"],
+    "/api/microcosm/variable": [
+      "./scripts/microcosm_variable_value.py",
+      "./scripts/microcosm_variable_core.py",
+      "./scripts/hosted_release.py",
+      "./scripts/hosted_release.json",
+      "./scripts/runtime_identity.py",
+    ],
   },
   // NOTE: the hosted Microcosm variable lookup is a native (non-Next) Vercel
   // Python function pinned to the deployment root (`/api/microcosm_variable`),

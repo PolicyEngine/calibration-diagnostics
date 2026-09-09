@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "repo": "policyengine/populace-us",
+  "hf_revision": "f09f2f3b9fa8409642dc0c7fc9c8f7516ae0e3c5",
+  "release_id": "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
+  "filename": "populace_us_2024.h5",
+  "sha256": "48b9d479fb4fd1c3537f9383ce4697d130b6f618658409d74f6233c43b994c7e",
+  "data_year": 2024,
+  "release_manifest": {
+    "path": "releases/populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/release_manifest.json",
+    "json_sha256": "ecda19d971fad6d7ffcbb9ad1cbcb7825e1cdfa022f6da1eb89fcc96eb1250b0"
+  },
+  "build_manifest": {
+    "path": "releases/populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/build_manifest.json",
+    "json_sha256": "f503fc887efcf3ae5b36741f395e91d46f7e870f7f5d1254d3b7f79a4f3e655c"
+  },
+  "packages": {
+    "policyengine-us": "1.764.6",
+    "policyengine-core": "3.26.11",
+    "spm-calculator": "0.3.1"
+  },
+  "manifest_digest_algorithm": "sha256-json-sort-keys-compact-ascii-escaped-utf8"
+}

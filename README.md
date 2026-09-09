@@ -111,6 +111,31 @@ gate manually when reviewing Chronicle or dependency updates:
 uv run python scripts/verify_evaluation_harness.py
 ```
 
+The hosted variable lookup has a separate Python environment in
+`frontend/requirements.txt`. Its US/Core/SPM pins protect the existing model;
+update them together with the certified Microcosm data release. Do not use the
+root evaluation lock to install this function. Check the hosted assembly without
+loading a population with:
+
+```bash
+uv venv .tmp/hosted-runtime
+uv pip install --python .tmp/hosted-runtime/bin/python \
+  -r frontend/requirements.txt "pytest>=8.3,<9"
+uv pip check --python .tmp/hosted-runtime/bin/python
+UV_PROJECT_ENVIRONMENT=.tmp/hosted-runtime uv run --no-sync \
+  python frontend/scripts/verify_hosted_runtime.py
+UV_PROJECT_ENVIRONMENT=.tmp/hosted-runtime uv run --no-sync \
+  python -m pytest frontend/tests -q
+```
+
+`/api/microcosm_variable?metadata=1` reports installed packages and the deployment
+commit, when available, without downloading a dataset. The mounted equivalent
+is `/calibration/dashboard/api/microcosm_variable?metadata=1`. Its
+`data_configuration` describes repository settings, not a verified loaded
+release. Calculation responses include observed `runtime` versions. See
+[the active protection handoff](ACTIVE-DOWNSTREAM-PROTECTION.md) for the separate
+canonical model/data migration and deployment verification gates.
+
 See [the Chronicle update workflow](docs/chronicle-update-workflow.md) for the
 optional Microcosm and ACS inputs and the separate full-artifact command.
 

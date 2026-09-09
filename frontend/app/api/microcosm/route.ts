@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { countryRegistration } from "@/lib/microcosm/countries";
 
 import {
   asObject,
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
   const release = params.get("release") ?? "latest";
   const isLatestRequest = release === "latest" || release === "";
   const country = parseCountry(params.get("country"));
+  const productionRelease = countryRegistration(country).production_release_id;
   try {
     const cal = await loadRelease(release, revalidate, country);
     const calibration = latestMicrocosmCalibrationSummary(cal);
@@ -32,11 +34,12 @@ export async function GET(request: Request) {
         source_repo: microcosmRepo(country),
         repo_type: "dataset",
         revision: microcosmRevision(country),
-        source: "huggingface_live",
+        source: productionRelease ? "huggingface_immutable" : "huggingface_live",
+        selection_mode: productionRelease ? "pinned_production" : "latest",
         release_id: cal.release_id,
         updated_at: cal.updated_at,
         source_artifacts: [
-          ...(isLatestRequest
+          ...(isLatestRequest && !productionRelease
             ? [{ name: "latest_pointer", path: "latest.json", url: hfResolveUrl("latest.json", country) }]
             : []),
           { name: "build_manifest", path: `${prefix}/build_manifest.json`, url: hfResolveUrl(`${prefix}/build_manifest.json`, country) },
@@ -45,7 +48,9 @@ export async function GET(request: Request) {
           { name: "demographics", path: `${prefix}/demographics.json`, url: hfResolveUrl(`${prefix}/demographics.json`, country) },
         ],
         limitations: [
-          isLatestRequest
+          productionRelease
+            ? `This page reads the selected release from immutable Hugging Face revision ${microcosmRevision(country)}. The production default is pinned to ${productionRelease}; it does not follow latest.json.`
+            : isLatestRequest
             ? `Everything on this page is read live from the ${microcosmRepo(country)} Hugging Face dataset; the current release is resolved through latest.json.`
             : `Everything on this page is read live from the ${microcosmRepo(country)} Hugging Face dataset for the selected release id.`,
           "Loss values are the calibrator's own metric for this release; their scale is not comparable across releases that calibrate to different target surfaces.",

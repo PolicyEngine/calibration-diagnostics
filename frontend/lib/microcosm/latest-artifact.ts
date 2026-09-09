@@ -1,7 +1,7 @@
 // Pure-HF data layer for the country-selectable Microcosm dashboard. No
 // committed snapshot: every release's manifests and per-target calibration
-// diagnostics are read live from its country's Hugging Face dataset, resolved
-// through latest.json (current release) or by id (version compare).
+// diagnostics are read from its country's Hugging Face revision. Reviewed
+// production defaults are immutable; historical releases remain selectable.
 
 import { sourceAuthorityLabel } from "@/lib/source-labels";
 
@@ -37,6 +37,7 @@ import {
 } from "./target-representation";
 import { readStructuredTarget } from "./structured-target-reader";
 import { matchTargetSurfaces } from "./target-surface-matcher";
+import { assertReviewedRepository } from "./production-release";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
@@ -76,11 +77,15 @@ function envOverride(name: string | undefined): string | undefined {
 // second exhaustive country table.
 function resolveCountryRepository(country: MicrocosmCountry): MicrocosmCountryRepository {
   const registration = countryRegistration(country);
-  return {
+  const repository = {
     repo: envOverride(registration.repo_env) ?? registration.repo,
     revision: envOverride(registration.revision_env) ?? registration.revision,
     geography: registration.geography,
   };
+  if (registration.production_release_id) {
+    assertReviewedRepository(repository.repo, repository.revision);
+  }
+  return repository;
 }
 
 export const COUNTRY_REPO = Object.fromEntries(
@@ -2170,6 +2175,10 @@ export async function loadPointerReleaseId(
   revalidate: number,
   country: MicrocosmCountry = "us",
 ): Promise<{ release_id: string; updated_at: string | null }> {
+  const productionRelease = countryRegistration(country).production_release_id;
+  if (productionRelease) {
+    return { release_id: productionRelease, updated_at: null };
+  }
   const pointer = await hfJson(hfResolveUrl("latest.json", country), revalidate);
   return {
     release_id: String(pointer.release_id ?? ""),
@@ -2178,7 +2187,7 @@ export async function loadPointerReleaseId(
 }
 
 // Load one release's manifests + calibration diagnostics. releaseId "latest"
-// resolves through the pointer.
+// resolves to the reviewed production default when configured, otherwise the pointer.
 export async function loadRelease(
   releaseId: string,
   revalidate: number,

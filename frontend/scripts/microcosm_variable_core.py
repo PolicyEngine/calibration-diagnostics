@@ -2,22 +2,33 @@
 
 from __future__ import annotations
 
-import json
 import math
 import os
 import time
+from pathlib import PurePosixPath
 from typing import Any
-from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 import numpy as np
 
+from scripts.hosted_release import (
+    VariableCalculationError,
+    download_certification,
+    reviewed_release,
+    validate_runtime,
+    validate_selection,
+    verify_h5,
+)
+
 
 # Deprecated upstream identifiers: Microcosm's current HF repository and H5
 # filename still use the former Populace names.
-DEFAULT_REPO = "policyengine/populace-us"
-DEFAULT_REVISION = "main"
-DEFAULT_FILENAME = "populace_us_2024.h5"
+_REVIEWED = reviewed_release()
+DEFAULT_REPO = _REVIEWED["repo"]
+DEFAULT_REVISION = _REVIEWED["hf_revision"]
+DEFAULT_FILENAME = _REVIEWED["filename"]
+DEFAULT_RELEASE = _REVIEWED["release_id"]
+DEFAULT_PERIOD = str(_REVIEWED["data_year"])
 
 os.environ.setdefault("HF_HOME", "/tmp/huggingface")
 os.environ.setdefault("HF_HUB_CACHE", "/tmp/huggingface/hub")
@@ -83,19 +94,6 @@ STATE_FIPS = {
 }
 
 
-class VariableCalculationError(RuntimeError):
-    """User-facing calculation failure.
-
-    ``status_code`` lets the HTTP handler distinguish a caller error (400,
-    unknown variable), a capacity refusal (503, dataset too large for the
-    host — retryable elsewhere), and an upstream failure (502, default).
-    """
-
-    def __init__(self, message: str, status_code: int = 502) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-
-
 _SIM_CACHE: dict[tuple[str, str, str, str | None], tuple[str, Any]] = {}
 # Max state-filtered sims kept resident (plus the national sim); each pins a
 # full Microsimulation, so this caps warm-instance memory.
@@ -146,7 +144,9 @@ def _install_core_hdfstore_patch() -> None:
     _CORE_PATCH_INSTALLED[0] = True
 
 
-def _download_dataset(hf_hub_download: Any, repo: str, filename: str, revision: str) -> str:
+def _download_dataset(
+    hf_hub_download: Any, repo: str, filename: str, revision: str
+) -> str:
     """Fetch the release H5 to wherever it fits.
 
     The normal HF cache download is used everywhere it works (local dev, and
@@ -189,7 +189,10 @@ def _download_dataset(hf_hub_download: Any, repo: str, filename: str, revision: 
 
 def _cgroup_memory_limit_bytes() -> int | None:
     """The function's hard memory limit, from the cgroup (v2 then v1)."""
-    for path in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+    for path in (
+        "/sys/fs/cgroup/memory.max",
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+    ):
         try:
             with open(path) as handle:
                 raw = handle.read().strip()
@@ -301,7 +304,9 @@ def _disk_usage_report(root: str = "/tmp") -> str:
             if os.path.isfile(path):
                 total = os.path.getsize(path)
             elif os.path.isdir(path):
-                for dirpath, _dirnames, filenames in os.walk(path, onerror=lambda e: None):
+                for dirpath, _dirnames, filenames in os.walk(
+                    path, onerror=lambda e: None
+                ):
                     for f in filenames:
                         try:
                             total += os.path.getsize(os.path.join(dirpath, f))
@@ -359,33 +364,17 @@ def finite_float(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def resolve_release_id(repo: str, revision: str, requested_release: str) -> str:
-    if requested_release != "latest":
-        return requested_release
-    from urllib.request import Request
-
-    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/latest.json"
-    # Attach the token so a private/gated repo's pointer resolves too — the H5
-    # download already authenticates, so an unauthenticated pointer fetch would
-    # be the odd one out and fail on any non-public repo.
-    request = Request(url)
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    if token:
-        request.add_header("Authorization", f"Bearer {token}")
-    try:
-        with urlopen(request, timeout=20) as response:
-            pointer = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise VariableCalculationError(f"Could not resolve latest Microcosm release: {exc}") from exc
-    release_id = str(pointer.get("release_id") or "").strip()
-    if not release_id:
-        raise VariableCalculationError("Could not resolve latest Microcosm release.")
-    return release_id
-
-
-def state_prefix_for_variable(variable_name: str) -> str | None:
-    prefix = variable_name.split("_", 1)[0].upper()
-    return prefix if prefix in STATE_FIPS else None
+def state_for_variable(variable: Any) -> str | None:
+    """Use declared country metadata; national ``in_*`` names are not Indiana."""
+    defined_for = getattr(variable, "defined_for", None)
+    if isinstance(defined_for, str) and defined_for in STATE_FIPS:
+        return defined_for
+    parts = PurePosixPath(str(getattr(variable, "module_name", ""))).parts
+    for index in range(len(parts) - 2):
+        if parts[index : index + 2] == ("gov", "states"):
+            state = parts[index + 2].upper()
+            return state if state in STATE_FIPS else None
+    return None
 
 
 def state_filtered_dataset(dataset_path: str, state: str) -> Any:
@@ -437,25 +426,43 @@ def calculate_variables(
     variables: list[str],
     period: str,
     repo: str = DEFAULT_REPO,
-    revision: str,
+    revision: str | None = None,
+    hf_revision: str = DEFAULT_REVISION,
     filename: str = DEFAULT_FILENAME,
 ) -> dict[str, Any]:
     started = time.time()
+    config = validate_selection(
+        requested_release=revision,
+        repo=repo,
+        hf_revision=hf_revision,
+        filename=filename,
+        period=period,
+    )
+    runtime = validate_runtime(config)
+    release_id = config["release_id"]
+    revision = config["hf_revision"]
     try:
         from huggingface_hub import hf_hub_download
-        from policyengine_us import Microsimulation
     except Exception as exc:  # pragma: no cover - depends on host Python env.
         raise VariableCalculationError(
-            "Python package policyengine_us or huggingface_hub is not installed "
-            f"in the server environment: {exc}"
+            f"Could not import huggingface_hub in the server environment: {exc}"
         ) from exc
 
     unique_variables = list(dict.fromkeys(v.strip() for v in variables if v.strip()))
     dataset = f"hf://{repo}/{filename}@{revision}"
 
     try:
+        download_certification(config, hf_hub_download)
         _evict_other_releases(repo, filename, revision)
         dataset_path = _download_dataset(hf_hub_download, repo, filename, revision)
+        actual_sha256 = verify_h5(
+            dataset_path, config, image=_CORE_IMAGES.get(dataset_path)
+        )
+
+        # Country initialization and H5 input loading happen only after the
+        # installed package tuple, release certificate, and bytes are verified.
+        from policyengine_us import Microsimulation
+        from policyengine_us.system import system
 
         def get_sim(state: str | None = None) -> Any:
             cache_key = (repo, revision, filename, state)
@@ -479,24 +486,29 @@ def calculate_variables(
         results = []
         for variable_name in unique_variables:
             variable_started = time.time()
-            sim = get_sim(state_prefix_for_variable(variable_name))
-            variable = sim.tax_benefit_system.get_variable(variable_name)
+            variable = system.get_variable(variable_name)
             if variable is None:
                 raise VariableCalculationError(
                     f"Unknown variable: {variable_name}", status_code=400
                 )
+            state = state_for_variable(variable)
+            sim = get_sim(state)
             values = sim.calculate(variable_name, period)
-            raw_values = np.asarray(sim.calculate(variable_name, period, use_weights=False))
+            raw_values = np.asarray(
+                sim.calculate(variable_name, period, use_weights=False)
+            )
             weights = np.asarray(getattr(values, "weights", []))
             weighted_sum = finite_float(values.sum())
             raw_sum = finite_float(raw_values.sum())
             weight_sum = finite_float(weights.sum()) if weights.size else None
-            nonzero_weight_count = int(np.count_nonzero(weights)) if weights.size else None
+            nonzero_weight_count = (
+                int(np.count_nonzero(weights)) if weights.size else None
+            )
             results.append(
                 {
                     "variable": variable_name,
                     "period": period,
-                    "release_id": revision,
+                    "release_id": release_id,
                     "dataset": dataset,
                     "entity": variable.entity.key,
                     "definition_period": str(variable.definition_period),
@@ -508,6 +520,7 @@ def calculate_variables(
                     "weight_sum": weight_sum,
                     "record_count": int(raw_values.size),
                     "nonzero_weight_count": nonzero_weight_count,
+                    "state_filter": state,
                     "elapsed_seconds": finite_float(time.time() - variable_started),
                 }
             )
@@ -524,9 +537,11 @@ def calculate_variables(
 
     result: dict[str, Any] = {
         "period": period,
-        "release_id": revision,
+        "release_id": release_id,
         "dataset": dataset,
         "variables": results,
+        "runtime": runtime,
+        "data_identity": {**config, "sha256": actual_sha256, "verified": True},
         "elapsed_seconds": finite_float(time.time() - started),
     }
     if len(results) == 1:

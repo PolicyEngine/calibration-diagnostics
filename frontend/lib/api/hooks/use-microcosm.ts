@@ -10,6 +10,7 @@ import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
 import type { TargetChangeMode } from "@/lib/microcosm/target-change";
 import type { TargetChangeTreeApiResponse } from "@/lib/microcosm/target-change-tree";
+import { HOSTED_US_RELEASE } from "@/lib/microcosm/production-release";
 import {
   hasCapability,
   type CountryCapability,
@@ -288,7 +289,10 @@ export interface MicrocosmReleaseEntry {
 }
 
 export interface MicrocosmReleasesResponse {
-  latest_release_id: string;
+  latest_release_id: string | null;
+  default_release_id?: string;
+  selection_mode?: "pinned_production" | "latest";
+  revision?: string;
   updated_at: string | null;
   releases: MicrocosmReleaseEntry[];
   all_releases: MicrocosmReleaseEntry[];
@@ -544,6 +548,7 @@ export interface MicrocosmVariableValue {
   weight_sum: number | null;
   record_count: number;
   nonzero_weight_count: number | null;
+  state_filter?: string | null;
   elapsed_seconds: number | null;
 }
 
@@ -554,6 +559,18 @@ export interface MicrocosmVariableLookupResponse extends Partial<MicrocosmVariab
   dataset_path?: string | null;
   variables: MicrocosmVariableValue[];
   elapsed_seconds: number | null;
+  runtime?: {
+    packages: Record<string, string | null>;
+    source_commit: string | null;
+  };
+  data_identity?: {
+    repo: string;
+    hf_revision: string;
+    release_id: string;
+    filename: string;
+    sha256: string;
+    verified: boolean;
+  };
 }
 
 export interface CatalogVariable {
@@ -588,7 +605,7 @@ export function useMicrocosmVariableValue(params: {
     !["localhost", "127.0.0.1"].includes(window.location.hostname)
       ? "/microcosm_variable"
       : "/microcosm/variable";
-  const endpointCacheKey = path === "/microcosm_variable" ? "python-hosted-v3" : "node-local-v3";
+  const endpointCacheKey = path === "/microcosm_variable" ? "python-hosted-pinned-v4" : "node-local-pinned-v4";
   return useQuery({
     queryKey: [
       "microcosm",
@@ -596,13 +613,13 @@ export function useMicrocosmVariableValue(params: {
       endpointCacheKey,
       variables,
       params.period ?? "2024",
-      params.release ?? "latest",
+      params.release || HOSTED_US_RELEASE.release_id,
     ],
     queryFn: () =>
       apiGet<MicrocosmVariableLookupResponse>(path, {
         variables,
         period: params.period ?? "2024",
-        release: params.release || undefined,
+        release: params.release || HOSTED_US_RELEASE.release_id,
       }),
     enabled: variables.length > 0,
     staleTime: 30 * 60 * 1000,
@@ -776,20 +793,22 @@ export function releaseRoleSuffix(entry: MicrocosmReleaseEntry): string {
   return "";
 }
 
-// Release dropdown options. "Latest" resolves to the newest build, so we show
-// its date/sha on the label to make clear which release it currently points at.
+// Keep an immutable production default distinct from a live latest pointer.
 export function releaseSelectOptions(
   data?: MicrocosmReleasesResponse,
 ): { value: string; label: string }[] {
   const releases = data?.releases ?? [];
-  const latest =
-    (data?.latest_release_id
-      ? releases.find((r) => r.release_id === data.latest_release_id)
-      : undefined) ?? releases[0];
+  const defaultId = data?.default_release_id ?? data?.latest_release_id;
+  const selectedDefault = releases.find((r) => r.release_id === defaultId);
+  const defaultLabel = data?.selection_mode === "pinned_production"
+    ? "Production default (pinned)"
+    : data ? "Latest" : "Default release";
   return [
     {
       value: "",
-      label: latest ? `Latest · ${releaseLabel(latest.release_id, latest.date)}` : "Latest",
+      label: selectedDefault
+        ? `${defaultLabel} · ${releaseLabel(selectedDefault.release_id, selectedDefault.date)}`
+        : defaultLabel,
     },
     ...releases.map((r) => ({
       value: r.release_id,

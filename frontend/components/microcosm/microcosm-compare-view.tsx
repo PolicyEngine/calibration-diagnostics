@@ -563,10 +563,10 @@ export function MicrocosmCompareView() {
   const [a, setA] = useState("");
   const [b, setB] = useState("");
 
-  // Default B to the latest release and A to the next one down.
+  // Default B to the reviewed production selection, or the live default elsewhere.
   useEffect(() => {
     if (!releases.length) return;
-    if (!b) setB(releaseData?.latest_release_id || releases[0].release_id);
+    if (!b) setB(releaseData?.default_release_id || releaseData?.latest_release_id || releases[0].release_id);
     if (!a && releases[1]) setA(releases[1].release_id);
   }, [releases, releaseData, a, b]);
 

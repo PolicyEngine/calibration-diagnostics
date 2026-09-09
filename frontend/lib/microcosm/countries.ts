@@ -7,6 +7,8 @@
 // not import server-only modules or read `process.env`. Deployment overrides
 // for repositories are resolved server side in latest-artifact.ts.
 
+import { HOSTED_US_RELEASE } from "./production-release";
+
 export const COUNTRY_CAPABILITIES = [
   "calibration",
   "targets",
@@ -29,6 +31,8 @@ export interface CountryRegistration {
   revision: string;
   repo_env?: string;
   revision_env?: string;
+  // A reviewed immutable production default, distinct from a live latest pointer.
+  production_release_id?: string;
   // Country display name ("United States").
   label: string;
   // Sidebar dataset line ("Microcosm US").
@@ -66,8 +70,9 @@ const CALIBRATION_CAPABILITIES: readonly CountryCapability[] = [
 // deployment variables still use the former Populace names.
 export const COUNTRY_REGISTRY = {
   us: {
-    repo: "policyengine/populace-us",
-    revision: "main",
+    repo: HOSTED_US_RELEASE.repo,
+    revision: HOSTED_US_RELEASE.hf_revision,
+    production_release_id: HOSTED_US_RELEASE.release_id,
     repo_env: "POPULACE_HF_REPO",
     revision_env: "POPULACE_HF_REVISION",
     label: "United States",
