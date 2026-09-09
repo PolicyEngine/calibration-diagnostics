@@ -138,6 +138,22 @@ describe("version 2", () => {
     });
   });
 
+  test("rejects invalid run manifest date-time strings", () => {
+    const source = json("v2", `${runRoot}/run_manifest.json`);
+    const invalidTimestamps = [
+      ["started_at", "not-a-date"],
+      ["updated_at", "2026-02-30T00:00:00+00:00"],
+      ["updated_at", "2026-01-01 00:00:00"],
+      ["updated_at", "2026-01-01T00:00:00"],
+    ] as const;
+
+    for (const [field, value] of invalidTimestamps) {
+      expect(() => parseStagingManifest({ ...source, [field]: value })).toThrow(
+        new RegExp(`${field} must be a valid RFC 3339 date-time string`),
+      );
+    }
+  });
+
   test("accepts reviewed typed artifacts and rejects unknown artifact kinds", () => {
     const source = json("v2", `${runRoot}/run_manifest.json`);
     const artifact = {

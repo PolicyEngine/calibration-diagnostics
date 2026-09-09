@@ -340,10 +340,22 @@ function summaryFromManifest(
 
 function sortRuns(a: StagingRunSummary, b: StagingRunSummary): number {
   return (
-    String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")) ||
-    String(b.started_at ?? "").localeCompare(String(a.started_at ?? "")) ||
+    compareTimestampsDescending(a.updated_at, b.updated_at) ||
+    compareTimestampsDescending(a.started_at, b.started_at) ||
     b.run_id.localeCompare(a.run_id)
   );
+}
+
+function compareTimestampsDescending(
+  a: string | null,
+  b: string | null,
+): number {
+  const aTime = a == null ? Number.NEGATIVE_INFINITY : Date.parse(a);
+  const bTime = b == null ? Number.NEGATIVE_INFINITY : Date.parse(b);
+  const normalizedA = Number.isNaN(aTime) ? Number.NEGATIVE_INFINITY : aTime;
+  const normalizedB = Number.isNaN(bTime) ? Number.NEGATIVE_INFINITY : bTime;
+  if (normalizedA === normalizedB) return 0;
+  return normalizedB > normalizedA ? 1 : -1;
 }
 
 const RUN_PATH = /^runs\/([A-Za-z0-9][A-Za-z0-9._-]*)\//;

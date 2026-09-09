@@ -30,6 +30,47 @@ function stringValue(value: unknown, label: string): string {
   return value;
 }
 
+const RFC_3339_DATE_TIME =
+  /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+
+function dateTimeValue(value: unknown, label: string): string {
+  const dateTime = stringValue(value, label);
+  const match = RFC_3339_DATE_TIME.exec(dateTime);
+  if (!match) {
+    throw new IncompatibleStagingDataError(
+      `${label} must be a valid RFC 3339 date-time string.`,
+    );
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [
+    31,
+    leapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+
+  if (
+    day > daysInMonth[month - 1] ||
+    !Number.isFinite(Date.parse(dateTime))
+  ) {
+    throw new IncompatibleStagingDataError(
+      `${label} must be a valid RFC 3339 date-time string.`,
+    );
+  }
+  return dateTime;
+}
+
 function nullableString(value: unknown, label: string): string | null {
   return value == null ? null : stringValue(value, label);
 }
@@ -212,8 +253,8 @@ export function parseStagingManifest(value: unknown): JsonObject {
   if (!new Set(["running", "completed", "failed"]).has(String(payload.status))) {
     throw new IncompatibleStagingDataError("run manifest status is unsupported.");
   }
-  const startedAt = stringValue(payload.started_at, "run manifest started_at");
-  const updatedAt = stringValue(payload.updated_at, "run manifest updated_at");
+  const startedAt = dateTimeValue(payload.started_at, "run manifest started_at");
+  const updatedAt = dateTimeValue(payload.updated_at, "run manifest updated_at");
   return {
     ...payload,
     run_id: runId,

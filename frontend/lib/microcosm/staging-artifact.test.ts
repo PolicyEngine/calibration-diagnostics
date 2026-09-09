@@ -494,3 +494,34 @@ test("Belgium staging loaders return an empty state before resolving artifacts",
     run_id: "",
   });
 });
+
+test("orders version 2 runs by date-time instant across UTC offsets", async () => {
+  const manifests = new Map([
+    [
+      "earlier",
+      v2RunManifest("earlier", "2026-01-01T01:00:00+01:00"),
+    ],
+    ["later", v2RunManifest("later", "2026-01-01T00:30:00Z")],
+  ]);
+
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    if (url.includes("/tree/")) {
+      return Response.json(
+        [...manifests.keys()].map((runId) => ({
+          type: "file",
+          path: `runs/${runId}/run_manifest.json`,
+        })),
+      );
+    }
+    const match = /\/runs\/([^/]+)\/run_manifest\.json$/.exec(url);
+    if (match && manifests.has(match[1])) {
+      return Response.json(manifests.get(match[1]));
+    }
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+
+  const result = await loadStagingRuns(0, "uk");
+
+  expect(result.runs.map((run) => run.run_id)).toEqual(["later", "earlier"]);
+});
