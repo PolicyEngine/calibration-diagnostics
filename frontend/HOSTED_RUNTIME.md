@@ -6,7 +6,8 @@ certificate together. The root evaluation lock is a separate frozen environment.
 
 Vercel must install these requirements at build time. `pyproject.toml` defines a
 Python install hook that verifies the installed dependencies and imported APIs
-without downloading or opening population data. A custom install prevents the
+without downloading or opening population data. The exact install removes packages
+left over from a restored build cache. A custom install prevents the
 Python builder from deferring country-wheel installation until cold start. The
 ordinary optimized bundle exhausted `/tmp` before the handler could start.
 

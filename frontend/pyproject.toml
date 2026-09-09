@@ -3,4 +3,4 @@
 # in /tmp at cold start, where the country wheel exceeds available disk space.
 # This function also requires VERCEL_SUPPORT_LARGE_FUNCTIONS=1 in Vercel.
 [tool.vercel.scripts]
-vercel-install = 'test -n "$VIRTUAL_ENV" && uv pip install --python "$VIRTUAL_ENV/bin/python" --requirement requirements.txt && uv pip check --python "$VIRTUAL_ENV/bin/python" && "$VIRTUAL_ENV/bin/python" scripts/verify_hosted_runtime.py'
+vercel-install = 'test -n "$VIRTUAL_ENV" && uv pip install --exact --python "$VIRTUAL_ENV/bin/python" --requirement requirements.txt && uv pip check --python "$VIRTUAL_ENV/bin/python" && "$VIRTUAL_ENV/bin/python" scripts/verify_hosted_runtime.py'
