@@ -16,7 +16,7 @@ import {
 const FIXTURES = join(import.meta.dir, "fixtures", "staging-contract");
 const MANIFEST_DIGESTS = {
   v1: "165d24caf29b82afdb0ce241b65d088da552abd59d6ddabf4b2183b9a61be75b",
-  v2: "372a1c82e4bafbe636299636f25d51a2edad7d7dc28814cadbddac6f436948f0",
+  v2: "4fb0b6b45782fe18da6eb79513ef788230bf3476bd296bb3e120c9d248c46e5f",
 };
 
 function bytes(version: "v1" | "v2", path: string): Buffer {
@@ -98,10 +98,7 @@ describe("version 2", () => {
       non_release: true,
     });
     expect(progress.delivery).toMatchObject({ mode: "local_only", contract_version: 2 });
-    expect(progress.sample).toMatchObject({
-      requested_source_households: 5,
-      realized_source_families: 7,
-    });
+    expect(progress.sample).toEqual({ mode: "full" });
     expect(manifest.artifacts).toEqual({});
     expect(events[1]).toMatchObject({
       sequence: 2,
