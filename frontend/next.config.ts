@@ -12,11 +12,23 @@ const nextConfig: NextConfig = {
   output: "standalone",
   ...(BASE_PATH ? { basePath: BASE_PATH } : {}),
   async redirects() {
-    if (!BASE_PATH) return [];
+    const apiAliases = [
+      ["/api/populace_variable", "/api/microcosm_variable"],
+      ["/api/populace/:path*", "/api/microcosm/:path*"],
+    ].flatMap(([source, destination]) =>
+      (BASE_PATH ? ["", BASE_PATH] : [""]).map((prefix) => ({
+        source: `${prefix}${source}`,
+        destination: `${BASE_PATH}${destination}`,
+        basePath: false as const,
+        permanent: false,
+      })),
+    );
+    if (!BASE_PATH) return apiAliases;
     // Backward-compat, two eras deep: the pre-mount URLs served at the app's
     // own domain root (`basePath: false` matches un-prefixed paths), and the
     // pre-rename `/populace` slug both bare and under the mount.
     return [
+      ...apiAliases,
       {
         source: "/api/microcosm_variable",
         destination: `${BASE_PATH}/api/microcosm_variable`,

@@ -118,9 +118,11 @@ root evaluation lock to install this service. Check the hosted assembly without
 loading a population with:
 
 ```bash
-uv venv .tmp/hosted-runtime
+uv venv --python 3.12 .tmp/hosted-runtime
 uv pip install --python .tmp/hosted-runtime/bin/python \
   --require-hashes -r backend/requirements.lock
+uv pip install --python .tmp/hosted-runtime/bin/python \
+  'pytest>=8.3,<9' httpx==0.28.1 modal==1.5.5
 uv pip check --python .tmp/hosted-runtime/bin/python
 UV_PROJECT_ENVIRONMENT=.tmp/hosted-runtime uv run --no-sync \
   python frontend/scripts/verify_hosted_runtime.py
@@ -139,8 +141,10 @@ canonical model/data migration and deployment verification gates.
 See [the Chronicle update workflow](docs/chronicle-update-workflow.md) for the
 optional Microcosm and ACS inputs and the separate full-artifact command.
 
-Optional env: `POPULACE_HF_REPO`, `POPULACE_HF_REVISION` to point at a different
-US dataset/revision; `POPULACE_UK_HF_REPO`, `POPULACE_UK_HF_REVISION` for the UK;
+The US hosted application uses its reviewed immutable release. Leave
+`POPULACE_HF_REPO` and `POPULACE_HF_REVISION` unset; conflicting overrides fail
+validation and must be removed before a production rebuild. Optional
+`POPULACE_UK_HF_REPO`, `POPULACE_UK_HF_REVISION` configure the UK;
 and `POPULACE_BE_HF_REPO`, `POPULACE_BE_HF_REVISION` for Belgium. The Belgium
 repository defaults in code to `policyengine/populace-be-private`. Set `HF_TOKEN`
 or `HUGGINGFACE_TOKEN` to read private datasets. Each country with the

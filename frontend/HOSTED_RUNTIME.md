@@ -32,6 +32,9 @@ actual deployed allocation and response resource measurements rather than assumi
 requested allocation is sufficient.
 The identical local SPM reference peaked at approximately 12 GB; an 8 GiB hosted
 allocation did not complete the calculation. The required gate below must still pass.
+Only one native simulation stays resident: changing between national and state scopes
+evicts the preceding simulation before loading the next input tables. Same-scope requests
+can reuse it; mixed variable lists may rebuild when their scopes change.
 
 Create a dedicated Modal proxy token using `modal workspace proxy-tokens` (Modal 1.5.5
 or later). Store its ID and secret through `agent-secret`; do not print or put them in
@@ -69,6 +72,10 @@ explicitly. Without a remote URL, local calculations still use the shared Python
    token. The 800-second function setting is not proof of an 800-second browser budget.
    If measured requests exceed the usable budget, add an explicit asynchronous client
    flow before promotion; do not hide timeouts with retries or stale outputs.
+5. After a national request, execute a real state variable such as `ca_income_tax`.
+   Require recorded national-cache eviction, numeric output with the correct state scope,
+   and comparison with the same-tuple local reference. Exercise the reverse transition
+   or a mixed-scope request as well; national-only success does not qualify state lookup.
 
 ## Promotion and rollback
 
@@ -77,6 +84,12 @@ merging main, disable automatic domain assignment for the real Vercel production
 (the supported project setting is `autoAssignCustomDomains=false`) and read it back.
 Record all current production alias targets. This hold must precede main's automatic Git
 build; setting it after the merge is too late.
+Inspect the production-scoped environment entries before the build and require
+`POPULACE_HF_REPO` and `POPULACE_HF_REVISION` to be absent. The US data selection is
+compiled from the reviewed release; stale overrides can fail module initialization.
+If present, record and remove only those two conflicting US overrides, with their
+prior settings retained for rollback. This specific check also applies to preview
+qualification. Do not print or change unrelated environment entries.
 
 Build/deploy the matching private production backend, then stage the exact frontend
 with production server-only URL/credentials. Use `vercel deploy --prod --skip-domain`

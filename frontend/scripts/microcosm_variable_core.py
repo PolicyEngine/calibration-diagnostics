@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import gc
 import math
 import os
 import time
 import uuid
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -95,9 +96,24 @@ STATE_FIPS = {
 
 
 _SIM_CACHE: dict[tuple[str, str, str, str | None], tuple[str, Any]] = {}
-# Max state-filtered sims kept resident (plus the national sim); each pins a
-# full Microsimulation, so this caps warm-instance memory.
-_MAX_STATE_SIMS = 3
+
+
+def _simulation_for(
+    key: tuple[str, str, str, str | None],
+    dataset_path: str,
+    build: Callable[[], Any],
+) -> Any:
+    """Keep one native simulation, releasing it before loading another scope."""
+    cached = _SIM_CACHE.get(key)
+    if cached is not None:
+        return cached[1]
+    _SIM_CACHE.clear()
+    # Native populations and simulations have cyclic references. Collect them
+    # before state filtering loads the input tables for the next simulation.
+    gc.collect()
+    sim = build()
+    _SIM_CACHE[key] = (dataset_path, sim)
+    return sim
 
 
 def _download_dataset(
@@ -281,6 +297,7 @@ def calculate_variables(
         from policyengine_us.system import system
 
         simulation_cache_hits: dict[str, bool] = {}
+        simulation_cache_evictions: list[str] = []
 
         def get_sim(state: str | None = None) -> Any:
             cache_key = (repo, revision, filename, state)
@@ -288,19 +305,19 @@ def calculate_variables(
             simulation_cache_hits.setdefault(state or "national", cached is not None)
             if cached is not None:
                 return cached[1]
-            sim_dataset = (
-                state_filtered_dataset(dataset_path, state) if state else dataset_path
+            simulation_cache_evictions.extend(
+                key[3] or "national" for key in _SIM_CACHE
             )
-            sim = Microsimulation(dataset=sim_dataset)
-            _SIM_CACHE[cache_key] = (dataset_path, sim)
-            # Bound the cache: each state-filtered sim pins another full
-            # Microsimulation, so an unbounded cache OOMs a warm host serving
-            # lookups across many states. Keep the national sim plus the few
-            # most-recent state sims (dict preserves insertion order).
-            state_keys = [k for k in _SIM_CACHE if k[3] is not None]
-            while len(state_keys) > _MAX_STATE_SIMS:
-                _SIM_CACHE.pop(state_keys.pop(0), None)
-            return sim
+            return _simulation_for(
+                cache_key,
+                dataset_path,
+                lambda: Microsimulation(
+                    dataset=(
+                        state_filtered_dataset(dataset_path, state)
+                        if state else dataset_path
+                    )
+                ),
+            )
 
         results = []
         for variable_name in unique_variables:
@@ -343,6 +360,9 @@ def calculate_variables(
                     "elapsed_seconds": finite_float(time.time() - variable_started),
                 }
             )
+            # Do not retain the preceding simulation through this loop's local
+            # variables when the next variable needs another geographic scope.
+            del sim, values, raw_values, weights
     except VariableCalculationError:
         raise
     except OSError as exc:
@@ -364,6 +384,7 @@ def calculate_variables(
         "execution": {
             "id": str(uuid.uuid4()),
             "simulation_cache_hits": simulation_cache_hits,
+            "simulation_cache_evictions": simulation_cache_evictions,
             "host_resources_after_calculation": host_resources(),
         },
         "elapsed_seconds": finite_float(time.time() - started),
