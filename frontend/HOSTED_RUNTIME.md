@@ -25,11 +25,13 @@ CALIBRATION_MODAL_APP_NAME=calibration-diagnostics-preview-REVIEW_ID \
   uv run --no-sync modal deploy backend/modal_app.py --env testing
 ```
 
-The service reserves 8 GiB and sets the same hard limit, requests two CPU cores, and
+The service reserves 16 GiB and sets the same hard limit, requests two CPU cores, and
 serializes requests (`max_inputs=1`, one container). It scales to zero. Its working disk
 holds the normal HF download; there is no Vercel RAM-backed HDF5 workaround. Observe the
 actual deployed allocation and response resource measurements rather than assuming the
 requested allocation is sufficient.
+The identical local SPM reference peaked at approximately 12 GB; an 8 GiB hosted
+allocation did not complete the calculation. The required gate below must still pass.
 
 Create a dedicated Modal proxy token using `modal workspace proxy-tokens` (Modal 1.5.5
 or later). Store its ID and secret through `agent-secret`; do not print or put them in

@@ -72,7 +72,7 @@ else:
 @app.function(
     image=image,
     cpu=2.0,
-    memory=(8192, 8192),
+    memory=(16384, 16384),
     timeout=800,
     max_containers=1,
     scaledown_window=60,
