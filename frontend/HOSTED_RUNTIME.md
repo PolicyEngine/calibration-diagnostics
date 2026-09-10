@@ -54,8 +54,9 @@ explicitly. Without a remote URL, local calculations still use the shared Python
 2. On a fresh backend deployment, run a genuine `spm_unit_spm_threshold` lookup for 2024
    on the pinned BuildP release through the exact Next preview. Require JSON 200, verified
    H5 SHA-256, exact model/source identity, `execution.simulation_cache_hits.national=false`
-   and a non-null weighted result. Compare with an independently qualified identical
-   runtime when available; state explicitly if no exact-tuple oracle exists.
+   and a non-null weighted result. Require comparison with a separately executed reference
+   using the identical source, package tuple and immutable H5. An older Core version's
+   results are not a substitute, and an unavailable reference leaves this gate incomplete.
 3. Preserve the request, response hash, execution ID, source/deployment identities,
    allocation, peak memory and elapsed time. Exercise a warm request separately and label
    its cache reuse. Test explicit blank fields (400), unsupported year/release (409),

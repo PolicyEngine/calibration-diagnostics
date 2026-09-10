@@ -88,6 +88,17 @@ describe("private calculation backend", () => {
         packages: HOSTED_US_RELEASE.packages,
       },
       data_identity: { ...HOSTED_US_RELEASE, verified: true },
+      period: "2024",
+      release_id: HOSTED_US_RELEASE.release_id,
+      variable: "snap",
+      variables: [
+        {
+          variable: "snap",
+          period: "2024",
+          release_id: HOSTED_US_RELEASE.release_id,
+          weighted_sum: 123,
+        },
+      ],
       weighted_sum: 123,
     };
     const response = await proxyVariableBackend(
@@ -106,6 +117,87 @@ describe("private calculation backend", () => {
         }),
     );
     expect(unverified.status).toBe(409);
+  });
+  test("successful output must match the requested selection at every result", async () => {
+    const body = {
+      runtime: {
+        source_commit: config.sourceCommit,
+        packages: HOSTED_US_RELEASE.packages,
+      },
+      data_identity: { ...HOSTED_US_RELEASE, verified: true },
+      period: "2024",
+      release_id: HOSTED_US_RELEASE.release_id,
+      variables: ["snap", "ssi"].map((variable) => ({
+        variable,
+        period: "2024",
+        release_id: HOSTED_US_RELEASE.release_id,
+      })),
+    };
+    const query = new URLSearchParams({
+      variables: "snap,ssi",
+      period: "2024",
+      release: HOSTED_US_RELEASE.release_id,
+    }).toString();
+    expect(
+      (
+        await proxyVariableBackend(query, config, async () =>
+          Response.json(body),
+        )
+      ).status,
+    ).toBe(200);
+    const invalid = [
+      { ...body, period: "2025" },
+      { ...body, period: undefined },
+      { ...body, release_id: "other" },
+      { ...body, release_id: undefined },
+      { ...body, variables: undefined },
+      { ...body, variables: [] },
+      { ...body, variables: [body.variables[0]] },
+      { ...body, variables: [body.variables[0], body.variables[0]] },
+      { ...body, variables: body.variables.toReversed() },
+      ...["variable", "period", "release_id"].flatMap((field) =>
+        [undefined, "wrong"].map((value) => ({
+          ...body,
+          variables: [
+            body.variables[0],
+            { ...body.variables[1], [field]: value },
+          ],
+        })),
+      ),
+    ];
+    for (const responseBody of invalid) {
+      const response = await proxyVariableBackend(query, config, async () =>
+        Response.json(responseBody),
+      );
+      expect(response.status).toBe(409);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+    }
+  });
+  test("single-result compatibility fields cannot claim a different variable", async () => {
+    const body = {
+      runtime: {
+        source_commit: config.sourceCommit,
+        packages: HOSTED_US_RELEASE.packages,
+      },
+      data_identity: { ...HOSTED_US_RELEASE, verified: true },
+      period: "2024",
+      release_id: HOSTED_US_RELEASE.release_id,
+      variable: "ssi",
+      variables: [
+        {
+          variable: "snap",
+          period: "2024",
+          release_id: HOSTED_US_RELEASE.release_id,
+        },
+      ],
+    };
+    expect(
+      (
+        await proxyVariableBackend("variable=snap", config, async () =>
+          Response.json(body),
+        )
+      ).status,
+    ).toBe(409);
   });
   test("Modal result redirects are followed only on the original path", async () => {
     let calls = 0;

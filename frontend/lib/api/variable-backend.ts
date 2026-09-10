@@ -46,6 +46,39 @@ function matchesRelease(value: unknown): boolean {
   );
 }
 
+function matchesSelection(
+  body: Record<string, unknown>,
+  query: string,
+): boolean {
+  const params = new URLSearchParams(query);
+  const names = [
+    ...new Set(
+      [...params.getAll("variables"), ...params.getAll("variable")]
+        .flatMap((value) => value.split(/[,\s]+/))
+        .filter(Boolean),
+    ),
+  ];
+  const period = params.get("period") ?? String(HOSTED_US_RELEASE.data_year);
+  const release = params.get("release") ?? HOSTED_US_RELEASE.release_id;
+  if (
+    !names.length ||
+    body.period !== period ||
+    body.release_id !== release ||
+    !Array.isArray(body.variables) ||
+    body.variables.length !== names.length
+  )
+    return false;
+  if (names.length === 1 && body.variable !== names[0]) return false;
+  return body.variables.every((value, index) => {
+    const result = record(value);
+    return (
+      result.variable === names[index] &&
+      result.period === period &&
+      result.release_id === release
+    );
+  });
+}
+
 export async function proxyVariableBackend(
   query: string,
   config: BackendConfig,
@@ -139,12 +172,13 @@ export async function proxyVariableBackend(
           ([name, version]) => packages[name] === version,
         ) ||
         !matchesRelease(identity) ||
-        (!metadataOnly && identity.verified !== true)
+        (!metadataOnly &&
+          (identity.verified !== true || !matchesSelection(body, query)))
       ) {
         return json(
           {
             detail:
-              "The calculation backend does not match this application's reviewed source, model and data release.",
+              "The calculation backend does not match this application's reviewed source, model, data release and requested selection.",
           },
           409,
         );
