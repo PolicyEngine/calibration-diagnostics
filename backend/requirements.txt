@@ -1,8 +1,9 @@
 # Match the reviewed Build P certificate and immutable data identity in
-# scripts/hosted_release.json. Upgrade all model/data pins together.
+# frontend/scripts/hosted_release.json. Upgrade all model/data pins together.
 policyengine-us==1.764.6
 policyengine-core==3.26.11
 # This country wheel imports legacy SPM APIs and has no upper dependency bound.
 spm-calculator==0.3.1
 huggingface_hub>=0.25,<1.0
 numpy>=1.26,<3.0
+fastapi==0.141.1

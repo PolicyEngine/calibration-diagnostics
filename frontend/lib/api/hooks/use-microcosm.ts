@@ -600,12 +600,8 @@ export function useMicrocosmVariableValue(params: {
   release?: string;
 }) {
   const variables = params.variables?.map((v) => v.trim()).filter(Boolean) ?? [];
-  const path =
-    typeof window !== "undefined" &&
-    !["localhost", "127.0.0.1"].includes(window.location.hostname)
-      ? "/microcosm_variable"
-      : "/microcosm/variable";
-  const endpointCacheKey = path === "/microcosm_variable" ? "python-hosted-pinned-v4" : "node-local-pinned-v4";
+  const path = "/microcosm/variable";
+  const endpointCacheKey = "reviewed-modal-runtime-v1";
   return useQuery({
     queryKey: [
       "microcosm",

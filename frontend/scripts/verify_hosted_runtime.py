@@ -8,6 +8,7 @@ from the frozen scientific checkpoint:
 import argparse
 import inspect
 import json
+import os
 import sys
 from importlib import import_module, metadata
 from pathlib import Path
@@ -16,13 +17,13 @@ from packaging.requirements import Requirement
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.runtime_identity import runtime_identity
 from scripts.hosted_release import (
     load_verified_native_input,
     reviewed_release,
     validate_manifests,
     validate_runtime,
 )
+from scripts.runtime_identity import runtime_identity
 
 
 def main() -> None:
@@ -38,7 +39,12 @@ def main() -> None:
         parser.error("Native input verification requires the H5 and both manifests")
     config = reviewed_release()
     validate_runtime(config)
-    requirements = Path(__file__).resolve().parents[1] / "requirements.txt"
+    requirements = Path(
+        os.environ.get(
+            "CALIBRATION_REQUIREMENTS",
+            Path(__file__).resolve().parents[2] / "backend/requirements.txt",
+        )
+    )
     for line in requirements.read_text().splitlines():
         line = line.split("#", 1)[0].strip()
         if not line:

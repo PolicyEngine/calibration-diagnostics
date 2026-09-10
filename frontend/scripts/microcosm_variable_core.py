@@ -5,9 +5,9 @@ from __future__ import annotations
 import math
 import os
 import time
+import uuid
 from pathlib import PurePosixPath
 from typing import Any
-from urllib.request import urlopen
 
 import numpy as np
 
@@ -19,7 +19,7 @@ from scripts.hosted_release import (
     validate_selection,
     verify_h5,
 )
-
+from scripts.runtime_identity import host_resources
 
 # Deprecated upstream identifiers: Microcosm's current HF repository and H5
 # filename still use the former Populace names.
@@ -100,195 +100,13 @@ _SIM_CACHE: dict[tuple[str, str, str, str | None], tuple[str, Any]] = {}
 _MAX_STATE_SIMS = 3
 
 
-# Sentinel .h5 path -> the release H5 bytes held in RAM. Populated only when
-# the dataset can't fit on the ephemeral disk (see _download_dataset).
-_CORE_IMAGES: dict[str, bytes] = {}
-_CORE_LABEL_SEQ = [0]
-_CORE_PATCH_INSTALLED = [False]
-
-
-def _install_core_hdfstore_patch() -> None:
-    """Route pd.HDFStore(sentinel) reads through HDF5's in-memory core driver.
-
-    policyengine-us opens datasets with a hardcoded ``pd.HDFStore(path,
-    mode="r")`` in several places (schema validation, format sniffing, our own
-    state filter). When ``path`` is one of our sentinels we inject the core
-    driver with the release bytes as an in-memory image — HDF5 reads the exact
-    same file content from RAM (verified byte-identical), so no dataset ever
-    has to touch the too-small disk. The core driver refuses an existing file,
-    so it opens under a throwaway label; the sentinel itself stays a 0-byte
-    file purely so the loaders' ``Path.exists()`` checks pass.
-    """
-    if _CORE_PATCH_INSTALLED[0]:
-        return
-    import pandas as pd
-
-    real_hdfstore = pd.HDFStore
-
-    class _CoreImageHDFStore(real_hdfstore):  # type: ignore[misc, valid-type]
-        def __init__(self, path: Any, *args: Any, **kwargs: Any) -> None:
-            image = _CORE_IMAGES.get(str(path))
-            if image is not None and "driver" not in kwargs:
-                _CORE_LABEL_SEQ[0] += 1
-                label = f"/tmp/.microcosm-core-{os.getpid()}-{_CORE_LABEL_SEQ[0]}.h5"
-                kwargs.update(
-                    driver="H5FD_CORE",
-                    driver_core_image=image,
-                    driver_core_backing_store=0,
-                )
-                super().__init__(label, *args, **kwargs)
-                return
-            super().__init__(path, *args, **kwargs)
-
-    pd.HDFStore = _CoreImageHDFStore
-    _CORE_PATCH_INSTALLED[0] = True
-
-
 def _download_dataset(
     hf_hub_download: Any, repo: str, filename: str, revision: str
 ) -> str:
-    """Fetch the release H5 to wherever it fits.
-
-    The normal HF cache download is used everywhere it works (local dev, and
-    any host whose disk holds the file). Vercel's ephemeral disk is only
-    ~550MB with ~150MB of function bundle, so a ~340MB H5 cannot land on disk
-    at all — hf_hub_download fails there with ENOSPC. In that case the H5 is
-    streamed into RAM and served through HDF5's in-memory core driver instead,
-    charged to the function's much larger memory allocation.
-    """
-    # If the file plainly can't fit on the ephemeral disk, don't waste tens of
-    # seconds and hundreds of MB of egress on a download that will ENOSPC —
-    # go straight to the RAM path (which applies the memory guard and refuses
-    # cleanly on a small-memory host). Only pre-skip when we can positively
-    # confirm the file won't fit; otherwise fall through to the normal path.
-    import shutil
-
-    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{filename}"
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    auth = {"Authorization": f"Bearer {token}"} if token else {}
-    size = _url_content_length(url, auth)
-    cache_root = os.environ.get("HF_HUB_CACHE", "/tmp/huggingface/hub")
-    try:
-        os.makedirs(cache_root, exist_ok=True)
-        free = shutil.disk_usage(cache_root).free
-    except OSError:
-        free = None
-    # 1.2x headroom for HF's temp/blob copy during download.
-    if size is not None and free is not None and size * 1.2 > free:
-        return _load_release_into_ram(repo, filename, revision)
-
-    try:
-        return hf_hub_download(
-            repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
-        )
-    except OSError as exc:
-        if getattr(exc, "errno", None) != 28:
-            raise
-        return _load_release_into_ram(repo, filename, revision)
-
-
-def _cgroup_memory_limit_bytes() -> int | None:
-    """The function's hard memory limit, from the cgroup (v2 then v1)."""
-    for path in (
-        "/sys/fs/cgroup/memory.max",
-        "/sys/fs/cgroup/memory/memory.limit_in_bytes",
-    ):
-        try:
-            with open(path) as handle:
-                raw = handle.read().strip()
-        except OSError:
-            continue
-        if raw and raw != "max":
-            try:
-                value = int(raw)
-            except ValueError:
-                continue
-            # cgroup v1 reports a huge sentinel when unlimited.
-            if 0 < value < (1 << 62):
-                return value
-    return None
-
-
-def _url_content_length(url: str, headers: dict[str, str]) -> int | None:
-    from urllib.request import Request
-
-    request = Request(url, method="HEAD")
-    for key, value in headers.items():
-        request.add_header(key, value)
-    try:
-        with urlopen(request, timeout=60) as response:
-            length = response.headers.get("Content-Length")
-            return int(length) if length else None
-    except (OSError, ValueError):
-        return None
-
-
-def _load_release_into_ram(repo: str, filename: str, revision: str) -> str:
-    import shutil
-    from urllib.request import Request
-
-    sentinel = f"/tmp/microcosm-{revision}.h5"
-    if sentinel in _CORE_IMAGES and os.path.exists(sentinel):
-        return sentinel
-
-    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{filename}"
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    auth = {"Authorization": f"Bearer {token}"} if token else {}
-
-    # A full Microsimulation over a microcosm release needs base runtime + two
-    # copies of the H5 (our retained image + HDF5's transient core copy) +
-    # entity arrays — empirically >3GB, which OOM-kills a 3GB serverless
-    # function. When the cgroup limit is that tight, refuse up front with a
-    # clear message instead of being OOM-killed mid-load. A host with more
-    # memory (the Modal backend, or local dev with no cgroup limit) proceeds.
-    # Reaching here means the H5 didn't fit on disk (ENOSPC) — which only
-    # happens on the tiny-disk Vercel function; Modal and local dev have disk
-    # and never take this branch. Unless we can positively confirm a generous
-    # memory limit (>=4GB, e.g. a big-RAM/small-disk host), refuse with a clear
-    # message rather than be OOM-killed loading a >3GB microsimulation. The
-    # cgroup file is often unreadable on serverless, so unknown == refuse.
-    limit = _cgroup_memory_limit_bytes()
-    if limit is None or limit < 4_000_000_000:
-        size = _url_content_length(url, auth)
-        size_note = f" ({size / 1e6:.0f}MB)" if size else ""
-        limit_note = f"memory limit {limit / 1e9:.1f}GB" if limit else "limited memory"
-        raise VariableCalculationError(
-            f"This release's dataset{size_note} is too large to compute in the "
-            f"hosted environment ({limit_note}; a full microsimulation needs "
-            "over 3GB). Run the variable lookup locally, or point the endpoint "
-            "at a higher-memory backend.",
-            status_code=503,
-        )
-
-    # Drop other releases held in RAM (image + any cached simulation) so only
-    # one dataset is resident at a time.
-    for other in [k for k in _CORE_IMAGES if k != sentinel]:
-        _CORE_IMAGES.pop(other, None)
-        try:
-            os.unlink(other)
-        except OSError:
-            pass
-    for key in [k for k in _SIM_CACHE if k[1] != revision]:
-        _SIM_CACHE.pop(key, None)
-
-    # Remove any partial hf_hub_download left by the ENOSPC attempt.
-    cache_root = os.environ.get("HF_HUB_CACHE", "/tmp/huggingface/hub")
-    shutil.rmtree(
-        os.path.join(cache_root, f"datasets--{repo.replace('/', '--')}"),
-        ignore_errors=True,
+    """Download immutable bytes to the backend's disk before verification."""
+    return hf_hub_download(
+        repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
     )
-
-    request = Request(url)
-    for key, value in auth.items():
-        request.add_header(key, value)
-    with urlopen(request, timeout=600) as response:
-        image = response.read()  # single bytes object; no bytearray double-copy
-
-    _install_core_hdfstore_patch()
-    _CORE_IMAGES[sentinel] = image
-    with open(sentinel, "wb"):  # 0-byte marker so Path.exists() checks pass
-        pass
-    return sentinel
 
 
 def _disk_usage_report(root: str = "/tmp") -> str:
@@ -337,7 +155,7 @@ def _evict_other_releases(repo: str, filename: str, revision: str) -> None:
     """
     try:
         from huggingface_hub import try_to_load_from_cache
-    except Exception:  # pragma: no cover - depends on host Python env.
+    except ImportError:  # pragma: no cover - depends on host Python env.
         return
     cached = try_to_load_from_cache(
         repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
@@ -455,18 +273,19 @@ def calculate_variables(
         download_certification(config, hf_hub_download)
         _evict_other_releases(repo, filename, revision)
         dataset_path = _download_dataset(hf_hub_download, repo, filename, revision)
-        actual_sha256 = verify_h5(
-            dataset_path, config, image=_CORE_IMAGES.get(dataset_path)
-        )
+        actual_sha256 = verify_h5(dataset_path, config)
 
         # Country initialization and H5 input loading happen only after the
         # installed package tuple, release certificate, and bytes are verified.
         from policyengine_us import Microsimulation
         from policyengine_us.system import system
 
+        simulation_cache_hits: dict[str, bool] = {}
+
         def get_sim(state: str | None = None) -> Any:
             cache_key = (repo, revision, filename, state)
             cached = _SIM_CACHE.get(cache_key)
+            simulation_cache_hits.setdefault(state or "national", cached is not None)
             if cached is not None:
                 return cached[1]
             sim_dataset = (
@@ -542,6 +361,11 @@ def calculate_variables(
         "variables": results,
         "runtime": runtime,
         "data_identity": {**config, "sha256": actual_sha256, "verified": True},
+        "execution": {
+            "id": str(uuid.uuid4()),
+            "simulation_cache_hits": simulation_cache_hits,
+            "host_resources_after_calculation": host_resources(),
+        },
         "elapsed_seconds": finite_float(time.time() - started),
     }
     if len(results) == 1:

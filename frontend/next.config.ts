@@ -11,27 +11,18 @@ const BASE_PATH =
 const nextConfig: NextConfig = {
   output: "standalone",
   ...(BASE_PATH ? { basePath: BASE_PATH } : {}),
-  outputFileTracingIncludes: {
-    "/api/microcosm/variable": [
-      "./scripts/microcosm_variable_value.py",
-      "./scripts/microcosm_variable_core.py",
-      "./scripts/hosted_release.py",
-      "./scripts/hosted_release.json",
-      "./scripts/runtime_identity.py",
-    ],
-  },
-  // NOTE: the hosted Microcosm variable lookup is a native (non-Next) Vercel
-  // Python function pinned to the deployment root (`/api/microcosm_variable`),
-  // immune to Next's basePath. Under the mount the client calls it at
-  // `${BASE_PATH}/api/microcosm_variable`; that path is mapped back to the root
-  // function by an edge rewrite in vercel.json (Next forbids a config rewrite
-  // from a basePath'd source to an internal, non-basePath destination).
   async redirects() {
     if (!BASE_PATH) return [];
     // Backward-compat, two eras deep: the pre-mount URLs served at the app's
     // own domain root (`basePath: false` matches un-prefixed paths), and the
     // pre-rename `/populace` slug both bare and under the mount.
     return [
+      {
+        source: "/api/microcosm_variable",
+        destination: `${BASE_PATH}/api/microcosm_variable`,
+        basePath: false,
+        permanent: false,
+      },
       {
         source: "/populace",
         destination: `${BASE_PATH}/microcosm`,

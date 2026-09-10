@@ -17,11 +17,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.13"
-      # The hosted function has its own requirements. Do not sync the frozen
+          python-version: "3.12"
+      # The Modal runtime has its own hashed requirements. Do not sync the frozen
       # root evaluation lock into this environment.
-      - run: uv venv --python 3.13 .venv
-      - run: uv pip install -r frontend/requirements.txt "pytest>=8.3,<9"
+      - run: uv venv --python 3.12 .venv
+      - run: uv pip install --require-hashes -r backend/requirements.lock
+      - run: uv pip install "pytest>=8.3,<9" httpx==0.28.1
       - run: uv pip check
       - run: uv run --no-sync python frontend/scripts/verify_hosted_runtime.py
       - run: uv run --no-sync python -m pytest frontend/tests -q
