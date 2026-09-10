@@ -116,3 +116,29 @@ References: [Modal timeouts](https://modal.com/docs/guide/webhook-timeouts),
 [Modal resources](https://modal.com/docs/guide/resources),
 [Vercel staged promotion](https://vercel.com/docs/cli/deploying-from-cli), and
 [Vercel automatic domain assignment](https://vercel.com/changelog/stage-and-manually-promote-deployments-to-production).
+
+### Private serving-process audit
+
+An operator can request `GET /api/microcosm_variable?runtime_audit=<nonce>` on
+this existing backend through its required Modal proxy authentication. Use one
+16–128 character nonce containing only letters, digits, `_` or `-`, with no
+calculation parameters. The response is uncached and the branch precedes the
+calculation code. It reports the actual handling PID, `sys.executable`, prefixes,
+sanitized `pyvenv.cfg` fields/hash, loaded module paths, public Modal call/input
+IDs, and a real lightweight child launched through `sys.executable`.
+
+This is metadata from the actual serving process. It neither runs a population nor
+establishes full package closure. Bind the actual authenticated response and nonce
+to `FunctionCall.from_id(call_id).get_call_graph()`, the task/container ID and the
+reviewed app/function/image/source receipts. Missing call-graph correlation leaves
+the serving identity pending. A separate container-exec process is useful for
+package/RECORD/source-byte capture but does not replace this serving witness. The
+lightweight child demonstrates interpreter inheritance; it is not a scientific
+calculation receipt. Preserve the traffic hold and require the existing staged
+functional and deployment gates before production promotion.
+
+The witness reports whether both public Modal context IDs are present; this is
+an observation, not identity approval. Null parent module origins mean the module
+has not been loaded in that process. The lightweight child separately reports
+installed package versions through metadata and its import paths, without
+importing any model. Audit capture failures return generic uncached 502 JSON.

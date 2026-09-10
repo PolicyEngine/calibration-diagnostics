@@ -7,6 +7,7 @@ import re
 import threading
 from urllib.parse import parse_qs
 
+from backend.runtime_audit import serving_witness, validate_nonce
 from scripts.hosted_release import reviewed_release, validate_selection
 from scripts.microcosm_variable_core import (
     DEFAULT_FILENAME,
@@ -28,6 +29,22 @@ _CALCULATION_LOCK = threading.Lock()
 def handle_query(query: str) -> tuple[int, dict]:
     """Validate a lookup, then execute the unchanged shared calculation."""
     params = parse_qs(query, keep_blank_values=True)
+    if "runtime_audit" in params:
+        # This is the existing Modal proxy-authenticated serving handler.
+        # Audit requests must never fall through into the calculation branch.
+        if set(params) != {"runtime_audit"} or len(params["runtime_audit"]) != 1:
+            return 400, {
+                "detail": "Use one runtime_audit nonce without calculation parameters."
+            }
+        nonce = params["runtime_audit"][0]
+        try:
+            validate_nonce(nonce)
+        except ValueError:
+            return 400, {"detail": "Invalid runtime audit nonce."}
+        try:
+            return 200, {"runtime_audit": serving_witness(nonce)}
+        except Exception:
+            return 502, {"detail": "Runtime audit failed."}
     variables = []
     for key in ("variables", "variable"):
         for value in params.get(key, []):
