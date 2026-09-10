@@ -29,33 +29,44 @@ def deployment_identity() -> tuple[str, str]:
     return commit, hashlib.sha256(tree).hexdigest()
 
 
-source_commit, source_tree_sha256 = deployment_identity()
-app = modal.App(os.environ["CALIBRATION_MODAL_APP_NAME"])
-image = (
-    modal.Image.debian_slim(python_version="3.12")
-    .pip_install_from_requirements(str(ROOT / "backend/requirements.lock"))
-    .add_local_dir(
-        str(ROOT / "frontend/scripts"),
-        "/root/scripts",
-        copy=True,
-        ignore=["**/__pycache__/**", "**/*.pyc"],
+app_name = os.environ["CALIBRATION_MODAL_APP_NAME"]
+app = modal.App(app_name)
+image = None
+if modal.is_local():
+    source_commit, source_tree_sha256 = deployment_identity()
+    image = (
+        modal.Image.debian_slim(python_version="3.12")
+        .pip_install_from_requirements(str(ROOT / "backend/requirements.lock"))
+        .add_local_dir(
+            str(ROOT / "frontend/scripts"),
+            "/root/scripts",
+            copy=True,
+            ignore=["**/__pycache__/**", "**/*.pyc"],
+        )
+        .add_local_dir(
+            str(ROOT / "backend"),
+            "/root/backend",
+            copy=True,
+            ignore=["**/__pycache__/**", "**/*.pyc"],
+        )
+        .env(
+            {
+                "CALIBRATION_SOURCE_COMMIT": source_commit,
+                "CALIBRATION_MODAL_APP_NAME": app_name,
+                "CALIBRATION_SOURCE_TREE_SHA256": source_tree_sha256,
+                "CALIBRATION_REQUIREMENTS": "/root/backend/requirements.txt",
+                "PYTHONPATH": "/root",
+            }
+        )
+        .run_commands("python /root/scripts/verify_hosted_runtime.py")
     )
-    .add_local_dir(
-        str(ROOT / "backend"),
-        "/root/backend",
-        copy=True,
-        ignore=["**/__pycache__/**", "**/*.pyc"],
-    )
-    .env(
-        {
-            "CALIBRATION_SOURCE_COMMIT": source_commit,
-            "CALIBRATION_SOURCE_TREE_SHA256": source_tree_sha256,
-            "CALIBRATION_REQUIREMENTS": "/root/backend/requirements.txt",
-            "PYTHONPATH": "/root",
-        }
-    )
-    .run_commands("python /root/scripts/verify_hosted_runtime.py")
-)
+else:
+    # Modal imports this definition inside a container without Git or the checkout.
+    # Source identity was bound into the image by the clean local deployment.
+    if not os.environ.get("CALIBRATION_SOURCE_COMMIT") or not os.environ.get(
+        "CALIBRATION_SOURCE_TREE_SHA256"
+    ):
+        raise RuntimeError("The packaged calculation source identity is missing.")
 
 
 @app.function(
