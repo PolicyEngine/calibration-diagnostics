@@ -83,6 +83,51 @@ describe("schema 8 hierarchy target reader", () => {
         hierarchy: { ...row().hierarchy, dimensions: {} },
       }),
     ).toThrow("dimensions must be an array");
+    expect(() =>
+      readHierarchyTarget({
+        ...row(),
+        hierarchy: {
+          ...row().hierarchy,
+          category: { ...row().hierarchy.category, label: "" },
+        },
+      }),
+    ).toThrow("hierarchy.category.label");
+    expect(() =>
+      readHierarchyTarget({
+        ...row(),
+        hierarchy: {
+          ...row().hierarchy,
+          geography: { ...row().hierarchy.geography, label: "" },
+        },
+      }),
+    ).toThrow("hierarchy.geography.label");
+    expect(() =>
+      readHierarchyTarget({
+        ...row(),
+        hierarchy: {
+          ...row().hierarchy,
+          dimensions: [{ ...row().hierarchy.dimensions[0], label: "" }],
+        },
+      }),
+    ).toThrow("hierarchy.dimensions[0].label");
+    expect(() =>
+      readHierarchyTarget({
+        ...row(),
+        hierarchy: {
+          ...row().hierarchy,
+          dimensions: [{ ...row().hierarchy.dimensions[0], value_label: "" }],
+        },
+      }),
+    ).toThrow("hierarchy.dimensions[0].value_label");
+    expect(() =>
+      readHierarchyTarget({
+        ...row(),
+        hierarchy: {
+          ...row().hierarchy,
+          target: { ...row().hierarchy.target, label: "" },
+        },
+      }),
+    ).toThrow("hierarchy.target.label");
   });
 
   test("rejects conflicting labels for repeated ids across a file", () => {
@@ -106,6 +151,32 @@ describe("schema 8 hierarchy target reader", () => {
     second.hierarchy.category.provider_id = "hmrc";
     expect(() => validateHierarchyTargets([row(), second])).toThrow(
       "category obr.efo_receipts references inconsistent providers",
+    );
+  });
+
+  test("rejects conflicting Chronicle-owned labels across rows", () => {
+    const geography = row();
+    geography.hierarchy.geography.label = "Conflicting geography";
+    expect(() => validateHierarchyTargets([row(), geography])).toThrow(
+      "geography country",
+    );
+
+    const dimension = row();
+    dimension.hierarchy.dimensions[0].label = "Conflicting dimension";
+    expect(() => validateHierarchyTargets([row(), dimension])).toThrow(
+      "dimension obr.efo_line",
+    );
+
+    const dimensionValue = row();
+    dimensionValue.hierarchy.dimensions[0].value_label = "Conflicting value";
+    expect(() => validateHierarchyTargets([row(), dimensionValue])).toThrow(
+      "dimension value obr.efo_line",
+    );
+
+    const target = row();
+    target.hierarchy.target.label = "Conflicting target";
+    expect(() => validateHierarchyTargets([row(), target])).toThrow(
+      "target obr.income_tax",
     );
   });
 });

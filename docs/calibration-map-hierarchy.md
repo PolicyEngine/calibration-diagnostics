@@ -54,9 +54,10 @@ while preserving the order in which the dashboard must traverse dimensions.
 Microcosm owns the provider/category relationship. Chronicle supplies
 geography, categorical dimensions, categorical value labels, and the preferred
 target label when its selected fact can describe the resulting target exactly.
-Microcosm supplies deterministic labels when Chronicle omits optional source
-labels or when a target combines or restamps multiple facts. The dashboard does
-not construct labels for schema 8.
+Microcosm supplies an explicitly declared, reviewed target label when a target
+combines facts, transforms their value, or assigns a different target period.
+Missing or conflicting Chronicle-owned labels stop target compilation. The
+dashboard does not construct labels for schema 8.
 
 ## Dashboard parsing
 
@@ -111,9 +112,13 @@ For a producer change, verify these representations in order:
 8. dashboard hierarchy reader; and
 9. calibration-map tree traversal.
 
-`tools/generate_uk_calibration_hierarchy_fixture.py` in Microcosm performs this
-check with synthetic Chronicle-shaped facts for every registered UK target and
-writes three representative rows separately for inspection.
+Microcosm unit tests perform this check with small Chronicle-shaped fixtures.
+Do not add a committed generator that builds a complete synthetic UK target
+artifact: that duplicates the production compilation path and creates a large
+maintenance surface. A focused sample can instead compile selected committed
+UK reference rows against the committed Chronicle-shaped fixture, serialize a
+registry round trip, compile solver targets, and pass its schema 8 diagnostics
+to the dashboard tests.
 
 For local inspection, point the dashboard at the generated directory before
 starting the frontend:
