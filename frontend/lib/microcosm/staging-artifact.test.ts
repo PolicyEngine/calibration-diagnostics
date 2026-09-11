@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, expect, test } from "bun:test";
 
 import {
+  loadStagingCalibration,
   loadStagingComparison,
   loadStagingRun,
   loadStagingRuns,
@@ -163,6 +164,113 @@ function v2RunManifest(
     },
   };
 }
+
+function calibrationDiagnostics() {
+  return {
+    schema_version: 6,
+    weight_entity: "household",
+    options: {},
+    n_nonzero: 2,
+    n_records: 2,
+    initial_loss: 0.2,
+    final_loss: 0.05,
+    fraction_within_10pct: 1,
+    loss_trajectory: [0.2, 0.05],
+    skipped: [],
+    targets: [
+      {
+        name: "ons/employment_income/total@2025",
+        target_name: "ons/employment_income/total",
+        period: 2025,
+        entity: "household",
+        source: "ons",
+        metadata: {
+          variable: "employment_income",
+          geography: "United Kingdom",
+          geography_level: "national",
+        },
+        target: 100,
+        initial_estimate: 80,
+        final_estimate: 95,
+        relative_error: -0.05,
+        within_tolerance: true,
+      },
+    ],
+  };
+}
+
+test("loads version 2 calibration diagnostics from the declared artifact path", async () => {
+  const runId = "uk-calibration-with-diagnostics";
+  const manifest = {
+    ...v2RunManifest(runId, "2026-01-03T00:00:03+00:00"),
+    operation_id: "uk_national_calibration",
+    run_kind: "calibration",
+    artifacts: [
+      {
+        logical_name: "calibration_diagnostics",
+        artifact_kind: "aggregate_diagnostics",
+        contract_relative_path: "artifacts/calibration_diagnostics.json",
+        media_type: "application/json",
+        sha256: "a".repeat(64),
+        classification: "aggregate",
+      },
+    ],
+  };
+  const requested: string[] = [];
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.endsWith(`/runs/${runId}/run_manifest.json`)) {
+      return Response.json(manifest);
+    }
+    if (url.endsWith(`/runs/${runId}/artifacts/calibration_diagnostics.json`)) {
+      return Response.json(calibrationDiagnostics());
+    }
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+
+  const calibration = await loadStagingCalibration(runId, 0, "uk");
+
+  expect(calibration?.release_id).toBe(`${runId}-candidate`);
+  expect(calibration?.rows).toHaveLength(1);
+  expect(calibration?.rows[0]?.final_estimate).toBe(95);
+  expect(
+    requested.some((url) =>
+      url.endsWith(`/runs/${runId}/artifacts/calibration_diagnostics.json`),
+    ),
+  ).toBe(true);
+  expect(
+    requested.some((url) =>
+      url.endsWith(`/runs/${runId}/calibration_diagnostics.json`),
+    ),
+  ).toBe(false);
+});
+
+test("keeps the version 1 calibration diagnostics path", async () => {
+  const runId = "legacy-calibration";
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    if (url.endsWith(`/runs/${runId}/progress.json`)) {
+      return Response.json({
+        schema_version: 1,
+        run_id: runId,
+        candidate_release_id: "legacy-candidate",
+      });
+    }
+    if (url.endsWith(`/runs/${runId}/run_manifest.json`)) {
+      return Response.json({ schema_version: 1, run_id: runId });
+    }
+    if (url.endsWith(`/runs/${runId}/calibration_diagnostics.json`)) {
+      return Response.json(calibrationDiagnostics());
+    }
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+
+  const calibration = await loadStagingCalibration(runId, 0, "us");
+
+  expect(calibration?.release_id).toBe("legacy-candidate");
+  expect(calibration?.rows[0]?.final_estimate).toBe(95);
+});
 
 test("UK staging reads use the private repository credential only on server fetches", async () => {
   const token = "hf_test_server_only_credential";

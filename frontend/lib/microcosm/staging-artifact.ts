@@ -500,18 +500,25 @@ export async function loadStagingCalibration(
 ): Promise<Calibration | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
-  const progressRaw = await stagingJsonOrNull(
-    `runs/${runId}/progress.json`,
-    revalidate,
-    country,
-  );
+  const [progressRaw, runManifestRaw] = await Promise.all([
+    stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate, country),
+    stagingJsonOrNull(`runs/${runId}/run_manifest.json`, revalidate, country),
+  ]);
   const progress = progressRaw == null ? null : parseStagingProgress(progressRaw);
-  const candidateReleaseId = stringValue(progress?.candidate_release_id) ?? runId;
-  const diag = await stagingJsonOrNull(
-    `runs/${runId}/calibration_diagnostics.json`,
-    revalidate,
-    country,
-  );
+  const runManifest =
+    runManifestRaw == null ? null : parseStagingManifest(runManifestRaw);
+  const candidateReleaseId =
+    stringValue(progress?.candidate_release_id) ??
+    stringValue(runManifest?.candidate_release_id) ??
+    runId;
+  const artifacts = objectOrNull(runManifest?.artifacts);
+  const diagnosticsArtifact = objectOrNull(artifacts?.calibration_diagnostics);
+  const diagnosticsPath =
+    runManifest?.schema_version === 2
+      ? stringValue(diagnosticsArtifact?.staging_path)
+      : `runs/${runId}/calibration_diagnostics.json`;
+  if (!diagnosticsPath) return null;
+  const diag = await stagingJsonOrNull(diagnosticsPath, revalidate, country);
   if (!diag) return null;
   const [buildManifest, releaseManifest] = await Promise.all([
     stagingJsonOrNull(`runs/${runId}/build_manifest.json`, revalidate, country),

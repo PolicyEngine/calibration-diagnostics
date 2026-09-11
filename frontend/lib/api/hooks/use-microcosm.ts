@@ -900,29 +900,49 @@ function explorerApiParams(
 
 export function useMicrocosmCalibrationTree(
   state: ExplorerState,
-  release?: string,
+  source: MicrocosmCalibrationTreeSource,
 ) {
   const { country } = useCountry();
-  return useQuery({
-    ...microcosmCalibrationTreeQueryOptions(state, release, country),
-    placeholderData: keepPreviousData,
+  return useQuery<CalibrationTreeResponse>({
+    ...microcosmCalibrationTreeQueryOptions(state, source, country),
+    placeholderData: source.kind === "release" ? keepPreviousData : undefined,
   });
 }
 
+export type MicrocosmCalibrationTreeSource =
+  | { kind: "release"; release?: string }
+  | { kind: "staging"; runId: string };
+
 export function microcosmCalibrationTreeQueryOptions(
   state: ExplorerState,
-  release: string | undefined,
+  source: MicrocosmCalibrationTreeSource,
   country: Country,
 ) {
+  const staging = source.kind === "staging";
+  const sourceId = staging ? source.runId : source.release ?? "latest";
   return {
-    queryKey: ["microcosm", "target-tree", country, release ?? "latest", state],
+    queryKey: [
+      "microcosm",
+      ...(staging ? ["staging", "target-tree"] : ["target-tree"]),
+      country,
+      sourceId,
+      state,
+    ],
     queryFn: () =>
-      apiGet<CalibrationTreeResponse>("/microcosm/target-tree", {
-        ...explorerApiParams(state),
-        release: release || undefined,
-        country,
-      }),
-    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
+      apiGet<CalibrationTreeResponse>(
+        staging
+          ? "/microcosm/staging/target-tree"
+          : "/microcosm/target-tree",
+        {
+          ...explorerApiParams(state),
+          ...(staging
+            ? { run: source.runId }
+            : { release: source.release || undefined }),
+          country,
+        },
+      ),
+    staleTime: staging ? 30 * 1000 : PUBLISHED_RELEASE_STALE_TIME_MS,
+    refetchInterval: staging ? 30 * 1000 : (false as const),
   };
 }
 

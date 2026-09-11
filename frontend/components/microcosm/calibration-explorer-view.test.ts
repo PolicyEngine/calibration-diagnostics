@@ -286,7 +286,7 @@ describe("calibration explorer presentation model", () => {
   test("uses an ordinary unavailable message without attribution provenance", () => {
     expect(explorerLossAvailabilityMessage(true)).toBeNull();
     expect(explorerLossAvailabilityMessage(false)).toBe(
-      "Target weight and weighted target error are unavailable for this release.",
+      "Target weight and weighted target error are unavailable for this calibration.",
     );
     expect(explorerLossAvailabilityMessage(false)).not.toMatch(
       /reported|reconstructed|derived|recipe|hash/i,
