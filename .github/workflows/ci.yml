@@ -10,6 +10,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  hosted-python:
+    name: hosted Python · dependencies · source APIs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      # The Modal runtime has its own hashed requirements. Do not sync the frozen
+      # root evaluation lock into this environment.
+      - run: uv venv --python 3.12 .venv
+      - run: uv pip install --require-hashes -r backend/requirements.lock
+      - run: uv pip install "pytest>=8.3,<9" httpx==0.28.1 modal==1.5.5
+      - run: uv pip check
+      - run: uv run --no-sync python frontend/scripts/verify_hosted_runtime.py
+      - run: uv run --no-sync python -m pytest frontend/tests -q
+
   frontend-tests:
     name: frontend · tests
     runs-on: ubuntu-latest

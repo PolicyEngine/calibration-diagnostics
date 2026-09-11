@@ -34,12 +34,26 @@ const TAG_PREFIX = "refs/tags/";
 // the dashboard actually reads (a POPULACE_*_HF_REPO override moves the
 // allowlist with it); Hugging Face webhook payloads carry the repositories'
 // former Populace names, as registered.
-const ALLOWED_REPOS = new Map<string, MicrocosmCountry>(
-  selectableCountries().map((country) => [microcosmRepo(country).toLowerCase(), country]),
-);
+//
+// A country whose reviewed data selection this deployment refuses is left out
+// of the allowlist rather than alerted from an unreviewed repository. Resolve
+// the list per request: building it at module scope would make one country's
+// conflicting override break this route's import, and `next build` with it,
+// for every other country.
+function allowedRepos(): Map<string, MicrocosmCountry> {
+  const allowed = new Map<string, MicrocosmCountry>();
+  for (const country of selectableCountries()) {
+    try {
+      allowed.set(microcosmRepo(country).toLowerCase(), country);
+    } catch (error) {
+      console.error(`Release alerts are disabled for ${country}:`, error);
+    }
+  }
+  return allowed;
+}
 
 function countryForRepo(repoName: string): MicrocosmCountry | null {
-  return ALLOWED_REPOS.get(repoName.toLowerCase()) ?? null;
+  return allowedRepos().get(repoName.toLowerCase()) ?? null;
 }
 
 // Constant-time secret check. HF sends the configured secret as the

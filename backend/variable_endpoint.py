@@ -1,0 +1,115 @@
+"""HTTP-independent request boundary shared by the hosted service and tests."""
+
+from __future__ import annotations
+
+import logging
+import os
+import re
+import threading
+from urllib.parse import parse_qs
+
+from backend.runtime_audit import serving_witness, validate_nonce
+from scripts.hosted_release import reviewed_release, validate_selection
+from scripts.microcosm_variable_core import (
+    DEFAULT_FILENAME,
+    DEFAULT_PERIOD,
+    DEFAULT_RELEASE,
+    DEFAULT_REPO,
+    DEFAULT_REVISION,
+    VariableCalculationError,
+    calculate_variables,
+)
+from scripts.runtime_identity import runtime_identity
+
+LOGGER = logging.getLogger(__name__)
+VARIABLE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# The native simulation and its cache are mutable. Serialize their use even
+# when a local ASGI server is configured with multiple request threads.
+_CALCULATION_LOCK = threading.Lock()
+
+
+def handle_query(query: str) -> tuple[int, dict]:
+    """Validate a lookup, then execute the unchanged shared calculation."""
+    params = parse_qs(query, keep_blank_values=True)
+    if "runtime_audit" in params:
+        # This is the existing Modal proxy-authenticated serving handler.
+        # Audit requests must never fall through into the calculation branch.
+        if set(params) != {"runtime_audit"} or len(params["runtime_audit"]) != 1:
+            return 400, {
+                "detail": "Use one runtime_audit nonce without calculation parameters."
+            }
+        nonce = params["runtime_audit"][0]
+        try:
+            validate_nonce(nonce)
+        except ValueError:
+            return 400, {"detail": "Invalid runtime audit nonce."}
+        try:
+            return 200, {"runtime_audit": serving_witness(nonce)}
+        except Exception:
+            # This branch exists so an operator can diagnose the serving
+            # process. Its own failure cause belongs in the backend logs, not
+            # in the public JSON and not discarded.
+            LOGGER.exception("Runtime audit failed")
+            return 502, {"detail": "Runtime audit failed."}
+    variables = []
+    for key in ("variables", "variable"):
+        for value in params.get(key, []):
+            variables.extend(v.strip() for v in re.split(r"[,\s]+", value) if v.strip())
+    variables = list(dict.fromkeys(variables))
+    period = params.get("period", [DEFAULT_PERIOD])[0].strip()
+    requested_release = params.get("release", [DEFAULT_RELEASE])[0].strip()
+    repo = os.environ.get("POPULACE_HF_REPO", DEFAULT_REPO)
+    revision = os.environ.get("POPULACE_HF_REVISION", DEFAULT_REVISION)
+
+    if params.get("metadata") == ["1"]:
+        try:
+            validate_selection(
+                repo=repo, hf_revision=revision, filename=DEFAULT_FILENAME
+            )
+        except VariableCalculationError as exc:
+            # The conflict is detectable here, and it fails every calculation.
+            return exc.status_code, {"detail": str(exc)}
+        return 200, {
+            "runtime": runtime_identity(),
+            "data_configuration": reviewed_release(),
+            "environment_configuration": {
+                "repo": repo,
+                "revision": revision,
+                "filename": DEFAULT_FILENAME,
+            },
+        }
+    if not variables:
+        return 400, {"detail": "Enter at least one PolicyEngine variable name."}
+    if len(variables) > 12:
+        return 400, {"detail": "Run at most 12 variables at a time."}
+    invalid = next((v for v in variables if not VARIABLE_RE.fullmatch(v)), None)
+    if invalid:
+        return 400, {"detail": f"Invalid PolicyEngine variable name: {invalid}"}
+    if not re.fullmatch(r"\d{4}", period):
+        return 400, {"detail": "Period must be a four-digit year."}
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", requested_release):
+        return 400, {"detail": "Invalid release id."}
+    try:
+        config = validate_selection(
+            requested_release=requested_release,
+            repo=repo,
+            hf_revision=revision,
+            filename=DEFAULT_FILENAME,
+            period=period,
+        )
+        with _CALCULATION_LOCK:
+            result = calculate_variables(
+                variables=variables,
+                period=period,
+                repo=repo,
+                revision=config["release_id"],
+                hf_revision=config["hf_revision"],
+                filename=DEFAULT_FILENAME,
+            )
+        return 200, result
+    except VariableCalculationError as exc:
+        return exc.status_code, {"detail": str(exc)}
+    except Exception:
+        # Internal tracebacks belong in the backend logs, not public JSON.
+        LOGGER.exception("Variable calculation failed")
+        return 502, {"detail": "Variable calculation failed."}
