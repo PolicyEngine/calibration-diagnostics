@@ -442,7 +442,7 @@ export function StagingTargetChangeMap({
   }
 
   const directions = layoutDirections(data, size.width, size.height, expanded);
-  const breadcrumbs = explorerBreadcrumbs(state);
+  const breadcrumbs = explorerBreadcrumbs(state, data.pathLabels);
   const upLabel = expanded ? `Up to ${data.currentLevel.label.toLowerCase()}` : explorerUpLabel(state);
 
   return (

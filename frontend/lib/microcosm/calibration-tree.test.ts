@@ -234,6 +234,31 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     expect(tree.groups[0].label).toBe("Nova Statistics Agency");
   });
 
+  test("retains artifact source and category labels throughout the selected path", () => {
+    const tree = buildCalibrationTree(
+      [
+        target("obr-income-tax", {
+          source: "obr",
+          source_label: "Office for Budget Responsibility",
+          variable: "efo_receipts",
+          variable_label: "EFO receipts",
+          geography: "United Kingdom",
+        }),
+      ],
+      state({
+        source: "obr",
+        program: "efo_receipts",
+        dimensions: [],
+      }),
+    );
+
+    expect(tree.pathLabels).toEqual({
+      source: "Office for Budget Responsibility",
+      program: "EFO receipts",
+    });
+    expect(tree.groups[0].label).toBe("EFO receipts");
+  });
+
   test("renders geography first, then programs grouped by their source", () => {
     const overview = buildCalibrationTree(
       rows,
@@ -563,6 +588,119 @@ describe("source, geography, and declared-dimension hierarchy", () => {
     expect(programA.groups.flatMap((group) => group.nodes).map((node) => node.id)).toEqual([
       "sparse/program/a",
     ]);
+  });
+});
+
+describe("schema 8 ordered hierarchy", () => {
+  const hierarchyRows: CalibrationTreeTarget[] = [
+    target("target-adult@2025", {
+      source: "provider-a",
+      source_label: "Provider A — authored",
+      variable: "provider-a.category",
+      variable_label: "Category A — authored",
+      geography: "United Kingdom — authored",
+      level: "country",
+      target_label: "Adult target — authored",
+      target_representation: "hierarchy",
+      target_dimensions: [
+        {
+          key: "dimension.age",
+          label: "Age — authored",
+          value: "Adults — authored",
+          value_id: "adult",
+        },
+        {
+          key: "dimension.sex",
+          label: "Sex — authored",
+          value: "Female — authored",
+          value_id: "female",
+        },
+      ],
+    }),
+    target("target-child@2025", {
+      source: "provider-a",
+      source_label: "Provider A — authored",
+      variable: "provider-a.category",
+      variable_label: "Category A — authored",
+      geography: "United Kingdom — authored",
+      level: "country",
+      target_label: "Child target — authored",
+      target_representation: "hierarchy",
+      target_dimensions: [
+        {
+          key: "dimension.age",
+          label: "Age — authored",
+          value: "Children — authored",
+          value_id: "child",
+        },
+        {
+          key: "dimension.sex",
+          label: "Sex — authored",
+          value: "Female — authored",
+          value_id: "female",
+        },
+      ],
+    }),
+    target("target-total@2025", {
+      source: "provider-a",
+      source_label: "Provider A — authored",
+      variable: "provider-a.category",
+      variable_label: "Category A — authored",
+      geography: "United Kingdom — authored",
+      level: "country",
+      target_label: "Total target — authored",
+      target_representation: "hierarchy",
+      target_dimensions: [],
+    }),
+  ];
+
+  const hierarchyPath = {
+    source: "provider-a",
+    program: "provider-a.category",
+    geography: "United Kingdom — authored",
+    dimensions: [],
+  };
+
+  test("uses producer order for ragged paths and keeps zero-dimension targets", () => {
+    const tree = buildCalibrationTree(hierarchyRows, state(hierarchyPath));
+
+    expect(tree.currentLevel).toEqual({
+      kind: "mixed",
+      label: "Breakdowns and targets",
+    });
+    expect(tree.dimensionOrder).toEqual([
+      { key: "dimension.age", label: "Age — authored" },
+      { key: "dimension.sex", label: "Sex — authored" },
+    ]);
+    expect(tree.groups.map((group) => group.id)).toEqual([
+      "dimension.age",
+      "targets",
+    ]);
+    expect(tree.groups[0].nodes.map((node) => [node.id, node.label])).toEqual([
+      ["adult", "Adults — authored"],
+      ["child", "Children — authored"],
+    ]);
+    expect(tree.groups[1].nodes[0].label).toBe("Total target — authored");
+  });
+
+  test("uses stable value ids while preserving labels and collapsing one choice", () => {
+    const tree = buildCalibrationTree(
+      hierarchyRows,
+      state({
+        ...hierarchyPath,
+        dimensions: [
+          { key: "dimension.age", label: "Age — authored", value: "adult" },
+        ],
+      }),
+    );
+
+    expect(tree.currentLevel).toEqual({ kind: "target", label: "Targets" });
+    expect(tree.pathLabels.geography).toBe("United Kingdom — authored");
+    expect(tree.pathLabels.dimensions).toEqual(["Adults — authored"]);
+    expect(tree.groups[0].nodes.map((node) => node.label)).toEqual([
+      "Adult target — authored",
+    ]);
+    expect(tree.groups[0].nodes[0].target?.target_dimensions).toHaveLength(2);
   });
 });
 

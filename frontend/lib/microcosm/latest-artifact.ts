@@ -1,11 +1,19 @@
-// Pure-HF data layer for the country-selectable Microcosm dashboard. No
-// committed snapshot: every release's manifests and per-target calibration
-// diagnostics are read from its country's Hugging Face revision. Reviewed
-// production defaults are immutable; historical releases remain selectable.
+// Data layer for the country-selectable Microcosm dashboard. Published releases
+// are read from each country's reviewed Hugging Face dataset; an explicit UK
+// local-run directory can replace that source for local diagnostics inspection.
+// Reviewed production defaults are immutable, and historical releases remain
+// selectable.
+
+import { readFile, readdir, stat } from "node:fs/promises";
+import { basename, join } from "node:path";
 
 import { sourceAuthorityLabel } from "@/lib/source-labels";
 
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
+import {
+  readHierarchyTarget,
+  validateHierarchyTargets,
+} from "./hierarchy-target-reader";
 import {
   chroniclePublisherFromMetadata,
   qualifyingChildrenFromRecordSet,
@@ -31,9 +39,9 @@ import {
   type TargetLossDiagnosticWarning,
 } from "./target-loss-attribution";
 import {
-  classifyTargetRow,
-  classifyTargetRepresentation,
+  targetRepresentationForSchema,
   type TargetRepresentation,
+  type TargetRowRepresentation,
 } from "./target-representation";
 import { readStructuredTarget } from "./structured-target-reader";
 import { matchTargetSurfaces } from "./target-surface-matcher";
@@ -866,8 +874,23 @@ function computeDimensions(rows: TargetRow[]): TargetDimension[] {
     if (values.length <= 1) continue;
     const label = candidate.label ?? classifyDimension(values);
     const ranks = new Map<string, number>();
-    let everyValueRanked = candidate.key !== "geography";
+    let everyValueRanked = true;
     for (const value of values) {
+      if (candidate.key === "geography") {
+        const matchingRows = rows.filter((row) => row.geography === value);
+        if (
+          !matchingRows.length ||
+          matchingRows.some((row) => typeof row.geography_rank !== "number")
+        ) {
+          everyValueRanked = false;
+          break;
+        }
+        ranks.set(
+          value,
+          Math.min(...matchingRows.map((row) => row.geography_rank as number)),
+        );
+        continue;
+      }
       const matchingDimensions = rows.flatMap((row) =>
         ((row.target_dimensions as TargetBreakdownDimension[] | undefined) ?? [])
           .filter((dimension) =>
@@ -995,6 +1018,7 @@ function enrichTargetRow(
   artifactCountry: ArtifactCountry,
   publisherLabels: Record<string, string>,
   dimensionDefinitions: Record<string, DiagnosticsDimension>,
+  rowRepresentation: TargetRowRepresentation,
 ): TargetRow {
   const nationalGeography = artifactCountry.geography_label;
   const metadata = normalizeChronicleMetadata(rawRow.metadata);
@@ -1034,19 +1058,23 @@ function enrichTargetRow(
     initialError == null || finalError == null
       ? null
       : Math.abs(initialError) - Math.abs(finalError);
-  const rowRepresentation = classifyTargetRow(row);
+  const hierarchyIdentity = rowRepresentation === "hierarchy"
+    ? readHierarchyTarget(row)
+    : null;
   const structuredIdentity = rowRepresentation === "structured"
     ? readStructuredTarget(row, dimensionDefinitions, nationalGeography)
     : null;
-  const filterDecomposition = structuredIdentity
+  const filterDecomposition = hierarchyIdentity || structuredIdentity
     ? null
     : decomposeTargetFilter(row.filter);
-  const dimensionAdapter = structuredIdentity
-    ? "structured"
-    : filterDecomposition
-      ? "legacy_filter"
-      : "legacy_name";
-  const legacyParsed = structuredIdentity
+  const dimensionAdapter = hierarchyIdentity
+    ? "hierarchy"
+    : structuredIdentity
+      ? "structured"
+      : filterDecomposition
+        ? "legacy_filter"
+        : "legacy_name";
+  const legacyParsed = hierarchyIdentity || structuredIdentity
     ? null
     : readLegacyTarget(
         baseName,
@@ -1054,7 +1082,15 @@ function enrichTargetRow(
         nationalGeography,
         filterDecomposition,
       );
-  const parsed: ParsedTarget = structuredIdentity
+  const parsed: ParsedTarget = hierarchyIdentity
+    ? {
+        geography: hierarchyIdentity.geography,
+        level: hierarchyIdentity.level,
+        source: hierarchyIdentity.source,
+        variable: hierarchyIdentity.variable,
+        breakdown: hierarchyIdentity.breakdown,
+      }
+    : structuredIdentity
     ? {
         geography: structuredIdentity.geography,
         level: structuredIdentity.level,
@@ -1068,6 +1104,7 @@ function enrichTargetRow(
   const level = hasGeography ? parsed.level : DEFAULT_GEOGRAPHY_LEVEL;
   const measureCol = asObject(row.measure);
   const metadataTargetDimensions =
+    hierarchyIdentity?.dimensions ??
     structuredIdentity?.dimensions ??
     filterDecomposition?.dimensions ??
     metadataDimensions(row);
@@ -1099,6 +1136,7 @@ function enrichTargetRow(
   // without filter dimensions retain their legacy family so US/UK releases do
   // not regroup merely because they also carry Chronicle record IDs.
   const usesArtifactFamily =
+    hierarchyIdentity != null ||
     structuredIdentity != null ||
     filterDecomposition != null ||
     (chroniclePublisherFromMetadata(metadata) != null &&
@@ -1109,20 +1147,29 @@ function enrichTargetRow(
     name: fullName,
     base_name: baseName,
     family: deriveFamily(baseName, parsed, usesArtifactFamily),
-    state: structuredIdentity
+    state: hierarchyIdentity || structuredIdentity
       ? null
       : stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
     geography,
+    geography_id:
+      hierarchyIdentity?.geographyId ??
+      structuredIdentity?.geographyId ??
+      stringValue(metadata.ledger_geography_id),
+    geography_dimension_id: structuredIdentity?.geographyDimensionId ?? null,
+    geography_rank: structuredIdentity?.geographyRank ?? null,
     level,
     source: parsed.source,
     source_label:
+      hierarchyIdentity?.sourceLabel ??
       (Object.hasOwn(publisherLabels, parsed.source)
         ? publisherLabels[parsed.source]
         : undefined) ??
       structuredIdentity?.sourceLabel ??
       sourceAuthorityLabel(parsed.source),
     variable: parsed.variable,
-    variable_label: structuredIdentity?.variableLabel ?? null,
+    variable_label:
+      hierarchyIdentity?.variableLabel ?? structuredIdentity?.variableLabel ?? null,
+    target_label: hierarchyIdentity?.targetLabel,
     measure,
     target_role: targetRole,
     source_measure_id: sourceMeasureId,
@@ -1704,7 +1751,7 @@ export interface TargetSchema {
 }
 
 export interface Calibration {
-  source: "huggingface_live";
+  source: "huggingface_live" | "local_filesystem";
   country: MicrocosmCountry;
   // Typed `release_manifest.country` merged over the registration.
   country_info: ArtifactCountry;
@@ -1953,11 +2000,15 @@ export function buildCalibration(
   releaseManifest: JsonObject = {},
   demographics: JsonObject = {},
   country: MicrocosmCountry = "us",
+  source: Calibration["source"] = "huggingface_live",
 ): Calibration {
+  const targetRepresentation = targetRepresentationForSchema(diag.schema_version);
   const targets = (Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : []).map(
     normalizeDiagnosticsRow,
   );
-  const targetRepresentation = classifyTargetRepresentation(targets);
+  if (targetRepresentation === "hierarchy") {
+    validateHierarchyTargets(targets);
+  }
   const skipped = Array.isArray(diag.skipped) ? (diag.skipped as JsonObject[]) : [];
   const targetCompilation = asObject(asObject(buildManifest.gates).target_compilation);
   const droppedTargetNames = Array.isArray(targetCompilation.dropped_target_names)
@@ -1980,6 +2031,7 @@ export function buildCalibration(
         artifactCountry,
         publisherLabels,
         dimensionDefinitions,
+        targetRepresentation,
       ),
     ),
   );
@@ -1994,7 +2046,7 @@ export function buildCalibration(
   const rows = normalizedAttribution.rows;
   const includedTargetCount = rows.filter((row) => row.calibration_status === "included").length;
   return {
-    source: "huggingface_live",
+    source,
     country,
     country_info: artifactCountry,
     presentation,
@@ -2120,10 +2172,109 @@ function releaseDate(id: string): string {
   return m ? m[1] : id;
 }
 
+export const UK_LOCAL_CALIBRATION_DIR_ENV =
+  "MICROCOSM_UK_LOCAL_CALIBRATION_DIR";
+
+interface LocalCalibrationRelease {
+  releaseId: string;
+  updatedAt: string;
+  files: string[];
+  diagnostics: JsonObject;
+  buildManifest: JsonObject;
+  releaseManifest: JsonObject;
+  demographics: JsonObject;
+}
+
+function localCalibrationDirectory(country: MicrocosmCountry): string | null {
+  if (country !== "uk") return null;
+  const directory = process.env[UK_LOCAL_CALIBRATION_DIR_ENV]?.trim();
+  return directory || null;
+}
+
+async function localJson(
+  directory: string,
+  filename: string,
+): Promise<JsonObject> {
+  const path = join(directory, filename);
+  try {
+    return asObject(JSON.parse(await readFile(path, "utf8")));
+  } catch (error) {
+    throw new Error(`Unable to read local Microcosm artifact ${path}`, {
+      cause: error,
+    });
+  }
+}
+
+async function optionalLocalJson(
+  directory: string,
+  filename: string,
+): Promise<JsonObject> {
+  try {
+    return await localJson(directory, filename);
+  } catch {
+    return {};
+  }
+}
+
+async function loadLocalCalibrationRelease(
+  country: MicrocosmCountry,
+): Promise<LocalCalibrationRelease | null> {
+  const directory = localCalibrationDirectory(country);
+  if (!directory) return null;
+
+  const diagnosticsPath = join(directory, "calibration_diagnostics.json");
+  const [
+    diagnostics,
+    diagnosticsStat,
+    files,
+    buildManifest,
+    releaseManifest,
+    demographics,
+  ] = await Promise.all([
+    localJson(directory, "calibration_diagnostics.json"),
+    stat(diagnosticsPath),
+    readdir(directory),
+    optionalLocalJson(directory, "build_manifest.json"),
+    optionalLocalJson(directory, "release_manifest.json"),
+    optionalLocalJson(directory, "demographics.json"),
+  ]);
+  const diagnosticsBuild = asObject(diagnostics.build);
+  const releaseId = assertSafeReleaseId(
+    String(
+      diagnostics.release_id ?? diagnosticsBuild.build_id ?? basename(directory),
+    ),
+    "local UK calibration release",
+  );
+  return {
+    releaseId,
+    updatedAt: diagnosticsStat.mtime.toISOString(),
+    files: files.sort(),
+    diagnostics,
+    buildManifest,
+    releaseManifest,
+    demographics,
+  };
+}
+
 export async function loadReleases(
   revalidate: number,
   country: MicrocosmCountry = "us",
 ): Promise<ReleaseEntry[]> {
+  const local = await loadLocalCalibrationRelease(country);
+  if (local) {
+    return [
+      {
+        release_id: local.releaseId,
+        date: local.updatedAt,
+        files: local.files,
+        has_calibration: true,
+        dataset_role: null,
+        is_default: true,
+        is_local_area: false,
+      },
+    ];
+  }
+
   const { repo, revision } = countryRepository(country);
   const files = new Map<string, Set<string>>();
   // The HF tree endpoint paginates (~1000 entries/page via a Link cursor);
@@ -2187,10 +2338,16 @@ export async function loadPointerReleaseId(
   revalidate: number,
   country: MicrocosmCountry = "us",
 ): Promise<{ release_id: string; updated_at: string | null }> {
+  const local = await loadLocalCalibrationRelease(country);
+  if (local) {
+    return { release_id: local.releaseId, updated_at: local.updatedAt };
+  }
+
   const productionRelease = countryRegistration(country).production_release_id;
   if (productionRelease) {
     return { release_id: productionRelease, updated_at: null };
   }
+
   const pointer = await hfJson(hfResolveUrl("latest.json", country), revalidate);
   return {
     release_id: String(pointer.release_id ?? ""),
@@ -2228,6 +2385,23 @@ async function loadReleaseUncached(
   revalidate: number,
   country: MicrocosmCountry,
 ): Promise<Calibration> {
+  const local = await loadLocalCalibrationRelease(country);
+  if (
+    local &&
+    (releaseId === "latest" || !releaseId || releaseId === local.releaseId)
+  ) {
+    return buildCalibration(
+      local.diagnostics,
+      local.releaseId,
+      local.updatedAt,
+      local.buildManifest,
+      local.releaseManifest,
+      local.demographics,
+      country,
+      "local_filesystem",
+    );
+  }
+
   let id = assertSafeReleaseId(releaseId);
   let updatedAt: string | null = null;
   if (releaseId === "latest" || !releaseId) {
@@ -2287,6 +2461,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     source_label: row.source_label,
     variable: row.variable,
     variable_label: row.variable_label,
+    target_label: row.target_label,
     measure: row.measure,
     target_role: row.target_role,
     source_measure_id: row.source_measure_id,
@@ -2308,6 +2483,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     target_dimensions: row.target_dimensions,
     dimension_adapter: row.dimension_adapter,
     target_representation: row.target_representation,
+    hierarchy: row.hierarchy,
     variable_key: row.variable_key,
     source_citation: row.source_citation,
     source_url: row.source_url,
@@ -2855,12 +3031,17 @@ export function buildComparison(a: Calibration, b: Calibration) {
       current_representation: match.current_representation,
       candidate_representation: match.candidate_representation,
       name,
-      target_label: [br.geography ?? ar.geography, br.breakdown ?? ar.breakdown]
-        .filter(Boolean)
-        .join(" · "),
+      target_label:
+        br.target_label ??
+        ar.target_label ??
+        [br.geography ?? ar.geography, br.breakdown ?? ar.breakdown]
+          .filter(Boolean)
+          .join(" · "),
       source: br.source ?? ar.source,
+      source_label: br.source_label ?? ar.source_label,
       variable_key: br.variable_key ?? ar.variable_key,
       variable: br.variable ?? ar.variable,
+      variable_label: br.variable_label ?? ar.variable_label,
       measure: br.measure ?? ar.measure,
       level: br.level ?? ar.level,
       breakdown: br.breakdown ?? ar.breakdown,

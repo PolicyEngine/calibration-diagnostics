@@ -4,6 +4,7 @@ import {
   type TargetMatchingSummary,
   type TargetSurfaceStatus,
 } from "./target-surface-matcher";
+import type { TargetRowRepresentation } from "./target-representation";
 
 type TargetRow = Calibration["rows"][number];
 
@@ -29,8 +30,8 @@ export interface TargetChangeRow extends Record<string, unknown> {
   match_kind: "base_name" | "chronicle_fact_key" | "structured_identity" | null;
   current_name: string | null;
   candidate_name: string | null;
-  current_representation: "legacy" | "structured" | null;
-  candidate_representation: "legacy" | "structured" | null;
+  current_representation: TargetRowRepresentation | null;
+  candidate_representation: TargetRowRepresentation | null;
   comparison_status: TargetSurfaceStatus;
   current: TargetChangeSide | null;
   candidate: TargetChangeSide | null;
@@ -91,6 +92,9 @@ function hierarchyFields(row: TargetRow): Record<string, unknown> {
     source: row.source ?? null,
     source_label: row.source_label ?? null,
     variable: row.variable ?? null,
+    variable_label: row.variable_label ?? null,
+    target_label: row.target_label ?? null,
+    target_representation: row.target_representation ?? null,
     variable_key: row.variable_key ?? null,
     measure: row.measure ?? null,
     source_measure_id: row.source_measure_id ?? null,

@@ -1,47 +1,36 @@
-export type TargetRepresentation = "legacy" | "structured" | "mixed" | "unknown";
-export type TargetRowRepresentation = "legacy" | "structured";
+export type TargetRepresentation =
+  | "legacy"
+  | "structured"
+  | "hierarchy"
+  | "mixed"
+  | "unknown";
 
-type JsonObject = Record<string, unknown>;
+export type TargetRowRepresentation = "legacy" | "structured" | "hierarchy";
 
-function isPlainObject(value: unknown): value is JsonObject {
-  return value != null && typeof value === "object" && !Array.isArray(value);
-}
+export class UnsupportedCalibrationDiagnosticsSchemaError extends Error {}
 
-function nonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-export function isCompleteStructuredTarget(row: JsonObject): boolean {
-  return (
-    isPlainObject(row.source) &&
-    nonEmptyString(row.source.id) &&
-    isPlainObject(row.variable) &&
-    nonEmptyString(row.variable.id) &&
-    isPlainObject(row.dimensions)
+/**
+ * Select the only target reader permitted for a diagnostics artifact.
+ *
+ * Row shape is deliberately not inspected: the top-level schema version is
+ * the compatibility contract between Microcosm and this dashboard.
+ */
+export function targetRepresentationForSchema(
+  schemaVersion: unknown,
+): TargetRowRepresentation {
+  if (
+    typeof schemaVersion !== "number" ||
+    !Number.isInteger(schemaVersion)
+  ) {
+    throw new UnsupportedCalibrationDiagnosticsSchemaError(
+      "Calibration diagnostics must declare an integer schema_version.",
+    );
+  }
+  if (schemaVersion >= 2 && schemaVersion <= 6) return "legacy";
+  if (schemaVersion === 7) return "structured";
+  if (schemaVersion === 8) return "hierarchy";
+  throw new UnsupportedCalibrationDiagnosticsSchemaError(
+    `Unsupported calibration diagnostics schema_version ${schemaVersion}; ` +
+      "this dashboard reads versions 2 through 8.",
   );
-}
-
-export function isLegacyTarget(row: JsonObject): boolean {
-  return (
-    !isPlainObject(row.source) &&
-    !isPlainObject(row.variable) &&
-    !isPlainObject(row.dimensions)
-  );
-}
-
-export function classifyTargetRow(row: JsonObject): TargetRowRepresentation {
-  if (isCompleteStructuredTarget(row)) return "structured";
-  if (isLegacyTarget(row)) return "legacy";
-  throw new Error(
-    "Calibration target rows must use either complete structured identity fields or legacy fields.",
-  );
-}
-
-export function classifyTargetRepresentation(
-  rows: readonly JsonObject[],
-): TargetRepresentation {
-  if (rows.length === 0) return "unknown";
-  const representations = new Set(rows.map(classifyTargetRow));
-  if (representations.size > 1) return "mixed";
-  return representations.has("structured") ? "structured" : "legacy";
 }
