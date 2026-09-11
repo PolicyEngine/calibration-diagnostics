@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCountry } from "@/components/layout/country-context";
+import { CalibrationExplorerMap } from "@/components/microcosm/calibration-explorer-map";
 import { StagingTargetChangeMap } from "@/components/microcosm/staging-target-change-map";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
@@ -43,6 +44,7 @@ import {
 } from "@/lib/microcosm/target-change-visualization";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
+type CalibrationMapView = "candidate" | "comparison";
 
 function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -62,7 +64,9 @@ function validationTone(absRel: number | null | undefined): "positive" | "neutra
 }
 
 function statusTone(status: string | null | undefined): StatusTone {
-  if (status === "passed" || status === "published") return "success";
+  if (status === "passed" || status === "published" || status === "completed") {
+    return "success";
+  }
   if (status === "failed") return "danger";
   if (status === "stalled") return "warning";
   if (status === "running" || status === "queued") return "info";
@@ -246,6 +250,46 @@ function RunSelect({
           </ul>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function CalibrationMapViewSelect({
+  value,
+  onChange,
+}: {
+  value: CalibrationMapView;
+  onChange: (value: CalibrationMapView) => void;
+}) {
+  const options: Array<{ value: CalibrationMapView; label: string }> = [
+    { value: "candidate", label: "Candidate fit" },
+    { value: "comparison", label: "Change from current release" },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="Calibration map view"
+      className="flex rounded-lg border border-border bg-muted/40 p-1"
+    >
+      {options.map((option) => {
+        const active = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(option.value)}
+            className={`h-8 rounded-md px-3 text-[13px] font-medium transition-all ${
+              active
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -600,7 +644,7 @@ function RunInternalsPanel({
                     <td className="px-3 py-1.5 text-xs text-muted-foreground">
                       {metadata.staging_path ? (
                         <a
-                          href={`https://huggingface.co/datasets/${runData.source_repo}/blob/main/${metadata.staging_path}`}
+                          href={`https://huggingface.co/datasets/${runData.source_repo}/blob/${runData.revision ?? "main"}/${metadata.staging_path}`}
                           target="_blank"
                           rel="noreferrer"
                           className="underline decoration-dotted underline-offset-2 hover:text-primary"
@@ -792,10 +836,14 @@ function MicrocosmStagingRunsView() {
   const [selectedRun, setSelectedRun] = useState("");
   const [targetSearch, setTargetSearch] = useState("");
   const [runInternalsOpen, setRunInternalsOpen] = useState(false);
+  const [calibrationMapView, setCalibrationMapView] =
+    useState<CalibrationMapView>("candidate");
+  const [pageIntroHeight, setPageIntroHeight] = useState(0);
 
   const resetRunVisualState = useCallback((runId: string) => {
     setTargetSearch("");
     setRunInternalsOpen(false);
+    setCalibrationMapView("candidate");
     setSelectedRun(runId);
   }, []);
 
@@ -879,6 +927,7 @@ function MicrocosmStagingRunsView() {
             onSelect={resetRunVisualState}
           />
         }
+        onHeightChange={setPageIntroHeight}
       />
 
       <div className="flex flex-col gap-5">
@@ -1124,30 +1173,49 @@ function MicrocosmStagingRunsView() {
               <div className="contents">
                 {runData.has_calibration && (
                   <SectionCard
-                    title="Target error change"
-                  >
-                    {compareData?.summary ? (
-                      <StagingTargetChangeMap
-                        key={targetChangeMapIdentity(selectedRun, compareData.a.release_id)}
-                        runId={selectedRun}
-                        releaseId={compareData.a.release_id}
+                    title="Calibration map"
+                    actions={
+                      <CalibrationMapViewSelect
+                        value={calibrationMapView}
+                        onChange={setCalibrationMapView}
                       />
-                    ) : compareLoading ? (
-                      <LoadingBlock
-                        label="Loading calibration diagnostics for the target error comparison…"
-                        height="h-40"
+                    }
+                  >
+                    {calibrationMapView === "candidate" ? (
+                      <CalibrationExplorerMap
+                        key={`candidate-fit:${selectedRun}`}
+                        stagingRunId={selectedRun}
+                        pageIntroHeight={pageIntroHeight}
                       />
                     ) : (
-                      <EmptyState
-                        title="Target error comparison unavailable"
-                        description={
-                          compareError instanceof Error
-                            ? compareError.message
-                            : compareData?.detail ??
-                              "The calibration diagnostics are available, but the comparison could not be loaded."
-                        }
-                        variant="compact"
-                      />
+                      <>
+                        {compareData?.summary ? (
+                          <StagingTargetChangeMap
+                            key={targetChangeMapIdentity(
+                              selectedRun,
+                              compareData.a.release_id,
+                            )}
+                            runId={selectedRun}
+                            releaseId={compareData.a.release_id}
+                          />
+                        ) : compareLoading ? (
+                          <LoadingBlock
+                            label="Loading calibration diagnostics for the target error comparison…"
+                            height="h-40"
+                          />
+                        ) : (
+                          <EmptyState
+                            title="Target error comparison unavailable"
+                            description={
+                              compareError instanceof Error
+                                ? compareError.message
+                                : compareData?.detail ??
+                                  "The calibration diagnostics are available, but the comparison could not be loaded."
+                            }
+                            variant="compact"
+                          />
+                        )}
+                      </>
                     )}
                   </SectionCard>
                 )}

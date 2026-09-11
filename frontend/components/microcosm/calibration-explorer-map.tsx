@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Spinner } from "@policyengine/ui-kit";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -28,6 +28,7 @@ import { HelpHint } from "@/components/shared/help-hint";
 import {
   microcosmCalibrationTreeQueryOptions,
   useMicrocosmCalibrationTree,
+  type MicrocosmCalibrationTreeSource,
   type MicrocosmTargetDimension,
   type MicrocosmTargetRow,
 } from "@/lib/api/hooks/use-microcosm";
@@ -258,7 +259,7 @@ function SizeControl({
           disabled: !lossAvailable,
           title: lossAvailable
             ? undefined
-            : "Target weight is unavailable for this release.",
+            : "Target weight is unavailable for this calibration.",
         },
         {
           value: "loss",
@@ -266,7 +267,7 @@ function SizeControl({
           disabled: !lossAvailable,
           title: lossAvailable
             ? undefined
-            : "Weighted target error is unavailable for this release.",
+            : "Weighted target error is unavailable for this calibration.",
           tooltip: WEIGHTED_TARGET_ERROR_HELP,
         },
       ]}
@@ -487,13 +488,13 @@ function CalibrationMapLoadingSkeleton() {
 function usePrefetchCalibrationLevels({
   state,
   data,
-  release,
+  source,
   isPlaceholderData,
   depth,
 }: {
   state: ExplorerState;
   data: CalibrationTreeResponse | undefined;
-  release?: string;
+  source: MicrocosmCalibrationTreeSource;
   isPlaceholderData: boolean;
   depth: number;
 }) {
@@ -510,14 +511,14 @@ function usePrefetchCalibrationLevels({
       concurrency: PREFETCH_CONCURRENCY,
       fetchTree: async (childState) =>
         queryClient.fetchQuery(
-          microcosmCalibrationTreeQueryOptions(childState, release, country),
+          microcosmCalibrationTreeQueryOptions(childState, source, country),
         ),
       isCancelled: () => cancelled,
     });
     return () => {
       cancelled = true;
     };
-  }, [country, data, depth, isPlaceholderData, queryClient, release, state]);
+  }, [country, data, depth, isPlaceholderData, queryClient, source, state]);
 }
 
 export function CalibrationExplorerDataPrefetch({
@@ -526,11 +527,15 @@ export function CalibrationExplorerDataPrefetch({
   release?: string;
 }) {
   const [state] = useState(createExplorerState);
-  const { data, isPlaceholderData } = useMicrocosmCalibrationTree(state, release);
+  const source = useMemo<MicrocosmCalibrationTreeSource>(
+    () => ({ kind: "release", release }),
+    [release],
+  );
+  const { data, isPlaceholderData } = useMicrocosmCalibrationTree(state, source);
   usePrefetchCalibrationLevels({
     state,
     data,
-    release,
+    source,
     isPlaceholderData,
     depth: PAGE_LOAD_PREFETCH_DEPTH,
   });
@@ -539,9 +544,11 @@ export function CalibrationExplorerDataPrefetch({
 
 export function CalibrationExplorerMap({
   release,
+  stagingRunId,
   pageIntroHeight,
 }: {
   release?: string;
+  stagingRunId?: string;
   pageIntroHeight: number;
 }) {
   const [state, dispatch] = useReducer(
@@ -549,8 +556,15 @@ export function CalibrationExplorerMap({
     undefined,
     createExplorerState,
   );
+  const source = useMemo<MicrocosmCalibrationTreeSource>(
+    () =>
+      stagingRunId
+        ? { kind: "staging", runId: stagingRunId }
+        : { kind: "release", release },
+    [release, stagingRunId],
+  );
   const { data, isFetching, isPlaceholderData, error } =
-    useMicrocosmCalibrationTree(state, release);
+    useMicrocosmCalibrationTree(state, source);
   const displayBoundsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(960);
@@ -564,7 +578,7 @@ export function CalibrationExplorerMap({
   usePrefetchCalibrationLevels({
     state,
     data,
-    release,
+    source,
     isPlaceholderData,
     depth: ACTIVE_VIEW_PREFETCH_DEPTH,
   });

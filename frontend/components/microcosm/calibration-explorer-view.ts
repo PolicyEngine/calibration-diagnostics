@@ -137,7 +137,7 @@ export function hasExplorerFilters(state: ExplorerState): boolean {
 export function explorerEmptyMessage(state: ExplorerState): string {
   return hasExplorerFilters(state)
     ? "No calibration targets match the active filters at this level."
-    : "No calibration targets match this hierarchy selection in the selected release.";
+    : "No calibration targets match this hierarchy selection in the selected calibration.";
 }
 
 export function explorerGeographyLevelLabel(value: string): string {
@@ -178,7 +178,7 @@ export function explorerColorPhrase(mode: CalibrationTreeSizeMode): string {
 export function explorerLossAvailabilityMessage(available: boolean): string | null {
   return available
     ? null
-    : "Target weight and weighted target error are unavailable for this release.";
+    : "Target weight and weighted target error are unavailable for this calibration.";
 }
 
 export function explorerMapHeight(pageIntroHeight: number): string {
