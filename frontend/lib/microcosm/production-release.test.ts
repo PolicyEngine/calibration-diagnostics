@@ -36,7 +36,12 @@ test("historical diagnostics remain readable at the immutable repository revisio
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input);
     urls.push(url);
-    return Response.json(url.includes("/tree/") ? [] : { targets: [] });
+    if (url.includes("/tree/")) return Response.json([]);
+    return Response.json(
+      url.endsWith("/calibration_diagnostics.json")
+        ? { schema_version: 5, targets: [] }
+        : {},
+    );
   }) as typeof fetch;
 
   const result = await loadRelease("historical-review-fixture", 0, "us");
