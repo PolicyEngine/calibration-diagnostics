@@ -47,6 +47,31 @@ def test_metadata_is_configuration_not_calculation(endpoint, monkeypatch):
     assert "data_identity" not in body
 
 
+def test_metadata_validates_the_deployment_data_configuration(endpoint, monkeypatch):
+    """A stale override is visible here, so the metadata gate must refuse it."""
+    monkeypatch.setattr(
+        endpoint, "calculate_variables", lambda **kwargs: pytest.fail("No population")
+    )
+    reviewed = endpoint.reviewed_release()
+    status, body = endpoint.handle_query("metadata=1")
+    assert status == 200
+    assert body["environment_configuration"] == {
+        "repo": reviewed["repo"],
+        "revision": reviewed["hf_revision"],
+        "filename": reviewed["filename"],
+    }
+    for variable, value in (
+        ("POPULACE_HF_REPO", "policyengine/unreviewed-override-fixture"),
+        ("POPULACE_HF_REVISION", "main"),
+    ):
+        monkeypatch.setenv(variable, value)
+        stale_status, stale_body = endpoint.handle_query("metadata=1")
+        # Every calculation would answer 503; metadata must not report health.
+        assert stale_status == 503
+        assert "conflicts with the reviewed value" in stale_body["detail"]
+        monkeypatch.delenv(variable)
+
+
 def test_calculation_uses_immutable_revision_and_preserves_response(
     endpoint, monkeypatch
 ):

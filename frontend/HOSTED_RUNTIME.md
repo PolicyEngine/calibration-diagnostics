@@ -55,7 +55,12 @@ explicitly. Without a remote URL, local calculations still use the shared Python
    Next metadata routes return JSON 200 with the expected source, model and configuration.
    With a nonempty base path, the former root `/api/microcosm_variable` URL first returns
    a same-origin 307 to the mounted Next route; preserve that redirect in the receipt.
-   Metadata is not proof that data loaded or a calculation succeeded.
+   Metadata is not proof that data loaded or a calculation succeeded. It does now refuse a
+   conflicting deployment data selection: the backend validates its resolved
+   `POPULACE_HF_REPO`/`POPULACE_HF_REVISION` against the reviewed release and answers 503,
+   and the proxy compares the response's `environment_configuration` with the reviewed
+   selection and answers 409. A 200 metadata receipt therefore also records that this
+   deployment is not carrying a stale override.
 2. On a fresh backend deployment, run a genuine `spm_unit_spm_threshold` lookup for 2024
    on the pinned BuildP release through the exact Next preview. Require JSON 200, verified
    H5 SHA-256, exact model/source identity, `execution.simulation_cache_hits.national=false`
@@ -86,10 +91,11 @@ Record all current production alias targets. This hold must precede main's autom
 build; setting it after the merge is too late.
 Inspect the production-scoped environment entries before the build and require
 `POPULACE_HF_REPO` and `POPULACE_HF_REVISION` to be absent. The US data selection is
-compiled from the reviewed release; stale overrides can fail module initialization.
-If present, record and remove only those two conflicting US overrides, with their
-prior settings retained for rollback. This specific check also applies to preview
-qualification. Do not print or change unrelated environment entries.
+compiled from the reviewed release; a conflicting override is refused at each US
+read and leaves US release alerts disabled, while other countries' pages, routes
+and the build stay up. If present, record and remove only those two conflicting US
+overrides, with their prior settings retained for rollback. This specific check also
+applies to preview qualification. Do not print or change unrelated environment entries.
 
 Build/deploy the matching private production backend, then stage the exact frontend
 with production server-only URL/credentials. Use `vercel deploy --prod --skip-domain`
@@ -141,4 +147,6 @@ The witness reports whether both public Modal context IDs are present; this is
 an observation, not identity approval. Null parent module origins mean the module
 has not been loaded in that process. The lightweight child separately reports
 installed package versions through metadata and its import paths, without
-importing any model. Audit capture failures return generic uncached 502 JSON.
+importing any model. Audit capture failures return generic uncached 502 JSON and
+log the captured traceback to the backend logger `backend.variable_endpoint`, so
+read those logs for the cause rather than the response body.

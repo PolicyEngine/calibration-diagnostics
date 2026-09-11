@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 
 import { NextResponse } from "next/server";
 
-import { MICROCOSM_HF_REPO, scrub } from "@/lib/microcosm/latest-artifact";
+import { microcosmRepo, scrub } from "@/lib/microcosm/latest-artifact";
 import {
   HOSTED_US_RELEASE,
   reviewedVariableRelease,
@@ -157,7 +157,7 @@ export async function GET(request: Request) {
         "--period",
         period,
         "--repo",
-        MICROCOSM_HF_REPO,
+        microcosmRepo("us"),
         "--revision",
         release,
       ],

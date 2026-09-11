@@ -46,6 +46,19 @@ function matchesRelease(value: unknown): boolean {
   );
 }
 
+// `data_configuration` is the backend's static reviewed contract, so it matches
+// even when the deployment carries a stale POPULACE_HF_REPO/POPULACE_HF_REVISION
+// override that fails every calculation with 503. The deployment's own resolved
+// selection is reported separately, and the metadata gate must check it too.
+function matchesEnvironment(value: unknown): boolean {
+  const environment = record(value);
+  return (
+    environment.repo === HOSTED_US_RELEASE.repo &&
+    environment.revision === HOSTED_US_RELEASE.hf_revision &&
+    environment.filename === HOSTED_US_RELEASE.filename
+  );
+}
+
 function matchesSelection(
   body: Record<string, unknown>,
   query: string,
@@ -126,7 +139,10 @@ export async function proxyVariableBackend(
       });
       // Modal's documented 150-second redirect resumes the existing invocation.
       // Never send its credentials to another origin or another function path.
-      if (response.status === 303 && redirects < 6) {
+      if (response.status === 303) {
+        // Leave the loop on the last allowed attempt so the redirect limit is
+        // reported as such, not as a response without a JSON content type.
+        if (redirects === 6) break;
         const location = response.headers.get("location");
         if (!location) throw new Error("Missing result URL");
         const next = new URL(location, endpoint);
@@ -172,8 +188,9 @@ export async function proxyVariableBackend(
           ([name, version]) => packages[name] === version,
         ) ||
         !matchesRelease(identity) ||
-        (!metadataOnly &&
-          (identity.verified !== true || !matchesSelection(body, query)))
+        (metadataOnly
+          ? !matchesEnvironment(body.environment_configuration)
+          : identity.verified !== true || !matchesSelection(body, query))
       ) {
         return json(
           {

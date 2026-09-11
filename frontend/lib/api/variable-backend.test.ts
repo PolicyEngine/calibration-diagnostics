@@ -9,6 +9,14 @@ const config = {
   sourceCommit: "reviewed-sha",
 };
 
+// The backend reports its deployment's own resolution of POPULACE_HF_REPO and
+// POPULACE_HF_REVISION beside the static reviewed configuration.
+const reviewedEnvironment = {
+  repo: HOSTED_US_RELEASE.repo,
+  revision: HOSTED_US_RELEASE.hf_revision,
+  filename: HOSTED_US_RELEASE.filename,
+};
+
 describe("private calculation backend", () => {
   test("missing configuration fails before making a request", async () => {
     const response = await proxyVariableBackend(
@@ -65,6 +73,7 @@ describe("private calculation backend", () => {
         packages: HOSTED_US_RELEASE.packages,
       },
       data_configuration: HOSTED_US_RELEASE,
+      environment_configuration: reviewedEnvironment,
     };
     const response = await proxyVariableBackend(
       "metadata=1",
@@ -198,6 +207,62 @@ describe("private calculation backend", () => {
         )
       ).status,
     ).toBe(409);
+  });
+  test("metadata must match the backend deployment's own data selection", async () => {
+    const body = {
+      runtime: {
+        source_commit: config.sourceCommit,
+        packages: HOSTED_US_RELEASE.packages,
+      },
+      data_configuration: HOSTED_US_RELEASE,
+      environment_configuration: reviewedEnvironment,
+    };
+    expect(
+      (
+        await proxyVariableBackend("metadata=1", config, async () =>
+          Response.json(body),
+        )
+      ).status,
+    ).toBe(200);
+    // A stale override passes the static configuration check while every
+    // calculation answers 503, so the metadata gate must refuse it here.
+    const stale = [
+      {
+        ...reviewedEnvironment,
+        repo: "policyengine/unreviewed-override-fixture",
+      },
+      { ...reviewedEnvironment, revision: "main" },
+      { ...reviewedEnvironment, filename: "other.h5" },
+      undefined,
+    ];
+    for (const environment_configuration of stale) {
+      const response = await proxyVariableBackend(
+        "metadata=1",
+        config,
+        async () => Response.json({ ...body, environment_configuration }),
+      );
+      expect(response.status).toBe(409);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+    }
+  });
+  test("a backend that only redirects is reported as exceeding the redirect limit", async () => {
+    let calls = 0;
+    const response = await proxyVariableBackend(
+      "variable=snap",
+      config,
+      async (url) => {
+        calls++;
+        return new Response(null, {
+          status: 303,
+          headers: { location: String(url) },
+        });
+      },
+    );
+    expect(calls).toBe(7);
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({
+      detail: "The calculation backend exceeded its result redirect limit.",
+    });
   });
   test("Modal result redirects are followed only on the original path", async () => {
     let calls = 0;

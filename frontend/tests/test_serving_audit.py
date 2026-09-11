@@ -1,6 +1,7 @@
 """Serving audit stays in the real private handler and never starts a population."""
 
 import importlib
+import logging
 import os
 from pathlib import Path
 
@@ -80,6 +81,24 @@ def test_audit_failure_is_controlled_and_uncached(endpoint, monkeypatch):
     assert response.status_code == 502
     assert response.headers["cache-control"] == "no-store"
     assert response.json() == {"detail": "Runtime audit failed."}
+
+
+def test_audit_failure_is_recorded_in_the_backend_log(endpoint, monkeypatch, caplog):
+    """The audit exists to diagnose serving; its own failure must leave a record."""
+
+    def failed(nonce):
+        raise RuntimeError("private-fixture-failure-detail")
+
+    monkeypatch.setattr(endpoint, "serving_witness", failed)
+    with caplog.at_level(logging.ERROR, logger=endpoint.__name__):
+        status, body = endpoint.handle_query("runtime_audit=fixture-nonce-012345")
+    assert (status, body) == (502, {"detail": "Runtime audit failed."})
+    records = [record for record in caplog.records if record.name == endpoint.__name__]
+    assert [record.levelno for record in records] == [logging.ERROR]
+    assert records[0].exc_info is not None
+    # The private detail belongs in the backend log, never in the public JSON.
+    assert "private-fixture-failure-detail" in caplog.text
+    assert "private-fixture-failure-detail" not in str(body)
 
 
 def test_real_lightweight_child_and_current_process_identity(endpoint, monkeypatch):

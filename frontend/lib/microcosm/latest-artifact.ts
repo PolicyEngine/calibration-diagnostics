@@ -74,29 +74,41 @@ function envOverride(name: string | undefined): string | undefined {
 // Server-side view of a registration: the registry defaults with this
 // deployment's repository/revision overrides applied. Keep the national
 // geography beside the repository so downstream shaping does not require a
-// second exhaustive country table.
+// second exhaustive country table. Resolution never throws: the reviewed-
+// selection check belongs to countryRepository() below.
 function resolveCountryRepository(country: MicrocosmCountry): MicrocosmCountryRepository {
   const registration = countryRegistration(country);
-  const repository = {
+  return {
     repo: envOverride(registration.repo_env) ?? registration.repo,
     revision: envOverride(registration.revision_env) ?? registration.revision,
     geography: registration.geography,
   };
-  if (registration.production_release_id) {
-    assertReviewedRepository(repository.repo, repository.revision);
-  }
-  return repository;
 }
 
-export const COUNTRY_REPO = Object.fromEntries(
+// The resolved table, without the reviewed-selection check. Module-private so
+// that countryRepository() below is the only way to read a country's
+// repository and the check cannot be bypassed.
+const COUNTRY_REPO = Object.fromEntries(
   (Object.keys(COUNTRY_REGISTRY) as MicrocosmCountry[]).map((country) => [
     country,
     resolveCountryRepository(country),
   ]),
 ) as Record<MicrocosmCountry, MicrocosmCountryRepository>;
 
-export const MICROCOSM_HF_REPO = COUNTRY_REPO.us.repo;
-export const MICROCOSM_HF_REVISION = COUNTRY_REPO.us.revision;
+// A country with a reviewed immutable production default must refuse a
+// conflicting deployment override. Check it per read rather than while building
+// COUNTRY_REPO: asserting at module scope would throw during import, so a
+// US-only misconfiguration would take down every other country's routes and
+// pages — and `next build` — instead of only the US reads it actually affects.
+export function countryRepository(
+  country: MicrocosmCountry,
+): MicrocosmCountryRepository {
+  const repository = COUNTRY_REPO[country];
+  if (countryRegistration(country).production_release_id) {
+    assertReviewedRepository(repository.repo, repository.revision);
+  }
+  return repository;
+}
 
 // Release/run ids are interpolated into HuggingFace URLs that carry the
 // server's HF token, so an unvalidated id ("../../..") could redirect the
@@ -128,15 +140,15 @@ export function classifyApiError(error: unknown): { status: number; body: { deta
 }
 
 export function microcosmRepo(country: MicrocosmCountry): string {
-  return COUNTRY_REPO[country].repo;
+  return countryRepository(country).repo;
 }
 
 export function microcosmRevision(country: MicrocosmCountry): string {
-  return COUNTRY_REPO[country].revision;
+  return countryRepository(country).revision;
 }
 
 export function microcosmCountryGeography(country: MicrocosmCountry): string {
-  return COUNTRY_REPO[country].geography;
+  return countryRepository(country).geography;
 }
 
 function hfAuthHeaders(): HeadersInit | undefined {
@@ -2032,7 +2044,7 @@ export function buildCalibration(
 
 // --- HF access --------------------------------------------------------------
 export function hfResolveUrl(path: string, country: MicrocosmCountry = "us"): string {
-  const { repo, revision } = COUNTRY_REPO[country];
+  const { repo, revision } = countryRepository(country);
   return `https://huggingface.co/datasets/${repo}/resolve/${revision}/${path}`;
 }
 
@@ -2074,7 +2086,7 @@ async function loadReleasePublishedAt(
   revalidate: number,
   country: MicrocosmCountry,
 ): Promise<string | null> {
-  const { repo, revision } = COUNTRY_REPO[country];
+  const { repo, revision } = countryRepository(country);
   const url =
     `https://huggingface.co/api/datasets/${repo}/tree/${revision}/releases/${releaseId}` +
     "?recursive=false&expand=true";
@@ -2112,7 +2124,7 @@ export async function loadReleases(
   revalidate: number,
   country: MicrocosmCountry = "us",
 ): Promise<ReleaseEntry[]> {
-  const { repo, revision } = COUNTRY_REPO[country];
+  const { repo, revision } = countryRepository(country);
   const files = new Map<string, Set<string>>();
   // The HF tree endpoint paginates (~1000 entries/page via a Link cursor);
   // follow every page so releases don't silently vanish as the repo grows.

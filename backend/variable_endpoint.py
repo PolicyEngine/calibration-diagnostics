@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import threading
@@ -20,6 +21,7 @@ from scripts.microcosm_variable_core import (
 )
 from scripts.runtime_identity import runtime_identity
 
+LOGGER = logging.getLogger(__name__)
 VARIABLE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # The native simulation and its cache are mutable. Serialize their use even
 # when a local ASGI server is configured with multiple request threads.
@@ -44,6 +46,10 @@ def handle_query(query: str) -> tuple[int, dict]:
         try:
             return 200, {"runtime_audit": serving_witness(nonce)}
         except Exception:
+            # This branch exists so an operator can diagnose the serving
+            # process. Its own failure cause belongs in the backend logs, not
+            # in the public JSON and not discarded.
+            LOGGER.exception("Runtime audit failed")
             return 502, {"detail": "Runtime audit failed."}
     variables = []
     for key in ("variables", "variable"):
@@ -56,6 +62,13 @@ def handle_query(query: str) -> tuple[int, dict]:
     revision = os.environ.get("POPULACE_HF_REVISION", DEFAULT_REVISION)
 
     if params.get("metadata") == ["1"]:
+        try:
+            validate_selection(
+                repo=repo, hf_revision=revision, filename=DEFAULT_FILENAME
+            )
+        except VariableCalculationError as exc:
+            # The conflict is detectable here, and it fails every calculation.
+            return exc.status_code, {"detail": str(exc)}
         return 200, {
             "runtime": runtime_identity(),
             "data_configuration": reviewed_release(),
@@ -98,7 +111,5 @@ def handle_query(query: str) -> tuple[int, dict]:
         return exc.status_code, {"detail": str(exc)}
     except Exception:
         # Internal tracebacks belong in the backend logs, not public JSON.
-        import logging
-
-        logging.getLogger(__name__).exception("Variable calculation failed")
+        LOGGER.exception("Variable calculation failed")
         return 502, {"detail": "Variable calculation failed."}
