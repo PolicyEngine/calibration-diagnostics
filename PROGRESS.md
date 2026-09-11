@@ -70,6 +70,17 @@ Full suites at `HEAD` (exit codes from a non-piped run):
 needs the evaluation dependencies rather than the Modal backend lock. In a venv
 with them it is 440 passed, 1 skipped, exit 0 at both `234f27c` and `HEAD`.
 
+## Independent review
+
+Six read-only reviewers (one per fix, one for the no-calculation-change
+constraint, one for completeness) reviewed `234f27c..HEAD`; every finding they
+raised went to three independent refuters. Zero findings survived. The single
+raised item, `backend/runtime_audit.py:66` raising a bare
+`RuntimeError("Audit child failed")` without the child's exit code or stderr,
+was refuted 3/3 as pre-existing code outside this diff (the file is byte-identical
+at `234f27c` and `HEAD`) and outside finding 1's ask. It is recorded as a
+follow-up, not fixed here, because the task forbids touching unrelated files.
+
 ## Done
 
 - [x] Verified clean worktree at `234f27c`.
@@ -79,7 +90,13 @@ with them it is 440 passed, 1 skipped, exit 0 at both `234f27c` and `HEAD`.
 - [x] Ran every suite CI runs, plus the root evaluation harness.
 - [x] Confirmed no pinned, locked or numeric asset changed.
 
+- [x] Independent adversarial review: zero confirmed defects.
+- [x] Re-verified the remote ref at `234f27c`, pushed with
+      `--force-with-lease` (a fast-forward, no rewrite), CI green.
+
 ## Next
 
-- [ ] Independent adversarial review of the landed fixes.
-- [ ] Re-verify the remote ref, force-with-lease push, watch `gh pr checks 182`.
+Nothing outstanding on these four findings. Follow-up for a separate change:
+`backend/runtime_audit.py:66` could carry the audit child's returncode and
+stderr into the `RuntimeError` so the logger landed by finding 1 records a cause
+for a non-zero child exit.
