@@ -15,6 +15,9 @@ export interface StructuredTargetIdentity {
   variableLabel: string | null;
   measure: string | null;
   geography: string;
+  geographyId: string | null;
+  geographyDimensionId: string | null;
+  geographyRank: number | null;
   level: string;
   dimensions: StructuredTargetDimension[];
   breakdown: string;
@@ -35,11 +38,20 @@ export function readStructuredTarget(
   definitions: Record<string, StructuredDimensionDefinition>,
   nationalGeography: string,
 ): StructuredTargetIdentity {
-  const source = isPlainObject(row.source) ? row.source : {};
-  const variable = isPlainObject(row.variable) ? row.variable : {};
-  const values = isPlainObject(row.dimensions) ? row.dimensions : {};
-  const sourceId = stringValue(source.id) ?? "other";
-  const variableId = stringValue(variable.id) ?? "unknown";
+  if (!isPlainObject(row.source) || !stringValue(row.source.id)) {
+    throw new Error("Schema 7 target source.id must be a non-empty string.");
+  }
+  if (!isPlainObject(row.variable) || !stringValue(row.variable.id)) {
+    throw new Error("Schema 7 target variable.id must be a non-empty string.");
+  }
+  if (!isPlainObject(row.dimensions)) {
+    throw new Error("Schema 7 target dimensions must be an object.");
+  }
+  const source = row.source;
+  const variable = row.variable;
+  const values = row.dimensions;
+  const sourceId = stringValue(source.id)!;
+  const variableId = stringValue(variable.id)!;
   const structured = readStructuredDimensions(values, definitions);
   const geography = structured.geography ?? nationalGeography;
   const level = structured.level ?? "national";
@@ -54,6 +66,9 @@ export function readStructuredTarget(
     variableLabel: stringValue(variable.label),
     measure: stringValue(variable.measure),
     geography,
+    geographyId: structured.geographyId,
+    geographyDimensionId: structured.geographyDimensionId,
+    geographyRank: structured.geographyRank,
     level,
     dimensions,
     breakdown: dimensions.map((dimension) => dimension.value).join(" · "),

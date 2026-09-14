@@ -9,20 +9,14 @@ import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import {
-  releaseSelectOptions,
-  useMicrocosmReleases,
   useMicrocosmVariableValue,
   useVariableCatalog,
   type CatalogVariable,
   type MicrocosmVariableValue,
 } from "@/lib/api/hooks/use-microcosm";
+import { HOSTED_US_RELEASE } from "@/lib/microcosm/production-release";
 
 const MAX_SELECTED = 12;
-const CURRENT_YEAR = new Date().getFullYear();
-const PERIOD_OPTIONS = Array.from(
-  { length: CURRENT_YEAR + 5 - 2020 + 1 },
-  (_, index) => String(2020 + index),
-);
 
 function formatValue(value: number | null | undefined, unit: string | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -82,6 +76,9 @@ function ResultCard({
       </div>
       <div className="mt-1.5 text-xs text-muted-foreground">
         Weighted total on the calibrated dataset
+        {row.state_filter !== undefined && (
+          <span> · {row.state_filter ? `${row.state_filter} records` : "national records"}</span>
+        )}
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-border/60 pt-3 text-xs">
@@ -110,18 +107,16 @@ function ResultCard({
 export function MicrocosmVariableLookupView() {
   const [selected, setSelected] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState<string[]>([]);
-  const [period, setPeriod] = useState("2024");
-  const [release, setRelease] = useState("");
+  const period = String(HOSTED_US_RELEASE.data_year);
+  const release = HOSTED_US_RELEASE.release_id;
   const [search, setSearch] = useState("");
 
   const { data: catalog = [], isLoading: catalogLoading } = useVariableCatalog();
-  const { data: releaseData } = useMicrocosmReleases();
-  const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
 
   const query = useMicrocosmVariableValue({
     variables: submitted,
     period,
-    release: release || undefined,
+    release,
   });
 
   const byName = useMemo(
@@ -248,7 +243,7 @@ export function MicrocosmVariableLookupView() {
 
       <SectionCard
         title={`Selected variables (${selected.length}/${MAX_SELECTED})`}
-        description="Pick a period and release, then run the weighted calculation through PolicyEngine."
+        description="Run the weighted calculation using the pinned production release and its supported period."
       >
         <div className="flex flex-col gap-4">
           {selected.length === 0 ? (
@@ -283,34 +278,14 @@ export function MicrocosmVariableLookupView() {
           )}
 
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+            <div className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
               Period
-              <select
-                value={period}
-                onChange={(event) => setPeriod(event.target.value)}
-                className="h-9 rounded-md border border-border bg-card px-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
-              >
-                {PERIOD_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-              Release
-              <select
-                value={release}
-                onChange={(event) => setRelease(event.target.value)}
-                className="h-9 min-w-[220px] rounded-md border border-border bg-card px-3 text-sm text-foreground focus:border-primary/60 focus:outline-none"
-              >
-                {releaseOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <span className="py-2 text-foreground">{period}</span>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-muted-foreground">
+              Production release (pinned)
+              <span className="break-all font-mono text-foreground">{release}</span>
+            </div>
             <button
               type="button"
               onClick={run}
@@ -320,6 +295,10 @@ export function MicrocosmVariableLookupView() {
               {query.isFetching ? "Running…" : `Run ${selected.length || ""}`.trim()}
             </button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Calculations use the reviewed production input. Historical releases remain
+            available in calibration browsing and comparisons.
+          </p>
         </div>
       </SectionCard>
 
@@ -342,6 +321,20 @@ export function MicrocosmVariableLookupView() {
                 : `${fmt(result.elapsed_seconds, { digits: 1 })}s total`}
             </span>
           </div>
+          {result.runtime && (
+            <div className="break-all rounded-md border border-border p-3 text-xs text-muted-foreground">
+              <p>Runtime: {Object.entries(result.runtime.packages)
+                .filter(([, version]) => version != null)
+                .map(([name, version]) => `${name} ${version}`).join(" · ")}</p>
+              {result.data_identity && (
+                <>
+                  <p>Data {result.data_identity.verified ? "verified" : "not verified"}: {result.data_identity.release_id}</p>
+                  <p>HF revision: {result.data_identity.hf_revision}</p>
+                  <p>H5 SHA-256: {result.data_identity.sha256}</p>
+                </>
+              )}
+            </div>
+          )}
           <div className="grid gap-3 md:grid-cols-2">
             {resultRows.map((row) => (
               <ResultCard key={row.variable} row={row} unit={byName.get(row.variable)?.unit} />

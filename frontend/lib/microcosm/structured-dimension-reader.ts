@@ -19,6 +19,9 @@ export interface StructuredTargetDimension {
 
 export interface StructuredDimensions {
   geography: string | null;
+  geographyId: string | null;
+  geographyDimensionId: string | null;
+  geographyRank: number | null;
   level: string | null;
   dimensions: StructuredTargetDimension[];
 }
@@ -84,6 +87,9 @@ export function readStructuredDimensions(
   definitions: Record<string, StructuredDimensionDefinition>,
 ): StructuredDimensions {
   let geography: string | null = null;
+  let geographyId: string | null = null;
+  let geographyDimensionId: string | null = null;
+  let geographyRank: number | null = null;
   let level: string | null = null;
   const dimensions: StructuredTargetDimension[] = [];
 
@@ -98,8 +104,16 @@ export function readStructuredDimensions(
       (definition?.values ? Object.keys(definition.values) : undefined);
     const rank = rankOrder?.indexOf(rawValue) ?? -1;
     if (definition?.role === "geography") {
-      geography ??= value;
-      level ??= definition.level ?? "region";
+      if (geography != null) {
+        throw new Error(
+          "Structured target dimensions must contain at most one populated geography-role dimension.",
+        );
+      }
+      geography = value;
+      geographyId = rawValue;
+      geographyDimensionId = id;
+      geographyRank = rank >= 0 ? rank : null;
+      level = definition.level ?? "region";
       continue;
     }
     dimensions.push({
@@ -112,5 +126,12 @@ export function readStructuredDimensions(
     });
   }
 
-  return { geography, level, dimensions };
+  return {
+    geography,
+    geographyId,
+    geographyDimensionId,
+    geographyRank,
+    level,
+    dimensions,
+  };
 }

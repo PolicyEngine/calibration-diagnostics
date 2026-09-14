@@ -2,22 +2,34 @@
 
 from __future__ import annotations
 
-import json
+import gc
 import math
 import os
 import time
-from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import urlopen
+import uuid
+from pathlib import PurePosixPath
+from typing import Any, Callable
 
 import numpy as np
 
+from scripts.hosted_release import (
+    VariableCalculationError,
+    download_certification,
+    reviewed_release,
+    validate_runtime,
+    validate_selection,
+    verify_h5,
+)
+from scripts.runtime_identity import host_resources
 
 # Deprecated upstream identifiers: Microcosm's current HF repository and H5
 # filename still use the former Populace names.
-DEFAULT_REPO = "policyengine/populace-us"
-DEFAULT_REVISION = "main"
-DEFAULT_FILENAME = "populace_us_2024.h5"
+_REVIEWED = reviewed_release()
+DEFAULT_REPO = _REVIEWED["repo"]
+DEFAULT_REVISION = _REVIEWED["hf_revision"]
+DEFAULT_FILENAME = _REVIEWED["filename"]
+DEFAULT_RELEASE = _REVIEWED["release_id"]
+DEFAULT_PERIOD = str(_REVIEWED["data_year"])
 
 os.environ.setdefault("HF_HOME", "/tmp/huggingface")
 os.environ.setdefault("HF_HUB_CACHE", "/tmp/huggingface/hub")
@@ -83,209 +95,34 @@ STATE_FIPS = {
 }
 
 
-class VariableCalculationError(RuntimeError):
-    """User-facing calculation failure.
-
-    ``status_code`` lets the HTTP handler distinguish a caller error (400,
-    unknown variable), a capacity refusal (503, dataset too large for the
-    host — retryable elsewhere), and an upstream failure (502, default).
-    """
-
-    def __init__(self, message: str, status_code: int = 502) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-
-
 _SIM_CACHE: dict[tuple[str, str, str, str | None], tuple[str, Any]] = {}
-# Max state-filtered sims kept resident (plus the national sim); each pins a
-# full Microsimulation, so this caps warm-instance memory.
-_MAX_STATE_SIMS = 3
 
 
-# Sentinel .h5 path -> the release H5 bytes held in RAM. Populated only when
-# the dataset can't fit on the ephemeral disk (see _download_dataset).
-_CORE_IMAGES: dict[str, bytes] = {}
-_CORE_LABEL_SEQ = [0]
-_CORE_PATCH_INSTALLED = [False]
+def _simulation_for(
+    key: tuple[str, str, str, str | None],
+    dataset_path: str,
+    build: Callable[[], Any],
+) -> Any:
+    """Keep one native simulation, releasing it before loading another scope."""
+    cached = _SIM_CACHE.get(key)
+    if cached is not None:
+        return cached[1]
+    _SIM_CACHE.clear()
+    # Native populations and simulations have cyclic references. Collect them
+    # before state filtering loads the input tables for the next simulation.
+    gc.collect()
+    sim = build()
+    _SIM_CACHE[key] = (dataset_path, sim)
+    return sim
 
 
-def _install_core_hdfstore_patch() -> None:
-    """Route pd.HDFStore(sentinel) reads through HDF5's in-memory core driver.
-
-    policyengine-us opens datasets with a hardcoded ``pd.HDFStore(path,
-    mode="r")`` in several places (schema validation, format sniffing, our own
-    state filter). When ``path`` is one of our sentinels we inject the core
-    driver with the release bytes as an in-memory image — HDF5 reads the exact
-    same file content from RAM (verified byte-identical), so no dataset ever
-    has to touch the too-small disk. The core driver refuses an existing file,
-    so it opens under a throwaway label; the sentinel itself stays a 0-byte
-    file purely so the loaders' ``Path.exists()`` checks pass.
-    """
-    if _CORE_PATCH_INSTALLED[0]:
-        return
-    import pandas as pd
-
-    real_hdfstore = pd.HDFStore
-
-    class _CoreImageHDFStore(real_hdfstore):  # type: ignore[misc, valid-type]
-        def __init__(self, path: Any, *args: Any, **kwargs: Any) -> None:
-            image = _CORE_IMAGES.get(str(path))
-            if image is not None and "driver" not in kwargs:
-                _CORE_LABEL_SEQ[0] += 1
-                label = f"/tmp/.microcosm-core-{os.getpid()}-{_CORE_LABEL_SEQ[0]}.h5"
-                kwargs.update(
-                    driver="H5FD_CORE",
-                    driver_core_image=image,
-                    driver_core_backing_store=0,
-                )
-                super().__init__(label, *args, **kwargs)
-                return
-            super().__init__(path, *args, **kwargs)
-
-    pd.HDFStore = _CoreImageHDFStore
-    _CORE_PATCH_INSTALLED[0] = True
-
-
-def _download_dataset(hf_hub_download: Any, repo: str, filename: str, revision: str) -> str:
-    """Fetch the release H5 to wherever it fits.
-
-    The normal HF cache download is used everywhere it works (local dev, and
-    any host whose disk holds the file). Vercel's ephemeral disk is only
-    ~550MB with ~150MB of function bundle, so a ~340MB H5 cannot land on disk
-    at all — hf_hub_download fails there with ENOSPC. In that case the H5 is
-    streamed into RAM and served through HDF5's in-memory core driver instead,
-    charged to the function's much larger memory allocation.
-    """
-    # If the file plainly can't fit on the ephemeral disk, don't waste tens of
-    # seconds and hundreds of MB of egress on a download that will ENOSPC —
-    # go straight to the RAM path (which applies the memory guard and refuses
-    # cleanly on a small-memory host). Only pre-skip when we can positively
-    # confirm the file won't fit; otherwise fall through to the normal path.
-    import shutil
-
-    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{filename}"
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    auth = {"Authorization": f"Bearer {token}"} if token else {}
-    size = _url_content_length(url, auth)
-    cache_root = os.environ.get("HF_HUB_CACHE", "/tmp/huggingface/hub")
-    try:
-        os.makedirs(cache_root, exist_ok=True)
-        free = shutil.disk_usage(cache_root).free
-    except OSError:
-        free = None
-    # 1.2x headroom for HF's temp/blob copy during download.
-    if size is not None and free is not None and size * 1.2 > free:
-        return _load_release_into_ram(repo, filename, revision)
-
-    try:
-        return hf_hub_download(
-            repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
-        )
-    except OSError as exc:
-        if getattr(exc, "errno", None) != 28:
-            raise
-        return _load_release_into_ram(repo, filename, revision)
-
-
-def _cgroup_memory_limit_bytes() -> int | None:
-    """The function's hard memory limit, from the cgroup (v2 then v1)."""
-    for path in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
-        try:
-            with open(path) as handle:
-                raw = handle.read().strip()
-        except OSError:
-            continue
-        if raw and raw != "max":
-            try:
-                value = int(raw)
-            except ValueError:
-                continue
-            # cgroup v1 reports a huge sentinel when unlimited.
-            if 0 < value < (1 << 62):
-                return value
-    return None
-
-
-def _url_content_length(url: str, headers: dict[str, str]) -> int | None:
-    from urllib.request import Request
-
-    request = Request(url, method="HEAD")
-    for key, value in headers.items():
-        request.add_header(key, value)
-    try:
-        with urlopen(request, timeout=60) as response:
-            length = response.headers.get("Content-Length")
-            return int(length) if length else None
-    except (OSError, ValueError):
-        return None
-
-
-def _load_release_into_ram(repo: str, filename: str, revision: str) -> str:
-    import shutil
-    from urllib.request import Request
-
-    sentinel = f"/tmp/microcosm-{revision}.h5"
-    if sentinel in _CORE_IMAGES and os.path.exists(sentinel):
-        return sentinel
-
-    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{filename}"
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    auth = {"Authorization": f"Bearer {token}"} if token else {}
-
-    # A full Microsimulation over a microcosm release needs base runtime + two
-    # copies of the H5 (our retained image + HDF5's transient core copy) +
-    # entity arrays — empirically >3GB, which OOM-kills a 3GB serverless
-    # function. When the cgroup limit is that tight, refuse up front with a
-    # clear message instead of being OOM-killed mid-load. A host with more
-    # memory (the Modal backend, or local dev with no cgroup limit) proceeds.
-    # Reaching here means the H5 didn't fit on disk (ENOSPC) — which only
-    # happens on the tiny-disk Vercel function; Modal and local dev have disk
-    # and never take this branch. Unless we can positively confirm a generous
-    # memory limit (>=4GB, e.g. a big-RAM/small-disk host), refuse with a clear
-    # message rather than be OOM-killed loading a >3GB microsimulation. The
-    # cgroup file is often unreadable on serverless, so unknown == refuse.
-    limit = _cgroup_memory_limit_bytes()
-    if limit is None or limit < 4_000_000_000:
-        size = _url_content_length(url, auth)
-        size_note = f" ({size / 1e6:.0f}MB)" if size else ""
-        limit_note = f"memory limit {limit / 1e9:.1f}GB" if limit else "limited memory"
-        raise VariableCalculationError(
-            f"This release's dataset{size_note} is too large to compute in the "
-            f"hosted environment ({limit_note}; a full microsimulation needs "
-            "over 3GB). Run the variable lookup locally, or point the endpoint "
-            "at a higher-memory backend.",
-            status_code=503,
-        )
-
-    # Drop other releases held in RAM (image + any cached simulation) so only
-    # one dataset is resident at a time.
-    for other in [k for k in _CORE_IMAGES if k != sentinel]:
-        _CORE_IMAGES.pop(other, None)
-        try:
-            os.unlink(other)
-        except OSError:
-            pass
-    for key in [k for k in _SIM_CACHE if k[1] != revision]:
-        _SIM_CACHE.pop(key, None)
-
-    # Remove any partial hf_hub_download left by the ENOSPC attempt.
-    cache_root = os.environ.get("HF_HUB_CACHE", "/tmp/huggingface/hub")
-    shutil.rmtree(
-        os.path.join(cache_root, f"datasets--{repo.replace('/', '--')}"),
-        ignore_errors=True,
+def _download_dataset(
+    hf_hub_download: Any, repo: str, filename: str, revision: str
+) -> str:
+    """Download immutable bytes to the backend's disk before verification."""
+    return hf_hub_download(
+        repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
     )
-
-    request = Request(url)
-    for key, value in auth.items():
-        request.add_header(key, value)
-    with urlopen(request, timeout=600) as response:
-        image = response.read()  # single bytes object; no bytearray double-copy
-
-    _install_core_hdfstore_patch()
-    _CORE_IMAGES[sentinel] = image
-    with open(sentinel, "wb"):  # 0-byte marker so Path.exists() checks pass
-        pass
-    return sentinel
 
 
 def _disk_usage_report(root: str = "/tmp") -> str:
@@ -301,7 +138,9 @@ def _disk_usage_report(root: str = "/tmp") -> str:
             if os.path.isfile(path):
                 total = os.path.getsize(path)
             elif os.path.isdir(path):
-                for dirpath, _dirnames, filenames in os.walk(path, onerror=lambda e: None):
+                for dirpath, _dirnames, filenames in os.walk(
+                    path, onerror=lambda e: None
+                ):
                     for f in filenames:
                         try:
                             total += os.path.getsize(os.path.join(dirpath, f))
@@ -332,7 +171,7 @@ def _evict_other_releases(repo: str, filename: str, revision: str) -> None:
     """
     try:
         from huggingface_hub import try_to_load_from_cache
-    except Exception:  # pragma: no cover - depends on host Python env.
+    except ImportError:  # pragma: no cover - depends on host Python env.
         return
     cached = try_to_load_from_cache(
         repo_id=repo, filename=filename, revision=revision, repo_type="dataset"
@@ -359,33 +198,17 @@ def finite_float(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def resolve_release_id(repo: str, revision: str, requested_release: str) -> str:
-    if requested_release != "latest":
-        return requested_release
-    from urllib.request import Request
-
-    url = f"https://huggingface.co/datasets/{repo}/resolve/{revision}/latest.json"
-    # Attach the token so a private/gated repo's pointer resolves too — the H5
-    # download already authenticates, so an unauthenticated pointer fetch would
-    # be the odd one out and fail on any non-public repo.
-    request = Request(url)
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-    if token:
-        request.add_header("Authorization", f"Bearer {token}")
-    try:
-        with urlopen(request, timeout=20) as response:
-            pointer = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise VariableCalculationError(f"Could not resolve latest Microcosm release: {exc}") from exc
-    release_id = str(pointer.get("release_id") or "").strip()
-    if not release_id:
-        raise VariableCalculationError("Could not resolve latest Microcosm release.")
-    return release_id
-
-
-def state_prefix_for_variable(variable_name: str) -> str | None:
-    prefix = variable_name.split("_", 1)[0].upper()
-    return prefix if prefix in STATE_FIPS else None
+def state_for_variable(variable: Any) -> str | None:
+    """Use declared country metadata; national ``in_*`` names are not Indiana."""
+    defined_for = getattr(variable, "defined_for", None)
+    if isinstance(defined_for, str) and defined_for in STATE_FIPS:
+        return defined_for
+    parts = PurePosixPath(str(getattr(variable, "module_name", ""))).parts
+    for index in range(len(parts) - 2):
+        if parts[index : index + 2] == ("gov", "states"):
+            state = parts[index + 2].upper()
+            return state if state in STATE_FIPS else None
+    return None
 
 
 def state_filtered_dataset(dataset_path: str, state: str) -> Any:
@@ -437,66 +260,91 @@ def calculate_variables(
     variables: list[str],
     period: str,
     repo: str = DEFAULT_REPO,
-    revision: str,
+    revision: str | None = None,
+    hf_revision: str = DEFAULT_REVISION,
     filename: str = DEFAULT_FILENAME,
 ) -> dict[str, Any]:
     started = time.time()
+    config = validate_selection(
+        requested_release=revision,
+        repo=repo,
+        hf_revision=hf_revision,
+        filename=filename,
+        period=period,
+    )
+    runtime = validate_runtime(config)
+    release_id = config["release_id"]
+    revision = config["hf_revision"]
     try:
         from huggingface_hub import hf_hub_download
-        from policyengine_us import Microsimulation
     except Exception as exc:  # pragma: no cover - depends on host Python env.
         raise VariableCalculationError(
-            "Python package policyengine_us or huggingface_hub is not installed "
-            f"in the server environment: {exc}"
+            f"Could not import huggingface_hub in the server environment: {exc}"
         ) from exc
 
     unique_variables = list(dict.fromkeys(v.strip() for v in variables if v.strip()))
     dataset = f"hf://{repo}/{filename}@{revision}"
 
     try:
+        download_certification(config, hf_hub_download)
         _evict_other_releases(repo, filename, revision)
         dataset_path = _download_dataset(hf_hub_download, repo, filename, revision)
+        actual_sha256 = verify_h5(dataset_path, config)
+
+        # Country initialization and H5 input loading happen only after the
+        # installed package tuple, release certificate, and bytes are verified.
+        from policyengine_us import Microsimulation
+        from policyengine_us.system import system
+
+        simulation_cache_hits: dict[str, bool] = {}
+        simulation_cache_evictions: list[str] = []
 
         def get_sim(state: str | None = None) -> Any:
             cache_key = (repo, revision, filename, state)
             cached = _SIM_CACHE.get(cache_key)
+            simulation_cache_hits.setdefault(state or "national", cached is not None)
             if cached is not None:
                 return cached[1]
-            sim_dataset = (
-                state_filtered_dataset(dataset_path, state) if state else dataset_path
+            simulation_cache_evictions.extend(
+                key[3] or "national" for key in _SIM_CACHE
             )
-            sim = Microsimulation(dataset=sim_dataset)
-            _SIM_CACHE[cache_key] = (dataset_path, sim)
-            # Bound the cache: each state-filtered sim pins another full
-            # Microsimulation, so an unbounded cache OOMs a warm host serving
-            # lookups across many states. Keep the national sim plus the few
-            # most-recent state sims (dict preserves insertion order).
-            state_keys = [k for k in _SIM_CACHE if k[3] is not None]
-            while len(state_keys) > _MAX_STATE_SIMS:
-                _SIM_CACHE.pop(state_keys.pop(0), None)
-            return sim
+            return _simulation_for(
+                cache_key,
+                dataset_path,
+                lambda: Microsimulation(
+                    dataset=(
+                        state_filtered_dataset(dataset_path, state)
+                        if state else dataset_path
+                    )
+                ),
+            )
 
         results = []
         for variable_name in unique_variables:
             variable_started = time.time()
-            sim = get_sim(state_prefix_for_variable(variable_name))
-            variable = sim.tax_benefit_system.get_variable(variable_name)
+            variable = system.get_variable(variable_name)
             if variable is None:
                 raise VariableCalculationError(
                     f"Unknown variable: {variable_name}", status_code=400
                 )
+            state = state_for_variable(variable)
+            sim = get_sim(state)
             values = sim.calculate(variable_name, period)
-            raw_values = np.asarray(sim.calculate(variable_name, period, use_weights=False))
+            raw_values = np.asarray(
+                sim.calculate(variable_name, period, use_weights=False)
+            )
             weights = np.asarray(getattr(values, "weights", []))
             weighted_sum = finite_float(values.sum())
             raw_sum = finite_float(raw_values.sum())
             weight_sum = finite_float(weights.sum()) if weights.size else None
-            nonzero_weight_count = int(np.count_nonzero(weights)) if weights.size else None
+            nonzero_weight_count = (
+                int(np.count_nonzero(weights)) if weights.size else None
+            )
             results.append(
                 {
                     "variable": variable_name,
                     "period": period,
-                    "release_id": revision,
+                    "release_id": release_id,
                     "dataset": dataset,
                     "entity": variable.entity.key,
                     "definition_period": str(variable.definition_period),
@@ -508,9 +356,13 @@ def calculate_variables(
                     "weight_sum": weight_sum,
                     "record_count": int(raw_values.size),
                     "nonzero_weight_count": nonzero_weight_count,
+                    "state_filter": state,
                     "elapsed_seconds": finite_float(time.time() - variable_started),
                 }
             )
+            # Do not retain the preceding simulation through this loop's local
+            # variables when the next variable needs another geographic scope.
+            del sim, values, raw_values, weights
     except VariableCalculationError:
         raise
     except OSError as exc:
@@ -524,9 +376,17 @@ def calculate_variables(
 
     result: dict[str, Any] = {
         "period": period,
-        "release_id": revision,
+        "release_id": release_id,
         "dataset": dataset,
         "variables": results,
+        "runtime": runtime,
+        "data_identity": {**config, "sha256": actual_sha256, "verified": True},
+        "execution": {
+            "id": str(uuid.uuid4()),
+            "simulation_cache_hits": simulation_cache_hits,
+            "simulation_cache_evictions": simulation_cache_evictions,
+            "host_resources_after_calculation": host_resources(),
+        },
         "elapsed_seconds": finite_float(time.time() - started),
     }
     if len(results) == 1:

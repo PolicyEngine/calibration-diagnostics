@@ -13,9 +13,7 @@ describe("target matching presentation", () => {
     expect(targetMatchKindExplanation("chronicle_fact_key")).toBe(
       "Matched by exact Chronicle fact key.",
     );
-    expect(targetMatchKindExplanation("structured_identity")).toContain(
-      "structured source ID",
-    );
+    expect(targetMatchKindExplanation("structured_identity")).toContain("provider ID");
     expect(targetMatchKindExplanation(null)).toBe("Not matched across releases.");
   });
 
@@ -24,6 +22,8 @@ describe("target matching presentation", () => {
       "Legacy format → Structured format",
     );
     expect(targetRepresentationPairLabel(null, "structured")).toBe("Structured format");
+    expect(targetRepresentationPairLabel("structured", "hierarchy")).toBe(
+      "Structured format → Hierarchy format",
+    );
   });
-
 });

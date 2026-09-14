@@ -24,11 +24,15 @@ const RELEASE_ID = "microcosm-zz-2026-conformance";
 const DESCRIPTION =
   "Synthetic ZZ release whose dashboard presentation comes from release artifacts.";
 const PUBLISHER = "novastat_agency";
+const legacyDiagnosticsFixture = {
+  ...diagnosticsFixture,
+  schema_version: 2,
+};
 
 // Registration-only contract: production presentation/parsing code must not
 // gain a `zz` branch or table entry to make these data-shape assertions pass.
 const calibration = buildCalibration(
-  diagnosticsFixture,
+  legacyDiagnosticsFixture,
   RELEASE_ID,
   "2026-08-23T18:00:00Z",
   {},
@@ -67,7 +71,7 @@ describe("synthetic third-country conformance", () => {
     // A release_manifest.country block overrides the registration's labels and
     // flows through buildCalibration into the summary and the row geography.
     const overridden = buildCalibration(
-      diagnosticsFixture,
+      legacyDiagnosticsFixture,
       RELEASE_ID,
       "2026-08-23T18:00:00Z",
       {},
@@ -212,7 +216,7 @@ describe("synthetic third-country conformance", () => {
         targets_intro: "Zedland target-browser copy from the release artifact.",
       };
       const futureCalibration = buildCalibration(
-        diagnosticsFixture,
+        legacyDiagnosticsFixture,
         RELEASE_ID,
         "2026-08-23T18:00:00Z",
         {},
@@ -231,7 +235,7 @@ describe("synthetic third-country conformance", () => {
     "zz can override a publisher display name: treemap shaping ignores release_manifest.publisher_labels",
     () => {
       const futureCalibration = buildCalibration(
-        diagnosticsFixture,
+        legacyDiagnosticsFixture,
         RELEASE_ID,
         "2026-08-23T18:00:00Z",
         {},
@@ -261,7 +265,8 @@ describe("synthetic third-country conformance", () => {
         { region: "north", sex: "male", age_band: "65_plus" },
       ];
       const futureDiagnostics = {
-        ...diagnosticsFixture,
+        ...legacyDiagnosticsFixture,
+        schema_version: 7,
         dimensions: {
           region: {
             label: "Region",
@@ -278,17 +283,16 @@ describe("synthetic third-country conformance", () => {
             values: { "0_17": "0–17", "18_64": "18–64", "65_plus": "65+" },
           },
         },
-        targets: diagnosticsFixture.targets.map((target, index) =>
-          index < facetValues.length
-            ? {
-                ...target,
-                source: { id: PUBLISHER, citation: "ZZ official population table" },
-                variable: { id: "population", measure: "count" },
-                filter: null,
-                dimensions: facetValues[index],
-              }
-            : target,
-        ),
+        targets: diagnosticsFixture.targets.map((target, index) => ({
+          ...target,
+          source: { id: PUBLISHER, citation: "ZZ official population table" },
+          variable: {
+            id: index < facetValues.length ? "population" : "revenue",
+            measure: "count",
+          },
+          filter: null,
+          dimensions: facetValues[index] ?? {},
+        })),
       };
       const futureCalibration = buildCalibration(
         futureDiagnostics,
@@ -324,7 +328,8 @@ describe("synthetic third-country conformance", () => {
       measure: "count",
     };
     const futureDiagnostics = {
-      ...diagnosticsFixture,
+      ...legacyDiagnosticsFixture,
+      schema_version: 7,
       dimensions: {
         region: {
           label: "Region",

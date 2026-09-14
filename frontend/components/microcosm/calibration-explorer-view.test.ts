@@ -50,18 +50,18 @@ describe("calibration explorer presentation model", () => {
     );
   });
 
-  test("resolves program labels at the final presentation boundary", () => {
+  test("uses the program label resolved by the tree", () => {
     expect(
       explorerNodeLabel({
         id: "taxable interest income",
-        label: "taxable interest income",
+        label: "Taxable interest income",
         kind: "program",
       }),
     ).toBe("Taxable interest income");
     expect(
       explorerNodeLabel({
         id: "refundable ctc",
-        label: "refundable ctc",
+        label: "Refundable CTC",
         kind: "program",
       }),
     ).toBe("Refundable CTC");
@@ -72,6 +72,14 @@ describe("calibration explorer presentation model", () => {
         kind: "dimension_value",
       }),
     ).toBe("Traditional IRA deduction");
+    expect(
+      explorerNodeLabel({
+        id: "income_tax",
+        label: "Income TAX (GBP) — authored",
+        kind: "dimension_value",
+        authored_label: true,
+      }),
+    ).toBe("Income TAX (GBP) — authored");
     expect(
       explorerNodeLabel({
         id: "target-1",
@@ -244,6 +252,80 @@ describe("calibration explorer presentation model", () => {
         dimensions: [],
       },
     });
+  });
+
+  test("prefers artifact source and category labels in breadcrumbs", () => {
+    expect(
+      explorerBreadcrumbs(
+        state({
+          source: "obr",
+          program: "efo_receipts",
+          geography: "United Kingdom — authored",
+          dimensions: [],
+        }),
+        {
+          source: "Office for Budget Responsibility",
+          program: "EFO receipts",
+          geography: "United Kingdom — authored",
+        },
+      ),
+    ).toEqual([
+      { label: "All targets", path: { dimensions: [] } },
+      {
+        label: "Office for Budget Responsibility",
+        path: { dimensions: [] },
+      },
+      {
+        label: "EFO receipts",
+        path: {
+          source: "obr",
+          program: "efo_receipts",
+          dimensions: [],
+        },
+      },
+      {
+        label: "United Kingdom — authored",
+        path: {
+          source: "obr",
+          program: "efo_receipts",
+          geography: "United Kingdom — authored",
+          dimensions: [],
+        },
+      },
+    ]);
+  });
+
+  test("uses schema 8 value labels instead of formatting navigation ids", () => {
+    const current = state({
+      source: "obr",
+      program: "obr.efo_receipts",
+      geography: "United Kingdom",
+      dimensions: [
+        {
+          key: "obr.efo_line",
+          label: "Economic and fiscal outlook line",
+          value: "income_tax",
+        },
+      ],
+    });
+
+    expect(
+      explorerBreadcrumbs(current, {
+        source: "Office for Budget Responsibility",
+        program: "Economic and fiscal outlook receipts",
+        dimensions: ["Income tax (gross of tax credits)"],
+      }).at(-1)?.label,
+    ).toBe("Income tax (gross of tax credits)");
+  });
+
+  test("preserves an artifact category label on a program tile", () => {
+    expect(
+      explorerNodeLabel({
+        id: "efo_receipts",
+        kind: "program",
+        label: "EFO receipts",
+      }),
+    ).toBe("EFO receipts");
   });
 
   test("distinguishes an empty filtered result from an invalid hierarchy scope", () => {

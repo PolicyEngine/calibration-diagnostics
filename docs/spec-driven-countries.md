@@ -107,9 +107,10 @@ A registration with `fixture: true` (the conformance country `zz`) is a valid
 country for parsers and builders but is never listed in selectors or the
 release-alert allowlist.
 
-Schema readers must remain backward-compatible while published releases migrate.
-Name/filter parsing is a legacy adapter selected from each row's artifact shape,
-never by country.
+Schema readers remain backward-compatible for declared diagnostics schemas 2
+through 7 while published releases migrate. The top-level schema version selects
+one reader for the complete file, never by country or individual row shape. See
+[Calibration map hierarchy](calibration-map-hierarchy.md).
 
 ### Presentation
 
@@ -209,39 +210,31 @@ their IDs and raw values are humanized. When an age-band value lacks an
 artifact label, range values such as `0_17` and `65_plus` become `0–17` and
 `65+`.
 
-A geography-role dimension sets `row.geography` and uses its declared `level`
-or `"region"`. Other dimensions become `target_dimensions` with `key`,
+A geography-role dimension sets `row.geography`, `row.geography_id`,
+`row.geography_dimension_id`, and `row.geography_rank`, and uses its declared
+`level` or `"region"`. A target may contain at most one populated
+geography-role dimension. Other dimensions become `target_dimensions` with `key`,
 `label`, `value`, `source_key`, `raw_value`, and an optional zero-based `rank`.
 The published dimension ID, not its display label, determines `key`. Simple
 lowercase IDs retain keys such as `bd_age_band`; IDs containing other
 characters receive a lossless query-safe encoding. Consequently, two distinct
 dimensions may share a display label without merging into one facet.
-Facet values use rank order only when every displayed value has a rank;
-otherwise the legacy facet sorter remains in force. Structured rows are also
-excluded from whole-population estimate-scope inference.
+Facet values, including geography values, use rank order only when every
+displayed value has a rank; otherwise the legacy facet sorter remains in force.
+Structured rows are also excluded from whole-population estimate-scope
+inference.
 
-### Target representation classification
+### Target representation dispatch
 
-The dashboard classifies each target row by structure before normalizing it,
-then summarizes the complete `targets` array. Diagnostics schema versions do
-not identify the target representation: published schema 5 and schema 6 files
-can both contain legacy string fields. The structural classification is:
+The top-level diagnostics schema selects exactly one target reader. Schemas 2–6
+use the legacy reader, schema 7 uses the structured reader described above, and
+schema 8 uses the normalized hierarchy reader. Missing versions, version 1, and
+unsupported future versions are rejected explicitly. A row that does not match
+its file's declared representation is rejected; the dashboard does not choose a
+different reader from that row's shape.
 
-1. `structured` when every row has a plain-object `source` with a non-empty
-   `id`, a plain-object `variable` with a non-empty `id`, and a plain-object
-   `dimensions` field. Use `{}` when a target has no dimensions.
-2. `legacy` when no row has object-valued `source`, `variable`, or `dimensions`
-   fields.
-3. `mixed` when complete structured rows and complete legacy rows occur together.
-4. `unknown` when there are no target rows.
-
-Every target row must independently satisfy either the structured or legacy
-shape. Partially structured rows are invalid. In a mixed file, each complete
-structured row uses the structured reader and each complete legacy row uses the
-legacy reader; the file-level `mixed` value is descriptive and does not select a
-third normalization strategy.
-
-Calibration summary and target-diagnostics responses report the classification:
+Calibration summary and target-diagnostics responses report the selected
+representation:
 
 ```json
 {
@@ -254,10 +247,11 @@ Calibration summary and target-diagnostics responses report the classification:
 ```
 
 `structured_dimensions` reports whether the diagnostics published a plain
-dimension dictionary. `target_representation` summarizes the collection. The
-existing per-row `dimension_adapter` response field remains for compatibility
-and describes only whether that row's dimensions came from a structured object,
-a known legacy filter, or legacy name and metadata parsing.
+dimension dictionary. `target_representation` identifies the selected reader.
+The existing per-row `dimension_adapter` response field remains for
+compatibility and describes whether that row's dimensions came from a structured
+object, a normalized hierarchy, a known legacy filter, or legacy name and
+metadata parsing.
 
 ### Structured source and variable identifiers
 
@@ -295,24 +289,18 @@ For a `legacy` file, the isolated legacy reader handles the established dotted,
 slash, Chronicle metadata, and known filter encodings. It does not interpret an
 arbitrary underscore as a structural separator.
 
-For a `mixed` file, fully legacy rows retain legacy behavior. Partially
-structured rows use the compatibility precedence: Chronicle publisher ID,
-then `source.id`, then legacy source parsing; `variable.id`, then legacy
-variable parsing; structured dimensions, then known filter dimensions, then
-legacy metadata and name dimensions. This prevents one partially migrated row
-from changing unrelated legacy rows in the same file.
-
 ### Cross-release target matching
 
-The legacy and structured readers normalize each row independently. Candidate
-validation and weighted target-error comparisons then use one collection-level
-matcher with this order:
+The legacy, structured, and hierarchy readers normalize their rows before
+candidate validation and weighted target-error comparison. The collection-level
+matcher uses this order:
 
 1. Exact, non-empty `base_name`, which uses `target_name` when supplied and
    otherwise removes the period suffix from `name`.
 2. Exact, non-empty Chronicle `fact_key`.
-3. For two structured rows, an exact tuple of source ID, variable ID, measure,
-   and raw dimension ID/value pairs sorted by dimension ID.
+3. For two structured or hierarchy rows, an exact tuple of provider/source ID,
+   category/variable ID, measure, and raw dimension ID/value pairs. Schema 8
+   preserves producer dimension order.
 
 At each step, a key is used only when it identifies exactly one still-unmatched
 row in each release. Duplicate and many-to-one keys remain unmatched unless a
@@ -330,12 +318,15 @@ using the structured representation is available.
 
 ### Producer follow-up
 
-Microcosm release producers must publish all of the following before the legacy
-presentation and normalization readers can be retired:
+Microcosm release producers must publish schema 8 hierarchy rows before the
+legacy presentation and normalization readers can be retired. Each row must
+contain:
 
 - `release_manifest.country`;
 - `release_manifest.presentation`;
 - `release_manifest.publisher_labels`;
-- `calibration_diagnostics.dimensions`;
-- a `targets[].dimensions` object on every row, including `{}` where empty; and
-- structured `targets[].source` and `targets[].variable` objects on every row.
+- a provider ID and label;
+- a category ID, label, and provider relationship;
+- a geography ID, label, and level;
+- an ordered `dimensions` array, including `[]` where empty; and
+- a target ID and label.

@@ -33,6 +33,16 @@ const STATE_ABBRS = new Set([
   "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "US",
 ]);
 
+// Compatibility labels for the country-level GSS identifiers in the current
+// UK schema-6 artifact. Future artifacts should publish geography labels in
+// structured dimension definitions or `ledger_geography_name`.
+const LEGACY_GSS_GEOGRAPHIES: Readonly<Record<string, string>> = {
+  K02000001: "United Kingdom",
+  K03000001: "Great Britain",
+  E92000001: "England",
+  S92000003: "Scotland",
+};
+
 const MEASURES = new Set(["total", "count", "mean", "filers", "nonfilers"]);
 const LEGACY_UNDERSCORE_PUBLISHERS = new Set([
   "statbel",
@@ -68,6 +78,43 @@ export function districtFromGeoId(value: string | null): string | null {
   if (!match) return null;
   const state = FIPS_TO_ABBR[match[1]];
   return state ? `${state}-${match[2]}` : null;
+}
+
+function geographyFromMetadata(
+  metadata: JsonObject,
+  nationalGeography: string,
+): Pick<ParsedLegacyTarget, "geography" | "level"> | null {
+  const publishedName = stringValue(metadata.ledger_geography_name)?.trim() ?? null;
+  const geographyId = stringValue(metadata.ledger_geography_id);
+  const geographyLevel = stringValue(metadata.ledger_geography_level);
+  const gssGeography = geographyId ? LEGACY_GSS_GEOGRAPHIES[geographyId] : null;
+
+  if (publishedName) {
+    return {
+      geography: publishedName,
+      level:
+        geographyLevel === "country" &&
+          publishedName === nationalGeography &&
+          !gssGeography
+          ? "national"
+          : geographyLevel ?? "",
+    };
+  }
+  if (gssGeography) {
+    return { geography: gssGeography, level: geographyLevel ?? "country" };
+  }
+  if (geographyLevel === "congressional_district") {
+    const geography = districtFromGeoId(geographyId);
+    return geography ? { geography, level: geographyLevel } : null;
+  }
+  if (geographyLevel === "state") {
+    const geography = stateFromGeoId(geographyId) ?? stringValue(metadata.state);
+    return geography ? { geography, level: geographyLevel } : null;
+  }
+  if (geographyLevel === "country") {
+    return { geography: nationalGeography, level: "national" };
+  }
+  return null;
 }
 
 function variableFromMeasure(value: string | null): string | null {
@@ -162,29 +209,13 @@ function legacyVariable(
 function parseDottedTarget(
   name: string,
   row: JsonObject,
-  nationalGeography: string,
+  _nationalGeography: string,
 ): ParsedLegacyTarget | null {
   if (!name.includes(".")) return null;
   const metadata = asObject(row.metadata);
   const registry = asObject(row.registry);
   const parts = name.split(".");
   const source = stringValue(registry.family) ?? parts[0] ?? "";
-  const geoLevel = stringValue(metadata.ledger_geography_level);
-  const geoId = stringValue(metadata.ledger_geography_id);
-  const geography =
-    geoLevel === "country"
-      ? nationalGeography
-      : geoLevel === "congressional_district"
-        ? districtFromGeoId(geoId) ?? ""
-        : stateFromGeoId(geoId) ?? stringValue(metadata.state) ?? "";
-  const level =
-    geoLevel === "country"
-      ? "national"
-      : geoLevel === "state"
-        ? "state"
-        : geoLevel === "congressional_district"
-          ? "congressional_district"
-          : "";
   const measureId = stringValue(metadata.source_measure_id) ?? parts.at(-1) ?? "";
   const variable =
     readableToken(stringValue(metadata.variable)) ??
@@ -202,7 +233,7 @@ function parseDottedTarget(
     .filter((value): value is string => Boolean(value && value !== variable))
     .join(" · ");
 
-  return { geography, level, source, variable, breakdown };
+  return { geography: "", level: "", source, variable, breakdown };
 }
 
 function parseSlashTarget(name: string, nationalGeography: string): ParsedLegacyTarget {
@@ -276,10 +307,12 @@ export function readLegacyTarget(
     parseDottedTarget(name, row, nationalGeography) ??
     parseSlashTarget(name, nationalGeography);
   const publisher = chroniclePublisherFromMetadata(metadata);
+  const metadataGeography = geographyFromMetadata(metadata, nationalGeography);
   return {
     ...parsed,
-    geography: decomposition?.geography ?? parsed.geography,
-    level: decomposition?.level ?? parsed.level,
+    geography:
+      decomposition?.geography ?? metadataGeography?.geography ?? parsed.geography,
+    level: decomposition?.level ?? metadataGeography?.level ?? parsed.level,
     source: publisher ?? parsed.source,
     variable: legacyVariable(name, row, decomposition) ?? parsed.variable,
     breakdown: decomposition
