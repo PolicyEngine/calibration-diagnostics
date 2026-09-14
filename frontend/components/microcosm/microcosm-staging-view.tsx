@@ -1174,6 +1174,7 @@ function MicrocosmStagingRunsView() {
                 {runData.has_calibration && (
                   <SectionCard
                     title="Calibration map"
+                    headerAlign="center"
                     actions={
                       <CalibrationMapViewSelect
                         value={calibrationMapView}
