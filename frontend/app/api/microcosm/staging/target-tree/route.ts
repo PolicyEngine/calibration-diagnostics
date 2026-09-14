@@ -37,6 +37,7 @@ export async function GET(request: Request) {
           calibrationTreeRequestState(params),
           calibration.release_id,
           calibration.target_loss_attribution.status !== "unavailable",
+          calibration.calibration_provenance,
         ),
       ),
       { headers: { "Cache-Control": "no-store" } },

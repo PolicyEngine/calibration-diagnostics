@@ -8,6 +8,7 @@ import { PUBLISHED_RELEASE_STALE_TIME_MS } from "@/lib/api/cache-policy";
 import { withBasePath } from "@/lib/base-path";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
+import type { CalibrationProvenance } from "@/lib/microcosm/target-loss-attribution";
 import type { TargetChangeMode } from "@/lib/microcosm/target-change";
 import type { TargetChangeTreeApiResponse } from "@/lib/microcosm/target-change-tree";
 import {
@@ -248,6 +249,7 @@ export interface MicrocosmCalibration {
   compiled_candidate_targets?: number | null;
   dropped_target_count?: number;
   included_target_count?: number;
+  calibration_provenance?: CalibrationProvenance;
   target_loss_attribution?: {
     status: MicrocosmTargetLossAttributionStatus;
     aggregate: number | null;

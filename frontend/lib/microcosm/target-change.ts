@@ -43,6 +43,7 @@ export interface TargetChangeRow extends Record<string, unknown> {
 
 export interface TargetChangeAttributionSide {
   releaseId: string;
+  calibrationProvenance: Calibration["calibration_provenance"];
   status: Calibration["target_loss_attribution"]["status"];
   aggregate: number | null;
   cap: number | null;
@@ -109,6 +110,7 @@ function attributionSide(calibration: Calibration): TargetChangeAttributionSide 
   const attribution = calibration.target_loss_attribution;
   return {
     releaseId: calibration.release_id,
+    calibrationProvenance: calibration.calibration_provenance,
     status: attribution.status,
     aggregate: finiteNumber(attribution.aggregate),
     cap: finiteNumber(attribution.cap),

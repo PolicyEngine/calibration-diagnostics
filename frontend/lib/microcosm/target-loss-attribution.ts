@@ -55,11 +55,25 @@ export interface NormalizeTargetLossAttributionInput {
   releaseId: string;
   buildManifest: JsonObject;
   releaseFamily: "national" | "local_area";
+  diagnosticsSha256?: string | null;
 }
 
 export interface NormalizedTargetLossAttributionResult {
   attribution: FinalTargetLossAttribution;
+  provenance: CalibrationProvenance;
   rows: JsonObject[];
+}
+
+export interface CalibrationProvenance {
+  mode: "direct" | "inherited";
+  dataset_release_id: string;
+  calibration_source_id: string | null;
+  diagnostics_sha256: string | null;
+  target_surface_sha256: string | null;
+  validation: {
+    status: "not_applicable" | "verified" | "failed";
+    reason: string | null;
+  };
 }
 
 export interface HistoricalAttributionEvidence {
@@ -73,6 +87,21 @@ export interface HistoricalAttributionEvidence {
   orderedTargetNamesSha256: string;
   producerTargetSurfaceSha256: string | null;
   weightingIdentifier: string | null;
+  lossCap: number | null;
+}
+
+export interface InheritedAttributionEvidence {
+  parentBuildId: string | null;
+  declaredDiagnosticsSchema: number | null;
+  declaredDiagnosticsSha256: string | null;
+  observedDiagnosticsSha256: string | null;
+  releaseFamily: "national" | "local_area";
+  diagnosticsSchema: number | null;
+  targetCount: number;
+  orderedTargetNamesSha256: string;
+  producerTargetSurfaceSha256: string | null;
+  weightingIdentifier: string | null;
+  lossCap: number | null;
 }
 
 export interface HistoricalAttributionClassification {
@@ -88,6 +117,7 @@ export const TARGET_LOSS_FORMULA =
   "weighted_mean(min(abs((estimate - target) / scale), cap))";
 
 const TARGET_LOSS_WARNING_PREFIX = "target_loss_attribution_";
+const SHA256_RE = /^[0-9a-f]{64}$/i;
 const ATTRIBUTION_FIELDS = [
   "target_loss_weight",
   "target_loss_weight_share",
@@ -148,6 +178,11 @@ function finiteNumber(value: unknown): number | null {
 
 function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.length ? value : null;
+}
+
+function normalizedSha256(value: unknown): string | null {
+  const candidate = optionalString(value);
+  return candidate && SHA256_RE.test(candidate) ? candidate.toLowerCase() : null;
 }
 
 function targetName(row: JsonObject): string {
@@ -562,6 +597,40 @@ function lossCap(diagnostics: JsonObject): number | null {
     ?? finiteNumber(producer.target_loss_cap);
 }
 
+function supportContentFailure(
+  support: HistoricalAttributionSupport,
+  evidence: Pick<
+    HistoricalAttributionEvidence,
+    | "releaseFamily"
+    | "diagnosticsSchema"
+    | "targetCount"
+    | "orderedTargetNamesSha256"
+    | "producerTargetSurfaceSha256"
+    | "weightingIdentifier"
+    | "lossCap"
+  >,
+): string | null {
+  if (support.diagnosticsSchema !== evidence.diagnosticsSchema) return "diagnostics schema mismatch";
+  if (support.releaseFamily !== evidence.releaseFamily) return "release family mismatch";
+  if (support.targetCount !== evidence.targetCount) return "target count mismatch";
+  if (support.orderedTargetNamesSha256 !== evidence.orderedTargetNamesSha256) {
+    return "ordered target surface mismatch";
+  }
+  if (
+    support.producerTargetSurfaceSha256 &&
+    evidence.producerTargetSurfaceSha256 !== support.producerTargetSurfaceSha256
+  ) {
+    return "diagnostics target-surface digest does not match the pinned parent digest";
+  }
+  if (support.weightingIdentifier !== evidence.weightingIdentifier) {
+    return "weighting identifier mismatch";
+  }
+  if (support.lossCap != null && support.lossCap !== evidence.lossCap) {
+    return "target-loss cap mismatch";
+  }
+  return null;
+}
+
 function supportEvidenceFailure(
   support: HistoricalAttributionSupport,
   evidence: HistoricalAttributionEvidence,
@@ -573,22 +642,7 @@ function supportEvidenceFailure(
   if (support.producerCommit && support.producerCommit !== evidence.producerCommit) {
     return "producer commit mismatch";
   }
-  if (support.diagnosticsSchema !== evidence.diagnosticsSchema) return "diagnostics schema mismatch";
-  if (support.releaseFamily !== evidence.releaseFamily) return "release family mismatch";
-  if (support.targetCount !== evidence.targetCount) return "target count mismatch";
-  if (support.orderedTargetNamesSha256 !== evidence.orderedTargetNamesSha256) {
-    return "ordered target surface mismatch";
-  }
-  if (
-    support.producerTargetSurfaceSha256 &&
-    evidence.producerTargetSurfaceSha256 !== support.producerTargetSurfaceSha256
-  ) {
-    return "producer target-surface fingerprint mismatch";
-  }
-  if (support.weightingIdentifier !== evidence.weightingIdentifier) {
-    return "weighting identifier mismatch";
-  }
-  return null;
+  return supportContentFailure(support, evidence);
 }
 
 export function classifyHistoricalAttributionEvidence(
@@ -608,6 +662,107 @@ export function classifyHistoricalAttributionEvidence(
     : { status: support.expectedStatus, recipe: support.recipe, reason: null };
 }
 
+export function classifyInheritedAttributionEvidence(
+  evidence: InheritedAttributionEvidence,
+): HistoricalAttributionClassification {
+  if (!evidence.parentBuildId) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "inherited calibration does not declare a parent build identifier",
+    };
+  }
+  const support = HISTORICAL_ATTRIBUTION_SUPPORT_BY_RELEASE.get(evidence.parentBuildId);
+  if (!support || support.buildId !== evidence.parentBuildId) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "no pinned historical attribution recipe matches the declared parent build",
+    };
+  }
+  if (
+    evidence.declaredDiagnosticsSchema == null ||
+    !Number.isInteger(evidence.declaredDiagnosticsSchema)
+  ) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "inherited calibration does not declare an integer diagnostics schema version",
+    };
+  }
+  if (evidence.declaredDiagnosticsSchema !== evidence.diagnosticsSchema) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "declared diagnostics schema does not match the downloaded diagnostics",
+    };
+  }
+  const declaredDigest = normalizedSha256(evidence.declaredDiagnosticsSha256);
+  if (!declaredDigest) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "inherited calibration does not declare a valid diagnostics SHA-256 digest",
+    };
+  }
+  const observedDigest = normalizedSha256(evidence.observedDiagnosticsSha256);
+  if (!observedDigest) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "the downloaded diagnostics SHA-256 digest is unavailable",
+    };
+  }
+  if (observedDigest !== declaredDigest) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "downloaded diagnostics do not match the digest declared by the release",
+    };
+  }
+  const parentDigest = normalizedSha256(support.diagnosticsSha256);
+  if (!parentDigest) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "the declared parent has no pinned diagnostics digest",
+    };
+  }
+  if (observedDigest !== parentDigest) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "downloaded diagnostics do not match the pinned parent artifact",
+    };
+  }
+  if (!support.producerTargetSurfaceSha256) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "the declared parent has no pinned target-surface digest",
+    };
+  }
+  if (!normalizedSha256(evidence.producerTargetSurfaceSha256)) {
+    return {
+      status: "unavailable",
+      recipe: null,
+      reason: "downloaded diagnostics do not declare a valid target-surface digest",
+    };
+  }
+  const failure = supportContentFailure(support, evidence);
+  return failure
+    ? { status: "unavailable", recipe: null, reason: failure }
+    : { status: support.expectedStatus, recipe: support.recipe, reason: null };
+}
+
+function targetSurfaceSha256(
+  diagnostics: JsonObject,
+  buildManifest: JsonObject,
+): string | null {
+  return optionalString(asObject(diagnostics.target_surface).sha256)
+    ?? optionalString(asObject(asObject(buildManifest.calibration).target_surface).sha256);
+}
+
 function historicalEvidence(
   releaseId: string,
   diagnostics: JsonObject,
@@ -624,10 +779,9 @@ function historicalEvidence(
     diagnosticsSchema: finiteNumber(diagnostics.schema_version),
     targetCount: rows.length,
     orderedTargetNamesSha256: orderedTargetNamesHash(rows),
-    producerTargetSurfaceSha256: optionalString(
-      asObject(asObject(buildManifest.calibration).target_surface).sha256,
-    ),
+    producerTargetSurfaceSha256: targetSurfaceSha256(diagnostics, buildManifest),
     weightingIdentifier: optionalString(asObject(diagnostics.build).target_loss_weighting),
+    lossCap: lossCap(diagnostics),
   };
 }
 
@@ -734,19 +888,60 @@ export function reconstructTargetLossAttribution(
 export function normalizeTargetLossAttribution(
   input: NormalizeTargetLossAttributionInput,
 ): NormalizedTargetLossAttributionResult {
-  const { diagnostics, releaseId, buildManifest, releaseFamily } = input;
+  const {
+    diagnostics,
+    releaseId,
+    buildManifest,
+    releaseFamily,
+    diagnosticsSha256 = null,
+  } = input;
   const rows = input.rows.map(stripAttributionFields);
   const finalLoss = finiteNumber(diagnostics.final_loss);
   const warnings = diagnosticWarnings(diagnostics);
   const schemaVersion = finiteNumber(diagnostics.schema_version);
+  const calibration = asObject(buildManifest.calibration);
+  const inherited = calibration.mode === "inherited";
+  const parentBuildId = inherited ? optionalString(calibration.parent_build_id) : null;
+  const inheritedClassification = inherited
+    ? classifyInheritedAttributionEvidence({
+        parentBuildId,
+        declaredDiagnosticsSchema: finiteNumber(calibration.diagnostics_schema_version),
+        declaredDiagnosticsSha256: optionalString(calibration.diagnostics_sha256),
+        observedDiagnosticsSha256: diagnosticsSha256,
+        releaseFamily,
+        diagnosticsSchema: schemaVersion,
+        targetCount: input.rows.length,
+        orderedTargetNamesSha256: orderedTargetNamesHash(input.rows),
+        producerTargetSurfaceSha256: targetSurfaceSha256(diagnostics, buildManifest),
+        weightingIdentifier: optionalString(asObject(diagnostics.build).target_loss_weighting),
+        lossCap: lossCap(diagnostics),
+      })
+    : null;
 
   let attribution: FinalTargetLossAttribution;
-  if (schemaVersion != null && schemaVersion >= 6) {
+  if (inheritedClassification?.status === "unavailable") {
+    attribution = unavailable(
+      finalLoss,
+      `Inherited calibration diagnostics rejected: ${inheritedClassification.reason}.`,
+      warnings,
+    );
+  } else if (schemaVersion != null && schemaVersion >= 6) {
     attribution = reportedAttribution(diagnostics, input.rows, finalLoss, warnings);
   } else {
-    const support = HISTORICAL_ATTRIBUTION_SUPPORT_BY_RELEASE.get(releaseId);
+    const supportReleaseId = inherited ? parentBuildId : releaseId;
+    const support = supportReleaseId
+      ? HISTORICAL_ATTRIBUTION_SUPPORT_BY_RELEASE.get(supportReleaseId)
+      : undefined;
     if (!support) {
       attribution = unavailable(finalLoss, "No pinned historical attribution recipe matches this release.", warnings);
+    } else if (inherited) {
+      attribution = reconstructTargetLossAttribution(
+        support,
+        diagnostics,
+        input.rows,
+        finalLoss,
+        warnings,
+      );
     } else {
       const classification = classifyHistoricalAttributionEvidence(
         historicalEvidence(releaseId, diagnostics, input.rows, buildManifest, releaseFamily),
@@ -766,8 +961,35 @@ export function normalizeTargetLossAttribution(
           );
     }
   }
+  const inheritedValidationReason = inheritedClassification?.reason
+    ?? (inherited && attribution.status === "unavailable" ? attribution.reason : null);
+  const provenance: CalibrationProvenance = inherited
+    ? {
+        mode: "inherited",
+        dataset_release_id: releaseId,
+        calibration_source_id: parentBuildId,
+        diagnostics_sha256: normalizedSha256(diagnosticsSha256),
+        target_surface_sha256: normalizedSha256(
+          targetSurfaceSha256(diagnostics, buildManifest),
+        ),
+        validation: {
+          status: inheritedValidationReason ? "failed" : "verified",
+          reason: inheritedValidationReason,
+        },
+      }
+    : {
+        mode: "direct",
+        dataset_release_id: releaseId,
+        calibration_source_id: releaseId,
+        diagnostics_sha256: normalizedSha256(diagnosticsSha256),
+        target_surface_sha256: normalizedSha256(
+          targetSurfaceSha256(diagnostics, buildManifest),
+        ),
+        validation: { status: "not_applicable", reason: null },
+      };
   return {
     attribution,
+    provenance,
     rows: attribution.status === "unavailable"
       ? rows
       : rowsWithAttribution(rows, attribution.targets),

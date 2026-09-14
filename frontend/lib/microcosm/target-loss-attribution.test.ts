@@ -10,6 +10,7 @@ import {
 } from "./target-loss-attribution-manifest";
 import {
   classifyHistoricalAttributionEvidence,
+  classifyInheritedAttributionEvidence,
   normalizeTargetLossAttribution,
   orderedTargetNamesHash,
   reconstructTargetLossAttribution,
@@ -40,6 +41,7 @@ function evidence(entry: HistoricalAttributionSupport) {
     orderedTargetNamesSha256: entry.orderedTargetNamesSha256,
     producerTargetSurfaceSha256: entry.producerTargetSurfaceSha256,
     weightingIdentifier: entry.weightingIdentifier,
+    lossCap: entry.lossCap ?? null,
   };
 }
 
@@ -89,6 +91,12 @@ describe("schema-version-6 reported target-loss attribution", () => {
     expect(result.attribution.aggregate).toBeCloseTo(0.15, 15);
     expect(result.attribution.targets).toHaveLength(2);
     expect(result.rows.map((row) => row.final_loss_contribution)).toEqual([0.05, 0.1]);
+    expect(result.provenance).toMatchObject({
+      mode: "direct",
+      dataset_release_id: "schema-v6-fixture",
+      calibration_source_id: "schema-v6-fixture",
+      validation: { status: "not_applicable", reason: null },
+    });
   });
 
   test("accepts unequal weights and custom scales", () => {
@@ -199,6 +207,82 @@ describe("audited historical support manifest", () => {
 
     expect(classification.status).toBe("unavailable");
     expect(classification.reason).toBe("ordered target surface mismatch");
+  });
+});
+
+describe("inherited historical attribution", () => {
+  const parent = HISTORICAL_ATTRIBUTION_SUPPORT.find(
+    (entry) =>
+      entry.releaseId ===
+      "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
+  )!;
+  const inheritedEvidence = (
+    overrides: Partial<Parameters<typeof classifyInheritedAttributionEvidence>[0]> = {},
+  ) => ({
+    parentBuildId: parent.buildId,
+    declaredDiagnosticsSchema: parent.diagnosticsSchema,
+    declaredDiagnosticsSha256: parent.diagnosticsSha256 ?? null,
+    observedDiagnosticsSha256: parent.diagnosticsSha256 ?? null,
+    releaseFamily: parent.releaseFamily,
+    diagnosticsSchema: parent.diagnosticsSchema,
+    targetCount: parent.targetCount,
+    orderedTargetNamesSha256: parent.orderedTargetNamesSha256,
+    producerTargetSurfaceSha256: parent.producerTargetSurfaceSha256,
+    weightingIdentifier: parent.weightingIdentifier,
+    lossCap: parent.lossCap ?? null,
+    ...overrides,
+  });
+
+  test("resolves a byte-identical inherited diagnostic through its pinned parent", () => {
+    expect(classifyInheritedAttributionEvidence(inheritedEvidence())).toEqual({
+      status: "exact_reconstructed",
+      recipe: "concept_budget_sqrt_value_50_50_v3",
+      reason: null,
+    });
+  });
+
+  test("rejects a diagnostics digest mismatch", () => {
+    const classification = classifyInheritedAttributionEvidence(inheritedEvidence({
+      observedDiagnosticsSha256: "0".repeat(64),
+    }));
+    expect(classification).toEqual({
+      status: "unavailable",
+      recipe: null,
+      reason: "downloaded diagnostics do not match the digest declared by the release",
+    });
+  });
+
+  test("rejects a target-surface mismatch", () => {
+    const classification = classifyInheritedAttributionEvidence(inheritedEvidence({
+      producerTargetSurfaceSha256: "0".repeat(64),
+    }));
+    expect(classification).toEqual({
+      status: "unavailable",
+      recipe: null,
+      reason: "diagnostics target-surface digest does not match the pinned parent digest",
+    });
+  });
+
+  test("rejects an unsupported parent build", () => {
+    const classification = classifyInheritedAttributionEvidence(inheritedEvidence({
+      parentBuildId: "unknown-parent",
+    }));
+    expect(classification).toEqual({
+      status: "unavailable",
+      recipe: null,
+      reason: "no pinned historical attribution recipe matches the declared parent build",
+    });
+  });
+
+  test("rejects a declared schema mismatch", () => {
+    const classification = classifyInheritedAttributionEvidence(inheritedEvidence({
+      declaredDiagnosticsSchema: 6,
+    }));
+    expect(classification).toEqual({
+      status: "unavailable",
+      recipe: null,
+      reason: "declared diagnostics schema does not match the downloaded diagnostics",
+    });
   });
 });
 
