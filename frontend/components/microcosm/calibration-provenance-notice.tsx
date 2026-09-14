@@ -2,8 +2,10 @@ import type { CalibrationProvenance } from "@/lib/microcosm/target-loss-attribut
 
 export function CalibrationProvenanceNotice({
   provenance,
+  subject,
 }: {
   provenance: CalibrationProvenance | undefined;
+  subject?: string;
 }) {
   if (!provenance || provenance.mode !== "inherited") return null;
 
@@ -14,7 +16,9 @@ export function CalibrationProvenanceNotice({
       className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-xs leading-relaxed text-muted-foreground"
     >
       <p className="font-semibold text-foreground">
-        Inherited calibration diagnostics
+        {subject
+          ? `${subject}: inherited calibration diagnostics`
+          : "Inherited calibration diagnostics"}
       </p>
       <p className="mt-1">
         Calibration was not rerun for{" "}
@@ -29,6 +33,28 @@ export function CalibrationProvenanceNotice({
           ? "; the diagnostics file digest and the digest of its calibrated target definitions and values match the pinned parent record."
           : `. Validation failed: ${provenance.validation.reason ?? "unknown reason"}.`}
       </p>
+    </div>
+  );
+}
+
+export function CalibrationComparisonProvenanceNotices({
+  current,
+  candidate,
+}: {
+  current: CalibrationProvenance | undefined;
+  candidate: CalibrationProvenance | undefined;
+}) {
+  if (current?.mode !== "inherited" && candidate?.mode !== "inherited") {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <CalibrationProvenanceNotice
+        provenance={current}
+        subject="Current release"
+      />
+      <CalibrationProvenanceNotice provenance={candidate} subject="Candidate" />
     </div>
   );
 }

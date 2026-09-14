@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { ExplorerState } from "./calibration-explorer";
+import type { CalibrationProvenance } from "./target-loss-attribution";
 import {
   applyExplorerFilters,
   buildCalibrationTree,
@@ -592,6 +593,15 @@ describe("source, geography, and declared-dimension hierarchy", () => {
 });
 
 describe("schema 8 ordered hierarchy", () => {
+  const inheritedProvenance: CalibrationProvenance = {
+    mode: "inherited",
+    dataset_release_id: "candidate-release",
+    calibration_source_id: "parent-build",
+    diagnostics_sha256: "a".repeat(64),
+    target_surface_sha256: "b".repeat(64),
+    validation: { status: "verified", reason: null },
+  };
+
   const hierarchyRows: CalibrationTreeTarget[] = [
     target("target-adult@2025", {
       source: "provider-a",
@@ -701,6 +711,23 @@ describe("schema 8 ordered hierarchy", () => {
       "Adult target — authored",
     ]);
     expect(tree.groups[0].nodes[0].target?.target_dimensions).toHaveLength(2);
+  });
+
+  test("preserves inherited calibration provenance through hierarchy navigation", () => {
+    const tree = buildCalibrationTree(
+      hierarchyRows,
+      state({
+        ...hierarchyPath,
+        dimensions: [
+          { key: "dimension.age", label: "Age — authored", value: "adult" },
+        ],
+      }),
+      "candidate-release",
+      true,
+      inheritedProvenance,
+    );
+
+    expect(tree.calibrationProvenance).toEqual(inheritedProvenance);
   });
 });
 

@@ -692,6 +692,7 @@ function hierarchyDimensionTree(
   state: ExplorerState,
   releaseId: string | undefined,
   lossAttributionAvailable: boolean,
+  calibrationProvenance: CalibrationProvenance | undefined,
   selectedPathLabels: CalibrationTreeResponse["pathLabels"],
   options: CalibrationTreeResponse["filterOptions"],
 ): CalibrationTreeResponse {
@@ -818,6 +819,7 @@ function hierarchyDimensionTree(
         : { kind: "mixed" as const, label: "Breakdowns and targets" };
   return {
     releaseId,
+    calibrationProvenance,
     lossAttributionAvailable,
     path: state.path,
     pathLabels: {
@@ -943,6 +945,7 @@ export function buildCalibrationTree(
       state,
       releaseId,
       lossAttributionAvailable,
+      calibrationProvenance,
       selectedPathLabels,
       options,
     );
