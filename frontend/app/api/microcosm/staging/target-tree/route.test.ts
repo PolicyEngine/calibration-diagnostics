@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { afterEach, expect, test } from "bun:test";
 
 import { GET } from "./route";
@@ -8,7 +10,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-function runManifest(runId: string) {
+function runManifest(runId: string, diagnosticsSha256: string) {
   return {
     schema_name: "microcosm.staging.run-manifest",
     schema_version: 2,
@@ -43,7 +45,7 @@ function runManifest(runId: string) {
         artifact_kind: "aggregate_diagnostics",
         contract_relative_path: "artifacts/calibration_diagnostics.json",
         media_type: "application/json",
-        sha256: "a".repeat(64),
+        sha256: diagnosticsSha256,
         classification: "aggregate",
       },
     ],
@@ -58,42 +60,49 @@ function runManifest(runId: string) {
 
 test("builds the calibration tree from a staging diagnostics artifact", async () => {
   const runId = "uk-fit-map";
+  const diagnostics = {
+    schema_version: 6,
+    weight_entity: "household",
+    options: {},
+    n_nonzero: 2,
+    n_records: 2,
+    initial_loss: 0.2,
+    final_loss: 0.05,
+    fraction_within_10pct: 1,
+    loss_trajectory: [0.2, 0.05],
+    skipped: [],
+    targets: [
+      {
+        name: "ons/employment_income/total@2025",
+        target_name: "ons/employment_income/total",
+        period: 2025,
+        entity: "household",
+        source: "ons",
+        metadata: {
+          variable: "employment_income",
+          geography: "United Kingdom",
+          geography_level: "national",
+        },
+        target: 100,
+        initial_estimate: 80,
+        final_estimate: 95,
+        relative_error: -0.05,
+        within_tolerance: true,
+      },
+    ],
+  };
+  const diagnosticsBody = JSON.stringify(diagnostics);
+  const diagnosticsSha256 = createHash("sha256")
+    .update(diagnosticsBody)
+    .digest("hex");
   globalThis.fetch = (async (input) => {
     const url = String(input);
     if (url.endsWith(`/runs/${runId}/run_manifest.json`)) {
-      return Response.json(runManifest(runId));
+      return Response.json(runManifest(runId, diagnosticsSha256));
     }
     if (url.endsWith(`/runs/${runId}/artifacts/calibration_diagnostics.json`)) {
-      return Response.json({
-        schema_version: 6,
-        weight_entity: "household",
-        options: {},
-        n_nonzero: 2,
-        n_records: 2,
-        initial_loss: 0.2,
-        final_loss: 0.05,
-        fraction_within_10pct: 1,
-        loss_trajectory: [0.2, 0.05],
-        skipped: [],
-        targets: [
-          {
-            name: "ons/employment_income/total@2025",
-            target_name: "ons/employment_income/total",
-            period: 2025,
-            entity: "household",
-            source: "ons",
-            metadata: {
-              variable: "employment_income",
-              geography: "United Kingdom",
-              geography_level: "national",
-            },
-            target: 100,
-            initial_estimate: 80,
-            final_estimate: 95,
-            relative_error: -0.05,
-            within_tolerance: true,
-          },
-        ],
+      return new Response(diagnosticsBody, {
+        headers: { "Content-Type": "application/json" },
       });
     }
     return new Response(null, { status: 404 });

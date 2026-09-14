@@ -11,6 +11,7 @@ import {
   parseStagingManifest,
   parseStagingProgress,
   parseStagingRunIndex,
+  validateStagingRunConsistency,
 } from "./staging-contract";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "staging-contract");
@@ -199,5 +200,180 @@ describe("version 2", () => {
     expect(() => parseStagingManifest(cases.unknown_version)).toThrow(
       /Incompatible staging data: unsupported manifest schema version 999/,
     );
+  });
+
+  test("rejects missing and additional fields in run documents and nested objects", () => {
+    const manifest = json("v2", `${runRoot}/run_manifest.json`);
+    const withoutOperation = { ...manifest };
+    delete withoutOperation.operation_id;
+    expect(() => parseStagingManifest(withoutOperation)).toThrow(
+      /run manifest is missing operation_id/,
+    );
+    expect(() =>
+      parseStagingManifest({ ...manifest, undocumented: true }),
+    ).toThrow(/unexpected field undocumented/);
+    expect(() =>
+      parseStagingManifest({
+        ...manifest,
+        pipeline: { ...(manifest.pipeline as Record<string, unknown>), extra: true },
+      }),
+    ).toThrow(/pipeline contains unexpected field extra/);
+    expect(() =>
+      parseStagingProgress({
+        ...json("v2", `${runRoot}/progress.json`),
+        details: [],
+      }),
+    ).toThrow(/progress details must be an object/);
+  });
+
+  test("enforces version 2 semantic relationships", () => {
+    const manifest = json("v2", `${runRoot}/run_manifest.json`);
+    const delivery = manifest.delivery as Record<string, unknown>;
+    expect(() =>
+      parseStagingManifest({ ...manifest, non_release: false }),
+    ).toThrow(/non_release must be true exactly when release_id is absent/);
+    expect(() =>
+      parseStagingManifest({
+        ...manifest,
+        delivery: { ...delivery, upload_attempts: 0, upload_successes: 1 },
+      }),
+    ).toThrow(/upload_successes cannot exceed upload_attempts/);
+    expect(() =>
+      parseStagingManifest({
+        ...manifest,
+        delivery: { ...delivery, run_id: "another-run" },
+      }),
+    ).toThrow(/delivery run_id does not match/);
+    expect(() =>
+      parseStagingManifest({
+        ...manifest,
+        status: "failed",
+        current_stage: "failed",
+      }),
+    ).toThrow(/failed status requires failure data/);
+  });
+
+  test("fully validates calibration progress records", () => {
+    const calibration = json(
+      "v2",
+      "calibration/runs/uk-calibration-v2-fixture/calibration_progress.json",
+    );
+    const event = (calibration.events as Record<string, unknown>[])[0];
+    expect(() =>
+      parseStagingCalibrationProgress({
+        ...calibration,
+        updated_at: "2026-02-30T00:00:00Z",
+      }),
+    ).toThrow(/updated_at must be a valid RFC 3339 date-time string/);
+    expect(() =>
+      parseStagingCalibrationProgress({
+        ...calibration,
+        events: [{ ...event, epoch: -1 }],
+      }),
+    ).toThrow(/epoch must be an integer greater than or equal to 0/);
+    expect(() =>
+      parseStagingCalibrationProgress({
+        ...calibration,
+        events: [{ ...event, extra: true }],
+      }),
+    ).toThrow(/calibration event 0 contains unexpected field extra/);
+  });
+
+  test("fully validates individual event records", () => {
+    const event = JSON.parse(
+      bytes("v2", `${runRoot}/events.ndjson`).toString().trim().split("\n")[0],
+    ) as Record<string, unknown>;
+    expect(() =>
+      parseStagingEvents(JSON.stringify({ ...event, timestamp: "not-a-date" })),
+    ).toThrow(/timestamp must be a valid RFC 3339 date-time string/);
+    expect(() =>
+      parseStagingEvents(JSON.stringify({ ...event, status: "waiting" })),
+    ).toThrow(/status is unsupported/);
+    expect(() =>
+      parseStagingEvents(JSON.stringify({ ...event, extra: true })),
+    ).toThrow(/event 0 contains unexpected field extra/);
+  });
+
+  test("accepts lifecycle differences while enforcing stable run identity", () => {
+    const manifest = parseStagingManifest(
+      json("v2", `${runRoot}/run_manifest.json`),
+    );
+    const progressSource = json("v2", `${runRoot}/progress.json`);
+    const delivery = progressSource.delivery as Record<string, unknown>;
+    const progress = parseStagingProgress({
+      ...progressSource,
+      status: "running",
+      current_stage: "validation",
+      updated_at: "2026-01-02T00:00:05+00:00",
+      message: "Validation is running.",
+      delivery: {
+        ...delivery,
+        upload_attempts: 2,
+        upload_successes: 1,
+        read_back: "passed",
+      },
+    });
+    const events = parseStagingEvents(
+      bytes("v2", `${runRoot}/events.ndjson`).toString(),
+    );
+
+    expect(() =>
+      validateStagingRunConsistency("uk-spine-v2-fixture", {
+        progress,
+        runManifest: manifest,
+        events,
+      }),
+    ).not.toThrow();
+
+    const mismatchedProgress = parseStagingProgress({
+      ...progressSource,
+      candidate_id: "different-candidate",
+    });
+    expect(() =>
+      validateStagingRunConsistency("uk-spine-v2-fixture", {
+        progress: mismatchedProgress,
+        runManifest: manifest,
+      }),
+    ).toThrow(/disagree on stable field candidate_id/);
+  });
+
+  test("validates paths and identities across all available run files", () => {
+    const manifestSource = json("v2", `${runRoot}/run_manifest.json`);
+    const manifest = parseStagingManifest(manifestSource);
+    const events = parseStagingEvents(
+      bytes("v2", `${runRoot}/events.ndjson`).toString(),
+    );
+    expect(() =>
+      validateStagingRunConsistency("uk-spine-v2-fixture", {
+        runManifest: parseStagingManifest({
+          ...manifestSource,
+          paths: {
+            ...(manifestSource.paths as Record<string, unknown>),
+            events: "runs/another-run/events.ndjson",
+          },
+        }),
+      }),
+    ).toThrow(/paths do not identify the requested run/);
+    expect(() =>
+      validateStagingRunConsistency("uk-spine-v2-fixture", {
+        runManifest: manifest,
+        events: [{ ...events[0], run_id: "another-run" }],
+      }),
+    ).toThrow(/event 0 identifies run another-run/);
+
+    const calibrationRoot = "calibration/runs/uk-calibration-v2-fixture";
+    const calibrationManifest = parseStagingManifest(
+      json("v2", `${calibrationRoot}/run_manifest.json`),
+    );
+    const calibrationProgress = parseStagingCalibrationProgress({
+      ...json("v2", `${calibrationRoot}/calibration_progress.json`),
+      candidate_id: "another-candidate",
+    });
+    expect(() =>
+      validateStagingRunConsistency("uk-calibration-v2-fixture", {
+        runManifest: calibrationManifest,
+        calibrationProgress,
+      }),
+    ).toThrow(/disagree on candidate_id/);
   });
 });

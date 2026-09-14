@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -199,8 +200,17 @@ function calibrationDiagnostics() {
   };
 }
 
+function serializedDiagnostics(): { body: string; sha256: string } {
+  const body = JSON.stringify(calibrationDiagnostics());
+  return {
+    body,
+    sha256: createHash("sha256").update(body).digest("hex"),
+  };
+}
+
 test("loads version 2 calibration diagnostics from the declared artifact path", async () => {
   const runId = "uk-calibration-with-diagnostics";
+  const diagnostics = serializedDiagnostics();
   const manifest = {
     ...v2RunManifest(runId, "2026-01-03T00:00:03+00:00"),
     operation_id: "uk_national_calibration",
@@ -211,7 +221,7 @@ test("loads version 2 calibration diagnostics from the declared artifact path", 
         artifact_kind: "aggregate_diagnostics",
         contract_relative_path: "artifacts/calibration_diagnostics.json",
         media_type: "application/json",
-        sha256: "a".repeat(64),
+        sha256: diagnostics.sha256,
         classification: "aggregate",
       },
     ],
@@ -224,7 +234,9 @@ test("loads version 2 calibration diagnostics from the declared artifact path", 
       return Response.json(manifest);
     }
     if (url.endsWith(`/runs/${runId}/artifacts/calibration_diagnostics.json`)) {
-      return Response.json(calibrationDiagnostics());
+      return new Response(diagnostics.body, {
+        headers: { "Content-Type": "application/json" },
+      });
     }
     return new Response(null, { status: 404 });
   }) as typeof fetch;
@@ -244,6 +256,39 @@ test("loads version 2 calibration diagnostics from the declared artifact path", 
       url.endsWith(`/runs/${runId}/calibration_diagnostics.json`),
     ),
   ).toBe(false);
+});
+
+test("rejects version 2 calibration diagnostics whose bytes do not match the declared digest", async () => {
+  const runId = "uk-calibration-digest-mismatch";
+  const manifest = {
+    ...v2RunManifest(runId, "2026-01-03T00:00:03+00:00"),
+    operation_id: "uk_national_calibration",
+    run_kind: "calibration",
+    artifacts: [
+      {
+        logical_name: "calibration_diagnostics",
+        artifact_kind: "aggregate_diagnostics",
+        contract_relative_path: "artifacts/calibration_diagnostics.json",
+        media_type: "application/json",
+        sha256: "0".repeat(64),
+        classification: "aggregate",
+      },
+    ],
+  };
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    if (url.endsWith(`/runs/${runId}/run_manifest.json`)) {
+      return Response.json(manifest);
+    }
+    if (url.endsWith(`/runs/${runId}/artifacts/calibration_diagnostics.json`)) {
+      return new Response(serializedDiagnostics().body);
+    }
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+
+  await expect(loadStagingCalibration(runId, 0, "uk")).rejects.toThrow(
+    /digest does not match its run manifest declaration/,
+  );
 });
 
 test("keeps the version 1 calibration diagnostics path", async () => {

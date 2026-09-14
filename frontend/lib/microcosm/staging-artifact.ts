@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   type Calibration,
   type MicrocosmCountry,
@@ -26,6 +28,7 @@ import {
   parseStagingManifest,
   parseStagingProgress,
   parseStagingRunIndex,
+  validateStagingRunConsistency,
 } from "@/lib/microcosm/staging-contract";
 
 type JsonObject = Record<string, unknown>;
@@ -186,6 +189,41 @@ async function stagingJsonOrNull(
     if (error instanceof StagingFetchError && error.status !== 404) throw error;
     return null;
   }
+}
+
+interface HashedStagingJson {
+  payload: JsonObject;
+  sha256: string;
+}
+
+async function stagingHashedJsonOrNull(
+  path: string,
+  revalidate: number,
+  country: MicrocosmCountry,
+): Promise<HashedStagingJson | null> {
+  const repository = stagingSource(country);
+  const res = await fetch(
+    stagingResolveUrlFor(repository, path),
+    stagingFetchOptions(revalidate, country),
+  );
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw new StagingFetchError(res.status, path, repository);
+  }
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new IncompatibleStagingDataError(`${path} is not valid JSON.`);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new IncompatibleStagingDataError(`${path} must contain a JSON object.`);
+  }
+  return {
+    payload: parsed as JsonObject,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
 }
 
 async function stagingTextOrNull(
@@ -410,6 +448,7 @@ export async function loadStagingRuns(
           `run manifest id ${String(manifest.run_id)} does not match directory ${runId}.`,
         );
       }
+      validateStagingRunConsistency(runId, { runManifest: manifest });
       return manifest;
     }),
   );
@@ -474,7 +513,9 @@ export async function loadStagingRuns(
         revalidate,
         country,
       );
-      return summaryFromProgress(runId, raw == null ? null : parseStagingProgress(raw));
+      const progress = raw == null ? null : parseStagingProgress(raw);
+      validateStagingRunConsistency(runId, { progress });
+      return summaryFromProgress(runId, progress);
     }),
   );
   for (const run of fetched) byId.set(run.run_id, run);
@@ -507,6 +548,7 @@ export async function loadStagingCalibration(
   const progress = progressRaw == null ? null : parseStagingProgress(progressRaw);
   const runManifest =
     runManifestRaw == null ? null : parseStagingManifest(runManifestRaw);
+  validateStagingRunConsistency(runId, { progress, runManifest });
   const candidateReleaseId =
     stringValue(progress?.candidate_release_id) ??
     stringValue(runManifest?.candidate_release_id) ??
@@ -518,8 +560,24 @@ export async function loadStagingCalibration(
       ? stringValue(diagnosticsArtifact?.staging_path)
       : `runs/${runId}/calibration_diagnostics.json`;
   if (!diagnosticsPath) return null;
-  const diag = await stagingJsonOrNull(diagnosticsPath, revalidate, country);
+  const diagnostics =
+    runManifest?.schema_version === 2
+      ? await stagingHashedJsonOrNull(diagnosticsPath, revalidate, country)
+      : null;
+  const diag =
+    runManifest?.schema_version === 2
+      ? diagnostics?.payload ?? null
+      : await stagingJsonOrNull(diagnosticsPath, revalidate, country);
   if (!diag) return null;
+  const expectedDigest = stringValue(diagnosticsArtifact?.sha256);
+  if (
+    runManifest?.schema_version === 2 &&
+    diagnostics?.sha256 !== expectedDigest
+  ) {
+    throw new IncompatibleStagingDataError(
+      `artifact calibration_diagnostics digest does not match its run manifest declaration.`,
+    );
+  }
   const [buildManifest, releaseManifest] = await Promise.all([
     stagingJsonOrNull(`runs/${runId}/build_manifest.json`, revalidate, country),
     stagingJsonOrNull(`runs/${runId}/release_manifest.json`, revalidate, country),
@@ -532,6 +590,8 @@ export async function loadStagingCalibration(
     releaseManifest ?? {},
     {},
     country,
+    "huggingface_live",
+    diagnostics?.sha256 ?? null,
   );
 }
 
@@ -549,6 +609,7 @@ export async function loadStagingTargetChangeDataset(
     country,
   );
   const parsedProgress = progress == null ? null : parseStagingProgress(progress);
+  validateStagingRunConsistency(runId, { progress: parsedProgress });
   const ttlSeconds = stagingTargetChangeCacheTtlSeconds(parsedProgress?.status);
   const cacheKey = `${country}:${runId}:${releaseId}`;
   const now = Date.now();
@@ -639,6 +700,13 @@ export async function loadStagingRun(
     calibrationProgressRaw == null
       ? null
       : parseStagingCalibrationProgress(calibrationProgressRaw);
+  const events = parseStagingEvents(eventsText);
+  validateStagingRunConsistency(runId, {
+    progress,
+    runManifest,
+    calibrationProgress,
+    events,
+  });
   const candidateReleaseId =
     stringValue(progress?.candidate_release_id) ??
     stringValue(runManifest?.candidate_release_id) ??
@@ -659,7 +727,7 @@ export async function loadStagingRun(
     progress,
     run_manifest: runManifest,
     calibration_progress: calibrationProgress,
-    events: parseStagingEvents(eventsText),
+    events,
     has_calibration: cal != null,
     calibration: cal ? latestMicrocosmCalibrationSummary(cal) : null,
     reform_validation: reformValidationRaw
