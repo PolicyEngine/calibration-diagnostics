@@ -505,7 +505,7 @@ test("discovers and orders version 2 runs from paginated manifests only", async 
   expect(requested.some((url) => url.includes("/directory/"))).toBe(false);
 });
 
-test("rejects a version 2 manifest whose run id differs from its path", async () => {
+test("reports a version 2 manifest whose run id differs from its path", async () => {
   globalThis.fetch = (async (input) => {
     const url = String(input);
     if (url.includes("/tree/")) {
@@ -521,26 +521,48 @@ test("rejects a version 2 manifest whose run id differs from its path", async ()
     return new Response(null, { status: 404 });
   }) as typeof fetch;
 
-  await expect(loadStagingRuns(0, "uk")).rejects.toThrow(/does not match/);
+  await expect(loadStagingRuns(0, "uk")).resolves.toMatchObject({
+    runs: [],
+    incompatible_runs: [
+      {
+        run_id: "listed",
+        run_manifest_path: "runs/listed/run_manifest.json",
+        detail: expect.stringMatching(/does not match/),
+      },
+    ],
+  });
 });
 
-test("fails the version 2 run list when a listed manifest is unreadable", async () => {
+test("reports an unreadable listed manifest without hiding valid runs", async () => {
   globalThis.fetch = (async (input) => {
     const url = String(input);
     if (url.includes("/tree/")) {
       return Response.json([
         { type: "file", path: "runs/missing/run_manifest.json" },
+        { type: "file", path: "runs/valid/run_manifest.json" },
       ]);
+    }
+    if (url.endsWith("/runs/valid/run_manifest.json")) {
+      return Response.json(v2RunManifest("valid", "2026-01-01T00:00:00+00:00"));
     }
     return new Response(null, { status: 404 });
   }) as typeof fetch;
 
-  await expect(loadStagingRuns(0, "uk")).rejects.toThrow(
-    /Staging artifact not found.*run_manifest\.json/,
-  );
+  await expect(loadStagingRuns(0, "uk")).resolves.toMatchObject({
+    runs: [{ run_id: "valid" }],
+    incompatible_runs: [
+      {
+        run_id: "missing",
+        run_manifest_path: "runs/missing/run_manifest.json",
+        detail: expect.stringMatching(
+          /Staging artifact not found.*run_manifest\.json/,
+        ),
+      },
+    ],
+  });
 });
 
-test("fails the version 2 run list when a listed manifest is malformed", async () => {
+test("reports a malformed listed manifest", async () => {
   globalThis.fetch = (async (input) => {
     const url = String(input);
     if (url.includes("/tree/")) {
@@ -557,7 +579,16 @@ test("fails the version 2 run list when a listed manifest is malformed", async (
     return new Response(null, { status: 404 });
   }) as typeof fetch;
 
-  await expect(loadStagingRuns(0, "uk")).rejects.toThrow(/updated_at/);
+  await expect(loadStagingRuns(0, "uk")).resolves.toMatchObject({
+    runs: [],
+    incompatible_runs: [
+      {
+        run_id: "malformed",
+        run_manifest_path: "runs/malformed/run_manifest.json",
+        detail: expect.stringMatching(/updated_at/),
+      },
+    ],
+  });
 });
 
 test("fails explicitly when the staging repository tree cannot be read", async () => {
@@ -592,6 +623,7 @@ test("reports an authenticated empty staging repository as available", async () 
     revision: "main",
     truncated: false,
     runs: [],
+    incompatible_runs: [],
   });
   expect(requested).toHaveLength(1);
   expect(requested[0]).toContain("/tree/");
@@ -632,6 +664,7 @@ test("Belgium staging loaders return an empty state before resolving artifacts",
     ...unavailable,
     truncated: false,
     runs: [],
+    incompatible_runs: [],
   });
   expect(await loadStagingRun("", 0, "be")).toMatchObject({
     ...unavailable,

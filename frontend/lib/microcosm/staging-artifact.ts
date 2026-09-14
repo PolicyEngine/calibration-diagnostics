@@ -291,6 +291,12 @@ export interface StagingRunSummary {
   run_manifest_path: string;
 }
 
+export interface IncompatibleStagingRun {
+  run_id: string;
+  run_manifest_path: string;
+  detail: string;
+}
+
 export interface StagingRunDetail {
   available: boolean;
   source_repo: string | null;
@@ -415,6 +421,7 @@ export async function loadStagingRuns(
       ...unavailable,
       truncated: false,
       runs: [] as StagingRunSummary[],
+      incompatible_runs: [] as IncompatibleStagingRun[],
     };
   }
   const repository = stagingSource(country);
@@ -438,19 +445,36 @@ export async function loadStagingRuns(
     if (manifestMatch) manifestPaths.set(manifestMatch[1], entry.path);
   }
 
-  const listedManifests = await Promise.all(
+  const manifestResults = await Promise.all(
     [...manifestPaths].map(async ([runId, path]) => {
-      const manifest = parseStagingManifest(
-        await stagingJson(path, revalidate, country),
-      );
-      if (manifest.run_id !== runId) {
-        throw new IncompatibleStagingDataError(
-          `run manifest id ${String(manifest.run_id)} does not match directory ${runId}.`,
+      try {
+        const manifest = parseStagingManifest(
+          await stagingJson(path, revalidate, country),
         );
+        if (manifest.run_id !== runId) {
+          throw new IncompatibleStagingDataError(
+            `run manifest id ${String(manifest.run_id)} does not match directory ${runId}.`,
+          );
+        }
+        validateStagingRunConsistency(runId, { runManifest: manifest });
+        return { manifest, problem: null };
+      } catch (error) {
+        return {
+          manifest: null,
+          problem: {
+            run_id: runId,
+            run_manifest_path: path,
+            detail: error instanceof Error ? error.message : String(error),
+          } satisfies IncompatibleStagingRun,
+        };
       }
-      validateStagingRunConsistency(runId, { runManifest: manifest });
-      return manifest;
     }),
+  );
+  const listedManifests = manifestResults.flatMap(({ manifest }) =>
+    manifest == null ? [] : [manifest],
+  );
+  const incompatibleRuns = manifestResults.flatMap(({ problem }) =>
+    problem == null ? [] : [problem],
   );
   const v2Manifests = listedManifests.filter(
     (manifest) => manifest.schema_version === 2,
@@ -489,6 +513,7 @@ export async function loadStagingRuns(
           `Staging repository ${repository.repo} is not visible (HTTP ${repoRes.status}). ` +
           "It is private — a missing or expired HF token reads as 404, not 401.",
         runs: [],
+        incompatible_runs: incompatibleRuns,
       };
     }
   }
@@ -531,6 +556,7 @@ export async function loadStagingRuns(
     revision: repository.revision,
     truncated,
     runs: [...byId.values()].sort(sortRuns),
+    incompatible_runs: incompatibleRuns,
   };
 }
 

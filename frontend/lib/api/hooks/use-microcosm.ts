@@ -523,6 +523,11 @@ export interface MicrocosmStagingRunsResponse {
   revision: string | null;
   detail?: string | null;
   runs: MicrocosmStagingRunSummary[];
+  incompatible_runs: {
+    run_id: string;
+    run_manifest_path: string;
+    detail: string;
+  }[];
 }
 
 export interface MicrocosmStagingRunResponse {
