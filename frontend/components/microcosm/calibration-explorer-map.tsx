@@ -661,8 +661,9 @@ export function CalibrationExplorerMap({
   return (
     <div className="flex flex-col gap-3">
       <CalibrationProvenanceNotice provenance={data.calibrationProvenance} />
+      <div className="shrink-0">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
-          <div className="flex flex-wrap items-start gap-x-5 gap-y-3">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <BreakdownControl
               value={state.breakdown}
               onChange={(breakdown) => {
@@ -670,18 +671,11 @@ export function CalibrationExplorerMap({
                 dispatch({ type: "breakdown", breakdown });
               }}
             />
-            <div className="flex flex-col gap-1">
-              <SizeControl
-                value={sizeMode}
-                lossAvailable={data.lossAttributionAvailable}
-                onChange={setSizeMode}
-              />
-              {lossUnavailableMessage && (
-                <span className="text-[10px] text-muted-foreground">
-                  {lossUnavailableMessage}
-                </span>
-              )}
-            </div>
+            <SizeControl
+              value={sizeMode}
+              lossAvailable={data.lossAttributionAvailable}
+              onChange={setSizeMode}
+            />
             <FilterMenu
               data={data}
               state={state}
@@ -695,6 +689,12 @@ export function CalibrationExplorerMap({
             <FitLegend mode={sizeMode} />
           </div>
         </div>
+        {lossUnavailableMessage && (
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {lossUnavailableMessage}
+          </p>
+        )}
+      </div>
 
       <div
         ref={displayBoundsRef}
