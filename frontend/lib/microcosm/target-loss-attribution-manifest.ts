@@ -19,6 +19,7 @@ export interface AttributionVerificationTolerance {
 export interface HistoricalAttributionSupport {
   releaseId: string;
   buildId: string;
+  diagnosticsSha256?: string;
   buildSha: string | null;
   producerCommit: string | null;
   releaseFamily: "national" | "local_area";
@@ -27,6 +28,7 @@ export interface HistoricalAttributionSupport {
   orderedTargetNamesSha256: string;
   producerTargetSurfaceSha256: string | null;
   weightingIdentifier: string | null;
+  lossCap?: number;
   recipe: HistoricalAttributionRecipe;
   expectedStatus: HistoricalAttributionStatus;
   tolerance: AttributionVerificationTolerance;
@@ -397,6 +399,7 @@ export const HISTORICAL_ATTRIBUTION_SUPPORT: readonly HistoricalAttributionSuppo
   {
     releaseId: "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
     buildId: "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
+    diagnosticsSha256: "870449b44e86b13b25bcea1a57f0e7af37f4d4db18be815eea3acdf9fe6eb40e",
     buildSha: "cae8640",
     producerCommit: "cae8640f9e65e274aea65c7916cb37b956978e32",
     releaseFamily: "national",
@@ -405,6 +408,7 @@ export const HISTORICAL_ATTRIBUTION_SUPPORT: readonly HistoricalAttributionSuppo
     orderedTargetNamesSha256: "49861b0d1c7e528256c3548293e8f304b9ca726db96f92481a709e87437fffbe",
     producerTargetSurfaceSha256: "49bb0fe3dfd4c399e7b3f900b0e5ba29d9d72413d9170dfc155a9fa5e91c6f6f",
     weightingIdentifier: CONCEPT_BUDGET_WEIGHTING,
+    lossCap: 1,
     recipe: "concept_budget_sqrt_value_50_50_v3",
     expectedStatus: "exact_reconstructed",
     tolerance: FLOATING_POINT_TOLERANCE,

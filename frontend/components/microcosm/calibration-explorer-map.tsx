@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Spinner } from "@policyengine/ui-kit";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -23,11 +23,13 @@ import {
   WEIGHTED_TARGET_ERROR_HELP,
 } from "@/components/microcosm/calibration-explorer-view";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
+import { CalibrationProvenanceNotice } from "@/components/microcosm/calibration-provenance-notice";
 import { fmt, humanizeName } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import {
   microcosmCalibrationTreeQueryOptions,
   useMicrocosmCalibrationTree,
+  type MicrocosmCalibrationTreeSource,
   type MicrocosmTargetDimension,
   type MicrocosmTargetRow,
 } from "@/lib/api/hooks/use-microcosm";
@@ -258,7 +260,7 @@ function SizeControl({
           disabled: !lossAvailable,
           title: lossAvailable
             ? undefined
-            : "Target weight is unavailable for this release.",
+            : "Target weight is unavailable for this calibration.",
         },
         {
           value: "loss",
@@ -266,7 +268,7 @@ function SizeControl({
           disabled: !lossAvailable,
           title: lossAvailable
             ? undefined
-            : "Weighted target error is unavailable for this release.",
+            : "Weighted target error is unavailable for this calibration.",
           tooltip: WEIGHTED_TARGET_ERROR_HELP,
         },
       ]}
@@ -487,13 +489,13 @@ function CalibrationMapLoadingSkeleton() {
 function usePrefetchCalibrationLevels({
   state,
   data,
-  release,
+  source,
   isPlaceholderData,
   depth,
 }: {
   state: ExplorerState;
   data: CalibrationTreeResponse | undefined;
-  release?: string;
+  source: MicrocosmCalibrationTreeSource;
   isPlaceholderData: boolean;
   depth: number;
 }) {
@@ -510,14 +512,14 @@ function usePrefetchCalibrationLevels({
       concurrency: PREFETCH_CONCURRENCY,
       fetchTree: async (childState) =>
         queryClient.fetchQuery(
-          microcosmCalibrationTreeQueryOptions(childState, release, country),
+          microcosmCalibrationTreeQueryOptions(childState, source, country),
         ),
       isCancelled: () => cancelled,
     });
     return () => {
       cancelled = true;
     };
-  }, [country, data, depth, isPlaceholderData, queryClient, release, state]);
+  }, [country, data, depth, isPlaceholderData, queryClient, source, state]);
 }
 
 export function CalibrationExplorerDataPrefetch({
@@ -526,11 +528,15 @@ export function CalibrationExplorerDataPrefetch({
   release?: string;
 }) {
   const [state] = useState(createExplorerState);
-  const { data, isPlaceholderData } = useMicrocosmCalibrationTree(state, release);
+  const source = useMemo<MicrocosmCalibrationTreeSource>(
+    () => ({ kind: "release", release }),
+    [release],
+  );
+  const { data, isPlaceholderData } = useMicrocosmCalibrationTree(state, source);
   usePrefetchCalibrationLevels({
     state,
     data,
-    release,
+    source,
     isPlaceholderData,
     depth: PAGE_LOAD_PREFETCH_DEPTH,
   });
@@ -539,9 +545,11 @@ export function CalibrationExplorerDataPrefetch({
 
 export function CalibrationExplorerMap({
   release,
+  stagingRunId,
   pageIntroHeight,
 }: {
   release?: string;
+  stagingRunId?: string;
   pageIntroHeight: number;
 }) {
   const [state, dispatch] = useReducer(
@@ -549,8 +557,15 @@ export function CalibrationExplorerMap({
     undefined,
     createExplorerState,
   );
+  const source = useMemo<MicrocosmCalibrationTreeSource>(
+    () =>
+      stagingRunId
+        ? { kind: "staging", runId: stagingRunId }
+        : { kind: "release", release },
+    [release, stagingRunId],
+  );
   const { data, isFetching, isPlaceholderData, error } =
-    useMicrocosmCalibrationTree(state, release);
+    useMicrocosmCalibrationTree(state, source);
   const displayBoundsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(960);
@@ -564,7 +579,7 @@ export function CalibrationExplorerMap({
   usePrefetchCalibrationLevels({
     state,
     data,
-    release,
+    source,
     isPlaceholderData,
     depth: ACTIVE_VIEW_PREFETCH_DEPTH,
   });
@@ -645,6 +660,8 @@ export function CalibrationExplorerMap({
   );
   return (
     <div className="flex flex-col gap-3">
+      <CalibrationProvenanceNotice provenance={data.calibrationProvenance} />
+      <div className="shrink-0">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <BreakdownControl
@@ -654,18 +671,11 @@ export function CalibrationExplorerMap({
                 dispatch({ type: "breakdown", breakdown });
               }}
             />
-            <div className="flex flex-col gap-1">
-              <SizeControl
-                value={sizeMode}
-                lossAvailable={data.lossAttributionAvailable}
-                onChange={setSizeMode}
-              />
-              {lossUnavailableMessage && (
-                <span className="text-[10px] text-muted-foreground">
-                  {lossUnavailableMessage}
-                </span>
-              )}
-            </div>
+            <SizeControl
+              value={sizeMode}
+              lossAvailable={data.lossAttributionAvailable}
+              onChange={setSizeMode}
+            />
             <FilterMenu
               data={data}
               state={state}
@@ -679,6 +689,12 @@ export function CalibrationExplorerMap({
             <FitLegend mode={sizeMode} />
           </div>
         </div>
+        {lossUnavailableMessage && (
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {lossUnavailableMessage}
+          </p>
+        )}
+      </div>
 
       <div
         ref={displayBoundsRef}

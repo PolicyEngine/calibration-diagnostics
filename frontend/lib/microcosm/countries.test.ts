@@ -45,6 +45,9 @@ test("every registration carries the full shape", () => {
         expect(registration.staging.repo_env).toMatch(/^[A-Z][A-Z0-9_]*$/);
         expect(registration.staging.revision_env).toMatch(/^[A-Z][A-Z0-9_]*$/);
       }
+      if (registration.staging.token_env != null) {
+        expect(registration.staging.token_env).toMatch(/^[A-Z][A-Z0-9_]*$/);
+      }
     }
     expect(hasCapability(country, "staging")).toBe(registration.staging != null);
   }
@@ -73,6 +76,13 @@ test("keeps the live registrations on their published repositories and labels", 
     label: "United Kingdom",
     dataset_label: "Microcosm UK",
     visibility: "private",
+    capabilities: ["calibration", "targets", "compare", "cross_dataset", "staging"],
+    staging: {
+      repo: "policyengine/populace-uk-staging",
+      repo_env: "POPULACE_UK_STAGING_HF_REPO",
+      revision_env: "POPULACE_UK_STAGING_HF_REVISION",
+      token_env: "POPULACE_UK_STAGING_HF_TOKEN",
+    },
     jurisdiction_aliases: ["GB"],
   });
   expect(countryRegistration("be")).toMatchObject({
@@ -118,7 +128,7 @@ test("capability gates read the registration", () => {
   expect(hasCapability("us", "staging")).toBe(true);
   expect(hasCapability("am", "staging")).toBe(true);
   expect(hasCapability("us", "model_coverage")).toBe(true);
-  expect(hasCapability("uk", "staging")).toBe(false);
+  expect(hasCapability("uk", "staging")).toBe(true);
   expect(hasCapability("be", "pipeline")).toBe(false);
   expect(hasCapability("be", "cross_dataset")).toBe(true);
   expect(countryCapabilities("be")).toEqual([

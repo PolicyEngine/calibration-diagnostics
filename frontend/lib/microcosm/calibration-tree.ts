@@ -6,6 +6,7 @@ import type {
 } from "./calibration-explorer";
 import { canonicalLabel, programLabel } from "./program-label";
 import { sourceLabel } from "./source-label";
+import type { CalibrationProvenance } from "./target-loss-attribution";
 
 const DEFAULT_GEOGRAPHY = "United States";
 const DEFAULT_GEOGRAPHY_LEVEL = "national";
@@ -88,6 +89,7 @@ export interface CalibrationTreeGroup {
 
 export interface CalibrationTreeResponse {
   releaseId?: string;
+  calibrationProvenance?: CalibrationProvenance;
   lossAttributionAvailable: boolean;
   path: ExplorerState["path"];
   pathLabels: {
@@ -690,6 +692,7 @@ function hierarchyDimensionTree(
   state: ExplorerState,
   releaseId: string | undefined,
   lossAttributionAvailable: boolean,
+  calibrationProvenance: CalibrationProvenance | undefined,
   selectedPathLabels: CalibrationTreeResponse["pathLabels"],
   options: CalibrationTreeResponse["filterOptions"],
 ): CalibrationTreeResponse {
@@ -816,6 +819,7 @@ function hierarchyDimensionTree(
         : { kind: "mixed" as const, label: "Breakdowns and targets" };
   return {
     releaseId,
+    calibrationProvenance,
     lossAttributionAvailable,
     path: state.path,
     pathLabels: {
@@ -836,6 +840,7 @@ export function buildCalibrationTree(
   releaseId?: string,
   lossAttributionAvailable =
     allRows.length > 0 && allRows.every((row) => finiteLossContribution(row) != null),
+  calibrationProvenance?: CalibrationProvenance,
 ): CalibrationTreeResponse {
   const chartRows = allRows.map(normalizeChartCalibrationStatus);
   const { path } = state;
@@ -847,6 +852,7 @@ export function buildCalibrationTree(
     const nodes = geographyNodes(filteredRows);
     return {
       releaseId,
+      calibrationProvenance,
       lossAttributionAvailable,
       path,
       pathLabels: selectedPathLabels,
@@ -873,6 +879,7 @@ export function buildCalibrationTree(
     );
     return {
       releaseId,
+      calibrationProvenance,
       lossAttributionAvailable,
       path,
       pathLabels: selectedPathLabels,
@@ -887,6 +894,7 @@ export function buildCalibrationTree(
   if (!path.source || !path.program) {
     return {
       releaseId,
+      calibrationProvenance,
       lossAttributionAvailable,
       path,
       pathLabels: selectedPathLabels,
@@ -908,6 +916,7 @@ export function buildCalibrationTree(
     const nodes = geographyNodes(filteredProgramRows);
     return {
       releaseId,
+      calibrationProvenance,
       lossAttributionAvailable,
       path,
       pathLabels: selectedPathLabels,
@@ -936,6 +945,7 @@ export function buildCalibrationTree(
       state,
       releaseId,
       lossAttributionAvailable,
+      calibrationProvenance,
       selectedPathLabels,
       options,
     );
@@ -1024,6 +1034,7 @@ export function buildCalibrationTree(
         : { kind: "mixed" as const, label: "Breakdowns and targets" };
   return {
     releaseId,
+    calibrationProvenance,
     lossAttributionAvailable,
     path,
     pathLabels: selectedPathLabels,

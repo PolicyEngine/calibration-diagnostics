@@ -49,6 +49,7 @@ export interface CountryRegistration {
     revision: string;
     repo_env?: string;
     revision_env?: string;
+    token_env?: string;
   };
   // Other jurisdiction codes a cross-dataset bundle may use for this country.
   jurisdiction_aliases?: readonly string[];
@@ -100,7 +101,14 @@ export const COUNTRY_REGISTRY = {
     geography: "United Kingdom",
     geography_id: null,
     visibility: "private",
-    capabilities: CALIBRATION_CAPABILITIES,
+    capabilities: [...CALIBRATION_CAPABILITIES, "staging"],
+    staging: {
+      repo: "policyengine/populace-uk-staging",
+      revision: "main",
+      repo_env: "POPULACE_UK_STAGING_HF_REPO",
+      revision_env: "POPULACE_UK_STAGING_HF_REVISION",
+      token_env: "POPULACE_UK_STAGING_HF_TOKEN",
+    },
     jurisdiction_aliases: ["GB"],
   },
   be: {

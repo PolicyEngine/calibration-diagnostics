@@ -30,6 +30,7 @@ import {
   microcosmRevision,
   microcosmTargetTreemap,
   parseCountry,
+  parseHashedJsonArtifact,
   releaseCountry,
   releasePresentation,
   releasePublisherLabels,
@@ -57,6 +58,16 @@ test("keeps Microcosm deployment configuration on its published Populace env con
     "POPULACE_BE_HF_REPO",
     "POPULACE_BE_HF_REVISION",
   ]);
+});
+
+test("hashes calibration diagnostics before parsing JSON", () => {
+  const artifact = parseHashedJsonArtifact(
+    new TextEncoder().encode('{"value":1}\n'),
+  );
+  expect(artifact.payload).toEqual({ value: 1 });
+  expect(artifact.sha256).toBe(
+    "3a37782e8974c48eebf2a0517c866ad15641c53b3d31993188796b56aeb79624",
+  );
 });
 
 test("coerces supported country parameters and defaults unknown values to US", () => {

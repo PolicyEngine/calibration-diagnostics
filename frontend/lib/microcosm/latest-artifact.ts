@@ -7,6 +7,8 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import { createHash } from "node:crypto";
+
 import { sourceAuthorityLabel } from "@/lib/source-labels";
 
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
@@ -35,6 +37,7 @@ import {
 import {
   normalizeTargetLossAttribution,
   targetLossAttributionSummary,
+  type CalibrationProvenance,
   type FinalTargetLossAttribution,
   type TargetLossDiagnosticWarning,
 } from "./target-loss-attribution";
@@ -1782,6 +1785,7 @@ export interface Calibration {
   diagnostic_warnings: TargetLossDiagnosticWarning[];
   target_loss_basis: JsonObject | null;
   target_loss_attribution: FinalTargetLossAttribution;
+  calibration_provenance: CalibrationProvenance;
   build_manifest: JsonObject;
   release_manifest: JsonObject;
   // demographics.json geography_coverage: unweighted household-record counts
@@ -2001,6 +2005,7 @@ export function buildCalibration(
   demographics: JsonObject = {},
   country: MicrocosmCountry = "us",
   source: Calibration["source"] = "huggingface_live",
+  diagnosticsSha256: string | null = null,
 ): Calibration {
   const targetRepresentation = targetRepresentationForSchema(diag.schema_version);
   const targets = (Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : []).map(
@@ -2042,6 +2047,7 @@ export function buildCalibration(
     releaseId,
     buildManifest,
     releaseFamily: role.is_local_area ? "local_area" : "national",
+    diagnosticsSha256,
   });
   const rows = normalizedAttribution.rows;
   const includedTargetCount = rows.filter((row) => row.calibration_status === "included").length;
@@ -2085,6 +2091,7 @@ export function buildCalibration(
       ? asObject(diag.target_loss_basis)
       : null,
     target_loss_attribution: normalizedAttribution.attribution,
+    calibration_provenance: normalizedAttribution.provenance,
     build_manifest: buildManifest,
     release_manifest: releaseManifest,
     geography_coverage: Object.keys(asObject(demographics.geography_coverage)).length
@@ -2118,6 +2125,23 @@ async function hfJson(url: string, revalidate: number): Promise<JsonObject> {
   const res = await hfFetch(url, revalidate);
   if (!res.ok) throw new Error(`HF fetch failed ${res.status}: ${url}`);
   return asObject(await res.json());
+}
+
+interface HashedJsonArtifact {
+  payload: JsonObject;
+  sha256: string;
+}
+
+export function parseHashedJsonArtifact(bytes: Uint8Array): HashedJsonArtifact {
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const payload = asObject(JSON.parse(new TextDecoder().decode(bytes)));
+  return { payload, sha256 };
+}
+
+async function hfHashedJson(url: string, revalidate: number): Promise<HashedJsonArtifact> {
+  const res = await hfFetch(url, revalidate);
+  if (!res.ok) throw new Error(`HF fetch failed ${res.status}: ${url}`);
+  return parseHashedJsonArtifact(new Uint8Array(await res.arrayBuffer()));
 }
 
 export function releasePublishedAtFromTree(tree: unknown): string | null {
@@ -2410,8 +2434,8 @@ async function loadReleaseUncached(
     updatedAt = ptr.updated_at;
   }
   const prefix = `releases/${id}`;
-  const [diag, buildManifest, releaseManifest, demographics, publishedAt] = await Promise.all([
-    hfJson(hfResolveUrl(`${prefix}/calibration_diagnostics.json`, country), revalidate),
+  const [diagnosticsArtifact, buildManifest, releaseManifest, demographics, publishedAt] = await Promise.all([
+    hfHashedJson(hfResolveUrl(`${prefix}/calibration_diagnostics.json`, country), revalidate),
     hfJson(hfResolveUrl(`${prefix}/build_manifest.json`, country), revalidate).catch(() => ({})),
     hfJson(hfResolveUrl(`${prefix}/release_manifest.json`, country), revalidate).catch(() => ({})),
     hfJson(hfResolveUrl(`${prefix}/demographics.json`, country), revalidate).catch(() => ({})),
@@ -2420,13 +2444,15 @@ async function loadReleaseUncached(
       : loadReleasePublishedAt(id, revalidate, country).catch(() => null),
   ]);
   return buildCalibration(
-    diag,
+    diagnosticsArtifact.payload,
     id,
     updatedAt ?? publishedAt,
     buildManifest,
     releaseManifest,
     demographics,
     country,
+    "huggingface_live",
+    diagnosticsArtifact.sha256,
   );
 }
 
@@ -2697,6 +2723,7 @@ export function latestMicrocosmCalibrationSummary(cal: Calibration) {
     compiled_candidate_targets: cal.compiled_candidate_targets,
     dropped_target_count: cal.dropped_target_names.length,
     included_target_count: cal.included_target_count,
+    calibration_provenance: cal.calibration_provenance,
     target_loss_attribution: targetLossAttributionSummary(cal.target_loss_attribution),
     total_targets: cal.rows.length,
     within_tolerance_count: withinToleranceCount(cal.rows),

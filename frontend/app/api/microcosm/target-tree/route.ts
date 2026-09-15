@@ -30,6 +30,7 @@ export async function GET(request: Request) {
           state,
           calibration.release_id,
           calibration.target_loss_attribution.status !== "unavailable",
+          calibration.calibration_provenance,
         ),
       ),
     );
