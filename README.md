@@ -10,10 +10,13 @@ repositories require a server-side Hugging Face token.
 > use `populace`/`ledger`; see
 > [upstream identifier compatibility](docs/upstream-identifier-compatibility.md).
 
-Everything is read **live from Hugging Face**: the current release is resolved
-through `latest.json`, and each release's manifests and per-target calibration
-diagnostics are fetched on demand. There is no committed data snapshot and no
-separate service layer — the Next.js API routes are the API layer.
+Release metadata and diagnostics are read from exact Hugging Face commits. The
+calibration explorer instead downloads a precomputed tree bundle from private
+Vercel Blob storage through a public, same-origin Next.js API route. It renders
+the roots first and then loads deeper hierarchy levels in increasing depth
+order. A dashboard-owned manifest maps `latest` to an immutable release and
+commit. There is no committed data snapshot; the Next.js route handlers are the
+dashboard API layer.
 
 ## What it shows
 
@@ -58,6 +61,8 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 |---|---|
 | `GET /api/microcosm/releases` | List published releases (newest first) |
 | `GET /api/microcosm?release=<id>` | Release summary (default: latest; `staging:<run_id>` reviews an unreleased staging candidate, never cached, 404 until it has diagnostics) |
+| `GET /api/microcosm/tree?country=<code>&release=<id>&part=<part>` | Redirect to an exact commit and stream one immutable tree-bundle part |
+| `GET /api/microcosm/tree-manifest?country=<code>` | Return the dashboard's current release and immutable tree identity |
 | `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics (`release` accepts `staging:<run_id>`) |
 | `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks (`release` accepts `staging:<run_id>`) |
 | `GET /api/microcosm/compare?a=<id>&b=<id>` | Version-over-version diff |
@@ -149,10 +154,18 @@ canonical model/data migration and deployment verification gates.
 
 See [the Chronicle update workflow](docs/chronicle-update-workflow.md) for the
 optional Microcosm and ACS inputs and the separate full-artifact command.
+See [calibration tree artifacts](docs/calibration-tree-artifacts.md) for the
+breadth-first folder schema, filtering indices, Hugging Face webhook
+publication, Vercel Blob authentication, one-time historical publication, and
+cache behavior.
 
-The US hosted application uses its reviewed immutable release. Leave
-`POPULACE_HF_REPO` and `POPULACE_HF_REVISION` unset; conflicting overrides fail
-validation and must be removed before a production rebuild. Optional
+The US variable-calculation service uses its reviewed immutable release. Leave
+`POPULACE_HF_REPO` and `POPULACE_HF_REVISION` unset for that service; conflicting
+overrides fail validation. Dashboard release discovery is separate: it resolves
+the registered US repository's `main` branch to an exact commit before reading
+`latest.json`, then uses the release tag when one exists. Repositories without
+release tags use that exact source-branch commit as the immutable release
+identity. Optional
 `POPULACE_UK_HF_REPO`, `POPULACE_UK_HF_REVISION` configure the UK;
 and `POPULACE_BE_HF_REPO`, `POPULACE_BE_HF_REVISION` for Belgium. The Belgium
 repository defaults in code to `policyengine/populace-be-private`. Set `HF_TOKEN`
