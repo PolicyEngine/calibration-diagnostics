@@ -31,3 +31,7 @@ backend/data/target_index.json.union.jsonl
 
 # OS
 .DS_Store
+
+# Local Vercel project metadata and downloaded environment credentials
+.vercel/
+.env*.local
