@@ -1,0 +1,73 @@
+name: Publish calibration tree
+
+on:
+  workflow_dispatch:
+    inputs:
+      country:
+        description: Registered dashboard country code
+        required: true
+        default: us
+        type: string
+      event_kind:
+        description: Hugging Face event type or manual operation
+        required: true
+        default: manual
+        type: choice
+        options:
+          - manual
+          - tag
+          - branch
+      release_id:
+        description: Immutable Hugging Face release tag; omit to publish latest
+        required: false
+        type: string
+      hf_commit_sha:
+        description: Expected Hugging Face tag commit
+        required: false
+        type: string
+      backfill:
+        description: Publish every release that contains calibration diagnostics
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: calibration-tree-${{ inputs.country }}-${{ inputs.hf_commit_sha || inputs.release_id || 'latest' }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ vars.CALIBRATION_TREE_BUILD_ENABLED != 'FALSE' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Build, validate, and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--country "${{ inputs.country }}")
+          if [[ "${{ inputs.backfill }}" == "true" ]]; then
+            args+=(--backfill)
+          elif [[ -n "${{ inputs.release_id }}" ]]; then
+            args+=(--release "${{ inputs.release_id }}")
+            if [[ -n "${{ inputs.hf_commit_sha }}" ]]; then
+              args+=(--sha "${{ inputs.hf_commit_sha }}")
+            fi
+          else
+            args+=(--latest)
+            if [[ -n "${{ inputs.hf_commit_sha }}" ]]; then
+              args+=(--sha "${{ inputs.hf_commit_sha }}")
+            fi
+          fi
+          bun run publish:calibration-tree -- "${args[@]}"
