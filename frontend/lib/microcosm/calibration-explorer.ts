@@ -52,6 +52,22 @@ export type ExplorerAction =
   | { type: "filters"; filters: ExplorerFilters }
   | { type: "clear_target" };
 
+export function calibrationExplorerSourceIdentity({
+  country,
+  release,
+  stagingRunId,
+}: {
+  country: string;
+  release?: string;
+  stagingRunId?: string;
+}): string {
+  return JSON.stringify(
+    stagingRunId
+      ? [country, "staging", stagingRunId]
+      : [country, "release", release ?? null],
+  );
+}
+
 export function createExplorerState(): ExplorerState {
   return {
     breakdown: "program",
