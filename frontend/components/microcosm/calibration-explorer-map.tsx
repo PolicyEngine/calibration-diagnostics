@@ -587,8 +587,16 @@ function CalibrationExplorerMapForSource({
         : { kind: "release", release },
     [release, stagingRunId],
   );
-  const { data, isFetching, isPlaceholderData, error, filtersReady } =
-    useMicrocosmCalibrationTree(state, source);
+  const {
+    data,
+    isFetching,
+    isPlaceholderData,
+    error,
+    filtersReady,
+    targetDetailIsLoading,
+    targetDetailError,
+    retryTargetDetail,
+  } = useMicrocosmCalibrationTree(state, source);
   const displayBoundsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(960);
@@ -881,6 +889,42 @@ function CalibrationExplorerMapForSource({
           dimensions={detailDimensions}
           onClose={() => dispatch({ type: "clear_target" })}
         />
+      )}
+      {state.path.target && targetDetailIsLoading && (
+        <div
+          className="rounded-lg border border-border p-6 text-sm text-muted-foreground"
+          aria-live="polite"
+        >
+          Loading target details…
+        </div>
+      )}
+      {state.path.target && targetDetailError && (
+        <div className="rounded-lg border border-border p-6" role="alert">
+          <p className="text-sm font-medium text-foreground">
+            Target details could not be loaded.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {targetDetailError instanceof Error
+              ? targetDetailError.message
+              : "The target-detail request failed."}
+          </p>
+          <div className="mt-3 flex gap-4 text-sm">
+            <button
+              type="button"
+              className="font-medium text-primary hover:underline"
+              onClick={retryTargetDetail}
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              className="font-medium text-primary hover:underline"
+              onClick={() => dispatch({ type: "clear_target" })}
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

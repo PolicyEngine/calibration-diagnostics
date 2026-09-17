@@ -12,7 +12,7 @@ import {
 const entry: CalibrationTreeManifestEntry = {
   releaseId: "microcosm-us-test-20260915",
   hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-  treeSchemaVersion: 2,
+  treeSchemaVersion: 3,
   indexSha256: "b".repeat(64),
   indexBytes: 1234,
   updatedAt: "2026-09-15T12:00:00.000Z",
@@ -34,11 +34,15 @@ test("manifest updates one country without replacing other country entries", () 
 
 test("manifest validation rejects mutable or malformed content identities", () => {
   expect(() => parseCalibrationTreeManifest({
-    schemaVersion: 2,
+    schemaVersion: 3,
     countries: { us: { ...entry, hfCommitSha: "main" } },
   })).toThrow("invalid HF commit SHA");
   expect(() => parseCalibrationTreeManifest({
-    schemaVersion: 2,
+    schemaVersion: 3,
     countries: { us: { ...entry, indexSha256: "short" } },
   })).toThrow("invalid index hash");
+  expect(() => parseCalibrationTreeManifest({
+    schemaVersion: 2,
+    countries: {},
+  })).toThrow("Unsupported calibration tree manifest schema 2");
 });

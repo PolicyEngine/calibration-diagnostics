@@ -2,8 +2,6 @@ import { expect, test } from "bun:test";
 
 import { buildCalibrationTreeBundle } from "./calibration-tree-bundle";
 import {
-  deleteLegacyCalibrationTreeBlobs,
-  listLegacyCalibrationTreeBlobs,
   readCalibrationTreeManifest,
   updateCalibrationTreeManifest,
   uploadCalibrationTreeBundle,
@@ -14,7 +12,6 @@ function memoryClient() {
   const content = new Map<string, string>();
   const etags = new Map<string, string>();
   const putCalls: Array<{ pathname: string; options: Record<string, unknown> }> = [];
-  const deleted: string[] = [];
   let version = 0;
   const client: CalibrationTreeBlobClient = {
     get: (async (pathname: string, options: { ifNoneMatch?: string }) => {
@@ -71,26 +68,8 @@ function memoryClient() {
         contentDisposition: "inline",
       };
     }) as unknown as CalibrationTreeBlobClient["put"],
-    list: (async (options: { prefix?: string }) => ({
-      blobs: [...content.keys()]
-        .filter((pathname) => pathname.startsWith(options.prefix ?? ""))
-        .map((pathname) => ({
-          pathname,
-          url: `https://blob.example/${pathname}`,
-          downloadUrl: `https://blob.example/${pathname}?download=1`,
-          size: content.get(pathname)!.length,
-          uploadedAt: new Date(),
-        })),
-      hasMore: false,
-    })) as CalibrationTreeBlobClient["list"],
-    del: (async (paths: string[] | string) => {
-      for (const pathname of Array.isArray(paths) ? paths : [paths]) {
-        deleted.push(pathname);
-        content.delete(pathname);
-      }
-    }) as CalibrationTreeBlobClient["del"],
   };
-  return { client, content, putCalls, deleted };
+  return { client, content, putCalls };
 }
 
 function treeBundle() {
@@ -162,7 +141,7 @@ test("manifest writes merge countries and conditionally replace the prior versio
   const baseEntry = {
     releaseId: "microcosm-test",
     hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-    treeSchemaVersion: 2 as const,
+    treeSchemaVersion: 3 as const,
     indexSha256: "b".repeat(64),
     indexBytes: 100,
     updatedAt: "2026-09-15T12:00:00.000Z",
@@ -187,30 +166,4 @@ test("manifest writes merge countries and conditionally replace the prior versio
   expect(manifest.countries.us?.releaseId).toBe("microcosm-us-test");
   expect(manifest.countries.uk?.releaseId).toBe("microcosm-uk-test");
   expect(store.putCalls[1].options.ifMatch).toBe('"etag-1"');
-});
-
-test("legacy cleanup lists and deletes only obsolete v1 paths", async () => {
-  const store = memoryClient();
-  store.content.set("calibration-trees/v1/us/old.json", "old");
-  store.content.set("calibration-trees/latest.v1.json", "old manifest");
-  store.content.set("calibration-trees/us/new/index.json", "new");
-  const paths = await listLegacyCalibrationTreeBlobs({
-    token: "publisher-token",
-    client: store.client,
-  });
-  expect(paths).toEqual([
-    "calibration-trees/latest.v1.json",
-    "calibration-trees/v1/us/old.json",
-  ]);
-  await deleteLegacyCalibrationTreeBlobs({
-    token: "publisher-token",
-    paths,
-    client: store.client,
-  });
-  expect(store.deleted).toEqual(paths);
-  await expect(deleteLegacyCalibrationTreeBlobs({
-    token: "publisher-token",
-    paths: ["calibration-trees/us/new/index.json"],
-    client: store.client,
-  })).rejects.toThrow("Refusing");
 });

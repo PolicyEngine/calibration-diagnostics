@@ -17,7 +17,7 @@ test("latest release identity is read only from the dashboard manifest", () => {
     {
       releaseId: "microcosm-us-new-release",
       hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-      treeSchemaVersion: 2,
+      treeSchemaVersion: 3,
       indexSha256: "c".repeat(64),
       indexBytes: 20,
       updatedAt: "2026-09-15T12:00:00.000Z",

@@ -1,6 +1,6 @@
 import { readCalibrationTreeManifest } from "./calibration-tree-blob";
 import { calibrationTreeManifestEntry } from "./calibration-tree-manifest";
-import type { CalibrationTreeLatestManifestV2 } from "./calibration-tree-manifest";
+import type { CalibrationTreeLatestManifest } from "./calibration-tree-manifest";
 import {
   countryRegistration,
   type MicrocosmCountry,
@@ -178,7 +178,7 @@ export async function resolveCalibrationRelease(
 }
 
 export function calibrationReleaseFromManifest(
-  manifest: CalibrationTreeLatestManifestV2,
+  manifest: CalibrationTreeLatestManifest,
   country: MicrocosmCountry,
 ): CalibrationReleaseLocation {
   const entry = calibrationTreeManifestEntry(manifest, country);

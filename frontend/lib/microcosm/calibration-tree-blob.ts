@@ -1,8 +1,6 @@
 import {
   BlobPreconditionFailedError,
-  del,
   get,
-  list,
   put,
   type GetBlobResult,
 } from "@vercel/blob";
@@ -23,25 +21,20 @@ import {
   parseCalibrationTreeManifest,
   serializeCalibrationTreeManifest,
   withCalibrationTreeManifestEntry,
-  type CalibrationTreeLatestManifestV2,
+  type CalibrationTreeLatestManifest,
   type CalibrationTreeManifestEntry,
 } from "./calibration-tree-manifest";
 import type { MicrocosmCountry } from "./countries";
 
 const IMMUTABLE_CACHE_SECONDS = 31_536_000;
 const MANIFEST_CACHE_SECONDS = 60;
-export const LEGACY_CALIBRATION_TREE_PREFIX = "calibration-trees/v1/";
-export const LEGACY_CALIBRATION_TREE_MANIFEST_PATH =
-  "calibration-trees/latest.v1.json";
 
 export interface CalibrationTreeBlobClient {
   get: typeof get;
   put: typeof put;
-  list?: typeof list;
-  del?: typeof del;
 }
 
-const DEFAULT_BLOB_CLIENT: CalibrationTreeBlobClient = { get, put, list, del };
+const DEFAULT_BLOB_CLIENT: CalibrationTreeBlobClient = { get, put };
 
 function tokenOption(token?: string): { token: string } | Record<string, never> {
   return token ? { token } : {};
@@ -53,7 +46,7 @@ async function streamText(stream: ReadableStream<Uint8Array> | null): Promise<st
 }
 
 export interface StoredCalibrationTreeManifest {
-  manifest: CalibrationTreeLatestManifestV2;
+  manifest: CalibrationTreeLatestManifest;
   etag: string | null;
 }
 
@@ -197,7 +190,7 @@ export async function updateCalibrationTreeManifest(options: {
   token: string;
   retries?: number;
   client?: CalibrationTreeBlobClient;
-}): Promise<CalibrationTreeLatestManifestV2> {
+}): Promise<CalibrationTreeLatestManifest> {
   const retries = options.retries ?? 3;
   let lastError: unknown;
   for (let attempt = 0; attempt < retries; attempt += 1) {
@@ -249,52 +242,4 @@ export async function updateCalibrationTreeManifest(options: {
   throw lastError instanceof Error
     ? lastError
     : new Error("Calibration tree manifest update failed after concurrent writes.");
-}
-
-export async function listLegacyCalibrationTreeBlobs(options: {
-  token: string;
-  client?: CalibrationTreeBlobClient;
-}): Promise<string[]> {
-  const client = options.client ?? DEFAULT_BLOB_CLIENT;
-  if (!client.list) throw new Error("Blob client does not support listing objects.");
-  const paths: string[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await client.list({
-      prefix: LEGACY_CALIBRATION_TREE_PREFIX,
-      cursor,
-      limit: 1000,
-      ...tokenOption(options.token),
-    });
-    paths.push(...page.blobs.map((blob) => blob.pathname));
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  const oldManifest = await client.get(LEGACY_CALIBRATION_TREE_MANIFEST_PATH, {
-    access: "private",
-    useCache: false,
-    ...tokenOption(options.token),
-  });
-  if (oldManifest) paths.push(LEGACY_CALIBRATION_TREE_MANIFEST_PATH);
-  return [...new Set(paths)].sort();
-}
-
-export async function deleteLegacyCalibrationTreeBlobs(options: {
-  token: string;
-  paths: string[];
-  client?: CalibrationTreeBlobClient;
-}): Promise<void> {
-  const client = options.client ?? DEFAULT_BLOB_CLIENT;
-  if (!client.del) throw new Error("Blob client does not support deleting objects.");
-  if (
-    options.paths.some(
-      (path) =>
-        path !== LEGACY_CALIBRATION_TREE_MANIFEST_PATH &&
-        !path.startsWith(LEGACY_CALIBRATION_TREE_PREFIX),
-    )
-  ) {
-    throw new Error("Refusing to delete a Blob outside the obsolete calibration-tree paths.");
-  }
-  if (options.paths.length) {
-    await client.del(options.paths, { token: options.token });
-  }
 }

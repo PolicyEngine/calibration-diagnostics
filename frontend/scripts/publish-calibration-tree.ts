@@ -341,7 +341,7 @@ async function promoteIfCurrent(
     entry: {
       releaseId: latest.releaseId,
       hfCommitSha: latest.hfCommitSha,
-      treeSchemaVersion: 2,
+      treeSchemaVersion: 3,
       indexSha256: candidate.stored.index.sha256,
       indexBytes: candidate.stored.index.bytes,
       updatedAt: latest.updatedAt ?? new Date().toISOString(),

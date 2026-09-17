@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   keepPreviousData,
   useQueries,
@@ -19,14 +19,15 @@ import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
 import {
   calibrationTreeResponseFromBundle,
+  calibrationTreeTargetDetailSelection,
   parseCalibrationTreeIndex,
   parseCalibrationTreePart,
-  type CalibrationTreeArtifactPartV2,
-  type CalibrationTreeIndexArtifactV2,
+  type CalibrationTreeArtifactPart,
+  type CalibrationTreeIndexArtifact,
   type CalibrationTreePart,
-  type CalibrationTreeTargetDetailsArtifactV2,
-  type CalibrationTreeTargetIndexArtifactV2,
-  type CalibrationTreeTierArtifactV2,
+  type CalibrationTreeTargetDetailsArtifact,
+  type CalibrationTreeTargetIndexArtifact,
+  type CalibrationTreeTierArtifact,
 } from "@/lib/microcosm/calibration-tree-artifact";
 import type { CalibrationProvenance } from "@/lib/microcosm/target-loss-attribution";
 import type { TargetChangeMode } from "@/lib/microcosm/target-change";
@@ -973,7 +974,13 @@ export function useMicrocosmCalibrationTree(
     enabled: source.kind === "staging",
   });
   return source.kind === "staging"
-    ? { ...stagingQuery, filtersReady: true }
+    ? {
+        ...stagingQuery,
+        filtersReady: true,
+        targetDetailIsLoading: false,
+        targetDetailError: null,
+        retryTargetDetail: () => {},
+      }
     : releaseQuery;
 }
 
@@ -1000,7 +1007,7 @@ export function microcosmCalibrationTreeIndexQueryOptions(
       release ?? "latest",
       "index",
     ],
-    queryFn: async (): Promise<CalibrationTreeIndexArtifactV2> => {
+    queryFn: async (): Promise<CalibrationTreeIndexArtifact> => {
       const index = parseCalibrationTreeIndex(await apiGet<unknown>("/microcosm/tree", {
         release: release || undefined,
         country,
@@ -1030,7 +1037,7 @@ function calibrationTreePartQueryOptions(
       revision,
       part,
     ],
-    queryFn: async (): Promise<CalibrationTreeArtifactPartV2> => {
+    queryFn: async (): Promise<CalibrationTreeArtifactPart> => {
       const artifact = parseCalibrationTreePart(await apiGet<unknown>("/microcosm/tree", {
         country,
         revision,
@@ -1071,19 +1078,9 @@ function usePublishedCalibrationTree(
   });
   const loadedTiers = tierQueries.flatMap((query) =>
     query.data?.part.startsWith("tier-")
-      ? [query.data as CalibrationTreeTierArtifactV2]
+      ? [query.data as CalibrationTreeTierArtifact]
       : [],
   );
-  const allTiersLoaded =
-    loadedTiers.length === tierDescriptors.length &&
-    tierQueries.every((query) => query.data != null);
-  const targetDetailsQuery = useQuery({
-    ...calibrationTreePartQueryOptions(country, revision, "target-details"),
-    enabled:
-      enabled &&
-      Boolean(index) &&
-      (Boolean(state.path.target) || allTiersLoaded),
-  });
 
   useEffect(() => {
     if (!enabled || !index) return;
@@ -1104,14 +1101,64 @@ function usePublishedCalibrationTree(
   }, [country, enabled, index, queryClient]);
 
   const targetIndex = targetIndexQuery.data?.part === "target-index"
-    ? targetIndexQuery.data as CalibrationTreeTargetIndexArtifactV2
+    ? targetIndexQuery.data as CalibrationTreeTargetIndexArtifact
     : undefined;
-  const targetDetails = targetDetailsQuery.data?.part === "target-details"
-    ? targetDetailsQuery.data as CalibrationTreeTargetDetailsArtifactV2
+  const targetsById = useMemo(
+    () => new Map(
+      (targetIndex?.targets ?? []).map((target, targetOrdinal) => [
+        target.id,
+        { target, targetOrdinal },
+      ]),
+    ),
+    [targetIndex],
+  );
+  const selectedTarget = state.path.target
+    ? targetsById.get(state.path.target)
     : undefined;
+  let detailDescriptor = selectedTarget && index
+    ? index.parts.targetDetails[selectedTarget.target.detailLocation.shardIndex]
+    : undefined;
+  let detailLocationError: Error | null = null;
+  if (state.path.target && targetIndex && !selectedTarget) {
+    detailLocationError = new Error(
+      `Calibration target ${state.path.target} is missing from target-index.json.`,
+    );
+  } else if (selectedTarget && index) {
+    try {
+      detailDescriptor = calibrationTreeTargetDetailSelection(
+        index,
+        selectedTarget.target,
+        selectedTarget.targetOrdinal,
+      ).descriptor;
+    } catch (error) {
+      detailDescriptor = undefined;
+      detailLocationError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+  const targetDetailQueryDefinitions: Array<
+    ReturnType<typeof calibrationTreePartQueryOptions>
+  > = detailDescriptor && enabled
+    ? [calibrationTreePartQueryOptions(country, revision, detailDescriptor.part)]
+    : [];
+  const targetDetailQueries = useQueries({ queries: targetDetailQueryDefinitions });
+  const targetDetailQuery = targetDetailQueries[0];
+  const fetchedTargetDetailShard = targetDetailQuery?.data?.part.startsWith("target-details-")
+    ? targetDetailQuery.data as CalibrationTreeTargetDetailsArtifact
+    : undefined;
+  const targetDetailRangeError = fetchedTargetDetailShard && detailDescriptor && (
+    fetchedTargetDetailShard.part !== detailDescriptor.part ||
+    fetchedTargetDetailShard.startTargetOrdinal !== detailDescriptor.startTargetOrdinal ||
+    fetchedTargetDetailShard.endTargetOrdinalExclusive !==
+      detailDescriptor.endTargetOrdinalExclusive
+  )
+    ? new Error(`Calibration tree part ${detailDescriptor.part} has an unexpected target range.`)
+    : null;
+  const targetDetailShard = targetDetailRangeError
+    ? undefined
+    : fetchedTargetDetailShard;
   const data = index
     ? calibrationTreeResponseFromBundle(
-        { index, tiers: loadedTiers, targetIndex, targetDetails },
+        { index, tiers: loadedTiers, targetIndex, targetDetailShard },
         state,
       ) ?? undefined
     : undefined;
@@ -1120,6 +1167,8 @@ function usePublishedCalibrationTree(
     (!targetIndex && targetIndexQuery.error) ||
     (!data && tierError) ||
     null;
+  const targetDetailError =
+    detailLocationError || targetDetailRangeError || targetDetailQuery?.error || null;
 
   return {
     data,
@@ -1128,10 +1177,17 @@ function usePublishedCalibrationTree(
     isFetching:
       indexQuery.isFetching ||
       targetIndexQuery.isFetching ||
-      targetDetailsQuery.isFetching ||
       tierQueries.some((query) => query.isFetching),
     isPlaceholderData: false,
     filtersReady: Boolean(targetIndex),
+    targetDetailIsLoading:
+      Boolean(state.path.target) &&
+      !targetDetailError &&
+      (!targetIndex || Boolean(detailDescriptor && !targetDetailShard)),
+    targetDetailError,
+    retryTargetDetail: () => {
+      void targetDetailQuery?.refetch();
+    },
   };
 }
 

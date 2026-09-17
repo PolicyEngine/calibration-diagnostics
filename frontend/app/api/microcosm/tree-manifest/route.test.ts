@@ -7,7 +7,7 @@ test("manifest API returns one country's current immutable release identity", as
   const latest = {
     releaseId: "microcosm-us-release",
     hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-    treeSchemaVersion: 2 as const,
+    treeSchemaVersion: 3 as const,
     indexSha256: "a".repeat(64),
     indexBytes: 1234,
     updatedAt: "2026-09-15T12:00:00.000Z",
@@ -24,7 +24,7 @@ test("manifest API returns one country's current immutable release identity", as
     "https://dashboard.example/api/microcosm/tree-manifest?country=us",
   ));
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ schemaVersion: 2, country: "us", latest });
+  expect(await response.json()).toEqual({ schemaVersion: 3, country: "us", latest });
   expect(response.headers.get("vercel-cdn-cache-control")).toContain("max-age=60");
 });
 

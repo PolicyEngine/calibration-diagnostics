@@ -59,8 +59,8 @@ test("publisher enforces configured artifact size limits", () => {
   process.env.CALIBRATION_TREE_MAX_RAW_BYTES = "10";
   try {
     expect(() => enforceConfiguredSizeLimits({
-      part: "target-details",
-      path: "calibration-trees/us/1234567890abcdef1234567890abcdef12345678/target-details.json",
+      part: "target-details-0001",
+      path: "calibration-trees/us/1234567890abcdef1234567890abcdef12345678/target-details-0001.json",
       artifact: {} as never,
       serialized: "12345678901",
       sha256: "a".repeat(64),

@@ -1,24 +1,24 @@
 import { isCountry, type MicrocosmCountry } from "./countries";
 import { isHfCommitSha, isSha256 } from "./calibration-tree-artifact";
 
-export const CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION = 2 as const;
+export const CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION = 3 as const;
 export const CALIBRATION_TREE_MANIFEST_PATH = "calibration-trees/latest.json";
 
 export interface CalibrationTreeManifestEntry {
   releaseId: string;
   hfCommitSha: string;
-  treeSchemaVersion: 2;
+  treeSchemaVersion: 3;
   indexSha256: string;
   indexBytes: number;
   updatedAt: string;
 }
 
-export interface CalibrationTreeLatestManifestV2 {
+export interface CalibrationTreeLatestManifest {
   schemaVersion: typeof CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION;
   countries: Partial<Record<MicrocosmCountry, CalibrationTreeManifestEntry>>;
 }
 
-export function emptyCalibrationTreeManifest(): CalibrationTreeLatestManifestV2 {
+export function emptyCalibrationTreeManifest(): CalibrationTreeLatestManifest {
   return {
     schemaVersion: CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION,
     countries: {},
@@ -40,7 +40,7 @@ function parseEntry(value: unknown, country: string): CalibrationTreeManifestEnt
   if (typeof entry.hfCommitSha !== "string" || !isHfCommitSha(entry.hfCommitSha)) {
     throw new Error(`Calibration tree manifest entry ${country} has an invalid HF commit SHA.`);
   }
-  if (entry.treeSchemaVersion !== 2) {
+  if (entry.treeSchemaVersion !== 3) {
     throw new Error(`Calibration tree manifest entry ${country} has an unsupported tree schema.`);
   }
   if (typeof entry.indexSha256 !== "string" || !isSha256(entry.indexSha256)) {
@@ -57,13 +57,13 @@ function parseEntry(value: unknown, country: string): CalibrationTreeManifestEnt
 
 export function parseCalibrationTreeManifest(
   value: unknown,
-): CalibrationTreeLatestManifestV2 {
+): CalibrationTreeLatestManifest {
   const manifest = record(value, "Calibration tree manifest");
   if (manifest.schemaVersion !== CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION) {
     throw new Error(`Unsupported calibration tree manifest schema ${String(manifest.schemaVersion)}.`);
   }
   const countries = record(manifest.countries, "Calibration tree manifest countries");
-  const parsedCountries: CalibrationTreeLatestManifestV2["countries"] = {};
+  const parsedCountries: CalibrationTreeLatestManifest["countries"] = {};
   for (const [country, entry] of Object.entries(countries)) {
     if (!isCountry(country)) {
       throw new Error(`Calibration tree manifest contains unknown country ${country}.`);
@@ -77,7 +77,7 @@ export function parseCalibrationTreeManifest(
 }
 
 export function serializeCalibrationTreeManifest(
-  manifest: CalibrationTreeLatestManifestV2,
+  manifest: CalibrationTreeLatestManifest,
 ): string {
   const parsed = parseCalibrationTreeManifest(manifest);
   const countries = Object.fromEntries(
@@ -89,7 +89,7 @@ export function serializeCalibrationTreeManifest(
 }
 
 export function calibrationTreeManifestEntry(
-  manifest: CalibrationTreeLatestManifestV2,
+  manifest: CalibrationTreeLatestManifest,
   country: MicrocosmCountry,
 ): CalibrationTreeManifestEntry {
   const entry = manifest.countries[country];
@@ -98,10 +98,10 @@ export function calibrationTreeManifestEntry(
 }
 
 export function withCalibrationTreeManifestEntry(
-  manifest: CalibrationTreeLatestManifestV2,
+  manifest: CalibrationTreeLatestManifest,
   country: MicrocosmCountry,
   entry: CalibrationTreeManifestEntry,
-): CalibrationTreeLatestManifestV2 {
+): CalibrationTreeLatestManifest {
   parseEntry(entry, country);
   return {
     schemaVersion: CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION,
