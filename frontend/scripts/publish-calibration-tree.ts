@@ -12,6 +12,7 @@ import {
 import { createHash } from "node:crypto";
 import {
   CalibrationReleaseNotFoundError,
+  resolveHfReleaseDirectorySha,
   resolveHfRevisionSha,
 } from "../lib/microcosm/calibration-release-locator";
 import {
@@ -237,12 +238,10 @@ async function publishRelease(
   allowMissingReleaseTag = false,
 ) {
   const resolvedSha = await resolveHfRevisionSha(country, id, 0).catch((error) => {
-    if (
-      allowMissingReleaseTag &&
-      expectedSha &&
-      error instanceof CalibrationReleaseNotFoundError
-    ) {
-      return exactCommitSha(expectedSha, "Fallback source revision");
+    if (allowMissingReleaseTag && error instanceof CalibrationReleaseNotFoundError) {
+      return expectedSha
+        ? exactCommitSha(expectedSha, "Fallback source revision")
+        : resolveHfReleaseDirectorySha(country, id, 0);
     }
     throw error;
   });
@@ -346,6 +345,7 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
           release.release_id,
           undefined,
           blobToken,
+          true,
         );
         console.log(JSON.stringify({
           country: options.country,
