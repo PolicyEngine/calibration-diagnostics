@@ -31,8 +31,10 @@ test("every registration carries the full shape", () => {
     expect(registration.capabilities.length).toBeGreaterThan(0);
     expect(registration.capabilities.every(isCountryCapability)).toBe(true);
     expect(new Set(registration.capabilities).size).toBe(registration.capabilities.length);
-    if (registration.repo_env != null || registration.revision_env != null) {
+    if (registration.repo_env != null) {
       expect(registration.repo_env).toMatch(/^[A-Z][A-Z0-9_]*$/);
+    }
+    if (registration.revision_env != null) {
       expect(registration.revision_env).toMatch(/^[A-Z][A-Z0-9_]*$/);
     }
     if (registration.staging) {
@@ -57,7 +59,7 @@ test("keeps the live registrations on their published repositories and labels", 
   expect(countryRegistration("us")).toMatchObject({
     repo: "policyengine/populace-us",
     repo_env: "POPULACE_HF_REPO",
-    revision_env: "POPULACE_HF_REVISION",
+    revision: "main",
     label: "United States",
     dataset_label: "Microcosm US",
     geography: "United States",

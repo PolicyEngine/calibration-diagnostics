@@ -18,12 +18,3 @@ export function reviewedVariableRelease(requested?: string | null): string {
   }
   return release;
 }
-
-export function assertReviewedRepository(repo: string, revision: string): void {
-  if (repo !== HOSTED_US_RELEASE.repo || revision !== HOSTED_US_RELEASE.hf_revision) {
-    throw new IncompatibleProductionReleaseError(
-      "The US dashboard requires its reviewed immutable production data selection. " +
-      "Remove conflicting POPULACE_HF_REPO/POPULACE_HF_REVISION overrides and rebuild.",
-    );
-  }
-}
