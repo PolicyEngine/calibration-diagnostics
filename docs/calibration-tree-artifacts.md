@@ -209,6 +209,8 @@ create per-release tags, backfill reads the expanded release-directory metadata
 and uses the newest commit that changed one of that release's source files. The
 publisher then fetches and validates every required artifact at that immutable
 commit; it never builds a historical bundle from a mutable branch name.
+An explicit `--release` may also supply `--sha` when an operator already knows
+the exact source commit and the repository has no same-named release tag.
 Releases with unsupported diagnostics, unavailable commit metadata, or an
 oversized part are reported and skipped. The current release must build
 successfully; otherwise the publication workflow fails without updating

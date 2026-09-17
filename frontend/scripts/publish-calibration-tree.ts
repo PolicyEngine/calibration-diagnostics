@@ -230,6 +230,28 @@ export function enforceConfiguredSizeLimits(file: CalibrationTreeBundleFile): {
   return { rawBytes, gzipBytes };
 }
 
+export async function resolvePublicationSourceSha(
+  country: MicrocosmCountry,
+  id: string,
+  expectedSha: string | undefined,
+  allowReleaseDirectoryLookup: boolean,
+): Promise<string> {
+  try {
+    return await resolveHfRevisionSha(country, id, 0);
+  } catch (error) {
+    if (error instanceof CalibrationReleaseNotFoundError && expectedSha) {
+      return exactCommitSha(expectedSha, "Fallback source revision");
+    }
+    if (
+      error instanceof CalibrationReleaseNotFoundError &&
+      allowReleaseDirectoryLookup
+    ) {
+      return resolveHfReleaseDirectorySha(country, id, 0);
+    }
+    throw error;
+  }
+}
+
 async function publishRelease(
   country: MicrocosmCountry,
   id: string,
@@ -237,14 +259,12 @@ async function publishRelease(
   blobToken: string,
   allowMissingReleaseTag = false,
 ) {
-  const resolvedSha = await resolveHfRevisionSha(country, id, 0).catch((error) => {
-    if (allowMissingReleaseTag && error instanceof CalibrationReleaseNotFoundError) {
-      return expectedSha
-        ? exactCommitSha(expectedSha, "Fallback source revision")
-        : resolveHfReleaseDirectorySha(country, id, 0);
-    }
-    throw error;
-  });
+  const resolvedSha = await resolvePublicationSourceSha(
+    country,
+    id,
+    expectedSha,
+    allowMissingReleaseTag,
+  );
   if (expectedSha && expectedSha.toLowerCase() !== resolvedSha) {
     throw new Error(
       `Webhook commit ${expectedSha} does not match release ${id} commit ${resolvedSha}.`,
