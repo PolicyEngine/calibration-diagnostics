@@ -4,11 +4,16 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
 import {
+  calibrationTreeTargetDetailsFromDraft,
   calibrationTreeResponseFromBundle,
+  calibrationTreeTargetDetailSelection,
+  compileCalibrationTreeBundleDraft,
+  parseCalibrationTreeIndex,
   parseCalibrationTreePart,
-  type CalibrationTreeTargetDetailsArtifactV2,
-  type CalibrationTreeTargetIndexArtifactV2,
-  type CalibrationTreeTierArtifactV2,
+  serializeCalibrationTreePart,
+  type CalibrationTreeTargetDetailsArtifact,
+  type CalibrationTreeTargetIndexArtifact,
+  type CalibrationTreeTierArtifact,
 } from "./calibration-tree-artifact";
 import {
   buildCalibrationTreeBundle,
@@ -84,13 +89,15 @@ function loaded(built = bundle()) {
     index: built.index,
     tiers: built.files.flatMap((file) =>
       file.part.startsWith("tier-")
-        ? [file.artifact as CalibrationTreeTierArtifactV2]
+        ? [file.artifact as CalibrationTreeTierArtifact]
         : [],
     ),
     targetIndex: built.files.find((file) => file.part === "target-index")!
-      .artifact as CalibrationTreeTargetIndexArtifactV2,
-    targetDetails: built.files.find((file) => file.part === "target-details")!
-      .artifact as CalibrationTreeTargetDetailsArtifactV2,
+      .artifact as CalibrationTreeTargetIndexArtifact,
+    targetDetailShard: built.files.find((file) =>
+      file.part.startsWith("target-details-"),
+    )!
+      .artifact as CalibrationTreeTargetDetailsArtifact,
   };
 }
 
@@ -155,7 +162,7 @@ test("bundle serialization and folder paths are deterministic", async () => {
     first.files.map((file) => file.serialized),
   );
   expect(first.files.map((file) => file.path)).toEqual([
-    `calibration-trees/us/${COMMIT}/target-details.json`,
+    `calibration-trees/us/${COMMIT}/target-details-0001.json`,
     `calibration-trees/us/${COMMIT}/target-index.json`,
     ...first.index.parts.tiers.map((_, index) =>
       `calibration-trees/us/${COMMIT}/tier-${index + 1}.json`,
@@ -179,6 +186,108 @@ test("bundle serialization and folder paths are deterministic", async () => {
   }
 });
 
+test("target details use deterministic shards and explicit locations", () => {
+  const input = {
+    country: "us" as const,
+    releaseId: RELEASE,
+    hfRepo: "policyengine/populace-us",
+    hfCommitSha: COMMIT,
+    sourceArtifacts: {
+      calibrationDiagnostics: {
+        path: `releases/${RELEASE}/calibration_diagnostics.json`,
+        sha256: SOURCE_HASH,
+      },
+      buildManifest: null,
+      releaseManifest: null,
+      demographics: null,
+    },
+    rows,
+    lossAttributionAvailable: true,
+  };
+  const draft = compileCalibrationTreeBundleDraft(input);
+  const first = calibrationTreeTargetDetailsFromDraft(draft, 1_000);
+  const second = calibrationTreeTargetDetailsFromDraft(draft, 1_000);
+
+  expect(first.artifacts.length).toBeGreaterThan(1);
+  expect(first).toEqual(second);
+  expect(first.artifacts.map((artifact) => artifact.part)).toEqual(
+    first.artifacts.map((_, index) =>
+      `target-details-${String(index + 1).padStart(4, "0")}` as const,
+    ),
+  );
+  first.locations.forEach((location, targetOrdinal) => {
+    const shard = first.artifacts[location.shardIndex];
+    expect(shard.startTargetOrdinal + location.offset).toBe(targetOrdinal);
+    expect(shard.targets[location.offset]).toEqual(draft.targets[targetOrdinal].detail);
+  });
+});
+
+test("target-detail shard limits use exact UTF-8 bytes", () => {
+  const unicodeRows = [{
+    ...rows[0],
+    comparison_id: "unicode-target",
+    name: "unicode-target",
+    target_label: "Café 🌍",
+    description: "é🌍".repeat(50),
+  }];
+  const draft = compileCalibrationTreeBundleDraft({
+    country: "us",
+    releaseId: RELEASE,
+    hfRepo: "policyengine/populace-us",
+    hfCommitSha: COMMIT,
+    sourceArtifacts: {
+      calibrationDiagnostics: {
+        path: `releases/${RELEASE}/calibration_diagnostics.json`,
+        sha256: SOURCE_HASH,
+      },
+      buildManifest: null,
+      releaseManifest: null,
+      demographics: null,
+    },
+    rows: unicodeRows,
+    lossAttributionAvailable: true,
+  });
+  const initial = calibrationTreeTargetDetailsFromDraft(draft, 10_000);
+  const serialized = serializeCalibrationTreePart(initial.artifacts[0]);
+  const exactBytes = Buffer.byteLength(serialized, "utf8");
+  expect(exactBytes).toBeGreaterThan(serialized.length);
+  expect(calibrationTreeTargetDetailsFromDraft(draft, exactBytes).artifacts).toHaveLength(1);
+  expect(() => calibrationTreeTargetDetailsFromDraft(draft, exactBytes - 1)).toThrow(
+    "exceeds",
+  );
+});
+
+test("calibration tree schema 2 artifacts are rejected", () => {
+  const legacy = structuredClone(bundle().index) as unknown as Record<string, unknown>;
+  legacy.schemaVersion = 2;
+  expect(() => parseCalibrationTreeIndex(legacy)).toThrow(
+    "Unsupported calibration tree schema 2",
+  );
+});
+
+test("target detail selection resolves explicit shard locations", () => {
+  const built = bundle();
+  const targetIndex = built.files.find((file) => file.part === "target-index")!
+    .artifact as CalibrationTreeTargetIndexArtifact;
+  targetIndex.targets.forEach((target, targetOrdinal) => {
+    const selection = calibrationTreeTargetDetailSelection(
+      built.index,
+      target,
+      targetOrdinal,
+    );
+    expect(selection.descriptor.part).toBe(
+      built.index.parts.targetDetails[target.detailLocation.shardIndex].part,
+    );
+    expect(selection.offset).toBe(target.detailLocation.offset);
+  });
+
+  const corrupt = structuredClone(targetIndex.targets[0]);
+  corrupt.detailLocation.offset += 1;
+  expect(() => calibrationTreeTargetDetailSelection(built.index, corrupt, 0)).toThrow(
+    "invalid detail location",
+  );
+});
+
 test("bundle validation rejects corrupt metadata and postings", () => {
   const built = bundle();
   const corruptPath = structuredClone(built);
@@ -189,11 +298,19 @@ test("bundle validation rejects corrupt metadata and postings", () => {
   const parsed = parseCalibrationTreePart(
     JSON.parse(targetIndexFile.serialized),
     "target-index",
-  ) as CalibrationTreeTargetIndexArtifactV2;
-  parsed.postings.geographies[0].targetIndices = [];
+  ) as CalibrationTreeTargetIndexArtifact;
+  parsed.postings.geographies[0].targetOrdinals = [];
   const corruptPosting = structuredClone(built);
   const corruptFile = corruptPosting.files.find((file) => file.part === "target-index")!;
   corruptFile.artifact = parsed;
   corruptFile.serialized = `${JSON.stringify(parsed)}\n`;
   expect(() => validateCalibrationTreeBundle(corruptPosting)).toThrow();
+
+  const corruptLocation = structuredClone(built);
+  const corruptTargetIndex = corruptLocation.files.find(
+    (file) => file.part === "target-index",
+  )!;
+  if (corruptTargetIndex.artifact.part !== "target-index") throw new Error("bad fixture");
+  corruptTargetIndex.artifact.targets[0].detailLocation.offset += 1;
+  expect(() => validateCalibrationTreeBundle(corruptLocation)).toThrow();
 });

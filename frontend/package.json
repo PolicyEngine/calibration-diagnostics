@@ -8,7 +8,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
-    "cleanup:calibration-tree-v1": "bun run scripts/cleanup-calibration-tree-v1.ts",
     "publish:calibration-tree": "bun run scripts/publish-calibration-tree.ts",
     "test:dev-port": "node --test scripts/available-port.node-test.mjs"
   },

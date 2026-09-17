@@ -3,6 +3,7 @@ import { gzipSync } from "node:zlib";
 
 import {
   CALIBRATION_TREE_SCHEMA_VERSION,
+  CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES,
   calibrationTreePartPath,
   calibrationTreeTargetDetailsFromDraft,
   calibrationTreeTargetIndexFromDraft,
@@ -11,11 +12,13 @@ import {
   parseCalibrationTreeIndex,
   parseCalibrationTreePart,
   serializeCalibrationTreePart,
-  type CalibrationTreeArtifactPartV2,
-  type CalibrationTreeIndexArtifactV2,
+  type CalibrationTreeArtifactPart,
+  type CalibrationTreeIndexArtifact,
   type CalibrationTreePart,
   type CalibrationTreePartDescriptor,
-  type CalibrationTreeTierArtifactV2,
+  type CalibrationTreeTargetDetailsArtifact,
+  type CalibrationTreeTargetDetailsDescriptor,
+  type CalibrationTreeTierArtifact,
   type CalibrationTreeTierDescriptor,
   type CompileCalibrationTreeInput,
   type CompiledCalibrationLevel,
@@ -25,7 +28,7 @@ import { fitBandForTarget, type CalibrationTreeTarget } from "./calibration-tree
 export interface CalibrationTreeBundleFile {
   part: CalibrationTreePart;
   path: string;
-  artifact: CalibrationTreeArtifactPartV2;
+  artifact: CalibrationTreeArtifactPart;
   serialized: string;
   sha256: string;
   rawBytes: number;
@@ -33,7 +36,7 @@ export interface CalibrationTreeBundleFile {
 }
 
 export interface CalibrationTreeBundle {
-  index: CalibrationTreeIndexArtifactV2;
+  index: CalibrationTreeIndexArtifact;
   files: CalibrationTreeBundleFile[];
 }
 
@@ -41,7 +44,7 @@ function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-function describePart(artifact: CalibrationTreeArtifactPartV2): CalibrationTreeBundleFile {
+function describePart(artifact: CalibrationTreeArtifactPart): CalibrationTreeBundleFile {
   const serialized = serializeCalibrationTreePart(artifact);
   return {
     part: artifact.part,
@@ -73,8 +76,11 @@ export function buildCalibrationTreeBundle(
   input: CompileCalibrationTreeInput,
 ): CalibrationTreeBundle {
   const draft = compileCalibrationTreeBundleDraft(input);
-  const targetIndexFile = describePart(calibrationTreeTargetIndexFromDraft(draft));
-  const targetDetailsFile = describePart(calibrationTreeTargetDetailsFromDraft(draft));
+  const targetDetails = calibrationTreeTargetDetailsFromDraft(draft);
+  const targetDetailsFiles = targetDetails.artifacts.map(describePart);
+  const targetIndexFile = describePart(
+    calibrationTreeTargetIndexFromDraft(draft, targetDetails.locations),
+  );
   const tierFiles = calibrationTreeTiersFromDraft(draft).map(describePart);
   const rootLevels = Object.fromEntries(
     Object.entries(draft.levels).filter(
@@ -86,10 +92,10 @@ export function buildCalibrationTreeBundle(
     part: file.part as `tier-${number}`,
     depth: index + 1,
     levelIds: Object.keys(
-      (file.artifact as CalibrationTreeTierArtifactV2).levels,
+      (file.artifact as CalibrationTreeTierArtifact).levels,
     ).sort(),
   }));
-  const index: CalibrationTreeIndexArtifactV2 = {
+  const index: CalibrationTreeIndexArtifact = {
     schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
     country: draft.country,
     hfCommitSha: draft.release.hfCommitSha,
@@ -108,16 +114,19 @@ export function buildCalibrationTreeBundle(
         ...descriptor(targetIndexFile),
         part: "target-index",
       },
-      targetDetails: {
-        ...descriptor(targetDetailsFile),
-        part: "target-details",
-      },
+      targetDetails: targetDetailsFiles.map((file, shardIndex) => ({
+        ...descriptor(file),
+        part: file.part as CalibrationTreeTargetDetailsDescriptor["part"],
+        startTargetOrdinal: targetDetails.artifacts[shardIndex].startTargetOrdinal,
+        endTargetOrdinalExclusive:
+          targetDetails.artifacts[shardIndex].endTargetOrdinalExclusive,
+      })),
     },
   };
   const indexFile = describePart(index);
   const bundle = {
     index,
-    files: [targetDetailsFile, targetIndexFile, ...tierFiles, indexFile],
+    files: [...targetDetailsFiles, targetIndexFile, ...tierFiles, indexFile],
   };
   validateCalibrationTreeBundle(bundle);
   return bundle;
@@ -142,19 +151,39 @@ function expectedFacet(row: CalibrationTreeTarget, key: string): string | null {
 function validatePostingCoverage(
   bundle: CalibrationTreeBundle,
   targetIndexFile: CalibrationTreeBundleFile,
-  targetDetailsFile: CalibrationTreeBundleFile,
+  targetDetailsFiles: CalibrationTreeBundleFile[],
 ): void {
   const targetIndex = targetIndexFile.artifact;
-  const targetDetails = targetDetailsFile.artifact;
-  if (targetIndex.part !== "target-index" || targetDetails.part !== "target-details") {
+  const targetDetails = targetDetailsFiles.map((file) => file.artifact);
+  if (
+    targetIndex.part !== "target-index" ||
+    targetDetails.some((artifact) => !artifact.part.startsWith("target-details-"))
+  ) {
     throw new Error("Calibration tree target files have incorrect part identities.");
   }
+  const detailRows = targetDetails.flatMap(
+    (artifact) => (artifact as CalibrationTreeTargetDetailsArtifact).targets,
+  );
   if (
     targetIndex.targets.length !== bundle.index.targetCount ||
-    targetDetails.targets.length !== bundle.index.targetCount
+    detailRows.length !== bundle.index.targetCount
   ) {
     throw new Error("Calibration tree target files do not match the declared target count.");
   }
+  targetIndex.targets.forEach((target, targetOrdinal) => {
+    const descriptor = bundle.index.parts.targetDetails[target.detailLocation.shardIndex];
+    const file = descriptor ? targetDetailsFiles[target.detailLocation.shardIndex] : undefined;
+    if (
+      !descriptor ||
+      !file ||
+      file.part !== descriptor.part ||
+      descriptor.startTargetOrdinal + target.detailLocation.offset !== targetOrdinal ||
+      target.detailLocation.offset >=
+        descriptor.endTargetOrdinalExclusive - descriptor.startTargetOrdinal
+    ) {
+      throw new Error(`Calibration target ordinal ${targetOrdinal} has an invalid detail location.`);
+    }
+  });
   for (const key of [
     "geographyLevels",
     "geographies",
@@ -162,17 +191,17 @@ function validatePostingCoverage(
     "calibrationStatuses",
   ] as const) {
     const actual = new Map(
-      targetIndex.postings[key].map((posting) => [posting.value, posting.targetIndices]),
+      targetIndex.postings[key].map((posting) => [posting.value, posting.targetOrdinals]),
     );
     const values = new Set(
-      targetDetails.targets.map((row) => expectedFacet(row, key)),
+      detailRows.map((row) => expectedFacet(row, key)),
     );
     if (actual.size !== values.size) {
       throw new Error(`Calibration tree ${key} postings do not cover every facet value.`);
     }
     for (const value of values) {
-      const expected = targetDetails.targets.flatMap((row, index) =>
-        expectedFacet(row, key) === value ? [index] : [],
+      const expected = detailRows.flatMap((row, targetOrdinal) =>
+        expectedFacet(row, key) === value ? [targetOrdinal] : [],
       );
       if (!sameIndices(actual.get(value) ?? [], expected)) {
         throw new Error(`Calibration tree ${key} posting ${String(value)} is incorrect.`);
@@ -187,7 +216,7 @@ function allLevels(bundle: CalibrationTreeBundle): Record<string, CompiledCalibr
     bundle.index.levels,
     ...bundle.files.flatMap((file) =>
       file.artifact.part.startsWith("tier-")
-        ? [(file.artifact as CalibrationTreeTierArtifactV2).levels]
+        ? [(file.artifact as CalibrationTreeTierArtifact).levels]
         : [],
     ),
   );
@@ -195,13 +224,13 @@ function allLevels(bundle: CalibrationTreeBundle): Record<string, CompiledCalibr
 
 function validateGraph(bundle: CalibrationTreeBundle): void {
   const levels = allLevels(bundle);
-  const expectedTargetIndices = Array.from(
+  const expectedTargetOrdinals = Array.from(
     { length: bundle.index.targetCount },
-    (_, index) => index,
+    (_, targetOrdinal) => targetOrdinal,
   );
   for (const rootName of ["program", "geography"] as const) {
     const root = levels[bundle.index.roots[rootName]];
-    if (!root || !sameIndices(root.targetIndices, expectedTargetIndices)) {
+    if (!root || !sameIndices(root.targetOrdinals, expectedTargetOrdinals)) {
       throw new Error(`Calibration tree ${rootName} root does not cover every target.`);
     }
   }
@@ -227,7 +256,7 @@ function validateGraph(bundle: CalibrationTreeBundle): void {
       if (node.kind === "target") continue;
       const child = levels[node.nextLevelId];
       if (!child) throw new Error(`Calibration tree level ${node.nextLevelId} is missing.`);
-      if (!sameIndices(node.targetIndices, child.targetIndices)) {
+      if (!sameIndices(node.targetOrdinals, child.targetOrdinals)) {
         throw new Error(`Calibration tree branch ${node.id} has inconsistent membership.`);
       }
       queue.push({ levelId: node.nextLevelId, depth: depth + 1 });
@@ -255,7 +284,7 @@ function validateGraph(bundle: CalibrationTreeBundle): void {
 export function validateCalibrationTreeBundle(bundle: CalibrationTreeBundle): void {
   parseCalibrationTreeIndex(bundle.index);
   const expectedParts: CalibrationTreePart[] = [
-    "target-details",
+    ...bundle.index.parts.targetDetails.map((descriptor) => descriptor.part),
     "target-index",
     ...bundle.index.parts.tiers.map((tier) => tier.part),
     "index",
@@ -297,6 +326,12 @@ export function validateCalibrationTreeBundle(bundle: CalibrationTreeBundle): vo
     ) {
       throw new Error(`Calibration tree part ${file.part} has incorrect content metadata.`);
     }
+    if (
+      file.part.startsWith("target-details-") &&
+      file.rawBytes > CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES
+    ) {
+      throw new Error(`Calibration tree part ${file.part} exceeds the target-detail limit.`);
+    }
   }
   const fileByPart = new Map(bundle.files.map((file) => [file.part, file]));
   if (serializeCalibrationTreePart(bundle.index) !== fileByPart.get("index")?.serialized) {
@@ -305,7 +340,7 @@ export function validateCalibrationTreeBundle(bundle: CalibrationTreeBundle): vo
   for (const partDescriptor of [
     ...bundle.index.parts.tiers,
     bundle.index.parts.targetIndex,
-    bundle.index.parts.targetDetails,
+    ...bundle.index.parts.targetDetails,
   ]) {
     const file = fileByPart.get(partDescriptor.part);
     if (
@@ -317,10 +352,24 @@ export function validateCalibrationTreeBundle(bundle: CalibrationTreeBundle): vo
     ) {
       throw new Error(`Calibration tree descriptor ${partDescriptor.part} is incorrect.`);
     }
+    if (partDescriptor.part.startsWith("target-details-")) {
+      const artifact = file.artifact as CalibrationTreeTargetDetailsArtifact;
+      const detailDescriptor = partDescriptor as CalibrationTreeTargetDetailsDescriptor;
+      if (
+        artifact.startTargetOrdinal !== detailDescriptor.startTargetOrdinal ||
+        artifact.endTargetOrdinalExclusive !== detailDescriptor.endTargetOrdinalExclusive
+      ) {
+        throw new Error(
+          `Calibration tree descriptor ${partDescriptor.part} has an inconsistent target range.`,
+        );
+      }
+    }
   }
   const targetIndexFile = fileByPart.get("target-index")!;
-  const targetDetailsFile = fileByPart.get("target-details")!;
-  validatePostingCoverage(bundle, targetIndexFile, targetDetailsFile);
+  const targetDetailsFiles = bundle.index.parts.targetDetails.map(
+    (descriptor) => fileByPart.get(descriptor.part)!,
+  );
+  validatePostingCoverage(bundle, targetIndexFile, targetDetailsFiles);
   validateGraph(bundle);
 }
 

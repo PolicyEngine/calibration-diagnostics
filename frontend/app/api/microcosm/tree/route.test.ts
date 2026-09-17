@@ -39,7 +39,7 @@ test("release aliases redirect to an exact immutable artifact URL", async () => 
 test("exact revisions stream private Blob content through the same-origin API", async () => {
   const requests: unknown[] = [];
   let releaseResolved = false;
-  const body = '{"schemaVersion":2,"part":"tier-1"}\n';
+  const body = '{"schemaVersion":3,"part":"tier-1"}\n';
   const handler = createCalibrationTreeHandler({
     resolveRelease: (async () => {
       releaseResolved = true;
@@ -132,9 +132,13 @@ test("tree API rejects ambiguous identities and reports unpublished revisions", 
 });
 
 test("tree API requires an allowlisted part name", async () => {
+  const parts: string[] = [];
   const handler = createCalibrationTreeHandler({
     resolveRelease: resolver(),
-    getBlob: (async () => null) as CalibrationTreeRouteDependencies["getBlob"],
+    getBlob: (async (options) => {
+      parts.push(options.part);
+      return null;
+    }) as CalibrationTreeRouteDependencies["getBlob"],
   });
   const missing = await handler(new Request(
     "https://dashboard.example/api/microcosm/tree?country=us&release=latest",
@@ -142,6 +146,19 @@ test("tree API requires an allowlisted part name", async () => {
   const unsafe = await handler(new Request(
     "https://dashboard.example/api/microcosm/tree?country=us&release=latest&part=../secret",
   ));
+  const monolith = await handler(new Request(
+    `https://dashboard.example/api/microcosm/tree?country=us&revision=${COMMIT}&part=target-details`,
+  ));
+  const zero = await handler(new Request(
+    `https://dashboard.example/api/microcosm/tree?country=us&revision=${COMMIT}&part=target-details-0000`,
+  ));
+  const validShard = await handler(new Request(
+    `https://dashboard.example/api/microcosm/tree?country=us&revision=${COMMIT}&part=target-details-0001`,
+  ));
   expect(missing.status).toBe(400);
   expect(unsafe.status).toBe(400);
+  expect(monolith.status).toBe(400);
+  expect(zero.status).toBe(400);
+  expect(validShard.status).toBe(404);
+  expect(parts).toEqual(["target-details-0001"]);
 });

@@ -21,14 +21,16 @@ import {
 import { isCountry, type MicrocosmCountry } from "./countries";
 import type { CalibrationProvenance } from "./target-loss-attribution";
 
-export const CALIBRATION_TREE_SCHEMA_VERSION = 2 as const;
+export const CALIBRATION_TREE_SCHEMA_VERSION = 3 as const;
+export const CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES = 4_000_000;
 
 export type CalibrationTreeTierPart = `tier-${number}`;
+export type CalibrationTreeTargetDetailsPart = `target-details-${string}`;
 export type CalibrationTreePart =
   | "index"
   | CalibrationTreeTierPart
   | "target-index"
-  | "target-details";
+  | CalibrationTreeTargetDetailsPart;
 
 export interface CalibrationTreeSourceArtifact {
   path: string;
@@ -53,11 +55,15 @@ export interface IndexedCalibrationTarget {
   id: string;
   label: string;
   metricInputs: CalibrationTreeMetricInput;
+  detailLocation: {
+    shardIndex: number;
+    offset: number;
+  };
 }
 
 export interface CalibrationTreePosting<T extends string | null = string> {
   value: T;
-  targetIndices: number[];
+  targetOrdinals: number[];
 }
 
 export interface CalibrationTreeFilterPostings {
@@ -71,7 +77,7 @@ interface CompiledCalibrationNodeBase {
   id: string;
   label: string;
   selection: ExplorerNodeSelection;
-  targetIndices: number[];
+  targetOrdinals: number[];
   metrics: CalibrationTreeMetrics;
   authoredLabel?: boolean;
 }
@@ -85,7 +91,7 @@ export interface CompiledCalibrationBranchNode
 export interface CompiledCalibrationTargetNode
   extends CompiledCalibrationNodeBase {
   kind: "target";
-  targetIndex: number;
+  targetOrdinal: number;
 }
 
 export type CompiledCalibrationNode =
@@ -95,7 +101,7 @@ export type CompiledCalibrationNode =
 export interface CompiledCalibrationGroup {
   id: string;
   label: string;
-  targetIndices: number[];
+  targetOrdinals: number[];
   metrics: CalibrationTreeMetrics;
   nodes: CompiledCalibrationNode[];
 }
@@ -104,7 +110,7 @@ export interface CompiledCalibrationLevel {
   currentLevel: CalibrationTreeResponse["currentLevel"];
   pathLabels: CalibrationTreeResponse["pathLabels"];
   dimensionOrder: CalibrationTreeResponse["dimensionOrder"];
-  targetIndices: number[];
+  targetOrdinals: number[];
   metrics: CalibrationTreeMetrics;
   groups: CompiledCalibrationGroup[];
 }
@@ -131,7 +137,14 @@ export interface CalibrationTreeTierDescriptor
   levelIds: string[];
 }
 
-export interface CalibrationTreeIndexArtifactV2
+export interface CalibrationTreeTargetDetailsDescriptor
+  extends CalibrationTreePartDescriptor {
+  part: CalibrationTreeTargetDetailsPart;
+  startTargetOrdinal: number;
+  endTargetOrdinalExclusive: number;
+}
+
+export interface CalibrationTreeIndexArtifact
   extends CalibrationTreePartIdentity {
   part: "index";
   release: CalibrationTreeRelease;
@@ -148,11 +161,11 @@ export interface CalibrationTreeIndexArtifactV2
   parts: {
     tiers: CalibrationTreeTierDescriptor[];
     targetIndex: CalibrationTreePartDescriptor & { part: "target-index" };
-    targetDetails: CalibrationTreePartDescriptor & { part: "target-details" };
+    targetDetails: CalibrationTreeTargetDetailsDescriptor[];
   };
 }
 
-export interface CalibrationTreeTierArtifactV2
+export interface CalibrationTreeTierArtifact
   extends CalibrationTreePartIdentity {
   part: CalibrationTreeTierPart;
   depth: number;
@@ -160,24 +173,26 @@ export interface CalibrationTreeTierArtifactV2
   levels: Record<string, CompiledCalibrationLevel>;
 }
 
-export interface CalibrationTreeTargetIndexArtifactV2
+export interface CalibrationTreeTargetIndexArtifact
   extends CalibrationTreePartIdentity {
   part: "target-index";
   targets: IndexedCalibrationTarget[];
   postings: CalibrationTreeFilterPostings;
 }
 
-export interface CalibrationTreeTargetDetailsArtifactV2
+export interface CalibrationTreeTargetDetailsArtifact
   extends CalibrationTreePartIdentity {
-  part: "target-details";
+  part: CalibrationTreeTargetDetailsPart;
+  startTargetOrdinal: number;
+  endTargetOrdinalExclusive: number;
   targets: CalibrationTreeTarget[];
 }
 
-export type CalibrationTreeArtifactPartV2 =
-  | CalibrationTreeIndexArtifactV2
-  | CalibrationTreeTierArtifactV2
-  | CalibrationTreeTargetIndexArtifactV2
-  | CalibrationTreeTargetDetailsArtifactV2;
+export type CalibrationTreeArtifactPart =
+  | CalibrationTreeIndexArtifact
+  | CalibrationTreeTierArtifact
+  | CalibrationTreeTargetIndexArtifact
+  | CalibrationTreeTargetDetailsArtifact;
 
 export interface CalibrationTreeBundleDraft {
   country: MicrocosmCountry;
@@ -185,10 +200,10 @@ export interface CalibrationTreeBundleDraft {
   calibrationProvenance?: CalibrationProvenance;
   lossAttributionAvailable: boolean;
   filterOptions: CalibrationTreeResponse["filterOptions"];
-  roots: CalibrationTreeIndexArtifactV2["roots"];
+  roots: CalibrationTreeIndexArtifact["roots"];
   levels: Record<string, CompiledCalibrationLevel>;
   levelDepths: Record<string, number>;
-  targets: Array<IndexedCalibrationTarget & {
+  targets: Array<Omit<IndexedCalibrationTarget, "detailLocation"> & {
     facets: {
       geographyLevel: string;
       geography: string;
@@ -200,10 +215,21 @@ export interface CalibrationTreeBundleDraft {
 }
 
 export interface LoadedCalibrationTreeBundle {
-  index: CalibrationTreeIndexArtifactV2;
-  tiers: CalibrationTreeTierArtifactV2[];
-  targetIndex?: CalibrationTreeTargetIndexArtifactV2;
-  targetDetails?: CalibrationTreeTargetDetailsArtifactV2;
+  index: CalibrationTreeIndexArtifact;
+  tiers: CalibrationTreeTierArtifact[];
+  targetIndex?: CalibrationTreeTargetIndexArtifact;
+  targetDetailShard?: CalibrationTreeTargetDetailsArtifact;
+}
+
+export interface CalibrationTreeTargetDetailsPlan {
+  artifacts: CalibrationTreeTargetDetailsArtifact[];
+  locations: IndexedCalibrationTarget["detailLocation"][];
+}
+
+export interface CalibrationTreeTargetDetailSelection {
+  descriptor: CalibrationTreeTargetDetailsDescriptor;
+  offset: number;
+  targetOrdinal: number;
 }
 
 export interface CompileCalibrationTreeInput {
@@ -222,6 +248,15 @@ const DEFAULT_GEOGRAPHY_LEVEL = "national";
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const HF_COMMIT_RE = /^[0-9a-f]{40,64}$/;
 const TIER_PART_RE = /^tier-([1-9][0-9]*)$/;
+const TARGET_DETAILS_PART_RE = /^target-details-([0-9]{4})$/;
+
+function targetDetailsPart(shardIndex: number): CalibrationTreeTargetDetailsPart {
+  const number = shardIndex + 1;
+  if (!Number.isSafeInteger(number) || number < 1 || number > 9_999) {
+    throw new Error("Calibration tree target-detail shard number is out of range.");
+  }
+  return `target-details-${String(number).padStart(4, "0")}`;
+}
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -300,16 +335,16 @@ function semanticStateKey(state: ExplorerState): string {
     : JSON.stringify({ breakdown: state.breakdown, path });
 }
 
-function targetIndexFor(
+function targetOrdinalFor(
   target: CalibrationTreeTarget | undefined,
-  targetIndices: Map<CalibrationTreeTarget, number>,
+  targetOrdinals: Map<CalibrationTreeTarget, number>,
 ): number {
   if (!target) throw new Error("Compiled target node is missing target details.");
-  const index = targetIndices.get(target);
-  if (index == null) {
+  const ordinal = targetOrdinals.get(target);
+  if (ordinal == null) {
     throw new Error(`Compiled target ${String(target.name ?? target.base_name)} is unknown.`);
   }
-  return index;
+  return ordinal;
 }
 
 export function compileCalibrationTreeBundleDraft(
@@ -324,7 +359,7 @@ export function compileCalibrationTreeBundleDraft(
     (rows.length > 0 &&
       rows.every((row) => nonnegativeNumber(row.final_loss_contribution) != null));
   const targets = rows.map(compiledTarget);
-  const targetIndices = new Map(rows.map((row, index) => [row, index]));
+  const targetOrdinals = new Map(rows.map((row, ordinal) => [row, ordinal]));
   const levels: Record<string, CompiledCalibrationLevel> = {};
   const stateLevels = new Map<string, string>();
   let nextLevelNumber = 0;
@@ -350,16 +385,16 @@ export function compileCalibrationTreeBundleDraft(
     const groups = response.groups.map((group): CompiledCalibrationGroup => {
       const nodes = group.nodes.map((treeNode): CompiledCalibrationNode => {
         if (treeNode.kind === "target") {
-          const targetIndex = targetIndexFor(treeNode.target, targetIndices);
-          targets[targetIndex].id = treeNode.id;
-          targets[targetIndex].label = treeNode.label;
+          const targetOrdinal = targetOrdinalFor(treeNode.target, targetOrdinals);
+          targets[targetOrdinal].id = treeNode.id;
+          targets[targetOrdinal].label = treeNode.label;
           return {
             id: treeNode.id,
             label: treeNode.label,
             kind: "target",
             selection: treeNode.selection,
-            targetIndices: [targetIndex],
-            targetIndex,
+            targetOrdinals: [targetOrdinal],
+            targetOrdinal,
             metrics: treeNode.metrics,
             authoredLabel: treeNode.authored_label,
           };
@@ -375,7 +410,7 @@ export function compileCalibrationTreeBundleDraft(
           label: treeNode.label,
           kind: treeNode.kind,
           selection: treeNode.selection,
-          targetIndices: levels[nextLevelId].targetIndices,
+          targetOrdinals: levels[nextLevelId].targetOrdinals,
           nextLevelId,
           metrics: treeNode.metrics,
           authoredLabel: treeNode.authored_label,
@@ -385,7 +420,7 @@ export function compileCalibrationTreeBundleDraft(
         id: group.id,
         label: group.label,
         nodes,
-        targetIndices: uniqueSorted(nodes.flatMap((node) => node.targetIndices)),
+        targetOrdinals: uniqueSorted(nodes.flatMap((node) => node.targetOrdinals)),
         metrics: group.metrics,
       };
     });
@@ -395,7 +430,7 @@ export function compileCalibrationTreeBundleDraft(
       pathLabels: response.pathLabels,
       dimensionOrder: response.dimensionOrder,
       groups,
-      targetIndices: uniqueSorted(groups.flatMap((group) => group.targetIndices)),
+      targetOrdinals: uniqueSorted(groups.flatMap((group) => group.targetOrdinals)),
       metrics: response.filteredMetrics,
     };
     return levelId;
@@ -462,21 +497,26 @@ function postingValues<T extends string | null>(values: T[]): CalibrationTreePos
   });
   return [...postings.entries()]
     .sort(([left], [right]) => String(left).localeCompare(String(right)))
-    .map(([value, targetIndices]) => ({ value, targetIndices }));
+    .map(([value, targetOrdinals]) => ({ value, targetOrdinals }));
 }
 
 export function calibrationTreeTargetIndexFromDraft(
   draft: CalibrationTreeBundleDraft,
-): CalibrationTreeTargetIndexArtifactV2 {
+  detailLocations: IndexedCalibrationTarget["detailLocation"][],
+): CalibrationTreeTargetIndexArtifact {
+  if (detailLocations.length !== draft.targets.length) {
+    throw new Error("Calibration tree target-detail locations do not cover every target.");
+  }
   return {
     schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
     country: draft.country,
     hfCommitSha: draft.release.hfCommitSha,
     part: "target-index",
-    targets: draft.targets.map(({ id, label, metricInputs }) => ({
+    targets: draft.targets.map(({ id, label, metricInputs }, targetOrdinal) => ({
       id,
       label,
       metricInputs,
+      detailLocation: detailLocations[targetOrdinal],
     })),
     postings: {
       geographyLevels: postingValues(
@@ -497,19 +537,119 @@ export function calibrationTreeTargetIndexFromDraft(
 
 export function calibrationTreeTargetDetailsFromDraft(
   draft: CalibrationTreeBundleDraft,
-): CalibrationTreeTargetDetailsArtifactV2 {
-  return {
-    schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
-    country: draft.country,
-    hfCommitSha: draft.release.hfCommitSha,
-    part: "target-details",
-    targets: draft.targets.map((target) => target.detail),
-  };
+  maxRawBytes = CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES,
+): CalibrationTreeTargetDetailsPlan {
+  if (!Number.isSafeInteger(maxRawBytes) || maxRawBytes <= 0) {
+    throw new Error("Calibration tree target-detail shard size must be a positive integer.");
+  }
+  const serializedTargets = draft.targets.map((target) => stableJson(target.detail));
+  const targetBytes = serializedTargets.map(utf8Bytes);
+  const artifacts: CalibrationTreeTargetDetailsArtifact[] = [];
+  const locations: IndexedCalibrationTarget["detailLocation"][] = [];
+  let startTargetOrdinal = 0;
+
+  while (startTargetOrdinal < draft.targets.length) {
+    const shardIndex = artifacts.length;
+    if (shardIndex >= 9_999) {
+      throw new Error("Calibration tree target details require more than 9,999 shards.");
+    }
+    const part = targetDetailsPart(shardIndex);
+    let endTargetOrdinalExclusive = startTargetOrdinal;
+    let payloadBytes = 0;
+
+    while (endTargetOrdinalExclusive < draft.targets.length) {
+      const nextPayloadBytes =
+        payloadBytes +
+        targetBytes[endTargetOrdinalExclusive] +
+        (endTargetOrdinalExclusive === startTargetOrdinal ? 0 : 1);
+      const emptyArtifact: CalibrationTreeTargetDetailsArtifact = {
+        schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
+        country: draft.country,
+        hfCommitSha: draft.release.hfCommitSha,
+        part,
+        startTargetOrdinal,
+        endTargetOrdinalExclusive: endTargetOrdinalExclusive + 1,
+        targets: [],
+      };
+      const candidateBytes = utf8Bytes(`${stableJson(emptyArtifact)}\n`) + nextPayloadBytes;
+      if (candidateBytes > maxRawBytes) break;
+      payloadBytes = nextPayloadBytes;
+      endTargetOrdinalExclusive += 1;
+    }
+
+    if (endTargetOrdinalExclusive === startTargetOrdinal) {
+      const targetBytesWithEnvelope = utf8Bytes(`${stableJson({
+        schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
+        country: draft.country,
+        hfCommitSha: draft.release.hfCommitSha,
+        part,
+        startTargetOrdinal,
+        endTargetOrdinalExclusive: startTargetOrdinal + 1,
+        targets: [draft.targets[startTargetOrdinal].detail],
+      })}\n`);
+      throw new Error(
+        `Calibration target ordinal ${startTargetOrdinal} requires ${targetBytesWithEnvelope} bytes, ` +
+        `which exceeds the ${maxRawBytes}-byte shard limit.`,
+      );
+    }
+
+    const artifact: CalibrationTreeTargetDetailsArtifact = {
+      schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
+      country: draft.country,
+      hfCommitSha: draft.release.hfCommitSha,
+      part,
+      startTargetOrdinal,
+      endTargetOrdinalExclusive,
+      targets: draft.targets
+        .slice(startTargetOrdinal, endTargetOrdinalExclusive)
+        .map((target) => target.detail),
+    };
+    const serialized = serializeCalibrationTreePart(artifact);
+    if (utf8Bytes(serialized) > maxRawBytes) {
+      throw new Error(`Calibration tree shard ${part} exceeded its planned byte limit.`);
+    }
+    for (
+      let targetOrdinal = startTargetOrdinal;
+      targetOrdinal < endTargetOrdinalExclusive;
+      targetOrdinal += 1
+    ) {
+      locations[targetOrdinal] = {
+        shardIndex,
+        offset: targetOrdinal - startTargetOrdinal,
+      };
+    }
+    artifacts.push(artifact);
+    startTargetOrdinal = endTargetOrdinalExclusive;
+  }
+
+  return { artifacts, locations };
+}
+
+export function calibrationTreeTargetDetailSelection(
+  index: CalibrationTreeIndexArtifact,
+  target: IndexedCalibrationTarget,
+  targetOrdinal: number,
+): CalibrationTreeTargetDetailSelection {
+  const { shardIndex, offset } = target.detailLocation;
+  const descriptor = index.parts.targetDetails[shardIndex];
+  if (
+    !Number.isSafeInteger(targetOrdinal) ||
+    targetOrdinal < 0 ||
+    !descriptor ||
+    descriptor.startTargetOrdinal + offset !== targetOrdinal ||
+    targetOrdinal >= descriptor.endTargetOrdinalExclusive
+  ) {
+    throw new Error(
+      `Calibration target ordinal ${targetOrdinal} has an invalid detail location ` +
+      `(${shardIndex}, ${offset}).`,
+    );
+  }
+  return { descriptor, offset, targetOrdinal };
 }
 
 export function calibrationTreeTiersFromDraft(
   draft: CalibrationTreeBundleDraft,
-): CalibrationTreeTierArtifactV2[] {
+): CalibrationTreeTierArtifact[] {
   const maxDepth = Math.max(0, ...Object.values(draft.levelDepths));
   return Array.from({ length: maxDepth }, (_, index) => index + 1).map((depth) => ({
     schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
@@ -540,9 +680,17 @@ function stableValue(value: unknown): unknown {
   return value;
 }
 
-export function serializeCalibrationTreePart(part: CalibrationTreeArtifactPartV2): string {
+function stableJson(value: unknown): string {
+  return JSON.stringify(stableValue(value));
+}
+
+function utf8Bytes(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+export function serializeCalibrationTreePart(part: CalibrationTreeArtifactPart): string {
   parseCalibrationTreePart(part, part.part);
-  return `${JSON.stringify(stableValue(part))}\n`;
+  return `${stableJson(part)}\n`;
 }
 
 function record(value: unknown, label: string): Record<string, unknown> {
@@ -604,18 +752,18 @@ function validateLevelRecords(
   for (const [levelId, item] of Object.entries(levels)) {
     const level = record(item, `${label}.${levelId}`);
     const levelIndices = validateIndices(
-      level.targetIndices,
+      level.targetOrdinals,
       targetCount,
-      `${levelId}.targetIndices`,
+      `${levelId}.targetOrdinals`,
     );
     if (!Array.isArray(level.groups)) throw new Error(`${levelId}.groups must be an array.`);
     const indicesFromGroups: number[] = [];
     for (const [groupIndex, groupItem] of level.groups.entries()) {
       const group = record(groupItem, `${levelId}.groups[${groupIndex}]`);
       const groupIndices = validateIndices(
-        group.targetIndices,
+        group.targetOrdinals,
         targetCount,
-        `${levelId}.groups[${groupIndex}].targetIndices`,
+        `${levelId}.groups[${groupIndex}].targetOrdinals`,
       );
       if (!Array.isArray(group.nodes)) {
         throw new Error(`${levelId}.groups[${groupIndex}].nodes must be an array.`);
@@ -624,18 +772,18 @@ function validateLevelRecords(
       for (const [nodeIndex, nodeItem] of group.nodes.entries()) {
         const node = record(nodeItem, `${levelId}.groups[${groupIndex}].nodes[${nodeIndex}]`);
         const indices = validateIndices(
-          node.targetIndices,
+          node.targetOrdinals,
           targetCount,
-          `${levelId}.groups[${groupIndex}].nodes[${nodeIndex}].targetIndices`,
+          `${levelId}.groups[${groupIndex}].nodes[${nodeIndex}].targetOrdinals`,
         );
         indicesFromNodes.push(...indices);
         if (node.kind === "target") {
           if (
             indices.length !== 1 ||
-            !Number.isInteger(node.targetIndex) ||
-            indices[0] !== node.targetIndex
+            !Number.isInteger(node.targetOrdinal) ||
+            indices[0] !== node.targetOrdinal
           ) {
-            throw new Error(`Target node ${String(node.id)} has an invalid target index.`);
+            throw new Error(`Target node ${String(node.id)} has an invalid target ordinal.`);
           }
         } else if (typeof node.nextLevelId !== "string" || !node.nextLevelId) {
           throw new Error(`Branch node ${String(node.id)} has an invalid next level.`);
@@ -717,7 +865,7 @@ function validateRelease(value: unknown, country: MicrocosmCountry, commit: stri
   if (!isCountry(country)) throw new Error("Calibration tree release country is invalid.");
 }
 
-export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexArtifactV2 {
+export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexArtifact {
   const index = validateIdentity(value, "index");
   const country = index.country as MicrocosmCountry;
   const commit = index.hfCommitSha as string;
@@ -728,6 +876,7 @@ export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexA
   if (!Number.isSafeInteger(index.targetCount) || (index.targetCount as number) < 0) {
     throw new Error("Calibration tree target count is invalid.");
   }
+  const targetCount = index.targetCount as number;
   if (!Number.isSafeInteger(index.maxDepth) || (index.maxDepth as number) < 0) {
     throw new Error("Calibration tree maximum depth is invalid.");
   }
@@ -770,14 +919,37 @@ export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexA
     stringArray(tier.levelIds, `Calibration tree descriptor ${expectedPart} levelIds`);
   });
   validateDescriptor(parts.targetIndex, "target-index", country, commit);
-  validateDescriptor(parts.targetDetails, "target-details", country, commit);
-  return value as CalibrationTreeIndexArtifactV2;
+  if (!Array.isArray(parts.targetDetails)) {
+    throw new Error("Calibration tree target-detail descriptors must be an array.");
+  }
+  let nextTargetOrdinal = 0;
+  parts.targetDetails.forEach((item, shardIndex) => {
+    const expectedPart = targetDetailsPart(shardIndex);
+    const descriptor = validateDescriptor(item, expectedPart, country, commit) as
+      CalibrationTreeTargetDetailsDescriptor;
+    if (descriptor.rawBytes > CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES) {
+      throw new Error(`Calibration tree descriptor ${expectedPart} exceeds the byte limit.`);
+    }
+    if (
+      descriptor.startTargetOrdinal !== nextTargetOrdinal ||
+      !Number.isSafeInteger(descriptor.endTargetOrdinalExclusive) ||
+      descriptor.endTargetOrdinalExclusive <= descriptor.startTargetOrdinal ||
+      descriptor.endTargetOrdinalExclusive > targetCount
+    ) {
+      throw new Error(`Calibration tree descriptor ${expectedPart} has an invalid target range.`);
+    }
+    nextTargetOrdinal = descriptor.endTargetOrdinalExclusive;
+  });
+  if (nextTargetOrdinal !== targetCount) {
+    throw new Error("Calibration tree target-detail descriptors do not cover every target.");
+  }
+  return value as CalibrationTreeIndexArtifact;
 }
 
 export function parseCalibrationTreeTier(
   value: unknown,
   expectedPart?: CalibrationTreeTierPart,
-): CalibrationTreeTierArtifactV2 {
+): CalibrationTreeTierArtifact {
   const tier = validateIdentity(value, expectedPart);
   const match = String(tier.part).match(TIER_PART_RE);
   if (!match) throw new Error("Calibration tree tier part name is invalid.");
@@ -791,7 +963,7 @@ export function parseCalibrationTreeTier(
     tier.targetCount as number,
     `Calibration tree tier-${depth} levels`,
   );
-  return value as CalibrationTreeTierArtifactV2;
+  return value as CalibrationTreeTierArtifact;
 }
 
 function validateMetricInputs(value: unknown, label: string): void {
@@ -830,13 +1002,13 @@ function validatePostings(
     const key = posting.value === null ? "null" : `string:${posting.value}`;
     if (seen.has(key)) throw new Error(`${label} contains a duplicate value.`);
     seen.add(key);
-    validateIndices(posting.targetIndices, targetCount, `${label}[${index}].targetIndices`);
+    validateIndices(posting.targetOrdinals, targetCount, `${label}[${index}].targetOrdinals`);
   }
 }
 
 export function parseCalibrationTreeTargetIndex(
   value: unknown,
-): CalibrationTreeTargetIndexArtifactV2 {
+): CalibrationTreeTargetIndexArtifact {
   const part = validateIdentity(value, "target-index");
   if (!Array.isArray(part.targets)) {
     throw new Error("Calibration tree indexed targets must be an array.");
@@ -850,6 +1022,18 @@ export function parseCalibrationTreeTargetIndex(
     if (ids.has(target.id)) throw new Error(`Calibration target id ${target.id} is duplicated.`);
     ids.add(target.id);
     validateMetricInputs(target.metricInputs, `Calibration tree indexed target ${index}`);
+    const location = record(
+      target.detailLocation,
+      `Calibration tree indexed target ${index} detailLocation`,
+    );
+    if (
+      !Number.isSafeInteger(location.shardIndex) ||
+      (location.shardIndex as number) < 0 ||
+      !Number.isSafeInteger(location.offset) ||
+      (location.offset as number) < 0
+    ) {
+      throw new Error(`Calibration tree indexed target ${index} has an invalid detail location.`);
+    }
   });
   const postings = record(part.postings, "Calibration tree filter postings");
   for (const key of [
@@ -864,30 +1048,53 @@ export function parseCalibrationTreeTargetIndex(
       `Calibration tree filter postings ${key}`,
     );
   }
-  return value as CalibrationTreeTargetIndexArtifactV2;
+  return value as CalibrationTreeTargetIndexArtifact;
 }
 
 export function parseCalibrationTreeTargetDetails(
   value: unknown,
-): CalibrationTreeTargetDetailsArtifactV2 {
-  const part = validateIdentity(value, "target-details");
+  expectedPart?: CalibrationTreeTargetDetailsPart,
+): CalibrationTreeTargetDetailsArtifact {
+  const part = validateIdentity(value, expectedPart);
+  if (typeof part.part !== "string" || !TARGET_DETAILS_PART_RE.test(part.part)) {
+    throw new Error("Calibration tree target-detail part name is invalid.");
+  }
+  if (
+    !Number.isSafeInteger(part.startTargetOrdinal) ||
+    (part.startTargetOrdinal as number) < 0 ||
+    !Number.isSafeInteger(part.endTargetOrdinalExclusive) ||
+    (part.endTargetOrdinalExclusive as number) <= (part.startTargetOrdinal as number)
+  ) {
+    throw new Error("Calibration tree target-detail range is invalid.");
+  }
   if (!Array.isArray(part.targets)) {
     throw new Error("Calibration tree target details must be an array.");
+  }
+  if (
+    part.targets.length !==
+      (part.endTargetOrdinalExclusive as number) - (part.startTargetOrdinal as number)
+  ) {
+    throw new Error("Calibration tree target-detail count does not match its range.");
   }
   part.targets.forEach((item, index) => {
     record(item, `Calibration tree target detail ${index}`);
   });
-  return value as CalibrationTreeTargetDetailsArtifactV2;
+  return value as CalibrationTreeTargetDetailsArtifact;
 }
 
 export function parseCalibrationTreePart(
   value: unknown,
   expectedPart?: CalibrationTreePart,
-): CalibrationTreeArtifactPartV2 {
+): CalibrationTreeArtifactPart {
   const identity = validateIdentity(value, expectedPart);
   if (identity.part === "index") return parseCalibrationTreeIndex(value);
   if (identity.part === "target-index") return parseCalibrationTreeTargetIndex(value);
-  if (identity.part === "target-details") return parseCalibrationTreeTargetDetails(value);
+  if (TARGET_DETAILS_PART_RE.test(String(identity.part))) {
+    return parseCalibrationTreeTargetDetails(
+      value,
+      identity.part as CalibrationTreeTargetDetailsPart,
+    );
+  }
   return parseCalibrationTreeTier(value, identity.part as CalibrationTreeTierPart);
 }
 
@@ -940,7 +1147,7 @@ function selectedPath(state: ExplorerState): ExplorerNodeSelection[] {
 }
 
 function membershipForFilters(
-  targetIndex: CalibrationTreeTargetIndexArtifactV2,
+  targetIndex: CalibrationTreeTargetIndexArtifact,
   filters: ExplorerState["filters"],
 ): Uint8Array {
   const membership = new Uint8Array(targetIndex.targets.length);
@@ -953,7 +1160,7 @@ function membershipForFilters(
     const postings = targetIndex.postings[key] as CalibrationTreePosting[];
     for (const posting of postings) {
       if (posting.value != null && selected.includes(posting.value)) {
-        for (const targetIndex of posting.targetIndices) category[targetIndex] = 1;
+        for (const targetOrdinal of posting.targetOrdinals) category[targetOrdinal] = 1;
       }
     }
     for (let index = 0; index < membership.length; index += 1) {
@@ -961,6 +1168,20 @@ function membershipForFilters(
     }
   }
   return membership;
+}
+
+function targetDetailForOrdinal(
+  shard: CalibrationTreeTargetDetailsArtifact | undefined,
+  targetOrdinal: number,
+): CalibrationTreeTarget | undefined {
+  if (
+    !shard ||
+    targetOrdinal < shard.startTargetOrdinal ||
+    targetOrdinal >= shard.endTargetOrdinalExclusive
+  ) {
+    return undefined;
+  }
+  return shard.targets[targetOrdinal - shard.startTargetOrdinal];
 }
 
 function loadedLevels(bundle: LoadedCalibrationTreeBundle) {
@@ -1006,10 +1227,10 @@ export function calibrationTreeResponseFromBundle(
       : fallback;
 
   const groups: CalibrationTreeGroup[] = level.groups.flatMap((group) => {
-    const groupIndices = filterIndices(group.targetIndices);
+    const groupIndices = filterIndices(group.targetOrdinals);
     if (!groupIndices.length) return [];
     const nodes: CalibrationTreeNode[] = group.nodes.flatMap((node) => {
-      const nodeIndices = filterIndices(node.targetIndices);
+      const nodeIndices = filterIndices(node.targetOrdinals);
       if (!nodeIndices.length) return [];
       return [{
         id: node.id,
@@ -1019,7 +1240,7 @@ export function calibrationTreeResponseFromBundle(
         metrics: metrics(nodeIndices, node.metrics),
         target:
           node.kind === "target"
-            ? bundle.targetDetails?.targets[node.targetIndex]
+            ? targetDetailForOrdinal(bundle.targetDetailShard, node.targetOrdinal)
             : undefined,
         authored_label: node.authoredLabel,
       }];
@@ -1032,7 +1253,7 @@ export function calibrationTreeResponseFromBundle(
       metrics: metrics(groupIndices, group.metrics),
     }];
   });
-  const levelIndices = filterIndices(level.targetIndices);
+  const levelIndices = filterIndices(level.targetOrdinals);
 
   return {
     releaseId: bundle.index.release.releaseId,
@@ -1051,7 +1272,7 @@ export function calibrationTreeResponseFromBundle(
 export function isCalibrationTreePart(value: string): value is CalibrationTreePart {
   return value === "index" ||
     value === "target-index" ||
-    value === "target-details" ||
+    (TARGET_DETAILS_PART_RE.test(value) && value !== "target-details-0000") ||
     TIER_PART_RE.test(value);
 }
 
