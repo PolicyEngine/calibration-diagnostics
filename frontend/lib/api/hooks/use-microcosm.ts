@@ -981,6 +981,13 @@ export type MicrocosmCalibrationTreeSource =
   | { kind: "release"; release?: string }
   | { kind: "staging"; runId: string };
 
+export async function fetchCalibrationTreeTiersConcurrently<T>(
+  tiers: readonly T[],
+  fetchTier: (tier: T) => Promise<unknown>,
+): Promise<void> {
+  await Promise.all(tiers.map((tier) => fetchTier(tier)));
+}
+
 export function microcosmCalibrationTreeIndexQueryOptions(
   release: string | undefined,
   country: Country,
@@ -1080,26 +1087,20 @@ function usePublishedCalibrationTree(
 
   useEffect(() => {
     if (!enabled || !index) return;
-    let cancelled = false;
-    void (async () => {
-      for (const descriptor of index.parts.tiers) {
-        if (cancelled) return;
-        try {
-          await queryClient.fetchQuery(
-            calibrationTreePartQueryOptions(
-              country,
-              index.hfCommitSha,
-              descriptor.part,
-            ),
-          );
-        } catch {
-          return;
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void fetchCalibrationTreeTiersConcurrently(
+      index.parts.tiers,
+      (descriptor) => queryClient.fetchQuery(
+        calibrationTreePartQueryOptions(
+          country,
+          index.hfCommitSha,
+          descriptor.part,
+        ),
+      ),
+    ).catch(() => {
+      // Each React Query observer retains its own error. Starting every request
+      // first ensures that one failed tier does not prevent the browser from
+      // completing other tier requests that are already in flight.
+    });
   }, [country, enabled, index, queryClient]);
 
   const targetIndex = targetIndexQuery.data?.part === "target-index"

@@ -80,9 +80,8 @@ GET /api/microcosm/tree?country=us&release=latest&part=index
   -> 307 to the same route with revision=<exact commit>
   -> stream calibration-trees/us/<commit>/index.json
   -> render the selected root
-  -> fetch target-index.json and tier-1.json
-  -> fetch tier-2.json after tier-1.json completes
-  -> continue through tier-N.json
+  -> fetch target-index.json and start tier-1.json through tier-N.json together
+  -> let the browser schedule and complete the tier requests independently
   -> fetch target-details.json after the tiers, or immediately when selected
 ```
 
@@ -242,7 +241,7 @@ After publication, verify for every country:
 4. A repeated exact-commit request from the same Vercel region reports a CDN
    cache hit or a positive cache age.
 5. The browser renders the root before later depth requests finish, requests
-   tiers in increasing order, and never requests an old `v1` path.
+   every tier after the index arrives, and never requests an old `v1` path.
 
 References: [Vercel Blob authentication](https://vercel.com/docs/vercel-blob/using-blob-sdk#authentication),
 [private Blob delivery](https://vercel.com/docs/vercel-blob/private-storage), and
