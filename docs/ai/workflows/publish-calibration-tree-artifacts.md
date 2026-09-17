@@ -1,0 +1,84 @@
+# Publish calibration tree artifacts
+
+Use this workflow when changing, publishing, or diagnosing the dashboard's
+precomputed calibration-tree files. Read
+[`docs/calibration-tree-artifacts.md`](../../calibration-tree-artifacts.md)
+before modifying code or external storage.
+
+## Establish scope and authorization
+
+1. Confirm the requested country, release, and exact Hugging Face commit.
+2. Distinguish tree schema 3 from unrelated Microcosm artifact schemas.
+3. Treat Blob deletion, manifest updates, workflow dispatch, and publication as
+   external state changes. Obtain explicit user authorization when the request
+   does not already cover them.
+4. Never print Blob, Hugging Face, GitHub, or webhook secret values.
+
+## Inspect the source and current publication
+
+1. Resolve the release to an immutable Hugging Face commit.
+2. Verify that the release directory contains calibration diagnostics and any
+   referenced manifests.
+3. Read `calibration-trees/latest.json` and the selected `index.json` when they
+   exist.
+4. Confirm that the country, release, commit, source digests, and schema version
+   agree before drawing conclusions.
+
+## Build and validate
+
+1. Run the publisher for an exact release or use its test helpers without
+   changing Blob storage.
+2. Confirm target ordinals cover `0` through `targetCount - 1`.
+3. Confirm every indexed target has one `{ shardIndex, offset }` location.
+4. Confirm detail descriptors have contiguous ordinal ranges and files remain
+   at or below 4,000,000 raw UTF-8 bytes.
+5. Confirm every file's path, hash, raw size, and gzip size matches `index.json`.
+6. Run `bun test`, `bun run lint`, and `bun run build` from `frontend/`.
+
+Do not change the shard size through an environment variable. A different size
+would assign different immutable paths to the same release.
+
+## Publish
+
+1. Confirm `BLOB_READ_WRITE_TOKEN` and any required `HF_TOKEN` are available
+   without displaying them.
+2. Publish non-index files first, then `index.json`.
+3. Verify uploaded bytes through a consistent Blob read.
+4. Update `latest.json` only when the upstream `latest.json` still names the
+   same release and commit.
+5. Report the release, commit, part count, and measured sizes without reporting
+   credentials.
+
+Webhook events publish only the affected release. Run historical backfill only
+when the user explicitly requests it.
+
+## Replace pre-production artifacts
+
+Schema 3 has no compatibility reader. If replacement requires deletion:
+
+1. List every object under the exact `calibration-trees/` prefix.
+2. Stop if any path is outside the documented folder structure or may serve a
+   production consumer.
+3. Present the exact scope and obtain approval before deletion.
+4. Delete with a one-off operation outside the repository.
+5. Confirm the prefix is empty, then publish US, UK, and Belgium.
+6. Compare the resulting release inventory with the inventory recorded before
+   deletion.
+
+Do not add a legacy parser or cleanup utility to the repository to perform this
+one-time replacement.
+
+## Verify the deployed reader
+
+1. Confirm the release alias redirects to an exact commit.
+2. Confirm `index.json` renders the root before later requests finish.
+3. Confirm `target-index.json` and all tier files start concurrently.
+4. Confirm no target-detail shard loads before target selection.
+5. Select targets in the first, middle, and last shards.
+6. Confirm a target-detail failure remains confined to its detail panel.
+7. Switch between releases and confirm country, commit, and part query keys
+   prevent stale display.
+8. Request one exact shard twice and inspect Vercel cache headers.
+
+Do not use browser automation or screenshots for visual verification. Provide
+the preview URL and ask the user to inspect the rendered behavior.
