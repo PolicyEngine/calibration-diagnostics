@@ -70,6 +70,14 @@ export interface CalibrationTreeMetrics {
   change?: CalibrationTreeChangeMetrics;
 }
 
+export interface CalibrationTreeMetricInput {
+  absRelativeError: number | null;
+  targetLossWeightShare: number | null;
+  finalLossContribution: number | null;
+  targetChange: number | null;
+  comparisonStatus: "shared" | "added" | "removed" | null;
+}
+
 export interface CalibrationTreeNode {
   id: string;
   label: string;
@@ -176,20 +184,22 @@ function median(values: number[]): number | null {
     : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-export function calibrationTreeMetrics(
-  rows: CalibrationTreeTarget[],
+export function calibrationTreeMetricsFromInputs(
+  inputs: CalibrationTreeMetricInput[],
 ): CalibrationTreeMetrics {
-  const errors = rows.map(finiteError).filter((value): value is number => value != null);
-  const loss = rows.reduce(
-    (sum, row) => sum + (finiteLossContribution(row) ?? 0),
+  const errors = inputs
+    .map((input) => input.absRelativeError)
+    .filter((value): value is number => value != null);
+  const loss = inputs.reduce(
+    (sum, input) => sum + (input.finalLossContribution ?? 0),
     0,
   );
-  const targetLossWeightShare = rows.reduce(
-    (sum, row) => sum + (finiteTargetLossWeightShare(row) ?? 0),
+  const targetLossWeightShare = inputs.reduce(
+    (sum, input) => sum + (input.targetLossWeightShare ?? 0),
     0,
   );
-  const changes = rows
-    .map((row) => finiteNumber(row.target_change))
+  const changes = inputs
+    .map((input) => input.targetChange)
     .filter((value): value is number => value != null);
   const increasedError = changes.reduce((sum, value) => sum + Math.max(value, 0), 0);
   const reducedError = changes.reduce((sum, value) => sum + Math.max(-value, 0), 0);
@@ -200,13 +210,13 @@ export function calibrationTreeMetrics(
         netChange: changes.reduce((sum, value) => sum + value, 0),
         changedTargets: changes.filter((value) => Math.abs(value) > 1e-12).length,
         unchangedTargets: changes.filter((value) => Math.abs(value) <= 1e-12).length,
-        sharedTargets: rows.filter((row) => row.comparison_status === "shared").length,
-        addedTargets: rows.filter((row) => row.comparison_status === "added").length,
-        removedTargets: rows.filter((row) => row.comparison_status === "removed").length,
+        sharedTargets: inputs.filter((input) => input.comparisonStatus === "shared").length,
+        addedTargets: inputs.filter((input) => input.comparisonStatus === "added").length,
+        removedTargets: inputs.filter((input) => input.comparisonStatus === "removed").length,
       }
     : undefined;
   return {
-    nTargets: rows.length,
+    nTargets: inputs.length,
     scored: errors.length,
     within10Pct: errors.filter((error) => error <= 0.1).length,
     loss,
@@ -220,6 +230,23 @@ export function calibrationTreeMetrics(
     medianAbsRelativeError: median(errors),
     change,
   };
+}
+
+export function calibrationTreeMetrics(
+  rows: CalibrationTreeTarget[],
+): CalibrationTreeMetrics {
+  return calibrationTreeMetricsFromInputs(rows.map((row) => ({
+    absRelativeError: finiteError(row),
+    targetLossWeightShare: finiteTargetLossWeightShare(row),
+    finalLossContribution: finiteLossContribution(row),
+    targetChange: finiteNumber(row.target_change),
+    comparisonStatus:
+      row.comparison_status === "shared" ||
+      row.comparison_status === "added" ||
+      row.comparison_status === "removed"
+        ? row.comparison_status
+        : null,
+  })));
 }
 
 function humanize(value: string): string {
@@ -585,6 +612,12 @@ function normalizeChartCalibrationStatus(
   };
 }
 
+export function normalizeCalibrationTreeTargets(
+  rows: CalibrationTreeTarget[],
+): CalibrationTreeTarget[] {
+  return rows.map(normalizeChartCalibrationStatus);
+}
+
 function programGroups(rows: CalibrationTreeTarget[]): CalibrationTreeGroup[] {
   const bySource = groupRows(
     rows,
@@ -842,7 +875,7 @@ export function buildCalibrationTree(
     allRows.length > 0 && allRows.every((row) => finiteLossContribution(row) != null),
   calibrationProvenance?: CalibrationProvenance,
 ): CalibrationTreeResponse {
-  const chartRows = allRows.map(normalizeChartCalibrationStatus);
+  const chartRows = normalizeCalibrationTreeTargets(allRows);
   const { path } = state;
   const selectedPathLabels = pathLabels(chartRows, path);
   const options = filterOptions(chartRows);
