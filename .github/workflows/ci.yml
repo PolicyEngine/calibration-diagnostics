@@ -10,30 +10,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  private-country-calibration-tree-backfill:
-    name: temporary private-country calibration tree backfill
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.ref == 'codex/immutable-calibration-trees'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    env:
-      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
-      - name: Publish UK and Belgium schema 3 artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          for country in uk be; do
-            bun run publish:calibration-tree -- --country "$country" --backfill
-          done
-
   hosted-python:
     name: hosted Python · dependencies · source APIs
     runs-on: ubuntu-latest
