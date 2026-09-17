@@ -5,6 +5,7 @@ import {
   enforceConfiguredSizeLimits,
   parsePublisherOptions,
   readUpstreamLatest,
+  resolvePublicationSourceSha,
 } from "./publish-calibration-tree";
 
 const originalFetch = globalThis.fetch;
@@ -100,6 +101,24 @@ test("latest publication uses its exact source commit when no release tag exists
     expect(requested).toContain(
       `https://huggingface.co/datasets/policyengine/populace-be-private/resolve/${sourceSha}/latest.json`,
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("an exact supplied commit supports a release without a matching tag", async () => {
+  const sourceSha = "4".repeat(40);
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    expect(String(input)).toContain("/revision/microcosm-us-untagged");
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+  try {
+    await expect(resolvePublicationSourceSha(
+      "us",
+      "microcosm-us-untagged",
+      sourceSha,
+      false,
+    )).resolves.toBe(sourceSha);
   } finally {
     globalThis.fetch = originalFetch;
   }
