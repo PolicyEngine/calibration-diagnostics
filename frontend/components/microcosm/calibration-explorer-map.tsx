@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Spinner } from "@policyengine/ui-kit";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useCountry } from "@/components/layout/country-context";
 import {
@@ -23,17 +23,18 @@ import {
   WEIGHTED_TARGET_ERROR_HELP,
 } from "@/components/microcosm/calibration-explorer-view";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
-import { CalibrationProvenanceNotice } from "@/components/microcosm/calibration-provenance-notice";
 import { fmt, humanizeName } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import {
-  microcosmCalibrationTreeQueryOptions,
+  microcosmCalibrationTreeIndexQueryOptions,
+  microcosmStagingCalibrationTreeQueryOptions,
   useMicrocosmCalibrationTree,
   type MicrocosmCalibrationTreeSource,
   type MicrocosmTargetDimension,
   type MicrocosmTargetRow,
 } from "@/lib/api/hooks/use-microcosm";
 import {
+  calibrationExplorerSourceIdentity,
   createExplorerState,
   explorerReducer,
   type ExplorerBreakdown,
@@ -59,10 +60,8 @@ import { squarify, type Placed } from "@/lib/treemap/squarify";
 const GROUP_GAP = 8;
 const NODE_GAP = 3;
 const HEADER_HEIGHT = 24;
-const PAGE_LOAD_PREFETCH_DEPTH = 3;
 const ACTIVE_VIEW_PREFETCH_DEPTH = 1;
 const PREFETCH_CONCURRENCY = 6;
-
 const FIT_LABELS: Record<string, string> = {
   "0_5": "0–5%",
   "5_10": "5–10%",
@@ -431,10 +430,12 @@ function FilterBar({
 function FilterMenu({
   data,
   state,
+  disabled,
   onFilters,
 }: {
   data: CalibrationTreeResponse;
   state: ExplorerState;
+  disabled: boolean;
   onFilters: (filters: ExplorerFilters) => void;
 }) {
   const activeCount =
@@ -442,6 +443,19 @@ function FilterMenu({
     state.filters.geographies.length +
     state.filters.fitBands.length +
     state.filters.calibrationStatuses.length;
+
+  if (disabled) {
+    return (
+      <button
+        type="button"
+        disabled
+        title="Filter data is still loading."
+        className="shrink-0 cursor-not-allowed rounded-md px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground opacity-60"
+      >
+        Filters · Loading…
+      </button>
+    );
+  }
 
   return (
     <details className="group relative shrink-0">
@@ -479,7 +493,7 @@ function CalibrationMapLoadingSkeleton() {
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-card/55 backdrop-blur-[1px]">
         <Spinner size="md" />
         <span className="text-xs font-medium text-muted-foreground">
-          Building calibration map…
+          Loading calibration map…
         </span>
       </div>
     </div>
@@ -503,7 +517,7 @@ function usePrefetchCalibrationLevels({
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!data || isPlaceholderData) return;
+    if (source.kind !== "staging" || !data || isPlaceholderData) return;
     let cancelled = false;
     void prefetchCalibrationDescendants({
       state,
@@ -512,7 +526,11 @@ function usePrefetchCalibrationLevels({
       concurrency: PREFETCH_CONCURRENCY,
       fetchTree: async (childState) =>
         queryClient.fetchQuery(
-          microcosmCalibrationTreeQueryOptions(childState, source, country),
+          microcosmStagingCalibrationTreeQueryOptions(
+            childState,
+            source.runId,
+            country,
+          ),
         ),
       isCancelled: () => cancelled,
     });
@@ -527,31 +545,36 @@ export function CalibrationExplorerDataPrefetch({
 }: {
   release?: string;
 }) {
-  const [state] = useState(createExplorerState);
-  const source = useMemo<MicrocosmCalibrationTreeSource>(
-    () => ({ kind: "release", release }),
-    [release],
-  );
-  const { data, isPlaceholderData } = useMicrocosmCalibrationTree(state, source);
-  usePrefetchCalibrationLevels({
-    state,
-    data,
-    source,
-    isPlaceholderData,
-    depth: PAGE_LOAD_PREFETCH_DEPTH,
-  });
+  const { country } = useCountry();
+  useQuery(microcosmCalibrationTreeIndexQueryOptions(release, country));
   return null;
 }
 
-export function CalibrationExplorerMap({
-  release,
-  stagingRunId,
-  pageIntroHeight,
-}: {
+interface CalibrationExplorerMapProps {
   release?: string;
   stagingRunId?: string;
   pageIntroHeight: number;
-}) {
+}
+
+export function CalibrationExplorerMap(props: CalibrationExplorerMapProps) {
+  const { country } = useCountry();
+  return (
+    <CalibrationExplorerMapForSource
+      key={calibrationExplorerSourceIdentity({
+        country,
+        release: props.release,
+        stagingRunId: props.stagingRunId,
+      })}
+      {...props}
+    />
+  );
+}
+
+function CalibrationExplorerMapForSource({
+  release,
+  stagingRunId,
+  pageIntroHeight,
+}: CalibrationExplorerMapProps) {
   const [state, dispatch] = useReducer(
     explorerReducer,
     undefined,
@@ -564,7 +587,7 @@ export function CalibrationExplorerMap({
         : { kind: "release", release },
     [release, stagingRunId],
   );
-  const { data, isFetching, isPlaceholderData, error } =
+  const { data, isFetching, isPlaceholderData, error, filtersReady } =
     useMicrocosmCalibrationTree(state, source);
   const displayBoundsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -660,7 +683,6 @@ export function CalibrationExplorerMap({
   );
   return (
     <div className="flex flex-col gap-3">
-      <CalibrationProvenanceNotice provenance={data.calibrationProvenance} />
       <div className="shrink-0">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
@@ -679,6 +701,7 @@ export function CalibrationExplorerMap({
             <FilterMenu
               data={data}
               state={state}
+              disabled={!filtersReady}
               onFilters={(filters) => {
                 setExpandedView(null);
                 dispatch({ type: "filters", filters });

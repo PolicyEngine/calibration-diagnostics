@@ -12,7 +12,6 @@ import {
   explorerNodeLabel,
   explorerUpLabel,
 } from "@/components/microcosm/calibration-explorer-view";
-import { CalibrationComparisonProvenanceNotices } from "@/components/microcosm/calibration-provenance-notice";
 import { fmt } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -436,14 +435,8 @@ export function StagingTargetChangeMap({
   }
   if (!data.available || !data.summary) {
     return (
-      <div className="flex flex-col gap-4">
-        <CalibrationComparisonProvenanceNotices
-          current={data.current.calibrationProvenance}
-          candidate={data.candidate.calibrationProvenance}
-        />
-        <div className="rounded-lg border border-border p-5 text-sm text-muted-foreground">
-          {data.reason ?? "Weighted target-error attribution is unavailable for this comparison."}
-        </div>
+      <div className="rounded-lg border border-border p-5 text-sm text-muted-foreground">
+        {data.reason ?? "Weighted target-error attribution is unavailable for this comparison."}
       </div>
     );
   }
@@ -454,10 +447,6 @@ export function StagingTargetChangeMap({
 
   return (
     <div className="flex flex-col gap-4">
-      <CalibrationComparisonProvenanceNotices
-        current={data.current.calibrationProvenance}
-        candidate={data.candidate.calibrationProvenance}
-      />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap gap-x-5 gap-y-3">
           <Control
