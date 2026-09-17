@@ -204,9 +204,15 @@ bun run publish:calibration-tree -- --country be --backfill
 ```
 
 The equivalent GitHub workflow input is `backfill: true`. Historical releases
-with unsupported diagnostics, missing immutable tags, or an oversized part are
-reported and skipped. The current release must build successfully; otherwise
-the publication workflow fails without updating `latest.json`.
+normally resolve through an immutable Hugging Face tag. If a repository did not
+create per-release tags, backfill reads the expanded release-directory metadata
+and uses the newest commit that changed one of that release's source files. The
+publisher then fetches and validates every required artifact at that immutable
+commit; it never builds a historical bundle from a mutable branch name.
+Releases with unsupported diagnostics, unavailable commit metadata, or an
+oversized part are reported and skipped. The current release must build
+successfully; otherwise the publication workflow fails without updating
+`latest.json`.
 
 `CALIBRATION_TREE_MAX_RAW_BYTES` defaults to 100,000,000 bytes and now applies
 to each file independently. `CALIBRATION_TREE_MAX_GZIP_BYTES` is optional and

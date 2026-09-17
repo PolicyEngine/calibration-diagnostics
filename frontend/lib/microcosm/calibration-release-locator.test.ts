@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 
 import {
   calibrationReleaseFromManifest,
+  resolveHfReleaseDirectorySha,
   resolveHfRevisionSha,
 } from "./calibration-release-locator";
 import { withCalibrationTreeManifestEntry, emptyCalibrationTreeManifest } from "./calibration-tree-manifest";
@@ -37,4 +38,54 @@ test("historical release tags resolve to exact Hugging Face commits", async () =
   expect(await resolveHfRevisionSha("us", "microcosm-us-history", 0)).toBe(
     "abcdef1234567890abcdef1234567890abcdef12",
   );
+});
+
+test("untagged release directories resolve to their newest source commit", async () => {
+  const diagnosticsCommit = "1".repeat(40);
+  const manifestCommit = "2".repeat(40);
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    expect(String(input)).toBe(
+      "https://huggingface.co/api/datasets/policyengine/populace-be-private/" +
+        "tree/main/releases/microcosm-be-history?recursive=false&expand=true",
+    );
+    return Response.json([
+      {
+        type: "file",
+        path: "releases/microcosm-be-history/calibration_diagnostics.json",
+        lastCommit: {
+          id: diagnosticsCommit,
+          date: "2026-08-23T16:13:38.000Z",
+        },
+      },
+      {
+        type: "file",
+        path: "releases/microcosm-be-history/release_manifest.json",
+        lastCommit: {
+          id: manifestCommit.toUpperCase(),
+          date: "2026-08-23T16:14:38.000Z",
+        },
+      },
+    ]);
+  }) as typeof fetch;
+  expect(await resolveHfReleaseDirectorySha(
+    "be",
+    "microcosm-be-history",
+  )).toBe(manifestCommit);
+});
+
+test("untagged release resolution requires calibration diagnostics", async () => {
+  globalThis.fetch = (async (_input: string | URL | Request) => Response.json([
+    {
+      type: "file",
+      path: "releases/microcosm-be-history/release_manifest.json",
+      lastCommit: {
+        id: "3".repeat(40),
+        date: "2026-08-23T16:14:38.000Z",
+      },
+    },
+  ])) as typeof fetch;
+  await expect(resolveHfReleaseDirectorySha(
+    "be",
+    "microcosm-be-history",
+  )).rejects.toThrow("has no calibration diagnostics");
 });
