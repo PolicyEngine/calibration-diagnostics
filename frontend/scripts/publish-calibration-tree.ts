@@ -64,7 +64,7 @@ export function publicationCreatedAt(
   const candidate = value?.trim();
   if (!candidate) return null;
 
-  const compact = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?$/.exec(
+  const compact = /(?:^|[-_])(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?$/.exec(
     candidate,
   );
   if (compact) {
@@ -376,7 +376,7 @@ async function publishRelease(
   );
   const bundle = buildCalibrationTreeBundle({
     country,
-    createdAt,
+    createdAt: publicationCreatedAt(id) ?? publicationCreatedAt(createdAt),
     releaseId: id,
     hfRepo: microcosmRepo(country),
     hfCommitSha: resolvedSha,

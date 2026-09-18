@@ -92,6 +92,9 @@ test("publisher normalizes compact release dates for manifest sorting", () => {
   expect(publicationCreatedAt("20260728T011454Z")).toBe(
     "2026-07-28T01:14:54.000Z",
   );
+  expect(
+    publicationCreatedAt("populace-us-2024-spm-20260728T011454Z"),
+  ).toBe("2026-07-28T01:14:54.000Z");
   expect(publicationCreatedAt("2026-09-16T12:00:00Z")).toBe(
     "2026-09-16T12:00:00.000Z",
   );
