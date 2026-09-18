@@ -7,15 +7,23 @@ import {
   type ComparisonBundleSource,
 } from "./calibration-comparison-bundle";
 import {
+  CALIBRATION_TREE_SCHEMA_VERSION,
+  calibrationTreeTargetDetailSelection,
   calibrationTreeTargetsFromSummaries,
   parseCalibrationTreeIndex,
+  parseCalibrationTreeTargetDetails,
   parseCalibrationTreeTargetSummary,
+  type CalibrationTreeComparisonTargetDetailResponse,
+  type CalibrationTreeIndexArtifact,
+  type CalibrationTreeTargetDetailsArtifact,
 } from "./calibration-tree-artifact";
 import {
+  calibrationTreeBlobText,
   getCalibrationTreeBlob,
   uploadCalibrationTreeBundle,
 } from "./calibration-tree-blob";
 import type { MicrocosmCountry } from "./countries";
+import type { TargetChangeRow } from "./target-change";
 
 interface ComparisonBuildIds {
   pairArtifactId: string;
@@ -56,7 +64,7 @@ async function textFromBlob(
   if (!result || result.statusCode !== 200 || !result.stream) {
     throw new Error(`${label} is unavailable.`);
   }
-  return new Response(result.stream).text();
+  return calibrationTreeBlobText(result.stream);
 }
 
 function sha256(value: string): string {
@@ -107,6 +115,183 @@ export async function loadCalibrationComparisonSource(
     index,
     indexSha256: sha256(indexText),
     targetSummaries: calibrationTreeTargetsFromSummaries(index, targetSummaries),
+  };
+}
+
+async function loadIndex(options: {
+  country: MicrocosmCountry;
+  buildArtifactId: string;
+  expectedSha256?: string;
+  getBlob: typeof getCalibrationTreeBlob;
+}): Promise<CalibrationTreeIndexArtifact> {
+  const text = await textFromBlob(
+    await options.getBlob({
+      country: options.country,
+      buildArtifactId: options.buildArtifactId,
+      part: "index",
+      consistent: true,
+    }),
+    `Calibration build ${options.buildArtifactId} index`,
+  );
+  if (options.expectedSha256 && sha256(text) !== options.expectedSha256) {
+    throw new Error(`Calibration build ${options.buildArtifactId} index digest is invalid.`);
+  }
+  const index = parseCalibrationTreeIndex(JSON.parse(text));
+  if (
+    index.country !== options.country ||
+    index.buildArtifactId !== options.buildArtifactId
+  ) {
+    throw new Error(
+      `Calibration build ${options.buildArtifactId} index identity is inconsistent.`,
+    );
+  }
+  return index;
+}
+
+export async function loadCalibrationComparisonTargetDetail(options: {
+  country: MicrocosmCountry;
+  buildArtifactId: string;
+  targetOrdinal: number;
+  getBlob?: typeof getCalibrationTreeBlob;
+}): Promise<CalibrationTreeComparisonTargetDetailResponse> {
+  const getBlob = options.getBlob ?? getCalibrationTreeBlob;
+  const comparisonIndex = await loadIndex({
+    country: options.country,
+    buildArtifactId: options.buildArtifactId,
+    getBlob,
+  });
+  if (
+    comparisonIndex.build.kind !== "comparison" ||
+    comparisonIndex.parts.targetDetailStrategy !== "source-targets" ||
+    !comparisonIndex.comparison
+  ) {
+    throw new Error("The requested build does not use source-backed comparison details.");
+  }
+  if (
+    !Number.isSafeInteger(options.targetOrdinal) ||
+    options.targetOrdinal < 0 ||
+    options.targetOrdinal >= comparisonIndex.targetCount
+  ) {
+    throw new Error("The requested comparison target ordinal is out of range.");
+  }
+  const summaryDescriptor = comparisonIndex.parts.targetSummaries.find(
+    (descriptor) =>
+      options.targetOrdinal >= descriptor.startTargetOrdinal &&
+      options.targetOrdinal < descriptor.endTargetOrdinalExclusive,
+  );
+  if (!summaryDescriptor) {
+    throw new Error("The requested comparison target has no summary shard.");
+  }
+  const summaryText = await textFromBlob(
+    await getBlob({
+      country: options.country,
+      buildArtifactId: options.buildArtifactId,
+      part: summaryDescriptor.part,
+      consistent: true,
+    }),
+    `Calibration comparison ${options.buildArtifactId} ${summaryDescriptor.part}`,
+  );
+  if (sha256(summaryText) !== summaryDescriptor.sha256) {
+    throw new Error("The comparison target-summary digest is invalid.");
+  }
+  const summaryArtifact = parseCalibrationTreeTargetSummary(
+    JSON.parse(summaryText),
+    summaryDescriptor.part,
+  );
+  const summary = summaryArtifact.targets[
+    options.targetOrdinal - summaryDescriptor.startTargetOrdinal
+  ];
+  if (!summary?.detailSource) {
+    throw new Error("The comparison target does not identify its source targets.");
+  }
+
+  const sourceIndexes = new Map<string, Promise<CalibrationTreeIndexArtifact>>();
+  const sourceDetails = new Map<string, Promise<CalibrationTreeTargetDetailsArtifact>>();
+  const sourceIndex = (
+    buildArtifactId: string,
+    expectedSha256: string,
+  ): Promise<CalibrationTreeIndexArtifact> => {
+    const existing = sourceIndexes.get(buildArtifactId);
+    if (existing) return existing;
+    const loading = loadIndex({
+      country: options.country,
+      buildArtifactId,
+      expectedSha256,
+      getBlob,
+    });
+    sourceIndexes.set(buildArtifactId, loading);
+    return loading;
+  };
+  const sourceDetail = async (
+    buildArtifactId: string,
+    expectedIndexSha256: string,
+    targetOrdinal: number | null,
+  ) => {
+    if (targetOrdinal == null) return null;
+    const index = await sourceIndex(buildArtifactId, expectedIndexSha256);
+    if (index.build.kind === "comparison") {
+      throw new Error("Comparison target details must resolve to source builds.");
+    }
+    const selection = calibrationTreeTargetDetailSelection(index, targetOrdinal);
+    const key = `${buildArtifactId}:${selection.descriptor.part}`;
+    let loading = sourceDetails.get(key);
+    if (!loading) {
+      loading = (async () => {
+        const text = await textFromBlob(
+          await getBlob({
+            country: options.country,
+            buildArtifactId,
+            part: selection.descriptor.part,
+            consistent: true,
+          }),
+          `Calibration build ${buildArtifactId} ${selection.descriptor.part}`,
+        );
+        if (sha256(text) !== selection.descriptor.sha256) {
+          throw new Error(
+            `Calibration build ${buildArtifactId} ${selection.descriptor.part} digest is invalid.`,
+          );
+        }
+        return parseCalibrationTreeTargetDetails(
+          JSON.parse(text),
+          selection.descriptor.part,
+        );
+      })();
+      sourceDetails.set(key, loading);
+    }
+    const artifact = await loading;
+    return artifact.targets[selection.offset] ?? null;
+  };
+
+  const currentSource = comparisonIndex.build.sourceArtifacts.comparisonCurrentIndex;
+  const candidateSource = comparisonIndex.build.sourceArtifacts.comparisonCandidateIndex;
+  if (!currentSource || !candidateSource) {
+    throw new Error("The comparison build does not identify both source indexes.");
+  }
+  const { currentBuildArtifactId, candidateBuildArtifactId } = comparisonIndex.comparison;
+  const [currentDetail, candidateDetail] = await Promise.all([
+    sourceDetail(
+      currentBuildArtifactId,
+      currentSource.sha256,
+      summary.detailSource.currentTargetOrdinal,
+    ),
+    sourceDetail(
+      candidateBuildArtifactId,
+      candidateSource.sha256,
+      summary.detailSource.candidateTargetOrdinal,
+    ),
+  ]);
+  const compact = summary.comparison.row as TargetChangeRow;
+  return {
+    schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
+    country: options.country,
+    buildArtifactId: options.buildArtifactId,
+    targetOrdinal: options.targetOrdinal,
+    targetId: summary.id,
+    target: {
+      ...compact,
+      currentDetail,
+      candidateDetail,
+    },
   };
 }
 

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import { buildCalibrationTreeBundle } from "./calibration-tree-bundle";
 import {
@@ -9,7 +10,7 @@ import {
 } from "./calibration-tree-blob";
 
 function memoryClient(transientManifestConflicts = 0) {
-  const content = new Map<string, string>();
+  const content = new Map<string, BlobPart>();
   const etags = new Map<string, string>();
   const putCalls: Array<{ pathname: string; options: Record<string, unknown> }> = [];
   let version = 0;
@@ -42,13 +43,13 @@ function memoryClient(transientManifestConflicts = 0) {
         blob: {
           ...metadata,
           contentType: "application/json; charset=utf-8",
-          size: body.length,
+          size: new Blob([body]).size,
         },
       };
     }) as CalibrationTreeBlobClient["get"],
     put: (async (
       pathname: string,
-      body: string,
+      body: BlobPart,
       options: Record<string, unknown>,
     ) => {
       putCalls.push({ pathname, options });
@@ -74,7 +75,7 @@ function memoryClient(transientManifestConflicts = 0) {
       }
       version += 1;
       const etag = `\"etag-${version}\"`;
-      content.set(pathname, String(body));
+      content.set(pathname, body);
       etags.set(pathname, etag);
       return {
         url: `https://blob.example/${pathname}`,
@@ -136,15 +137,19 @@ test("bundle upload writes the index last, verifies every part, and is idempoten
   });
   expect(first.files.every((file) => file.created)).toBe(true);
   expect(second.files.every((file) => !file.created)).toBe(true);
-  expect(store.putCalls.map((call) => call.pathname).at(-1)).toEndWith("/index.json");
+  expect(store.putCalls.map((call) => call.pathname).at(-1)).toEndWith("/index.json.gz");
   expect(store.putCalls[0].options).toMatchObject({
     access: "private",
     token: "publisher-token",
     addRandomSuffix: false,
     multipart: true,
+    contentType: "application/gzip",
   });
+  const storedIndex = store.content.get(`${bundle.files.at(-1)!.path}`);
+  expect(gunzipSync(await new Blob([storedIndex!]).arrayBuffer()).toString("utf8"))
+    .toBe(bundle.files.at(-1)!.serialized);
 
-  store.content.set(first.files[0].pathname, "changed");
+  store.content.set(first.files[0].pathname, gzipSync("changed"));
   await expect(uploadCalibrationTreeBundle({
     bundle,
     token: "publisher-token",
@@ -163,7 +168,7 @@ test("manifest writes merge countries and conditionally replace the prior versio
     stagingRunId: null,
     hfRepo: "policyengine/populace-us",
     hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-    treeSchemaVersion: 5 as const,
+    treeSchemaVersion: 6 as const,
     indexSha256: "c".repeat(64),
     indexBytes: 100,
     createdAt: "2026-09-15T12:00:00.000Z",
@@ -214,7 +219,7 @@ test("manifest writes refresh and replace after wrapped Blob ETag conflicts", as
     stagingRunId: null,
     hfRepo: "policyengine/populace-us",
     hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-    treeSchemaVersion: 5 as const,
+    treeSchemaVersion: 6 as const,
     indexSha256: "f".repeat(64),
     indexBytes: 100,
     createdAt: "2026-09-15T12:00:00.000Z",

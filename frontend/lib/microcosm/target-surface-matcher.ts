@@ -35,6 +35,8 @@ export interface TargetSurfaceMatch {
   candidate_name: string | null;
   current_representation: TargetRowRepresentation | null;
   candidate_representation: TargetRowRepresentation | null;
+  current_target_ordinal: number | null;
+  candidate_target_ordinal: number | null;
 }
 
 export interface TargetSurfaceMatchResult {
@@ -165,6 +167,8 @@ function sharedMatch(
     candidate_name: originalTargetName(candidate.row),
     current_representation: targetRowRepresentation(current.row),
     candidate_representation: targetRowRepresentation(candidate.row),
+    current_target_ordinal: current.index,
+    candidate_target_ordinal: candidate.index,
   };
 }
 
@@ -186,6 +190,8 @@ function sideOnlyMatch(
       side === "current" ? targetRowRepresentation(row) : null,
     candidate_representation:
       side === "candidate" ? targetRowRepresentation(row) : null,
+    current_target_ordinal: side === "current" ? indexed.index : null,
+    candidate_target_ordinal: side === "candidate" ? indexed.index : null,
   };
 }
 

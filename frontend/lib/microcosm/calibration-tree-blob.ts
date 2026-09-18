@@ -4,6 +4,7 @@ import {
   put,
   type GetBlobResult,
 } from "@vercel/blob";
+import { gunzipSync } from "node:zlib";
 
 import {
   calibrationTreePartPath,
@@ -52,6 +53,14 @@ function tokenOption(token?: string): { token: string } | Record<string, never> 
 async function streamText(stream: ReadableStream<Uint8Array> | null): Promise<string> {
   if (!stream) throw new Error("Blob response did not include a body.");
   return new Response(stream).text();
+}
+
+export async function calibrationTreeBlobText(
+  stream: ReadableStream<Uint8Array> | null,
+): Promise<string> {
+  if (!stream) throw new Error("Compressed calibration tree response did not include a body.");
+  const compressed = await new Response(stream).arrayBuffer();
+  return gunzipSync(compressed).toString("utf8");
 }
 
 export interface StoredCalibrationTreeManifest {
@@ -125,7 +134,7 @@ async function uploadCalibrationTreeFile(options: {
     client,
   });
   if (existing) {
-    const existingText = await streamText(existing.stream);
+    const existingText = await calibrationTreeBlobText(existing.stream);
     const verified = new TextEncoder().encode(existingText);
     const expected = new TextEncoder().encode(file.serialized);
     if (
@@ -144,12 +153,12 @@ async function uploadCalibrationTreeFile(options: {
     };
   }
 
-  await client.put(file.path, file.serialized, {
+  await client.put(file.path, Buffer.from(file.compressed), {
     access: "private",
     token,
     addRandomSuffix: false,
     multipart: true,
-    contentType: "application/json; charset=utf-8",
+    contentType: "application/gzip",
     cacheControlMaxAge: IMMUTABLE_CACHE_SECONDS,
   });
   const uploaded = await getCalibrationTreeBlob({
@@ -160,7 +169,7 @@ async function uploadCalibrationTreeFile(options: {
     consistent: true,
     client,
   });
-  if (!uploaded || await streamText(uploaded.stream) !== file.serialized) {
+  if (!uploaded || await calibrationTreeBlobText(uploaded.stream) !== file.serialized) {
     throw new Error(`Uploaded calibration tree part ${file.path} failed verification.`);
   }
   return {

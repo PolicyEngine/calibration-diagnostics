@@ -35,6 +35,8 @@ export interface TargetChangeRow extends Record<string, unknown> {
   candidate_name: string | null;
   current_representation: TargetRowRepresentation | null;
   candidate_representation: TargetRowRepresentation | null;
+  current_target_ordinal: number | null;
+  candidate_target_ordinal: number | null;
   comparison_status: TargetSurfaceStatus;
   comparison_fit: ComparisonFit;
   current: TargetChangeSide | null;
@@ -319,6 +321,8 @@ export function buildTargetChangeDataset(
       candidate_name: match.candidate_name,
       current_representation: match.current_representation,
       candidate_representation: match.candidate_representation,
+      current_target_ordinal: match.current_target_ordinal,
+      candidate_target_ordinal: match.candidate_target_ordinal,
       comparison_status: match.comparison_status,
       comparison_fit: comparisonFit(
         currentRow,

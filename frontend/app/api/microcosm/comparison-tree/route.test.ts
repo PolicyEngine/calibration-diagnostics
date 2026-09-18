@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { gzipSync } from "node:zlib";
 
 import {
   calibrationComparisonBuildArtifactId,
@@ -52,7 +53,8 @@ test("an uncached exact pair is built once and redirected to its immutable bundl
 });
 
 test("exact comparison bundle requests stream immutable private Blob parts", async () => {
-  const body = '{"schemaVersion":5,"part":"tier-1"}\n';
+  const body = '{"schemaVersion":6,"part":"tier-1"}\n';
+  const compressed = gzipSync(body);
   const requests: unknown[] = [];
   const handler = createCalibrationComparisonTreeHandler({
     ensureComparison: (async () => {
@@ -62,18 +64,18 @@ test("exact comparison bundle requests stream immutable private Blob parts", asy
       requests.push(options);
       return {
         statusCode: 200 as const,
-        stream: new Blob([body]).stream(),
+        stream: new Blob([compressed]).stream(),
         headers: new Headers(),
         blob: {
           url: "https://blob.example/tree.json",
           downloadUrl: "https://blob.example/tree.json?download=1",
-          pathname: `calibration-trees/us/${REPORTED}/tier-1.json`,
+          pathname: `calibration-trees/us/${REPORTED}/tier-1.json.gz`,
           contentDisposition: "inline",
           cacheControl: "public, max-age=31536000",
           uploadedAt: new Date("2026-09-18T12:00:00.000Z"),
           etag: '"comparison-etag"',
-          contentType: "application/json; charset=utf-8",
-          size: body.length,
+          contentType: "application/gzip",
+          size: compressed.byteLength,
         },
       };
     }) as CalibrationComparisonTreeRouteDependencies["getBlob"],

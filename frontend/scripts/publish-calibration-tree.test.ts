@@ -72,9 +72,10 @@ test("publisher enforces configured artifact size limits", () => {
   try {
     expect(() => enforceConfiguredSizeLimits({
       part: "target-details-0001",
-      path: `calibration-trees/us/${"a".repeat(64)}/target-details-0001.json`,
+      path: `calibration-trees/us/${"a".repeat(64)}/target-details-0001.json.gz`,
       artifact: {} as never,
       serialized: "12345678901",
+      compressed: new Uint8Array([1, 2, 3, 4, 5]),
       sha256: "a".repeat(64),
       rawBytes: 11,
       gzipBytes: 5,
