@@ -55,14 +55,22 @@ function memoryClient(transientManifestConflicts = 0) {
       if (
         pathname.endsWith("/manifest.json") &&
         version > 0 &&
+        options.ifMatch != null &&
         transientManifestConflicts > 0
       ) {
         transientManifestConflicts -= 1;
         throw new Error("Vercel Blob: Precondition failed: ETag mismatch.");
       }
       const existingEtag = etags.get(pathname);
-      if (existingEtag && options.ifMatch !== existingEtag) {
+      if (
+        existingEtag &&
+        options.ifMatch != null &&
+        options.ifMatch !== existingEtag
+      ) {
         throw new Error("precondition failed");
+      }
+      if (existingEtag && !options.ifMatch && options.allowOverwrite !== true) {
+        throw new Error("already exists");
       }
       version += 1;
       const etag = `\"etag-${version}\"`;
@@ -195,7 +203,7 @@ test("manifest writes merge countries and conditionally replace the prior versio
   expect(store.putCalls[1].options.ifMatch).toBe('"etag-1"');
 });
 
-test("manifest writes retry wrapped Blob ETag conflicts", async () => {
+test("manifest writes refresh and replace after wrapped Blob ETag conflicts", async () => {
   const store = memoryClient(1);
   const entry = {
     buildArtifactId: "e".repeat(64),

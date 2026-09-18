@@ -41,8 +41,8 @@ function isManifestWriteConflict(error: unknown): boolean {
     (error instanceof Error && /precondition failed.*etag mismatch/i.test(error.message));
 }
 
-function retryDelay(attempt: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, Math.min(100 * 2 ** attempt, 1_000)));
+function retryDelay(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 100));
 }
 
 function tokenOption(token?: string): { token: string } | Record<string, never> {
@@ -202,62 +202,77 @@ export async function updateCalibrationTreeManifest(options: {
   entry: CalibrationTreeManifestEntry;
   makeLatest?: boolean;
   token: string;
-  retries?: number;
   client?: CalibrationTreeBlobClient;
 }): Promise<CalibrationTreeManifest> {
-  const retries = options.retries ?? 5;
-  let lastError: unknown;
-  for (let attempt = 0; attempt < retries; attempt += 1) {
-    const current = await readCalibrationTreeManifest({
+  const client = options.client ?? DEFAULT_BLOB_CLIENT;
+  let current = await readCalibrationTreeManifest({
+    token: options.token,
+    consistent: true,
+    client,
+  });
+  let updated = withCalibrationTreeManifestEntry(
+    current.manifest,
+    options.country,
+    options.entry,
+    options.makeLatest,
+  );
+  try {
+    await client.put(
+      CALIBRATION_TREE_MANIFEST_PATH,
+      serializeCalibrationTreeManifest(updated),
+      {
+        access: "private",
+        token: options.token,
+        addRandomSuffix: false,
+        allowOverwrite: current.etag != null,
+        ifMatch: current.etag ?? undefined,
+        contentType: "application/json; charset=utf-8",
+        cacheControlMaxAge: MANIFEST_CACHE_SECONDS,
+      },
+    );
+  } catch (error) {
+    if (!isManifestWriteConflict(error)) throw error;
+
+    await retryDelay();
+    current = await readCalibrationTreeManifest({
       token: options.token,
       consistent: true,
-      client: options.client,
+      client,
     });
-    const updated = withCalibrationTreeManifestEntry(
+    updated = withCalibrationTreeManifestEntry(
       current.manifest,
       options.country,
       options.entry,
       options.makeLatest,
     );
-    const serialized = serializeCalibrationTreeManifest(updated);
-    try {
-      await (options.client ?? DEFAULT_BLOB_CLIENT).put(
-        CALIBRATION_TREE_MANIFEST_PATH,
-        serialized,
-        {
-          access: "private",
-          token: options.token,
-          addRandomSuffix: false,
-          allowOverwrite: current.etag != null,
-          ifMatch: current.etag ?? undefined,
-          contentType: "application/json; charset=utf-8",
-          cacheControlMaxAge: MANIFEST_CACHE_SECONDS,
-        },
-      );
-      const verified = await readCalibrationTreeManifest({
+    await client.put(
+      CALIBRATION_TREE_MANIFEST_PATH,
+      serializeCalibrationTreeManifest(updated),
+      {
+        access: "private",
         token: options.token,
-        consistent: true,
-        client: options.client,
-      });
-      const verifiedEntry = verified.manifest.countries[options.country]?.builds.find(
-        (entry) => entry.buildArtifactId === options.entry.buildArtifactId,
-      );
-      if (
-        !verifiedEntry ||
-        verifiedEntry.buildArtifactId !== options.entry.buildArtifactId ||
-        verifiedEntry.hfCommitSha !== options.entry.hfCommitSha ||
-        verifiedEntry.indexSha256 !== options.entry.indexSha256
-      ) {
-        throw new Error("Calibration tree manifest verification failed.");
-      }
-      return verified.manifest;
-    } catch (error) {
-      lastError = error;
-      if (!isManifestWriteConflict(error)) throw error;
-      if (attempt + 1 < retries) await retryDelay(attempt);
-    }
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType: "application/json; charset=utf-8",
+        cacheControlMaxAge: MANIFEST_CACHE_SECONDS,
+      },
+    );
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Calibration tree manifest update failed after concurrent writes.");
+
+  const verified = await readCalibrationTreeManifest({
+    token: options.token,
+    consistent: true,
+    client,
+  });
+  const verifiedEntry = verified.manifest.countries[options.country]?.builds.find(
+    (entry) => entry.buildArtifactId === options.entry.buildArtifactId,
+  );
+  if (
+    !verifiedEntry ||
+    verifiedEntry.hfCommitSha !== options.entry.hfCommitSha ||
+    verifiedEntry.indexSha256 !== options.entry.indexSha256
+  ) {
+    throw new Error("Calibration tree manifest verification failed.");
+  }
+  return verified.manifest;
 }

@@ -36,7 +36,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: calibration-tree-${{ inputs.country }}-${{ inputs.hf_commit_sha || inputs.release_id || 'latest' }}
+  group: calibration-tree-manifest-publication
   cancel-in-progress: false
 
 jobs:
