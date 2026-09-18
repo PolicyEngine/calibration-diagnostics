@@ -3,34 +3,34 @@ import { expect, test } from "bun:test";
 import { createExplorerState } from "@/lib/microcosm/calibration-explorer";
 
 import {
-  fetchCalibrationTreeTiersConcurrently,
+  fetchCalibrationTreePartsConcurrently,
   microcosmComparisonTreeIndexQueryOptions,
   microcosmStagingCalibrationTreeQueryOptions,
 } from "./use-microcosm";
 
-test("calibration tree tier requests start without waiting for earlier tiers", async () => {
+test("calibration tree part requests start without waiting for earlier parts", async () => {
   const started: string[] = [];
   const resolve = new Map<string, () => void>();
   let completed = false;
 
-  const loading = fetchCalibrationTreeTiersConcurrently(
-    ["tier-1", "tier-2", "tier-3"],
-    (tier) => {
-      started.push(tier);
-      return new Promise<void>((done) => resolve.set(tier, done));
+  const loading = fetchCalibrationTreePartsConcurrently(
+    ["filter-index", "target-summary-0001", "tier-1"],
+    (part) => {
+      started.push(part);
+      return new Promise<void>((done) => resolve.set(part, done));
     },
   );
   void loading.then(() => {
     completed = true;
   });
 
-  expect(started).toEqual(["tier-1", "tier-2", "tier-3"]);
-  resolve.get("tier-3")!();
+  expect(started).toEqual(["filter-index", "target-summary-0001", "tier-1"]);
   resolve.get("tier-1")!();
+  resolve.get("filter-index")!();
   await Promise.resolve();
   expect(completed).toBe(false);
 
-  resolve.get("tier-2")!();
+  resolve.get("target-summary-0001")!();
   await loading;
   expect(completed).toBe(true);
 });

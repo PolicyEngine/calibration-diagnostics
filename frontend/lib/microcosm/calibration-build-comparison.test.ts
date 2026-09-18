@@ -1,15 +1,18 @@
 import { expect, test } from "bun:test";
 
 import { buildCalibrationTreeBundle } from "./calibration-tree-bundle";
-import type { CalibrationTreeTargetIndexArtifact } from "./calibration-tree-artifact";
-import { buildTargetChangeDatasetFromIndexes } from "./calibration-build-comparison";
+import {
+  calibrationTreeTargetsFromSummaries,
+  type CalibrationTreeTargetSummaryArtifact,
+} from "./calibration-tree-artifact";
+import { buildTargetChangeDatasetFromSummaries } from "./calibration-build-comparison";
 
-function targetIndex(
+function comparisonInput(
   buildArtifactId: string,
   releaseId: string,
   contribution: number,
   estimate: number,
-): CalibrationTreeTargetIndexArtifact {
+) {
   const bundle = buildCalibrationTreeBundle({
     country: "us",
     buildArtifactId,
@@ -51,14 +54,22 @@ function targetIndex(
       targetRepresentation: "hierarchy",
     },
   });
-  return bundle.files.find((file) => file.part === "target-index")!
-    .artifact as CalibrationTreeTargetIndexArtifact;
+  const summaries = bundle.files.flatMap((file) =>
+    file.part.startsWith("target-summary-")
+      ? [file.artifact as CalibrationTreeTargetSummaryArtifact]
+      : [],
+  );
+  return {
+    country: bundle.index.country,
+    comparison: bundle.index.targetComparison,
+    targets: calibrationTreeTargetsFromSummaries(bundle.index, summaries),
+  };
 }
 
-test("compact build indexes contain everything required for a comparison", () => {
-  const current = targetIndex("a".repeat(64), "release-a", 0.1, 110);
-  const candidate = targetIndex("b".repeat(64), "release-b", 0.05, 105);
-  const result = buildTargetChangeDatasetFromIndexes(current, candidate);
+test("target summaries contain everything required for a comparison", () => {
+  const current = comparisonInput("a".repeat(64), "release-a", 0.1, 110);
+  const candidate = comparisonInput("b".repeat(64), "release-b", 0.05, 105);
+  const result = buildTargetChangeDatasetFromSummaries(current, candidate);
 
   expect(result.available).toBe(true);
   expect(result.rows).toHaveLength(1);

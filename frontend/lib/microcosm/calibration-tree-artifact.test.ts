@@ -7,12 +7,15 @@ import {
   calibrationTreeTargetDetailsFromDraft,
   calibrationTreeResponseFromBundle,
   calibrationTreeTargetDetailSelection,
+  calibrationTreeTargetsFromSummaries,
+  calibrationTreeTargetSummariesFromDraft,
   compileCalibrationTreeBundleDraft,
   parseCalibrationTreeIndex,
   parseCalibrationTreePart,
   serializeCalibrationTreePart,
+  type CalibrationTreeFilterIndexArtifact,
   type CalibrationTreeTargetDetailsArtifact,
-  type CalibrationTreeTargetIndexArtifact,
+  type CalibrationTreeTargetSummaryArtifact,
   type CalibrationTreeTierArtifact,
 } from "./calibration-tree-artifact";
 import {
@@ -92,8 +95,16 @@ function loaded(built = bundle()) {
         ? [file.artifact as CalibrationTreeTierArtifact]
         : [],
     ),
-    targetIndex: built.files.find((file) => file.part === "target-index")!
-      .artifact as CalibrationTreeTargetIndexArtifact,
+    filterIndex: built.files.find((file) => file.part === "filter-index")!
+      .artifact as CalibrationTreeFilterIndexArtifact,
+    targetSummaries: calibrationTreeTargetsFromSummaries(
+      built.index,
+      built.files.flatMap((file) =>
+        file.part.startsWith("target-summary-")
+          ? [file.artifact as CalibrationTreeTargetSummaryArtifact]
+          : [],
+      ),
+    ),
     targetDetailShard: built.files.find((file) =>
       file.part.startsWith("target-details-"),
     )!
@@ -164,8 +175,11 @@ test("bundle serialization and folder paths are deterministic", async () => {
   );
   const buildArtifactId = first.index.buildArtifactId;
   expect(first.files.map((file) => file.path)).toEqual([
+    `calibration-trees/us/${buildArtifactId}/filter-index.json`,
+    ...first.index.parts.targetSummaries.map((_, index) =>
+      `calibration-trees/us/${buildArtifactId}/target-summary-${String(index + 1).padStart(4, "0")}.json`,
+    ),
     `calibration-trees/us/${buildArtifactId}/target-details-0001.json`,
-    `calibration-trees/us/${buildArtifactId}/target-index.json`,
     ...first.index.parts.tiers.map((_, index) =>
       `calibration-trees/us/${buildArtifactId}/tier-${index + 1}.json`,
     ),
@@ -188,7 +202,7 @@ test("bundle serialization and folder paths are deterministic", async () => {
   }
 });
 
-test("target details use deterministic shards and explicit locations", () => {
+test("target details use deterministic contiguous ordinal ranges", () => {
   const input = {
     country: "us" as const,
     releaseId: RELEASE,
@@ -217,11 +231,60 @@ test("target details use deterministic shards and explicit locations", () => {
       `target-details-${String(index + 1).padStart(4, "0")}` as const,
     ),
   );
-  first.locations.forEach((location, targetOrdinal) => {
-    const shard = first.artifacts[location.shardIndex];
-    expect(shard.startTargetOrdinal + location.offset).toBe(targetOrdinal);
-    expect(shard.targets[location.offset]).toEqual(draft.targets[targetOrdinal].detail);
+  expect(first.artifacts[0].startTargetOrdinal).toBe(0);
+  first.artifacts.forEach((artifact, shardIndex) => {
+    const next = first.artifacts[shardIndex + 1];
+    if (next) expect(artifact.endTargetOrdinalExclusive).toBe(next.startTargetOrdinal);
+    artifact.targets.forEach((target, offset) => {
+      expect(target).toEqual(
+        draft.targets[artifact.startTargetOrdinal + offset].detail,
+      );
+    });
   });
+  expect(first.artifacts.at(-1)?.endTargetOrdinalExclusive).toBe(rows.length);
+});
+
+test("target summaries use deterministic byte-bounded shards and reconstruct ordinal order", () => {
+  const draft = compileCalibrationTreeBundleDraft({
+    country: "us",
+    releaseId: RELEASE,
+    hfRepo: "policyengine/populace-us",
+    hfCommitSha: COMMIT,
+    sourceArtifacts: {
+      calibrationDiagnostics: {
+        path: `releases/${RELEASE}/calibration_diagnostics.json`,
+        sha256: SOURCE_HASH,
+      },
+      buildManifest: null,
+      releaseManifest: null,
+      demographics: null,
+    },
+    rows,
+    lossAttributionAvailable: true,
+  });
+  const first = calibrationTreeTargetSummariesFromDraft(draft, 1_500);
+  const second = calibrationTreeTargetSummariesFromDraft(draft, 1_500);
+  expect(first).toEqual(second);
+  expect(first.artifacts.length).toBeGreaterThan(1);
+  first.artifacts.forEach((artifact) => {
+    expect(Buffer.byteLength(serializeCalibrationTreePart(artifact), "utf8"))
+      .toBeLessThanOrEqual(1_500);
+  });
+
+  const built = bundle();
+  const summaries = built.files.flatMap((file) =>
+    file.part.startsWith("target-summary-")
+      ? [file.artifact as CalibrationTreeTargetSummaryArtifact]
+      : [],
+  );
+  expect(calibrationTreeTargetsFromSummaries(built.index, summaries))
+    .toHaveLength(rows.length);
+  const corruptRange = structuredClone(summaries);
+  corruptRange[0].startTargetOrdinal += 1;
+  corruptRange[0].endTargetOrdinalExclusive += 1;
+  expect(() => calibrationTreeTargetsFromSummaries(built.index, corruptRange)).toThrow(
+    "unexpected range or identity",
+  );
 });
 
 test("target-detail shard limits use exact UTF-8 bytes", () => {
@@ -259,34 +322,31 @@ test("target-detail shard limits use exact UTF-8 bytes", () => {
   );
 });
 
-test("calibration tree schema 3 artifacts are rejected", () => {
+test("calibration tree schema 4 artifacts are rejected", () => {
   const legacy = structuredClone(bundle().index) as unknown as Record<string, unknown>;
-  legacy.schemaVersion = 3;
+  legacy.schemaVersion = 4;
   expect(() => parseCalibrationTreeIndex(legacy)).toThrow(
-    "Unsupported calibration tree schema 3",
+    "Unsupported calibration tree schema 4",
   );
 });
 
-test("target detail selection resolves explicit shard locations", () => {
+test("target detail selection resolves ordinal ranges", () => {
   const built = bundle();
-  const targetIndex = built.files.find((file) => file.part === "target-index")!
-    .artifact as CalibrationTreeTargetIndexArtifact;
-  targetIndex.targets.forEach((target, targetOrdinal) => {
+  Array.from({ length: built.index.targetCount }, (_, targetOrdinal) => {
     const selection = calibrationTreeTargetDetailSelection(
       built.index,
-      target,
       targetOrdinal,
     );
-    expect(selection.descriptor.part).toBe(
-      built.index.parts.targetDetails[target.detailLocation.shardIndex].part,
+    expect(selection.descriptor.startTargetOrdinal + selection.offset).toBe(
+      targetOrdinal,
     );
-    expect(selection.offset).toBe(target.detailLocation.offset);
   });
 
-  const corrupt = structuredClone(targetIndex.targets[0]);
-  corrupt.detailLocation.offset += 1;
-  expect(() => calibrationTreeTargetDetailSelection(built.index, corrupt, 0)).toThrow(
-    "invalid detail location",
+  expect(() => calibrationTreeTargetDetailSelection(
+    built.index,
+    built.index.targetCount,
+  )).toThrow(
+    "not covered by a detail shard",
   );
 });
 
@@ -296,23 +356,19 @@ test("bundle validation rejects corrupt metadata and postings", () => {
   corruptPath.index.parts.tiers[0].path = "calibration-trees/v2/bad.json";
   expect(() => validateCalibrationTreeBundle(corruptPath)).toThrow("wrong path");
 
-  const targetIndexFile = built.files.find((file) => file.part === "target-index")!;
+  const filterIndexFile = built.files.find((file) => file.part === "filter-index")!;
   const parsed = parseCalibrationTreePart(
-    JSON.parse(targetIndexFile.serialized),
-    "target-index",
-  ) as CalibrationTreeTargetIndexArtifact;
+    JSON.parse(filterIndexFile.serialized),
+    "filter-index",
+  ) as CalibrationTreeFilterIndexArtifact;
   parsed.postings.geographies[0].targetOrdinals = [];
   const corruptPosting = structuredClone(built);
-  const corruptFile = corruptPosting.files.find((file) => file.part === "target-index")!;
+  const corruptFile = corruptPosting.files.find((file) => file.part === "filter-index")!;
   corruptFile.artifact = parsed;
   corruptFile.serialized = `${JSON.stringify(parsed)}\n`;
   expect(() => validateCalibrationTreeBundle(corruptPosting)).toThrow();
 
-  const corruptLocation = structuredClone(built);
-  const corruptTargetIndex = corruptLocation.files.find(
-    (file) => file.part === "target-index",
-  )!;
-  if (corruptTargetIndex.artifact.part !== "target-index") throw new Error("bad fixture");
-  corruptTargetIndex.artifact.targets[0].detailLocation.offset += 1;
-  expect(() => validateCalibrationTreeBundle(corruptLocation)).toThrow();
+  const corruptRange = structuredClone(built);
+  corruptRange.index.parts.targetSummaries[0].startTargetOrdinal = 1;
+  expect(() => validateCalibrationTreeBundle(corruptRange)).toThrow("invalid target range");
 });

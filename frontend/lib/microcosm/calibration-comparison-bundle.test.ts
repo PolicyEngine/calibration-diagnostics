@@ -1,11 +1,14 @@
 import { expect, test } from "bun:test";
 
 import { buildCalibrationComparisonBundles } from "./calibration-comparison-bundle";
-import type { CalibrationTreeTargetIndexArtifact } from "./calibration-tree-artifact";
+import {
+  calibrationTreeTargetsFromSummaries,
+  type CalibrationTreeTargetSummaryArtifact,
+} from "./calibration-tree-artifact";
 import { buildCalibrationTreeBundle } from "./calibration-tree-bundle";
 
 function source(buildArtifactId: string, releaseId: string, contribution: number) {
-  const index = buildCalibrationTreeBundle({
+  const bundle = buildCalibrationTreeBundle({
     country: "us",
     buildArtifactId,
     releaseId,
@@ -46,10 +49,15 @@ function source(buildArtifactId: string, releaseId: string, contribution: number
       targetRepresentation: "hierarchy",
     },
   });
+  const summaries = bundle.files.flatMap((file) =>
+    file.part.startsWith("target-summary-")
+      ? [file.artifact as CalibrationTreeTargetSummaryArtifact]
+      : [],
+  );
   return {
-    index: index.index,
-    targetIndex: index.files.find((file) => file.part === "target-index")!
-      .artifact as CalibrationTreeTargetIndexArtifact,
+    index: bundle.index,
+    indexSha256: bundle.files.find((file) => file.part === "index")!.sha256,
+    targetSummaries: calibrationTreeTargetsFromSummaries(bundle.index, summaries),
   };
 }
 
@@ -77,11 +85,11 @@ test("comparison bundles are deterministic and contain both tree modes", () => {
   expect(first.reported.index.build.kind).toBe("comparison");
   expect(first.reported.index.build.sourceArtifacts).toMatchObject({
     calibrationDiagnostics: null,
-    comparisonCurrentTargetIndex: {
-      path: current.index.parts.targetIndex.path,
+    comparisonCurrentIndex: {
+      path: `calibration-trees/us/${current.index.buildArtifactId}/index.json`,
     },
-    comparisonCandidateTargetIndex: {
-      path: candidate.index.parts.targetIndex.path,
+    comparisonCandidateIndex: {
+      path: `calibration-trees/us/${candidate.index.buildArtifactId}/index.json`,
     },
   });
 });

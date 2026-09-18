@@ -41,7 +41,7 @@ test("release aliases redirect to an exact immutable artifact URL", async () => 
 test("exact builds stream private Blob content through the same-origin API", async () => {
   const requests: unknown[] = [];
   let releaseResolved = false;
-  const body = '{"schemaVersion":4,"part":"tier-1"}\n';
+  const body = '{"schemaVersion":5,"part":"tier-1"}\n';
   const handler = createCalibrationTreeHandler({
     resolveRelease: (async () => {
       releaseResolved = true;
@@ -151,8 +151,20 @@ test("tree API requires an allowlisted part name", async () => {
   const monolith = await handler(new Request(
     `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=target-details`,
   ));
+  const oldIndex = await handler(new Request(
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=target-index`,
+  ));
   const zero = await handler(new Request(
     `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=target-details-0000`,
+  ));
+  const zeroSummary = await handler(new Request(
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=target-summary-0000`,
+  ));
+  const filterIndex = await handler(new Request(
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=filter-index`,
+  ));
+  const validSummary = await handler(new Request(
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=target-summary-0001`,
   ));
   const validShard = await handler(new Request(
     `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=target-details-0001`,
@@ -160,7 +172,15 @@ test("tree API requires an allowlisted part name", async () => {
   expect(missing.status).toBe(400);
   expect(unsafe.status).toBe(400);
   expect(monolith.status).toBe(400);
+  expect(oldIndex.status).toBe(400);
   expect(zero.status).toBe(400);
+  expect(zeroSummary.status).toBe(400);
+  expect(filterIndex.status).toBe(404);
+  expect(validSummary.status).toBe(404);
   expect(validShard.status).toBe(404);
-  expect(parts).toEqual(["target-details-0001"]);
+  expect(parts).toEqual([
+    "filter-index",
+    "target-summary-0001",
+    "target-details-0001",
+  ]);
 });

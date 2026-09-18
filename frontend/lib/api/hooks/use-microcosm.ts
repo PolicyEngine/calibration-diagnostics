@@ -20,13 +20,15 @@ import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
 import {
   calibrationTreeResponseFromBundle,
   calibrationTreeTargetDetailSelection,
+  calibrationTreeTargetsFromSummaries,
   parseCalibrationTreeIndex,
   parseCalibrationTreePart,
   type CalibrationTreeArtifactPart,
+  type CalibrationTreeFilterIndexArtifact,
   type CalibrationTreeIndexArtifact,
   type CalibrationTreePart,
   type CalibrationTreeTargetDetailsArtifact,
-  type CalibrationTreeTargetIndexArtifact,
+  type CalibrationTreeTargetSummaryArtifact,
   type CalibrationTreeTierArtifact,
 } from "@/lib/microcosm/calibration-tree-artifact";
 import type { CalibrationProvenance } from "@/lib/microcosm/target-loss-attribution";
@@ -359,7 +361,7 @@ export interface MicrocosmCalibrationBuild {
   stagingRunId: string | null;
   hfRepo: string;
   hfCommitSha: string;
-  treeSchemaVersion: 4;
+  treeSchemaVersion: 5;
   indexSha256: string;
   indexBytes: number;
   createdAt: string | null;
@@ -367,7 +369,7 @@ export interface MicrocosmCalibrationBuild {
 }
 
 export interface MicrocosmCalibrationBuildManifest {
-  schemaVersion: 4;
+  schemaVersion: 5;
   country: Country;
   latestReleaseBuildArtifactId: string | null;
   builds: MicrocosmCalibrationBuild[];
@@ -1057,11 +1059,11 @@ export type MicrocosmCalibrationTreeSource =
   | { kind: "release"; release?: string }
   | { kind: "staging"; runId: string };
 
-export async function fetchCalibrationTreeTiersConcurrently<T>(
-  tiers: readonly T[],
-  fetchTier: (tier: T) => Promise<unknown>,
+export async function fetchCalibrationTreePartsConcurrently<T>(
+  parts: readonly T[],
+  fetchPart: (part: T) => Promise<unknown>,
 ): Promise<void> {
-  await Promise.all(tiers.map((tier) => fetchTier(tier)));
+  await Promise.all(parts.map((part) => fetchPart(part)));
 }
 
 export function microcosmCalibrationTreeIndexQueryOptions(
@@ -1156,9 +1158,18 @@ function useCalibrationTreeBundle(
   });
   const index = indexQuery.data;
   const buildArtifactId = index?.buildArtifactId ?? "";
-  const tierDescriptors = index?.parts.tiers ?? [];
-  const tierQueries = useQueries({
-    queries: tierDescriptors.map((descriptor) => ({
+  const eagerDescriptors = useMemo(
+    () => index
+      ? [
+          index.parts.filterIndex,
+          ...index.parts.targetSummaries,
+          ...index.parts.tiers,
+        ]
+      : [],
+    [index],
+  );
+  const eagerQueries = useQueries({
+    queries: eagerDescriptors.map((descriptor) => ({
       ...calibrationTreePartQueryOptions(
         country,
         buildArtifactId,
@@ -1168,25 +1179,62 @@ function useCalibrationTreeBundle(
       enabled: false,
     })),
   });
-  const targetIndexQuery = useQuery({
-    ...calibrationTreePartQueryOptions(
-      country,
-      buildArtifactId,
-      "target-index",
-      partRequest,
+  const loadedParts = new Map(
+    eagerQueries.flatMap((query) =>
+      query.data ? [[query.data.part, query.data] as const] : [],
     ),
-    enabled: enabled && Boolean(index),
-  });
-  const loadedTiers = tierQueries.flatMap((query) =>
-    query.data?.part.startsWith("tier-")
-      ? [query.data as CalibrationTreeTierArtifact]
-      : [],
   );
+  const loadedTiers = (index?.parts.tiers ?? []).flatMap((descriptor) => {
+    const artifact = loadedParts.get(descriptor.part);
+    return artifact?.part.startsWith("tier-")
+      ? [artifact as CalibrationTreeTierArtifact]
+      : [];
+  });
+  const loadedFilterIndex = loadedParts.get("filter-index");
+  const filterIndex = loadedFilterIndex?.part === "filter-index"
+    ? loadedFilterIndex as CalibrationTreeFilterIndexArtifact
+    : undefined;
+  const targetSummaries = (index?.parts.targetSummaries ?? []).flatMap(
+    (descriptor) => {
+      const artifact = loadedParts.get(descriptor.part);
+      return artifact?.part.startsWith("target-summary-")
+        ? [artifact as CalibrationTreeTargetSummaryArtifact]
+        : [];
+    },
+  );
+  const summariesComplete = Boolean(index) &&
+    targetSummaries.length === index!.parts.targetSummaries.length;
+  const targetSummaryVersion = index?.parts.targetSummaries.map((descriptor) => {
+    const queryIndex = eagerDescriptors.findIndex(
+      (candidate) => candidate.part === descriptor.part,
+    );
+    return eagerQueries[queryIndex]?.dataUpdatedAt ?? 0;
+  }).join(":") ?? "";
+  const targetSummaryResult = useMemo(() => {
+    if (!index || !summariesComplete) {
+      return { targets: undefined, error: null };
+    }
+    try {
+      return {
+        targets: calibrationTreeTargetsFromSummaries(index, targetSummaries),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        targets: undefined,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    }
+  // React Query preserves each artifact reference until its cached data changes.
+  // The update-time signature avoids rebuilding a potentially large target array
+  // on unrelated explorer-state renders.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, summariesComplete, targetSummaryVersion]);
 
   useEffect(() => {
     if (!enabled || !index) return;
-    void fetchCalibrationTreeTiersConcurrently(
-      index.parts.tiers,
+    void fetchCalibrationTreePartsConcurrently(
+      eagerDescriptors,
       (descriptor) => queryClient.fetchQuery(
         calibrationTreePartQueryOptions(
           country,
@@ -1197,39 +1245,35 @@ function useCalibrationTreeBundle(
       ),
     ).catch(() => {
       // Each React Query observer retains its own error. Starting every request
-      // first ensures that one failed tier does not prevent the browser from
-      // completing other tier requests that are already in flight.
+      // first ensures that one failed part does not prevent the browser from
+      // completing other requests that are already in flight.
     });
-  }, [country, enabled, index, partRequest, queryClient]);
+  }, [country, eagerDescriptors, enabled, index, partRequest, queryClient]);
 
-  const targetIndex = targetIndexQuery.data?.part === "target-index"
-    ? targetIndexQuery.data as CalibrationTreeTargetIndexArtifact
-    : undefined;
   const targetsById = useMemo(
     () => new Map(
-      (targetIndex?.targets ?? []).map((target, targetOrdinal) => [
+      (targetSummaryResult.targets ?? []).map((target, targetOrdinal) => [
         target.id,
         { target, targetOrdinal },
       ]),
     ),
-    [targetIndex],
+    [targetSummaryResult.targets],
   );
   const selectedTarget = state.path.target
     ? targetsById.get(state.path.target)
     : undefined;
-  let detailDescriptor = selectedTarget && index
-    ? index.parts.targetDetails[selectedTarget.target.detailLocation.shardIndex]
-    : undefined;
+  let detailDescriptor:
+    | CalibrationTreeIndexArtifact["parts"]["targetDetails"][number]
+    | undefined;
   let detailLocationError: Error | null = null;
-  if (state.path.target && targetIndex && !selectedTarget) {
+  if (state.path.target && summariesComplete && !selectedTarget) {
     detailLocationError = new Error(
-      `Calibration target ${state.path.target} is missing from target-index.json.`,
+      `Calibration target ${state.path.target} is missing from the target-summary shards.`,
     );
   } else if (selectedTarget && index) {
     try {
       detailDescriptor = calibrationTreeTargetDetailSelection(
         index,
-        selectedTarget.target,
         selectedTarget.targetOrdinal,
       ).descriptor;
     } catch (error) {
@@ -1267,13 +1311,27 @@ function useCalibrationTreeBundle(
     : fetchedTargetDetailShard;
   const data = index
     ? calibrationTreeResponseFromBundle(
-        { index, tiers: loadedTiers, targetIndex, targetDetailShard },
+        {
+          index,
+          tiers: loadedTiers,
+          filterIndex,
+          targetSummaries: targetSummaryResult.targets,
+          targetDetailShard,
+        },
         state,
       ) ?? undefined
     : undefined;
-  const tierError = tierQueries.find((query) => query.error)?.error;
+  const criticalPartError = eagerQueries.find((query, queryIndex) => {
+    const part = eagerDescriptors[queryIndex]?.part;
+    return query.error &&
+      (part === "filter-index" || part?.startsWith("target-summary-"));
+  })?.error;
+  const tierError = eagerQueries.find((query, queryIndex) =>
+    query.error && eagerDescriptors[queryIndex]?.part.startsWith("tier-"),
+  )?.error;
   const error = indexQuery.error ||
-    (!targetIndex && targetIndexQuery.error) ||
+    targetSummaryResult.error ||
+    criticalPartError ||
     (!data && tierError) ||
     null;
   const targetDetailError =
@@ -1286,14 +1344,13 @@ function useCalibrationTreeBundle(
     isLoading: indexQuery.isLoading || (Boolean(index) && !data && !error),
     isFetching:
       indexQuery.isFetching ||
-      targetIndexQuery.isFetching ||
-      tierQueries.some((query) => query.isFetching),
+      eagerQueries.some((query) => query.isFetching),
     isPlaceholderData: false,
-    filtersReady: Boolean(targetIndex),
+    filtersReady: Boolean(filterIndex && summariesComplete),
     targetDetailIsLoading:
       Boolean(state.path.target) &&
       !targetDetailError &&
-      (!targetIndex || Boolean(detailDescriptor && !targetDetailShard)),
+      (!summariesComplete || Boolean(detailDescriptor && !targetDetailShard)),
     targetDetailError,
     retryTargetDetail: () => {
       void targetDetailQuery?.refetch();

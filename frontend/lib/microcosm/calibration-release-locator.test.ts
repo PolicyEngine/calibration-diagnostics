@@ -23,7 +23,7 @@ test("latest release identity is read only from the dashboard manifest", () => {
       stagingRunId: null,
       hfRepo: "policyengine/populace-us",
       hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-      treeSchemaVersion: 4,
+      treeSchemaVersion: 5,
       indexSha256: "c".repeat(64),
       indexBytes: 20,
       createdAt: "2026-09-15T12:00:00.000Z",
