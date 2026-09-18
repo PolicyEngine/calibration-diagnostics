@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { readCalibrationTreeManifest } from "@/lib/microcosm/calibration-tree-blob";
-import { calibrationTreeManifestEntry } from "@/lib/microcosm/calibration-tree-manifest";
+import { calibrationTreeCountryManifest } from "@/lib/microcosm/calibration-tree-manifest";
 import {
   isCountry,
   selectableCountries,
@@ -37,9 +37,16 @@ export function createCalibrationTreeManifestHandler(
     }
     try {
       const { manifest } = await dependencies.readManifest();
-      const latest = calibrationTreeManifestEntry(manifest, countryValue);
+      const countryManifest = calibrationTreeCountryManifest(
+        manifest,
+        countryValue,
+      );
       return NextResponse.json(
-        { schemaVersion: manifest.schemaVersion, country: countryValue, latest },
+        {
+          schemaVersion: manifest.schemaVersion,
+          country: countryValue,
+          ...countryManifest,
+        },
         { headers: MANIFEST_CACHE_HEADERS },
       );
     } catch (error) {

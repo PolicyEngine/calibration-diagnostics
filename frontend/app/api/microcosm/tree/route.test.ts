@@ -6,9 +6,11 @@ import {
 } from "./route";
 
 const COMMIT = "1234567890abcdef1234567890abcdef12345678";
+const BUILD = "a".repeat(64);
 
 function resolver() {
   return (async () => ({
+    buildArtifactId: BUILD,
     releaseId: "microcosm-us-release",
     hfCommitSha: COMMIT,
     updatedAt: "2026-09-15T12:00:00.000Z",
@@ -29,17 +31,17 @@ test("release aliases redirect to an exact immutable artifact URL", async () => 
   );
   expect(response.status).toBe(307);
   expect(response.headers.get("location")).toBe(
-    `https://dashboard.example/calibration/dashboard/api/microcosm/tree?country=us&part=index&revision=${COMMIT}`,
+    `https://dashboard.example/calibration/dashboard/api/microcosm/tree?country=us&part=index&build=${BUILD}`,
   );
   expect(response.headers.get("x-microcosm-release")).toBe("microcosm-us-release");
   expect(response.headers.get("vercel-cdn-cache-control")).toContain("max-age=60");
   expect(blobRead).toBe(false);
 });
 
-test("exact revisions stream private Blob content through the same-origin API", async () => {
+test("exact builds stream private Blob content through the same-origin API", async () => {
   const requests: unknown[] = [];
   let releaseResolved = false;
-  const body = '{"schemaVersion":3,"part":"tier-1"}\n';
+  const body = '{"schemaVersion":4,"part":"tier-1"}\n';
   const handler = createCalibrationTreeHandler({
     resolveRelease: (async () => {
       releaseResolved = true;
@@ -54,7 +56,7 @@ test("exact revisions stream private Blob content through the same-origin API", 
         blob: {
           url: "https://blob.example/tree.json",
           downloadUrl: "https://blob.example/tree.json?download=1",
-          pathname: `calibration-trees/us/${COMMIT}/tier-1.json`,
+          pathname: `calibration-trees/us/${BUILD}/tier-1.json`,
           contentDisposition: "inline",
           cacheControl: "public, max-age=31536000",
           uploadedAt: new Date("2026-09-15T12:00:00.000Z"),
@@ -66,7 +68,7 @@ test("exact revisions stream private Blob content through the same-origin API", 
     }) as CalibrationTreeRouteDependencies["getBlob"],
   });
   const response = await handler(new Request(
-    `https://dashboard.example/api/microcosm/tree?country=us&revision=${COMMIT}&part=tier-1`,
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=tier-1`,
     { headers: { "if-none-match": '"old"' } },
   ));
 
@@ -77,13 +79,13 @@ test("exact revisions stream private Blob content through the same-origin API", 
   expect(releaseResolved).toBe(false);
   expect(requests).toEqual([{
     country: "us",
-    hfCommitSha: COMMIT,
+    buildArtifactId: BUILD,
     part: "tier-1",
     ifNoneMatch: '"old"',
   }]);
 });
 
-test("exact revisions forward conditional requests and return 304", async () => {
+test("exact builds forward conditional requests and return 304", async () => {
   const handler = createCalibrationTreeHandler({
     resolveRelease: resolver(),
     getBlob: (async (options) => {
@@ -95,7 +97,7 @@ test("exact revisions forward conditional requests and return 304", async () => 
         blob: {
           url: "https://blob.example/tree.json",
           downloadUrl: "https://blob.example/tree.json?download=1",
-          pathname: `calibration-trees/us/${COMMIT}/index.json`,
+          pathname: `calibration-trees/us/${BUILD}/index.json`,
           contentDisposition: "inline",
           cacheControl: "public, max-age=31536000",
           uploadedAt: new Date("2026-09-15T12:00:00.000Z"),
@@ -107,7 +109,7 @@ test("exact revisions forward conditional requests and return 304", async () => 
     }) as CalibrationTreeRouteDependencies["getBlob"],
   });
   const response = await handler(new Request(
-    `https://dashboard.example/api/microcosm/tree?country=us&revision=${COMMIT}&part=index`,
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=index`,
     { headers: { "if-none-match": '"tree-etag"' } },
   ));
 
@@ -116,17 +118,17 @@ test("exact revisions forward conditional requests and return 304", async () => 
   expect(await response.text()).toBe("");
 });
 
-test("tree API rejects ambiguous identities and reports unpublished revisions", async () => {
+test("tree API rejects ambiguous identities and reports unpublished builds", async () => {
   const handler = createCalibrationTreeHandler({
     resolveRelease: resolver(),
     getBlob: (async () => null) as CalibrationTreeRouteDependencies["getBlob"],
   });
   const ambiguous = await handler(new Request(
-    `https://dashboard.example/api/microcosm/tree?country=us&release=x&revision=${COMMIT}&part=index`,
+    `https://dashboard.example/api/microcosm/tree?country=us&release=x&build=${BUILD}&part=index`,
   ));
   expect(ambiguous.status).toBe(400);
   const missing = await handler(new Request(
-    `https://dashboard.example/api/microcosm/tree?country=us&revision=${COMMIT}&part=index`,
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=index`,
   ));
   expect(missing.status).toBe(404);
 });
@@ -147,13 +149,13 @@ test("tree API requires an allowlisted part name", async () => {
     "https://dashboard.example/api/microcosm/tree?country=us&release=latest&part=../secret",
   ));
   const monolith = await handler(new Request(
-    `https://dashboard.example/api/microcosm/tree?country=us&revision=${COMMIT}&part=target-details`,
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=target-details`,
   ));
   const zero = await handler(new Request(
-    `https://dashboard.example/api/microcosm/tree?country=us&revision=${COMMIT}&part=target-details-0000`,
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=target-details-0000`,
   ));
   const validShard = await handler(new Request(
-    `https://dashboard.example/api/microcosm/tree?country=us&revision=${COMMIT}&part=target-details-0001`,
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=target-details-0001`,
   ));
   expect(missing.status).toBe(400);
   expect(unsafe.status).toBe(400);

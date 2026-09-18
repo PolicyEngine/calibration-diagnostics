@@ -10,23 +10,41 @@ import {
 } from "./calibration-tree-manifest";
 
 const entry: CalibrationTreeManifestEntry = {
+  buildArtifactId: "a".repeat(64),
+  kind: "release",
+  sourceId: "microcosm-us-test-20260915",
+  label: "microcosm-us-test-20260915",
   releaseId: "microcosm-us-test-20260915",
+  stagingRunId: null,
+  hfRepo: "policyengine/populace-us",
   hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-  treeSchemaVersion: 3,
+  treeSchemaVersion: 4,
   indexSha256: "b".repeat(64),
   indexBytes: 1234,
+  createdAt: "2026-09-15T12:00:00.000Z",
   updatedAt: "2026-09-15T12:00:00.000Z",
 };
 
 test("manifest updates one country without replacing other country entries", () => {
-  const uk = { ...entry, releaseId: "microcosm-uk-test-20260915" };
+  const uk = {
+    ...entry,
+    buildArtifactId: "c".repeat(64),
+    sourceId: "microcosm-uk-test-20260915",
+    label: "microcosm-uk-test-20260915",
+    releaseId: "microcosm-uk-test-20260915",
+    hfRepo: "policyengine/populace-uk-private",
+  };
   const manifest = withCalibrationTreeManifestEntry(
     withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", uk),
     "us",
     entry,
   );
-  expect(calibrationTreeManifestEntry(manifest, "us")).toEqual(entry);
-  expect(calibrationTreeManifestEntry(manifest, "uk")).toEqual(uk);
+  expect(calibrationTreeManifestEntry(manifest, "us", {
+    releaseId: entry.releaseId!,
+  })).toEqual(entry);
+  expect(calibrationTreeManifestEntry(manifest, "uk", {
+    releaseId: uk.releaseId!,
+  })).toEqual(uk);
   expect(serializeCalibrationTreeManifest(manifest)).toBe(
     serializeCalibrationTreeManifest(parseCalibrationTreeManifest(manifest)),
   );
@@ -34,12 +52,16 @@ test("manifest updates one country without replacing other country entries", () 
 
 test("manifest validation rejects mutable or malformed content identities", () => {
   expect(() => parseCalibrationTreeManifest({
-    schemaVersion: 3,
-    countries: { us: { ...entry, hfCommitSha: "main" } },
+    schemaVersion: 4,
+    countries: {
+      us: { latestReleaseBuildArtifactId: null, builds: [{ ...entry, hfCommitSha: "main" }] },
+    },
   })).toThrow("invalid HF commit SHA");
   expect(() => parseCalibrationTreeManifest({
-    schemaVersion: 3,
-    countries: { us: { ...entry, indexSha256: "short" } },
+    schemaVersion: 4,
+    countries: {
+      us: { latestReleaseBuildArtifactId: null, builds: [{ ...entry, indexSha256: "short" }] },
+    },
   })).toThrow("invalid index hash");
   expect(() => parseCalibrationTreeManifest({
     schemaVersion: 2,

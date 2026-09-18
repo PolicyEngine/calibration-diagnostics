@@ -21,7 +21,7 @@ import {
   parseCalibrationTreeManifest,
   serializeCalibrationTreeManifest,
   withCalibrationTreeManifestEntry,
-  type CalibrationTreeLatestManifest,
+  type CalibrationTreeManifest,
   type CalibrationTreeManifestEntry,
 } from "./calibration-tree-manifest";
 import type { MicrocosmCountry } from "./countries";
@@ -46,7 +46,7 @@ async function streamText(stream: ReadableStream<Uint8Array> | null): Promise<st
 }
 
 export interface StoredCalibrationTreeManifest {
-  manifest: CalibrationTreeLatestManifest;
+  manifest: CalibrationTreeManifest;
   etag: string | null;
 }
 
@@ -77,7 +77,7 @@ export async function readCalibrationTreeManifest(options: {
 
 export async function getCalibrationTreeBlob(options: {
   country: MicrocosmCountry;
-  hfCommitSha: string;
+  buildArtifactId: string;
   part: CalibrationTreePart;
   token?: string;
   consistent?: boolean;
@@ -85,7 +85,11 @@ export async function getCalibrationTreeBlob(options: {
   client?: CalibrationTreeBlobClient;
 }): Promise<GetBlobResult | null> {
   return (options.client ?? DEFAULT_BLOB_CLIENT).get(
-    calibrationTreePartPath(options.country, options.hfCommitSha, options.part),
+    calibrationTreePartPath(
+      options.country,
+      options.buildArtifactId,
+      options.part,
+    ),
     {
       access: "private",
       useCache: options.consistent === true ? false : true,
@@ -98,14 +102,14 @@ export async function getCalibrationTreeBlob(options: {
 async function uploadCalibrationTreeFile(options: {
   file: CalibrationTreeBundleFile;
   country: MicrocosmCountry;
-  hfCommitSha: string;
+  buildArtifactId: string;
   token: string;
   client: CalibrationTreeBlobClient;
 }): Promise<{ pathname: string; sha256: string; bytes: number; created: boolean }> {
-  const { file, country, hfCommitSha, token, client } = options;
+  const { file, country, buildArtifactId, token, client } = options;
   const existing = await getCalibrationTreeBlob({
     country,
-    hfCommitSha,
+    buildArtifactId,
     part: file.part,
     token,
     consistent: true,
@@ -141,7 +145,7 @@ async function uploadCalibrationTreeFile(options: {
   });
   const uploaded = await getCalibrationTreeBlob({
     country,
-    hfCommitSha,
+    buildArtifactId,
     part: file.part,
     token,
     consistent: true,
@@ -173,7 +177,7 @@ export async function uploadCalibrationTreeBundle(options: {
     uploaded.push(await uploadCalibrationTreeFile({
       file,
       country: bundle.index.country,
-      hfCommitSha: bundle.index.hfCommitSha,
+      buildArtifactId: bundle.index.buildArtifactId,
       token,
       client,
     }));
@@ -187,10 +191,11 @@ export async function uploadCalibrationTreeBundle(options: {
 export async function updateCalibrationTreeManifest(options: {
   country: MicrocosmCountry;
   entry: CalibrationTreeManifestEntry;
+  makeLatest?: boolean;
   token: string;
   retries?: number;
   client?: CalibrationTreeBlobClient;
-}): Promise<CalibrationTreeLatestManifest> {
+}): Promise<CalibrationTreeManifest> {
   const retries = options.retries ?? 3;
   let lastError: unknown;
   for (let attempt = 0; attempt < retries; attempt += 1) {
@@ -203,6 +208,7 @@ export async function updateCalibrationTreeManifest(options: {
       current.manifest,
       options.country,
       options.entry,
+      options.makeLatest,
     );
     const serialized = serializeCalibrationTreeManifest(updated);
     try {
@@ -224,10 +230,12 @@ export async function updateCalibrationTreeManifest(options: {
         consistent: true,
         client: options.client,
       });
-      const verifiedEntry = verified.manifest.countries[options.country];
+      const verifiedEntry = verified.manifest.countries[options.country]?.builds.find(
+        (entry) => entry.buildArtifactId === options.entry.buildArtifactId,
+      );
       if (
         !verifiedEntry ||
-        verifiedEntry.releaseId !== options.entry.releaseId ||
+        verifiedEntry.buildArtifactId !== options.entry.buildArtifactId ||
         verifiedEntry.hfCommitSha !== options.entry.hfCommitSha ||
         verifiedEntry.indexSha256 !== options.entry.indexSha256
       ) {

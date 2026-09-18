@@ -162,13 +162,14 @@ test("bundle serialization and folder paths are deterministic", async () => {
   expect(second.files.map((file) => file.serialized)).toEqual(
     first.files.map((file) => file.serialized),
   );
+  const buildArtifactId = first.index.buildArtifactId;
   expect(first.files.map((file) => file.path)).toEqual([
-    `calibration-trees/us/${COMMIT}/target-details-0001.json`,
-    `calibration-trees/us/${COMMIT}/target-index.json`,
+    `calibration-trees/us/${buildArtifactId}/target-details-0001.json`,
+    `calibration-trees/us/${buildArtifactId}/target-index.json`,
     ...first.index.parts.tiers.map((_, index) =>
-      `calibration-trees/us/${COMMIT}/tier-${index + 1}.json`,
+      `calibration-trees/us/${buildArtifactId}/tier-${index + 1}.json`,
     ),
-    `calibration-trees/us/${COMMIT}/index.json`,
+    `calibration-trees/us/${buildArtifactId}/index.json`,
   ]);
 
   const directory = await mkdtemp(join(tmpdir(), "calibration-tree-bundle-"));
@@ -258,11 +259,11 @@ test("target-detail shard limits use exact UTF-8 bytes", () => {
   );
 });
 
-test("calibration tree schema 2 artifacts are rejected", () => {
+test("calibration tree schema 3 artifacts are rejected", () => {
   const legacy = structuredClone(bundle().index) as unknown as Record<string, unknown>;
-  legacy.schemaVersion = 2;
+  legacy.schemaVersion = 3;
   expect(() => parseCalibrationTreeIndex(legacy)).toThrow(
-    "Unsupported calibration tree schema 2",
+    "Unsupported calibration tree schema 3",
   );
 });
 

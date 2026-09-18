@@ -5,17 +5,25 @@ import { createCalibrationTreeManifestHandler } from "./route";
 
 test("manifest API returns one country's current immutable release identity", async () => {
   const latest = {
+    buildArtifactId: "a".repeat(64),
+    kind: "release" as const,
+    sourceId: "microcosm-us-release",
+    label: "microcosm-us-release",
     releaseId: "microcosm-us-release",
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-us",
     hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-    treeSchemaVersion: 3 as const,
+    treeSchemaVersion: 4 as const,
     indexSha256: "a".repeat(64),
     indexBytes: 1234,
+    createdAt: "2026-09-15T12:00:00.000Z",
     updatedAt: "2026-09-15T12:00:00.000Z",
   };
   const manifest = withCalibrationTreeManifestEntry(
     emptyCalibrationTreeManifest(),
     "us",
     latest,
+    true,
   );
   const handler = createCalibrationTreeManifestHandler({
     readManifest: async () => ({ manifest, etag: '"manifest"' }),
@@ -24,7 +32,12 @@ test("manifest API returns one country's current immutable release identity", as
     "https://dashboard.example/api/microcosm/tree-manifest?country=us",
   ));
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ schemaVersion: 3, country: "us", latest });
+  expect(await response.json()).toEqual({
+    schemaVersion: 4,
+    country: "us",
+    latestReleaseBuildArtifactId: latest.buildArtifactId,
+    builds: [latest],
+  });
   expect(response.headers.get("vercel-cdn-cache-control")).toContain("max-age=60");
 });
 
