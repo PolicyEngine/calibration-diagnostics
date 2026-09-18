@@ -122,6 +122,7 @@ export function buildCalibrationTreeBundle(
     buildArtifactId: draft.build.buildArtifactId,
     part: "index",
     build: draft.build,
+    comparison: draft.comparisonResult,
     calibrationProvenance: draft.calibrationProvenance,
     lossAttributionAvailable: draft.lossAttributionAvailable,
     filterOptions: draft.filterOptions,
@@ -162,6 +163,7 @@ function expectedFacet(row: CalibrationTreeTarget, key: string): string | null {
   if (key === "geographyLevels") return String(row.level ?? "").trim() || "national";
   if (key === "geographies") return String(row.geography ?? "").trim() || "United States";
   if (key === "fitBands") return fitBandForTarget(row);
+  if (key === "comparisonFits") return row.comparison_fit ?? null;
   if (row.calibration_status === "included") return "included";
   if (row.calibration_status === "skipped" || row.calibration_status === "not_materialized") {
     return "skipped";
@@ -209,6 +211,7 @@ function validatePostingCoverage(
     "geographyLevels",
     "geographies",
     "fitBands",
+    "comparisonFits",
     "calibrationStatuses",
   ] as const) {
     const actual = new Map(
