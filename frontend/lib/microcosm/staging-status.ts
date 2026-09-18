@@ -21,6 +21,7 @@ function sentenceCaseIdentifier(value: string): string {
 
 export function formatStagingStatus(status: unknown): string {
   const value = stringValue(status);
+  if (value === "passed") return "Finished";
   return value ? sentenceCaseIdentifier(value) : "Unknown";
 }
 

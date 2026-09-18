@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 
-import { fetchCalibrationTreeTiersConcurrently } from "./use-microcosm";
+import { createExplorerState } from "@/lib/microcosm/calibration-explorer";
+
+import {
+  fetchCalibrationTreeTiersConcurrently,
+  microcosmStagingCalibrationTreeQueryOptions,
+} from "./use-microcosm";
 
 test("calibration tree tier requests start without waiting for earlier tiers", async () => {
   const started: string[] = [];
@@ -27,4 +32,16 @@ test("calibration tree tier requests start without waiting for earlier tiers", a
   resolve.get("tier-2")!();
   await loading;
   expect(completed).toBe(true);
+});
+
+test("mutable staging calibration trees refresh every 30 seconds", () => {
+  const options = microcosmStagingCalibrationTreeQueryOptions(
+    createExplorerState(),
+    "run-a",
+    "us",
+  );
+
+  expect(options.staleTime).toBe(30 * 1000);
+  expect(options.refetchInterval).toBe(30 * 1000);
+  expect(options.queryKey).toContain("run-a");
 });

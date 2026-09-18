@@ -131,6 +131,7 @@ test("posting-list filters union within categories and intersect across them", (
       geographyLevels: ["state"],
       geographies: ["California", "New York"],
       fitBands: ["10_20", "20_40"],
+      comparisonFits: [],
       calibrationStatuses: ["included"],
     },
   };

@@ -5,6 +5,7 @@ import { formatStagingCurrentStatus, formatStagingStatus } from "./staging-statu
 test("sentence-cases status values", () => {
   expect(formatStagingStatus("running")).toBe("Running");
   expect(formatStagingStatus("waiting_for_input")).toBe("Waiting for input");
+  expect(formatStagingStatus("passed")).toBe("Finished");
   expect(formatStagingStatus(null)).toBe("Unknown");
 });
 

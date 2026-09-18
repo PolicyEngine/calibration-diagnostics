@@ -743,16 +743,6 @@ export interface ReformValidationResponse {
   source_artifact?: { name: string; path: string; url: string };
 }
 
-export function useMicrocosmCompare(a?: string, b?: string, enabled = true) {
-  const { country } = useCountry();
-  return useQuery({
-    queryKey: ["microcosm", "compare", "variables-v2", country, a, b],
-    queryFn: () => apiGet<MicrocosmComparison>("/microcosm/compare", { a, b, country }),
-    enabled: enabled && Boolean(a && b),
-    staleTime: 15 * 60 * 1000,
-  });
-}
-
 export function useMicrocosmStagingRuns() {
   const { country } = useCountry();
   const staging = hasCapability(country, "staging");
@@ -804,6 +794,7 @@ function explorerApiParams(
     geography_level: state.filters.geographyLevels,
     geography: state.filters.geographies,
     fit_band: state.filters.fitBands,
+    comparison_fit: state.filters.comparisonFits,
     status: state.filters.calibrationStatuses,
   };
   if (state.path.source && state.path.program) {
@@ -823,11 +814,13 @@ export function useMicrocosmStagingTargetChangeTree({
   releaseId,
   mode,
   state,
+  enabled = true,
 }: {
   runId?: string;
   releaseId?: string;
   mode: TargetChangeMode;
   state: ExplorerState;
+  enabled?: boolean;
 }) {
   const { country } = useCountry();
   return useQuery({
@@ -853,6 +846,7 @@ export function useMicrocosmStagingTargetChangeTree({
         },
       ),
     enabled:
+      enabled &&
       hasCapability(country, "staging") &&
       Boolean(runId && releaseId && releaseId !== "latest"),
     staleTime: 30 * 1000,
@@ -1005,6 +999,7 @@ export function useMicrocosmCalibrationTree(
       country,
     ),
     enabled: source.kind === "staging",
+    placeholderData: keepPreviousData,
   });
   return source.kind === "staging"
     ? {

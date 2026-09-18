@@ -1,4 +1,5 @@
 import type { Calibration } from "./latest-artifact";
+import type { ComparisonFit } from "./calibration-explorer";
 import {
   matchTargetSurfaces,
   type TargetMatchingSummary,
@@ -7,8 +8,10 @@ import {
 import type { TargetRowRepresentation } from "./target-representation";
 
 type TargetRow = Calibration["rows"][number];
+export type TargetChangeDetailRow = TargetRow;
 
 export const TARGET_CHANGE_EPSILON = 1e-12;
+const COMPARISON_FIT_EPSILON = 1e-9;
 
 export type TargetChangeMode = "reported" | "shared";
 export type { TargetSurfaceStatus } from "./target-surface-matcher";
@@ -33,8 +36,11 @@ export interface TargetChangeRow extends Record<string, unknown> {
   current_representation: TargetRowRepresentation | null;
   candidate_representation: TargetRowRepresentation | null;
   comparison_status: TargetSurfaceStatus;
+  comparison_fit: ComparisonFit;
   current: TargetChangeSide | null;
   candidate: TargetChangeSide | null;
+  currentDetail: TargetChangeDetailRow | null;
+  candidateDetail: TargetChangeDetailRow | null;
   reported_change: number;
   pooled_weight_share: number | null;
   shared_current_contribution: number | null;
@@ -147,6 +153,26 @@ function targetSide(row: TargetRow | undefined): TargetChangeSide | null {
     cappedError,
     contribution,
   };
+}
+
+function comparisonFit(
+  currentRow: TargetRow | undefined,
+  candidateRow: TargetRow | undefined,
+  current: TargetChangeSide | null,
+  candidate: TargetChangeSide | null,
+): ComparisonFit {
+  if (!currentRow || !candidateRow || !current || !candidate) {
+    return "not_applicable";
+  }
+  const currentReportedError = finiteNumber(currentRow.abs_relative_error);
+  const candidateReportedError = finiteNumber(candidateRow.abs_relative_error);
+  const hasReportedErrors = currentReportedError != null && candidateReportedError != null;
+  const currentError = hasReportedErrors ? currentReportedError : current.cappedError;
+  const candidateError = hasReportedErrors ? candidateReportedError : candidate.cappedError;
+  const change = Math.abs(candidateError) - Math.abs(currentError);
+  if (change < -COMPARISON_FIT_EPSILON) return "improved";
+  if (change > COMPARISON_FIT_EPSILON) return "regressed";
+  return "unchanged";
 }
 
 function close(left: number | null, right: number | null): boolean {
@@ -294,8 +320,16 @@ export function buildTargetChangeDataset(
       current_representation: match.current_representation,
       candidate_representation: match.candidate_representation,
       comparison_status: match.comparison_status,
+      comparison_fit: comparisonFit(
+        currentRow,
+        candidateRow,
+        currentTarget,
+        candidateTarget,
+      ),
       current: currentTarget,
       candidate: candidateTarget,
+      currentDetail: currentRow ?? null,
+      candidateDetail: candidateRow ?? null,
       reported_change:
         (candidateTarget?.contribution ?? 0) -
         (currentTarget?.contribution ?? 0),

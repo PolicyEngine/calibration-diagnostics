@@ -22,6 +22,7 @@ const EMPTY_FILTERS = {
   geographyLevels: [],
   geographies: [],
   fitBands: [],
+  comparisonFits: [],
   calibrationStatuses: [],
 };
 

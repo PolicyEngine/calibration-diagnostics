@@ -66,7 +66,7 @@ function signedRelativeErrorText(value: number | null): string {
   return fmtSigned(value, { pct: true, digits });
 }
 
-function errorText(
+export function targetErrorText(
   errorKind: MicrocosmTargetRow["error_kind"],
   value: number | null,
   signed = false,
@@ -75,7 +75,7 @@ function errorText(
   return signed ? signedRelativeErrorText(value) : relativeErrorText(value);
 }
 
-function estimateText(value: number | null): string {
+export function targetEstimateText(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
   const sign = value < 0 ? "−" : "";
@@ -136,7 +136,7 @@ function axisLabel(
 function improvementSummary(
   improvement: number | null,
   errorKind: MicrocosmTargetRow["error_kind"],
-): { text: string; tone: "positive" | "negative" | "neutral" } | null {
+): MicrocosmTargetErrorSummary | null {
   if (improvement == null || !Number.isFinite(improvement)) return null;
   if (Math.abs(improvement) < 0.00005) {
     return { text: "Calibration left the absolute error essentially unchanged.", tone: "neutral" };
@@ -164,60 +164,103 @@ function Metric({
   tone?: "positive" | "negative" | "neutral";
 }) {
   return (
-    <div className="min-w-0 px-4 py-3.5 text-center sm:px-5">
+    <div className="flex h-full min-w-0 flex-col px-4 py-3.5 text-center sm:px-5">
       <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </div>
-      <div
-        className={`mt-1 truncate text-2xl font-semibold tabular-nums ${
-          tone === "positive" ? "tone-pos" : tone === "negative" ? "tone-neg" : "text-foreground"
-        }`}
-        title={value}
-      >
-        {value}
+      <div className="mt-auto pt-2">
+        <div
+          className={`truncate text-2xl font-semibold tabular-nums ${
+            tone === "positive" ? "tone-pos" : tone === "negative" ? "tone-neg" : "text-foreground"
+          }`}
+          title={value}
+        >
+          {value}
+        </div>
+        {caption ? <div className="mt-0.5 text-xs text-muted-foreground">{caption}</div> : null}
       </div>
-      {caption ? <div className="mt-0.5 text-xs text-muted-foreground">{caption}</div> : null}
     </div>
   );
 }
 
+export interface MicrocosmTargetDetailMetric {
+  label: string;
+  value: string;
+  caption?: string;
+  tone?: "positive" | "negative" | "neutral";
+}
+
+export interface MicrocosmTargetErrorSeries {
+  label: string;
+  shortLabel: string;
+  value: number | null;
+  tone: "primary" | "secondary";
+}
+
+export interface MicrocosmTargetErrorSummary {
+  text: string;
+  tone: "positive" | "negative" | "neutral";
+}
+
 function CombinedErrorTrack({
   initial,
-  final,
   initialLabel,
-  finalLabel,
+  afterSeries,
+  alignToMidline = false,
   limit,
   errorKind,
 }: {
   initial: number | null;
-  final: number | null;
   initialLabel: string;
-  finalLabel: string;
+  afterSeries: Array<MicrocosmTargetErrorSeries & { valueLabel: string }>;
+  alignToMidline?: boolean;
   limit: number;
   errorKind: MicrocosmTargetRow["error_kind"];
 }) {
   const initialPosition = errorPosition(initial, limit);
-  const finalPosition = errorPosition(final, limit);
   const initialStart = Math.min(50, initialPosition);
-  const finalStart = Math.min(50, finalPosition);
+  const ariaValues = afterSeries
+    .map((series) => `${series.label}: ${series.valueLabel}.`)
+    .join(" ");
   return (
     <div
-      className="group relative rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+      className={`group relative rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 ${
+        alignToMidline ? "md:h-full" : ""
+      }`}
       tabIndex={0}
       role="img"
-      aria-label={`Before calibration: ${initialLabel}. After calibration: ${finalLabel}.`}
+      aria-label={`Before calibration: ${initialLabel}. ${ariaValues}`}
+      data-align-to-metric-midline={alignToMidline || undefined}
     >
-      <div className="mb-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <div
+        className={`mb-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground ${
+          alignToMidline
+            ? "md:absolute md:inset-x-0 md:bottom-[calc(50%+1rem)] md:mb-0"
+            : ""
+        }`}
+      >
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full swatch-warn" /> Before calibration
         </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full swatch-pos" /> After calibration
-        </span>
-        <span className="hidden text-[10px] sm:inline">Hover for values</span>
+        {afterSeries.map((series) => (
+          <span key={series.label} className="inline-flex items-center gap-1.5">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                series.tone === "secondary" ? "bg-blue-500" : "swatch-pos"
+              }`}
+            />{" "}
+            {series.label}
+          </span>
+        ))}
       </div>
 
-      <div className="relative h-8">
+      <div
+        className={`relative h-8 ${
+          alignToMidline
+            ? "md:absolute md:inset-x-0 md:top-1/2 md:-translate-y-1/2"
+            : ""
+        }`}
+      >
         <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border" />
         <svg
           aria-hidden="true"
@@ -239,12 +282,24 @@ function CombinedErrorTrack({
             style={{ left: `${initialStart}%`, width: `${Math.abs(initialPosition - 50)}%` }}
           />
         ) : null}
-        {final != null ? (
-          <span
-            className="absolute top-1/2 z-10 h-1 -translate-y-1/2 rounded-full swatch-pos opacity-50"
-            style={{ left: `${finalStart}%`, width: `${Math.abs(finalPosition - 50)}%` }}
-          />
-        ) : null}
+        {afterSeries.map((series, index) => {
+          if (series.value == null) return null;
+          const position = errorPosition(series.value, limit);
+          const start = Math.min(50, position);
+          return (
+            <span
+              key={`${series.label}:line`}
+              className={`absolute top-1/2 h-1 -translate-y-1/2 rounded-full opacity-50 ${
+                series.tone === "secondary" ? "bg-blue-500" : "swatch-pos"
+              }`}
+              style={{
+                left: `${start}%`,
+                width: `${Math.abs(position - 50)}%`,
+                zIndex: 10 + index,
+              }}
+            />
+          );
+        })}
         <div className="absolute left-1/2 top-0 h-8 w-px bg-muted-foreground/60" />
         {initial != null ? (
           <span
@@ -252,33 +307,61 @@ function CombinedErrorTrack({
             style={{ left: `${initialPosition}%` }}
           />
         ) : null}
-        {final != null ? (
-          <span
-            className="absolute top-1/2 z-30 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card shadow-sm swatch-pos"
-            style={{ left: `${finalPosition}%` }}
-          />
-        ) : null}
+        {afterSeries.map((series, index) => {
+          if (series.value == null) return null;
+          return (
+            <span
+              key={`${series.label}:point`}
+              className={`absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card shadow-sm ${
+                series.tone === "secondary" ? "bg-blue-500" : "swatch-pos"
+              }`}
+              style={{
+                left: `${errorPosition(series.value, limit)}%`,
+                zIndex: 30 + index,
+              }}
+            />
+          );
+        })}
       </div>
 
-      <div className="flex justify-between font-mono text-[9px] text-muted-foreground">
+      <div
+        className={`flex justify-between font-mono text-[9px] text-muted-foreground ${
+          alignToMidline
+            ? "md:absolute md:inset-x-0 md:top-[calc(50%+1rem)]"
+            : ""
+        }`}
+      >
         <span>−{axisLabel(limit, errorKind)}</span>
         <span>target</span>
         <span>+{axisLabel(limit, errorKind)}</span>
       </div>
 
-      <div className="pointer-events-none absolute bottom-[calc(100%-1.4rem)] left-1/2 z-40 w-56 -translate-x-1/2 rounded-md border border-border bg-popover px-3 py-2 text-xs opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus:opacity-100">
+      <div
+        className={`pointer-events-none absolute bottom-[calc(100%-1.4rem)] left-1/2 z-40 w-72 -translate-x-1/2 rounded-md border border-border bg-popover px-3 py-2 text-xs opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus:opacity-100 ${
+          alignToMidline ? "md:bottom-[calc(50%+2rem)]" : ""
+        }`}
+      >
         <div className="flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">
             <span className="h-2 w-2 rounded-full swatch-warn" /> Before
           </span>
           <span className="font-mono font-semibold tabular-nums text-foreground">{initialLabel}</span>
         </div>
-        <div className="mt-1.5 flex items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-            <span className="h-2 w-2 rounded-full swatch-pos" /> After
-          </span>
-          <span className="font-mono font-semibold tabular-nums text-foreground">{finalLabel}</span>
-        </div>
+        {afterSeries.map((series) => (
+          <div key={`${series.label}:tooltip`} className="mt-1.5 flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  series.tone === "secondary" ? "bg-blue-500" : "swatch-pos"
+                }`}
+              />{" "}
+              {series.shortLabel}
+            </span>
+            <span className="font-mono font-semibold tabular-nums text-foreground">
+              {series.valueLabel}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -289,22 +372,54 @@ function ErrorComparison({
   final,
   errorKind,
   improvement,
+  afterCalibrationSeries,
+  fitSummary,
+  alignToMetricMidline = false,
 }: {
   initial: number | null;
   final: number | null;
   errorKind: MicrocosmTargetRow["error_kind"];
   improvement: number | null;
+  afterCalibrationSeries?: MicrocosmTargetErrorSeries[];
+  fitSummary?: MicrocosmTargetErrorSummary | null;
+  alignToMetricMidline?: boolean;
 }) {
+  const displayedAfterSeries = (
+    afterCalibrationSeries ?? [
+      {
+        label: "After calibration",
+        shortLabel: "After",
+        value: final,
+        tone: "primary" as const,
+      },
+    ]
+  ).map((series) => ({
+    ...series,
+    valueLabel: targetErrorText(errorKind, series.value, true),
+  }));
   const minimum = errorKind === "absolute" ? 1 : 0.1;
-  const limit = niceAxisLimit(Math.max(Math.abs(initial ?? 0), Math.abs(final ?? 0)), minimum);
-  const summary = improvementSummary(improvement, errorKind);
+  const limit = niceAxisLimit(
+    Math.max(
+      Math.abs(initial ?? 0),
+      ...displayedAfterSeries.map((series) => Math.abs(series.value ?? 0)),
+    ),
+    minimum,
+  );
+  const summary =
+    fitSummary === undefined ? improvementSummary(improvement, errorKind) : fitSummary;
   return (
-    <div className="mx-2 my-6 md:my-0 md:self-center">
+    <div
+      className={`mx-2 my-6 ${
+        alignToMetricMidline
+          ? "md:relative md:my-0 md:h-full md:self-stretch"
+          : "md:my-0 md:self-center"
+      }`}
+    >
       <CombinedErrorTrack
         initial={initial}
-        final={final}
-        initialLabel={errorText(errorKind, initial, true)}
-        finalLabel={errorText(errorKind, final, true)}
+        initialLabel={targetErrorText(errorKind, initial, true)}
+        afterSeries={displayedAfterSeries}
+        alignToMidline={alignToMetricMidline}
         limit={limit}
         errorKind={errorKind}
       />
@@ -316,6 +431,10 @@ function ErrorComparison({
               : summary.tone === "negative"
                 ? "tone-neg"
                 : "text-muted-foreground"
+          } ${
+            alignToMetricMidline
+              ? "md:absolute md:inset-x-0 md:top-[calc(50%+2.25rem)] md:mt-0"
+              : ""
           }`}
         >
           {summary.text}
@@ -381,15 +500,29 @@ function Disclosure({
   );
 }
 
+export interface MicrocosmTargetDetailProps {
+  row: MicrocosmTargetRow;
+  dimensions: MicrocosmTargetDimension[];
+  onClose: () => void;
+  eyebrow?: string;
+  fitHeading?: string;
+  fitDescription?: string;
+  metrics?: MicrocosmTargetDetailMetric[];
+  afterCalibrationSeries?: MicrocosmTargetErrorSeries[];
+  fitSummary?: MicrocosmTargetErrorSummary | null;
+}
+
 export function MicrocosmTargetDetail({
   row,
   dimensions,
   onClose,
-}: {
-  row: MicrocosmTargetRow;
-  dimensions: MicrocosmTargetDimension[];
-  onClose: () => void;
-}) {
+  eyebrow = "Calibration target",
+  fitHeading = "Fit after calibration",
+  fitDescription = "How the weighted estimate moved relative to the official target.",
+  metrics,
+  afterCalibrationSeries,
+  fitSummary,
+}: MicrocosmTargetDetailProps) {
   const target = typeof row.target === "number" ? row.target : null;
   const initial = typeof row.initial_estimate === "number" ? row.initial_estimate : null;
   const final = typeof row.final_estimate === "number" ? row.final_estimate : null;
@@ -465,6 +598,24 @@ export function MicrocosmTargetDetail({
   ].filter((value): value is string => Boolean(value));
   const metricTone = within10 == null ? "neutral" : within10 ? "positive" : "negative";
   const unit = chronicle?.measure_unit?.toUpperCase() || null;
+  const displayedMetrics: MicrocosmTargetDetailMetric[] = metrics ?? [
+    {
+      label: "Official target",
+      value: targetEstimateText(target),
+      caption: unit ?? undefined,
+    },
+    {
+      label: "Final estimate",
+      value: targetEstimateText(final),
+      caption: unit ?? undefined,
+    },
+    {
+      label: errorKind === "absolute" ? "Final miss" : "Final error",
+      value: targetErrorText(errorKind, finalError, true),
+      caption: errorKind === "absolute" ? "Absolute difference" : "Relative to target",
+      tone: metricTone,
+    },
+  ];
 
   return (
     <article
@@ -473,7 +624,7 @@ export function MicrocosmTargetDetail({
     >
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border/70 bg-muted/15 px-5 py-4 sm:px-6 sm:py-5">
         <div className="min-w-0 flex-1">
-          <div className="site-eyebrow">Calibration target</div>
+          <div className="site-eyebrow">{eyebrow}</div>
           <h2 className="mt-1 text-xl font-semibold leading-tight tracking-tight text-foreground">
             {measure}
           </h2>
@@ -515,10 +666,10 @@ export function MicrocosmTargetDetail({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 id="target-fit-heading" className="text-sm font-semibold text-foreground">
-                Fit after calibration
+                {fitHeading}
               </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                How the weighted estimate moved relative to the official target.
+                {fitDescription}
               </p>
             </div>
             {within10 === false ? (
@@ -529,29 +680,22 @@ export function MicrocosmTargetDetail({
           </div>
 
           <div className="mt-4 grid md:grid-cols-2">
-            <div className="mx-2 grid grid-cols-3 divide-x divide-border/70 border border-border/70 md:self-center">
-              <Metric
-                label="Final estimate"
-                value={estimateText(final)}
-                caption={unit ?? undefined}
-              />
-              <Metric
-                label="Official target"
-                value={estimateText(target)}
-                caption={unit ?? undefined}
-              />
-              <Metric
-                label={errorKind === "absolute" ? "Final miss" : "Final error"}
-                value={errorText(errorKind, finalError, true)}
-                caption={errorKind === "absolute" ? "Absolute difference" : "Relative to target"}
-                tone={metricTone}
-              />
+            <div
+              className="mx-2 grid grid-cols-3 border border-border/70 md:self-center [&>*:not(:nth-child(3n+1))]:border-l [&>*:nth-child(n+4)]:border-t [&>*]:border-border/70"
+              data-metric-count={displayedMetrics.length}
+            >
+              {displayedMetrics.map((metric) => (
+                <Metric key={metric.label} {...metric} />
+              ))}
             </div>
             <ErrorComparison
               initial={initialError}
               final={finalError}
               errorKind={errorKind}
               improvement={improvement}
+              afterCalibrationSeries={afterCalibrationSeries}
+              fitSummary={fitSummary}
+              alignToMetricMidline={displayedMetrics.length === 6}
             />
           </div>
         </section>
