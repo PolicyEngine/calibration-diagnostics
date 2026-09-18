@@ -14,7 +14,6 @@ import {
   buildComparison,
   diagnosticsDimensions,
   MICROCOSM_HF_REPO_ENV,
-  MICROCOSM_HF_REVISION_ENV,
   MICROCOSM_BE_HF_REPO_ENV,
   MICROCOSM_BE_HF_REVISION_ENV,
   MICROCOSM_UK_HF_REPO_ENV,
@@ -45,14 +44,12 @@ import { buildCalibrationTree } from "./calibration-tree";
 test("keeps Microcosm deployment configuration on its published Populace env contract", () => {
   expect([
     MICROCOSM_HF_REPO_ENV,
-    MICROCOSM_HF_REVISION_ENV,
     MICROCOSM_UK_HF_REPO_ENV,
     MICROCOSM_UK_HF_REVISION_ENV,
     MICROCOSM_BE_HF_REPO_ENV,
     MICROCOSM_BE_HF_REVISION_ENV,
   ]).toEqual([
     "POPULACE_HF_REPO",
-    "POPULACE_HF_REVISION",
     "POPULACE_UK_HF_REPO",
     "POPULACE_UK_HF_REVISION",
     "POPULACE_BE_HF_REPO",
@@ -159,7 +156,7 @@ test("loads trimmed Belgium diagnostics without optional US artifact fields", ()
   expect("past_cap_census" in beDiagnosticsFixture).toBe(false);
   expect(beDiagnosticsFixture.targets.every((row) => !("registry" in row))).toBe(true);
   const cal = buildCalibration(
-    { ...beDiagnosticsFixture, schema_version: 2 },
+    beDiagnosticsFixture,
     "microcosm-be-2026-chronicle-3cef97b-20260823T134247Z",
     null,
     {},
@@ -381,7 +378,7 @@ test("top-level schema version selects one reader and rejects unsupported versio
       "invalid-schema-8",
     ),
   ).toThrow("hierarchy must be an object");
-  for (const schemaVersion of [undefined, 1, 9]) {
+  for (const schemaVersion of [undefined, 0, 9]) {
     expect(() =>
       buildCalibration(
         { schema_version: schemaVersion, targets: [] },
@@ -1230,6 +1227,7 @@ test("legacy geography and income metadata drive the explorer hierarchy", () => 
     geographyLevels: [],
     geographies: [],
     fitBands: [],
+    comparisonFits: [],
     calibrationStatuses: [],
   };
   const program = buildCalibrationTree(cal.rows, {
@@ -2182,6 +2180,37 @@ test("local-area diagnostics (value/estimate schema) render as included targets"
   expect(page.is_local_area).toBe(true);
 });
 
+test("an audited unversioned local-area artifact uses the legacy reader", () => {
+  const cal = buildCalibration(
+    {
+      targets: [
+        {
+          name: "usda_snap.fy2024.state.ct.average_monthly_households",
+          target: 229620.25,
+          initial_estimate: 280095,
+          final_estimate: 229462,
+        },
+      ],
+    },
+    "populace-us-2024-buildp-acs-local-592ae5d6-20260819T020303Z",
+    null,
+    {},
+    { dataset_role: "non_default_local_area", is_default: false },
+    {},
+    "us",
+    "huggingface_immutable",
+    "b6f05b652049f88c044f1907eeed13c378aea47aec9c6dd6518faa90d1a0dcd0",
+  );
+
+  expect(cal.target_schema).toEqual({
+    diagnostics_schema_version: null,
+    structured_dimensions: false,
+    target_representation: "legacy",
+  });
+  expect(cal.diagnostics_status).toBe("ok");
+  expect(cal.included_target_count).toBe(1);
+});
+
 test("canonical target/final_estimate are never overwritten by value/estimate aliases", () => {
   const cal = buildCalibration(
     {
@@ -2478,6 +2507,7 @@ test("fully structured targets ignore conflicting legacy identity fields", () =>
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
   });
@@ -2538,6 +2568,7 @@ test("structured categories group count and total rows by variable identity", ()
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
   });
@@ -2613,6 +2644,7 @@ test("structured dimension ids remain independent when display labels repeat", (
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
   };

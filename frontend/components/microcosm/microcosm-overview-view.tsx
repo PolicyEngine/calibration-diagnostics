@@ -28,6 +28,7 @@ import {
   releaseSelectOptions,
   useMicrocosm,
   useMicrocosmReleases,
+  type MicrocosmResponse,
 } from "@/lib/api/hooks/use-microcosm";
 import { microcosmOverviewIntro } from "@/lib/microcosm/presentation";
 import {
@@ -60,6 +61,88 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   return value.toExponential(3).replace("e+", "e");
 }
 
+export function MicrocosmReleaseHeader({
+  country,
+  release,
+  releaseOptions,
+  data,
+  onReleaseChange,
+  onHeightChange,
+}: {
+  country: Country;
+  release: string;
+  releaseOptions: { value: string; label: string }[];
+  data?: MicrocosmResponse;
+  onReleaseChange: (value: string) => void;
+  onHeightChange?: (height: number) => void;
+}) {
+  const calibration = data?.calibration ?? null;
+  const sourceAttribution = data
+    ? microcosmSourceAttribution(
+        country,
+        data.source_repo,
+        calibration?.country?.repository_visibility,
+      )
+    : null;
+  const publicationUrl = data
+    ? microcosmPublicationUrl(data.source_repo, data.release_id)
+    : null;
+  const overviewIntro = data
+    ? microcosmOverviewIntro(country, calibration?.presentation)
+    : null;
+
+  return (
+    <PageHeader
+      eyebrow="Microcosm · calibration fit"
+      title="What the data is anchored to"
+      description={
+        data && sourceAttribution ? (
+          <>
+            {overviewIntro} Data is built live from{" "}
+            {sourceAttribution.href ? (
+              <a
+                className="underline decoration-dotted underline-offset-2"
+                href={sourceAttribution.href}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {sourceAttribution.label}
+              </a>
+            ) : (
+              sourceAttribution.label
+            )}
+            .
+          </>
+        ) : (
+          "Select a published Microcosm release to review its calibration fit."
+        )
+      }
+      actions={
+        <>
+          <ToolbarSelect
+            label="Release"
+            value={release}
+            onChange={onReleaseChange}
+            options={releaseOptions}
+          />
+          {publicationUrl && (
+            <Button
+              asChild
+              variant="outline"
+              className="border-primary bg-background text-primary hover:bg-primary/5"
+            >
+              <a href={publicationUrl} target="_blank" rel="noopener noreferrer">
+                View on Hugging Face
+              </a>
+            </Button>
+          )}
+        </>
+      }
+      onHeightChange={onHeightChange}
+    />
+  );
+}
+
 export function MicrocosmOverviewView({
   initialCountry = "us",
   initialRelease = "",
@@ -78,21 +161,35 @@ export function MicrocosmOverviewView({
   const { data, isLoading, error } = useMicrocosm(release || undefined);
 
   const releaseOptions = useMemo(() => releaseSelectOptions(releaseData), [releaseData]);
+  const releaseHeader = (
+    <MicrocosmReleaseHeader
+      country={country}
+      release={release}
+      releaseOptions={releaseOptions}
+      data={data}
+      onReleaseChange={(value) => setReleaseSelection({ country, value })}
+      onHeightChange={setPageIntroHeight}
+    />
+  );
 
   if (isLoading) {
     return (
-      <>
+      <div className="flex flex-col gap-5">
         <CalibrationExplorerDataPrefetch release={release || undefined} />
+        {releaseHeader}
         <LoadingBlock label="Loading microcosm release…" />
-      </>
+      </div>
     );
   }
   if (error || !data) {
     return (
-      <EmptyState
-        title="Microcosm release data unavailable"
-        description={error instanceof Error ? error.message : "Unknown error."}
-      />
+      <div className="flex flex-col gap-5">
+        {releaseHeader}
+        <EmptyState
+          title="Microcosm release data unavailable"
+          description={error instanceof Error ? error.message : "Unknown error."}
+        />
+      </div>
     );
   }
 
@@ -103,59 +200,11 @@ export function MicrocosmOverviewView({
   const normalizedLoss = isNormalizedLoss(lossKind);
   const diagnosticsStatus = cal.diagnostics_status ?? "ok";
   const isNonDefault = cal.is_local_area === true || cal.is_default === false;
-  const sourceAttribution = microcosmSourceAttribution(
-    country,
-    data.source_repo,
-    cal.country?.repository_visibility,
-  );
-  const publicationUrl = microcosmPublicationUrl(data.source_repo, data.release_id);
-  const overviewIntro = microcosmOverviewIntro(country, cal.presentation);
 
   return (
     <div className="flex flex-col gap-5">
       <CalibrationExplorerDataPrefetch release={release || undefined} />
-      <PageHeader
-        eyebrow="Microcosm · calibration fit"
-        title="What the data is anchored to"
-        description={
-          <>
-            {overviewIntro} Data is built live from{" "}
-            {sourceAttribution.href ? (
-              <a
-                className="underline decoration-dotted underline-offset-2"
-                href={sourceAttribution.href}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {sourceAttribution.label}
-              </a>
-            ) : (
-              sourceAttribution.label
-            )}
-            .
-          </>
-        }
-        actions={
-          <>
-            <ToolbarSelect
-              label="Release"
-              value={release}
-              onChange={(value) => setReleaseSelection({ country, value })}
-              options={releaseOptions}
-            />
-            <Button
-              asChild
-              variant="outline"
-              className="border-primary bg-background text-primary hover:bg-primary/5"
-            >
-              <a href={publicationUrl} target="_blank" rel="noopener noreferrer">
-                View on Hugging Face
-              </a>
-            </Button>
-          </>
-        }
-        onHeightChange={setPageIntroHeight}
-      />
+      {releaseHeader}
 
       <ArtifactDescriptionBanner description={cal.description} />
 

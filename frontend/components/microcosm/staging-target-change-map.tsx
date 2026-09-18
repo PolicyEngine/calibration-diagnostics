@@ -9,16 +9,24 @@ import {
 
 import {
   explorerBreadcrumbs,
+  explorerEmptyMessage,
   explorerNodeLabel,
   explorerUpLabel,
+  hasExplorerFilters,
 } from "@/components/microcosm/calibration-explorer-view";
-import { CalibrationComparisonProvenanceNotices } from "@/components/microcosm/calibration-provenance-notice";
-import { fmt } from "@/components/shared/format";
+import { CalibrationExplorerFilterMenu } from "@/components/microcosm/calibration-explorer-filter-menu";
+import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
+import { stagingTargetDetailPresentation } from "@/components/microcosm/staging-target-detail-presentation";
 import { HelpHint } from "@/components/shared/help-hint";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
-import { StatusPill } from "@/components/shared/status-pill";
-import { useMicrocosmStagingTargetChangeTree } from "@/lib/api/hooks/use-microcosm";
 import {
+  useMicrocosmBuildComparisonTree,
+  useMicrocosmStagingTargetChangeTree,
+  type MicrocosmTargetDimension,
+  type MicrocosmTargetRow,
+} from "@/lib/api/hooks/use-microcosm";
+import {
+  createExplorerFilters,
   createExplorerState,
   explorerReducer,
 } from "@/lib/microcosm/calibration-explorer";
@@ -32,19 +40,10 @@ import {
   type CalibrationTreemapGroup,
   type CalibrationTreemapNode,
 } from "@/lib/microcosm/calibration-treemap-layout";
-import type {
-  TargetChangeMode,
-  TargetChangeRow,
-} from "@/lib/microcosm/target-change";
+import type { TargetChangeMode } from "@/lib/microcosm/target-change";
 import type { TargetChangeTreeResponse } from "@/lib/microcosm/target-change-tree";
 import {
-  targetMatchKindExplanation,
-  targetRepresentationPairLabel,
-} from "@/lib/microcosm/target-matching-presentation";
-import {
   formatTargetChange,
-  formatWeightedTargetError,
-  targetChangeDetailValues,
   targetChangeDirectionAreas,
   targetChangeGroupsForDirection,
   targetChangeDirectionValue,
@@ -243,148 +242,18 @@ function Control<T extends string>({
   );
 }
 
-function targetStatus(target: TargetChangeRow) {
-  if (target.comparison_status === "added") {
-    return <StatusPill tone="info">Added target</StatusPill>;
-  }
-  if (target.comparison_status === "removed") {
-    return <StatusPill tone="warning">Removed target</StatusPill>;
-  }
-  return <StatusPill tone="neutral">Shared target</StatusPill>;
-}
-
-function nullableNumber(value: number | null | undefined): string {
-  return value == null ? "—" : fmt(value, { digits: 2 });
-}
-
-function nullablePercent(value: number | null | undefined): string {
-  return value == null ? "—" : formatWeightedTargetError(value);
-}
-
-function TargetChangeDetail({
-  target,
-  mode,
-  onClose,
-}: {
-  target: TargetChangeRow;
-  mode: TargetChangeMode;
-  onClose: () => void;
-}) {
-  const detail = targetChangeDetailValues(target, mode);
-  const rows = [
-    {
-      label: "Target identifier",
-      current: target.current_name ?? "—",
-      candidate: target.candidate_name ?? "—",
-    },
-    {
-      label: "Benchmark",
-      current: nullableNumber(target.current?.target),
-      candidate: nullableNumber(target.candidate?.target),
-    },
-    {
-      label: "Final estimate",
-      current: nullableNumber(target.current?.finalEstimate),
-      candidate: nullableNumber(target.candidate?.finalEstimate),
-    },
-    {
-      label: "Artifact target weight",
-      current: nullablePercent(detail.currentWeightShare),
-      candidate: nullablePercent(detail.candidateWeightShare),
-    },
-    {
-      label: "Capped scaled error",
-      current: nullablePercent(target.current?.cappedError),
-      candidate: nullablePercent(target.candidate?.cappedError),
-    },
-    {
-      label: mode === "reported" ? "Weighted error contribution" : "Pooled-weight contribution",
-      current: nullablePercent(detail.currentContribution),
-      candidate: nullablePercent(detail.candidateContribution),
-    },
-  ];
-  return (
-    <div className="rounded-lg border border-border bg-card shadow-[var(--elev-2)]">
-      <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="truncate text-sm font-semibold text-foreground">
-              {String(target.variable ?? target.name)}
-            </h4>
-            {targetStatus(target)}
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {targetRepresentationPairLabel(
-              target.current_representation,
-              target.candidate_representation,
-            )}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-        >
-          Close
-        </button>
-      </div>
-      {mode === "shared" && detail.comparisonWeight != null ? (
-        <div className="border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
-          Shared comparison weight: {formatWeightedTargetError(detail.comparisonWeight)} on both sides.
-        </div>
-      ) : null}
-      {target.match_kind ? (
-        <div className="border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
-          {targetMatchKindExplanation(target.match_kind)}
-        </div>
-      ) : null}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-border/60 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <th className="px-4 py-2 font-semibold">Value</th>
-              <th className="px-4 py-2 text-right font-semibold">Current release</th>
-              <th className="px-4 py-2 text-right font-semibold">Candidate</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.label} className="border-b border-border/50 last:border-b-0">
-                <td className="px-4 py-2 font-medium">{row.label}</td>
-                <td className="max-w-[18rem] break-all px-4 py-2 text-right tabular-nums text-muted-foreground">{row.current}</td>
-                <td className="max-w-[18rem] break-all px-4 py-2 text-right tabular-nums">{row.candidate}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-2 text-xs">
-        <span className="font-medium">Selected-mode change</span>
-        <span className={
-          (detail.change ?? 0) > 0
-            ? "font-semibold tabular-nums tone-neg"
-            : (detail.change ?? 0) < 0
-              ? "font-semibold tabular-nums tone-pos"
-              : "font-semibold tabular-nums text-muted-foreground"
-        }>
-          {formatTargetChange(detail.change)}
-        </span>
-      </div>
-      {target.comparison_status === "removed" ? (
-        <p className="border-t border-border/60 px-4 py-2 text-xs text-muted-foreground">
-          Removing this target lowers the reported aggregate mechanically. It does not show that the candidate fits this target better.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 export function StagingTargetChangeMap({
   runId,
   releaseId,
+  currentBuildArtifactId,
+  candidateBuildArtifactId,
+  weightedTargetErrorChange,
 }: {
-  runId: string;
-  releaseId: string;
+  runId?: string;
+  releaseId?: string;
+  currentBuildArtifactId?: string;
+  candidateBuildArtifactId?: string;
+  weightedTargetErrorChange: number | null;
 }) {
   const [state, dispatch] = useReducer(explorerReducer, undefined, createExplorerState);
   const [mode, setMode] = useState<TargetChangeMode>("reported");
@@ -395,12 +264,26 @@ export function StagingTargetChangeMap({
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 960, height: 520 });
-  const { data, isLoading, error } = useMicrocosmStagingTargetChangeTree({
+  const immutableComparison = Boolean(
+    currentBuildArtifactId && candidateBuildArtifactId,
+  );
+  const liveQuery = useMicrocosmStagingTargetChangeTree({
     runId,
     releaseId,
     mode,
     state,
+    enabled: !immutableComparison,
   });
+  const immutableQuery = useMicrocosmBuildComparisonTree({
+    currentBuildArtifactId,
+    candidateBuildArtifactId,
+    mode,
+    state,
+    enabled: immutableComparison,
+  });
+  const { data, isLoading, error } = immutableComparison
+    ? immutableQuery
+    : liveQuery;
 
   useEffect(() => {
     const element = containerRef.current;
@@ -436,14 +319,8 @@ export function StagingTargetChangeMap({
   }
   if (!data.available || !data.summary) {
     return (
-      <div className="flex flex-col gap-4">
-        <CalibrationComparisonProvenanceNotices
-          current={data.current.calibrationProvenance}
-          candidate={data.candidate.calibrationProvenance}
-        />
-        <div className="rounded-lg border border-border p-5 text-sm text-muted-foreground">
-          {data.reason ?? "Weighted target-error attribution is unavailable for this comparison."}
-        </div>
+      <div className="rounded-lg border border-border p-5 text-sm text-muted-foreground">
+        {data.reason ?? "Weighted target-error attribution is unavailable for this comparison."}
       </div>
     );
   }
@@ -451,15 +328,25 @@ export function StagingTargetChangeMap({
   const directions = layoutDirections(data, size.width, size.height, expanded);
   const breadcrumbs = explorerBreadcrumbs(state, data.pathLabels);
   const upLabel = expanded ? `Up to ${data.currentLevel.label.toLowerCase()}` : explorerUpLabel(state);
+  const selectedDetail =
+    data.selectedTarget?.candidateDetail ?? data.selectedTarget?.currentDetail ?? null;
+  const selectedDetailDimensions: MicrocosmTargetDimension[] = data.dimensionOrder.map(
+    (dimension) => ({ ...dimension, values: [] }),
+  );
+  const selectedDetailPresentation = data.selectedTarget
+      ? stagingTargetDetailPresentation(
+          data.selectedTarget,
+          weightedTargetErrorChange,
+          data.selectedTarget.candidateDetail as MicrocosmTargetRow | null,
+        )
+    : null;
+  const filtersActive = hasExplorerFilters(state);
+  const filtersExcludeAllTargets = filtersActive && data.filteredMetrics.nTargets === 0;
 
   return (
     <div className="flex flex-col gap-4">
-      <CalibrationComparisonProvenanceNotices
-        current={data.current.calibrationProvenance}
-        candidate={data.candidate.calibrationProvenance}
-      />
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-wrap gap-x-5 gap-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
           <Control
             label="Comparison"
             value={mode}
@@ -491,6 +378,14 @@ export function StagingTargetChangeMap({
             onChange={(breakdown) => {
               setExpanded(null);
               dispatch({ type: "breakdown", breakdown });
+            }}
+          />
+          <CalibrationExplorerFilterMenu
+            data={data}
+            state={state}
+            onFilters={(filters) => {
+              setExpanded(null);
+              dispatch({ type: "filters", filters });
             }}
           />
         </div>
@@ -539,8 +434,23 @@ export function StagingTargetChangeMap({
         style={{ height: "min(620px, 70dvh)" }}
       >
         {directions.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-            No weighted target-error changes exceed the display tolerance at this level.
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground">
+            <p>
+              {filtersExcludeAllTargets
+                ? explorerEmptyMessage(state)
+                : "No weighted target-error changes exceed the display tolerance at this level."}
+            </p>
+            {filtersActive ? (
+              <button
+                type="button"
+                onClick={() =>
+                  dispatch({ type: "filters", filters: createExplorerFilters() })
+                }
+                className="cursor-pointer font-medium text-primary hover:underline"
+              >
+                Clear filters
+              </button>
+            ) : null}
           </div>
         ) : directions.map((direction) => {
           const directionSign = direction.direction === "increase" ? 1 : -1;
@@ -648,10 +558,18 @@ export function StagingTargetChangeMap({
         Area shows each category's absolute net change in weighted target error at the current level. Each category appears once, on the side determined by its net change. Select a category to drill down or select a target to compare its values directly.
       </p>
 
-      {data.selectedTarget ? (
-        <TargetChangeDetail
-          target={data.selectedTarget}
-          mode={mode}
+      {data.selectedTarget && selectedDetail ? (
+        <MicrocosmTargetDetail
+          row={selectedDetail as MicrocosmTargetRow}
+          dimensions={selectedDetailDimensions}
+          eyebrow={
+            data.selectedTarget.candidateDetail
+              ? "Candidate calibration target"
+              : "Current release calibration target"
+          }
+          metrics={selectedDetailPresentation?.metrics}
+          afterCalibrationSeries={selectedDetailPresentation?.afterCalibrationSeries}
+          fitSummary={selectedDetailPresentation?.fitSummary}
           onClose={() => dispatch({ type: "clear_target" })}
         />
       ) : null}

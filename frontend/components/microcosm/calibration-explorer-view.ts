@@ -130,6 +130,7 @@ export function hasExplorerFilters(state: ExplorerState): boolean {
     state.filters.geographyLevels.length > 0 ||
     state.filters.geographies.length > 0 ||
     state.filters.fitBands.length > 0 ||
+    state.filters.comparisonFits.length > 0 ||
     state.filters.calibrationStatuses.length > 0
   );
 }

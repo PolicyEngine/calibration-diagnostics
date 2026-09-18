@@ -38,10 +38,17 @@ interface TargetChangeCacheEntry {
   promise: Promise<TargetChangeDataset | null>;
 }
 
+interface StagingCalibrationCacheEntry {
+  expiresAt: number;
+  promise: Promise<Calibration | null>;
+}
+
 const TARGET_CHANGE_FINAL_CACHE_SECONDS = 21_600;
 const TARGET_CHANGE_MUTABLE_CACHE_SECONDS = 30;
 const TARGET_CHANGE_CACHE_LIMIT = 8;
+const STAGING_CALIBRATION_CACHE_LIMIT = 8;
 const targetChangeCache = new Map<string, TargetChangeCacheEntry>();
+const stagingCalibrationCache = new Map<string, StagingCalibrationCacheEntry>();
 
 export const MICROCOSM_STAGING_HF_REPO_ENV = "POPULACE_STAGING_HF_REPO";
 export const MICROCOSM_STAGING_HF_REVISION_ENV = "POPULACE_STAGING_HF_REVISION";
@@ -564,6 +571,42 @@ export async function loadStagingCalibration(
   runId: string,
   revalidate: number,
   country: MicrocosmCountry = "us",
+): Promise<Calibration | null> {
+  if (revalidate <= 0) {
+    return loadStagingCalibrationUncached(runId, revalidate, country);
+  }
+  const cacheKey = `${country}:${runId}:${revalidate}`;
+  const now = Date.now();
+  for (const [key, entry] of stagingCalibrationCache) {
+    if (entry.expiresAt <= now) stagingCalibrationCache.delete(key);
+  }
+  const cached = stagingCalibrationCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = loadStagingCalibrationUncached(runId, revalidate, country);
+  stagingCalibrationCache.set(cacheKey, {
+    promise,
+    expiresAt: now + revalidate * 1000,
+  });
+  while (stagingCalibrationCache.size > STAGING_CALIBRATION_CACHE_LIMIT) {
+    const oldest = stagingCalibrationCache.keys().next().value;
+    if (typeof oldest !== "string") break;
+    stagingCalibrationCache.delete(oldest);
+  }
+  try {
+    const result = await promise;
+    if (!result) stagingCalibrationCache.delete(cacheKey);
+    return result;
+  } catch (error) {
+    stagingCalibrationCache.delete(cacheKey);
+    throw error;
+  }
+}
+
+async function loadStagingCalibrationUncached(
+  runId: string,
+  revalidate: number,
+  country: MicrocosmCountry,
 ): Promise<Calibration | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");

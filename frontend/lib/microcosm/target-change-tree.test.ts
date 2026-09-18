@@ -130,6 +130,16 @@ describe("target change hierarchy", () => {
     expect(tree.selectedTarget?.candidate).toEqual(expect.objectContaining({
       contribution: 0.2,
     }));
+    expect(tree.selectedTarget?.candidateDetail).toEqual(expect.objectContaining({
+      name: "one@2024",
+      target: 100,
+      final_estimate: 140,
+    }));
+    const selectedNode = tree.groups
+      .flatMap((group) => group.nodes)
+      .find((node) => node.id === state.path.target);
+    expect(selectedNode?.target).not.toHaveProperty("currentDetail");
+    expect(selectedNode?.target).not.toHaveProperty("candidateDetail");
   });
 
   test("selects a shared target whose release identifiers differ", () => {
@@ -163,5 +173,37 @@ describe("target change hierarchy", () => {
     expect(tree.filteredMetrics.change?.addedTargets).toBe(0);
     expect(tree.filteredMetrics.change?.removedTargets).toBe(0);
     expect(tree.filteredMetrics.change?.sharedTargets).toBe(2);
+  });
+
+  test("filters comparison targets by fit change", () => {
+    const improvedState = createExplorerState();
+    improvedState.filters.comparisonFits = ["improved"];
+    const improved = buildTargetChangeTree(fixture(), improvedState, "reported");
+    expect(improved.filteredMetrics.nTargets).toBe(1);
+    expect(improved.filteredMetrics.change).toMatchObject({
+      reducedError: 0.1,
+      increasedError: 0,
+      sharedTargets: 1,
+    });
+
+    const notApplicableState = createExplorerState();
+    notApplicableState.filters.comparisonFits = ["not_applicable"];
+    const notApplicable = buildTargetChangeTree(
+      fixture(),
+      notApplicableState,
+      "reported",
+    );
+    expect(notApplicable.filteredMetrics.nTargets).toBe(2);
+    expect(notApplicable.filteredMetrics.change).toMatchObject({
+      sharedTargets: 0,
+      addedTargets: 1,
+      removedTargets: 1,
+    });
+    expect(notApplicable.filterOptions.comparisonFits).toEqual([
+      "improved",
+      "regressed",
+      "unchanged",
+      "not_applicable",
+    ]);
   });
 });

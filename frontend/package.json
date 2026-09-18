@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
+    "publish:calibration-tree": "bun run scripts/publish-calibration-tree.ts",
     "test:dev-port": "node --test scripts/available-port.node-test.mjs"
   },
   "dependencies": {
@@ -15,6 +16,7 @@
     "@tanstack/react-query": "^5.84.0",
     "@tanstack/react-query-devtools": "^5.83.0",
     "@types/dagre": "^0.7.54",
+    "@vercel/blob": "^2.6.1",
     "dagre": "^0.8.5",
     "next": "^16.2.6",
     "react": "^19.2.0",

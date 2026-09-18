@@ -2,11 +2,13 @@
 
 ## Contract today
 
-The dashboard resolves a country's `latest.json`, then reads
-`releases/<id>/calibration_diagnostics.json`. `build_manifest.json`,
+The calibration dashboard resolves a country and release through its
+Vercel-backed build manifest, whose publisher pins the corresponding Hugging
+Face commit and reads `releases/<id>/calibration_diagnostics.json`.
+`build_manifest.json`,
 `release_manifest.json`, and `demographics.json` are optional enrichments. The
 diagnostics artifact owns fit values and target metadata; the build manifest owns
-gates and compilation/loss metadata; the release manifest owns release identity,
+validation results and compilation/loss metadata; the release manifest owns release identity,
 role/default status, and the optional provenance `description`; demographics owns
 geography coverage. A description may fill the existing provenance note, but an
 artifact cannot add sections or choose components.

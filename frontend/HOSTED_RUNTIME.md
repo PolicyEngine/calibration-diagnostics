@@ -90,10 +90,11 @@ merging main, disable automatic domain assignment for the real Vercel production
 Record all current production alias targets. This hold must precede main's automatic Git
 build; setting it after the merge is too late.
 Inspect the production-scoped environment entries before the build and require
-`POPULACE_HF_REPO` and `POPULACE_HF_REVISION` to be absent. The US data selection is
-compiled from the reviewed release; a conflicting override is refused at each US
-read and leaves US release alerts disabled, while other countries' pages, routes
-and the build stay up. If present, record and remove only those two conflicting US
+`POPULACE_HF_REPO` and `POPULACE_HF_REVISION` to be absent for the variable-calculation
+service. Its US data selection is compiled from the reviewed release, and a conflicting
+runtime override is refused by that service. Dashboard release discovery is independent:
+it follows the registered repository's `main` branch through the dashboard manifest.
+If either variable is present, record and remove only those two conflicting calculation
 overrides, with their prior settings retained for rollback. This specific check also
 applies to preview qualification. Do not print or change unrelated environment entries.
 

@@ -5,8 +5,9 @@ import { calibrationTreeRequestState } from "@/lib/microcosm/calibration-tree-re
 import { classifyApiError, parseCountry, scrub } from "@/lib/microcosm/latest-artifact";
 import { loadStagingCalibration } from "@/lib/microcosm/staging-artifact";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// Candidate calibration trees use the same six-hour cache interval as
+// published calibration trees. Each staging run has its own URL and query key.
+export const revalidate = 21_600;
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -24,10 +25,7 @@ export async function GET(request: Request) {
         {
           detail: "This staging run has not uploaded calibration diagnostics yet.",
         },
-        {
-          status: 404,
-          headers: { "Cache-Control": "no-store" },
-        },
+        { status: 404 },
       );
     }
     return NextResponse.json(
@@ -40,13 +38,9 @@ export async function GET(request: Request) {
           calibration.calibration_provenance,
         ),
       ),
-      { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
     const { status, body } = classifyApiError(error);
-    return NextResponse.json(body, {
-      status,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(body, { status });
   }
 }

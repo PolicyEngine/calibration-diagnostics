@@ -36,6 +36,7 @@ function response(
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
     filteredMetrics: EMPTY_METRICS,
