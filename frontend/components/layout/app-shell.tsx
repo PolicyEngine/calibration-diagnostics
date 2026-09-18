@@ -15,14 +15,14 @@ import { SiteFooter } from "./site-footer";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { country } = useCountry();
   return (
-    <div className="flex min-h-screen flex-col text-foreground">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden text-foreground">
       <GlobalLoader />
       <SiteHeader />
-      <div className="app-viewport flex">
-        <aside className="w-56 shrink-0 overflow-y-auto border-r border-border-light bg-card/50 backdrop-blur-sm">
+      <div className="flex min-h-0 flex-1">
+        <aside className="min-h-0 w-56 shrink-0 overflow-y-auto border-r border-border-light bg-card/50 backdrop-blur-sm">
           <NavSidebar />
         </aside>
-        <main className="flex flex-1 flex-col overflow-auto">
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto">
           <div key={country} className="flex-1 p-6 pt-0">{children}</div>
           <SiteFooter />
         </main>
