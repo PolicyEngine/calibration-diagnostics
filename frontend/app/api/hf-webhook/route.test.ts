@@ -133,6 +133,35 @@ test("webhook dispatches tag and main-branch events to the publisher workflow", 
   });
 });
 
+test("staging repository updates dispatch finalized-build publication", async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  replaceFetch(async (input, init) => {
+    calls.push({ url: String(input), init: init ?? {} });
+    return new Response(null, { status: 204 });
+  });
+  const stagingSha = "4".repeat(40);
+  const response = await POST(request({
+    repo: { name: "policyengine/populace-uk-staging" },
+    updatedRefs: [{
+      ref: "refs/heads/main",
+      oldSha: "3".repeat(40),
+      newSha: stagingSha,
+    }],
+  }));
+
+  expect(response.status).toBe(200);
+  expect(calls).toHaveLength(1);
+  expect(JSON.parse(String(calls[0].init.body))).toMatchObject({
+    ref: "main",
+    inputs: {
+      country: "uk",
+      event_kind: "staging",
+      release_id: "",
+      hf_commit_sha: stagingSha,
+    },
+  });
+});
+
 test("webhook returns a retriable server error when GitHub rejects dispatch", async () => {
   replaceFetch(async () => new Response("forbidden", { status: 403 }));
   const response = await POST(request({

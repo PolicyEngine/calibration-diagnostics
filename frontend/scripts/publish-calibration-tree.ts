@@ -27,13 +27,17 @@ import {
   microcosmRepo,
   microcosmRevision,
 } from "../lib/microcosm/latest-artifact";
+import {
+  loadStagingRuns,
+  stagingRepository,
+} from "../lib/microcosm/staging-artifact";
 import { UnsupportedCalibrationDiagnosticsSchemaError } from "../lib/microcosm/target-representation";
 
 type JsonObject = Record<string, unknown>;
 
 export interface PublisherOptions {
   country: MicrocosmCountry;
-  mode: "latest" | "release" | "backfill";
+  mode: "latest" | "release" | "backfill" | "staging-finalized";
   releaseId?: string;
   hfCommitSha?: string;
 }
@@ -94,13 +98,17 @@ function sourceUrl(
   return `https://huggingface.co/datasets/${microcosmRepo(country)}/resolve/${revision}/${path}`;
 }
 
-async function fetchJsonArtifact(
-  country: MicrocosmCountry,
+function repoSourceUrl(repo: string, revision: string, path: string): string {
+  return `https://huggingface.co/datasets/${repo}/resolve/${revision}/${path}`;
+}
+
+async function fetchJsonArtifactFromRepo(
+  repo: string,
   revision: string,
   path: string,
   required: boolean,
 ): Promise<FetchedArtifact | null> {
-  const response = await fetch(sourceUrl(country, revision, path), {
+  const response = await fetch(repoSourceUrl(repo, revision, path), {
     headers: hfHeaders(),
     cache: "no-store",
     signal: AbortSignal.timeout(120_000),
@@ -116,12 +124,30 @@ async function fetchJsonArtifact(
   };
 }
 
+async function fetchJsonArtifact(
+  country: MicrocosmCountry,
+  revision: string,
+  path: string,
+  required: boolean,
+): Promise<FetchedArtifact | null> {
+  return fetchJsonArtifactFromRepo(
+    microcosmRepo(country),
+    revision,
+    path,
+    required,
+  );
+}
+
 export function parsePublisherOptions(argv: string[]): PublisherOptions {
   const values = new Map<string, string>();
   const flags = new Set<string>();
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument === "--latest" || argument === "--backfill") {
+    if (
+      argument === "--latest" ||
+      argument === "--backfill" ||
+      argument === "--staging-finalized"
+    ) {
       flags.add(argument);
       continue;
     }
@@ -144,12 +170,24 @@ export function parsePublisherOptions(argv: string[]): PublisherOptions {
   const selectedModes = [
     flags.has("--latest"),
     flags.has("--backfill"),
+    flags.has("--staging-finalized"),
     values.has("--release"),
   ].filter(Boolean).length;
   if (selectedModes !== 1) {
-    throw new Error("Specify exactly one of --latest, --release, or --backfill.");
+    throw new Error(
+      "Specify exactly one of --latest, --release, --backfill, or --staging-finalized.",
+    );
   }
   if (flags.has("--backfill")) return { country: countryValue, mode: "backfill" };
+  if (flags.has("--staging-finalized")) {
+    return {
+      country: countryValue,
+      mode: "staging-finalized",
+      ...(values.has("--sha")
+        ? { hfCommitSha: exactCommitSha(values.get("--sha"), "--sha") }
+        : {}),
+    };
+  }
   if (flags.has("--latest")) {
     return {
       country: countryValue,
@@ -389,9 +427,197 @@ async function registerReleaseBuild(
   return entry;
 }
 
+function optionalObject(value: unknown): JsonObject | null {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonObject
+    : null;
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function resolveRepositoryRevisionSha(
+  repo: string,
+  revision: string,
+): Promise<string> {
+  const response = await fetch(
+    `https://huggingface.co/api/datasets/${repo}/revision/${encodeURIComponent(revision)}`,
+    {
+      headers: hfHeaders(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Hugging Face returned ${response.status} while resolving ${repo}@${revision}.`,
+    );
+  }
+  const payload = object(await response.json(), `${repo}@${revision}`);
+  return exactCommitSha(
+    typeof payload.sha === "string" ? payload.sha : undefined,
+    `${repo}@${revision}`,
+  );
+}
+
+async function publishFinalizedStagingBuilds(
+  country: MicrocosmCountry,
+  expectedSha: string | undefined,
+  blobToken: string,
+): Promise<void> {
+  const repository = stagingRepository(country);
+  if (!repository) {
+    throw new Error(`Staging is not configured for ${country}.`);
+  }
+  const revisionSha = await resolveRepositoryRevisionSha(
+    repository.repo,
+    repository.revision,
+  );
+  if (expectedSha && expectedSha !== revisionSha) {
+    throw new Error(
+      `Webhook commit ${expectedSha} is no longer the current staging revision ${revisionSha}.`,
+    );
+  }
+  const runs = await loadStagingRuns(0, country);
+  if (!runs.available) {
+    throw new Error(runs.detail ?? "The staging repository is unavailable.");
+  }
+  const finalized = runs.runs.filter((run) =>
+    ["passed", "published", "completed"].includes(run.status ?? ""),
+  );
+
+  for (const run of finalized) {
+    const prefix = `runs/${run.run_id}`;
+    const runManifest = await fetchJsonArtifactFromRepo(
+      repository.repo,
+      revisionSha,
+      `${prefix}/run_manifest.json`,
+      false,
+    );
+    const artifacts = optionalObject(runManifest?.json.artifacts);
+    const diagnosticsArtifact = optionalObject(artifacts?.calibration_diagnostics);
+    const diagnosticsPath =
+      optionalString(diagnosticsArtifact?.staging_path) ??
+      `${prefix}/calibration_diagnostics.json`;
+    const [diagnostics, buildManifest, releaseManifest] = await Promise.all([
+      fetchJsonArtifactFromRepo(
+        repository.repo,
+        revisionSha,
+        diagnosticsPath,
+        true,
+      ),
+      fetchJsonArtifactFromRepo(
+        repository.repo,
+        revisionSha,
+        `${prefix}/build_manifest.json`,
+        false,
+      ),
+      fetchJsonArtifactFromRepo(
+        repository.repo,
+        revisionSha,
+        `${prefix}/release_manifest.json`,
+        false,
+      ),
+    ]);
+    if (!diagnostics) throw new Error(`Staging run ${run.run_id} has no diagnostics.`);
+    const declaredDigest = optionalString(diagnosticsArtifact?.sha256);
+    if (declaredDigest && declaredDigest !== diagnostics.source.sha256) {
+      throw new Error(
+        `Staging run ${run.run_id} diagnostics do not match the run manifest digest.`,
+      );
+    }
+    const candidateReleaseId = run.candidate_release_id ?? run.run_id;
+    const calibration = buildCalibration(
+      diagnostics.json,
+      candidateReleaseId,
+      run.updated_at,
+      buildManifest?.json ?? {},
+      releaseManifest?.json ?? {},
+      {},
+      country,
+      "huggingface_immutable",
+      diagnostics.source.sha256,
+      revisionSha,
+    );
+    const bundle = buildCalibrationTreeBundle({
+      country,
+      buildKind: "staging",
+      sourceId: run.run_id,
+      label: candidateReleaseId,
+      createdAt: run.updated_at,
+      releaseId: candidateReleaseId,
+      hfRepo: repository.repo,
+      hfCommitSha: revisionSha,
+      sourceArtifacts: {
+        calibrationDiagnostics: diagnostics.source,
+        buildManifest: buildManifest?.source ?? null,
+        releaseManifest: releaseManifest?.source ?? null,
+        demographics: null,
+      },
+      rows: calibration.rows,
+      calibrationProvenance: calibration.calibration_provenance,
+      lossAttributionAvailable:
+        calibration.target_loss_attribution.status !== "unavailable",
+      comparison: {
+        releaseId: calibration.release_id,
+        calibrationProvenance: calibration.calibration_provenance,
+        status: calibration.target_loss_attribution.status,
+        aggregate: calibration.target_loss_attribution.aggregate,
+        cap: calibration.target_loss_attribution.cap,
+        basisIdentifier: calibration.target_loss_attribution.basis_identifier,
+        targetRepresentation: calibration.target_schema.target_representation,
+      },
+    });
+    for (const file of bundle.files) enforceConfiguredSizeLimits(file);
+    const stored = await uploadCalibrationTreeBundle({ bundle, token: blobToken });
+    const entry: CalibrationTreeManifestEntry = {
+      buildArtifactId: bundle.index.buildArtifactId,
+      kind: "staging",
+      sourceId: run.run_id,
+      label: candidateReleaseId,
+      releaseId: null,
+      stagingRunId: run.run_id,
+      hfRepo: repository.repo,
+      hfCommitSha: revisionSha,
+      treeSchemaVersion: 4,
+      indexSha256: stored.index.sha256,
+      indexBytes: stored.index.bytes,
+      createdAt: run.updated_at,
+      updatedAt: run.updated_at ?? "1970-01-01T00:00:00.000Z",
+    };
+    await updateCalibrationTreeManifest({ country, entry, token: blobToken });
+    console.log(JSON.stringify({
+      country,
+      stagingRunId: run.run_id,
+      buildArtifactId: entry.buildArtifactId,
+      files: stored.files,
+    }));
+  }
+
+  const verifiedSha = await resolveRepositoryRevisionSha(
+    repository.repo,
+    repository.revision,
+  );
+  if (verifiedSha !== revisionSha) {
+    throw new Error(
+      `Staging repository advanced from ${revisionSha} to ${verifiedSha} during publication.`,
+    );
+  }
+}
+
 export async function runPublisher(options: PublisherOptions): Promise<void> {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (!blobToken) throw new Error("BLOB_READ_WRITE_TOKEN is required.");
+
+  if (options.mode === "staging-finalized") {
+    await publishFinalizedStagingBuilds(
+      options.country,
+      options.hfCommitSha,
+      blobToken,
+    );
+    return;
+  }
 
   if (options.mode === "backfill") {
     const releases = (await loadReleases(0, options.country)).filter(
