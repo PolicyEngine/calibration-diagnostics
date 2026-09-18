@@ -1,8 +1,8 @@
 # Calibration build and comparison artifacts
 
-The calibration explorer reads precomputed schema-4 JSON from private Vercel
+The calibration explorer reads precomputed schema-5 JSON from private Vercel
 Blob storage. The browser does not download calibration diagnostics or rebuild
-the hierarchy. Schemas 1, 2, and 3 are unsupported.
+the hierarchy. Schemas 1 through 4 are unsupported.
 
 ## Required Blob folder schema
 
@@ -12,7 +12,10 @@ calibration-trees/
   <country>/
     <build-artifact-id>/
       index.json
-      target-index.json
+      filter-index.json
+      target-summary-0001.json
+      target-summary-0002.json
+      ...
       target-details-0001.json
       target-details-0002.json
       ...
@@ -27,18 +30,19 @@ from the schema version, country, build kind, source ID, and source artifact
 digests. A Hugging Face commit remains provenance in `index.json`; it is not the
 Blob directory key.
 
-Every JSON file declares `schemaVersion: 4`. Publication refuses to replace an
+Every JSON file declares `schemaVersion: 5`. Publication refuses to replace an
 existing part with different bytes.
 
 - `manifest.json` lists every published release build and finalized staging
   build, and points to the current release build for each country.
 - `index.json` contains build provenance, filter options, both root hierarchy
-  levels, and descriptors for all other parts.
+  levels, comparison metadata, and descriptors for all other parts.
 - `tier-N.json` contains every hierarchy level exactly `N` selections from a
   root. Tier numbers are contiguous.
-- `target-index.json` contains compact target identities, weighted-error
-  inputs, comparison keys, hierarchy fields, filter postings, and direct detail
-  locations.
+- `filter-index.json` contains only filter-value posting lists keyed by target
+  ordinal.
+- `target-summary-NNNN.json` contains compact target identities, weighted-error
+  inputs, comparison keys, and the hierarchy fields needed to compare builds.
 - `target-details-NNNN.json` contains complete target records for one
   contiguous ordinal range.
 
@@ -46,34 +50,37 @@ Comparison bundles use the same directory and file schema. Their build IDs are
 derived from the ordered source build IDs and comparison mode. They are not
 listed as selectable source builds in `manifest.json`.
 
-## Target ordinals and detail shards
+## Target ordinals and target shards
 
 Every target receives a zero-based ordinal within one build. The ordinal is not
 stable across builds. Numeric ordinals keep hierarchy membership and filter
 postings smaller than repeated string IDs and allow the browser to represent
 membership with a `Uint8Array`.
 
-Each indexed target has a direct detail location:
+`index.json` maps ordinal ranges to both summary and detail files:
 
 ```json
 {
-  "id": "target-id",
-  "detailLocation": { "shardIndex": 2, "offset": 17 }
+  "part": "target-details-0003",
+  "startTargetOrdinal": 8000,
+  "endTargetOrdinalExclusive": 12000
 }
 ```
 
-`shardIndex` selects `index.parts.targetDetails[shardIndex]`; `offset` selects a
-record in that shard. Descriptor ranges cover every target exactly once without
-gaps or overlaps.
+To locate ordinal 8017, the reader selects the descriptor whose half-open range
+contains 8017 and reads offset 17. Summary and detail descriptor ranges each
+cover every target exactly once without gaps or overlaps. No per-target shard
+pointer is stored.
 
-The publisher preserves ordinal order and limits each detail file to 4,000,000
-raw UTF-8 bytes. It measures the complete canonical JSON file, including
-metadata and punctuation. Publication fails when one target does not fit or
-when a build would require more than 9,999 shards.
+The publisher preserves ordinal order and limits each summary file to 8,000,000
+raw UTF-8 bytes and each detail file to 4,000,000 raw UTF-8 bytes. It measures
+the complete canonical JSON file, including metadata and punctuation.
+Publication fails when one target does not fit or when either file class would
+require more than 9,999 shards.
 
-## Comparison-ready target index
+## Comparison-ready target summaries
 
-Each target-index record publishes one compact comparison record containing:
+Each target-summary record publishes one compact comparison record containing:
 
 - normalized base name;
 - Chronicle fact key, when present;
@@ -89,10 +96,11 @@ unmatched. Candidate hierarchy fields categorize shared and added targets;
 current-build hierarchy fields categorize removed targets.
 
 An uncached ordered build pair is calculated synchronously by the comparison
-API. The server reads only `index.json` and `target-index.json` from each source,
-calculates reported and shared-target rows, builds both hierarchy bundles,
-validates them, and uploads them. Later requests address those immutable bundle
-IDs directly. Full source detail shards are not inputs to this calculation.
+API. The server reads `index.json` and all `target-summary-NNNN.json` files from
+each source, calculates reported and shared-target rows, builds both hierarchy
+bundles, validates them, and uploads them. Later requests address those
+immutable bundle IDs directly. Filter postings and full source detail shards
+are not inputs to this calculation.
 
 ## Publication flows
 
@@ -104,8 +112,8 @@ release repository update
   -> GitHub workflow_dispatch
   -> resolve the release to an exact Hugging Face commit
   -> fetch and hash source files at that commit
-  -> compile and validate schema-4 parts
-  -> upload detail shards, target index, tiers, then index
+  -> compile and validate schema-5 parts
+  -> upload filter postings, summary shards, detail shards, tiers, then index
   -> add the build to manifest.json
   -> update latestReleaseBuildArtifactId only if upstream latest is unchanged
 ```
@@ -143,7 +151,7 @@ GET /api/microcosm/tree?country=us&release=<release>&part=index
   -> 307 to build=<exact-build-artifact-id>
   -> stream index.json
   -> render the root
-  -> start target-index.json and every tier request concurrently
+  -> start filter-index.json, every target-summary shard, and every tier request concurrently
   -> fetch one target-details-NNNN.json only after target selection
 ```
 
@@ -163,9 +171,10 @@ part from another build.
 
 ## Filtering indices
 
-Hierarchy levels, groups, and nodes store sorted target ordinals. The target
-index stores postings for geography level, geography, fit band, comparison fit,
-and calibration status.
+Hierarchy levels, groups, and nodes store sorted target ordinals.
+`filter-index.json` stores postings for geography level, geography, fit band,
+comparison fit, and calibration status. Target-summary shards store the compact
+metric inputs used to recalculate visible aggregates after filtering.
 
 The browser unions selected values within one category, intersects categories,
 filters hierarchy memberships, and recalculates visible metrics from compact
@@ -213,9 +222,9 @@ bun run publish:calibration-tree -- --country uk --staging-finalized
 ```
 
 `CALIBRATION_TREE_MAX_RAW_BYTES` defaults to 100,000,000 bytes per file, in
-addition to the fixed detail-shard limit. `CALIBRATION_TREE_MAX_GZIP_BYTES` can
-add a compressed-size limit. Either violation fails publication and therefore
-fails the GitHub Actions job.
+addition to the fixed summary- and detail-shard limits.
+`CALIBRATION_TREE_MAX_GZIP_BYTES` can add a compressed-size limit. Any violation
+fails publication and therefore fails the GitHub Actions job.
 
 ## Verification
 
@@ -229,10 +238,10 @@ bun run build
 
 Then verify that:
 
-1. The manifest and all parts declare schema 4.
+1. The manifest and all parts declare schema 5.
 2. Every descriptor returns matching bytes and an ETag.
 3. Root rendering does not wait for deeper tiers.
-4. Target index and tier requests start concurrently.
+4. Filter, target-summary, and tier requests start concurrently.
 5. No detail shard downloads before target selection.
 6. An uncached comparison persists both modes and a repeated request reuses
    them.
