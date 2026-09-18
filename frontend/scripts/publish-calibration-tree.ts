@@ -1,4 +1,5 @@
 import {
+  CALIBRATION_TREE_SCHEMA_VERSION,
   type CalibrationTreeSourceArtifact,
 } from "../lib/microcosm/calibration-tree-artifact";
 import {
@@ -448,7 +449,7 @@ function releaseManifestEntry(
     stagingRunId: null,
     hfRepo: build.hfRepo,
     hfCommitSha: build.hfCommitSha,
-    treeSchemaVersion: 4,
+    treeSchemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
     indexSha256: published.stored.index.sha256,
     indexBytes: published.stored.index.bytes,
     createdAt: build.createdAt,
@@ -619,7 +620,7 @@ async function publishFinalizedStagingBuilds(
       stagingRunId: run.run_id,
       hfRepo: repository.repo,
       hfCommitSha: revisionSha,
-      treeSchemaVersion: 4,
+      treeSchemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
       indexSha256: stored.index.sha256,
       indexBytes: stored.index.bytes,
       createdAt: run.updated_at,

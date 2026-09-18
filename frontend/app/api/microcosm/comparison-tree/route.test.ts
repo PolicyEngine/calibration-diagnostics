@@ -52,7 +52,7 @@ test("an uncached exact pair is built once and redirected to its immutable bundl
 });
 
 test("exact comparison bundle requests stream immutable private Blob parts", async () => {
-  const body = '{"schemaVersion":4,"part":"tier-1"}\n';
+  const body = '{"schemaVersion":5,"part":"tier-1"}\n';
   const requests: unknown[] = [];
   const handler = createCalibrationComparisonTreeHandler({
     ensureComparison: (async () => {

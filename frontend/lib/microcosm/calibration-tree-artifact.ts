@@ -42,15 +42,18 @@ import type {
 } from "./target-change";
 import type { TargetMatchingSummary } from "./target-surface-matcher";
 
-export const CALIBRATION_TREE_SCHEMA_VERSION = 4 as const;
+export const CALIBRATION_TREE_SCHEMA_VERSION = 5 as const;
+export const CALIBRATION_TREE_TARGET_SUMMARY_MAX_RAW_BYTES = 8_000_000;
 export const CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES = 4_000_000;
 
 export type CalibrationTreeTierPart = `tier-${number}`;
+export type CalibrationTreeTargetSummaryPart = `target-summary-${string}`;
 export type CalibrationTreeTargetDetailsPart = `target-details-${string}`;
 export type CalibrationTreePart =
   | "index"
   | CalibrationTreeTierPart
-  | "target-index"
+  | "filter-index"
+  | CalibrationTreeTargetSummaryPart
   | CalibrationTreeTargetDetailsPart;
 
 export interface CalibrationTreeSourceArtifact {
@@ -63,8 +66,8 @@ export interface CalibrationTreeSourceArtifacts {
   buildManifest: CalibrationTreeSourceArtifact | null;
   releaseManifest: CalibrationTreeSourceArtifact | null;
   demographics: CalibrationTreeSourceArtifact | null;
-  comparisonCurrentTargetIndex?: CalibrationTreeSourceArtifact | null;
-  comparisonCandidateTargetIndex?: CalibrationTreeSourceArtifact | null;
+  comparisonCurrentIndex?: CalibrationTreeSourceArtifact | null;
+  comparisonCandidateIndex?: CalibrationTreeSourceArtifact | null;
 }
 
 export type CalibrationTreeBuildKind = "release" | "staging" | "comparison";
@@ -81,14 +84,10 @@ export interface CalibrationTreeBuild {
   sourceArtifacts: CalibrationTreeSourceArtifacts;
 }
 
-export interface IndexedCalibrationTarget {
+export interface CalibrationTreeTargetSummary {
   id: string;
   label: string;
   metricInputs: CalibrationTreeMetricInput;
-  detailLocation: {
-    shardIndex: number;
-    offset: number;
-  };
   comparison: CalibrationTreeComparisonTarget;
 }
 
@@ -208,10 +207,18 @@ export interface CalibrationTreeTargetDetailsDescriptor
   endTargetOrdinalExclusive: number;
 }
 
+export interface CalibrationTreeTargetSummaryDescriptor
+  extends CalibrationTreePartDescriptor {
+  part: CalibrationTreeTargetSummaryPart;
+  startTargetOrdinal: number;
+  endTargetOrdinalExclusive: number;
+}
+
 export interface CalibrationTreeIndexArtifact
   extends CalibrationTreePartIdentity {
   part: "index";
   build: CalibrationTreeBuild;
+  targetComparison: CalibrationTreeComparisonMetadata;
   comparison?: CalibrationTreeComparisonResultMetadata;
   calibrationProvenance?: CalibrationProvenance;
   lossAttributionAvailable: boolean;
@@ -225,7 +232,8 @@ export interface CalibrationTreeIndexArtifact
   levels: Record<string, CompiledCalibrationLevel>;
   parts: {
     tiers: CalibrationTreeTierDescriptor[];
-    targetIndex: CalibrationTreePartDescriptor & { part: "target-index" };
+    filterIndex: CalibrationTreePartDescriptor & { part: "filter-index" };
+    targetSummaries: CalibrationTreeTargetSummaryDescriptor[];
     targetDetails: CalibrationTreeTargetDetailsDescriptor[];
   };
 }
@@ -238,12 +246,19 @@ export interface CalibrationTreeTierArtifact
   levels: Record<string, CompiledCalibrationLevel>;
 }
 
-export interface CalibrationTreeTargetIndexArtifact
+export interface CalibrationTreeFilterIndexArtifact
   extends CalibrationTreePartIdentity {
-  part: "target-index";
-  comparison: CalibrationTreeComparisonMetadata;
-  targets: IndexedCalibrationTarget[];
+  part: "filter-index";
+  targetCount: number;
   postings: CalibrationTreeFilterPostings;
+}
+
+export interface CalibrationTreeTargetSummaryArtifact
+  extends CalibrationTreePartIdentity {
+  part: CalibrationTreeTargetSummaryPart;
+  startTargetOrdinal: number;
+  endTargetOrdinalExclusive: number;
+  targets: CalibrationTreeTargetSummary[];
 }
 
 export interface CalibrationTreeTargetDetailsArtifact
@@ -257,7 +272,8 @@ export interface CalibrationTreeTargetDetailsArtifact
 export type CalibrationTreeArtifactPart =
   | CalibrationTreeIndexArtifact
   | CalibrationTreeTierArtifact
-  | CalibrationTreeTargetIndexArtifact
+  | CalibrationTreeFilterIndexArtifact
+  | CalibrationTreeTargetSummaryArtifact
   | CalibrationTreeTargetDetailsArtifact;
 
 export interface CalibrationTreeBundleDraft {
@@ -271,7 +287,7 @@ export interface CalibrationTreeBundleDraft {
   roots: CalibrationTreeIndexArtifact["roots"];
   levels: Record<string, CompiledCalibrationLevel>;
   levelDepths: Record<string, number>;
-  targets: Array<Omit<IndexedCalibrationTarget, "detailLocation"> & {
+  targets: Array<CalibrationTreeTargetSummary & {
     facets: {
       geographyLevel: string;
       geography: string;
@@ -286,13 +302,17 @@ export interface CalibrationTreeBundleDraft {
 export interface LoadedCalibrationTreeBundle {
   index: CalibrationTreeIndexArtifact;
   tiers: CalibrationTreeTierArtifact[];
-  targetIndex?: CalibrationTreeTargetIndexArtifact;
+  filterIndex?: CalibrationTreeFilterIndexArtifact;
+  targetSummaries?: CalibrationTreeTargetSummary[];
   targetDetailShard?: CalibrationTreeTargetDetailsArtifact;
 }
 
 export interface CalibrationTreeTargetDetailsPlan {
   artifacts: CalibrationTreeTargetDetailsArtifact[];
-  locations: IndexedCalibrationTarget["detailLocation"][];
+}
+
+export interface CalibrationTreeTargetSummariesPlan {
+  artifacts: CalibrationTreeTargetSummaryArtifact[];
 }
 
 export interface CalibrationTreeTargetDetailSelection {
@@ -324,7 +344,16 @@ const DEFAULT_GEOGRAPHY_LEVEL = "national";
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const HF_COMMIT_RE = /^[0-9a-f]{40,64}$/;
 const TIER_PART_RE = /^tier-([1-9][0-9]*)$/;
+const TARGET_SUMMARY_PART_RE = /^target-summary-([0-9]{4})$/;
 const TARGET_DETAILS_PART_RE = /^target-details-([0-9]{4})$/;
+
+function targetSummaryPart(shardIndex: number): CalibrationTreeTargetSummaryPart {
+  const number = shardIndex + 1;
+  if (!Number.isSafeInteger(number) || number < 1 || number > 9_999) {
+    throw new Error("Calibration tree target-summary shard number is out of range.");
+  }
+  return `target-summary-${String(number).padStart(4, "0")}`;
+}
 
 function targetDetailsPart(shardIndex: number): CalibrationTreeTargetDetailsPart {
   const number = shardIndex + 1;
@@ -685,29 +714,15 @@ function postingValues<T extends string | null>(values: T[]): CalibrationTreePos
     .map(([value, targetOrdinals]) => ({ value, targetOrdinals }));
 }
 
-export function calibrationTreeTargetIndexFromDraft(
+export function calibrationTreeFilterIndexFromDraft(
   draft: CalibrationTreeBundleDraft,
-  detailLocations: IndexedCalibrationTarget["detailLocation"][],
-): CalibrationTreeTargetIndexArtifact {
-  if (detailLocations.length !== draft.targets.length) {
-    throw new Error("Calibration tree target-detail locations do not cover every target.");
-  }
+): CalibrationTreeFilterIndexArtifact {
   return {
     schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
     country: draft.country,
     buildArtifactId: draft.build.buildArtifactId,
-    part: "target-index",
-    comparison: draft.comparison,
-    targets: draft.targets.map((
-      { id, label, metricInputs, comparison },
-      targetOrdinal,
-    ) => ({
-      id,
-      label,
-      metricInputs,
-      comparison,
-      detailLocation: detailLocations[targetOrdinal],
-    })),
+    part: "filter-index",
+    targetCount: draft.targets.length,
     postings: {
       geographyLevels: postingValues(
         draft.targets.map((target) => target.facets.geographyLevel),
@@ -728,6 +743,88 @@ export function calibrationTreeTargetIndexFromDraft(
   };
 }
 
+export function calibrationTreeTargetSummariesFromDraft(
+  draft: CalibrationTreeBundleDraft,
+  maxRawBytes = CALIBRATION_TREE_TARGET_SUMMARY_MAX_RAW_BYTES,
+): CalibrationTreeTargetSummariesPlan {
+  if (!Number.isSafeInteger(maxRawBytes) || maxRawBytes <= 0) {
+    throw new Error("Calibration tree target-summary shard size must be a positive integer.");
+  }
+  const targets = draft.targets.map(({ id, label, metricInputs, comparison }) => ({
+    id,
+    label,
+    metricInputs,
+    comparison,
+  }));
+  const serializedTargets = targets.map(stableJson);
+  const targetBytes = serializedTargets.map(utf8Bytes);
+  const artifacts: CalibrationTreeTargetSummaryArtifact[] = [];
+  let startTargetOrdinal = 0;
+
+  while (startTargetOrdinal < targets.length) {
+    const shardIndex = artifacts.length;
+    if (shardIndex >= 9_999) {
+      throw new Error("Calibration tree target summaries require more than 9,999 shards.");
+    }
+    const part = targetSummaryPart(shardIndex);
+    let endTargetOrdinalExclusive = startTargetOrdinal;
+    let payloadBytes = 0;
+
+    while (endTargetOrdinalExclusive < targets.length) {
+      const nextPayloadBytes =
+        payloadBytes +
+        targetBytes[endTargetOrdinalExclusive] +
+        (endTargetOrdinalExclusive === startTargetOrdinal ? 0 : 1);
+      const emptyArtifact: CalibrationTreeTargetSummaryArtifact = {
+        schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
+        country: draft.country,
+        buildArtifactId: draft.build.buildArtifactId,
+        part,
+        startTargetOrdinal,
+        endTargetOrdinalExclusive: endTargetOrdinalExclusive + 1,
+        targets: [],
+      };
+      const candidateBytes = utf8Bytes(`${stableJson(emptyArtifact)}\n`) + nextPayloadBytes;
+      if (candidateBytes > maxRawBytes) break;
+      payloadBytes = nextPayloadBytes;
+      endTargetOrdinalExclusive += 1;
+    }
+
+    if (endTargetOrdinalExclusive === startTargetOrdinal) {
+      const targetBytesWithEnvelope = utf8Bytes(`${stableJson({
+        schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
+        country: draft.country,
+        buildArtifactId: draft.build.buildArtifactId,
+        part,
+        startTargetOrdinal,
+        endTargetOrdinalExclusive: startTargetOrdinal + 1,
+        targets: [targets[startTargetOrdinal]],
+      })}\n`);
+      throw new Error(
+        `Calibration target summary ordinal ${startTargetOrdinal} requires ` +
+        `${targetBytesWithEnvelope} bytes, which exceeds the ${maxRawBytes}-byte shard limit.`,
+      );
+    }
+
+    const artifact: CalibrationTreeTargetSummaryArtifact = {
+      schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
+      country: draft.country,
+      buildArtifactId: draft.build.buildArtifactId,
+      part,
+      startTargetOrdinal,
+      endTargetOrdinalExclusive,
+      targets: targets.slice(startTargetOrdinal, endTargetOrdinalExclusive),
+    };
+    if (utf8Bytes(serializeCalibrationTreePart(artifact)) > maxRawBytes) {
+      throw new Error(`Calibration tree shard ${part} exceeded its planned byte limit.`);
+    }
+    artifacts.push(artifact);
+    startTargetOrdinal = endTargetOrdinalExclusive;
+  }
+
+  return { artifacts };
+}
+
 export function calibrationTreeTargetDetailsFromDraft(
   draft: CalibrationTreeBundleDraft,
   maxRawBytes = CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES,
@@ -738,7 +835,6 @@ export function calibrationTreeTargetDetailsFromDraft(
   const serializedTargets = draft.targets.map((target) => stableJson(target.detail));
   const targetBytes = serializedTargets.map(utf8Bytes);
   const artifacts: CalibrationTreeTargetDetailsArtifact[] = [];
-  const locations: IndexedCalibrationTarget["detailLocation"][] = [];
   let startTargetOrdinal = 0;
 
   while (startTargetOrdinal < draft.targets.length) {
@@ -801,42 +897,32 @@ export function calibrationTreeTargetDetailsFromDraft(
     if (utf8Bytes(serialized) > maxRawBytes) {
       throw new Error(`Calibration tree shard ${part} exceeded its planned byte limit.`);
     }
-    for (
-      let targetOrdinal = startTargetOrdinal;
-      targetOrdinal < endTargetOrdinalExclusive;
-      targetOrdinal += 1
-    ) {
-      locations[targetOrdinal] = {
-        shardIndex,
-        offset: targetOrdinal - startTargetOrdinal,
-      };
-    }
     artifacts.push(artifact);
     startTargetOrdinal = endTargetOrdinalExclusive;
   }
 
-  return { artifacts, locations };
+  return { artifacts };
 }
 
 export function calibrationTreeTargetDetailSelection(
   index: CalibrationTreeIndexArtifact,
-  target: IndexedCalibrationTarget,
   targetOrdinal: number,
 ): CalibrationTreeTargetDetailSelection {
-  const { shardIndex, offset } = target.detailLocation;
-  const descriptor = index.parts.targetDetails[shardIndex];
+  const descriptor = index.parts.targetDetails.find(
+    (candidate) =>
+      targetOrdinal >= candidate.startTargetOrdinal &&
+      targetOrdinal < candidate.endTargetOrdinalExclusive,
+  );
   if (
     !Number.isSafeInteger(targetOrdinal) ||
     targetOrdinal < 0 ||
-    !descriptor ||
-    descriptor.startTargetOrdinal + offset !== targetOrdinal ||
-    targetOrdinal >= descriptor.endTargetOrdinalExclusive
+    !descriptor
   ) {
     throw new Error(
-      `Calibration target ordinal ${targetOrdinal} has an invalid detail location ` +
-      `(${shardIndex}, ${offset}).`,
+      `Calibration target ordinal ${targetOrdinal} is not covered by a detail shard.`,
     );
   }
+  const offset = targetOrdinal - descriptor.startTargetOrdinal;
   return { descriptor, offset, targetOrdinal };
 }
 
@@ -1024,6 +1110,49 @@ function validateDescriptor(
   return descriptor as unknown as CalibrationTreePartDescriptor;
 }
 
+function validateTargetShardDescriptors(options: {
+  value: unknown;
+  targetCount: number;
+  country: MicrocosmCountry;
+  buildArtifactId: string;
+  label: "target-summary" | "target-detail";
+  maxRawBytes: number;
+  partForIndex: (
+    shardIndex: number,
+  ) => CalibrationTreeTargetSummaryPart | CalibrationTreeTargetDetailsPart;
+}): void {
+  if (!Array.isArray(options.value)) {
+    throw new Error(`Calibration tree ${options.label} descriptors must be an array.`);
+  }
+  let nextTargetOrdinal = 0;
+  options.value.forEach((item, shardIndex) => {
+    const expectedPart = options.partForIndex(shardIndex);
+    const descriptor = validateDescriptor(
+      item,
+      expectedPart,
+      options.country,
+      options.buildArtifactId,
+    ) as CalibrationTreeTargetSummaryDescriptor | CalibrationTreeTargetDetailsDescriptor;
+    if (descriptor.rawBytes > options.maxRawBytes) {
+      throw new Error(`Calibration tree descriptor ${expectedPart} exceeds the byte limit.`);
+    }
+    if (
+      descriptor.startTargetOrdinal !== nextTargetOrdinal ||
+      !Number.isSafeInteger(descriptor.endTargetOrdinalExclusive) ||
+      descriptor.endTargetOrdinalExclusive <= descriptor.startTargetOrdinal ||
+      descriptor.endTargetOrdinalExclusive > options.targetCount
+    ) {
+      throw new Error(`Calibration tree descriptor ${expectedPart} has an invalid target range.`);
+    }
+    nextTargetOrdinal = descriptor.endTargetOrdinalExclusive;
+  });
+  if (nextTargetOrdinal !== options.targetCount) {
+    throw new Error(
+      `Calibration tree ${options.label} descriptors do not cover every target.`,
+    );
+  }
+}
+
 function validateBuild(
   value: unknown,
   country: MicrocosmCountry,
@@ -1065,8 +1194,8 @@ function validateBuild(
     "buildManifest",
     "releaseManifest",
     "demographics",
-    "comparisonCurrentTargetIndex",
-    "comparisonCandidateTargetIndex",
+    "comparisonCurrentIndex",
+    "comparisonCandidateIndex",
   ]) {
     if (sources[key] == null) {
       if (key === "calibrationDiagnostics" && build.kind !== "comparison") {
@@ -1074,8 +1203,8 @@ function validateBuild(
       }
       if (
         build.kind === "comparison" &&
-        (key === "comparisonCurrentTargetIndex" ||
-          key === "comparisonCandidateTargetIndex")
+        (key === "comparisonCurrentIndex" ||
+          key === "comparisonCandidateIndex")
       ) {
         throw new Error(`Calibration comparison source ${key} is missing.`);
       }
@@ -1102,6 +1231,7 @@ export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexA
   const country = index.country as MicrocosmCountry;
   const buildArtifactId = index.buildArtifactId as string;
   validateBuild(index.build, country, buildArtifactId);
+  validateComparisonMetadata(index.targetComparison);
   if (index.comparison != null) {
     const comparison = record(index.comparison, "Calibration tree comparison result");
     for (const key of [
@@ -1174,36 +1304,25 @@ export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexA
     }
     stringArray(tier.levelIds, `Calibration tree descriptor ${expectedPart} levelIds`);
   });
-  validateDescriptor(parts.targetIndex, "target-index", country, buildArtifactId);
-  if (!Array.isArray(parts.targetDetails)) {
-    throw new Error("Calibration tree target-detail descriptors must be an array.");
-  }
-  let nextTargetOrdinal = 0;
-  parts.targetDetails.forEach((item, shardIndex) => {
-    const expectedPart = targetDetailsPart(shardIndex);
-    const descriptor = validateDescriptor(
-      item,
-      expectedPart,
-      country,
-      buildArtifactId,
-    ) as
-      CalibrationTreeTargetDetailsDescriptor;
-    if (descriptor.rawBytes > CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES) {
-      throw new Error(`Calibration tree descriptor ${expectedPart} exceeds the byte limit.`);
-    }
-    if (
-      descriptor.startTargetOrdinal !== nextTargetOrdinal ||
-      !Number.isSafeInteger(descriptor.endTargetOrdinalExclusive) ||
-      descriptor.endTargetOrdinalExclusive <= descriptor.startTargetOrdinal ||
-      descriptor.endTargetOrdinalExclusive > targetCount
-    ) {
-      throw new Error(`Calibration tree descriptor ${expectedPart} has an invalid target range.`);
-    }
-    nextTargetOrdinal = descriptor.endTargetOrdinalExclusive;
+  validateDescriptor(parts.filterIndex, "filter-index", country, buildArtifactId);
+  validateTargetShardDescriptors({
+    value: parts.targetSummaries,
+    targetCount,
+    country,
+    buildArtifactId,
+    label: "target-summary",
+    maxRawBytes: CALIBRATION_TREE_TARGET_SUMMARY_MAX_RAW_BYTES,
+    partForIndex: targetSummaryPart,
   });
-  if (nextTargetOrdinal !== targetCount) {
-    throw new Error("Calibration tree target-detail descriptors do not cover every target.");
-  }
+  validateTargetShardDescriptors({
+    value: parts.targetDetails,
+    targetCount,
+    country,
+    buildArtifactId,
+    label: "target-detail",
+    maxRawBytes: CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES,
+    partForIndex: targetDetailsPart,
+  });
   return value as CalibrationTreeIndexArtifact;
 }
 
@@ -1302,60 +1421,13 @@ function validatePostings(
   }
 }
 
-export function parseCalibrationTreeTargetIndex(
+export function parseCalibrationTreeFilterIndex(
   value: unknown,
-): CalibrationTreeTargetIndexArtifact {
-  const part = validateIdentity(value, "target-index");
-  validateComparisonMetadata(part.comparison);
-  if (!Array.isArray(part.targets)) {
-    throw new Error("Calibration tree indexed targets must be an array.");
+): CalibrationTreeFilterIndexArtifact {
+  const part = validateIdentity(value, "filter-index");
+  if (!Number.isSafeInteger(part.targetCount) || (part.targetCount as number) < 0) {
+    throw new Error("Calibration tree filter index has an invalid target count.");
   }
-  const ids = new Set<string>();
-  part.targets.forEach((item, index) => {
-    const target = record(item, `Calibration tree indexed target ${index}`);
-    if (typeof target.id !== "string" || !target.id || typeof target.label !== "string") {
-      throw new Error(`Calibration tree indexed target ${index} has invalid identity fields.`);
-    }
-    if (ids.has(target.id)) throw new Error(`Calibration target id ${target.id} is duplicated.`);
-    ids.add(target.id);
-    validateMetricInputs(target.metricInputs, `Calibration tree indexed target ${index}`);
-    const comparison = record(
-      target.comparison,
-      `Calibration tree indexed target ${index} comparison`,
-    );
-    for (const key of [
-      "normalizedBaseName",
-      "chronicleFactKey",
-      "structuredIdentity",
-    ] as const) {
-      if (comparison[key] != null && typeof comparison[key] !== "string") {
-        throw new Error(
-          `Calibration tree indexed target ${index} comparison ${key} is invalid.`,
-        );
-      }
-    }
-    if (!['legacy', 'structured', 'hierarchy'].includes(String(comparison.representation))) {
-      throw new Error(
-        `Calibration tree indexed target ${index} comparison representation is invalid.`,
-      );
-    }
-    record(
-      comparison.row,
-      `Calibration tree indexed target ${index} comparison row`,
-    );
-    const location = record(
-      target.detailLocation,
-      `Calibration tree indexed target ${index} detailLocation`,
-    );
-    if (
-      !Number.isSafeInteger(location.shardIndex) ||
-      (location.shardIndex as number) < 0 ||
-      !Number.isSafeInteger(location.offset) ||
-      (location.offset as number) < 0
-    ) {
-      throw new Error(`Calibration tree indexed target ${index} has an invalid detail location.`);
-    }
-  });
   const postings = record(part.postings, "Calibration tree filter postings");
   for (const key of [
     "geographyLevels",
@@ -1366,11 +1438,73 @@ export function parseCalibrationTreeTargetIndex(
   ]) {
     validatePostings(
       postings[key],
-      part.targets.length,
+      part.targetCount as number,
       `Calibration tree filter postings ${key}`,
     );
   }
-  return value as CalibrationTreeTargetIndexArtifact;
+  return value as CalibrationTreeFilterIndexArtifact;
+}
+
+export function parseCalibrationTreeTargetSummary(
+  value: unknown,
+  expectedPart?: CalibrationTreeTargetSummaryPart,
+): CalibrationTreeTargetSummaryArtifact {
+  const part = validateIdentity(value, expectedPart);
+  if (typeof part.part !== "string" || !TARGET_SUMMARY_PART_RE.test(part.part)) {
+    throw new Error("Calibration tree target-summary part name is invalid.");
+  }
+  if (
+    !Number.isSafeInteger(part.startTargetOrdinal) ||
+    (part.startTargetOrdinal as number) < 0 ||
+    !Number.isSafeInteger(part.endTargetOrdinalExclusive) ||
+    (part.endTargetOrdinalExclusive as number) <= (part.startTargetOrdinal as number)
+  ) {
+    throw new Error("Calibration tree target-summary range is invalid.");
+  }
+  if (!Array.isArray(part.targets)) {
+    throw new Error("Calibration tree target summaries must be an array.");
+  }
+  if (
+    part.targets.length !==
+      (part.endTargetOrdinalExclusive as number) - (part.startTargetOrdinal as number)
+  ) {
+    throw new Error("Calibration tree target-summary count does not match its range.");
+  }
+  const ids = new Set<string>();
+  part.targets.forEach((item, index) => {
+    const target = record(item, `Calibration tree target summary ${index}`);
+    if (typeof target.id !== "string" || !target.id || typeof target.label !== "string") {
+      throw new Error(`Calibration tree target summary ${index} has invalid identity fields.`);
+    }
+    if (ids.has(target.id)) throw new Error(`Calibration target id ${target.id} is duplicated.`);
+    ids.add(target.id);
+    validateMetricInputs(target.metricInputs, `Calibration tree target summary ${index}`);
+    const comparison = record(
+      target.comparison,
+      `Calibration tree target summary ${index} comparison`,
+    );
+    for (const key of [
+      "normalizedBaseName",
+      "chronicleFactKey",
+      "structuredIdentity",
+    ] as const) {
+      if (comparison[key] != null && typeof comparison[key] !== "string") {
+        throw new Error(
+          `Calibration tree target summary ${index} comparison ${key} is invalid.`,
+        );
+      }
+    }
+    if (!['legacy', 'structured', 'hierarchy'].includes(String(comparison.representation))) {
+      throw new Error(
+        `Calibration tree target summary ${index} comparison representation is invalid.`,
+      );
+    }
+    record(
+      comparison.row,
+      `Calibration tree target summary ${index} comparison row`,
+    );
+  });
+  return value as CalibrationTreeTargetSummaryArtifact;
 }
 
 export function parseCalibrationTreeTargetDetails(
@@ -1410,7 +1544,13 @@ export function parseCalibrationTreePart(
 ): CalibrationTreeArtifactPart {
   const identity = validateIdentity(value, expectedPart);
   if (identity.part === "index") return parseCalibrationTreeIndex(value);
-  if (identity.part === "target-index") return parseCalibrationTreeTargetIndex(value);
+  if (identity.part === "filter-index") return parseCalibrationTreeFilterIndex(value);
+  if (TARGET_SUMMARY_PART_RE.test(String(identity.part))) {
+    return parseCalibrationTreeTargetSummary(
+      value,
+      identity.part as CalibrationTreeTargetSummaryPart,
+    );
+  }
   if (TARGET_DETAILS_PART_RE.test(String(identity.part))) {
     return parseCalibrationTreeTargetDetails(
       value,
@@ -1469,17 +1609,17 @@ function selectedPath(state: ExplorerState): ExplorerNodeSelection[] {
 }
 
 function membershipForFilters(
-  targetIndex: CalibrationTreeTargetIndexArtifact,
+  filterIndex: CalibrationTreeFilterIndexArtifact,
   filters: ExplorerState["filters"],
 ): Uint8Array {
-  const membership = new Uint8Array(targetIndex.targets.length);
+  const membership = new Uint8Array(filterIndex.targetCount);
   membership.fill(1);
   for (const [key, selected] of Object.entries(filters) as Array<
     [keyof ExplorerState["filters"], string[]]
   >) {
     if (!selected.length) continue;
-    const category = new Uint8Array(targetIndex.targets.length);
-    const postings = targetIndex.postings[key] as CalibrationTreePosting[];
+    const category = new Uint8Array(filterIndex.targetCount);
+    const postings = filterIndex.postings[key] as CalibrationTreePosting[];
     for (const posting of postings) {
       if (posting.value != null && selected.includes(posting.value)) {
         for (const targetOrdinal of posting.targetOrdinals) category[targetOrdinal] = 1;
@@ -1490,6 +1630,43 @@ function membershipForFilters(
     }
   }
   return membership;
+}
+
+export function calibrationTreeTargetsFromSummaries(
+  index: CalibrationTreeIndexArtifact,
+  summaries: CalibrationTreeTargetSummaryArtifact[],
+): CalibrationTreeTargetSummary[] {
+  if (summaries.length !== index.parts.targetSummaries.length) {
+    throw new Error("Calibration tree target-summary shards are incomplete.");
+  }
+  const targets: CalibrationTreeTargetSummary[] = [];
+  const ids = new Set<string>();
+  summaries.forEach((summary, shardIndex) => {
+    const descriptor = index.parts.targetSummaries[shardIndex];
+    if (
+      !descriptor ||
+      summary.part !== descriptor.part ||
+      summary.country !== index.country ||
+      summary.buildArtifactId !== index.buildArtifactId ||
+      summary.startTargetOrdinal !== descriptor.startTargetOrdinal ||
+      summary.endTargetOrdinalExclusive !== descriptor.endTargetOrdinalExclusive
+    ) {
+      throw new Error(
+        `Calibration tree target-summary shard ${shardIndex + 1} has an unexpected range or identity.`,
+      );
+    }
+    for (const target of summary.targets) {
+      if (ids.has(target.id)) {
+        throw new Error(`Calibration target id ${target.id} is duplicated across summary shards.`);
+      }
+      ids.add(target.id);
+      targets.push(target);
+    }
+  });
+  if (targets.length !== index.targetCount) {
+    throw new Error("Calibration tree target-summary shards do not match the target count.");
+  }
+  return targets;
 }
 
 function targetDetailForOrdinal(
@@ -1535,16 +1712,23 @@ export function calibrationTreeResponseFromBundle(
   if (!level) return null;
 
   const hasFilters = Object.values(state.filters).some((values) => values.length > 0);
-  if (hasFilters && !bundle.targetIndex) return null;
-  const membership = bundle.targetIndex
-    ? membershipForFilters(bundle.targetIndex, state.filters)
+  if (
+    bundle.filterIndex &&
+    bundle.filterIndex.targetCount !== bundle.index.targetCount
+  ) {
+    throw new Error("Calibration tree filter index does not match the target count.");
+  }
+  const targets = bundle.targetSummaries;
+  if (hasFilters && (!bundle.filterIndex || !targets)) return null;
+  const membership = bundle.filterIndex
+    ? membershipForFilters(bundle.filterIndex, state.filters)
     : null;
   const filterIndices = (indices: number[]) =>
     membership ? indices.filter((index) => membership[index] === 1) : indices;
   const metrics = (indices: number[], fallback: CalibrationTreeMetrics) =>
-    hasFilters && bundle.targetIndex
+    hasFilters && targets
       ? calibrationTreeMetricsFromInputs(
-          indices.map((index) => bundle.targetIndex!.targets[index].metricInputs),
+          indices.map((index) => targets[index].metricInputs),
         )
       : fallback;
 
@@ -1593,7 +1777,8 @@ export function calibrationTreeResponseFromBundle(
 
 export function isCalibrationTreePart(value: string): value is CalibrationTreePart {
   return value === "index" ||
-    value === "target-index" ||
+    value === "filter-index" ||
+    (TARGET_SUMMARY_PART_RE.test(value) && value !== "target-summary-0000") ||
     (TARGET_DETAILS_PART_RE.test(value) && value !== "target-details-0000") ||
     TIER_PART_RE.test(value);
 }

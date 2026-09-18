@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 
-import { buildTargetChangeDatasetFromIndexes } from "./calibration-build-comparison";
-import type {
-  CalibrationTreeIndexArtifact,
-  CalibrationTreeTargetIndexArtifact,
+import { buildTargetChangeDatasetFromSummaries } from "./calibration-build-comparison";
+import {
+  CALIBRATION_TREE_SCHEMA_VERSION,
+  calibrationTreePartPath,
+  type CalibrationTreeIndexArtifact,
+  type CalibrationTreeTargetSummary,
 } from "./calibration-tree-artifact";
 import type { CalibrationTreeTarget } from "./calibration-tree";
 import {
@@ -14,7 +16,8 @@ import { targetChangeForMode, type TargetChangeMode } from "./target-change";
 
 export interface ComparisonBundleSource {
   index: CalibrationTreeIndexArtifact;
-  targetIndex: CalibrationTreeTargetIndexArtifact;
+  indexSha256: string;
+  targetSummaries: CalibrationTreeTargetSummary[];
 }
 
 export interface CalibrationComparisonBundles {
@@ -33,7 +36,7 @@ export function calibrationComparisonPairArtifactId(
   candidateBuildArtifactId: string,
 ): string {
   return sha256(JSON.stringify({
-    schemaVersion: 4,
+    schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
     country,
     currentBuildArtifactId,
     candidateBuildArtifactId,
@@ -45,14 +48,14 @@ export function calibrationComparisonBuildArtifactId(
   mode: TargetChangeMode,
 ): string {
   return sha256(JSON.stringify({
-    schemaVersion: 4,
+    schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
     pairArtifactId,
     mode,
   }));
 }
 
 function rowsForMode(
-  rows: ReturnType<typeof buildTargetChangeDatasetFromIndexes>["rows"],
+  rows: ReturnType<typeof buildTargetChangeDatasetFromSummaries>["rows"],
   mode: TargetChangeMode,
 ): CalibrationTreeTarget[] {
   return rows.flatMap((row) => {
@@ -69,12 +72,6 @@ export function buildCalibrationComparisonBundles(
   if (current.index.country !== candidate.index.country) {
     throw new Error("Calibration builds from different countries cannot be compared.");
   }
-  if (
-    current.index.buildArtifactId !== current.targetIndex.buildArtifactId ||
-    candidate.index.buildArtifactId !== candidate.targetIndex.buildArtifactId
-  ) {
-    throw new Error("Calibration comparison source parts have inconsistent identities.");
-  }
   const country = current.index.country;
   const currentBuildArtifactId = current.index.buildArtifactId;
   const candidateBuildArtifactId = candidate.index.buildArtifactId;
@@ -83,9 +80,17 @@ export function buildCalibrationComparisonBundles(
     currentBuildArtifactId,
     candidateBuildArtifactId,
   );
-  const dataset = buildTargetChangeDatasetFromIndexes(
-    current.targetIndex,
-    candidate.targetIndex,
+  const dataset = buildTargetChangeDatasetFromSummaries(
+    {
+      country,
+      comparison: current.index.targetComparison,
+      targets: current.targetSummaries,
+    },
+    {
+      country,
+      comparison: candidate.index.targetComparison,
+      targets: candidate.targetSummaries,
+    },
   );
   const buildForMode = (mode: TargetChangeMode): CalibrationTreeBundle => {
     const buildArtifactId = calibrationComparisonBuildArtifactId(
@@ -107,19 +112,19 @@ export function buildCalibrationComparisonBundles(
         buildManifest: null,
         releaseManifest: null,
         demographics: null,
-        comparisonCurrentTargetIndex: {
-          path: current.index.parts.targetIndex.path,
-          sha256: current.index.parts.targetIndex.sha256,
+        comparisonCurrentIndex: {
+          path: calibrationTreePartPath(country, currentBuildArtifactId, "index"),
+          sha256: current.indexSha256,
         },
-        comparisonCandidateTargetIndex: {
-          path: candidate.index.parts.targetIndex.path,
-          sha256: candidate.index.parts.targetIndex.sha256,
+        comparisonCandidateIndex: {
+          path: calibrationTreePartPath(country, candidateBuildArtifactId, "index"),
+          sha256: candidate.indexSha256,
         },
       },
       rows: rowsForMode(dataset.rows, mode),
       calibrationProvenance: dataset.candidate.calibrationProvenance,
       lossAttributionAvailable: dataset.available,
-      comparison: candidate.targetIndex.comparison,
+      comparison: candidate.index.targetComparison,
       comparisonResult: {
         pairArtifactId,
         currentBuildArtifactId,

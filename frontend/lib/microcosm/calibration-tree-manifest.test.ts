@@ -18,7 +18,7 @@ const entry: CalibrationTreeManifestEntry = {
   stagingRunId: null,
   hfRepo: "policyengine/populace-us",
   hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-  treeSchemaVersion: 4,
+  treeSchemaVersion: 5,
   indexSha256: "b".repeat(64),
   indexBytes: 1234,
   createdAt: "2026-09-15T12:00:00.000Z",
@@ -52,19 +52,19 @@ test("manifest updates one country without replacing other country entries", () 
 
 test("manifest validation rejects mutable or malformed content identities", () => {
   expect(() => parseCalibrationTreeManifest({
-    schemaVersion: 4,
+    schemaVersion: 5,
     countries: {
       us: { latestReleaseBuildArtifactId: null, builds: [{ ...entry, hfCommitSha: "main" }] },
     },
   })).toThrow("invalid HF commit SHA");
   expect(() => parseCalibrationTreeManifest({
-    schemaVersion: 4,
+    schemaVersion: 5,
     countries: {
       us: { latestReleaseBuildArtifactId: null, builds: [{ ...entry, indexSha256: "short" }] },
     },
   })).toThrow("invalid index hash");
   expect(() => parseCalibrationTreeManifest({
-    schemaVersion: 2,
+    schemaVersion: 4,
     countries: {},
-  })).toThrow("Unsupported calibration tree manifest schema 2");
+  })).toThrow("Unsupported calibration tree manifest schema 4");
 });

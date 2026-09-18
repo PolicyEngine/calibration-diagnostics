@@ -1,11 +1,21 @@
 import type { Calibration } from "./latest-artifact";
-import type { CalibrationTreeTargetIndexArtifact } from "./calibration-tree-artifact";
+import type {
+  CalibrationTreeComparisonMetadata,
+  CalibrationTreeTargetSummary,
+} from "./calibration-tree-artifact";
+import type { MicrocosmCountry } from "./countries";
 import { buildTargetChangeDataset, type TargetChangeDataset } from "./target-change";
 
-function calibrationFromTargetIndex(
-  index: CalibrationTreeTargetIndexArtifact,
+export interface CalibrationTreeComparisonInput {
+  country: MicrocosmCountry;
+  comparison: CalibrationTreeComparisonMetadata;
+  targets: CalibrationTreeTargetSummary[];
+}
+
+function calibrationFromTargetSummaries(
+  input: CalibrationTreeComparisonInput,
 ): Calibration {
-  const comparison = index.comparison;
+  const comparison = input.comparison;
   return {
     release_id: comparison.releaseId,
     calibration_provenance: comparison.calibrationProvenance ?? {
@@ -39,19 +49,19 @@ function calibrationFromTargetIndex(
           : null,
       targets: [],
     },
-    rows: index.targets.map((target) => target.comparison.row),
+    rows: input.targets.map((target) => target.comparison.row),
   } as unknown as Calibration;
 }
 
-export function buildTargetChangeDatasetFromIndexes(
-  current: CalibrationTreeTargetIndexArtifact,
-  candidate: CalibrationTreeTargetIndexArtifact,
+export function buildTargetChangeDatasetFromSummaries(
+  current: CalibrationTreeComparisonInput,
+  candidate: CalibrationTreeComparisonInput,
 ): TargetChangeDataset {
   if (current.country !== candidate.country) {
     throw new Error("Calibration builds from different countries cannot be compared.");
   }
   return buildTargetChangeDataset(
-    calibrationFromTargetIndex(current),
-    calibrationFromTargetIndex(candidate),
+    calibrationFromTargetSummaries(current),
+    calibrationFromTargetSummaries(candidate),
   );
 }

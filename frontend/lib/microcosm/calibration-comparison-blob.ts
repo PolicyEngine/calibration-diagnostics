@@ -7,8 +7,9 @@ import {
   type ComparisonBundleSource,
 } from "./calibration-comparison-bundle";
 import {
+  calibrationTreeTargetsFromSummaries,
   parseCalibrationTreeIndex,
-  parseCalibrationTreeTargetIndex,
+  parseCalibrationTreeTargetSummary,
 } from "./calibration-tree-artifact";
 import {
   getCalibrationTreeBlob,
@@ -62,12 +63,13 @@ function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-async function loadSource(
+export async function loadCalibrationComparisonSource(
   country: MicrocosmCountry,
   buildArtifactId: string,
+  getBlob: typeof getCalibrationTreeBlob = getCalibrationTreeBlob,
 ): Promise<ComparisonBundleSource> {
   const indexText = await textFromBlob(
-    await getCalibrationTreeBlob({
+    await getBlob({
       country,
       buildArtifactId,
       part: "index",
@@ -76,28 +78,36 @@ async function loadSource(
     `Calibration build ${buildArtifactId} index`,
   );
   const index = parseCalibrationTreeIndex(JSON.parse(indexText));
+  if (index.country !== country || index.buildArtifactId !== buildArtifactId) {
+    throw new Error(`Calibration build ${buildArtifactId} index identity is inconsistent.`);
+  }
   if (index.build.kind === "comparison") {
     throw new Error("A derived comparison cannot be used as a source build.");
   }
-  const targetIndexText = await textFromBlob(
-    await getCalibrationTreeBlob({
-      country,
-      buildArtifactId,
-      part: "target-index",
-      consistent: true,
+  const targetSummaries = await Promise.all(
+    index.parts.targetSummaries.map(async (descriptor) => {
+      const text = await textFromBlob(
+        await getBlob({
+          country,
+          buildArtifactId,
+          part: descriptor.part,
+          consistent: true,
+        }),
+        `Calibration build ${buildArtifactId} ${descriptor.part}`,
+      );
+      if (sha256(text) !== descriptor.sha256) {
+        throw new Error(
+          `Calibration build ${buildArtifactId} ${descriptor.part} digest is invalid.`,
+        );
+      }
+      return parseCalibrationTreeTargetSummary(JSON.parse(text), descriptor.part);
     }),
-    `Calibration build ${buildArtifactId} target index`,
   );
-  if (sha256(targetIndexText) !== index.parts.targetIndex.sha256) {
-    throw new Error(`Calibration build ${buildArtifactId} target index digest is invalid.`);
-  }
-  const targetIndex = parseCalibrationTreeTargetIndex(
-    JSON.parse(targetIndexText),
-  );
-  if (targetIndex.buildArtifactId !== buildArtifactId) {
-    throw new Error(`Calibration build ${buildArtifactId} has inconsistent parts.`);
-  }
-  return { index, targetIndex };
+  return {
+    index,
+    indexSha256: sha256(indexText),
+    targetSummaries: calibrationTreeTargetsFromSummaries(index, targetSummaries),
+  };
 }
 
 async function comparisonExists(
@@ -130,8 +140,8 @@ async function buildAndPublishComparison(options: {
   if (reportedExists && sharedExists) return result;
 
   const [current, candidate] = await Promise.all([
-    loadSource(options.country, options.currentBuildArtifactId),
-    loadSource(options.country, options.candidateBuildArtifactId),
+    loadCalibrationComparisonSource(options.country, options.currentBuildArtifactId),
+    loadCalibrationComparisonSource(options.country, options.candidateBuildArtifactId),
   ]);
   const bundles = buildCalibrationComparisonBundles(current, candidate);
   if (bundles.pairArtifactId !== result.pairArtifactId) {

@@ -1,11 +1,12 @@
 import { isCountry, type MicrocosmCountry } from "./countries";
 import {
+  CALIBRATION_TREE_SCHEMA_VERSION,
   isHfCommitSha,
   isSha256,
   type CalibrationTreeBuildKind,
 } from "./calibration-tree-artifact";
 
-export const CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION = 4 as const;
+export const CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION = 5 as const;
 export const CALIBRATION_TREE_MANIFEST_PATH = "calibration-trees/manifest.json";
 
 export interface CalibrationTreeManifestEntry {
@@ -17,7 +18,7 @@ export interface CalibrationTreeManifestEntry {
   stagingRunId: string | null;
   hfRepo: string;
   hfCommitSha: string;
-  treeSchemaVersion: 4;
+  treeSchemaVersion: typeof CALIBRATION_TREE_SCHEMA_VERSION;
   indexSha256: string;
   indexBytes: number;
   createdAt: string | null;
@@ -97,7 +98,7 @@ function parseEntry(value: unknown, country: string): CalibrationTreeManifestEnt
   ) {
     throw new Error(`Calibration tree manifest entry ${country} has inconsistent aliases.`);
   }
-  if (entry.treeSchemaVersion !== 4) {
+  if (entry.treeSchemaVersion !== CALIBRATION_TREE_SCHEMA_VERSION) {
     throw new Error(`Calibration tree manifest entry ${country} has an unsupported tree schema.`);
   }
   if (typeof entry.indexSha256 !== "string" || !isSha256(entry.indexSha256)) {
