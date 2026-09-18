@@ -14,6 +14,7 @@ import {
   createExplorerState,
   selectExplorerNode,
   type CalibrationStatus,
+  type ComparisonFit,
   type ExplorerNodeSelection,
   type ExplorerState,
   type FitBand,
@@ -33,6 +34,13 @@ import type {
   TargetRepresentation,
   TargetRowRepresentation,
 } from "./target-representation";
+import type {
+  TargetChangeAttributionSide,
+  TargetChangeMethodology,
+  TargetChangeMode,
+  TargetChangeSummary,
+} from "./target-change";
+import type { TargetMatchingSummary } from "./target-surface-matcher";
 
 export const CALIBRATION_TREE_SCHEMA_VERSION = 4 as const;
 export const CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES = 4_000_000;
@@ -51,10 +59,12 @@ export interface CalibrationTreeSourceArtifact {
 }
 
 export interface CalibrationTreeSourceArtifacts {
-  calibrationDiagnostics: CalibrationTreeSourceArtifact;
+  calibrationDiagnostics: CalibrationTreeSourceArtifact | null;
   buildManifest: CalibrationTreeSourceArtifact | null;
   releaseManifest: CalibrationTreeSourceArtifact | null;
   demographics: CalibrationTreeSourceArtifact | null;
+  comparisonCurrentTargetIndex?: CalibrationTreeSourceArtifact | null;
+  comparisonCandidateTargetIndex?: CalibrationTreeSourceArtifact | null;
 }
 
 export type CalibrationTreeBuildKind = "release" | "staging" | "comparison";
@@ -100,6 +110,20 @@ export interface CalibrationTreeComparisonMetadata {
   targetRepresentation: TargetRepresentation;
 }
 
+export interface CalibrationTreeComparisonResultMetadata {
+  pairArtifactId: string;
+  currentBuildArtifactId: string;
+  candidateBuildArtifactId: string;
+  mode: TargetChangeMode;
+  available: boolean;
+  reason: string | null;
+  current: TargetChangeAttributionSide;
+  candidate: TargetChangeAttributionSide;
+  methodology: TargetChangeMethodology;
+  matching: TargetMatchingSummary;
+  summary: TargetChangeSummary | null;
+}
+
 export interface CalibrationTreePosting<T extends string | null = string> {
   value: T;
   targetOrdinals: number[];
@@ -109,7 +133,7 @@ export interface CalibrationTreeFilterPostings {
   geographyLevels: CalibrationTreePosting[];
   geographies: CalibrationTreePosting[];
   fitBands: CalibrationTreePosting<FitBand>[];
-  comparisonFits: CalibrationTreePosting[];
+  comparisonFits: CalibrationTreePosting<ComparisonFit | null>[];
   calibrationStatuses: CalibrationTreePosting<CalibrationStatus | null>[];
 }
 
@@ -188,6 +212,7 @@ export interface CalibrationTreeIndexArtifact
   extends CalibrationTreePartIdentity {
   part: "index";
   build: CalibrationTreeBuild;
+  comparison?: CalibrationTreeComparisonResultMetadata;
   calibrationProvenance?: CalibrationProvenance;
   lossAttributionAvailable: boolean;
   filterOptions: CalibrationTreeResponse["filterOptions"];
@@ -239,6 +264,7 @@ export interface CalibrationTreeBundleDraft {
   country: MicrocosmCountry;
   build: CalibrationTreeBuild;
   comparison: CalibrationTreeComparisonMetadata;
+  comparisonResult?: CalibrationTreeComparisonResultMetadata;
   calibrationProvenance?: CalibrationProvenance;
   lossAttributionAvailable: boolean;
   filterOptions: CalibrationTreeResponse["filterOptions"];
@@ -250,6 +276,7 @@ export interface CalibrationTreeBundleDraft {
       geographyLevel: string;
       geography: string;
       fitBand: FitBand;
+      comparisonFit: ComparisonFit | null;
       calibrationStatus: CalibrationStatus | null;
     };
     detail: CalibrationTreeTarget;
@@ -282,13 +309,14 @@ export interface CompileCalibrationTreeInput {
   label?: string;
   createdAt?: string | null;
   releaseId: string;
-  hfRepo: string;
-  hfCommitSha: string;
+  hfRepo: string | null;
+  hfCommitSha: string | null;
   sourceArtifacts: CalibrationTreeSourceArtifacts;
   rows: CalibrationTreeTarget[];
   calibrationProvenance?: CalibrationProvenance;
   lossAttributionAvailable?: boolean;
   comparison?: CalibrationTreeComparisonMetadata;
+  comparisonResult?: CalibrationTreeComparisonResultMetadata;
 }
 
 const DEFAULT_GEOGRAPHY = "United States";
@@ -392,6 +420,13 @@ function compiledTarget(
         String(row.level ?? "").trim() || DEFAULT_GEOGRAPHY_LEVEL,
       geography: String(row.geography ?? "").trim() || DEFAULT_GEOGRAPHY,
       fitBand: fitBandForTarget(row),
+      comparisonFit:
+        row.comparison_fit === "improved" ||
+        row.comparison_fit === "regressed" ||
+        row.comparison_fit === "unchanged" ||
+        row.comparison_fit === "not_applicable"
+          ? row.comparison_fit
+          : null,
       calibrationStatus: normalizeStatus(row.calibration_status),
     },
     metricInputs: {
@@ -467,11 +502,17 @@ function inferredTargetRepresentation(
 export function compileCalibrationTreeBundleDraft(
   input: CompileCalibrationTreeInput,
 ): CalibrationTreeBundleDraft {
-  if (!HF_COMMIT_RE.test(input.hfCommitSha)) {
+  if (
+    input.buildKind !== "comparison" &&
+    (input.hfCommitSha == null || !HF_COMMIT_RE.test(input.hfCommitSha))
+  ) {
     throw new Error(`Invalid Hugging Face commit SHA: ${input.hfCommitSha}`);
   }
-  const buildArtifactId =
-    input.buildArtifactId ?? input.sourceArtifacts.calibrationDiagnostics.sha256;
+  const buildArtifactId = input.buildArtifactId ??
+    input.sourceArtifacts.calibrationDiagnostics?.sha256;
+  if (!buildArtifactId) {
+    throw new Error("A calibration build artifact id is required.");
+  }
   if (!SHA256_RE.test(buildArtifactId)) {
     throw new Error(`Invalid calibration build artifact id: ${buildArtifactId}`);
   }
@@ -615,6 +656,7 @@ export function compileCalibrationTreeBundleDraft(
       basisIdentifier: null,
       targetRepresentation: inferredTargetRepresentation(rows),
     },
+    comparisonResult: input.comparisonResult,
     calibrationProvenance: input.calibrationProvenance,
     lossAttributionAvailable,
     filterOptions: filterOptions ?? {
@@ -676,7 +718,9 @@ export function calibrationTreeTargetIndexFromDraft(
       fitBands: postingValues(
         draft.targets.map((target) => target.facets.fitBand),
       ),
-      comparisonFits: [],
+      comparisonFits: postingValues(
+        draft.targets.map((target) => target.facets.comparisonFit),
+      ),
       calibrationStatuses: postingValues(
         draft.targets.map((target) => target.facets.calibrationStatus),
       ),
@@ -1021,10 +1065,19 @@ function validateBuild(
     "buildManifest",
     "releaseManifest",
     "demographics",
+    "comparisonCurrentTargetIndex",
+    "comparisonCandidateTargetIndex",
   ]) {
     if (sources[key] == null) {
-      if (key === "calibrationDiagnostics") {
+      if (key === "calibrationDiagnostics" && build.kind !== "comparison") {
         throw new Error("Calibration diagnostics source is missing.");
+      }
+      if (
+        build.kind === "comparison" &&
+        (key === "comparisonCurrentTargetIndex" ||
+          key === "comparisonCandidateTargetIndex")
+      ) {
+        throw new Error(`Calibration comparison source ${key} is missing.`);
       }
       continue;
     }
@@ -1049,6 +1102,24 @@ export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexA
   const country = index.country as MicrocosmCountry;
   const buildArtifactId = index.buildArtifactId as string;
   validateBuild(index.build, country, buildArtifactId);
+  if (index.comparison != null) {
+    const comparison = record(index.comparison, "Calibration tree comparison result");
+    for (const key of [
+      "pairArtifactId",
+      "currentBuildArtifactId",
+      "candidateBuildArtifactId",
+    ] as const) {
+      if (typeof comparison[key] !== "string" || !SHA256_RE.test(comparison[key])) {
+        throw new Error(`Calibration tree comparison ${key} is invalid.`);
+      }
+    }
+    if (comparison.mode !== "reported" && comparison.mode !== "shared") {
+      throw new Error("Calibration tree comparison mode is invalid.");
+    }
+    if (typeof comparison.available !== "boolean") {
+      throw new Error("Calibration tree comparison availability is invalid.");
+    }
+  }
   if (typeof index.lossAttributionAvailable !== "boolean") {
     throw new Error("Calibration tree loss-attribution availability must be boolean.");
   }
