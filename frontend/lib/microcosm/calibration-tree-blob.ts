@@ -36,6 +36,15 @@ export interface CalibrationTreeBlobClient {
 
 const DEFAULT_BLOB_CLIENT: CalibrationTreeBlobClient = { get, put };
 
+function isManifestWriteConflict(error: unknown): boolean {
+  return error instanceof BlobPreconditionFailedError ||
+    (error instanceof Error && /precondition failed.*etag mismatch/i.test(error.message));
+}
+
+function retryDelay(attempt: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, Math.min(100 * 2 ** attempt, 1_000)));
+}
+
 function tokenOption(token?: string): { token: string } | Record<string, never> {
   return token ? { token } : {};
 }
@@ -196,7 +205,7 @@ export async function updateCalibrationTreeManifest(options: {
   retries?: number;
   client?: CalibrationTreeBlobClient;
 }): Promise<CalibrationTreeManifest> {
-  const retries = options.retries ?? 3;
+  const retries = options.retries ?? 5;
   let lastError: unknown;
   for (let attempt = 0; attempt < retries; attempt += 1) {
     const current = await readCalibrationTreeManifest({
@@ -244,7 +253,8 @@ export async function updateCalibrationTreeManifest(options: {
       return verified.manifest;
     } catch (error) {
       lastError = error;
-      if (current.etag && !(error instanceof BlobPreconditionFailedError)) throw error;
+      if (!isManifestWriteConflict(error)) throw error;
+      if (attempt + 1 < retries) await retryDelay(attempt);
     }
   }
   throw lastError instanceof Error
