@@ -203,8 +203,11 @@ Never use a `NEXT_PUBLIC_` prefix for these values.
    `BLOB_READ_WRITE_TOKEN`.
 2. Store the Hugging Face credential as `HF_TOKEN` when any source repository
    is private.
-3. Store `GITHUB_ACTIONS_DISPATCH_TOKEN` and `HF_WEBHOOK_SECRET` only in Vercel.
-4. Configure the same webhook secret on every release and staging Hugging Face
+3. Store any country-specific staging credential under the registration's
+   `token_env` name in both GitHub Actions and Vercel. The UK registration uses
+   `POPULACE_UK_STAGING_HF_TOKEN`.
+4. Store `GITHUB_ACTIONS_DISPATCH_TOKEN` and `HF_WEBHOOK_SECRET` only in Vercel.
+5. Configure the same webhook secret on every release and staging Hugging Face
    repository.
 
 ## Historical regeneration
