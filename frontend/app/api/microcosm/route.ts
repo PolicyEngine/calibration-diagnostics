@@ -50,7 +50,7 @@ export async function GET(request: Request) {
                 ...(isLatestRequest
                   ? [{
                       name: "dashboard_manifest",
-                      path: "calibration-trees/latest.json",
+                      path: "calibration-trees/manifest.json",
                       url: new URL(
                         withBasePath(`/api/microcosm/tree-manifest?country=${country}`),
                         request.url,

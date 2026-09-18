@@ -44,7 +44,9 @@ dashboard API layer.
 
 ## API
 
-The Next.js route handlers are the API layer; all read live from Hugging Face:
+The Next.js route handlers are the API layer. Mutable staging data reads from
+Hugging Face; immutable calibration trees and comparisons read through private
+Vercel Blob storage.
 
 Published-release endpoints accept `country=us|uk|be` (default `us`).
 
@@ -52,8 +54,9 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 |---|---|
 | `GET /api/microcosm/releases` | List published releases (newest first) |
 | `GET /api/microcosm?release=<id>` | Release summary (default: latest) |
-| `GET /api/microcosm/tree?country=<code>&release=<id>&part=<part>` | Redirect to an exact commit and stream one immutable tree-bundle part |
-| `GET /api/microcosm/tree-manifest?country=<code>` | Return the dashboard's current release and immutable tree identity |
+| `GET /api/microcosm/tree?country=<code>&release=<id>&part=<part>` | Redirect to an exact build artifact ID and stream one immutable tree-bundle part |
+| `GET /api/microcosm/tree-manifest?country=<code>` | List selectable release and finalized-staging builds and the current release build |
+| `GET /api/microcosm/comparison-tree?country=<code>&a=<build>&b=<build>&mode=reported\|shared&part=<part>` | Build an ordered pair once when absent, then stream its immutable comparison-tree parts |
 | `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics |
 | `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks |
 | `GET /api/microcosm/compare?a=<id>&b=<id>` | Version-over-version diff |
@@ -152,11 +155,11 @@ cache behavior.
 
 The US variable-calculation service uses its reviewed immutable release. Leave
 `POPULACE_HF_REPO` and `POPULACE_HF_REVISION` unset for that service; conflicting
-overrides fail validation. Dashboard release discovery is separate: it resolves
-the registered US repository's `main` branch to an exact commit before reading
-`latest.json`, then uses the release tag when one exists. Repositories without
-release tags use that exact source-branch commit as the immutable release
-identity. Optional
+overrides fail validation. Dashboard release discovery is separate: automated
+publication resolves Hugging Face sources to exact commits and records every
+immutable build in the dashboard's Vercel Blob manifest. The dashboard resolves
+both current and historical calibration maps through that manifest and uses a
+content-derived build artifact ID as the CDN path. Optional
 `POPULACE_UK_HF_REPO`, `POPULACE_UK_HF_REVISION` configure the UK;
 and `POPULACE_BE_HF_REPO`, `POPULACE_BE_HF_REVISION` for Belgium. The Belgium
 repository defaults in code to `policyengine/populace-be-private`. Set `HF_TOKEN`
