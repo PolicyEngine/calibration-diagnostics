@@ -35,6 +35,7 @@ export interface CalibrationTreeBundleFile {
   path: string;
   artifact: CalibrationTreeArtifactPart;
   serialized: string;
+  compressed: Uint8Array;
   sha256: string;
   rawBytes: number;
   gzipBytes: number;
@@ -68,6 +69,7 @@ function sha256(value: string): string {
 
 function describePart(artifact: CalibrationTreeArtifactPart): CalibrationTreeBundleFile {
   const serialized = serializeCalibrationTreePart(artifact);
+  const compressed = gzipSync(serialized, { level: 9 });
   return {
     part: artifact.part,
     path: calibrationTreePartPath(
@@ -77,9 +79,10 @@ function describePart(artifact: CalibrationTreeArtifactPart): CalibrationTreeBun
     ),
     artifact,
     serialized,
+    compressed,
     sha256: sha256(serialized),
     rawBytes: Buffer.byteLength(serialized, "utf8"),
-    gzipBytes: gzipSync(serialized, { level: 9 }).byteLength,
+    gzipBytes: compressed.byteLength,
   };
 }
 
@@ -102,7 +105,9 @@ export function buildCalibrationTreeBundle(
     buildArtifactId:
       input.buildArtifactId ?? calibrationTreeBuildArtifactId(input),
   });
-  const targetDetails = calibrationTreeTargetDetailsFromDraft(draft);
+  const targetDetails = input.buildKind === "comparison"
+    ? { artifacts: [] }
+    : calibrationTreeTargetDetailsFromDraft(draft);
   const targetDetailsFiles = targetDetails.artifacts.map(describePart);
   const targetSummaries = calibrationTreeTargetSummariesFromDraft(draft);
   const targetSummaryFiles = targetSummaries.artifacts.map(describePart);
@@ -150,6 +155,8 @@ export function buildCalibrationTreeBundle(
         endTargetOrdinalExclusive:
           targetSummaries.artifacts[shardIndex].endTargetOrdinalExclusive,
       })),
+      targetDetailStrategy:
+        input.buildKind === "comparison" ? "source-targets" : "shards",
       targetDetails: targetDetailsFiles.map((file, shardIndex) => ({
         ...descriptor(file),
         part: file.part as CalibrationTreeTargetDetailsDescriptor["part"],
@@ -216,13 +223,22 @@ function validatePostingCoverage(
   if (
     filterIndex.targetCount !== bundle.index.targetCount ||
     summaryTargets.length !== bundle.index.targetCount ||
-    detailRows.length !== bundle.index.targetCount
+    (bundle.index.parts.targetDetailStrategy === "shards" &&
+      detailRows.length !== bundle.index.targetCount) ||
+    (bundle.index.parts.targetDetailStrategy === "source-targets" &&
+      detailRows.length !== 0)
   ) {
     throw new Error("Calibration tree target files do not match the declared target count.");
   }
   const ids = new Set(summaryTargets.map((target) => target.id));
   if (ids.size !== summaryTargets.length) {
     throw new Error("Calibration tree target summaries repeat a target id.");
+  }
+  if (
+    bundle.index.parts.targetDetailStrategy === "source-targets" &&
+    summaryTargets.some((target) => target.detailSource == null)
+  ) {
+    throw new Error("Comparison target summaries must identify their source targets.");
   }
   for (const key of [
     "geographyLevels",
@@ -237,14 +253,14 @@ function validatePostingCoverage(
       ),
     );
     const values = new Set(
-      detailRows.map((row) => expectedFacet(row, key)),
+      summaryTargets.map((target) => expectedFacet(target.comparison.row, key)),
     );
     if (actual.size !== values.size) {
       throw new Error(`Calibration tree ${key} postings do not cover every facet value.`);
     }
     for (const value of values) {
-      const expected = detailRows.flatMap((row, targetOrdinal) =>
-        expectedFacet(row, key) === value ? [targetOrdinal] : [],
+      const expected = summaryTargets.flatMap((target, targetOrdinal) =>
+        expectedFacet(target.comparison.row, key) === value ? [targetOrdinal] : [],
       );
       if (!sameIndices(actual.get(value) ?? [], expected)) {
         throw new Error(`Calibration tree ${key} posting ${String(value)} is incorrect.`);
@@ -366,7 +382,8 @@ export function validateCalibrationTreeBundle(bundle: CalibrationTreeBundle): vo
     if (
       sha256(file.serialized) !== file.sha256 ||
       Buffer.byteLength(file.serialized, "utf8") !== file.rawBytes ||
-      gzipSync(file.serialized, { level: 9 }).byteLength !== file.gzipBytes
+      gzipSync(file.serialized, { level: 9 }).byteLength !== file.gzipBytes ||
+      !Buffer.from(file.compressed).equals(gzipSync(file.serialized, { level: 9 }))
     ) {
       throw new Error(`Calibration tree part ${file.part} has incorrect content metadata.`);
     }
@@ -385,7 +402,7 @@ export function validateCalibrationTreeBundle(bundle: CalibrationTreeBundle): vo
   }
   const fileByPart = new Map(bundle.files.map((file) => [file.part, file]));
   if (serializeCalibrationTreePart(bundle.index) !== fileByPart.get("index")?.serialized) {
-    throw new Error("Calibration tree bundle index does not match index.json.");
+    throw new Error("Calibration tree bundle index does not match index.json.gz.");
   }
   for (const partDescriptor of [
     ...bundle.index.parts.tiers,

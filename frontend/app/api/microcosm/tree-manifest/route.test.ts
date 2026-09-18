@@ -13,7 +13,7 @@ test("manifest API returns one country's current immutable release identity", as
     stagingRunId: null,
     hfRepo: "policyengine/populace-us",
     hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-    treeSchemaVersion: 5 as const,
+    treeSchemaVersion: 6 as const,
     indexSha256: "a".repeat(64),
     indexBytes: 1234,
     createdAt: "2026-09-15T12:00:00.000Z",
@@ -33,7 +33,7 @@ test("manifest API returns one country's current immutable release identity", as
   ));
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({
-    schemaVersion: 5,
+    schemaVersion: 6,
     country: "us",
     latestReleaseBuildArtifactId: latest.buildArtifactId,
     builds: [latest],

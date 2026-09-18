@@ -83,13 +83,20 @@ test("comparison bundles are deterministic and contain both tree modes", () => {
     available: true,
   });
   expect(first.reported.index.build.kind).toBe("comparison");
+  expect(first.reported.index.parts.targetDetailStrategy).toBe("source-targets");
+  expect(first.reported.index.parts.targetDetails).toEqual([]);
+  expect(first.reported.files.some((file) =>
+    file.part.startsWith("target-details-"),
+  )).toBe(false);
+  expect(first.shared.index.parts.targetDetailStrategy).toBe("source-targets");
+  expect(first.shared.index.parts.targetDetails).toEqual([]);
   expect(first.reported.index.build.sourceArtifacts).toMatchObject({
     calibrationDiagnostics: null,
     comparisonCurrentIndex: {
-      path: `calibration-trees/us/${current.index.buildArtifactId}/index.json`,
+      path: `calibration-trees/us/${current.index.buildArtifactId}/index.json.gz`,
     },
     comparisonCandidateIndex: {
-      path: `calibration-trees/us/${candidate.index.buildArtifactId}/index.json`,
+      path: `calibration-trees/us/${candidate.index.buildArtifactId}/index.json.gz`,
     },
   });
 });

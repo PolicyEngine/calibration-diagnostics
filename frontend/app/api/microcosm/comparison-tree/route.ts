@@ -7,6 +7,7 @@ import {
   calibrationComparisonPairArtifactId,
 } from "@/lib/microcosm/calibration-comparison-bundle";
 import { getCalibrationTreeBlob } from "@/lib/microcosm/calibration-tree-blob";
+import { immutableCalibrationTreePartResponse } from "@/lib/microcosm/calibration-tree-http";
 import {
   isCalibrationTreePart,
   isSha256,
@@ -171,14 +172,7 @@ export function createCalibrationComparisonTreeHandler(
       if (result.statusCode === 304) {
         return new NextResponse(null, { status: 304, headers });
       }
-      if (!result.stream) throw new Error("Private Blob response did not contain a stream.");
-      return new NextResponse(result.stream, {
-        status: 200,
-        headers: {
-          ...headers,
-          "Content-Type": result.blob.contentType ?? "application/json; charset=utf-8",
-        },
-      });
+      return immutableCalibrationTreePartResponse(request, result, headers);
     } catch (error) {
       console.error("Calibration comparison Blob read failed:", error);
       return NextResponse.json(

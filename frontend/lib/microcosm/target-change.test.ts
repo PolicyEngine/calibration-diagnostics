@@ -98,6 +98,18 @@ describe("target change attribution", () => {
     expect(result.summaries.reported?.grossReduction).toBeCloseTo(0.2);
     expect(result.summaries.reported?.netChange).toBeCloseTo(-0.1);
     expect(result.summaries.reported?.reconciliationDifference).toBeCloseTo(0);
+    expect(result.rows.find((row) => row.name === "shared")).toMatchObject({
+      current_target_ordinal: 0,
+      candidate_target_ordinal: 0,
+    });
+    expect(result.rows.find((row) => row.name === "removed")).toMatchObject({
+      current_target_ordinal: 1,
+      candidate_target_ordinal: null,
+    });
+    expect(result.rows.find((row) => row.name === "added")).toMatchObject({
+      current_target_ordinal: null,
+      candidate_target_ordinal: 1,
+    });
   });
 
   test("shared mode normalizes each side over shared targets and applies pooled weights", () => {

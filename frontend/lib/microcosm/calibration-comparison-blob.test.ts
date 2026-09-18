@@ -1,22 +1,32 @@
 import { expect, test } from "bun:test";
+import { gzipSync } from "node:zlib";
 
-import { loadCalibrationComparisonSource } from "./calibration-comparison-blob";
+import {
+  loadCalibrationComparisonSource,
+  loadCalibrationComparisonTargetDetail,
+} from "./calibration-comparison-blob";
+import { buildCalibrationComparisonBundles } from "./calibration-comparison-bundle";
+import type { CalibrationTreeTargetSummaryArtifact } from "./calibration-tree-artifact";
 import { getCalibrationTreeBlob } from "./calibration-tree-blob";
 import { buildCalibrationTreeBundle } from "./calibration-tree-bundle";
 
 const BUILD = "a".repeat(64);
 
-function bundle() {
+function bundle(
+  buildArtifactId = BUILD,
+  releaseId = "release-a",
+  target = 100,
+) {
   return buildCalibrationTreeBundle({
     country: "us",
-    buildArtifactId: BUILD,
-    releaseId: "release-a",
+    buildArtifactId,
+    releaseId,
     hfRepo: "policyengine/populace-us",
-    hfCommitSha: BUILD.slice(0, 40),
+    hfCommitSha: buildArtifactId.slice(0, 40),
     sourceArtifacts: {
       calibrationDiagnostics: {
-        path: "releases/release-a/calibration_diagnostics.json",
-        sha256: BUILD,
+        path: `releases/${releaseId}/calibration_diagnostics.json`,
+        sha256: buildArtifactId,
       },
       buildManifest: null,
       releaseManifest: null,
@@ -29,7 +39,7 @@ function bundle() {
       variable: "snap",
       target_representation: "hierarchy",
       target_dimensions: [],
-      target: 100,
+      target,
       final_estimate: 105,
       abs_relative_error: 0.05,
       target_loss_weight: 1,
@@ -40,7 +50,7 @@ function bundle() {
       calibration_status: "included",
     }],
     comparison: {
-      releaseId: "release-a",
+      releaseId,
       status: "reported",
       aggregate: 0.05,
       cap: 1,
@@ -51,9 +61,10 @@ function bundle() {
 }
 
 function blobResult(pathname: string, body: string) {
+  const compressed = gzipSync(body);
   return {
     statusCode: 200 as const,
-    stream: new Blob([body]).stream(),
+    stream: new Blob([compressed]).stream(),
     headers: new Headers(),
     blob: {
       url: `https://blob.example/${pathname}`,
@@ -63,8 +74,8 @@ function blobResult(pathname: string, body: string) {
       cacheControl: "public, max-age=31536000",
       uploadedAt: new Date("2026-09-18T00:00:00.000Z"),
       etag: '"etag"',
-      contentType: "application/json; charset=utf-8",
-      size: body.length,
+      contentType: "application/gzip",
+      size: compressed.byteLength,
     },
   };
 }
@@ -100,4 +111,59 @@ test("comparison source loading rejects a target-summary digest mismatch", async
   expect(loadCalibrationComparisonSource("us", BUILD, getBlob)).rejects.toThrow(
     "digest is invalid",
   );
+});
+
+test("comparison target detail reads only the selected source detail shards", async () => {
+  const current = bundle("a".repeat(64), "release-current", 100);
+  const candidate = bundle("b".repeat(64), "release-candidate", 101);
+  const source = (built: typeof current) => ({
+    index: built.index,
+    indexSha256: built.files.find((file) => file.part === "index")!.sha256,
+    targetSummaries: built.files.flatMap((file) =>
+      file.part.startsWith("target-summary-")
+        ? (file.artifact as CalibrationTreeTargetSummaryArtifact).targets
+        : [],
+    ),
+  });
+  const comparison = buildCalibrationComparisonBundles(
+    source(current),
+    source(candidate),
+  ).reported;
+  const bundles = [current, candidate, comparison];
+  const requested: Array<{ buildArtifactId: string; part: string }> = [];
+  const getBlob = (async (options: Parameters<typeof getCalibrationTreeBlob>[0]) => {
+    requested.push({
+      buildArtifactId: options.buildArtifactId,
+      part: options.part,
+    });
+    const built = bundles.find(
+      (candidateBundle) => candidateBundle.index.buildArtifactId === options.buildArtifactId,
+    );
+    const file = built?.files.find((candidateFile) => candidateFile.part === options.part);
+    return file ? blobResult(file.path, file.serialized) : null;
+  }) as typeof getCalibrationTreeBlob;
+
+  const result = await loadCalibrationComparisonTargetDetail({
+    country: "us",
+    buildArtifactId: comparison.index.buildArtifactId,
+    targetOrdinal: 0,
+    getBlob,
+  });
+
+  expect(result.target.currentDetail?.target).toBe(100);
+  expect(result.target.candidateDetail?.target).toBe(101);
+  expect(requested).toContainEqual({
+    buildArtifactId: comparison.index.buildArtifactId,
+    part: "index",
+  });
+  expect(requested).toContainEqual({
+    buildArtifactId: comparison.index.buildArtifactId,
+    part: "target-summary-0001",
+  });
+  expect(requested.filter((request) => request.part.startsWith("target-details-")))
+    .toHaveLength(2);
+  expect(requested.some((request) =>
+    request.buildArtifactId === comparison.index.buildArtifactId &&
+    request.part.startsWith("target-details-"),
+  )).toBe(false);
 });

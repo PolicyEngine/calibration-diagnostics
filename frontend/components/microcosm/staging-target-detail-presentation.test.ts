@@ -12,6 +12,8 @@ const TARGET_CHANGE: TargetChangeRow = {
   candidate_name: "benefits@2025",
   current_representation: "legacy",
   candidate_representation: "structured",
+  current_target_ordinal: 0,
+  candidate_target_ordinal: 0,
   comparison_status: "shared",
   comparison_fit: "improved",
   current: {

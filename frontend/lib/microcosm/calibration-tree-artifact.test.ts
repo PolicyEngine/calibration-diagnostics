@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
+import { gunzipSync } from "node:zlib";
 
 import {
   calibrationTreeTargetDetailsFromDraft,
@@ -175,23 +176,27 @@ test("bundle serialization and folder paths are deterministic", async () => {
   );
   const buildArtifactId = first.index.buildArtifactId;
   expect(first.files.map((file) => file.path)).toEqual([
-    `calibration-trees/us/${buildArtifactId}/filter-index.json`,
+    `calibration-trees/us/${buildArtifactId}/filter-index.json.gz`,
     ...first.index.parts.targetSummaries.map((_, index) =>
-      `calibration-trees/us/${buildArtifactId}/target-summary-${String(index + 1).padStart(4, "0")}.json`,
+      `calibration-trees/us/${buildArtifactId}/target-summary-${String(index + 1).padStart(4, "0")}.json.gz`,
     ),
-    `calibration-trees/us/${buildArtifactId}/target-details-0001.json`,
+    `calibration-trees/us/${buildArtifactId}/target-details-0001.json.gz`,
     ...first.index.parts.tiers.map((_, index) =>
-      `calibration-trees/us/${buildArtifactId}/tier-${index + 1}.json`,
+      `calibration-trees/us/${buildArtifactId}/tier-${index + 1}.json.gz`,
     ),
-    `calibration-trees/us/${buildArtifactId}/index.json`,
+    `calibration-trees/us/${buildArtifactId}/index.json.gz`,
   ]);
+  first.files.forEach((file) => {
+    expect(gunzipSync(file.compressed).toString("utf8")).toBe(file.serialized);
+    expect(file.compressed.byteLength).toBe(file.gzipBytes);
+  });
 
   const directory = await mkdtemp(join(tmpdir(), "calibration-tree-bundle-"));
   try {
     for (const file of first.files) {
       const destination = join(directory, file.path);
       await mkdir(dirname(destination), { recursive: true });
-      await writeFile(destination, file.serialized, "utf8");
+      await writeFile(destination, file.compressed);
     }
     const materialized = first.files.map((file) =>
       relative(directory, join(directory, file.path)),
@@ -322,11 +327,11 @@ test("target-detail shard limits use exact UTF-8 bytes", () => {
   );
 });
 
-test("calibration tree schema 4 artifacts are rejected", () => {
+test("calibration tree schema 5 artifacts are rejected", () => {
   const legacy = structuredClone(bundle().index) as unknown as Record<string, unknown>;
-  legacy.schemaVersion = 4;
+  legacy.schemaVersion = 5;
   expect(() => parseCalibrationTreeIndex(legacy)).toThrow(
-    "Unsupported calibration tree schema 4",
+    "Unsupported calibration tree schema 5",
   );
 });
 

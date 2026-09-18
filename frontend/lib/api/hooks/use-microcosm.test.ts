@@ -4,6 +4,7 @@ import { createExplorerState } from "@/lib/microcosm/calibration-explorer";
 
 import {
   fetchCalibrationTreePartsConcurrently,
+  microcosmComparisonTargetDetailQueryOptions,
   microcosmComparisonTreeIndexQueryOptions,
   microcosmStagingCalibrationTreeQueryOptions,
 } from "./use-microcosm";
@@ -65,5 +66,18 @@ test("immutable comparison queries include both ordered build identities and mod
     candidate,
     "shared",
     "index",
+  ]);
+});
+
+test("comparison target-detail queries are keyed by immutable build and ordinal", () => {
+  const build = "c".repeat(64);
+  const options = microcosmComparisonTargetDetailQueryOptions("uk", build, 17);
+
+  expect(options.queryKey).toEqual([
+    "microcosm",
+    "calibration-comparison-target-detail",
+    "uk",
+    build,
+    17,
   ]);
 });

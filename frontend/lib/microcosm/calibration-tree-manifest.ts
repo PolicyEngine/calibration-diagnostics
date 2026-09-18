@@ -6,7 +6,7 @@ import {
   type CalibrationTreeBuildKind,
 } from "./calibration-tree-artifact";
 
-export const CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION = 5 as const;
+export const CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION = 6 as const;
 export const CALIBRATION_TREE_MANIFEST_PATH = "calibration-trees/manifest.json";
 
 export interface CalibrationTreeManifestEntry {

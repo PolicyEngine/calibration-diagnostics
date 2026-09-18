@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import {
   createCalibrationTreeHandler,
@@ -41,7 +42,8 @@ test("release aliases redirect to an exact immutable artifact URL", async () => 
 test("exact builds stream private Blob content through the same-origin API", async () => {
   const requests: unknown[] = [];
   let releaseResolved = false;
-  const body = '{"schemaVersion":5,"part":"tier-1"}\n';
+  const body = '{"schemaVersion":6,"part":"tier-1"}\n';
+  const compressed = gzipSync(body);
   const handler = createCalibrationTreeHandler({
     resolveRelease: (async () => {
       releaseResolved = true;
@@ -51,18 +53,18 @@ test("exact builds stream private Blob content through the same-origin API", asy
       requests.push(options);
       return {
         statusCode: 200 as const,
-        stream: new Blob([body]).stream(),
+        stream: new Blob([compressed]).stream(),
         headers: new Headers(),
         blob: {
           url: "https://blob.example/tree.json",
           downloadUrl: "https://blob.example/tree.json?download=1",
-          pathname: `calibration-trees/us/${BUILD}/tier-1.json`,
+          pathname: `calibration-trees/us/${BUILD}/tier-1.json.gz`,
           contentDisposition: "inline",
           cacheControl: "public, max-age=31536000",
           uploadedAt: new Date("2026-09-15T12:00:00.000Z"),
           etag: '"tree-etag"',
-          contentType: "application/json; charset=utf-8",
-          size: body.length,
+          contentType: "application/gzip",
+          size: compressed.byteLength,
         },
       };
     }) as CalibrationTreeRouteDependencies["getBlob"],
@@ -85,6 +87,38 @@ test("exact builds stream private Blob content through the same-origin API", asy
   }]);
 });
 
+test("gzip-capable clients receive the stored compressed bytes", async () => {
+  const body = '{"schemaVersion":6,"part":"index"}\n';
+  const compressed = gzipSync(body);
+  const handler = createCalibrationTreeHandler({
+    resolveRelease: resolver(),
+    getBlob: (async () => ({
+      statusCode: 200 as const,
+      stream: new Blob([compressed]).stream(),
+      headers: new Headers(),
+      blob: {
+        url: "https://blob.example/index.json.gz",
+        downloadUrl: "https://blob.example/index.json.gz?download=1",
+        pathname: `calibration-trees/us/${BUILD}/index.json.gz`,
+        contentDisposition: "inline",
+        cacheControl: "public, max-age=31536000",
+        uploadedAt: new Date("2026-09-15T12:00:00.000Z"),
+        etag: '"tree-etag"',
+        contentType: "application/gzip",
+        size: compressed.byteLength,
+      },
+    })) as CalibrationTreeRouteDependencies["getBlob"],
+  });
+  const response = await handler(new Request(
+    `https://dashboard.example/api/microcosm/tree?country=us&build=${BUILD}&part=index`,
+    { headers: { "accept-encoding": "br, gzip" } },
+  ));
+
+  expect(response.headers.get("content-encoding")).toBe("gzip");
+  expect(response.headers.get("vary")).toContain("Accept-Encoding");
+  expect(gunzipSync(await response.arrayBuffer()).toString("utf8")).toBe(body);
+});
+
 test("exact builds forward conditional requests and return 304", async () => {
   const handler = createCalibrationTreeHandler({
     resolveRelease: resolver(),
@@ -97,7 +131,7 @@ test("exact builds forward conditional requests and return 304", async () => {
         blob: {
           url: "https://blob.example/tree.json",
           downloadUrl: "https://blob.example/tree.json?download=1",
-          pathname: `calibration-trees/us/${BUILD}/index.json`,
+          pathname: `calibration-trees/us/${BUILD}/index.json.gz`,
           contentDisposition: "inline",
           cacheControl: "public, max-age=31536000",
           uploadedAt: new Date("2026-09-15T12:00:00.000Z"),

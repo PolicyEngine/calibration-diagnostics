@@ -38,11 +38,12 @@ import type {
   TargetChangeAttributionSide,
   TargetChangeMethodology,
   TargetChangeMode,
+  TargetChangeRow,
   TargetChangeSummary,
 } from "./target-change";
 import type { TargetMatchingSummary } from "./target-surface-matcher";
 
-export const CALIBRATION_TREE_SCHEMA_VERSION = 5 as const;
+export const CALIBRATION_TREE_SCHEMA_VERSION = 6 as const;
 export const CALIBRATION_TREE_TARGET_SUMMARY_MAX_RAW_BYTES = 8_000_000;
 export const CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES = 4_000_000;
 
@@ -89,6 +90,10 @@ export interface CalibrationTreeTargetSummary {
   label: string;
   metricInputs: CalibrationTreeMetricInput;
   comparison: CalibrationTreeComparisonTarget;
+  detailSource?: {
+    currentTargetOrdinal: number | null;
+    candidateTargetOrdinal: number | null;
+  };
 }
 
 export interface CalibrationTreeComparisonTarget {
@@ -234,6 +239,7 @@ export interface CalibrationTreeIndexArtifact
     tiers: CalibrationTreeTierDescriptor[];
     filterIndex: CalibrationTreePartDescriptor & { part: "filter-index" };
     targetSummaries: CalibrationTreeTargetSummaryDescriptor[];
+    targetDetailStrategy: "shards" | "source-targets";
     targetDetails: CalibrationTreeTargetDetailsDescriptor[];
   };
 }
@@ -305,6 +311,10 @@ export interface LoadedCalibrationTreeBundle {
   filterIndex?: CalibrationTreeFilterIndexArtifact;
   targetSummaries?: CalibrationTreeTargetSummary[];
   targetDetailShard?: CalibrationTreeTargetDetailsArtifact;
+  selectedTargetDetail?: {
+    targetOrdinal: number;
+    target: CalibrationTreeTarget;
+  };
 }
 
 export interface CalibrationTreeTargetDetailsPlan {
@@ -319,6 +329,15 @@ export interface CalibrationTreeTargetDetailSelection {
   descriptor: CalibrationTreeTargetDetailsDescriptor;
   offset: number;
   targetOrdinal: number;
+}
+
+export interface CalibrationTreeComparisonTargetDetailResponse {
+  schemaVersion: typeof CALIBRATION_TREE_SCHEMA_VERSION;
+  country: MicrocosmCountry;
+  buildArtifactId: string;
+  targetOrdinal: number;
+  targetId: string;
+  target: TargetChangeRow;
 }
 
 export interface CompileCalibrationTreeInput {
@@ -410,6 +429,23 @@ const COMPARISON_ROW_FIELDS = [
   "breakdown",
   "dims",
   "calibration_status",
+  "comparison_fit",
+  "comparison_id",
+  "match_kind",
+  "current_name",
+  "candidate_name",
+  "current_representation",
+  "candidate_representation",
+  "comparison_status",
+  "current",
+  "candidate",
+  "reported_change",
+  "pooled_weight_share",
+  "shared_current_contribution",
+  "shared_candidate_contribution",
+  "shared_change",
+  "current_target_ordinal",
+  "candidate_target_ordinal",
   "abs_relative_error",
   "target_loss_weight",
   "target_loss_weight_share",
@@ -441,6 +477,16 @@ function compiledTarget(
   index: number,
 ): CalibrationTreeBundleDraft["targets"][number] {
   const error = finiteNumber(row.abs_relative_error);
+  const hasDetailSource =
+    row.current_target_ordinal !== undefined ||
+    row.candidate_target_ordinal !== undefined;
+  const sourceOrdinal = (value: unknown, label: string): number | null => {
+    if (value == null) return null;
+    if (!Number.isSafeInteger(value) || (value as number) < 0) {
+      throw new Error(`${label} must be a non-negative integer or null.`);
+    }
+    return value as number;
+  };
   return {
     id: targetIdentifier(row, index),
     label: targetIdentifier(row, index),
@@ -471,6 +517,20 @@ function compiledTarget(
           : null,
     },
     comparison: comparisonReadyTarget(row),
+    ...(hasDetailSource
+      ? {
+          detailSource: {
+            currentTargetOrdinal: sourceOrdinal(
+              row.current_target_ordinal,
+              "Current comparison target ordinal",
+            ),
+            candidateTargetOrdinal: sourceOrdinal(
+              row.candidate_target_ordinal,
+              "Candidate comparison target ordinal",
+            ),
+          },
+        }
+      : {}),
     detail: row,
   };
 }
@@ -750,11 +810,12 @@ export function calibrationTreeTargetSummariesFromDraft(
   if (!Number.isSafeInteger(maxRawBytes) || maxRawBytes <= 0) {
     throw new Error("Calibration tree target-summary shard size must be a positive integer.");
   }
-  const targets = draft.targets.map(({ id, label, metricInputs, comparison }) => ({
+  const targets = draft.targets.map(({ id, label, metricInputs, comparison, detailSource }) => ({
     id,
     label,
     metricInputs,
     comparison,
+    ...(detailSource ? { detailSource } : {}),
   }));
   const serializedTargets = targets.map(stableJson);
   const targetBytes = serializedTargets.map(utf8Bytes);
@@ -908,6 +969,9 @@ export function calibrationTreeTargetDetailSelection(
   index: CalibrationTreeIndexArtifact,
   targetOrdinal: number,
 ): CalibrationTreeTargetDetailSelection {
+  if (index.parts.targetDetailStrategy !== "shards") {
+    throw new Error("Calibration comparison target details resolve through source targets.");
+  }
   const descriptor = index.parts.targetDetails.find(
     (candidate) =>
       targetOrdinal >= candidate.startTargetOrdinal &&
@@ -1314,15 +1378,28 @@ export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexA
     maxRawBytes: CALIBRATION_TREE_TARGET_SUMMARY_MAX_RAW_BYTES,
     partForIndex: targetSummaryPart,
   });
-  validateTargetShardDescriptors({
-    value: parts.targetDetails,
-    targetCount,
-    country,
-    buildArtifactId,
-    label: "target-detail",
-    maxRawBytes: CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES,
-    partForIndex: targetDetailsPart,
-  });
+  const expectedDetailStrategy =
+    (index.build as CalibrationTreeBuild).kind === "comparison"
+      ? "source-targets"
+      : "shards";
+  if (parts.targetDetailStrategy !== expectedDetailStrategy) {
+    throw new Error("Calibration tree target-detail strategy is inconsistent with its build.");
+  }
+  if (expectedDetailStrategy === "source-targets") {
+    if (!Array.isArray(parts.targetDetails) || parts.targetDetails.length !== 0) {
+      throw new Error("Comparison trees cannot publish target-detail shards.");
+    }
+  } else {
+    validateTargetShardDescriptors({
+      value: parts.targetDetails,
+      targetCount,
+      country,
+      buildArtifactId,
+      label: "target-detail",
+      maxRawBytes: CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES,
+      partForIndex: targetDetailsPart,
+    });
+  }
   return value as CalibrationTreeIndexArtifact;
 }
 
@@ -1503,6 +1580,22 @@ export function parseCalibrationTreeTargetSummary(
       comparison.row,
       `Calibration tree target summary ${index} comparison row`,
     );
+    if (target.detailSource != null) {
+      const source = record(
+        target.detailSource,
+        `Calibration tree target summary ${index} detail source`,
+      );
+      for (const key of ["currentTargetOrdinal", "candidateTargetOrdinal"] as const) {
+        if (
+          source[key] != null &&
+          (!Number.isSafeInteger(source[key]) || (source[key] as number) < 0)
+        ) {
+          throw new Error(
+            `Calibration tree target summary ${index} detail source ${key} is invalid.`,
+          );
+        }
+      }
+    }
   });
   return value as CalibrationTreeTargetSummaryArtifact;
 }
@@ -1536,6 +1629,34 @@ export function parseCalibrationTreeTargetDetails(
     record(item, `Calibration tree target detail ${index}`);
   });
   return value as CalibrationTreeTargetDetailsArtifact;
+}
+
+export function parseCalibrationTreeComparisonTargetDetail(
+  value: unknown,
+): CalibrationTreeComparisonTargetDetailResponse {
+  const response = record(value, "Calibration comparison target detail");
+  if (response.schemaVersion !== CALIBRATION_TREE_SCHEMA_VERSION) {
+    throw new Error(
+      `Unsupported calibration tree schema ${String(response.schemaVersion)}.`,
+    );
+  }
+  if (typeof response.country !== "string" || !isCountry(response.country)) {
+    throw new Error("Calibration comparison target detail has an unknown country.");
+  }
+  if (
+    typeof response.buildArtifactId !== "string" ||
+    !SHA256_RE.test(response.buildArtifactId)
+  ) {
+    throw new Error("Calibration comparison target detail has an invalid build id.");
+  }
+  if (!Number.isSafeInteger(response.targetOrdinal) || (response.targetOrdinal as number) < 0) {
+    throw new Error("Calibration comparison target detail has an invalid target ordinal.");
+  }
+  if (typeof response.targetId !== "string" || !response.targetId) {
+    throw new Error("Calibration comparison target detail has an invalid target id.");
+  }
+  record(response.target, "Calibration comparison target detail target");
+  return value as CalibrationTreeComparisonTargetDetailResponse;
 }
 
 export function parseCalibrationTreePart(
@@ -1671,8 +1792,10 @@ export function calibrationTreeTargetsFromSummaries(
 
 function targetDetailForOrdinal(
   shard: CalibrationTreeTargetDetailsArtifact | undefined,
+  selected: LoadedCalibrationTreeBundle["selectedTargetDetail"],
   targetOrdinal: number,
 ): CalibrationTreeTarget | undefined {
+  if (selected?.targetOrdinal === targetOrdinal) return selected.target;
   if (
     !shard ||
     targetOrdinal < shard.startTargetOrdinal ||
@@ -1746,7 +1869,11 @@ export function calibrationTreeResponseFromBundle(
         metrics: metrics(nodeIndices, node.metrics),
         target:
           node.kind === "target"
-            ? targetDetailForOrdinal(bundle.targetDetailShard, node.targetOrdinal)
+            ? targetDetailForOrdinal(
+                bundle.targetDetailShard,
+                bundle.selectedTargetDetail,
+                node.targetOrdinal,
+              )
             : undefined,
         authored_label: node.authoredLabel,
       }];
@@ -1804,7 +1931,7 @@ export function calibrationTreePartPath(
   part: CalibrationTreePart,
 ): string {
   if (!isCalibrationTreePart(part)) throw new Error("Invalid calibration tree part.");
-  return `${calibrationTreeBundlePrefix(country, buildArtifactId)}/${part}.json`;
+  return `${calibrationTreeBundlePrefix(country, buildArtifactId)}/${part}.json.gz`;
 }
 
 export function isSha256(value: string): boolean {

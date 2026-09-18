@@ -21,12 +21,14 @@ import {
   calibrationTreeResponseFromBundle,
   calibrationTreeTargetDetailSelection,
   calibrationTreeTargetsFromSummaries,
+  parseCalibrationTreeComparisonTargetDetail,
   parseCalibrationTreeIndex,
   parseCalibrationTreePart,
   type CalibrationTreeArtifactPart,
   type CalibrationTreeFilterIndexArtifact,
   type CalibrationTreeIndexArtifact,
   type CalibrationTreePart,
+  type CalibrationTreeComparisonTargetDetailResponse,
   type CalibrationTreeTargetDetailsArtifact,
   type CalibrationTreeTargetSummaryArtifact,
   type CalibrationTreeTierArtifact,
@@ -350,7 +352,7 @@ export interface MicrocosmCalibrationBuild {
   stagingRunId: string | null;
   hfRepo: string;
   hfCommitSha: string;
-  treeSchemaVersion: 5;
+  treeSchemaVersion: 6;
   indexSha256: string;
   indexBytes: number;
   createdAt: string | null;
@@ -358,7 +360,7 @@ export interface MicrocosmCalibrationBuild {
 }
 
 export interface MicrocosmCalibrationBuildManifest {
-  schemaVersion: 5;
+  schemaVersion: 6;
   country: Country;
   latestReleaseBuildArtifactId: string | null;
   builds: MicrocosmCalibrationBuild[];
@@ -1101,6 +1103,40 @@ function calibrationTreePartQueryOptions(
   };
 }
 
+export function microcosmComparisonTargetDetailQueryOptions(
+  country: Country,
+  buildArtifactId: string,
+  targetOrdinal: number,
+) {
+  return {
+    queryKey: [
+      "microcosm",
+      "calibration-comparison-target-detail",
+      country,
+      buildArtifactId,
+      targetOrdinal,
+    ],
+    queryFn: async (): Promise<CalibrationTreeComparisonTargetDetailResponse> => {
+      const detail = parseCalibrationTreeComparisonTargetDetail(
+        await apiGet<unknown>("/microcosm/comparison-tree/target-detail", {
+          country,
+          build: buildArtifactId,
+          target: targetOrdinal,
+        }),
+      );
+      if (
+        detail.country !== country ||
+        detail.buildArtifactId !== buildArtifactId ||
+        detail.targetOrdinal !== targetOrdinal
+      ) {
+        throw new Error("Calibration comparison target detail does not match the request.");
+      }
+      return detail;
+    },
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
+  };
+}
+
 const DEFAULT_CALIBRATION_TREE_PART_REQUEST = {};
 
 function useCalibrationTreeBundle(
@@ -1237,7 +1273,10 @@ function useCalibrationTreeBundle(
     detailLocationError = new Error(
       `Calibration target ${state.path.target} is missing from the target-summary shards.`,
     );
-  } else if (selectedTarget && index) {
+  } else if (
+    selectedTarget &&
+    index?.parts.targetDetailStrategy === "shards"
+  ) {
     try {
       detailDescriptor = calibrationTreeTargetDetailSelection(
         index,
@@ -1276,6 +1315,24 @@ function useCalibrationTreeBundle(
   const targetDetailShard = targetDetailRangeError
     ? undefined
     : fetchedTargetDetailShard;
+  const comparisonTargetOrdinal =
+    index?.parts.targetDetailStrategy === "source-targets" && selectedTarget
+      ? selectedTarget.targetOrdinal
+      : -1;
+  const comparisonTargetDetailQuery = useQuery({
+    ...microcosmComparisonTargetDetailQueryOptions(
+      country,
+      buildArtifactId,
+      comparisonTargetOrdinal,
+    ),
+    enabled: enabled && comparisonTargetOrdinal >= 0,
+  });
+  const comparisonTargetDetail = comparisonTargetDetailQuery.data;
+  const comparisonTargetDetailError =
+    comparisonTargetDetail && selectedTarget &&
+    comparisonTargetDetail.targetId !== selectedTarget.target.id
+      ? new Error("Calibration comparison target detail does not match its summary.")
+      : null;
   const data = index
     ? calibrationTreeResponseFromBundle(
         {
@@ -1284,6 +1341,12 @@ function useCalibrationTreeBundle(
           filterIndex,
           targetSummaries: targetSummaryResult.targets,
           targetDetailShard,
+          selectedTargetDetail: comparisonTargetDetail && !comparisonTargetDetailError
+            ? {
+                targetOrdinal: comparisonTargetDetail.targetOrdinal,
+                target: comparisonTargetDetail.target,
+              }
+            : undefined,
         },
         state,
       ) ?? undefined
@@ -1302,7 +1365,12 @@ function useCalibrationTreeBundle(
     (!data && tierError) ||
     null;
   const targetDetailError =
-    detailLocationError || targetDetailRangeError || targetDetailQuery?.error || null;
+    detailLocationError ||
+    targetDetailRangeError ||
+    comparisonTargetDetailError ||
+    targetDetailQuery?.error ||
+    comparisonTargetDetailQuery.error ||
+    null;
 
   return {
     index,
@@ -1317,10 +1385,17 @@ function useCalibrationTreeBundle(
     targetDetailIsLoading:
       Boolean(state.path.target) &&
       !targetDetailError &&
-      (!summariesComplete || Boolean(detailDescriptor && !targetDetailShard)),
+      (
+        !summariesComplete ||
+        Boolean(detailDescriptor && !targetDetailShard) ||
+        Boolean(comparisonTargetOrdinal >= 0 && !comparisonTargetDetail)
+      ),
     targetDetailError,
     retryTargetDetail: () => {
       void targetDetailQuery?.refetch();
+      if (comparisonTargetOrdinal >= 0) {
+        void comparisonTargetDetailQuery.refetch();
+      }
     },
   };
 }
