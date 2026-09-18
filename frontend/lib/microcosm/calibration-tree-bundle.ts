@@ -40,6 +40,23 @@ export interface CalibrationTreeBundle {
   files: CalibrationTreeBundleFile[];
 }
 
+export function calibrationTreeBuildArtifactId(
+  input: CompileCalibrationTreeInput,
+): string {
+  const sourceHashes = Object.fromEntries(
+    Object.entries(input.sourceArtifacts)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, artifact]) => [name, artifact?.sha256 ?? null]),
+  );
+  return sha256(JSON.stringify({
+    schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
+    country: input.country,
+    kind: input.buildKind ?? "release",
+    sourceId: input.sourceId ?? input.releaseId,
+    sourceHashes,
+  }));
+}
+
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -50,7 +67,7 @@ function describePart(artifact: CalibrationTreeArtifactPart): CalibrationTreeBun
     part: artifact.part,
     path: calibrationTreePartPath(
       artifact.country,
-      artifact.hfCommitSha,
+      artifact.buildArtifactId,
       artifact.part,
     ),
     artifact,
@@ -75,7 +92,11 @@ function descriptor(file: CalibrationTreeBundleFile): CalibrationTreePartDescrip
 export function buildCalibrationTreeBundle(
   input: CompileCalibrationTreeInput,
 ): CalibrationTreeBundle {
-  const draft = compileCalibrationTreeBundleDraft(input);
+  const draft = compileCalibrationTreeBundleDraft({
+    ...input,
+    buildArtifactId:
+      input.buildArtifactId ?? calibrationTreeBuildArtifactId(input),
+  });
   const targetDetails = calibrationTreeTargetDetailsFromDraft(draft);
   const targetDetailsFiles = targetDetails.artifacts.map(describePart);
   const targetIndexFile = describePart(
@@ -98,9 +119,9 @@ export function buildCalibrationTreeBundle(
   const index: CalibrationTreeIndexArtifact = {
     schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
     country: draft.country,
-    hfCommitSha: draft.release.hfCommitSha,
+    buildArtifactId: draft.build.buildArtifactId,
     part: "index",
-    release: draft.release,
+    build: draft.build,
     calibrationProvenance: draft.calibrationProvenance,
     lossAttributionAvailable: draft.lossAttributionAvailable,
     filterOptions: draft.filterOptions,
@@ -303,7 +324,7 @@ export function validateCalibrationTreeBundle(bundle: CalibrationTreeBundle): vo
     seenPaths.add(file.path);
     const expectedPath = calibrationTreePartPath(
       bundle.index.country,
-      bundle.index.hfCommitSha,
+      bundle.index.buildArtifactId,
       file.part,
     );
     if (file.path !== expectedPath) {
@@ -315,7 +336,7 @@ export function validateCalibrationTreeBundle(bundle: CalibrationTreeBundle): vo
     const parsed = parseCalibrationTreePart(JSON.parse(file.serialized), file.part);
     if (
       parsed.country !== bundle.index.country ||
-      parsed.hfCommitSha !== bundle.index.hfCommitSha
+      parsed.buildArtifactId !== bundle.index.buildArtifactId
     ) {
       throw new Error(`Calibration tree part ${file.part} has inconsistent identity.`);
     }

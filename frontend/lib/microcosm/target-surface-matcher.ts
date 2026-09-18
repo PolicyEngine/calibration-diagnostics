@@ -62,7 +62,7 @@ function nonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function normalizedTargetName(row: TargetRow): string | null {
+export function normalizedTargetName(row: TargetRow): string | null {
   return nonEmptyString(row.base_name) ?? nonEmptyString(row.name);
 }
 
@@ -70,7 +70,7 @@ function originalTargetName(row: TargetRow): string | null {
   return nonEmptyString(row.name) ?? nonEmptyString(row.base_name);
 }
 
-function rowRepresentation(row: TargetRow): TargetRowRepresentation {
+export function targetRowRepresentation(row: TargetRow): TargetRowRepresentation {
   if (row.target_representation === "hierarchy") return "hierarchy";
   if (row.target_representation === "structured") return "structured";
   if (row.target_representation === "legacy") return "legacy";
@@ -89,18 +89,18 @@ function collectionRepresentation(calibration: Calibration): TargetRepresentatio
     return published;
   }
   if (!calibration.rows.length) return "unknown";
-  const representations = new Set(calibration.rows.map(rowRepresentation));
+  const representations = new Set(calibration.rows.map(targetRowRepresentation));
   if (representations.size > 1) return "mixed";
   if (representations.has("hierarchy")) return "hierarchy";
   return representations.has("structured") ? "structured" : "legacy";
 }
 
-function chronicleFactKey(row: TargetRow): string | null {
+export function chronicleFactKey(row: TargetRow): string | null {
   return nonEmptyString(asObject(row.chronicle).fact_key);
 }
 
-function structuredIdentity(row: TargetRow): string | null {
-  const representation = rowRepresentation(row);
+export function structuredIdentity(row: TargetRow): string | null {
+  const representation = targetRowRepresentation(row);
   if (representation !== "structured" && representation !== "hierarchy") {
     return null;
   }
@@ -163,8 +163,8 @@ function sharedMatch(
     candidate: candidate.row,
     current_name: originalTargetName(current.row),
     candidate_name: originalTargetName(candidate.row),
-    current_representation: rowRepresentation(current.row),
-    candidate_representation: rowRepresentation(candidate.row),
+    current_representation: targetRowRepresentation(current.row),
+    candidate_representation: targetRowRepresentation(candidate.row),
   };
 }
 
@@ -182,8 +182,10 @@ function sideOnlyMatch(
     candidate: side === "candidate" ? row : null,
     current_name: side === "current" ? name : null,
     candidate_name: side === "candidate" ? name : null,
-    current_representation: side === "current" ? rowRepresentation(row) : null,
-    candidate_representation: side === "candidate" ? rowRepresentation(row) : null,
+    current_representation:
+      side === "current" ? targetRowRepresentation(row) : null,
+    candidate_representation:
+      side === "candidate" ? targetRowRepresentation(row) : null,
   };
 }
 

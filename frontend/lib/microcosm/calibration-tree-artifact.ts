@@ -19,9 +19,22 @@ import {
   type FitBand,
 } from "./calibration-explorer";
 import { isCountry, type MicrocosmCountry } from "./countries";
-import type { CalibrationProvenance } from "./target-loss-attribution";
+import {
+  chronicleFactKey,
+  normalizedTargetName,
+  structuredIdentity,
+  targetRowRepresentation,
+} from "./target-surface-matcher";
+import type {
+  CalibrationProvenance,
+  TargetLossAttributionStatus,
+} from "./target-loss-attribution";
+import type {
+  TargetRepresentation,
+  TargetRowRepresentation,
+} from "./target-representation";
 
-export const CALIBRATION_TREE_SCHEMA_VERSION = 3 as const;
+export const CALIBRATION_TREE_SCHEMA_VERSION = 4 as const;
 export const CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES = 4_000_000;
 
 export type CalibrationTreeTierPart = `tier-${number}`;
@@ -44,10 +57,17 @@ export interface CalibrationTreeSourceArtifacts {
   demographics: CalibrationTreeSourceArtifact | null;
 }
 
-export interface CalibrationTreeRelease {
-  releaseId: string;
-  hfRepo: string;
-  hfCommitSha: string;
+export type CalibrationTreeBuildKind = "release" | "staging" | "comparison";
+
+export interface CalibrationTreeBuild {
+  buildArtifactId: string;
+  kind: CalibrationTreeBuildKind;
+  sourceId: string;
+  label: string;
+  releaseId: string | null;
+  hfRepo: string | null;
+  hfCommitSha: string | null;
+  createdAt: string | null;
   sourceArtifacts: CalibrationTreeSourceArtifacts;
 }
 
@@ -59,6 +79,25 @@ export interface IndexedCalibrationTarget {
     shardIndex: number;
     offset: number;
   };
+  comparison: CalibrationTreeComparisonTarget;
+}
+
+export interface CalibrationTreeComparisonTarget {
+  normalizedBaseName: string | null;
+  chronicleFactKey: string | null;
+  structuredIdentity: string | null;
+  representation: TargetRowRepresentation;
+  row: CalibrationTreeTarget;
+}
+
+export interface CalibrationTreeComparisonMetadata {
+  releaseId: string;
+  calibrationProvenance?: CalibrationProvenance;
+  status: TargetLossAttributionStatus;
+  aggregate: number | null;
+  cap: number | null;
+  basisIdentifier: string | null;
+  targetRepresentation: TargetRepresentation;
 }
 
 export interface CalibrationTreePosting<T extends string | null = string> {
@@ -119,7 +158,7 @@ export interface CompiledCalibrationLevel {
 interface CalibrationTreePartIdentity {
   schemaVersion: typeof CALIBRATION_TREE_SCHEMA_VERSION;
   country: MicrocosmCountry;
-  hfCommitSha: string;
+  buildArtifactId: string;
   part: CalibrationTreePart;
 }
 
@@ -148,7 +187,7 @@ export interface CalibrationTreeTargetDetailsDescriptor
 export interface CalibrationTreeIndexArtifact
   extends CalibrationTreePartIdentity {
   part: "index";
-  release: CalibrationTreeRelease;
+  build: CalibrationTreeBuild;
   calibrationProvenance?: CalibrationProvenance;
   lossAttributionAvailable: boolean;
   filterOptions: CalibrationTreeResponse["filterOptions"];
@@ -177,6 +216,7 @@ export interface CalibrationTreeTierArtifact
 export interface CalibrationTreeTargetIndexArtifact
   extends CalibrationTreePartIdentity {
   part: "target-index";
+  comparison: CalibrationTreeComparisonMetadata;
   targets: IndexedCalibrationTarget[];
   postings: CalibrationTreeFilterPostings;
 }
@@ -197,7 +237,8 @@ export type CalibrationTreeArtifactPart =
 
 export interface CalibrationTreeBundleDraft {
   country: MicrocosmCountry;
-  release: CalibrationTreeRelease;
+  build: CalibrationTreeBuild;
+  comparison: CalibrationTreeComparisonMetadata;
   calibrationProvenance?: CalibrationProvenance;
   lossAttributionAvailable: boolean;
   filterOptions: CalibrationTreeResponse["filterOptions"];
@@ -235,6 +276,11 @@ export interface CalibrationTreeTargetDetailSelection {
 
 export interface CompileCalibrationTreeInput {
   country: MicrocosmCountry;
+  buildArtifactId?: string;
+  buildKind?: CalibrationTreeBuildKind;
+  sourceId?: string;
+  label?: string;
+  createdAt?: string | null;
   releaseId: string;
   hfRepo: string;
   hfCommitSha: string;
@@ -242,6 +288,7 @@ export interface CompileCalibrationTreeInput {
   rows: CalibrationTreeTarget[];
   calibrationProvenance?: CalibrationProvenance;
   lossAttributionAvailable?: boolean;
+  comparison?: CalibrationTreeComparisonMetadata;
 }
 
 const DEFAULT_GEOGRAPHY = "United States";
@@ -280,6 +327,58 @@ function normalizeStatus(
   return null;
 }
 
+const COMPARISON_ROW_FIELDS = [
+  "name",
+  "base_name",
+  "target",
+  "value",
+  "final_estimate",
+  "estimate",
+  "source",
+  "source_label",
+  "variable",
+  "variable_label",
+  "variable_key",
+  "measure",
+  "source_measure_id",
+  "target_label",
+  "target_representation",
+  "dimension_adapter",
+  "dimensions",
+  "target_dimensions",
+  "chronicle",
+  "level",
+  "geography",
+  "family",
+  "breakdown",
+  "dims",
+  "calibration_status",
+  "abs_relative_error",
+  "target_loss_weight",
+  "target_loss_weight_share",
+  "target_loss_scale",
+  "final_capped_scaled_error",
+  "final_loss_contribution",
+] as const;
+
+function comparisonReadyTarget(
+  row: CalibrationTreeTarget,
+): CalibrationTreeComparisonTarget {
+  const compactRow = Object.fromEntries(
+    COMPARISON_ROW_FIELDS.flatMap((field) =>
+      row[field] === undefined ? [] : [[field, row[field]]],
+    ),
+  ) as CalibrationTreeTarget;
+  const matchingRow = row as Parameters<typeof normalizedTargetName>[0];
+  return {
+    normalizedBaseName: normalizedTargetName(matchingRow),
+    chronicleFactKey: chronicleFactKey(matchingRow),
+    structuredIdentity: structuredIdentity(matchingRow),
+    representation: targetRowRepresentation(matchingRow),
+    row: compactRow,
+  };
+}
+
 function compiledTarget(
   row: CalibrationTreeTarget,
   index: number,
@@ -307,6 +406,7 @@ function compiledTarget(
           ? row.comparison_status
           : null,
     },
+    comparison: comparisonReadyTarget(row),
     detail: row,
   };
 }
@@ -348,11 +448,32 @@ function targetOrdinalFor(
   return ordinal;
 }
 
+function inferredTargetRepresentation(
+  targets: CalibrationTreeTarget[],
+): TargetRepresentation {
+  if (!targets.length) return "unknown";
+  const values = new Set(
+    targets.map((row) =>
+      targetRowRepresentation(
+        row as Parameters<typeof targetRowRepresentation>[0],
+      ),
+    ),
+  );
+  if (values.size > 1) return "mixed";
+  if (values.has("hierarchy")) return "hierarchy";
+  return values.has("structured") ? "structured" : "legacy";
+}
+
 export function compileCalibrationTreeBundleDraft(
   input: CompileCalibrationTreeInput,
 ): CalibrationTreeBundleDraft {
   if (!HF_COMMIT_RE.test(input.hfCommitSha)) {
     throw new Error(`Invalid Hugging Face commit SHA: ${input.hfCommitSha}`);
+  }
+  const buildArtifactId =
+    input.buildArtifactId ?? input.sourceArtifacts.calibrationDiagnostics.sha256;
+  if (!SHA256_RE.test(buildArtifactId)) {
+    throw new Error(`Invalid calibration build artifact id: ${buildArtifactId}`);
   }
   const rows = normalizeCalibrationTreeTargets(input.rows);
   const lossAttributionAvailable =
@@ -468,11 +589,31 @@ export function compileCalibrationTreeBundleDraft(
 
   return {
     country: input.country,
-    release: {
+    build: {
+      buildArtifactId,
+      kind: input.buildKind ?? "release",
+      sourceId: input.sourceId ?? input.releaseId,
+      label: input.label ?? input.releaseId,
       releaseId: input.releaseId,
       hfRepo: input.hfRepo,
       hfCommitSha: input.hfCommitSha,
+      createdAt: input.createdAt ?? null,
       sourceArtifacts: input.sourceArtifacts,
+    },
+    comparison: input.comparison ?? {
+      releaseId: input.releaseId,
+      calibrationProvenance: input.calibrationProvenance,
+      status: lossAttributionAvailable ? "derived" : "unavailable",
+      aggregate: lossAttributionAvailable
+        ? targets.reduce(
+            (sum, target) =>
+              sum + (target.metricInputs.finalLossContribution ?? 0),
+            0,
+          )
+        : null,
+      cap: null,
+      basisIdentifier: null,
+      targetRepresentation: inferredTargetRepresentation(rows),
     },
     calibrationProvenance: input.calibrationProvenance,
     lossAttributionAvailable,
@@ -512,12 +653,17 @@ export function calibrationTreeTargetIndexFromDraft(
   return {
     schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
     country: draft.country,
-    hfCommitSha: draft.release.hfCommitSha,
+    buildArtifactId: draft.build.buildArtifactId,
     part: "target-index",
-    targets: draft.targets.map(({ id, label, metricInputs }, targetOrdinal) => ({
+    comparison: draft.comparison,
+    targets: draft.targets.map((
+      { id, label, metricInputs, comparison },
+      targetOrdinal,
+    ) => ({
       id,
       label,
       metricInputs,
+      comparison,
       detailLocation: detailLocations[targetOrdinal],
     })),
     postings: {
@@ -568,7 +714,7 @@ export function calibrationTreeTargetDetailsFromDraft(
       const emptyArtifact: CalibrationTreeTargetDetailsArtifact = {
         schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
         country: draft.country,
-        hfCommitSha: draft.release.hfCommitSha,
+        buildArtifactId: draft.build.buildArtifactId,
         part,
         startTargetOrdinal,
         endTargetOrdinalExclusive: endTargetOrdinalExclusive + 1,
@@ -584,7 +730,7 @@ export function calibrationTreeTargetDetailsFromDraft(
       const targetBytesWithEnvelope = utf8Bytes(`${stableJson({
         schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
         country: draft.country,
-        hfCommitSha: draft.release.hfCommitSha,
+        buildArtifactId: draft.build.buildArtifactId,
         part,
         startTargetOrdinal,
         endTargetOrdinalExclusive: startTargetOrdinal + 1,
@@ -599,7 +745,7 @@ export function calibrationTreeTargetDetailsFromDraft(
     const artifact: CalibrationTreeTargetDetailsArtifact = {
       schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
       country: draft.country,
-      hfCommitSha: draft.release.hfCommitSha,
+      buildArtifactId: draft.build.buildArtifactId,
       part,
       startTargetOrdinal,
       endTargetOrdinalExclusive,
@@ -657,7 +803,7 @@ export function calibrationTreeTiersFromDraft(
   return Array.from({ length: maxDepth }, (_, index) => index + 1).map((depth) => ({
     schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
     country: draft.country,
-    hfCommitSha: draft.release.hfCommitSha,
+    buildArtifactId: draft.build.buildArtifactId,
     part: `tier-${depth}`,
     depth,
     targetCount: draft.targets.length,
@@ -734,8 +880,11 @@ function validateIdentity(
   if (typeof part.country !== "string" || !isCountry(part.country)) {
     throw new Error("Calibration tree part has an unknown country.");
   }
-  if (typeof part.hfCommitSha !== "string" || !HF_COMMIT_RE.test(part.hfCommitSha)) {
-    throw new Error("Calibration tree part has an invalid Hugging Face commit SHA.");
+  if (
+    typeof part.buildArtifactId !== "string" ||
+    !SHA256_RE.test(part.buildArtifactId)
+  ) {
+    throw new Error("Calibration tree part has an invalid build artifact id.");
   }
   if (typeof part.part !== "string" || !isCalibrationTreePart(part.part)) {
     throw new Error("Calibration tree part name is invalid.");
@@ -808,13 +957,16 @@ function validateDescriptor(
   value: unknown,
   expectedPart: Exclude<CalibrationTreePart, "index">,
   country: MicrocosmCountry,
-  commit: string,
+  buildArtifactId: string,
 ): CalibrationTreePartDescriptor {
   const descriptor = record(value, `Calibration tree descriptor ${expectedPart}`);
   if (descriptor.part !== expectedPart) {
     throw new Error(`Calibration tree descriptor ${expectedPart} has the wrong part name.`);
   }
-  if (descriptor.path !== calibrationTreePartPath(country, commit, expectedPart)) {
+  if (
+    descriptor.path !==
+      calibrationTreePartPath(country, buildArtifactId, expectedPart)
+  ) {
     throw new Error(`Calibration tree descriptor ${expectedPart} has the wrong path.`);
   }
   if (typeof descriptor.sha256 !== "string" || !SHA256_RE.test(descriptor.sha256)) {
@@ -828,18 +980,42 @@ function validateDescriptor(
   return descriptor as unknown as CalibrationTreePartDescriptor;
 }
 
-function validateRelease(value: unknown, country: MicrocosmCountry, commit: string): void {
-  const release = record(value, "Calibration tree release");
-  if (typeof release.releaseId !== "string" || !release.releaseId) {
-    throw new Error("Calibration tree release id is missing.");
+function validateBuild(
+  value: unknown,
+  country: MicrocosmCountry,
+  buildArtifactId: string,
+): void {
+  const build = record(value, "Calibration tree build");
+  if (build.buildArtifactId !== buildArtifactId) {
+    throw new Error("Calibration tree build identity does not match its parts.");
   }
-  if (typeof release.hfRepo !== "string" || !release.hfRepo) {
-    throw new Error("Calibration tree repository is missing.");
+  if (!["release", "staging", "comparison"].includes(String(build.kind))) {
+    throw new Error("Calibration tree build kind is invalid.");
   }
-  if (release.hfCommitSha !== commit) {
-    throw new Error("Calibration tree release commit does not match its part identity.");
+  for (const key of ["sourceId", "label"] as const) {
+    if (typeof build[key] !== "string" || !build[key]) {
+      throw new Error(`Calibration tree build ${key} is missing.`);
+    }
   }
-  const sources = record(release.sourceArtifacts, "Calibration tree source artifacts");
+  if (build.releaseId != null && typeof build.releaseId !== "string") {
+    throw new Error("Calibration tree build release id is invalid.");
+  }
+  if (build.hfRepo != null && (typeof build.hfRepo !== "string" || !build.hfRepo)) {
+    throw new Error("Calibration tree build repository is invalid.");
+  }
+  if (
+    build.hfCommitSha != null &&
+    (typeof build.hfCommitSha !== "string" || !HF_COMMIT_RE.test(build.hfCommitSha))
+  ) {
+    throw new Error("Calibration tree build commit is invalid.");
+  }
+  if (
+    build.createdAt != null &&
+    (typeof build.createdAt !== "string" || !Number.isFinite(Date.parse(build.createdAt)))
+  ) {
+    throw new Error("Calibration tree build creation time is invalid.");
+  }
+  const sources = record(build.sourceArtifacts, "Calibration tree source artifacts");
   for (const key of [
     "calibrationDiagnostics",
     "buildManifest",
@@ -865,14 +1041,14 @@ function validateRelease(value: unknown, country: MicrocosmCountry, commit: stri
       throw new Error(`Calibration tree source ${key} has an invalid hash.`);
     }
   }
-  if (!isCountry(country)) throw new Error("Calibration tree release country is invalid.");
+  if (!isCountry(country)) throw new Error("Calibration tree build country is invalid.");
 }
 
 export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexArtifact {
   const index = validateIdentity(value, "index");
   const country = index.country as MicrocosmCountry;
-  const commit = index.hfCommitSha as string;
-  validateRelease(index.release, country, commit);
+  const buildArtifactId = index.buildArtifactId as string;
+  validateBuild(index.build, country, buildArtifactId);
   if (typeof index.lossAttributionAvailable !== "boolean") {
     throw new Error("Calibration tree loss-attribution availability must be boolean.");
   }
@@ -888,6 +1064,7 @@ export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexA
     "geographyLevels",
     "geographies",
     "fitBands",
+    "comparisonFits",
     "calibrationStatuses",
   ]) {
     stringArray(filters[key], `Calibration tree filter option ${key}`);
@@ -914,21 +1091,31 @@ export function parseCalibrationTreeIndex(value: unknown): CalibrationTreeIndexA
   parts.tiers.forEach((item, tierIndex) => {
     const expectedDepth = tierIndex + 1;
     const expectedPart = `tier-${expectedDepth}` as CalibrationTreeTierPart;
-    const descriptor = validateDescriptor(item, expectedPart, country, commit);
+    const descriptor = validateDescriptor(
+      item,
+      expectedPart,
+      country,
+      buildArtifactId,
+    );
     const tier = descriptor as CalibrationTreeTierDescriptor;
     if (tier.depth !== expectedDepth) {
       throw new Error(`Calibration tree descriptor ${expectedPart} has the wrong depth.`);
     }
     stringArray(tier.levelIds, `Calibration tree descriptor ${expectedPart} levelIds`);
   });
-  validateDescriptor(parts.targetIndex, "target-index", country, commit);
+  validateDescriptor(parts.targetIndex, "target-index", country, buildArtifactId);
   if (!Array.isArray(parts.targetDetails)) {
     throw new Error("Calibration tree target-detail descriptors must be an array.");
   }
   let nextTargetOrdinal = 0;
   parts.targetDetails.forEach((item, shardIndex) => {
     const expectedPart = targetDetailsPart(shardIndex);
-    const descriptor = validateDescriptor(item, expectedPart, country, commit) as
+    const descriptor = validateDescriptor(
+      item,
+      expectedPart,
+      country,
+      buildArtifactId,
+    ) as
       CalibrationTreeTargetDetailsDescriptor;
     if (descriptor.rawBytes > CALIBRATION_TREE_TARGET_DETAIL_MAX_RAW_BYTES) {
       throw new Error(`Calibration tree descriptor ${expectedPart} exceeds the byte limit.`);
@@ -990,6 +1177,41 @@ function validateMetricInputs(value: unknown, label: string): void {
   }
 }
 
+function validateComparisonMetadata(value: unknown): void {
+  const comparison = record(value, "Calibration tree comparison metadata");
+  if (typeof comparison.releaseId !== "string" || !comparison.releaseId) {
+    throw new Error("Calibration tree comparison release id is missing.");
+  }
+  if (
+    !["reported", "exact_reconstructed", "derived", "unavailable"].includes(
+      String(comparison.status),
+    )
+  ) {
+    throw new Error("Calibration tree comparison attribution status is invalid.");
+  }
+  for (const key of ["aggregate", "cap"] as const) {
+    if (
+      comparison[key] != null &&
+      (typeof comparison[key] !== "number" || !Number.isFinite(comparison[key]))
+    ) {
+      throw new Error(`Calibration tree comparison ${key} is invalid.`);
+    }
+  }
+  if (
+    comparison.basisIdentifier != null &&
+    typeof comparison.basisIdentifier !== "string"
+  ) {
+    throw new Error("Calibration tree comparison basis identifier is invalid.");
+  }
+  if (
+    !["legacy", "structured", "hierarchy", "mixed", "unknown"].includes(
+      String(comparison.targetRepresentation),
+    )
+  ) {
+    throw new Error("Calibration tree comparison target representation is invalid.");
+  }
+}
+
 function validatePostings(
   value: unknown,
   targetCount: number,
@@ -1013,6 +1235,7 @@ export function parseCalibrationTreeTargetIndex(
   value: unknown,
 ): CalibrationTreeTargetIndexArtifact {
   const part = validateIdentity(value, "target-index");
+  validateComparisonMetadata(part.comparison);
   if (!Array.isArray(part.targets)) {
     throw new Error("Calibration tree indexed targets must be an array.");
   }
@@ -1025,6 +1248,30 @@ export function parseCalibrationTreeTargetIndex(
     if (ids.has(target.id)) throw new Error(`Calibration target id ${target.id} is duplicated.`);
     ids.add(target.id);
     validateMetricInputs(target.metricInputs, `Calibration tree indexed target ${index}`);
+    const comparison = record(
+      target.comparison,
+      `Calibration tree indexed target ${index} comparison`,
+    );
+    for (const key of [
+      "normalizedBaseName",
+      "chronicleFactKey",
+      "structuredIdentity",
+    ] as const) {
+      if (comparison[key] != null && typeof comparison[key] !== "string") {
+        throw new Error(
+          `Calibration tree indexed target ${index} comparison ${key} is invalid.`,
+        );
+      }
+    }
+    if (!['legacy', 'structured', 'hierarchy'].includes(String(comparison.representation))) {
+      throw new Error(
+        `Calibration tree indexed target ${index} comparison representation is invalid.`,
+      );
+    }
+    record(
+      comparison.row,
+      `Calibration tree indexed target ${index} comparison row`,
+    );
     const location = record(
       target.detailLocation,
       `Calibration tree indexed target ${index} detailLocation`,
@@ -1043,6 +1290,7 @@ export function parseCalibrationTreeTargetIndex(
     "geographyLevels",
     "geographies",
     "fitBands",
+    "comparisonFits",
     "calibrationStatuses",
   ]) {
     validatePostings(
@@ -1259,7 +1507,7 @@ export function calibrationTreeResponseFromBundle(
   const levelIndices = filterIndices(level.targetOrdinals);
 
   return {
-    releaseId: bundle.index.release.releaseId,
+    releaseId: bundle.index.build.releaseId ?? bundle.index.build.sourceId,
     calibrationProvenance: bundle.index.calibrationProvenance,
     lossAttributionAvailable: bundle.index.lossAttributionAvailable,
     path: state.path,
@@ -1286,19 +1534,21 @@ export function calibrationTreePartDepth(part: CalibrationTreePart): number | nu
 
 export function calibrationTreeBundlePrefix(
   country: MicrocosmCountry,
-  hfCommitSha: string,
+  buildArtifactId: string,
 ): string {
-  if (!HF_COMMIT_RE.test(hfCommitSha)) throw new Error("Invalid Hugging Face commit SHA.");
-  return `calibration-trees/${country}/${hfCommitSha}`;
+  if (!SHA256_RE.test(buildArtifactId)) {
+    throw new Error("Invalid calibration build artifact id.");
+  }
+  return `calibration-trees/${country}/${buildArtifactId}`;
 }
 
 export function calibrationTreePartPath(
   country: MicrocosmCountry,
-  hfCommitSha: string,
+  buildArtifactId: string,
   part: CalibrationTreePart,
 ): string {
   if (!isCalibrationTreePart(part)) throw new Error("Invalid calibration tree part.");
-  return `${calibrationTreeBundlePrefix(country, hfCommitSha)}/${part}.json`;
+  return `${calibrationTreeBundlePrefix(country, buildArtifactId)}/${part}.json`;
 }
 
 export function isSha256(value: string): boolean {

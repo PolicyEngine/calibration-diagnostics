@@ -1054,7 +1054,7 @@ export function microcosmCalibrationTreeIndexQueryOptions(
 
 function calibrationTreePartQueryOptions(
   country: Country,
-  revision: string,
+  buildArtifactId: string,
   part: Exclude<CalibrationTreePart, "index">,
 ) {
   return {
@@ -1062,16 +1062,19 @@ function calibrationTreePartQueryOptions(
       "microcosm",
       "calibration-tree-part",
       country,
-      revision,
+      buildArtifactId,
       part,
     ],
     queryFn: async (): Promise<CalibrationTreeArtifactPart> => {
       const artifact = parseCalibrationTreePart(await apiGet<unknown>("/microcosm/tree", {
         country,
-        revision,
+        build: buildArtifactId,
         part,
       }), part);
-      if (artifact.country !== country || artifact.hfCommitSha !== revision) {
+      if (
+        artifact.country !== country ||
+        artifact.buildArtifactId !== buildArtifactId
+      ) {
         throw new Error(`Calibration tree part ${part} does not match the request.`);
       }
       return artifact;
@@ -1092,16 +1095,20 @@ function usePublishedCalibrationTree(
     enabled,
   });
   const index = indexQuery.data;
-  const revision = index?.hfCommitSha ?? "";
+  const buildArtifactId = index?.buildArtifactId ?? "";
   const tierDescriptors = index?.parts.tiers ?? [];
   const tierQueries = useQueries({
     queries: tierDescriptors.map((descriptor) => ({
-      ...calibrationTreePartQueryOptions(country, revision, descriptor.part),
+      ...calibrationTreePartQueryOptions(
+        country,
+        buildArtifactId,
+        descriptor.part,
+      ),
       enabled: false,
     })),
   });
   const targetIndexQuery = useQuery({
-    ...calibrationTreePartQueryOptions(country, revision, "target-index"),
+    ...calibrationTreePartQueryOptions(country, buildArtifactId, "target-index"),
     enabled: enabled && Boolean(index),
   });
   const loadedTiers = tierQueries.flatMap((query) =>
@@ -1117,7 +1124,7 @@ function usePublishedCalibrationTree(
       (descriptor) => queryClient.fetchQuery(
         calibrationTreePartQueryOptions(
           country,
-          index.hfCommitSha,
+          index.buildArtifactId,
           descriptor.part,
         ),
       ),
@@ -1166,7 +1173,13 @@ function usePublishedCalibrationTree(
   const targetDetailQueryDefinitions: Array<
     ReturnType<typeof calibrationTreePartQueryOptions>
   > = detailDescriptor && enabled
-    ? [calibrationTreePartQueryOptions(country, revision, detailDescriptor.part)]
+    ? [
+        calibrationTreePartQueryOptions(
+          country,
+          buildArtifactId,
+          detailDescriptor.part,
+        ),
+      ]
     : [];
   const targetDetailQueries = useQueries({ queries: targetDetailQueryDefinitions });
   const targetDetailQuery = targetDetailQueries[0];

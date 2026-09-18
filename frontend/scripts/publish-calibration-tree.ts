@@ -9,6 +9,7 @@ import {
   updateCalibrationTreeManifest,
   uploadCalibrationTreeBundle,
 } from "../lib/microcosm/calibration-tree-blob";
+import type { CalibrationTreeManifestEntry } from "../lib/microcosm/calibration-tree-manifest";
 import { createHash } from "node:crypto";
 import {
   CalibrationReleaseNotFoundError,
@@ -312,6 +313,15 @@ async function publishRelease(
     calibrationProvenance: calibration.calibration_provenance,
     lossAttributionAvailable:
       calibration.target_loss_attribution.status !== "unavailable",
+    comparison: {
+      releaseId: calibration.release_id,
+      calibrationProvenance: calibration.calibration_provenance,
+      status: calibration.target_loss_attribution.status,
+      aggregate: calibration.target_loss_attribution.aggregate,
+      cap: calibration.target_loss_attribution.cap,
+      basisIdentifier: calibration.target_loss_attribution.basis_identifier,
+      targetRepresentation: calibration.target_schema.target_representation,
+    },
   });
   const sizes = Object.fromEntries(
     bundle.files.map((file) => [file.part, enforceConfiguredSizeLimits(file)]),
@@ -326,28 +336,57 @@ async function publishRelease(
 async function promoteIfCurrent(
   country: MicrocosmCountry,
   candidate: Awaited<ReturnType<typeof publishRelease>>,
+  entry: CalibrationTreeManifestEntry,
   blobToken: string,
 ): Promise<boolean> {
   const latest = await readUpstreamLatest(country);
   if (
-    latest.releaseId !== candidate.bundle.index.release.releaseId ||
-    latest.hfCommitSha !== candidate.bundle.index.release.hfCommitSha
+    latest.releaseId !== candidate.bundle.index.build.releaseId ||
+    latest.hfCommitSha !== candidate.bundle.index.build.hfCommitSha
   ) {
     return false;
   }
   await updateCalibrationTreeManifest({
     country,
     token: blobToken,
-    entry: {
-      releaseId: latest.releaseId,
-      hfCommitSha: latest.hfCommitSha,
-      treeSchemaVersion: 3,
-      indexSha256: candidate.stored.index.sha256,
-      indexBytes: candidate.stored.index.bytes,
-      updatedAt: latest.updatedAt ?? new Date().toISOString(),
-    },
+    entry,
+    makeLatest: true,
   });
   return true;
+}
+
+function releaseManifestEntry(
+  published: Awaited<ReturnType<typeof publishRelease>>,
+): CalibrationTreeManifestEntry {
+  const build = published.bundle.index.build;
+  if (!build.releaseId || !build.hfRepo || !build.hfCommitSha) {
+    throw new Error("Published release build is missing release provenance.");
+  }
+  return {
+    buildArtifactId: build.buildArtifactId,
+    kind: "release",
+    sourceId: build.sourceId,
+    label: build.label,
+    releaseId: build.releaseId,
+    stagingRunId: null,
+    hfRepo: build.hfRepo,
+    hfCommitSha: build.hfCommitSha,
+    treeSchemaVersion: 4,
+    indexSha256: published.stored.index.sha256,
+    indexBytes: published.stored.index.bytes,
+    createdAt: build.createdAt,
+    updatedAt: build.createdAt ?? "1970-01-01T00:00:00.000Z",
+  };
+}
+
+async function registerReleaseBuild(
+  country: MicrocosmCountry,
+  published: Awaited<ReturnType<typeof publishRelease>>,
+  blobToken: string,
+): Promise<CalibrationTreeManifestEntry> {
+  const entry = releaseManifestEntry(published);
+  await updateCalibrationTreeManifest({ country, entry, token: blobToken });
+  return entry;
 }
 
 export async function runPublisher(options: PublisherOptions): Promise<void> {
@@ -367,10 +406,12 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
           blobToken,
           true,
         );
+        await registerReleaseBuild(options.country, published, blobToken);
         console.log(JSON.stringify({
           country: options.country,
           releaseId: release.release_id,
-          hfCommitSha: published.bundle.index.release.hfCommitSha,
+          hfCommitSha: published.bundle.index.build.hfCommitSha,
+          buildArtifactId: published.bundle.index.buildArtifactId,
           files: published.stored.files,
           sizes: published.sizes,
         }));
@@ -398,7 +439,12 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
       blobToken,
       true,
     );
-    await promoteIfCurrent(options.country, current, blobToken);
+    const currentEntry = await registerReleaseBuild(
+      options.country,
+      current,
+      blobToken,
+    );
+    await promoteIfCurrent(options.country, current, currentEntry, blobToken);
     return;
   }
 
@@ -416,11 +462,18 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
     blobToken,
     options.mode === "latest",
   );
-  const promoted = await promoteIfCurrent(options.country, published, blobToken);
+  const entry = await registerReleaseBuild(options.country, published, blobToken);
+  const promoted = await promoteIfCurrent(
+    options.country,
+    published,
+    entry,
+    blobToken,
+  );
   console.log(JSON.stringify({
     country: options.country,
-    releaseId: published.bundle.index.release.releaseId,
-    hfCommitSha: published.bundle.index.release.hfCommitSha,
+    releaseId: published.bundle.index.build.releaseId,
+    hfCommitSha: published.bundle.index.build.hfCommitSha,
+    buildArtifactId: published.bundle.index.buildArtifactId,
     files: published.stored.files,
     sizes: published.sizes,
     promoted,

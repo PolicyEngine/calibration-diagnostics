@@ -139,22 +139,41 @@ test("bundle upload writes the index last, verifies every part, and is idempoten
 test("manifest writes merge countries and conditionally replace the prior version", async () => {
   const store = memoryClient();
   const baseEntry = {
+    buildArtifactId: "b".repeat(64),
+    kind: "release" as const,
+    sourceId: "microcosm-test",
+    label: "microcosm-test",
     releaseId: "microcosm-test",
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-us",
     hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
-    treeSchemaVersion: 3 as const,
-    indexSha256: "b".repeat(64),
+    treeSchemaVersion: 4 as const,
+    indexSha256: "c".repeat(64),
     indexBytes: 100,
+    createdAt: "2026-09-15T12:00:00.000Z",
     updatedAt: "2026-09-15T12:00:00.000Z",
   };
   await updateCalibrationTreeManifest({
     country: "us",
-    entry: { ...baseEntry, releaseId: "microcosm-us-test" },
+    entry: {
+      ...baseEntry,
+      sourceId: "microcosm-us-test",
+      label: "microcosm-us-test",
+      releaseId: "microcosm-us-test",
+    },
     token: "publisher-token",
     client: store.client,
   });
   await updateCalibrationTreeManifest({
     country: "uk",
-    entry: { ...baseEntry, releaseId: "microcosm-uk-test" },
+    entry: {
+      ...baseEntry,
+      buildArtifactId: "d".repeat(64),
+      sourceId: "microcosm-uk-test",
+      label: "microcosm-uk-test",
+      releaseId: "microcosm-uk-test",
+      hfRepo: "policyengine/populace-uk-private",
+    },
     token: "publisher-token",
     client: store.client,
   });
@@ -163,7 +182,7 @@ test("manifest writes merge countries and conditionally replace the prior versio
     consistent: true,
     client: store.client,
   });
-  expect(manifest.countries.us?.releaseId).toBe("microcosm-us-test");
-  expect(manifest.countries.uk?.releaseId).toBe("microcosm-uk-test");
+  expect(manifest.countries.us?.builds[0].releaseId).toBe("microcosm-us-test");
+  expect(manifest.countries.uk?.builds[0].releaseId).toBe("microcosm-uk-test");
   expect(store.putCalls[1].options.ifMatch).toBe('"etag-1"');
 });

@@ -4,7 +4,7 @@ import { withBasePath } from "@/lib/base-path";
 import { getCalibrationTreeBlob } from "@/lib/microcosm/calibration-tree-blob";
 import {
   isCalibrationTreePart,
-  isHfCommitSha,
+  isSha256,
   type CalibrationTreePart,
 } from "@/lib/microcosm/calibration-tree-artifact";
 import { resolveCalibrationRelease } from "@/lib/microcosm/calibration-release-locator";
@@ -67,15 +67,15 @@ export function createCalibrationTreeHandler(
       );
     }
     const release = url.searchParams.get("release");
-    const revision = url.searchParams.get("revision");
-    if (release && revision) {
+    const build = url.searchParams.get("build");
+    if (release && build) {
       return NextResponse.json(
-        { detail: "Specify either release or revision, not both." },
+        { detail: "Specify either release or build, not both." },
         { status: 400 },
       );
     }
 
-    if (!revision) {
+    if (!build) {
       try {
         const location = await dependencies.resolveRelease(
           country,
@@ -88,7 +88,7 @@ export function createCalibrationTreeHandler(
         );
         destination.search = url.search;
         destination.searchParams.delete("release");
-        destination.searchParams.set("revision", location.hfCommitSha);
+        destination.searchParams.set("build", location.buildArtifactId);
         return new NextResponse(null, {
           status: 307,
           headers: {
@@ -96,6 +96,7 @@ export function createCalibrationTreeHandler(
             Location: destination.toString(),
             "X-Microcosm-Release": location.releaseId,
             "X-HF-Commit": location.hfCommitSha,
+            "X-Calibration-Build": location.buildArtifactId,
           },
         });
       } catch (error) {
@@ -119,16 +120,16 @@ export function createCalibrationTreeHandler(
       }
     }
 
-    if (!isHfCommitSha(revision)) {
+    if (!isSha256(build)) {
       return NextResponse.json(
-        { detail: "Invalid Hugging Face commit SHA." },
+        { detail: "Invalid calibration build artifact id." },
         { status: 400 },
       );
     }
     try {
       const result = await dependencies.getBlob({
         country,
-        hfCommitSha: revision,
+        buildArtifactId: build,
         part,
         ifNoneMatch: request.headers.get("if-none-match") ?? undefined,
       });
@@ -141,7 +142,7 @@ export function createCalibrationTreeHandler(
       const headers = {
         ...IMMUTABLE_CACHE_HEADERS,
         ETag: result.blob.etag,
-        "X-HF-Commit": revision,
+        "X-Calibration-Build": build,
       };
       if (result.statusCode === 304) {
         return new NextResponse(null, { status: 304, headers });

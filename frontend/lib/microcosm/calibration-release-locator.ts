@@ -1,12 +1,13 @@
 import { readCalibrationTreeManifest } from "./calibration-tree-blob";
 import { calibrationTreeManifestEntry } from "./calibration-tree-manifest";
-import type { CalibrationTreeLatestManifest } from "./calibration-tree-manifest";
+import type { CalibrationTreeManifest } from "./calibration-tree-manifest";
 import {
   countryRegistration,
   type MicrocosmCountry,
 } from "./countries";
 
 export interface CalibrationReleaseLocation {
+  buildArtifactId: string;
   releaseId: string;
   hfCommitSha: string;
   updatedAt: string | null;
@@ -163,26 +164,26 @@ export async function resolveHfReleaseDirectorySha(
 export async function resolveCalibrationRelease(
   country: MicrocosmCountry,
   requestedRelease: string,
-  revalidate = 3600,
+  _revalidate = 3600,
 ): Promise<CalibrationReleaseLocation> {
-  if (!requestedRelease || requestedRelease === "latest") {
-    const { manifest } = await readCalibrationTreeManifest();
-    return calibrationReleaseFromManifest(manifest, country);
-  }
-  const releaseId = safeReleaseId(requestedRelease);
-  return {
-    releaseId,
-    hfCommitSha: await resolveHfRevisionSha(country, releaseId, revalidate),
-    updatedAt: null,
-  };
+  const releaseId = requestedRelease && requestedRelease !== "latest"
+    ? safeReleaseId(requestedRelease)
+    : "latest";
+  const { manifest } = await readCalibrationTreeManifest();
+  return calibrationReleaseFromManifest(manifest, country, releaseId);
 }
 
 export function calibrationReleaseFromManifest(
-  manifest: CalibrationTreeLatestManifest,
+  manifest: CalibrationTreeManifest,
   country: MicrocosmCountry,
+  releaseId = "latest",
 ): CalibrationReleaseLocation {
-  const entry = calibrationTreeManifestEntry(manifest, country);
+  const entry = calibrationTreeManifestEntry(manifest, country, { releaseId });
+  if (!entry.releaseId) {
+    throw new Error(`Calibration build ${entry.buildArtifactId} is not a release.`);
+  }
   return {
+    buildArtifactId: entry.buildArtifactId,
     releaseId: entry.releaseId,
     hfCommitSha: entry.hfCommitSha,
     updatedAt: entry.updatedAt,
