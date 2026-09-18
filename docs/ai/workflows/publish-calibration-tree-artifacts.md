@@ -45,6 +45,8 @@ would assign different immutable paths to the same release.
 
 1. Confirm `BLOB_READ_WRITE_TOKEN` and any required `HF_TOKEN` are available
    without displaying them.
+   For a country whose staging registration declares `token_env`, confirm that
+   country-specific secret is also present in GitHub Actions.
 2. Publish non-index files first, then `index.json`.
 3. Verify uploaded bytes through a consistent Blob read.
 4. Add every immutable source build to `manifest.json`; change
