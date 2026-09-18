@@ -70,6 +70,7 @@ export interface CalibrationTreeFilterPostings {
   geographyLevels: CalibrationTreePosting[];
   geographies: CalibrationTreePosting[];
   fitBands: CalibrationTreePosting<FitBand>[];
+  comparisonFits: CalibrationTreePosting[];
   calibrationStatuses: CalibrationTreePosting<CalibrationStatus | null>[];
 }
 
@@ -479,6 +480,7 @@ export function compileCalibrationTreeBundleDraft(
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
     roots,
@@ -528,6 +530,7 @@ export function calibrationTreeTargetIndexFromDraft(
       fitBands: postingValues(
         draft.targets.map((target) => target.facets.fitBand),
       ),
+      comparisonFits: [],
       calibrationStatuses: postingValues(
         draft.targets.map((target) => target.facets.calibrationStatus),
       ),

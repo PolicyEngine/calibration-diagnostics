@@ -60,6 +60,7 @@ function runManifest(runId: string, diagnosticsSha256: string) {
 
 test("builds the calibration tree from a staging diagnostics artifact", async () => {
   const runId = "uk-fit-map";
+  let fetchCount = 0;
   const diagnostics = {
     schema_version: 6,
     weight_entity: "household",
@@ -96,6 +97,7 @@ test("builds the calibration tree from a staging diagnostics artifact", async ()
     .update(diagnosticsBody)
     .digest("hex");
   globalThis.fetch = (async (input) => {
+    fetchCount += 1;
     const url = String(input);
     if (url.endsWith(`/runs/${runId}/run_manifest.json`)) {
       return Response.json(runManifest(runId, diagnosticsSha256));
@@ -117,7 +119,16 @@ test("builds the calibration tree from a staging diagnostics artifact", async ()
     releaseId: `${runId}-candidate`,
     filteredMetrics: { nTargets: 1, within10Pct: 1 },
   });
-  expect(response.headers.get("Cache-Control")).toBe("no-store");
+  expect(response.headers.get("Cache-Control")).toBeNull();
+
+  const firstRequestFetchCount = fetchCount;
+  const childResponse = await GET(
+    new Request(
+      `http://example.test/api/microcosm/staging/target-tree?run=${runId}&country=uk&source=ons&program=employment_income`,
+    ),
+  );
+  expect(childResponse.status).toBe(200);
+  expect(fetchCount).toBe(firstRequestFetchCount);
 });
 
 test("requires a staging run id", async () => {

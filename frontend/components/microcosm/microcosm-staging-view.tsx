@@ -3,12 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCountry } from "@/components/layout/country-context";
-import { CalibrationExplorerMap } from "@/components/microcosm/calibration-explorer-map";
-import { StagingTargetChangeMap } from "@/components/microcosm/staging-target-change-map";
+import { CalibrationExplorerDataPrefetch } from "@/components/microcosm/calibration-explorer-map";
+import { StagingCalibrationMapPanel } from "@/components/microcosm/staging-calibration-map-panel";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
   differingPercentDigits,
-  fmtUnitValue,
   fmt,
   fmtCompact,
   fmtMoney,
@@ -31,20 +30,15 @@ import {
   useMicrocosmStagingRuns,
   type MicrocosmStagingRunResponse,
   type MicrocosmStagingRunSummary,
-  type ReformValidationRow,
 } from "@/lib/api/hooks/use-microcosm";
 import { countryRegistration, hasCapability } from "@/lib/microcosm/countries";
 import {
   formatStagingCurrentStatus,
   formatStagingStatus,
 } from "@/lib/microcosm/staging-status";
-import {
-  formatWeightedTargetError,
-  targetChangeMapIdentity,
-} from "@/lib/microcosm/target-change-visualization";
+import { formatWeightedTargetError } from "@/lib/microcosm/target-change-visualization";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
-type CalibrationMapView = "candidate" | "comparison";
 
 function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -54,13 +48,6 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
 
 function pct(value: number | null | undefined) {
   return value == null ? "—" : fmt(value, { pct: true, digits: 1 });
-}
-
-function validationTone(absRel: number | null | undefined): "positive" | "neutral" | "negative" {
-  if (absRel == null) return "neutral";
-  if (absRel <= 0.1) return "positive";
-  if (absRel <= 0.25) return "neutral";
-  return "negative";
 }
 
 function statusTone(status: string | null | undefined): StatusTone {
@@ -254,46 +241,6 @@ function RunSelect({
   );
 }
 
-function CalibrationMapViewSelect({
-  value,
-  onChange,
-}: {
-  value: CalibrationMapView;
-  onChange: (value: CalibrationMapView) => void;
-}) {
-  const options: Array<{ value: CalibrationMapView; label: string }> = [
-    { value: "candidate", label: "Candidate fit" },
-    { value: "comparison", label: "Change from current release" },
-  ];
-  return (
-    <div
-      role="tablist"
-      aria-label="Calibration map view"
-      className="flex rounded-lg border border-border bg-muted/40 p-1"
-    >
-      {options.map((option) => {
-        const active = value === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(option.value)}
-            className={`h-8 rounded-md px-3 text-[13px] font-medium transition-all ${
-              active
-                ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function agoLabel(value: string | null | undefined): string {
   const t = value ? new Date(value).valueOf() : NaN;
   if (!Number.isFinite(t)) return "";
@@ -412,7 +359,9 @@ function RunInternalsPanel({
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Stage</div>
-                <StatusPill tone={statusTone(status)}>{stage || status || "unknown"}</StatusPill>
+                <StatusPill tone={statusTone(status)}>
+                  {stage || formatStagingStatus(status)}
+                </StatusPill>
               </div>
             </div>
           </div>
@@ -666,62 +615,6 @@ function RunInternalsPanel({
   );
 }
 
-function ReformValidationTable({ rows }: { rows: ReformValidationRow[] }) {
-  const ordered = rows.filter(
-    (row) =>
-      !row.in_sample &&
-      (row.microcosm_estimate != null || row.jct_score != null),
-  );
-  if (!ordered.length) {
-    return <EmptyState title="No out-of-sample validation rows yet." variant="compact" />;
-  }
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-            <th className="px-3 py-2 font-semibold">Test</th>
-            <th className="px-3 py-2 text-right font-semibold">Benchmark</th>
-            <th className="px-3 py-2 text-right font-semibold">Candidate</th>
-            <th className="px-3 py-2 text-right font-semibold">Error</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ordered.map((row) => {
-            return (
-              <tr key={row.id} className="border-b border-border/60 last:border-b-0">
-                <td className="px-3 py-2">
-                  <span className="font-medium text-foreground">{row.name}</span>
-                  <div className="text-xs text-muted-foreground">
-                    {row.category || "Reform score"}
-                  </div>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                  {fmtUnitValue(row.jct_score, row.unit)}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                  {fmtUnitValue(row.microcosm_estimate, row.unit)}
-                </td>
-                <td
-                  className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
-                    validationTone(row.abs_relative_error) === "positive"
-                      ? "tone-pos"
-                      : validationTone(row.abs_relative_error) === "negative"
-                        ? "tone-neg"
-                        : "text-foreground"
-                  }`}
-                >
-                  {pct(row.abs_relative_error)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 // Unweighted common-target statistics are computed on the same targets because
 // rates over different target sets are not directly comparable.
 interface SideStats {
@@ -834,16 +727,11 @@ function MicrocosmStagingRunsView() {
   const { data: runsData, isLoading: runsLoading, error: runsError } = useMicrocosmStagingRuns();
   const runs = runsData?.runs ?? [];
   const [selectedRun, setSelectedRun] = useState("");
-  const [targetSearch, setTargetSearch] = useState("");
   const [runInternalsOpen, setRunInternalsOpen] = useState(false);
-  const [calibrationMapView, setCalibrationMapView] =
-    useState<CalibrationMapView>("candidate");
   const [pageIntroHeight, setPageIntroHeight] = useState(0);
 
   const resetRunVisualState = useCallback((runId: string) => {
-    setTargetSearch("");
     setRunInternalsOpen(false);
-    setCalibrationMapView("candidate");
     setSelectedRun(runId);
   }, []);
 
@@ -881,6 +769,11 @@ function MicrocosmStagingRunsView() {
     commonStats.a.median,
     commonStats.b.median,
   );
+  const weightedTargetErrorChange =
+    compareData?.a.weighted_target_error != null &&
+    compareData.b.weighted_target_error != null
+      ? compareData.b.weighted_target_error - compareData.a.weighted_target_error
+      : null;
   const calibrationEvents = runData?.calibration_progress?.events ?? [];
   const lossValues = useMemo(
     () =>
@@ -965,6 +858,9 @@ function MicrocosmStagingRunsView() {
             </div>
           ) : (
             <>
+              {runData.has_calibration && (
+                <CalibrationExplorerDataPrefetch stagingRunId={selectedRun} />
+              )}
               <div className="flex min-w-0 flex-col gap-5">
               <SectionCard
                 title="Candidate overview"
@@ -1172,217 +1068,20 @@ function MicrocosmStagingRunsView() {
 
               <div className="contents">
                 {runData.has_calibration && (
-                  <SectionCard
-                    title="Calibration map"
-                    headerAlign="center"
-                    actions={
-                      <CalibrationMapViewSelect
-                        value={calibrationMapView}
-                        onChange={setCalibrationMapView}
-                      />
+                  <StagingCalibrationMapPanel
+                    key={`calibration-map-panel:${selectedRun}`}
+                    runId={selectedRun}
+                    comparisonReleaseId={
+                      compareData?.summary ? compareData.a.release_id : undefined
                     }
-                  >
-                    {calibrationMapView === "candidate" ? (
-                      <CalibrationExplorerMap
-                        key={`candidate-fit:${selectedRun}`}
-                        stagingRunId={selectedRun}
-                        pageIntroHeight={pageIntroHeight}
-                      />
-                    ) : (
-                      <>
-                        {compareData?.summary ? (
-                          <StagingTargetChangeMap
-                            key={targetChangeMapIdentity(
-                              selectedRun,
-                              compareData.a.release_id,
-                            )}
-                            runId={selectedRun}
-                            releaseId={compareData.a.release_id}
-                          />
-                        ) : compareLoading ? (
-                          <LoadingBlock
-                            label="Loading calibration diagnostics for the target error comparison…"
-                            height="h-40"
-                          />
-                        ) : (
-                          <EmptyState
-                            title="Target error comparison unavailable"
-                            description={
-                              compareError instanceof Error
-                                ? compareError.message
-                                : compareData?.detail ??
-                                  "The calibration diagnostics are available, but the comparison could not be loaded."
-                            }
-                            variant="compact"
-                          />
-                        )}
-                      </>
-                    )}
-                  </SectionCard>
+                    comparisonRows={compareData?.rows}
+                    weightedTargetErrorChange={weightedTargetErrorChange}
+                    pageIntroHeight={pageIntroHeight}
+                    comparisonLoading={compareLoading}
+                    comparisonError={compareError}
+                    comparisonDetail={compareData?.detail}
+                  />
                 )}
-
-                {runData.has_calibration && (
-                <SectionCard
-                  title="Target breakdown"
-                  description="Every target both sides share, worst movement first. Search by statistic, variable, or geography."
-                  actions={
-                    compareData?.summary ? (
-                      <input
-                        type="search"
-                        value={targetSearch}
-                        placeholder="Search targets…"
-                        onChange={(e) => setTargetSearch(e.target.value)}
-                        className="h-8 w-56 rounded-md border border-border bg-card px-2.5 text-sm focus:border-primary/60 focus:outline-none"
-                      />
-                    ) : undefined
-                  }
-                  padded={false}
-                >
-                  {compareData?.summary ? (() => {
-                    const q = targetSearch.trim().toLowerCase();
-                    const usable = (compareData?.rows ?? []).filter(
-                      (row) =>
-                        // Drop tiny-denominator artifacts (>1000% errors),
-                        // same convention as the release highlights.
-                        Math.abs(row.b_relative_error ?? 0) <= 10 &&
-                        Math.abs(row.a_relative_error ?? 0) <= 10,
-                    );
-                    const matched = q
-                      ? usable.filter((row) =>
-                          [row.name, row.variable, row.target_label, row.geography, row.source]
-                            .filter(Boolean)
-                            .some((v) => String(v).toLowerCase().includes(q)),
-                        )
-                      : usable;
-                    const shown = [...matched]
-                      .sort(
-                        (x, y) =>
-                          Math.abs(y.abs_rel_delta ?? 0) - Math.abs(x.abs_rel_delta ?? 0),
-                      )
-                      .slice(0, 50);
-                    const pctOrDash = (v: number | null | undefined) =>
-                      v == null ? "—" : fmt(Math.abs(v), { pct: true, digits: 1 });
-                    if (!shown.length) {
-                      return (
-                        <EmptyState
-                          title={q ? `No targets match “${targetSearch}”.` : "No comparable targets."}
-                          variant="compact"
-                        />
-                      );
-                    }
-                    return (
-                      <>
-                        <div className="max-h-96 overflow-y-auto">
-                          <table className="w-full text-left text-sm">
-                            <thead className="sticky top-0 bg-card shadow-[var(--elev-1)]">
-                              <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                                <th className="px-3 py-2 font-semibold">Target</th>
-                                <th className="px-3 py-2 text-right font-semibold">Current release</th>
-                                <th className="px-3 py-2 text-right font-semibold">Candidate</th>
-                                <th className="px-3 py-2 text-right font-semibold">Δ</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {shown.map((row) => {
-                                const delta = row.abs_rel_delta ?? null;
-                                return (
-                                  <tr
-                                    key={row.name}
-                                    className="border-b border-border/60 last:border-b-0"
-                                  >
-                                    <td className="px-3 py-1.5">
-                                      <span className="font-medium text-foreground">
-                                        {row.variable ?? row.name}
-                                      </span>
-                                      {row.target_label ? (
-                                        <span className="text-xs text-muted-foreground">
-                                          {" "}
-                                          · {row.target_label}
-                                        </span>
-                                      ) : null}
-                                      {row.geography ? (
-                                        <span className="text-xs text-muted-foreground">
-                                          {" "}
-                                          · {row.geography}
-                                        </span>
-                                      ) : null}
-                                    </td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                                      {pctOrDash(row.a_relative_error)}
-                                    </td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
-                                      {pctOrDash(row.b_relative_error)}
-                                    </td>
-                                    <td
-                                      className={`whitespace-nowrap px-3 py-1.5 text-right tabular-nums ${
-                                        delta == null
-                                          ? "text-muted-foreground"
-                                          : delta > 1e-9
-                                            ? "tone-neg"
-                                            : delta < -1e-9
-                                              ? "tone-pos"
-                                              : "text-muted-foreground"
-                                      }`}
-                                    >
-                                      {delta == null
-                                        ? "—"
-                                        : `${delta > 0 ? "+" : ""}${fmt(delta, { pct: true, digits: 1 })}`}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                        <div className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
-                          Showing {fmt(shown.length, { digits: 0 })} of{" "}
-                          {fmt(matched.length, { digits: 0 })}
-                          {q ? " matching" : ""} targets, biggest |Δ| first.
-                        </div>
-                      </>
-                    );
-                  })() : compareLoading ? (
-                    <LoadingBlock
-                      label="Loading calibration diagnostics for the target breakdown…"
-                      height="h-40"
-                    />
-                  ) : (
-                    <EmptyState
-                      title="Target breakdown unavailable"
-                      description={
-                        compareError instanceof Error
-                          ? compareError.message
-                          : compareData?.detail ??
-                            "The calibration diagnostics are available, but the target breakdown could not be loaded."
-                      }
-                      variant="compact"
-                    />
-                  )}
-                </SectionCard>
-              )}
-
-              {runData.reform_validation && (
-                <SectionCard
-                  title="External checks breakdown"
-                  description={
-                    <>
-                      Cross-release external comparisons live in the{" "}
-                      <a
-                        href="https://www.policyengine.org/scorecard"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline decoration-dotted underline-offset-2 hover:text-primary"
-                      >
-                        PolicyEngine scorecard
-                      </a>
-                      .
-                    </>
-                  }
-                  padded={false}
-                >
-                  <ReformValidationTable rows={runData.reform_validation.rows ?? []} />
-                </SectionCard>
-              )}
 
               {showsCandidateValidation && (
                 <RunInternalsPanel

@@ -100,13 +100,11 @@ test("Belgium navigation keeps country-ready pages and hides pages it lacks capa
   expect(items.map((item) => item.href)).toEqual([
     "/microcosm",
     "/microcosm/datasets",
-    "/microcosm/compare",
   ]);
   expect(items.every((item) => hasCapability("be", item.capability!))).toBe(true);
   expect(items.map((item) => navItemHref(item, "be"))).toEqual([
     "/microcosm?country=be",
     "/microcosm/datasets?country=be",
-    "/microcosm/compare?country=be",
   ]);
 });
 

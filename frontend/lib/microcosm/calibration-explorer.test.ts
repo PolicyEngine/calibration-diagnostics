@@ -18,6 +18,7 @@ function state(overrides: Partial<ExplorerState> = {}): ExplorerState {
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
     ...overrides,
@@ -69,6 +70,7 @@ describe("calibration explorer semantic navigation", () => {
         geographyLevels: ["state"],
         geographies: [],
         fitBands: [],
+        comparisonFits: [],
         calibrationStatuses: [],
       },
     });
@@ -91,6 +93,7 @@ describe("calibration explorer semantic navigation", () => {
       geographyLevels: ["state"],
       geographies: ["CA"],
       fitBands: ["10_20" as const],
+      comparisonFits: [],
       calibrationStatuses: ["included" as const],
     };
     const deep = state({
@@ -176,6 +179,7 @@ describe("calibration explorer semantic navigation", () => {
       geographyLevels: ["state"],
       geographies: ["CA"],
       fitBands: ["10_20" as const],
+      comparisonFits: [],
       calibrationStatuses: ["included" as const],
     };
     const selected = state({
@@ -193,6 +197,7 @@ describe("calibration explorer semantic navigation", () => {
       geographyLevels: ["state"],
       geographies: ["CA"],
       fitBands: ["10_20" as const],
+      comparisonFits: [],
       calibrationStatuses: ["included" as const],
     };
     const deep = state({
