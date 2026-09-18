@@ -10,7 +10,7 @@ import {
 
 const originalFetch = globalThis.fetch;
 
-test("publisher accepts latest, immutable release, and backfill modes", () => {
+test("publisher accepts latest, immutable release, backfill, and staging modes", () => {
   expect(parsePublisherOptions(["--country", "us", "--latest"])).toEqual({
     country: "us",
     mode: "latest",
@@ -43,6 +43,17 @@ test("publisher accepts latest, immutable release, and backfill modes", () => {
     mode: "latest",
     hfCommitSha: "abcdef1234567890abcdef1234567890abcdef12",
   });
+  expect(parsePublisherOptions([
+    "--country",
+    "uk",
+    "--staging-finalized",
+    "--sha",
+    "ABCDEF1234567890ABCDEF1234567890ABCDEF12",
+  ])).toEqual({
+    country: "uk",
+    mode: "staging-finalized",
+    hfCommitSha: "abcdef1234567890abcdef1234567890abcdef12",
+  });
 });
 
 test("publisher rejects ambiguous modes and unsafe release ids", () => {
@@ -60,7 +71,7 @@ test("publisher enforces configured artifact size limits", () => {
   try {
     expect(() => enforceConfiguredSizeLimits({
       part: "target-details-0001",
-      path: "calibration-trees/us/1234567890abcdef1234567890abcdef12345678/target-details-0001.json",
+      path: `calibration-trees/us/${"a".repeat(64)}/target-details-0001.json`,
       artifact: {} as never,
       serialized: "12345678901",
       sha256: "a".repeat(64),

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { selectableCountries, type MicrocosmCountry } from "@/lib/microcosm/countries";
 import { microcosmRepo } from "@/lib/microcosm/latest-artifact";
+import { stagingRepository } from "@/lib/microcosm/staging-artifact";
 import { postReleaseAlert } from "@/lib/slack";
 
 export const runtime = "nodejs";
@@ -34,11 +35,23 @@ const MAIN_BRANCH_REF = "refs/heads/main";
 // the dashboard actually reads (a POPULACE_*_HF_REPO override moves the
 // allowlist with it). Build the map per request from the server instance's
 // resolved deployment configuration.
-function allowedRepos(): Map<string, MicrocosmCountry> {
-  const allowed = new Map<string, MicrocosmCountry>();
+interface AllowedRepository {
+  country: MicrocosmCountry;
+  kind: "release" | "staging";
+}
+
+function allowedRepos(): Map<string, AllowedRepository> {
+  const allowed = new Map<string, AllowedRepository>();
   for (const country of selectableCountries()) {
     try {
-      allowed.set(microcosmRepo(country).toLowerCase(), country);
+      allowed.set(microcosmRepo(country).toLowerCase(), {
+        country,
+        kind: "release",
+      });
+      const staging = stagingRepository(country);
+      if (staging) {
+        allowed.set(staging.repo.toLowerCase(), { country, kind: "staging" });
+      }
     } catch (error) {
       console.error(`Release alerts are disabled for ${country}:`, error);
     }
@@ -46,7 +59,7 @@ function allowedRepos(): Map<string, MicrocosmCountry> {
   return allowed;
 }
 
-function countryForRepo(repoName: string): MicrocosmCountry | null {
+function registrationForRepo(repoName: string): AllowedRepository | null {
   return allowedRepos().get(repoName.toLowerCase()) ?? null;
 }
 
@@ -66,7 +79,7 @@ function secretOk(request: Request): boolean {
 
 interface TreeBuildDispatch {
   country: MicrocosmCountry;
-  eventKind: "tag" | "branch";
+  eventKind: "tag" | "branch" | "staging";
   releaseId?: string;
   hfCommitSha: string;
 }
@@ -127,7 +140,7 @@ export async function POST(request: Request) {
   }
 
   const repo = payload.repo?.name ?? "";
-  const country = countryForRepo(repo);
+  const registration = registrationForRepo(repo);
   const updatedRefs = payload.updatedRefs ?? [];
   const newTagRefs = updatedRefs
     // A newly created tag has no prior sha: oldSha is null OR absent.
@@ -142,23 +155,31 @@ export async function POST(request: Request) {
 
   // Acknowledge unrelated events and unknown repositories so Hugging Face does
   // not retry them. Only allowlisted repository names can start a workflow.
-  if (!country || (newTags.length === 0 && mainUpdates.length === 0)) {
+  if (!registration || (newTags.length === 0 && mainUpdates.length === 0)) {
     return NextResponse.json({ ok: true, dispatched: [], alerted: [] });
   }
 
-  const dispatches: TreeBuildDispatch[] = [
-    ...newTagRefs.map((updatedRef) => ({
-      country,
-      eventKind: "tag" as const,
-      releaseId: updatedRef.ref.slice(TAG_PREFIX.length),
-      hfCommitSha: updatedRef.newSha!,
-    })),
-    ...mainUpdates.map((updatedRef) => ({
-      country,
-      eventKind: "branch" as const,
-      hfCommitSha: updatedRef.newSha!,
-    })),
-  ];
+  const { country } = registration;
+
+  const dispatches: TreeBuildDispatch[] = registration.kind === "staging"
+    ? mainUpdates.map((updatedRef) => ({
+        country,
+        eventKind: "staging" as const,
+        hfCommitSha: updatedRef.newSha!,
+      }))
+    : [
+        ...newTagRefs.map((updatedRef) => ({
+          country,
+          eventKind: "tag" as const,
+          releaseId: updatedRef.ref.slice(TAG_PREFIX.length),
+          hfCommitSha: updatedRef.newSha!,
+        })),
+        ...mainUpdates.map((updatedRef) => ({
+          country,
+          eventKind: "branch" as const,
+          hfCommitSha: updatedRef.newSha!,
+        })),
+      ];
   try {
     for (const dispatch of dispatches) await dispatchTreeBuild(dispatch);
   } catch (error) {
@@ -170,7 +191,7 @@ export async function POST(request: Request) {
   }
 
   const alerted: string[] = [];
-  for (const releaseId of newTags) {
+  for (const releaseId of registration.kind === "release" ? newTags : []) {
     try {
       const sent = await postReleaseAlert({ country, releaseId, repo });
       if (sent) alerted.push(releaseId);

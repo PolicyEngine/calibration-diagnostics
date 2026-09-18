@@ -17,6 +17,7 @@ on:
           - manual
           - tag
           - branch
+          - staging
       release_id:
         description: Immutable Hugging Face release tag; omit to publish latest
         required: false
@@ -57,7 +58,12 @@ jobs:
         run: |
           set -euo pipefail
           args=(--country "${{ inputs.country }}")
-          if [[ "${{ inputs.backfill }}" == "true" ]]; then
+          if [[ "${{ inputs.event_kind }}" == "staging" ]]; then
+            args+=(--staging-finalized)
+            if [[ -n "${{ inputs.hf_commit_sha }}" ]]; then
+              args+=(--sha "${{ inputs.hf_commit_sha }}")
+            fi
+          elif [[ "${{ inputs.backfill }}" == "true" ]]; then
             args+=(--backfill)
           elif [[ -n "${{ inputs.release_id }}" ]]; then
             args+=(--release "${{ inputs.release_id }}")
