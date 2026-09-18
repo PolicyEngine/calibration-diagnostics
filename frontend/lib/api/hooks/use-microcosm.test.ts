@@ -4,6 +4,7 @@ import { createExplorerState } from "@/lib/microcosm/calibration-explorer";
 
 import {
   fetchCalibrationTreeTiersConcurrently,
+  microcosmComparisonTreeIndexQueryOptions,
   microcosmStagingCalibrationTreeQueryOptions,
 } from "./use-microcosm";
 
@@ -44,4 +45,25 @@ test("mutable staging calibration trees refresh every 30 seconds", () => {
   expect(options.staleTime).toBe(30 * 1000);
   expect(options.refetchInterval).toBe(30 * 1000);
   expect(options.queryKey).toContain("run-a");
+});
+
+test("immutable comparison queries include both ordered build identities and mode", () => {
+  const current = "a".repeat(64);
+  const candidate = "b".repeat(64);
+  const options = microcosmComparisonTreeIndexQueryOptions(
+    current,
+    candidate,
+    "shared",
+    "us",
+  );
+
+  expect(options.queryKey).toEqual([
+    "microcosm",
+    "calibration-comparison-tree",
+    "us",
+    current,
+    candidate,
+    "shared",
+    "index",
+  ]);
 });
