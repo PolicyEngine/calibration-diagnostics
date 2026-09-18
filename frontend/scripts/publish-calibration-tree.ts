@@ -58,6 +58,43 @@ const DEFAULT_MAX_RAW_BYTES = 100_000_000;
 
 export class CalibrationTreeArtifactSizeError extends Error {}
 
+export function publicationCreatedAt(
+  value: string | null | undefined,
+): string | null {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+
+  const compact = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?$/.exec(
+    candidate,
+  );
+  if (compact) {
+    const [, year, month, day, hour = "00", minute = "00", second = "00"] =
+      compact;
+    const date = new Date(Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second),
+    ));
+    if (
+      date.getUTCFullYear() !== Number(year) ||
+      date.getUTCMonth() !== Number(month) - 1 ||
+      date.getUTCDate() !== Number(day) ||
+      date.getUTCHours() !== Number(hour) ||
+      date.getUTCMinutes() !== Number(minute) ||
+      date.getUTCSeconds() !== Number(second)
+    ) {
+      return null;
+    }
+    return date.toISOString();
+  }
+
+  const timestamp = Date.parse(candidate);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
+
 function sha256Text(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -633,7 +670,7 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
           undefined,
           blobToken,
           true,
-          release.date,
+          publicationCreatedAt(release.date),
         );
         await registerReleaseBuild(options.country, published, blobToken);
         console.log(JSON.stringify({
@@ -667,7 +704,7 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
       latest.hfCommitSha,
       blobToken,
       true,
-      latest.updatedAt,
+      publicationCreatedAt(latest.updatedAt),
     );
     const currentEntry = await registerReleaseBuild(
       options.country,
@@ -691,7 +728,7 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
     selection.hfCommitSha,
     blobToken,
     options.mode === "latest",
-    selection.updatedAt,
+    publicationCreatedAt(selection.updatedAt),
   );
   const entry = await registerReleaseBuild(options.country, published, blobToken);
   const promoted = await promoteIfCurrent(

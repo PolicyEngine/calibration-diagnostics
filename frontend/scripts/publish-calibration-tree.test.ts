@@ -4,6 +4,7 @@ import {
   CalibrationTreeArtifactSizeError,
   enforceConfiguredSizeLimits,
   parsePublisherOptions,
+  publicationCreatedAt,
   readUpstreamLatest,
   resolvePublicationSourceSha,
 } from "./publish-calibration-tree";
@@ -84,6 +85,18 @@ test("publisher enforces configured artifact size limits", () => {
     if (previous == null) delete process.env.CALIBRATION_TREE_MAX_RAW_BYTES;
     else process.env.CALIBRATION_TREE_MAX_RAW_BYTES = previous;
   }
+});
+
+test("publisher normalizes compact release dates for manifest sorting", () => {
+  expect(publicationCreatedAt("20260915")).toBe("2026-09-15T00:00:00.000Z");
+  expect(publicationCreatedAt("20260728T011454Z")).toBe(
+    "2026-07-28T01:14:54.000Z",
+  );
+  expect(publicationCreatedAt("2026-09-16T12:00:00Z")).toBe(
+    "2026-09-16T12:00:00.000Z",
+  );
+  expect(publicationCreatedAt("release-without-a-date")).toBeNull();
+  expect(publicationCreatedAt("20261340")).toBeNull();
 });
 
 test("latest publication uses its exact source commit when no release tag exists", async () => {
