@@ -8,7 +8,7 @@ import {
   type CalibrationTreeBlobClient,
 } from "./calibration-tree-blob";
 
-function memoryClient() {
+function memoryClient(transientManifestConflicts = 0) {
   const content = new Map<string, string>();
   const etags = new Map<string, string>();
   const putCalls: Array<{ pathname: string; options: Record<string, unknown> }> = [];
@@ -52,6 +52,14 @@ function memoryClient() {
       options: Record<string, unknown>,
     ) => {
       putCalls.push({ pathname, options });
+      if (
+        pathname.endsWith("/manifest.json") &&
+        version > 0 &&
+        transientManifestConflicts > 0
+      ) {
+        transientManifestConflicts -= 1;
+        throw new Error("Vercel Blob: Precondition failed: ETag mismatch.");
+      }
       const existingEtag = etags.get(pathname);
       if (existingEtag && options.ifMatch !== existingEtag) {
         throw new Error("precondition failed");
@@ -185,4 +193,36 @@ test("manifest writes merge countries and conditionally replace the prior versio
   expect(manifest.countries.us?.builds[0].releaseId).toBe("microcosm-us-test");
   expect(manifest.countries.uk?.builds[0].releaseId).toBe("microcosm-uk-test");
   expect(store.putCalls[1].options.ifMatch).toBe('"etag-1"');
+});
+
+test("manifest writes retry wrapped Blob ETag conflicts", async () => {
+  const store = memoryClient(1);
+  const entry = {
+    buildArtifactId: "e".repeat(64),
+    kind: "release" as const,
+    sourceId: "microcosm-us-test",
+    label: "microcosm-us-test",
+    releaseId: "microcosm-us-test",
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-us",
+    hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
+    treeSchemaVersion: 4 as const,
+    indexSha256: "f".repeat(64),
+    indexBytes: 100,
+    createdAt: "2026-09-15T12:00:00.000Z",
+    updatedAt: "2026-09-15T12:00:00.000Z",
+  };
+  await updateCalibrationTreeManifest({
+    country: "us",
+    entry,
+    token: "publisher-token",
+    client: store.client,
+  });
+  await updateCalibrationTreeManifest({
+    country: "us",
+    entry: { ...entry, buildArtifactId: "a".repeat(64) },
+    token: "publisher-token",
+    client: store.client,
+  });
+  expect(store.putCalls).toHaveLength(3);
 });
