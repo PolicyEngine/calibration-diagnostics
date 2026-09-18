@@ -20,6 +20,7 @@ import { stagingTargetDetailPresentation } from "@/components/microcosm/staging-
 import { HelpHint } from "@/components/shared/help-hint";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import {
+  useMicrocosmBuildComparisonTree,
   useMicrocosmStagingTargetChangeTree,
   type MicrocosmTargetDimension,
   type MicrocosmTargetRow,
@@ -244,10 +245,14 @@ function Control<T extends string>({
 export function StagingTargetChangeMap({
   runId,
   releaseId,
+  currentBuildArtifactId,
+  candidateBuildArtifactId,
   weightedTargetErrorChange,
 }: {
-  runId: string;
-  releaseId: string;
+  runId?: string;
+  releaseId?: string;
+  currentBuildArtifactId?: string;
+  candidateBuildArtifactId?: string;
   weightedTargetErrorChange: number | null;
 }) {
   const [state, dispatch] = useReducer(explorerReducer, undefined, createExplorerState);
@@ -259,12 +264,26 @@ export function StagingTargetChangeMap({
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 960, height: 520 });
-  const { data, isLoading, error } = useMicrocosmStagingTargetChangeTree({
+  const immutableComparison = Boolean(
+    currentBuildArtifactId && candidateBuildArtifactId,
+  );
+  const liveQuery = useMicrocosmStagingTargetChangeTree({
     runId,
     releaseId,
     mode,
     state,
+    enabled: !immutableComparison,
   });
+  const immutableQuery = useMicrocosmBuildComparisonTree({
+    currentBuildArtifactId,
+    candidateBuildArtifactId,
+    mode,
+    state,
+    enabled: immutableComparison,
+  });
+  const { data, isLoading, error } = immutableComparison
+    ? immutableQuery
+    : liveQuery;
 
   useEffect(() => {
     const element = containerRef.current;
