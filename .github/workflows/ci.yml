@@ -10,6 +10,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  regenerate-schema-four-calibration-artifacts:
+    name: regenerate schema 4 calibration artifacts
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.ref == 'codex/immutable-calibration-trees'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Publish release and finalized staging builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          for country in us uk be; do
+            bun run publish:calibration-tree -- --country "$country" --backfill
+          done
+          for country in us uk; do
+            bun run publish:calibration-tree -- --country "$country" --staging-finalized
+          done
+
   hosted-python:
     name: hosted Python · dependencies · source APIs
     runs-on: ubuntu-latest
