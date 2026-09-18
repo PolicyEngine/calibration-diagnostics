@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  regenerate-schema-four-calibration-artifacts:
-    name: regenerate schema 4 calibration artifacts
+  regenerate-schema-five-calibration-artifacts:
+    name: regenerate schema 5 calibration artifacts
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.ref == 'codex/immutable-calibration-trees'

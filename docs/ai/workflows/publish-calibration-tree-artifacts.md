@@ -8,7 +8,7 @@ before modifying code or external storage.
 ## Establish scope and authorization
 
 1. Confirm the requested country, source kind, source ID, and exact Hugging Face commit.
-2. Distinguish tree schema 4 from unrelated Microcosm artifact schemas.
+2. Distinguish tree schema 5 from unrelated Microcosm artifact schemas.
 3. Treat Blob deletion, manifest updates, workflow dispatch, and publication as
    external state changes. Obtain explicit user authorization when the request
    does not already cover them.
@@ -29,11 +29,12 @@ before modifying code or external storage.
 1. Run the publisher for an exact release or use its test helpers without
    changing Blob storage.
 2. Confirm target ordinals cover `0` through `targetCount - 1`.
-3. Confirm every indexed target has one `{ shardIndex, offset }` location.
-4. Confirm detail descriptors have contiguous ordinal ranges and files remain
-   at or below 4,000,000 raw UTF-8 bytes.
+3. Confirm summary and detail descriptors each cover all target ordinals with
+   contiguous, non-overlapping ranges.
+4. Confirm summary files remain at or below 8,000,000 raw UTF-8 bytes and
+   detail files remain at or below 4,000,000 raw UTF-8 bytes.
 5. Confirm every file's path, hash, raw size, and gzip size matches `index.json`.
-6. Confirm each compact target record contains the three comparison keys,
+6. Confirm each target-summary record contains the three comparison keys,
    hierarchy metadata, and weighted-error inputs.
 7. Run `bun test`, `bun run lint`, and `bun run build` from `frontend/`.
 
@@ -60,7 +61,7 @@ requests it.
 
 ## Replace pre-production artifacts
 
-Schema 4 has no compatibility reader for schemas 1 through 3. If replacement
+Schema 5 has no compatibility reader for schemas 1 through 4. If replacement
 requires deletion:
 
 1. List every object under the exact `calibration-trees/` prefix.
@@ -79,14 +80,15 @@ one-time replacement.
 
 1. Confirm the release alias redirects to an exact build artifact ID.
 2. Confirm `index.json` renders the root before later requests finish.
-3. Confirm `target-index.json` and all tier files start concurrently.
+3. Confirm `filter-index.json`, all target-summary files, and all tier files
+   start concurrently.
 4. Confirm no target-detail shard loads before target selection.
 5. Select targets in the first, middle, and last shards.
 6. Confirm a target-detail failure remains confined to its detail panel.
 7. Switch between builds and confirm country, build ID, comparison mode, and part query keys
    prevent stale display.
-8. Request an uncached comparison and confirm both modes persist without
-   reading source detail shards.
+8. Request an uncached comparison and confirm both modes persist after reading
+   only each source's index and target-summary files.
 9. Request one exact shard twice and inspect Vercel cache headers.
 
 Do not use browser automation or screenshots for visual verification. Provide
