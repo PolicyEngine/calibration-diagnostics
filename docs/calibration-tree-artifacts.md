@@ -1,21 +1,16 @@
-# Calibration tree artifacts
+# Calibration build and comparison artifacts
 
-The calibration explorer reads precomputed schema-3 JSON files from private
-Vercel Blob storage. The browser does not download calibration diagnostics or
-reconstruct the hierarchy.
-
-Calibration-tree schema versions 1 and 2 are unsupported. Other Microcosm
-artifacts have independent schema contracts and may use those version numbers.
+The calibration explorer reads precomputed schema-4 JSON from private Vercel
+Blob storage. The browser does not download calibration diagnostics or rebuild
+the hierarchy. Schemas 1, 2, and 3 are unsupported.
 
 ## Required Blob folder schema
 
-Each country and immutable Hugging Face commit has one directory:
-
 ```text
 calibration-trees/
-  latest.json
+  manifest.json
   <country>/
-    <commit>/
+    <build-artifact-id>/
       index.json
       target-index.json
       target-details-0001.json
@@ -27,214 +22,217 @@ calibration-trees/
       tier-N.json
 ```
 
-There is no schema-version directory. Every JSON file, including
-`latest.json`, declares `schemaVersion: 3`. Publication refuses to overwrite an
-existing country, commit, and part path with different bytes.
+`<build-artifact-id>` is a 64-character SHA-256 content identity. It is derived
+from the schema version, country, build kind, source ID, and source artifact
+digests. A Hugging Face commit remains provenance in `index.json`; it is not the
+Blob directory key.
 
-- `index.json` contains provenance, filter options, both root levels, and a
-  descriptor for every other file.
+Every JSON file declares `schemaVersion: 4`. Publication refuses to replace an
+existing part with different bytes.
+
+- `manifest.json` lists every published release build and finalized staging
+  build, and points to the current release build for each country.
+- `index.json` contains build provenance, filter options, both root hierarchy
+  levels, and descriptors for all other parts.
 - `tier-N.json` contains every hierarchy level exactly `N` selections from a
   root. Tier numbers are contiguous.
-- `target-index.json` contains compact target identities, metric inputs,
-  filter postings, and a direct detail location for every target.
+- `target-index.json` contains compact target identities, weighted-error
+  inputs, comparison keys, hierarchy fields, filter postings, and direct detail
+  locations.
 - `target-details-NNNN.json` contains complete target records for one
   contiguous ordinal range.
-- `latest.json` maps each country to the current release and exact commit.
 
-## Target ordinals and detail locations
+Comparison bundles use the same directory and file schema. Their build IDs are
+derived from the ordered source build IDs and comparison mode. They are not
+listed as selectable source builds in `manifest.json`.
 
-Every target receives a zero-based ordinal within one compiled release. The
-ordinal is not stable across releases. Numeric ordinals keep hierarchy
-membership and filter postings smaller than repeated string target IDs and let
-the browser represent filter membership with a `Uint8Array`.
+## Target ordinals and detail shards
 
-The array position in `target-index.json` is the target ordinal. Each indexed
-target includes a direct location:
+Every target receives a zero-based ordinal within one build. The ordinal is not
+stable across builds. Numeric ordinals keep hierarchy membership and filter
+postings smaller than repeated string IDs and allow the browser to represent
+membership with a `Uint8Array`.
+
+Each indexed target has a direct detail location:
 
 ```json
 {
   "id": "target-id",
-  "label": "Target label",
-  "detailLocation": {
-    "shardIndex": 2,
-    "offset": 17
-  }
+  "detailLocation": { "shardIndex": 2, "offset": 17 }
 }
 ```
 
-`shardIndex` selects `index.parts.targetDetails[shardIndex]`. `offset` selects
-one record from that shard's `targets` array. For target ordinal `N`, the
-publisher verifies:
+`shardIndex` selects `index.parts.targetDetails[shardIndex]`; `offset` selects a
+record in that shard. Descriptor ranges cover every target exactly once without
+gaps or overlaps.
+
+The publisher preserves ordinal order and limits each detail file to 4,000,000
+raw UTF-8 bytes. It measures the complete canonical JSON file, including
+metadata and punctuation. Publication fails when one target does not fit or
+when a build would require more than 9,999 shards.
+
+## Comparison-ready target index
+
+Each target-index record publishes one compact comparison record containing:
+
+- normalized base name;
+- Chronicle fact key, when present;
+- structured source, variable, measure, and dimension identity;
+- target representation;
+- program, geography, dimension, and display fields;
+- benchmark, estimate, weight, weight share, scale, capped error, and final
+  loss contribution.
+
+Matching applies the existing priority order: normalized base name, unique
+Chronicle fact key, then unique structured identity. Ambiguous keys remain
+unmatched. Candidate hierarchy fields categorize shared and added targets;
+current-build hierarchy fields categorize removed targets.
+
+An uncached ordered build pair is calculated synchronously by the comparison
+API. The server reads only `index.json` and `target-index.json` from each source,
+calculates reported and shared-target rows, builds both hierarchy bundles,
+validates them, and uploads them. Later requests address those immutable bundle
+IDs directly. Full source detail shards are not inputs to this calculation.
+
+## Publication flows
+
+### Release builds
 
 ```text
-descriptor.startTargetOrdinal + detailLocation.offset == N
-```
-
-Descriptors also declare `endTargetOrdinalExclusive`. Their ranges must cover
-every target exactly once without gaps or overlaps.
-
-## Deterministic detail sharding
-
-The publisher preserves target ordinal order and limits each target-detail file
-to 4,000,000 raw UTF-8 bytes. This limit is part of schema 3 and is not
-configurable through an environment variable.
-
-The builder serializes each target canonically, then adds consecutive records
-to a shard while the complete serialized file remains at or below the limit.
-The measurement includes metadata, JSON punctuation, and the trailing newline.
-The next target starts a new shard when adding it would exceed the limit.
-
-Publication fails if one target cannot fit in an empty shard or if a release
-would require more than 9,999 shards.
-
-## Publication flow
-
-```text
-Hugging Face repository update
+release repository update
   -> POST <basePath>/api/hf-webhook
   -> GitHub workflow_dispatch
   -> resolve the release to an exact Hugging Face commit
   -> fetch and hash source files at that commit
-  -> compile the complete hierarchy and target ordinals
-  -> assign target details to size-bounded shards
-  -> validate the complete bundle
-  -> upload detail shards, target index, and tier files
-  -> upload index.json
-  -> verify every uploaded object's bytes
-  -> conditionally update calibration-trees/latest.json
+  -> compile and validate schema-4 parts
+  -> upload detail shards, target index, tiers, then index
+  -> add the build to manifest.json
+  -> update latestReleaseBuildArtifactId only if upstream latest is unchanged
 ```
 
-The publisher verifies file paths, identities, ranges, direct detail locations,
-posting lists, hierarchy reachability, SHA-256 digests, raw byte counts, and
-gzip byte counts before it changes the manifest. An interrupted publication can
-leave unreferenced immutable files. A retry reuses files whose bytes match.
-
-## Browser loading flow
-
-The browser uses the same-origin API and never receives a Blob credential or a
-private Blob URL.
+### Finalized staging builds
 
 ```text
-GET /api/microcosm/tree?country=us&release=latest&part=index
-  -> 307 to the same route with revision=<exact commit>
-  -> stream calibration-trees/us/<commit>/index.json
-  -> render the selected root
-  -> start target-index.json and every tier-N.json request together
-  -> resolve a selected target through its detailLocation
-  -> fetch only that target's target-details-NNNN.json shard
+staging repository main-branch update
+  -> POST <basePath>/api/hf-webhook
+  -> GitHub workflow_dispatch with event_kind=staging
+  -> scan successful final statuses: passed, published, completed
+  -> fetch each run from the exact webhook commit
+  -> compile, validate, upload, and add immutable staging builds to manifest.json
+  -> verify the staging branch did not advance during publication
 ```
 
-The browser does not prefetch target-detail shards. Selecting another target in
-the same shard uses the React Query cache. Selecting a target in another shard
-downloads that shard. Query keys include country, exact commit, and part, so a
-release switch cannot display data from another build.
+Active or failed staging runs remain on the live 30-second API path. Historical
+release backfill is never started by a webhook.
 
-A detail request has its own loading and error state. It does not replace the
-map or release selector. Vercel applies HTTP transfer compression; Blob stores
-ordinary JSON.
+Set the GitHub repository variable `CALIBRATION_TREE_BUILD_ENABLED=FALSE` to
+disable both automated release and finalized-staging publication.
+
+## Browser loading
+
+For a release map:
+
+```text
+GET /api/microcosm/tree?country=us&release=<release>&part=index
+  -> resolve release through calibration-trees/manifest.json
+  -> 307 to build=<exact-build-artifact-id>
+  -> stream index.json
+  -> render the root
+  -> start target-index.json and every tier request concurrently
+  -> fetch one target-details-NNNN.json only after target selection
+```
+
+For an immutable comparison:
+
+```text
+GET /api/microcosm/comparison-tree
+    ?country=us&a=<build-a>&b=<build-b>&mode=<reported|shared>&part=index
+  -> build and persist both modes if absent
+  -> 307 to build=<exact-comparison-build-id>
+  -> use the same concurrent tier and on-demand detail loading behavior
+```
+
+Query keys include country, ordered source build IDs, comparison mode, exact
+output build ID, and part. Switching builds therefore cannot display a cached
+part from another build.
 
 ## Filtering indices
 
 Hierarchy levels, groups, and nodes store sorted target ordinals. The target
-index stores one posting for every geography level, geography, fit band, and
-calibration status.
+index stores postings for geography level, geography, fit band, comparison fit,
+and calibration status.
 
-The browser unions selected values within one category, intersects results
-across categories, writes the result to a `Uint8Array`, removes empty branches,
-and recalculates visible metrics from compact per-target inputs. Complete target
-records are not required for navigation, filtering, or aggregation.
+The browser unions selected values within one category, intersects categories,
+filters hierarchy memberships, and recalculates visible metrics from compact
+per-target inputs. Target detail shards are not required for navigation,
+filtering, aggregation, or comparison construction.
 
-## Private Blob authentication
+## Authentication
 
-### Vercel runtime reads
+The browser never receives a Blob or Hugging Face credential.
 
-1. Connect a private Blob store to the Vercel project for Production and
-   Preview.
-2. Confirm the project has `BLOB_STORE_ID`.
-3. Redeploy so server functions receive Vercel OIDC credentials.
-4. Use `BLOB_READ_WRITE_TOKEN` only for local server-side development.
-5. Confirm direct private Blob access fails while the dashboard API succeeds.
+### Vercel reads and lazy comparison writes
 
-Never prefix Blob credentials with `NEXT_PUBLIC_`.
+1. Connect the private Blob store to Production and Preview deployments.
+2. Confirm the deployment has `BLOB_STORE_ID`.
+3. Set server-only `BLOB_READ_WRITE_TOKEN`; lazy comparison creation requires
+   write access.
+4. Redeploy after changing credentials.
+5. Confirm direct private Blob access fails while the same-origin dashboard API
+   succeeds.
 
-### GitHub Actions writes
+Never use a `NEXT_PUBLIC_` prefix for these values.
 
-1. Store the private Blob read-write token as `BLOB_READ_WRITE_TOKEN`.
-2. Store a Hugging Face token as `HF_TOKEN` when a source repository is
-   private.
-3. Do not expose either value through inputs, repository variables, logs, or
-   browser environment variables.
+### GitHub publication
 
-### Hugging Face webhook dispatch
+1. Store the Blob read-write token as the Actions secret
+   `BLOB_READ_WRITE_TOKEN`.
+2. Store the Hugging Face credential as `HF_TOKEN` when any source repository
+   is private.
+3. Store `GITHUB_ACTIONS_DISPATCH_TOKEN` and `HF_WEBHOOK_SECRET` only in Vercel.
+4. Configure the same webhook secret on every release and staging Hugging Face
+   repository.
 
-1. Store the fine-grained GitHub token as
-   `GITHUB_ACTIONS_DISPATCH_TOKEN` in Vercel.
-2. Set `CALIBRATION_TREE_GITHUB_REPOSITORY` only when dispatching to a fork.
-3. Set `HF_WEBHOOK_SECRET` in Vercel and use the same value in the Hugging Face
-   webhook's `X-Webhook-Secret` header.
-4. Set `CALIBRATION_TREE_BUILD_ENABLED=FALSE` in GitHub to disable publication.
+## Historical regeneration
 
-Webhook publication builds only the affected release. It does not republish
-historical releases.
-
-## One-time pre-production replacement
-
-Schema 3 does not include a compatibility reader or a committed cleanup tool.
-Before publishing schema 3:
-
-1. List every object under `calibration-trees/`.
-2. Confirm the objects belong only to the pre-production dashboard.
-3. Record the existing country, release, and commit inventory.
-4. Obtain explicit approval for the exact deletion.
-5. Delete the existing `calibration-trees/` objects with a one-off operation.
-6. Confirm the prefix is empty.
-7. Run one manual backfill for US, UK, and Belgium.
-8. Confirm every previously published release is present and `latest.json`
-   declares schema 3.
-
-This deletion is not recoverable through the application. The dashboard cannot
-load release trees between deletion and successful republication.
-
-## One-time historical publication
+Regeneration reads existing immutable Hugging Face artifacts; it does not rerun
+calibration:
 
 ```sh
 cd frontend
 bun run publish:calibration-tree -- --country us --backfill
 bun run publish:calibration-tree -- --country uk --backfill
 bun run publish:calibration-tree -- --country be --backfill
+bun run publish:calibration-tree -- --country us --staging-finalized
+bun run publish:calibration-tree -- --country uk --staging-finalized
 ```
 
-Backfill reads existing immutable Hugging Face release artifacts. It does not
-rerun Microcosm calibration. The current release must publish successfully
-before the workflow updates that country's manifest entry.
-
 `CALIBRATION_TREE_MAX_RAW_BYTES` defaults to 100,000,000 bytes per file, in
-addition to the fixed 4,000,000-byte target-detail limit.
-`CALIBRATION_TREE_MAX_GZIP_BYTES` optionally adds a per-file compressed-size
-check.
+addition to the fixed detail-shard limit. `CALIBRATION_TREE_MAX_GZIP_BYTES` can
+add a compressed-size limit. Either violation fails publication and therefore
+fails the GitHub Actions job.
 
 ## Verification
 
-Run locally:
+Run from `frontend/`:
 
 ```sh
-cd frontend
 bun test
 bun run lint
 bun run build
 ```
 
-After publication, verify that:
+Then verify that:
 
-1. The manifest and every part declare schema 3.
-2. Every descriptor returns matching bytes and an ETag through the API.
-3. The root renders before tier requests complete.
-4. The browser starts all tier requests after the index arrives.
+1. The manifest and all parts declare schema 4.
+2. Every descriptor returns matching bytes and an ETag.
+3. Root rendering does not wait for deeper tiers.
+4. Target index and tier requests start concurrently.
 5. No detail shard downloads before target selection.
-6. Selecting targets in the same shard does not repeat the application query.
-7. A repeated exact-commit shard request reports a CDN cache hit or positive
-   cache age after the first request.
+6. An uncached comparison persists both modes and a repeated request reuses
+   them.
+7. Repeated exact-part requests report CDN reuse or a positive cache age.
 
-References: [Vercel Blob authentication](https://vercel.com/docs/vercel-blob/using-blob-sdk#authentication),
-[private Blob delivery](https://vercel.com/docs/vercel-blob/private-storage), and
-[Vercel OIDC](https://vercel.com/docs/oidc).
+Do not use browser automation or screenshots for visual verification. Provide
+the local preview URL and ask a person to inspect build selection and map
+behavior.

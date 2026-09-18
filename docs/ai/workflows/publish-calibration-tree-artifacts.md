@@ -7,8 +7,8 @@ before modifying code or external storage.
 
 ## Establish scope and authorization
 
-1. Confirm the requested country, release, and exact Hugging Face commit.
-2. Distinguish tree schema 3 from unrelated Microcosm artifact schemas.
+1. Confirm the requested country, source kind, source ID, and exact Hugging Face commit.
+2. Distinguish tree schema 4 from unrelated Microcosm artifact schemas.
 3. Treat Blob deletion, manifest updates, workflow dispatch, and publication as
    external state changes. Obtain explicit user authorization when the request
    does not already cover them.
@@ -16,12 +16,12 @@ before modifying code or external storage.
 
 ## Inspect the source and current publication
 
-1. Resolve the release to an immutable Hugging Face commit.
-2. Verify that the release directory contains calibration diagnostics and any
+1. Resolve the release or finalized staging run to an immutable Hugging Face commit.
+2. Verify that the source directory contains calibration diagnostics and any
    referenced manifests.
-3. Read `calibration-trees/latest.json` and the selected `index.json` when they
+3. Read `calibration-trees/manifest.json` and the selected `index.json` when they
    exist.
-4. Confirm that the country, release, commit, source digests, and schema version
+4. Confirm that the country, source ID, build artifact ID, commit, source digests, and schema version
    agree before drawing conclusions.
 
 ## Build and validate
@@ -33,7 +33,9 @@ before modifying code or external storage.
 4. Confirm detail descriptors have contiguous ordinal ranges and files remain
    at or below 4,000,000 raw UTF-8 bytes.
 5. Confirm every file's path, hash, raw size, and gzip size matches `index.json`.
-6. Run `bun test`, `bun run lint`, and `bun run build` from `frontend/`.
+6. Confirm each compact target record contains the three comparison keys,
+   hierarchy metadata, and weighted-error inputs.
+7. Run `bun test`, `bun run lint`, and `bun run build` from `frontend/`.
 
 Do not change the shard size through an environment variable. A different size
 would assign different immutable paths to the same release.
@@ -44,17 +46,22 @@ would assign different immutable paths to the same release.
    without displaying them.
 2. Publish non-index files first, then `index.json`.
 3. Verify uploaded bytes through a consistent Blob read.
-4. Update `latest.json` only when the upstream `latest.json` still names the
-   same release and commit.
-5. Report the release, commit, part count, and measured sizes without reporting
+4. Add every immutable source build to `manifest.json`; change
+   `latestReleaseBuildArtifactId` only when upstream `latest.json` still names
+   the same release and commit.
+5. For staging publication, include only `passed`, `published`, or `completed`
+   runs and verify the staging branch remains at the webhook commit.
+6. Report the source ID, build artifact ID, commit, part count, and measured sizes without reporting
    credentials.
 
-Webhook events publish only the affected release. Run historical backfill only
-when the user explicitly requests it.
+Release webhooks publish the affected release. Staging webhooks scan finalized
+successful runs. Run historical release backfill only when the user explicitly
+requests it.
 
 ## Replace pre-production artifacts
 
-Schema 3 has no compatibility reader. If replacement requires deletion:
+Schema 4 has no compatibility reader for schemas 1 through 3. If replacement
+requires deletion:
 
 1. List every object under the exact `calibration-trees/` prefix.
 2. Stop if any path is outside the documented folder structure or may serve a
@@ -70,15 +77,17 @@ one-time replacement.
 
 ## Verify the deployed reader
 
-1. Confirm the release alias redirects to an exact commit.
+1. Confirm the release alias redirects to an exact build artifact ID.
 2. Confirm `index.json` renders the root before later requests finish.
 3. Confirm `target-index.json` and all tier files start concurrently.
 4. Confirm no target-detail shard loads before target selection.
 5. Select targets in the first, middle, and last shards.
 6. Confirm a target-detail failure remains confined to its detail panel.
-7. Switch between releases and confirm country, commit, and part query keys
+7. Switch between builds and confirm country, build ID, comparison mode, and part query keys
    prevent stale display.
-8. Request one exact shard twice and inspect Vercel cache headers.
+8. Request an uncached comparison and confirm both modes persist without
+   reading source detail shards.
+9. Request one exact shard twice and inspect Vercel cache headers.
 
 Do not use browser automation or screenshots for visual verification. Provide
 the preview URL and ask the user to inspect the rendered behavior.

@@ -297,6 +297,7 @@ async function publishRelease(
   expectedSha: string | undefined,
   blobToken: string,
   allowMissingReleaseTag = false,
+  createdAt: string | null = null,
 ) {
   const resolvedSha = await resolvePublicationSourceSha(
     country,
@@ -338,6 +339,7 @@ async function publishRelease(
   );
   const bundle = buildCalibrationTreeBundle({
     country,
+    createdAt,
     releaseId: id,
     hfRepo: microcosmRepo(country),
     hfCommitSha: resolvedSha,
@@ -631,6 +633,7 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
           undefined,
           blobToken,
           true,
+          release.date,
         );
         await registerReleaseBuild(options.country, published, blobToken);
         console.log(JSON.stringify({
@@ -664,6 +667,7 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
       latest.hfCommitSha,
       blobToken,
       true,
+      latest.updatedAt,
     );
     const currentEntry = await registerReleaseBuild(
       options.country,
@@ -687,6 +691,7 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
     selection.hfCommitSha,
     blobToken,
     options.mode === "latest",
+    selection.updatedAt,
   );
   const entry = await registerReleaseBuild(options.country, published, blobToken);
   const promoted = await promoteIfCurrent(
