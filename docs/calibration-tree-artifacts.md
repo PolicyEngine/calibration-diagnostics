@@ -128,6 +128,11 @@ release backfill is never started by a webhook.
 Set the GitHub repository variable `CALIBRATION_TREE_BUILD_ENABLED=FALSE` to
 disable both automated release and finalized-staging publication.
 
+GitHub serializes publication jobs across countries because all publishers
+update the same manifest pathname. Manifest writes first use the current ETag;
+after an ETag conflict, the publisher reads the manifest again, merges the
+entry, replaces the manifest, and verifies the stored entry.
+
 ## Browser loading
 
 For a release map:
