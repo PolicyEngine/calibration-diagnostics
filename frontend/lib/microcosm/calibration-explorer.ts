@@ -8,6 +8,13 @@ export const FIT_BANDS = [
 ] as const;
 
 export type FitBand = (typeof FIT_BANDS)[number];
+export const COMPARISON_FITS = [
+  "improved",
+  "regressed",
+  "unchanged",
+  "not_applicable",
+] as const;
+export type ComparisonFit = (typeof COMPARISON_FITS)[number];
 export type CalibrationStatus = "included" | "skipped";
 export type ExplorerBreakdown = "program" | "geography";
 
@@ -29,6 +36,7 @@ export interface ExplorerFilters {
   geographyLevels: string[];
   geographies: string[];
   fitBands: FitBand[];
+  comparisonFits: ComparisonFit[];
   calibrationStatuses: CalibrationStatus[];
 }
 
@@ -52,16 +60,21 @@ export type ExplorerAction =
   | { type: "filters"; filters: ExplorerFilters }
   | { type: "clear_target" };
 
+export function createExplorerFilters(): ExplorerFilters {
+  return {
+    geographyLevels: [],
+    geographies: [],
+    fitBands: [],
+    comparisonFits: [],
+    calibrationStatuses: [],
+  };
+}
+
 export function createExplorerState(): ExplorerState {
   return {
     breakdown: "program",
     path: { dimensions: [] },
-    filters: {
-      geographyLevels: [],
-      geographies: [],
-      fitBands: [],
-      calibrationStatuses: [],
-    },
+    filters: createExplorerFilters(),
   };
 }
 

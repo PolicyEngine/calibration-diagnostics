@@ -1,9 +1,11 @@
 import type {
   CalibrationStatus,
+  ComparisonFit,
   ExplorerNodeSelection,
   ExplorerState,
   FitBand,
 } from "./calibration-explorer";
+import { COMPARISON_FITS } from "./calibration-explorer";
 import { canonicalLabel, programLabel } from "./program-label";
 import { sourceLabel } from "./source-label";
 import type { CalibrationProvenance } from "./target-loss-attribution";
@@ -42,6 +44,7 @@ export interface CalibrationTreeTarget {
   final_loss_contribution?: number | null;
   target_change?: number | null;
   comparison_status?: "shared" | "added" | "removed" | null;
+  comparison_fit?: ComparisonFit | null;
   calibration_status?: CalibrationStatus | "not_materialized" | null;
   target_dimensions?: CalibrationTreeDimension[] | null;
   [key: string]: unknown;
@@ -110,6 +113,7 @@ export interface CalibrationTreeResponse {
     geographyLevels: string[];
     geographies: string[];
     fitBands: string[];
+    comparisonFits: string[];
     calibrationStatuses: string[];
   };
   filteredMetrics: CalibrationTreeMetrics;
@@ -161,6 +165,8 @@ export function applyExplorerFilters(
       (!filters.geographyLevels.length || filters.geographyLevels.includes(geographyLevel)) &&
       (!filters.geographies.length || filters.geographies.includes(geography)) &&
       (!filters.fitBands.length || filters.fitBands.includes(fitBandForTarget(row))) &&
+      (!filters.comparisonFits.length ||
+        (row.comparison_fit != null && filters.comparisonFits.includes(row.comparison_fit))) &&
       (!filters.calibrationStatuses.length ||
         (status != null && filters.calibrationStatuses.includes(status)))
     );
@@ -570,6 +576,9 @@ function filterOptions(rows: CalibrationTreeTarget[]) {
       (row) => String(row.geography ?? "").trim() || DEFAULT_GEOGRAPHY,
     )),
     fitBands: ["0_5", "5_10", "10_20", "20_40", "40_plus", "unscored"],
+    comparisonFits: rows.some((row) => row.comparison_fit != null)
+      ? [...COMPARISON_FITS]
+      : [],
     calibrationStatuses: ["included", "skipped"],
   };
 }

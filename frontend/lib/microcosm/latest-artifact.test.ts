@@ -1230,6 +1230,7 @@ test("legacy geography and income metadata drive the explorer hierarchy", () => 
     geographyLevels: [],
     geographies: [],
     fitBands: [],
+    comparisonFits: [],
     calibrationStatuses: [],
   };
   const program = buildCalibrationTree(cal.rows, {
@@ -2478,6 +2479,7 @@ test("fully structured targets ignore conflicting legacy identity fields", () =>
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
   });
@@ -2538,6 +2540,7 @@ test("structured categories group count and total rows by variable identity", ()
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
   });
@@ -2613,6 +2616,7 @@ test("structured dimension ids remain independent when display labels repeat", (
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
   };

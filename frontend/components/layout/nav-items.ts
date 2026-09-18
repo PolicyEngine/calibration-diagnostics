@@ -44,7 +44,6 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Releases",
     items: [
-      { href: "/microcosm/compare", label: "Compare versions", capability: "compare" },
       { href: "/microcosm/staging", label: "Staging candidates", capability: "staging" },
     ],
   },

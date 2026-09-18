@@ -206,7 +206,7 @@ describe("synthetic third-country conformance", () => {
       navGroupsForCountry(COUNTRY)
         .flatMap((group) => group.items)
         .map((item) => item.href),
-    ).toEqual(["/microcosm", "/microcosm/compare"]);
+    ).toEqual(["/microcosm"]);
   });
   test(
     "zz overview data can carry artifact-provided intro copy: the summary omits a typed presentation contract",

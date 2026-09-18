@@ -1,7 +1,9 @@
 import {
+  COMPARISON_FITS,
   FIT_BANDS,
   createExplorerState,
   type CalibrationStatus,
+  type ComparisonFit,
   type FitBand,
 } from "./calibration-explorer";
 
@@ -32,6 +34,11 @@ export function calibrationTreeRequestState(params: URLSearchParams) {
   state.filters.fitBands = params
     .getAll("fit_band")
     .filter((value): value is FitBand => FIT_BANDS.includes(value as FitBand));
+  state.filters.comparisonFits = params
+    .getAll("comparison_fit")
+    .filter((value): value is ComparisonFit =>
+      COMPARISON_FITS.includes(value as ComparisonFit),
+    );
   state.filters.calibrationStatuses = params
     .getAll("status")
     .map((value) => (value === "not_materialized" ? "skipped" : value))

@@ -43,7 +43,13 @@ function rowsForMode(
   return dataset.rows.flatMap((row) => {
     if (mode === "shared" && row.comparison_status !== "shared") return [];
     const change = targetChangeForMode(row, mode);
-    return change == null ? [] : [{ ...row, target_change: change }];
+    if (change == null) return [];
+    const {
+      currentDetail: _currentDetail,
+      candidateDetail: _candidateDetail,
+      ...treeRow
+    } = row;
+    return [{ ...treeRow, target_change: change }];
   });
 }
 

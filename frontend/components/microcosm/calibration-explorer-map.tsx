@@ -12,7 +12,6 @@ import {
   explorerColorMetric,
   explorerColorPhrase,
   explorerEmptyMessage,
-  explorerGeographyLevelLabel,
   explorerMapHeight,
   explorerLossAvailabilityMessage,
   explorerNodeLabel,
@@ -22,22 +21,26 @@ import {
   WEIGHTED_MEAN_ERROR_HELP,
   WEIGHTED_TARGET_ERROR_HELP,
 } from "@/components/microcosm/calibration-explorer-view";
+import { CalibrationExplorerFilterMenu } from "@/components/microcosm/calibration-explorer-filter-menu";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { CalibrationProvenanceNotice } from "@/components/microcosm/calibration-provenance-notice";
-import { fmt, humanizeName } from "@/components/shared/format";
+import { stagingTargetDetailPresentation } from "@/components/microcosm/staging-target-detail-presentation";
+import { fmt } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import {
   microcosmCalibrationTreeQueryOptions,
   useMicrocosmCalibrationTree,
+  useMicrocosmStagingTargetChangeTree,
   type MicrocosmCalibrationTreeSource,
+  type MicrocosmComparisonRow,
   type MicrocosmTargetDimension,
   type MicrocosmTargetRow,
 } from "@/lib/api/hooks/use-microcosm";
 import {
+  createExplorerFilters,
   createExplorerState,
   explorerReducer,
   type ExplorerBreakdown,
-  type ExplorerFilters,
   type ExplorerState,
 } from "@/lib/microcosm/calibration-explorer";
 import { prefetchCalibrationDescendants } from "@/lib/microcosm/calibration-prefetch";
@@ -62,24 +65,6 @@ const HEADER_HEIGHT = 24;
 const PAGE_LOAD_PREFETCH_DEPTH = 3;
 const ACTIVE_VIEW_PREFETCH_DEPTH = 1;
 const PREFETCH_CONCURRENCY = 6;
-
-const FIT_LABELS: Record<string, string> = {
-  "0_5": "0–5%",
-  "5_10": "5–10%",
-  "10_20": "10–20%",
-  "20_40": "20–40%",
-  "40_plus": "40%+",
-  unscored: "Unscored",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  included: "Included",
-  skipped: "Skipped",
-};
-
-function displayValue(value: string): string {
-  return humanizeName(value) || value;
-}
 
 function metricValue(
   metrics: CalibrationTreeNode["metrics"],
@@ -306,158 +291,6 @@ function FitLegend({ mode }: { mode: CalibrationTreeSizeMode }) {
   );
 }
 
-function MultiSelectFilter({
-  label,
-  options,
-  selected,
-  labelOf = displayValue,
-  onChange,
-}: {
-  label: string;
-  options: string[];
-  selected: string[];
-  labelOf?: (value: string) => string;
-  onChange: (values: string[]) => void;
-}) {
-  return (
-    <details className="relative">
-      <summary className="cursor-pointer list-none rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/30 [&::-webkit-details-marker]:hidden">
-        {label}{selected.length ? ` · ${selected.length}` : " · All"} ▾
-      </summary>
-      <div className="absolute left-0 top-full z-40 mt-1 max-h-64 min-w-56 overflow-auto rounded-lg border border-border bg-card p-2 shadow-xl">
-        {options.map((option) => (
-          <label key={option} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted/40">
-            <input
-              type="checkbox"
-              checked={selected.includes(option)}
-              onChange={() =>
-                onChange(
-                  selected.includes(option)
-                    ? selected.filter((value) => value !== option)
-                    : [...selected, option],
-                )
-              }
-            />
-            <span>{labelOf(option)}</span>
-          </label>
-        ))}
-      </div>
-    </details>
-  );
-}
-
-function FilterBar({
-  data,
-  state,
-  onFilters,
-}: {
-  data: CalibrationTreeResponse;
-  state: ExplorerState;
-  onFilters: (filters: ExplorerFilters) => void;
-}) {
-  const filter = <K extends keyof ExplorerFilters>(key: K, values: ExplorerFilters[K]) =>
-    onFilters({ ...state.filters, [key]: values });
-  const active = [
-    ...state.filters.geographyLevels.map((value) => ({ key: "geographyLevels" as const, value, label: `Level: ${explorerGeographyLevelLabel(value)}` })),
-    ...state.filters.geographies.map((value) => ({ key: "geographies" as const, value, label: `Place: ${displayValue(value)}` })),
-    ...state.filters.fitBands.map((value) => ({ key: "fitBands" as const, value, label: `Fit: ${FIT_LABELS[value]}` })),
-    ...state.filters.calibrationStatuses.map((value) => ({ key: "calibrationStatuses" as const, value, label: `Status: ${STATUS_LABELS[value]}` })),
-  ];
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <MultiSelectFilter
-          label="Geography level"
-          options={data.filterOptions.geographyLevels}
-          selected={state.filters.geographyLevels}
-          labelOf={explorerGeographyLevelLabel}
-          onChange={(values) => filter("geographyLevels", values)}
-        />
-        <MultiSelectFilter
-          label="Geography"
-          options={data.filterOptions.geographies}
-          selected={state.filters.geographies}
-          onChange={(values) => filter("geographies", values)}
-        />
-        <MultiSelectFilter
-          label="Fit band"
-          options={data.filterOptions.fitBands}
-          selected={state.filters.fitBands}
-          labelOf={(value) => FIT_LABELS[value] ?? value}
-          onChange={(values) => filter("fitBands", values as ExplorerFilters["fitBands"])}
-        />
-        <MultiSelectFilter
-          label="Calibration status"
-          options={data.filterOptions.calibrationStatuses}
-          selected={state.filters.calibrationStatuses}
-          labelOf={(value) => STATUS_LABELS[value] ?? displayValue(value)}
-          onChange={(values) => filter("calibrationStatuses", values as ExplorerFilters["calibrationStatuses"])}
-        />
-        {active.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onFilters({ geographyLevels: [], geographies: [], fitBands: [], calibrationStatuses: [] })}
-            className="ml-auto text-xs font-medium text-primary hover:underline"
-          >
-            Clear filters
-          </button>
-        )}
-      </div>
-      {active.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {active.map((item) => (
-            <button
-              type="button"
-              key={`${item.key}:${item.value}`}
-              onClick={() =>
-                filter(
-                  item.key,
-                  state.filters[item.key].filter((value) => value !== item.value) as never,
-                )
-              }
-              className="rounded-full border border-border bg-card px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-              aria-label={`Remove ${item.label} filter`}
-            >
-              {item.label} ×
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FilterMenu({
-  data,
-  state,
-  onFilters,
-}: {
-  data: CalibrationTreeResponse;
-  state: ExplorerState;
-  onFilters: (filters: ExplorerFilters) => void;
-}) {
-  const activeCount =
-    state.filters.geographyLevels.length +
-    state.filters.geographies.length +
-    state.filters.fitBands.length +
-    state.filters.calibrationStatuses.length;
-
-  return (
-    <details className="group relative shrink-0">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted/40 hover:text-foreground [&::-webkit-details-marker]:hidden">
-        <span>Filters{activeCount ? ` · ${activeCount}` : ""}</span>
-        <span aria-hidden="true" className="text-xs transition-transform group-open:rotate-180">
-          ▾
-        </span>
-      </summary>
-      <div className="absolute right-0 top-full z-50 mt-2 w-[min(42rem,calc(100vw-2rem))] rounded-lg border border-border bg-card p-3 shadow-xl">
-        <FilterBar data={data} state={state} onFilters={onFilters} />
-      </div>
-    </details>
-  );
-}
-
 function CalibrationMapLoadingSkeleton() {
   return (
     <div
@@ -524,13 +357,18 @@ function usePrefetchCalibrationLevels({
 
 export function CalibrationExplorerDataPrefetch({
   release,
+  stagingRunId,
 }: {
   release?: string;
+  stagingRunId?: string;
 }) {
   const [state] = useState(createExplorerState);
   const source = useMemo<MicrocosmCalibrationTreeSource>(
-    () => ({ kind: "release", release }),
-    [release],
+    () =>
+      stagingRunId
+        ? { kind: "staging", runId: stagingRunId }
+        : { kind: "release", release },
+    [release, stagingRunId],
   );
   const { data, isPlaceholderData } = useMicrocosmCalibrationTree(state, source);
   usePrefetchCalibrationLevels({
@@ -546,10 +384,16 @@ export function CalibrationExplorerDataPrefetch({
 export function CalibrationExplorerMap({
   release,
   stagingRunId,
+  stagingComparison,
   pageIntroHeight,
 }: {
   release?: string;
   stagingRunId?: string;
+  stagingComparison?: {
+    releaseId: string;
+    rows: MicrocosmComparisonRow[];
+    weightedTargetErrorChange: number | null;
+  };
   pageIntroHeight: number;
 }) {
   const [state, dispatch] = useReducer(
@@ -575,6 +419,51 @@ export function CalibrationExplorerMap({
     label: string;
     groups: CalibrationTreeGroup[];
   } | null>(null);
+  const selectedTarget = data?.groups
+    .flatMap((group) => group.nodes)
+    .find((item) => item.kind === "target" && item.id === state.path.target)?.target as
+      | MicrocosmTargetRow
+      | undefined;
+  const selectedComparisonRow = selectedTarget
+    ? stagingComparison?.rows.find((row) => {
+        const targetName = String(selectedTarget.name ?? "");
+        const baseName = String(selectedTarget.base_name ?? "");
+        return (
+          row.candidate_name === targetName ||
+          row.comparison_id === targetName ||
+          (Boolean(baseName) && row.name === baseName)
+        );
+      })
+    : undefined;
+  const comparisonState = useMemo(
+    () => ({
+      ...state,
+      path: {
+        ...state.path,
+        target: selectedComparisonRow?.comparison_id,
+      },
+    }),
+    [selectedComparisonRow?.comparison_id, state],
+  );
+  const { data: selectedTargetChangeData } = useMicrocosmStagingTargetChangeTree({
+    runId: stagingRunId,
+    releaseId: stagingComparison?.releaseId,
+    mode: "reported",
+    state: comparisonState,
+    enabled: Boolean(selectedTarget && selectedComparisonRow?.comparison_id),
+  });
+  const selectedTargetChange =
+    selectedTargetChangeData && "selectedTarget" in selectedTargetChangeData
+      ? selectedTargetChangeData.selectedTarget
+      : null;
+  const selectedTargetPresentation =
+    stagingComparison && selectedTarget
+      ? stagingTargetDetailPresentation(
+          selectedTargetChange,
+          stagingComparison.weightedTargetErrorChange,
+          selectedTarget,
+        )
+      : null;
 
   usePrefetchCalibrationLevels({
     state,
@@ -648,9 +537,6 @@ export function CalibrationExplorerMap({
     ? `Up to all ${data.currentLevel.label.toLowerCase()}`
     : explorerUpLabel(state);
   const breadcrumbs = explorerBreadcrumbs(state, data.pathLabels);
-  const selectedTarget = data.groups
-    .flatMap((group) => group.nodes)
-    .find((item) => item.kind === "target" && item.id === state.path.target)?.target;
   const detailDimensions: MicrocosmTargetDimension[] = data.dimensionOrder.map((dimension) => ({
     ...dimension,
     values: [],
@@ -676,7 +562,7 @@ export function CalibrationExplorerMap({
               lossAvailable={data.lossAttributionAvailable}
               onChange={setSizeMode}
             />
-            <FilterMenu
+            <CalibrationExplorerFilterMenu
               data={data}
               state={state}
               onFilters={(filters) => {
@@ -764,7 +650,7 @@ export function CalibrationExplorerMap({
                   type="button"
                   onClick={() => dispatch({
                     type: "filters",
-                    filters: { geographyLevels: [], geographies: [], fitBands: [], calibrationStatuses: [] },
+                    filters: createExplorerFilters(),
                   })}
                   className="text-sm font-medium text-primary hover:underline"
                 >
@@ -856,6 +742,9 @@ export function CalibrationExplorerMap({
         <MicrocosmTargetDetail
           row={selectedTarget as MicrocosmTargetRow}
           dimensions={detailDimensions}
+          metrics={selectedTargetPresentation?.metrics}
+          afterCalibrationSeries={selectedTargetPresentation?.afterCalibrationSeries}
+          fitSummary={selectedTargetPresentation?.fitSummary}
           onClose={() => dispatch({ type: "clear_target" })}
         />
       )}
