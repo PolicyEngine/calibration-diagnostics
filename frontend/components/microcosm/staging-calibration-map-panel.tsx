@@ -12,6 +12,10 @@ import {
   type MicrocosmCalibrationBuild,
   type MicrocosmComparisonRow,
 } from "@/lib/api/hooks/use-microcosm";
+import {
+  calibrationBuildManifestState,
+  calibrationBuildsNewestFirst,
+} from "@/lib/microcosm/calibration-selection";
 import { targetChangeMapIdentity } from "@/lib/microcosm/target-change-visualization";
 
 type CalibrationMapView = "candidate" | "comparison";
@@ -116,15 +120,22 @@ export function StagingCalibrationMapPanel({
   comparisonDetail?: string | null;
 }) {
   const [view, setView] = useState<CalibrationMapView>("candidate");
-  const { data: buildManifest } = useMicrocosmCalibrationBuildManifest();
+  const {
+    data: buildManifest,
+    isLoading: buildManifestLoading,
+    error: buildManifestError,
+    refetch: refetchBuildManifest,
+  } = useMicrocosmCalibrationBuildManifest();
   const builds = useMemo(
-    () => [...(buildManifest?.builds ?? [])].sort((left, right) =>
-      (right.createdAt ?? right.updatedAt).localeCompare(
-        left.createdAt ?? left.updatedAt,
-      ),
-    ),
+    () => calibrationBuildsNewestFirst(buildManifest?.builds ?? []),
     [buildManifest?.builds],
   );
+  const buildManifestState = calibrationBuildManifestState({
+    hasData: Boolean(buildManifest),
+    isLoading: buildManifestLoading,
+    hasError: Boolean(buildManifestError),
+    buildCount: builds.length,
+  });
   const selectedRunBuild = builds.find(
     (build) => build.stagingRunId === runId,
   );
@@ -169,9 +180,39 @@ export function StagingCalibrationMapPanel({
           }
           pageIntroHeight={pageIntroHeight}
         />
-      ) : comparisonReleaseId || immutableComparison ? (
+      ) : (
         <div className="flex flex-col gap-4">
-          {builds.length ? (
+          {buildManifestState === "loading" ? (
+            <LoadingBlock
+              label="Loading published calibration builds…"
+              height="h-24"
+            />
+          ) : buildManifestState === "error" ? (
+            <EmptyState
+              title="Published calibration builds unavailable"
+              description={
+                buildManifestError instanceof Error
+                  ? buildManifestError.message
+                  : "The published calibration build manifest could not be loaded."
+              }
+              actions={
+                <button
+                  type="button"
+                  className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                  onClick={() => void refetchBuildManifest()}
+                >
+                  Try again
+                </button>
+              }
+              variant="compact"
+            />
+          ) : buildManifestState === "empty" ? (
+            <EmptyState
+              title="No published calibration builds"
+              description="The build manifest loaded successfully but contains no builds for this country."
+              variant="compact"
+            />
+          ) : buildManifestState === "ready" ? (
             <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/10 p-3 md:flex-row">
               <BuildSelect
                 label="From"
@@ -188,42 +229,45 @@ export function StagingCalibrationMapPanel({
               />
             </div>
           ) : null}
-          <StagingTargetChangeMap
-            key={immutableComparison
-              ? targetChangeMapIdentity(
-                  currentBuildArtifactId,
-                  candidateBuildArtifactId,
-                )
-              : targetChangeMapIdentity(runId, comparisonReleaseId ?? "")}
-            runId={immutableComparison ? undefined : runId}
-            releaseId={immutableComparison ? undefined : comparisonReleaseId}
-            currentBuildArtifactId={
-              immutableComparison ? currentBuildArtifactId : undefined
-            }
-            candidateBuildArtifactId={
-              immutableComparison ? candidateBuildArtifactId : undefined
-            }
-            weightedTargetErrorChange={
-              immutableComparison ? null : weightedTargetErrorChange
-            }
-          />
+          {comparisonReleaseId || currentBuildArtifactId ? (
+            <StagingTargetChangeMap
+              key={immutableComparison
+                ? targetChangeMapIdentity(
+                    currentBuildArtifactId,
+                    candidateBuildArtifactId,
+                  )
+                : targetChangeMapIdentity(
+                    currentBuildArtifactId || comparisonReleaseId || "",
+                    runId,
+                  )}
+              runId={immutableComparison ? undefined : runId}
+              releaseId={immutableComparison ? undefined : comparisonReleaseId}
+              currentBuildArtifactId={currentBuildArtifactId || undefined}
+              candidateBuildArtifactId={
+                immutableComparison ? candidateBuildArtifactId : undefined
+              }
+              weightedTargetErrorChange={
+                immutableComparison ? null : weightedTargetErrorChange
+              }
+            />
+          ) : comparisonLoading ? (
+            <LoadingBlock
+              label="Loading calibration diagnostics for the target error comparison…"
+              height="h-40"
+            />
+          ) : (
+            <EmptyState
+              title="Target error comparison unavailable"
+              description={
+                comparisonError instanceof Error
+                  ? comparisonError.message
+                  : comparisonDetail ??
+                    "The calibration diagnostics are available, but the comparison could not be loaded."
+              }
+              variant="compact"
+            />
+          )}
         </div>
-      ) : comparisonLoading ? (
-        <LoadingBlock
-          label="Loading calibration diagnostics for the target error comparison…"
-          height="h-40"
-        />
-      ) : (
-        <EmptyState
-          title="Target error comparison unavailable"
-          description={
-            comparisonError instanceof Error
-              ? comparisonError.message
-              : comparisonDetail ??
-                "The calibration diagnostics are available, but the comparison could not be loaded."
-          }
-          variant="compact"
-        />
       )}
     </SectionCard>
   );

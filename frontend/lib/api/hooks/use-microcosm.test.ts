@@ -7,6 +7,7 @@ import {
   microcosmComparisonTargetDetailQueryOptions,
   microcosmComparisonTreeIndexQueryOptions,
   microcosmStagingCalibrationTreeQueryOptions,
+  microcosmStagingTargetChangeSourceParameters,
 } from "./use-microcosm";
 
 test("calibration tree part requests start without waiting for earlier parts", async () => {
@@ -80,4 +81,15 @@ test("comparison target-detail queries are keyed by immutable build and ordinal"
     build,
     17,
   ]);
+});
+
+test("live candidates compare with the selected immutable staging build", () => {
+  const build = "d".repeat(64);
+
+  expect(
+    microcosmStagingTargetChangeSourceParameters("latest-release", build),
+  ).toEqual({ build });
+  expect(
+    microcosmStagingTargetChangeSourceParameters("latest-release"),
+  ).toEqual({ release: "latest-release" });
 });

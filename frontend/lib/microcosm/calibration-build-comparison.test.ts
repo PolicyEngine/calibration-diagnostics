@@ -5,7 +5,11 @@ import {
   calibrationTreeTargetsFromSummaries,
   type CalibrationTreeTargetSummaryArtifact,
 } from "./calibration-tree-artifact";
-import { buildTargetChangeDatasetFromSummaries } from "./calibration-build-comparison";
+import {
+  buildTargetChangeDatasetFromSummaries,
+  buildTargetChangeDatasetFromSummaryAndCalibration,
+} from "./calibration-build-comparison";
+import type { Calibration } from "./latest-artifact";
 
 function comparisonInput(
   buildArtifactId: string,
@@ -78,5 +82,41 @@ test("target summaries contain everything required for a comparison", () => {
     comparison_fit: "improved",
     reported_change: -0.05,
   });
+  expect(result.summaries.reported?.netChange).toBeCloseTo(-0.05);
+});
+
+test("compares an immutable summary source with a live calibration", () => {
+  const current = comparisonInput("a".repeat(64), "staging-build-a", 0.1, 110);
+  const live = comparisonInput("b".repeat(64), "live-candidate", 0.05, 105);
+  const candidate = {
+    release_id: live.comparison.releaseId,
+    calibration_provenance: live.comparison.calibrationProvenance,
+    target_schema: {
+      diagnostics_schema_version: 2,
+      structured_dimensions: false,
+      target_representation: live.comparison.targetRepresentation,
+    },
+    target_loss_attribution: {
+      status: live.comparison.status,
+      aggregate: live.comparison.aggregate,
+      historical_final_loss: null,
+      cap: live.comparison.cap,
+      basis_identifier: live.comparison.basisIdentifier,
+      basis_hash: null,
+      verification: null,
+      producer_warnings: [],
+      reason: null,
+      targets: [],
+    },
+    rows: live.targets.map((target) => target.comparison.row),
+  } as unknown as Calibration;
+
+  const result = buildTargetChangeDatasetFromSummaryAndCalibration(
+    current,
+    candidate,
+  );
+
+  expect(result.current.releaseId).toBe("staging-build-a");
+  expect(result.candidate.releaseId).toBe("live-candidate");
   expect(result.summaries.reported?.netChange).toBeCloseTo(-0.05);
 });

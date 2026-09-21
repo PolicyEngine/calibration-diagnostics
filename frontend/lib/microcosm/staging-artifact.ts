@@ -24,6 +24,8 @@ import {
   buildTargetChangeDataset,
   type TargetChangeDataset,
 } from "@/lib/microcosm/target-change";
+import { buildTargetChangeDatasetFromSummaryAndCalibration } from "@/lib/microcosm/calibration-build-comparison";
+import { loadCalibrationComparisonSource } from "@/lib/microcosm/calibration-comparison-blob";
 import {
   IncompatibleStagingDataError,
   parseStagingCalibrationProgress,
@@ -975,6 +977,63 @@ export async function loadStagingTargetChangeDataset(
   targetChangeCache.set(cacheKey, {
     expiresAt: now + ttlSeconds * 1000,
     promise,
+  });
+  while (targetChangeCache.size > TARGET_CHANGE_CACHE_LIMIT) {
+    const oldest = targetChangeCache.keys().next().value;
+    if (typeof oldest !== "string") break;
+    targetChangeCache.delete(oldest);
+  }
+  try {
+    const result = await promise;
+    if (!result) targetChangeCache.delete(cacheKey);
+    return result;
+  } catch (error) {
+    targetChangeCache.delete(cacheKey);
+    throw error;
+  }
+}
+
+export async function loadStagingTargetChangeDatasetFromBuild(
+  runId: string,
+  currentBuildArtifactId: string,
+  country: MicrocosmCountry = "us",
+): Promise<TargetChangeDataset | null> {
+  if (stagingUnavailableReason(country)) return null;
+  assertSafeReleaseId(runId, "run");
+  const progress = await stagingJsonOrNull(
+    `runs/${runId}/progress.json`,
+    TARGET_CHANGE_MUTABLE_CACHE_SECONDS,
+    country,
+  );
+  const parsedProgress = progress == null ? null : parseStagingProgress(progress);
+  validateStagingRunConsistency(runId, { progress: parsedProgress });
+  const ttlSeconds = stagingTargetChangeCacheTtlSeconds(parsedProgress?.status);
+  const cacheKey = `${country}:${runId}:build:${currentBuildArtifactId}`;
+  const now = Date.now();
+  for (const [key, entry] of targetChangeCache) {
+    if (entry.expiresAt <= now) targetChangeCache.delete(key);
+  }
+  const cached = targetChangeCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = Promise.all([
+    loadCalibrationComparisonSource(country, currentBuildArtifactId),
+    loadStagingCalibration(runId, ttlSeconds, country),
+  ]).then(([current, candidate]) =>
+    candidate
+      ? buildTargetChangeDatasetFromSummaryAndCalibration(
+          {
+            country,
+            comparison: current.index.targetComparison,
+            targets: current.targetSummaries,
+          },
+          candidate,
+        )
+      : null,
+  );
+  targetChangeCache.set(cacheKey, {
+    promise,
+    expiresAt: now + ttlSeconds * 1000,
   });
   while (targetChangeCache.size > TARGET_CHANGE_CACHE_LIMIT) {
     const oldest = targetChangeCache.keys().next().value;

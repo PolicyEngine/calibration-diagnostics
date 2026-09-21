@@ -65,3 +65,13 @@ export function buildTargetChangeDatasetFromSummaries(
     calibrationFromTargetSummaries(candidate),
   );
 }
+
+export function buildTargetChangeDatasetFromSummaryAndCalibration(
+  current: CalibrationTreeComparisonInput,
+  candidate: Calibration,
+): TargetChangeDataset {
+  return buildTargetChangeDataset(
+    calibrationFromTargetSummaries(current),
+    candidate,
+  );
+}

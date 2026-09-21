@@ -270,6 +270,7 @@ export function StagingTargetChangeMap({
   const liveQuery = useMicrocosmStagingTargetChangeTree({
     runId,
     releaseId,
+    currentBuildArtifactId,
     mode,
     state,
     enabled: !immutableComparison,
@@ -336,7 +337,7 @@ export function StagingTargetChangeMap({
   const selectedDetailPresentation = data.selectedTarget
       ? stagingTargetDetailPresentation(
           data.selectedTarget,
-          weightedTargetErrorChange,
+          data.summary?.netChange ?? weightedTargetErrorChange,
           data.selectedTarget.candidateDetail as MicrocosmTargetRow | null,
         )
     : null;

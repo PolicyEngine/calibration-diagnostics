@@ -838,12 +838,14 @@ function explorerApiParams(
 export function useMicrocosmStagingTargetChangeTree({
   runId,
   releaseId,
+  currentBuildArtifactId,
   mode,
   state,
   enabled = true,
 }: {
   runId?: string;
   releaseId?: string;
+  currentBuildArtifactId?: string;
   mode: TargetChangeMode;
   state: ExplorerState;
   enabled?: boolean;
@@ -857,6 +859,7 @@ export function useMicrocosmStagingTargetChangeTree({
       country,
       runId,
       releaseId,
+      currentBuildArtifactId,
       mode,
       state,
     ],
@@ -866,7 +869,10 @@ export function useMicrocosmStagingTargetChangeTree({
         {
           ...explorerApiParams(state),
           run: runId,
-          release: releaseId,
+          ...microcosmStagingTargetChangeSourceParameters(
+            releaseId,
+            currentBuildArtifactId,
+          ),
           mode,
           country,
         },
@@ -874,9 +880,21 @@ export function useMicrocosmStagingTargetChangeTree({
     enabled:
       enabled &&
       hasCapability(country, "staging") &&
-      Boolean(runId && releaseId && releaseId !== "latest"),
+      Boolean(
+        runId &&
+          (currentBuildArtifactId || (releaseId && releaseId !== "latest")),
+      ),
     staleTime: 30 * 1000,
   });
+}
+
+export function microcosmStagingTargetChangeSourceParameters(
+  releaseId?: string,
+  currentBuildArtifactId?: string,
+): { build: string } | { release: string | undefined } {
+  return currentBuildArtifactId
+    ? { build: currentBuildArtifactId }
+    : { release: releaseId };
 }
 
 export function useMicrocosmReleases() {
