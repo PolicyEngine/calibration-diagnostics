@@ -231,6 +231,10 @@ export interface MicrocosmTargetSchema {
 
 export interface MicrocosmCalibration {
   available: boolean;
+  // Where the diagnostics were read from: "huggingface_live" (a release),
+  // "huggingface_staged_bundle" (an unreleased candidate's staged bundle) or
+  // "local_filesystem"; absent on responses that predate the field.
+  source?: string | null;
   country?: MicrocosmArtifactCountry;
   presentation?: MicrocosmArtifactPresentation | null;
   target_schema?: MicrocosmTargetSchema;

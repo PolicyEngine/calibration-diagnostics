@@ -1754,7 +1754,10 @@ export interface TargetSchema {
 }
 
 export interface Calibration {
-  source: "huggingface_live" | "local_filesystem";
+  // `huggingface_staged_bundle`: an unreleased candidate read from the staged
+  // bundle its build uploaded to the release repository (`staged/<run_id>/`),
+  // pinned to the commit the run recorded.
+  source: "huggingface_live" | "huggingface_staged_bundle" | "local_filesystem";
   country: MicrocosmCountry;
   // Typed `release_manifest.country` merged over the registration.
   country_info: ArtifactCountry;
@@ -2140,6 +2143,23 @@ export function parseHashedJsonArtifact(bytes: Uint8Array): HashedJsonArtifact {
 
 async function hfHashedJson(url: string, revalidate: number): Promise<HashedJsonArtifact> {
   const res = await hfFetch(url, revalidate);
+  if (!res.ok) throw new Error(`HF fetch failed ${res.status}: ${url}`);
+  return parseHashedJsonArtifact(new Uint8Array(await res.arrayBuffer()));
+}
+
+// Read one JSON file from the country's registered release repository at an
+// explicit immutable revision, with the release credential, returning its
+// bytes' digest beside the payload. `null` when the file is absent there.
+export async function loadCountryRepositoryHashedJson(
+  path: string,
+  revalidate: number,
+  country: MicrocosmCountry,
+  revision: string,
+): Promise<HashedJsonArtifact | null> {
+  const { repo } = countryRepository(country);
+  const url = `https://huggingface.co/datasets/${repo}/resolve/${revision}/${path}`;
+  const res = await hfFetch(url, revalidate);
+  if (res.status === 404) return null;
   if (!res.ok) throw new Error(`HF fetch failed ${res.status}: ${url}`);
   return parseHashedJsonArtifact(new Uint8Array(await res.arrayBuffer()));
 }

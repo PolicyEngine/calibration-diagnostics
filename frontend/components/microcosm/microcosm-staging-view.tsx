@@ -63,6 +63,33 @@ function validationTone(absRel: number | null | undefined): "positive" | "neutra
   return "negative";
 }
 
+// Where a candidate's calibration diagnostics came from. A staged bundle is
+// the dataset the build uploaded to the release repository under
+// staged/<run_id>/ for inspection before any release: unreleased by
+// definition, and flagged as such wherever its diagnostics are shown.
+type CalibrationOrigin = "staged_bundle" | "telemetry_upload" | null;
+
+function calibrationOrigin(
+  calibration: { source?: string | null } | null | undefined,
+): CalibrationOrigin {
+  if (!calibration) return null;
+  return calibration.source === "huggingface_staged_bundle"
+    ? "staged_bundle"
+    : "telemetry_upload";
+}
+
+function CalibrationOriginPill({ origin }: { origin: CalibrationOrigin }) {
+  if (origin === "staged_bundle") {
+    return (
+      <StatusPill tone="warning">Unreleased · staged dataset</StatusPill>
+    );
+  }
+  if (origin === "telemetry_upload") {
+    return <StatusPill tone="neutral">Uploaded with telemetry</StatusPill>;
+  }
+  return null;
+}
+
 function statusTone(status: string | null | undefined): StatusTone {
   if (status === "passed" || status === "published" || status === "completed") {
     return "success";
@@ -421,7 +448,12 @@ function RunInternalsPanel({
         {runData.calibration ? (
           <SectionCard
             title="Candidate calibration"
-            description="Final calibration diagnostics uploaded by this staging run."
+            description={
+              calibrationOrigin(runData.calibration) === "staged_bundle"
+                ? "Final calibration diagnostics read from the dataset bundle this run staged in the release repository (staged/<run id>/, at the commit its receipt records). This is an unreleased candidate, not a published release."
+                : "Final calibration diagnostics uploaded by this staging run."
+            }
+            actions={<CalibrationOriginPill origin={calibrationOrigin(runData.calibration)} />}
           >
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <KpiCard
@@ -1016,6 +1048,18 @@ function MicrocosmStagingRunsView() {
                   >
                     {currentStatus}
                   </div>
+                  {runData.calibration && (
+                    <>
+                      <div
+                        className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
+                      >
+                        Dataset
+                      </div>
+                      <div className={`min-w-0 text-xs ${overviewMetricValueClassName}`}>
+                        <CalibrationOriginPill origin={calibrationOrigin(runData.calibration)} />
+                      </div>
+                    </>
+                  )}
                 </div>
               </SectionCard>
 
