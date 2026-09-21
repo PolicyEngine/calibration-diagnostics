@@ -26,6 +26,11 @@ on:
         description: Hugging Face commit that triggered reconciliation
         required: false
         type: string
+      dry_run:
+        description: Build missing artifacts and validate existing artifacts without writing Blob data
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -61,5 +66,8 @@ jobs:
             fi
           else
             args+=(--reconcile-releases)
+          fi
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            args+=(--dry-run)
           fi
           bun run publish:calibration-tree -- "${args[@]}"
