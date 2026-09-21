@@ -25,19 +25,15 @@ import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import {
-  candidateSelectOptions,
   releaseSelectOptions,
   useMicrocosm,
   useMicrocosmReleases,
-  useMicrocosmStagingRuns,
   type MicrocosmResponse,
 } from "@/lib/api/hooks/use-microcosm";
-import { stagingRunIdOf } from "@/lib/microcosm/calibration-selection";
 import { microcosmOverviewIntro } from "@/lib/microcosm/presentation";
 import {
   microcosmPublicationUrl,
   microcosmSourceAttribution,
-  microcosmStagingRunUrl,
 } from "@/lib/microcosm/source-attribution";
 
 function formatPublishedAt(value: string | null | undefined): string {
@@ -89,13 +85,7 @@ export function MicrocosmReleaseHeader({
       )
     : null;
   const publicationUrl = data
-    ? data.selection_mode === "staging_candidate" && data.staging_run_id
-      ? microcosmStagingRunUrl(
-          data.source_repo,
-          data.revision,
-          data.staging_run_id,
-        )
-      : microcosmPublicationUrl(data.source_repo, data.release_id)
+    ? microcosmPublicationUrl(data.source_repo, data.release_id)
     : null;
   const overviewIntro = data
     ? microcosmOverviewIntro(country, calibration?.presentation)
@@ -166,20 +156,13 @@ export function MicrocosmOverviewView({
     value: initialRelease,
   });
   const release = selectedReleaseForCountry(country, releaseSelection);
-  // An unreleased staging candidate selected as `staging:<run_id>` is reviewed
-  // with this page unchanged; its calibration map reads the staging routes.
-  const stagingRunId = stagingRunIdOf(release) ?? undefined;
   const [pageIntroHeight, setPageIntroHeight] = useState(0);
   const { data: releaseData } = useMicrocosmReleases();
-  const { data: stagingData } = useMicrocosmStagingRuns();
   const { data, isLoading, error } = useMicrocosm(release || undefined);
 
   const releaseOptions = useMemo(
-    () => [
-      ...releaseSelectOptions(releaseData),
-      ...candidateSelectOptions(country, stagingData),
-    ],
-    [releaseData, stagingData, country],
+    () => releaseSelectOptions(releaseData),
+    [releaseData],
   );
   const releaseHeader = (
     <MicrocosmReleaseHeader
@@ -195,10 +178,7 @@ export function MicrocosmOverviewView({
   if (isLoading) {
     return (
       <div className="flex flex-col gap-5">
-        <CalibrationExplorerDataPrefetch
-          release={release || undefined}
-          stagingRunId={stagingRunId}
-        />
+        <CalibrationExplorerDataPrefetch release={release || undefined} />
         {releaseHeader}
         <LoadingBlock label="Loading microcosm release…" />
       </div>
@@ -222,41 +202,16 @@ export function MicrocosmOverviewView({
   const lossKind = cal.loss_kind;
   const normalizedLoss = isNormalizedLoss(lossKind);
   const diagnosticsStatus = cal.diagnostics_status ?? "ok";
-  const isCandidate = data.selection_mode === "staging_candidate";
-  const candidateFromStagedBundle = cal.source === "huggingface_staged_bundle";
-  // A candidate carries no release manifest, so the release-role banner would
-  // misreport it as non-default; the candidate banner below covers it.
-  const isNonDefault =
-    !isCandidate && (cal.is_local_area === true || cal.is_default === false);
+  const isNonDefault = cal.is_local_area === true || cal.is_default === false;
   const labelVariantCount = cal.label_variants?.count ?? 0;
   const labelVariantExamples = (cal.label_variants?.examples ?? []).slice(0, 2);
 
   return (
     <div className="flex flex-col gap-5">
-      <CalibrationExplorerDataPrefetch
-        release={release || undefined}
-        stagingRunId={stagingRunId}
-      />
+      <CalibrationExplorerDataPrefetch release={release || undefined} />
       {releaseHeader}
 
       <ArtifactDescriptionBanner description={cal.description} />
-
-      {isCandidate ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/80 bg-card px-4 py-3 shadow-[var(--elev-1)]">
-          <StatusPill tone="warning">
-            {candidateFromStagedBundle
-              ? "Unreleased · staged dataset"
-              : "Unreleased · staging candidate"}
-          </StatusPill>
-          <p className="text-sm text-muted-foreground">
-            This is a staging candidate, not a published release. Its diagnostics come from{" "}
-            {candidateFromStagedBundle
-              ? "the dataset bundle the run staged for inspection"
-              : "the run's staging telemetry"}
-            ; nothing here has been promoted.
-          </p>
-        </div>
-      ) : null}
 
       {labelVariantCount > 0 ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/80 bg-card px-4 py-3 shadow-[var(--elev-1)]">
@@ -352,7 +307,6 @@ export function MicrocosmOverviewView({
       <SectionCard title="Calibration map">
         <CalibrationExplorerMap
           release={release || undefined}
-          stagingRunId={stagingRunId}
           pageIntroHeight={pageIntroHeight}
         />
       </SectionCard>

@@ -39,14 +39,3 @@ export function microcosmSourceAttribution(
         : null,
   };
 }
-
-// A staging candidate has no release tag to open; its telemetry folder in the
-// country's staging repository is the inspectable location.
-export function microcosmStagingRunUrl(
-  stagingRepo: string,
-  revision: string,
-  runId: string,
-): string {
-  const repoPath = huggingFaceRepoPath(stagingRepo);
-  return `https://huggingface.co/datasets/${repoPath}/tree/${encodeURIComponent(revision)}/runs/${encodeURIComponent(runId)}`;
-}

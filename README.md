@@ -22,10 +22,8 @@ dashboard API layer.
 
 - **Release summary** (`/microcosm`) — calibration fit KPIs, target coverage,
   per-family fit, and worst-fit / biggest-improvement targets, for the current
-  release (or any release via `?release=`). The release picker also lists a
-  country's staging candidates; selecting one (`?release=staging:<run_id>`)
-  reviews that unreleased run with the same page, calibration map, and target
-  diagnostics, flagged as a candidate. An identifier that publishers label
+  release (or any published release via `?release=`). Staging candidates appear
+  only on the Staging candidates page. An identifier that publishers label
   differently (HMRC "Hartlepool UA", ONS "Hartlepool") is reported, not
   refused: the first spelling is shown and the count surfaces on the page.
 - **Target diagnostics** (`/microcosm/targets`) — browse the calibration target
@@ -42,7 +40,7 @@ dashboard API layer.
   progress, final candidate diagnostics once they exist (uploaded with the
   telemetry, or read from the dataset bundle the run staged under
   `staged/<run_id>/` in the release repository, flagged as an unreleased staged
-  dataset wherever they are shown), candidate-vs-current-release
+  dataset on this page), candidate-vs-current-release
   fit, and a hierarchical map of weighted target-error increases and
   reductions. Countries without a staging repository show an explicit
   unavailable state.
@@ -62,12 +60,12 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/microcosm/releases` | List published releases (newest first) |
-| `GET /api/microcosm?release=<id>` | Release summary (default: latest; `staging:<run_id>` reviews an unreleased staging candidate, never cached, 404 until it has diagnostics) |
+| `GET /api/microcosm?release=<id>` | Published-release summary (default: latest) |
 | `GET /api/microcosm/tree?country=<code>&release=<id>&part=<part>` | Redirect to an exact build artifact ID and stream one immutable tree-bundle part |
 | `GET /api/microcosm/tree-manifest?country=<code>` | List selectable release and finalized-staging builds and the current release build |
 | `GET /api/microcosm/comparison-tree?country=<code>&a=<build>&b=<build>&mode=reported\|shared&part=<part>` | Build an ordered pair once when absent, then stream its immutable comparison-tree parts |
-| `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics (`release` accepts `staging:<run_id>`) |
-| `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks (`release` accepts `staging:<run_id>`) |
+| `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics for a published release |
+| `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one published target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks |
 | `GET /api/microcosm/compare?a=<id>&b=<id>` | Version-over-version diff |
 | `GET /api/microcosm/staging/runs` | List staging build runs |
 | `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and its candidate diagnostics: an uploaded `calibration_diagnostics` telemetry artifact, or the `calibration_diagnostics.json` of the dataset bundle the run staged under `staged/<run_id>/` in the country's release repository (read at the commit the run recorded, digest-verified) |

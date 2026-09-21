@@ -9,7 +9,6 @@ import { basename, join } from "node:path";
 import { createHash } from "node:crypto";
 
 import { sourceAuthorityLabel } from "@/lib/source-labels";
-import { StagingCalibrationUnavailableError } from "@/lib/microcosm/calibration-selection";
 
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
 import {
@@ -125,15 +124,11 @@ export function assertSafeReleaseId(id: string, label = "release"): string {
   return id;
 }
 
-// Route catch → HTTP: a bad id is the caller's fault (400); a staging
-// candidate with nothing to show yet is absent (404); anything else is an
-// upstream/HF failure (502). Keeps status semantics consistent across routes.
+// Route catch → HTTP: a bad id is the caller's fault (400); anything else is
+// an upstream/HF failure (502). Keeps status semantics consistent across routes.
 export function classifyApiError(error: unknown): { status: number; body: { detail: string } } {
   if (error instanceof InvalidReleaseIdError) {
     return { status: 400, body: { detail: error.message } };
-  }
-  if (error instanceof StagingCalibrationUnavailableError) {
-    return { status: 404, body: { detail: error.message } };
   }
   return {
     status: 502,
