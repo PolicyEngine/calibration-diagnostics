@@ -130,6 +130,31 @@ describe("schema 8 hierarchy target reader", () => {
     ).toThrow("hierarchy.target.label");
   });
 
+  test("accepts labels that differ only in case or whitespace for one id", () => {
+    const first = row();
+    first.hierarchy.geography = {
+      id: "E12000003",
+      label: "Yorkshire and the Humber",
+      level: "region",
+    };
+    const second = row();
+    second.hierarchy.geography = {
+      id: "E12000003",
+      label: " Yorkshire and The  Humber ",
+      level: "region",
+    };
+    expect(() => validateHierarchyTargets([first, second])).not.toThrow();
+    const third = row();
+    third.hierarchy.geography = {
+      id: "E12000003",
+      label: "Yorkshire",
+      level: "region",
+    };
+    expect(() => validateHierarchyTargets([first, third])).toThrow(
+      "geography region\u0000E12000003 has inconsistent labels",
+    );
+  });
+
   test("rejects conflicting labels for repeated ids across a file", () => {
     expect(() =>
       validateHierarchyTargets([
