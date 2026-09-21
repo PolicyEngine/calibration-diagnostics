@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  calibrationExplorerSourceIdentity,
   createExplorerState,
   explorerReducer,
   nextLevelExplorerStates,
@@ -17,6 +18,7 @@ function state(overrides: Partial<ExplorerState> = {}): ExplorerState {
       geographyLevels: [],
       geographies: [],
       fitBands: [],
+      comparisonFits: [],
       calibrationStatuses: [],
     },
     ...overrides,
@@ -24,6 +26,26 @@ function state(overrides: Partial<ExplorerState> = {}): ExplorerState {
 }
 
 describe("calibration explorer semantic navigation", () => {
+  test("changes explorer identity with the country or data source", () => {
+    const usReleaseA = calibrationExplorerSourceIdentity({
+      country: "us",
+      release: "release-a",
+    });
+
+    expect(usReleaseA).not.toBe(
+      calibrationExplorerSourceIdentity({ country: "us", release: "release-b" }),
+    );
+    expect(usReleaseA).not.toBe(
+      calibrationExplorerSourceIdentity({ country: "uk", release: "release-a" }),
+    );
+    expect(usReleaseA).not.toBe(
+      calibrationExplorerSourceIdentity({ country: "us", stagingRunId: "release-a" }),
+    );
+    expect(
+      calibrationExplorerSourceIdentity({ country: "us" }),
+    ).toBe(calibrationExplorerSourceIdentity({ country: "us" }));
+  });
+
   test("starts at all programs with no inherited route state", () => {
     expect(createExplorerState()).toEqual(state());
   });
@@ -48,6 +70,7 @@ describe("calibration explorer semantic navigation", () => {
         geographyLevels: ["state"],
         geographies: [],
         fitBands: [],
+        comparisonFits: [],
         calibrationStatuses: [],
       },
     });
@@ -70,6 +93,7 @@ describe("calibration explorer semantic navigation", () => {
       geographyLevels: ["state"],
       geographies: ["CA"],
       fitBands: ["10_20" as const],
+      comparisonFits: [],
       calibrationStatuses: ["included" as const],
     };
     const deep = state({
@@ -155,6 +179,7 @@ describe("calibration explorer semantic navigation", () => {
       geographyLevels: ["state"],
       geographies: ["CA"],
       fitBands: ["10_20" as const],
+      comparisonFits: [],
       calibrationStatuses: ["included" as const],
     };
     const selected = state({
@@ -172,6 +197,7 @@ describe("calibration explorer semantic navigation", () => {
       geographyLevels: ["state"],
       geographies: ["CA"],
       fitBands: ["10_20" as const],
+      comparisonFits: [],
       calibrationStatuses: ["included" as const],
     };
     const deep = state({

@@ -14,12 +14,8 @@ import {
   microcosmCountryGeography,
   microcosmRepo,
 } from "@/lib/microcosm/latest-artifact";
+import type { CalibrationTreeSourceArtifact } from "@/lib/microcosm/calibration-tree-artifact";
 import { countryRegistration, hasCapability } from "@/lib/microcosm/countries";
-import {
-  STAGING_CALIBRATION_UNAVAILABLE_DETAIL,
-  StagingCalibrationUnavailableError,
-  stagingRunIdOf,
-} from "@/lib/microcosm/calibration-selection";
 import {
   type ReformValidation,
   buildReformValidation,
@@ -28,6 +24,8 @@ import {
   buildTargetChangeDataset,
   type TargetChangeDataset,
 } from "@/lib/microcosm/target-change";
+import { buildTargetChangeDatasetFromSummaryAndCalibration } from "@/lib/microcosm/calibration-build-comparison";
+import { loadCalibrationComparisonSource } from "@/lib/microcosm/calibration-comparison-blob";
 import {
   IncompatibleStagingDataError,
   parseStagingCalibrationProgress,
@@ -45,10 +43,17 @@ interface TargetChangeCacheEntry {
   promise: Promise<TargetChangeDataset | null>;
 }
 
+interface StagingCalibrationCacheEntry {
+  expiresAt: number;
+  promise: Promise<Calibration | null>;
+}
+
 const TARGET_CHANGE_FINAL_CACHE_SECONDS = 21_600;
 const TARGET_CHANGE_MUTABLE_CACHE_SECONDS = 30;
 const TARGET_CHANGE_CACHE_LIMIT = 8;
+const STAGING_CALIBRATION_CACHE_LIMIT = 8;
 const targetChangeCache = new Map<string, TargetChangeCacheEntry>();
+const stagingCalibrationCache = new Map<string, StagingCalibrationCacheEntry>();
 
 export const MICROCOSM_STAGING_HF_REPO_ENV = "POPULACE_STAGING_HF_REPO";
 export const MICROCOSM_STAGING_HF_REVISION_ENV = "POPULACE_STAGING_HF_REVISION";
@@ -74,6 +79,35 @@ export function stagingRepository(country: MicrocosmCountry): StagingRepository 
 
 export const MICROCOSM_STAGING_HF_REPO = stagingRepository("us")!.repo;
 export const MICROCOSM_STAGING_HF_REVISION = stagingRepository("us")!.revision;
+
+export async function resolveStagingRevisionSha(
+  country: MicrocosmCountry,
+  revisionOverride?: string,
+): Promise<string> {
+  const repository = stagingSource(country, revisionOverride);
+  const response = await fetch(
+    `https://huggingface.co/api/datasets/${repository.repo}/revision/${encodeURIComponent(repository.revision)}`,
+    {
+      ...stagingFetchOptions(0, country),
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+  if (!response.ok) {
+    throw new StagingFetchError(
+      response.status,
+      `revision ${repository.revision}`,
+      repository,
+    );
+  }
+  const payload = asObject(await response.json());
+  const sha = typeof payload.sha === "string" ? payload.sha.toLowerCase() : "";
+  if (!/^[0-9a-f]{40,64}$/.test(sha)) {
+    throw new Error(
+      `Hugging Face returned an invalid commit SHA for ${repository.repo}@${repository.revision}.`,
+    );
+  }
+  return sha;
+}
 
 // Staging telemetry is served for countries registered with the `staging`
 // capability. Repository and credential selection happens in this server data
@@ -108,8 +142,14 @@ function stagingRepoUrl(repository: StagingRepository): string {
   return `https://huggingface.co/api/datasets/${repository.repo}`;
 }
 
-function stagingSource(country: MicrocosmCountry): StagingRepository {
-  return requiredStagingRepository(country);
+function stagingSource(
+  country: MicrocosmCountry,
+  revisionOverride?: string,
+): StagingRepository {
+  const repository = requiredStagingRepository(country);
+  return revisionOverride
+    ? { ...repository, revision: revisionOverride }
+    : repository;
 }
 
 function unavailableStaging(country: MicrocosmCountry) {
@@ -175,8 +215,9 @@ async function stagingJson(
   path: string,
   revalidate: number,
   country: MicrocosmCountry,
+  revisionOverride?: string,
 ): Promise<JsonObject> {
-  const repository = stagingSource(country);
+  const repository = stagingSource(country, revisionOverride);
   const res = await fetch(
     stagingResolveUrlFor(repository, path),
     stagingFetchOptions(revalidate, country),
@@ -189,9 +230,10 @@ async function stagingJsonOrNull(
   path: string,
   revalidate: number,
   country: MicrocosmCountry,
+  revisionOverride?: string,
 ): Promise<JsonObject | null> {
   try {
-    return await stagingJson(path, revalidate, country);
+    return await stagingJson(path, revalidate, country, revisionOverride);
   } catch (error) {
     if (error instanceof StagingFetchError && error.status !== 404) throw error;
     return null;
@@ -201,14 +243,16 @@ async function stagingJsonOrNull(
 interface HashedStagingJson {
   payload: JsonObject;
   sha256: string;
+  source: CalibrationTreeSourceArtifact;
 }
 
 async function stagingHashedJsonOrNull(
   path: string,
   revalidate: number,
   country: MicrocosmCountry,
+  revisionOverride?: string,
 ): Promise<HashedStagingJson | null> {
-  const repository = stagingSource(country);
+  const repository = stagingSource(country, revisionOverride);
   const res = await fetch(
     stagingResolveUrlFor(repository, path),
     stagingFetchOptions(revalidate, country),
@@ -227,9 +271,16 @@ async function stagingHashedJsonOrNull(
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new IncompatibleStagingDataError(`${path} must contain a JSON object.`);
   }
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
   return {
     payload: parsed as JsonObject,
-    sha256: createHash("sha256").update(bytes).digest("hex"),
+    sha256,
+    source: {
+      path,
+      sha256,
+      hfRepo: repository.repo,
+      hfCommitSha: repository.revision,
+    },
   };
 }
 
@@ -237,8 +288,9 @@ async function stagingTextOrNull(
   path: string,
   revalidate: number,
   country: MicrocosmCountry,
+  revisionOverride?: string,
 ): Promise<string | null> {
-  const repository = stagingSource(country);
+  const repository = stagingSource(country, revisionOverride);
   const res = await fetch(
     stagingResolveUrlFor(repository, path),
     stagingFetchOptions(revalidate, country),
@@ -253,8 +305,9 @@ async function stagingTextOrNull(
 async function stagingTree(
   revalidate: number,
   country: MicrocosmCountry,
+  revisionOverride?: string,
 ): Promise<JsonObject[]> {
-  const repository = stagingSource(country);
+  const repository = stagingSource(country, revisionOverride);
   const entries: JsonObject[] = [];
   const visited = new Set<string>();
   let url: string | null = stagingTreeUrl(repository);
@@ -421,6 +474,7 @@ const RUN_MANIFEST_PATH =
 export async function loadStagingRuns(
   revalidate: number,
   country: MicrocosmCountry = "us",
+  revisionOverride?: string,
 ) {
   const unavailable = unavailableStaging(country);
   if (unavailable) {
@@ -431,11 +485,11 @@ export async function loadStagingRuns(
       incompatible_runs: [] as IncompatibleStagingRun[],
     };
   }
-  const repository = stagingSource(country);
+  const repository = stagingSource(country, revisionOverride);
   let treeMissing = false;
   let tree: JsonObject[] = [];
   try {
-    tree = await stagingTree(revalidate, country);
+    tree = await stagingTree(revalidate, country, revisionOverride);
   } catch (error) {
     if (!(error instanceof StagingFetchError) || error.status !== 404) throw error;
     // A staging repo may exist before any tree listing is public.
@@ -456,7 +510,7 @@ export async function loadStagingRuns(
     [...manifestPaths].map(async ([runId, path]) => {
       try {
         const manifest = parseStagingManifest(
-          await stagingJson(path, revalidate, country),
+          await stagingJson(path, revalidate, country, revisionOverride),
         );
         if (manifest.run_id !== runId) {
           throw new IncompatibleStagingDataError(
@@ -498,7 +552,12 @@ export async function loadStagingRuns(
   let index: JsonObject | null = null;
   let indexedRuns: StagingRunSummary[] = [];
   if (treeMissing || v1ManifestIds.size > 0) {
-    index = await stagingJsonOrNull("runs.json", revalidate, country);
+    index = await stagingJsonOrNull(
+      "runs.json",
+      revalidate,
+      country,
+      revisionOverride,
+    );
     if (index?.schema_version === 1) indexedRuns = parseStagingRunIndex(index);
   }
 
@@ -544,6 +603,7 @@ export async function loadStagingRuns(
         `runs/${runId}/progress.json`,
         revalidate,
         country,
+        revisionOverride,
       );
       const progress = raw == null ? null : parseStagingProgress(raw);
       validateStagingRunConsistency(runId, { progress });
@@ -578,20 +638,49 @@ const STAGED_BUNDLE_PREFIX = /^staged\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const GIT_COMMIT_SHA = /^[0-9a-f]{40}$/;
 const SHA_256_HEX = /^[0-9a-f]{64}$/;
 
-async function loadStagedBundleCalibration(
+export interface ResolvedStagingCalibrationSource {
+  calibration: Calibration;
+  candidateReleaseId: string;
+  updatedAt: string | null;
+  stagingRepo: string;
+  stagingRevision: string;
+  sourceArtifacts: {
+    calibrationDiagnostics: CalibrationTreeSourceArtifact;
+    buildManifest: CalibrationTreeSourceArtifact | null;
+    releaseManifest: CalibrationTreeSourceArtifact | null;
+    stagingRunManifest: CalibrationTreeSourceArtifact | null;
+    stagingProgress: CalibrationTreeSourceArtifact | null;
+    stagedDatasetReceipt: CalibrationTreeSourceArtifact | null;
+  };
+}
+
+async function loadStagedBundleCalibrationSource(
   runId: string,
   runManifest: JsonObject | null,
   progress: JsonObject | null,
   candidateReleaseId: string,
   revalidate: number,
   country: MicrocosmCountry,
-): Promise<Calibration | null> {
+  stagingRevision: string,
+  runManifestSource: CalibrationTreeSourceArtifact | null,
+  progressSource: CalibrationTreeSourceArtifact | null,
+): Promise<ResolvedStagingCalibrationSource | null> {
+  const staging = stagingSource(country, stagingRevision);
   const artifacts = objectOrNull(runManifest?.artifacts);
   const stagedArtifact = objectOrNull(artifacts?.staged_dataset);
   const receiptPath = stringValue(stagedArtifact?.staging_path);
   if (!receiptPath) return null;
-  const receipt = await stagingHashedJsonOrNull(receiptPath, revalidate, country);
-  if (!receipt) return null;
+  const receipt = await stagingHashedJsonOrNull(
+    receiptPath,
+    revalidate,
+    country,
+    stagingRevision,
+  );
+  if (!receipt) {
+    throw new IncompatibleStagingDataError(
+      "artifact staged_dataset is declared but its receipt is absent.",
+    );
+  }
   if (receipt.sha256 !== stringValue(stagedArtifact?.sha256)) {
     throw new IncompatibleStagingDataError(
       "artifact staged_dataset digest does not match its run manifest declaration.",
@@ -646,17 +735,40 @@ async function loadStagedBundleCalibration(
       `staged bundle ${STAGED_BUNDLE_DIAGNOSTICS_FILE} does not match the digest the run recorded.`,
     );
   }
-  return buildCalibration(
+  const updatedAt = stringValue(progress?.updated_at) ??
+    stringValue(runManifest?.updated_at);
+  const calibration = buildCalibration(
     diagnostics.payload,
     candidateReleaseId,
-    stringValue(progress?.updated_at),
+    updatedAt,
     {},
     {},
     {},
     country,
     "huggingface_staged_bundle",
     diagnostics.sha256,
+    revision,
   );
+  return {
+    calibration,
+    candidateReleaseId,
+    updatedAt,
+    stagingRepo: staging.repo,
+    stagingRevision,
+    sourceArtifacts: {
+      calibrationDiagnostics: {
+        path: `${prefix}/${STAGED_BUNDLE_DIAGNOSTICS_FILE}`,
+        sha256: diagnostics.sha256,
+        hfRepo: repository,
+        hfCommitSha: revision,
+      },
+      buildManifest: null,
+      releaseManifest: null,
+      stagingRunManifest: runManifestSource,
+      stagingProgress: progressSource,
+      stagedDatasetReceipt: receipt.source,
+    },
+  };
 }
 
 export async function loadStagingCalibration(
@@ -664,15 +776,80 @@ export async function loadStagingCalibration(
   revalidate: number,
   country: MicrocosmCountry = "us",
 ): Promise<Calibration | null> {
+  if (revalidate <= 0) {
+    return loadStagingCalibrationUncached(runId, revalidate, country);
+  }
+  const cacheKey = `${country}:${runId}:${revalidate}`;
+  const now = Date.now();
+  for (const [key, entry] of stagingCalibrationCache) {
+    if (entry.expiresAt <= now) stagingCalibrationCache.delete(key);
+  }
+  const cached = stagingCalibrationCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = loadStagingCalibrationUncached(runId, revalidate, country);
+  stagingCalibrationCache.set(cacheKey, {
+    promise,
+    expiresAt: now + revalidate * 1000,
+  });
+  while (stagingCalibrationCache.size > STAGING_CALIBRATION_CACHE_LIMIT) {
+    const oldest = stagingCalibrationCache.keys().next().value;
+    if (typeof oldest !== "string") break;
+    stagingCalibrationCache.delete(oldest);
+  }
+  try {
+    const result = await promise;
+    if (!result) stagingCalibrationCache.delete(cacheKey);
+    return result;
+  } catch (error) {
+    stagingCalibrationCache.delete(cacheKey);
+    throw error;
+  }
+}
+
+async function loadStagingCalibrationUncached(
+  runId: string,
+  revalidate: number,
+  country: MicrocosmCountry,
+): Promise<Calibration | null> {
+  const source = await resolveStagingCalibrationSource(
+    runId,
+    revalidate,
+    country,
+  );
+  return source?.calibration ?? null;
+}
+
+export async function resolveStagingCalibrationSource(
+  runId: string,
+  revalidate: number,
+  country: MicrocosmCountry = "us",
+  revisionOverride?: string,
+): Promise<ResolvedStagingCalibrationSource | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
-  const [progressRaw, runManifestRaw] = await Promise.all([
-    stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate, country),
-    stagingJsonOrNull(`runs/${runId}/run_manifest.json`, revalidate, country),
+  const staging = stagingSource(country, revisionOverride);
+  const [progressArtifact, runManifestArtifact] = await Promise.all([
+    stagingHashedJsonOrNull(
+      `runs/${runId}/progress.json`,
+      revalidate,
+      country,
+      staging.revision,
+    ),
+    stagingHashedJsonOrNull(
+      `runs/${runId}/run_manifest.json`,
+      revalidate,
+      country,
+      staging.revision,
+    ),
   ]);
-  const progress = progressRaw == null ? null : parseStagingProgress(progressRaw);
+  const progress = progressArtifact == null
+    ? null
+    : parseStagingProgress(progressArtifact.payload);
   const runManifest =
-    runManifestRaw == null ? null : parseStagingManifest(runManifestRaw);
+    runManifestArtifact == null
+      ? null
+      : parseStagingManifest(runManifestArtifact.payload);
   validateStagingRunConsistency(runId, { progress, runManifest });
   const candidateReleaseId =
     stringValue(progress?.candidate_release_id) ??
@@ -687,69 +864,84 @@ export async function loadStagingCalibration(
   if (!diagnosticsPath) {
     // No telemetry diagnostics artifact: a run that staged its dataset bundle
     // carries the same diagnostics there.
-    return loadStagedBundleCalibration(
+    return loadStagedBundleCalibrationSource(
       runId,
       runManifest,
       progress,
       candidateReleaseId,
       revalidate,
       country,
+      staging.revision,
+      runManifestArtifact?.source ?? null,
+      progressArtifact?.source ?? null,
     );
   }
-  const diagnostics =
-    runManifest?.schema_version === 2
-      ? await stagingHashedJsonOrNull(diagnosticsPath, revalidate, country)
-      : null;
-  const diag =
-    runManifest?.schema_version === 2
-      ? diagnostics?.payload ?? null
-      : await stagingJsonOrNull(diagnosticsPath, revalidate, country);
-  if (!diag) return null;
+  const diagnostics = await stagingHashedJsonOrNull(
+    diagnosticsPath,
+    revalidate,
+    country,
+    staging.revision,
+  );
+  if (!diagnostics) {
+    if (runManifest?.schema_version === 2 && diagnosticsArtifact) {
+      throw new IncompatibleStagingDataError(
+        "artifact calibration_diagnostics is declared but absent.",
+      );
+    }
+    return null;
+  }
   const expectedDigest = stringValue(diagnosticsArtifact?.sha256);
   if (
     runManifest?.schema_version === 2 &&
-    diagnostics?.sha256 !== expectedDigest
+    diagnostics.sha256 !== expectedDigest
   ) {
     throw new IncompatibleStagingDataError(
       `artifact calibration_diagnostics digest does not match its run manifest declaration.`,
     );
   }
   const [buildManifest, releaseManifest] = await Promise.all([
-    stagingJsonOrNull(`runs/${runId}/build_manifest.json`, revalidate, country),
-    stagingJsonOrNull(`runs/${runId}/release_manifest.json`, revalidate, country),
+    stagingHashedJsonOrNull(
+      `runs/${runId}/build_manifest.json`,
+      revalidate,
+      country,
+      staging.revision,
+    ),
+    stagingHashedJsonOrNull(
+      `runs/${runId}/release_manifest.json`,
+      revalidate,
+      country,
+      staging.revision,
+    ),
   ]);
-  return buildCalibration(
-    diag,
+  const updatedAt = stringValue(progress?.updated_at) ??
+    stringValue(runManifest?.updated_at);
+  const calibration = buildCalibration(
+    diagnostics.payload,
     candidateReleaseId,
-    stringValue(progress?.updated_at),
-    buildManifest ?? {},
-    releaseManifest ?? {},
+    updatedAt,
+    buildManifest?.payload ?? {},
+    releaseManifest?.payload ?? {},
     {},
     country,
     "huggingface_live",
-    diagnostics?.sha256 ?? null,
+    diagnostics.sha256,
+    staging.revision,
   );
-}
-
-// Resolve a dashboard selection to its calibration: a published release id
-// through the release loader, or `staging:<run_id>` through the staging
-// loaders (a telemetry diagnostics artifact, else the run's staged bundle), so
-// the release pages review an unreleased candidate unchanged. A candidate
-// without diagnostics is a 404, not an upstream failure.
-export async function loadSelectedCalibration(
-  selection: string,
-  revalidate: number,
-  country: MicrocosmCountry = "us",
-): Promise<Calibration> {
-  const runId = stagingRunIdOf(selection);
-  if (runId == null) return loadRelease(selection, revalidate, country);
-  const unavailable = stagingUnavailableReason(country);
-  if (unavailable) throw new StagingCalibrationUnavailableError(unavailable);
-  const calibration = await loadStagingCalibration(runId, revalidate, country);
-  if (!calibration) {
-    throw new StagingCalibrationUnavailableError(STAGING_CALIBRATION_UNAVAILABLE_DETAIL);
-  }
-  return calibration;
+  return {
+    calibration,
+    candidateReleaseId,
+    updatedAt,
+    stagingRepo: staging.repo,
+    stagingRevision: staging.revision,
+    sourceArtifacts: {
+      calibrationDiagnostics: diagnostics.source,
+      buildManifest: buildManifest?.source ?? null,
+      releaseManifest: releaseManifest?.source ?? null,
+      stagingRunManifest: runManifestArtifact?.source ?? null,
+      stagingProgress: progressArtifact?.source ?? null,
+      stagedDatasetReceipt: null,
+    },
+  };
 }
 
 export async function loadStagingTargetChangeDataset(
@@ -785,6 +977,63 @@ export async function loadStagingTargetChangeDataset(
   targetChangeCache.set(cacheKey, {
     expiresAt: now + ttlSeconds * 1000,
     promise,
+  });
+  while (targetChangeCache.size > TARGET_CHANGE_CACHE_LIMIT) {
+    const oldest = targetChangeCache.keys().next().value;
+    if (typeof oldest !== "string") break;
+    targetChangeCache.delete(oldest);
+  }
+  try {
+    const result = await promise;
+    if (!result) targetChangeCache.delete(cacheKey);
+    return result;
+  } catch (error) {
+    targetChangeCache.delete(cacheKey);
+    throw error;
+  }
+}
+
+export async function loadStagingTargetChangeDatasetFromBuild(
+  runId: string,
+  currentBuildArtifactId: string,
+  country: MicrocosmCountry = "us",
+): Promise<TargetChangeDataset | null> {
+  if (stagingUnavailableReason(country)) return null;
+  assertSafeReleaseId(runId, "run");
+  const progress = await stagingJsonOrNull(
+    `runs/${runId}/progress.json`,
+    TARGET_CHANGE_MUTABLE_CACHE_SECONDS,
+    country,
+  );
+  const parsedProgress = progress == null ? null : parseStagingProgress(progress);
+  validateStagingRunConsistency(runId, { progress: parsedProgress });
+  const ttlSeconds = stagingTargetChangeCacheTtlSeconds(parsedProgress?.status);
+  const cacheKey = `${country}:${runId}:build:${currentBuildArtifactId}`;
+  const now = Date.now();
+  for (const [key, entry] of targetChangeCache) {
+    if (entry.expiresAt <= now) targetChangeCache.delete(key);
+  }
+  const cached = targetChangeCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+
+  const promise = Promise.all([
+    loadCalibrationComparisonSource(country, currentBuildArtifactId),
+    loadStagingCalibration(runId, ttlSeconds, country),
+  ]).then(([current, candidate]) =>
+    candidate
+      ? buildTargetChangeDatasetFromSummaryAndCalibration(
+          {
+            country,
+            comparison: current.index.targetComparison,
+            targets: current.targetSummaries,
+          },
+          candidate,
+        )
+      : null,
+  );
+  targetChangeCache.set(cacheKey, {
+    promise,
+    expiresAt: now + ttlSeconds * 1000,
   });
   while (targetChangeCache.size > TARGET_CHANGE_CACHE_LIMIT) {
     const oldest = targetChangeCache.keys().next().value;

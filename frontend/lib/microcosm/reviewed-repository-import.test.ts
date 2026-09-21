@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 
 import { COUNTRY_REGISTRY } from "./countries";
-import { HOSTED_US_RELEASE } from "./production-release";
 
 // A US-only data-selection conflict must fail US reads only. Asserting it while
 // building the repository table would throw during module import instead, taking
@@ -18,7 +17,10 @@ const ROUTES_IMPORTED = {
   variable: "ok",
   microcosm_variable: "ok",
 };
-const NOT_ALLOWLISTED = '200:{"ok":true,"alerted":[]}';
+const NOT_ALLOWLISTED =
+  '200:{"ok":true,"dispatched":[],"alerted":[]}';
+const DISPATCHED_TAG =
+  '200:{"ok":true,"country":"uk","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"alerted":[]}';
 
 function importedUnder(
   overrides: Partial<Record<(typeof OVERRIDES)[number], string>>,
@@ -32,7 +34,12 @@ function importedUnder(
   const child = Bun.spawnSync({
     cmd: [process.execPath, "run", FIXTURE],
     cwd: `${import.meta.dir}/../..`,
-    env: { ...env, ...overrides, HF_WEBHOOK_SECRET: SECRET },
+    env: {
+      ...env,
+      ...overrides,
+      HF_WEBHOOK_SECRET: SECRET,
+      GITHUB_ACTIONS_DISPATCH_TOKEN: "fixture-dispatch-token",
+    },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -43,16 +50,16 @@ function importedUnder(
   };
 }
 
-test("a conflicting US data override fails US reads, not module import", () => {
+test("a US repository override changes dashboard discovery without breaking imports", () => {
   const child = importedUnder({
     POPULACE_HF_REPO: "policyengine/unreviewed-override-fixture",
-    POPULACE_HF_REVISION: "main",
+    POPULACE_HF_REVISION: "stale-immutable-dashboard-revision",
   });
   expect(child.exitCode).toBe(0);
   expect(JSON.parse(child.stdout)).toEqual({
     imported: true,
-    us_repo: "refused:409",
-    us_revision: "refused:409",
+    us_repo: "ok:policyengine/unreviewed-override-fixture",
+    us_revision: "ok:main",
     uk_repo: `ok:${COUNTRY_REGISTRY.uk.repo}`,
     be_repo: `ok:${COUNTRY_REGISTRY.be.repo}`,
     be_revision: `ok:${COUNTRY_REGISTRY.be.revision}`,
@@ -60,24 +67,25 @@ test("a conflicting US data override fails US reads, not module import", () => {
     route_imports: ROUTES_IMPORTED,
     // The refused country is left out of the alert allowlist; the others stay.
     reviewed_us_tag: NOT_ALLOWLISTED,
-    uk_tag: '200:{"ok":true,"country":"uk","alerted":[]}',
+    uk_tag: DISPATCHED_TAG,
   });
 });
 
-test("the reviewed deployment keeps every country's reads working", () => {
+test("the default deployment discovers releases from each registered branch", () => {
   const child = importedUnder({});
   expect(child.stderr).toBe("");
   expect(child.exitCode).toBe(0);
   expect(JSON.parse(child.stdout)).toEqual({
     imported: true,
-    us_repo: `ok:${HOSTED_US_RELEASE.repo}`,
-    us_revision: `ok:${HOSTED_US_RELEASE.hf_revision}`,
+    us_repo: `ok:${COUNTRY_REGISTRY.us.repo}`,
+    us_revision: `ok:${COUNTRY_REGISTRY.us.revision}`,
     uk_repo: `ok:${COUNTRY_REGISTRY.uk.repo}`,
     be_repo: `ok:${COUNTRY_REGISTRY.be.repo}`,
     be_revision: `ok:${COUNTRY_REGISTRY.be.revision}`,
     be_geography: `ok:${COUNTRY_REGISTRY.be.geography}`,
     route_imports: ROUTES_IMPORTED,
-    reviewed_us_tag: '200:{"ok":true,"country":"us","alerted":[]}',
-    uk_tag: '200:{"ok":true,"country":"uk","alerted":[]}',
+    reviewed_us_tag:
+      '200:{"ok":true,"country":"us","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"alerted":[]}',
+    uk_tag: DISPATCHED_TAG,
   });
 });

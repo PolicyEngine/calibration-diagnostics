@@ -1,8 +1,7 @@
 // Data layer for the country-selectable Microcosm dashboard. Published releases
-// are read from each country's reviewed Hugging Face dataset; an explicit UK
+// are read from each country's registered Hugging Face dataset; an explicit UK
 // local-run directory can replace that source for local diagnostics inspection.
-// Reviewed production defaults are immutable, and historical releases remain
-// selectable.
+// Dashboard defaults and historical releases resolve to immutable commits.
 
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -10,7 +9,6 @@ import { basename, join } from "node:path";
 import { createHash } from "node:crypto";
 
 import { sourceAuthorityLabel } from "@/lib/source-labels";
-import { StagingCalibrationUnavailableError } from "@/lib/microcosm/calibration-selection";
 
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
 import {
@@ -44,13 +42,13 @@ import {
   type TargetLossDiagnosticWarning,
 } from "./target-loss-attribution";
 import {
-  targetRepresentationForSchema,
+  targetRepresentationForDiagnosticsArtifact,
   type TargetRepresentation,
   type TargetRowRepresentation,
 } from "./target-representation";
 import { readStructuredTarget } from "./structured-target-reader";
 import { matchTargetSurfaces } from "./target-surface-matcher";
-import { assertReviewedRepository } from "./production-release";
+import { resolveCalibrationRelease } from "./calibration-release-locator";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
@@ -68,7 +66,6 @@ const DEFAULT_GEOGRAPHY_LEVEL = "national";
 // each country's registration; they are re-exported here for deployment docs
 // and tests.
 export const MICROCOSM_HF_REPO_ENV = COUNTRY_REGISTRY.us.repo_env;
-export const MICROCOSM_HF_REVISION_ENV = COUNTRY_REGISTRY.us.revision_env;
 export const MICROCOSM_UK_HF_REPO_ENV = COUNTRY_REGISTRY.uk.repo_env;
 export const MICROCOSM_UK_HF_REVISION_ENV = COUNTRY_REGISTRY.uk.revision_env;
 export const MICROCOSM_BE_HF_REPO_ENV = COUNTRY_REGISTRY.be.repo_env;
@@ -87,8 +84,7 @@ function envOverride(name: string | undefined): string | undefined {
 // Server-side view of a registration: the registry defaults with this
 // deployment's repository/revision overrides applied. Keep the national
 // geography beside the repository so downstream shaping does not require a
-// second exhaustive country table. Resolution never throws: the reviewed-
-// selection check belongs to countryRepository() below.
+// second exhaustive country table.
 function resolveCountryRepository(country: MicrocosmCountry): MicrocosmCountryRepository {
   const registration = countryRegistration(country);
   return {
@@ -98,9 +94,6 @@ function resolveCountryRepository(country: MicrocosmCountry): MicrocosmCountryRe
   };
 }
 
-// The resolved table, without the reviewed-selection check. Module-private so
-// that countryRepository() below is the only way to read a country's
-// repository and the check cannot be bypassed.
 const COUNTRY_REPO = Object.fromEntries(
   (Object.keys(COUNTRY_REGISTRY) as MicrocosmCountry[]).map((country) => [
     country,
@@ -108,19 +101,10 @@ const COUNTRY_REPO = Object.fromEntries(
   ]),
 ) as Record<MicrocosmCountry, MicrocosmCountryRepository>;
 
-// A country with a reviewed immutable production default must refuse a
-// conflicting deployment override. Check it per read rather than while building
-// COUNTRY_REPO: asserting at module scope would throw during import, so a
-// US-only misconfiguration would take down every other country's routes and
-// pages — and `next build` — instead of only the US reads it actually affects.
 export function countryRepository(
   country: MicrocosmCountry,
 ): MicrocosmCountryRepository {
-  const repository = COUNTRY_REPO[country];
-  if (countryRegistration(country).production_release_id) {
-    assertReviewedRepository(repository.repo, repository.revision);
-  }
-  return repository;
+  return COUNTRY_REPO[country];
 }
 
 // Release/run ids are interpolated into HuggingFace URLs that carry the
@@ -140,15 +124,11 @@ export function assertSafeReleaseId(id: string, label = "release"): string {
   return id;
 }
 
-// Route catch → HTTP: a bad id is the caller's fault (400); a staging
-// candidate with nothing to show yet is absent (404); anything else is an
-// upstream/HF failure (502). Keeps status semantics consistent across routes.
+// Route catch → HTTP: a bad id is the caller's fault (400); anything else is
+// an upstream/HF failure (502). Keeps status semantics consistent across routes.
 export function classifyApiError(error: unknown): { status: number; body: { detail: string } } {
   if (error instanceof InvalidReleaseIdError) {
     return { status: 400, body: { detail: error.message } };
-  }
-  if (error instanceof StagingCalibrationUnavailableError) {
-    return { status: 404, body: { detail: error.message } };
   }
   return {
     status: 502,
@@ -1763,7 +1743,12 @@ export interface Calibration {
   // `huggingface_staged_bundle`: an unreleased candidate read from the staged
   // bundle its build uploaded to the release repository (`staged/<run_id>/`),
   // pinned to the commit the run recorded.
-  source: "huggingface_live" | "huggingface_staged_bundle" | "local_filesystem";
+  source:
+    | "huggingface_immutable"
+    | "huggingface_live"
+    | "huggingface_staged_bundle"
+    | "local_filesystem";
+  hf_commit_sha: string | null;
   country: MicrocosmCountry;
   // Typed `release_manifest.country` merged over the registration.
   country_info: ArtifactCountry;
@@ -2016,10 +2001,14 @@ export function buildCalibration(
   releaseManifest: JsonObject = {},
   demographics: JsonObject = {},
   country: MicrocosmCountry = "us",
-  source: Calibration["source"] = "huggingface_live",
+  source: Calibration["source"] = "huggingface_immutable",
   diagnosticsSha256: string | null = null,
+  hfCommitSha: string | null = null,
 ): Calibration {
-  const targetRepresentation = targetRepresentationForSchema(diag.schema_version);
+  const targetRepresentation = targetRepresentationForDiagnosticsArtifact(
+    diag.schema_version,
+    { releaseId, sha256: diagnosticsSha256 },
+  );
   const targets = (Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : []).map(
     normalizeDiagnosticsRow,
   );
@@ -2066,6 +2055,7 @@ export function buildCalibration(
   const includedTargetCount = rows.filter((row) => row.calibration_status === "included").length;
   return {
     source,
+    hf_commit_sha: hfCommitSha,
     country,
     country_info: artifactCountry,
     presentation,
@@ -2116,9 +2106,14 @@ export function buildCalibration(
 }
 
 // --- HF access --------------------------------------------------------------
-export function hfResolveUrl(path: string, country: MicrocosmCountry = "us"): string {
+export function hfResolveUrl(
+  path: string,
+  country: MicrocosmCountry = "us",
+  revisionOverride?: string,
+): string {
   const { repo, revision } = countryRepository(country);
-  return `https://huggingface.co/datasets/${repo}/resolve/${revision}/${path}`;
+  const resolvedRevision = revisionOverride ?? revision;
+  return `https://huggingface.co/datasets/${repo}/resolve/${resolvedRevision}/${path}`;
 }
 
 // A hung HF request would otherwise block the function for the whole route
@@ -2192,10 +2187,12 @@ async function loadReleasePublishedAt(
   releaseId: string,
   revalidate: number,
   country: MicrocosmCountry,
+  revisionOverride?: string,
 ): Promise<string | null> {
   const { repo, revision } = countryRepository(country);
+  const resolvedRevision = revisionOverride ?? revision;
   const url =
-    `https://huggingface.co/api/datasets/${repo}/tree/${revision}/releases/${releaseId}` +
+    `https://huggingface.co/api/datasets/${repo}/tree/${resolvedRevision}/releases/${releaseId}` +
     "?recursive=false&expand=true";
   const res = await hfFetch(url, revalidate);
   if (!res.ok) throw new Error(`HF tree failed ${res.status}: ${url}`);
@@ -2314,6 +2311,7 @@ async function loadLocalCalibrationRelease(
 export async function loadReleases(
   revalidate: number,
   country: MicrocosmCountry = "us",
+  revisionOverride?: string,
 ): Promise<ReleaseEntry[]> {
   const local = await loadLocalCalibrationRelease(country);
   if (local) {
@@ -2331,11 +2329,12 @@ export async function loadReleases(
   }
 
   const { repo, revision } = countryRepository(country);
+  const resolvedRevision = revisionOverride ?? revision;
   const files = new Map<string, Set<string>>();
   // The HF tree endpoint paginates (~1000 entries/page via a Link cursor);
   // follow every page so releases don't silently vanish as the repo grows.
   let url: string | null =
-    `https://huggingface.co/api/datasets/${repo}/tree/${revision}/releases?recursive=true`;
+    `https://huggingface.co/api/datasets/${repo}/tree/${resolvedRevision}/releases?recursive=true`;
   let page = 0;
   while (url && page < 50) {
     const res: Response = await hfFetch(url, revalidate);
@@ -2377,7 +2376,11 @@ export async function loadReleases(
       .map(async (entry) => {
         try {
           const manifest = await hfJson(
-            hfResolveUrl(`releases/${entry.release_id}/release_manifest.json`, country),
+            hfResolveUrl(
+              `releases/${entry.release_id}/release_manifest.json`,
+              country,
+              resolvedRevision,
+            ),
             revalidate,
           );
           Object.assign(entry, releaseRole(manifest));
@@ -2398,26 +2401,26 @@ export async function loadPointerReleaseId(
     return { release_id: local.releaseId, updated_at: local.updatedAt };
   }
 
-  const productionRelease = countryRegistration(country).production_release_id;
-  if (productionRelease) {
-    return { release_id: productionRelease, updated_at: null };
-  }
-
-  const pointer = await hfJson(hfResolveUrl("latest.json", country), revalidate);
+  const pointer = await resolveCalibrationRelease(country, "latest", revalidate);
   return {
-    release_id: String(pointer.release_id ?? ""),
-    updated_at: typeof pointer.updated_at === "string" ? pointer.updated_at : null,
+    release_id: pointer.releaseId,
+    updated_at: pointer.updatedAt,
   };
 }
 
 // Load one release's manifests + calibration diagnostics. releaseId "latest"
-// resolves to the reviewed production default when configured, otherwise the pointer.
+// resolves through the dashboard manifest. Historical releases resolve through
+// their immutable Hugging Face tag commit.
 export async function loadRelease(
   releaseId: string,
   revalidate: number,
   country: MicrocosmCountry = "us",
 ): Promise<Calibration> {
-  const cacheKey = `${country}:${releaseId || "latest"}:${revalidate}`;
+  const requestedRelease = releaseId || "latest";
+  const cacheSeconds = requestedRelease === "latest"
+    ? Math.min(Math.max(revalidate, 1), 60)
+    : Math.max(revalidate, 1);
+  const cacheKey = `${country}:${requestedRelease}:${cacheSeconds}`;
   const now = Date.now();
   const cached = releaseCache.get(cacheKey);
   if (cached && cached.expiresAt > now) return cached.promise;
@@ -2425,7 +2428,7 @@ export async function loadRelease(
   const promise = loadReleaseUncached(releaseId, revalidate, country);
   releaseCache.set(cacheKey, {
     promise,
-    expiresAt: now + Math.max(revalidate, 1) * 1000,
+    expiresAt: now + cacheSeconds * 1000,
   });
   try {
     return await promise;
@@ -2457,22 +2460,34 @@ async function loadReleaseUncached(
     );
   }
 
-  let id = assertSafeReleaseId(releaseId);
-  let updatedAt: string | null = null;
-  if (releaseId === "latest" || !releaseId) {
-    const ptr = await loadPointerReleaseId(revalidate, country);
-    id = ptr.release_id;
-    updatedAt = ptr.updated_at;
-  }
+  const location = await resolveCalibrationRelease(
+    country,
+    releaseId || "latest",
+    revalidate,
+  );
+  const id = location.releaseId;
+  const updatedAt = location.updatedAt;
   const prefix = `releases/${id}`;
   const [diagnosticsArtifact, buildManifest, releaseManifest, demographics, publishedAt] = await Promise.all([
-    hfHashedJson(hfResolveUrl(`${prefix}/calibration_diagnostics.json`, country), revalidate),
-    hfJson(hfResolveUrl(`${prefix}/build_manifest.json`, country), revalidate).catch(() => ({})),
-    hfJson(hfResolveUrl(`${prefix}/release_manifest.json`, country), revalidate).catch(() => ({})),
-    hfJson(hfResolveUrl(`${prefix}/demographics.json`, country), revalidate).catch(() => ({})),
+    hfHashedJson(
+      hfResolveUrl(
+        `${prefix}/calibration_diagnostics.json`,
+        country,
+        location.hfCommitSha,
+      ),
+      revalidate,
+    ),
+    hfJson(hfResolveUrl(`${prefix}/build_manifest.json`, country, location.hfCommitSha), revalidate).catch(() => ({})),
+    hfJson(hfResolveUrl(`${prefix}/release_manifest.json`, country, location.hfCommitSha), revalidate).catch(() => ({})),
+    hfJson(hfResolveUrl(`${prefix}/demographics.json`, country, location.hfCommitSha), revalidate).catch(() => ({})),
     updatedAt
       ? Promise.resolve(updatedAt)
-      : loadReleasePublishedAt(id, revalidate, country).catch(() => null),
+      : loadReleasePublishedAt(
+          id,
+          revalidate,
+          country,
+          location.hfCommitSha,
+        ).catch(() => null),
   ]);
   return buildCalibration(
     diagnosticsArtifact.payload,
@@ -2482,8 +2497,9 @@ async function loadReleaseUncached(
     releaseManifest,
     demographics,
     country,
-    "huggingface_live",
+    "huggingface_immutable",
     diagnosticsArtifact.sha256,
+    location.hfCommitSha,
   );
 }
 

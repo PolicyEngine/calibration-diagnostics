@@ -14,6 +14,7 @@ const EMPTY_FILTERS = {
   geographyLevels: [],
   geographies: [],
   fitBands: [],
+  comparisonFits: [],
   calibrationStatuses: [],
 };
 
@@ -794,6 +795,7 @@ describe("calibration tree metrics and filters", () => {
       geographyLevels: ["state"],
       geographies: ["CA", "NY"],
       fitBands: ["0_5", "10_20"],
+      comparisonFits: [],
       calibrationStatuses: ["included", "skipped"],
     });
 
@@ -817,6 +819,7 @@ describe("calibration tree metrics and filters", () => {
         geographyLevels: ["state"],
         geographies: ["CA"],
         fitBands: ["0_5"],
+        comparisonFits: [],
         calibrationStatuses: ["included"],
       },
     });
@@ -837,6 +840,7 @@ describe("calibration tree metrics and filters", () => {
         geographyLevels: ["national"],
         geographies: ["United States"],
         fitBands: [],
+        comparisonFits: [],
         calibrationStatuses: [],
       },
     );

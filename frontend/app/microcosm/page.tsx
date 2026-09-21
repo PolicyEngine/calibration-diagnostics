@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { MicrocosmOverviewView } from "@/components/microcosm/microcosm-overview-view";
+import { publishedReleaseSelection } from "@/lib/microcosm/calibration-selection";
 import { parseCountry } from "@/lib/microcosm/countries";
 
 interface MicrocosmOverviewPageProps {
@@ -17,7 +18,7 @@ export default async function MicrocosmOverviewPage({
     <AppShell>
       <MicrocosmOverviewView
         initialCountry={parseCountry(rawCountry)}
-        initialRelease={rawRelease ?? ""}
+        initialRelease={publishedReleaseSelection(rawRelease)}
       />
     </AppShell>
   );

@@ -19,9 +19,7 @@ import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 import {
-  candidateSelectOptions,
   releaseSelectOptions,
-  useMicrocosmStagingRuns,
   useMicrocosmReleases,
   useMicrocosmTargetDiagnostics,
   type MicrocosmTargetDimension,
@@ -520,13 +518,9 @@ export function MicrocosmTargetsView({
   const release = selectedReleaseForCountry(country, releaseSelection);
   const router = useRouter();
   const { data: releaseData } = useMicrocosmReleases();
-  const { data: stagingData } = useMicrocosmStagingRuns();
   const releaseOptions = useMemo(
-    () => [
-      ...releaseSelectOptions(releaseData),
-      ...candidateSelectOptions(country, stagingData),
-    ],
-    [releaseData, stagingData, country],
+    () => releaseSelectOptions(releaseData),
+    [releaseData],
   );
 
   function pickRelease(value: string) {

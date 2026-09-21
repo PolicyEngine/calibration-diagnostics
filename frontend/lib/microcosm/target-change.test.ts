@@ -80,6 +80,13 @@ describe("target change attribution", () => {
     expect(result.rows.find((row) => row.name === "shared")?.reported_change).toBeCloseTo(0.05);
     expect(result.rows.find((row) => row.name === "added")?.reported_change).toBeCloseTo(0.05);
     expect(result.rows.find((row) => row.name === "removed")?.reported_change).toBeCloseTo(-0.2);
+    expect(Object.fromEntries(
+      result.rows.map((row) => [row.name, row.comparison_fit]),
+    )).toEqual({
+      shared: "improved",
+      removed: "not_applicable",
+      added: "not_applicable",
+    });
     expect(result.summaries.reported).toEqual(expect.objectContaining({
       shared: 1,
       added: 1,
@@ -91,6 +98,18 @@ describe("target change attribution", () => {
     expect(result.summaries.reported?.grossReduction).toBeCloseTo(0.2);
     expect(result.summaries.reported?.netChange).toBeCloseTo(-0.1);
     expect(result.summaries.reported?.reconciliationDifference).toBeCloseTo(0);
+    expect(result.rows.find((row) => row.name === "shared")).toMatchObject({
+      current_target_ordinal: 0,
+      candidate_target_ordinal: 0,
+    });
+    expect(result.rows.find((row) => row.name === "removed")).toMatchObject({
+      current_target_ordinal: 1,
+      candidate_target_ordinal: null,
+    });
+    expect(result.rows.find((row) => row.name === "added")).toMatchObject({
+      current_target_ordinal: null,
+      candidate_target_ordinal: 1,
+    });
   });
 
   test("shared mode normalizes each side over shared targets and applies pooled weights", () => {
@@ -112,6 +131,8 @@ describe("target change attribution", () => {
     expect(one?.pooled_weight_share).toBeCloseTo(expectedOne);
     expect((one?.pooled_weight_share ?? 0) + (two?.pooled_weight_share ?? 0)).toBeCloseTo(1);
     expect(one?.shared_change).toBeCloseTo(expectedOne * (0.4 - 0.1));
+    expect(one?.comparison_fit).toBe("regressed");
+    expect(two?.comparison_fit).toBe("improved");
     expect(result.summaries.shared?.comparisonTargets).toBe(2);
     expect(result.summaries.shared?.reconciliationDifference).toBeCloseTo(0);
   });
@@ -128,6 +149,19 @@ describe("target change attribution", () => {
     const result = buildTargetChangeDataset(current, candidate);
     expect(result.rows.find((row) => row.name === "shared")?.source).toBe("new");
     expect(result.rows.find((row) => row.name === "removed")?.source).toBe("old");
+  });
+
+  test("classifies equal shared-target errors as unchanged", () => {
+    const result = buildTargetChangeDataset(
+      calibration("current", [
+        { name: "same", contribution: 0.2, share: 1, error: 0.2 },
+      ]),
+      calibration("candidate", [
+        { name: "same", contribution: 0.2, share: 1, error: 0.2 },
+      ]),
+    );
+
+    expect(result.rows[0].comparison_fit).toBe("unchanged");
   });
 
   test("uses cross-format Chronicle matches without changing contribution arithmetic", () => {

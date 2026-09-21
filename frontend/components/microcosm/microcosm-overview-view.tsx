@@ -25,18 +25,15 @@ import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import {
-  candidateSelectOptions,
   releaseSelectOptions,
   useMicrocosm,
   useMicrocosmReleases,
-  useMicrocosmStagingRuns,
+  type MicrocosmResponse,
 } from "@/lib/api/hooks/use-microcosm";
-import { stagingRunIdOf } from "@/lib/microcosm/calibration-selection";
 import { microcosmOverviewIntro } from "@/lib/microcosm/presentation";
 import {
   microcosmPublicationUrl,
   microcosmSourceAttribution,
-  microcosmStagingRunUrl,
 } from "@/lib/microcosm/source-attribution";
 
 function formatPublishedAt(value: string | null | undefined): string {
@@ -64,90 +61,42 @@ function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   return value.toExponential(3).replace("e+", "e");
 }
 
-export function MicrocosmOverviewView({
-  initialCountry = "us",
-  initialRelease = "",
+export function MicrocosmReleaseHeader({
+  country,
+  release,
+  releaseOptions,
+  data,
+  onReleaseChange,
+  onHeightChange,
 }: {
-  initialCountry?: Country;
-  initialRelease?: string;
+  country: Country;
+  release: string;
+  releaseOptions: { value: string; label: string }[];
+  data?: MicrocosmResponse;
+  onReleaseChange: (value: string) => void;
+  onHeightChange?: (height: number) => void;
 }) {
-  const { country } = useCountry();
-  const [releaseSelection, setReleaseSelection] = useState({
-    country: initialCountry,
-    value: initialRelease,
-  });
-  const release = selectedReleaseForCountry(country, releaseSelection);
-  // An unreleased staging candidate selected as `staging:<run_id>` is reviewed
-  // with this page unchanged; its calibration map reads the staging routes.
-  const stagingRunId = stagingRunIdOf(release) ?? undefined;
-  const [pageIntroHeight, setPageIntroHeight] = useState(0);
-  const { data: releaseData } = useMicrocosmReleases();
-  const { data: stagingData } = useMicrocosmStagingRuns();
-  const { data, isLoading, error } = useMicrocosm(release || undefined);
-
-  const releaseOptions = useMemo(
-    () => [
-      ...releaseSelectOptions(releaseData),
-      ...candidateSelectOptions(country, stagingData),
-    ],
-    [releaseData, stagingData, country],
-  );
-
-  if (isLoading) {
-    return (
-      <>
-        <CalibrationExplorerDataPrefetch
-          release={release || undefined}
-          stagingRunId={stagingRunId}
-        />
-        <LoadingBlock label="Loading microcosm release…" />
-      </>
-    );
-  }
-  if (error || !data) {
-    return (
-      <EmptyState
-        title="Microcosm release data unavailable"
-        description={error instanceof Error ? error.message : "Unknown error."}
-      />
-    );
-  }
-
-  const cal = data.calibration ?? { available: false };
-  const totalTargets = cal.total_targets ?? 0;
-  const includedTargets = cal.included_target_count ?? totalTargets;
-  const lossKind = cal.loss_kind;
-  const normalizedLoss = isNormalizedLoss(lossKind);
-  const diagnosticsStatus = cal.diagnostics_status ?? "ok";
-  const isCandidate = data.selection_mode === "staging_candidate";
-  const candidateFromStagedBundle = cal.source === "huggingface_staged_bundle";
-  // A candidate carries no release manifest, so the release-role banner would
-  // misreport it as non-default; the candidate banner below covers it.
-  const isNonDefault =
-    !isCandidate && (cal.is_local_area === true || cal.is_default === false);
-  const sourceAttribution = microcosmSourceAttribution(
-    country,
-    data.source_repo,
-    cal.country?.repository_visibility,
-  );
-  const labelVariantCount = cal.label_variants?.count ?? 0;
-  const labelVariantExamples = (cal.label_variants?.examples ?? []).slice(0, 2);
-  const publicationUrl =
-    isCandidate && data.staging_run_id
-      ? microcosmStagingRunUrl(data.source_repo, data.revision, data.staging_run_id)
-      : microcosmPublicationUrl(data.source_repo, data.release_id);
-  const overviewIntro = microcosmOverviewIntro(country, cal.presentation);
+  const calibration = data?.calibration ?? null;
+  const sourceAttribution = data
+    ? microcosmSourceAttribution(
+        country,
+        data.source_repo,
+        calibration?.country?.repository_visibility,
+      )
+    : null;
+  const publicationUrl = data
+    ? microcosmPublicationUrl(data.source_repo, data.release_id)
+    : null;
+  const overviewIntro = data
+    ? microcosmOverviewIntro(country, calibration?.presentation)
+    : null;
 
   return (
-    <div className="flex flex-col gap-5">
-      <CalibrationExplorerDataPrefetch
-        release={release || undefined}
-        stagingRunId={stagingRunId}
-      />
-      <PageHeader
-        eyebrow="Microcosm · calibration fit"
-        title="What the data is anchored to"
-        description={
+    <PageHeader
+      eyebrow="Microcosm · calibration fit"
+      title="What the data is anchored to"
+      description={
+        data && sourceAttribution ? (
           <>
             {overviewIntro} Data is built live from{" "}
             {sourceAttribution.href ? (
@@ -164,15 +113,19 @@ export function MicrocosmOverviewView({
             )}
             .
           </>
-        }
-        actions={
-          <>
-            <ToolbarSelect
-              label="Release"
-              value={release}
-              onChange={(value) => setReleaseSelection({ country, value })}
-              options={releaseOptions}
-            />
+        ) : (
+          "Select a published Microcosm release to review its calibration fit."
+        )
+      }
+      actions={
+        <>
+          <ToolbarSelect
+            label="Release"
+            value={release}
+            onChange={onReleaseChange}
+            options={releaseOptions}
+          />
+          {publicationUrl && (
             <Button
               asChild
               variant="outline"
@@ -182,29 +135,83 @@ export function MicrocosmOverviewView({
                 View on Hugging Face
               </a>
             </Button>
-          </>
-        }
-        onHeightChange={setPageIntroHeight}
-      />
+          )}
+        </>
+      }
+      onHeightChange={onHeightChange}
+    />
+  );
+}
+
+export function MicrocosmOverviewView({
+  initialCountry = "us",
+  initialRelease = "",
+}: {
+  initialCountry?: Country;
+  initialRelease?: string;
+}) {
+  const { country } = useCountry();
+  const [releaseSelection, setReleaseSelection] = useState({
+    country: initialCountry,
+    value: initialRelease,
+  });
+  const release = selectedReleaseForCountry(country, releaseSelection);
+  const [pageIntroHeight, setPageIntroHeight] = useState(0);
+  const { data: releaseData } = useMicrocosmReleases();
+  const { data, isLoading, error } = useMicrocosm(release || undefined);
+
+  const releaseOptions = useMemo(
+    () => releaseSelectOptions(releaseData),
+    [releaseData],
+  );
+  const releaseHeader = (
+    <MicrocosmReleaseHeader
+      country={country}
+      release={release}
+      releaseOptions={releaseOptions}
+      data={data}
+      onReleaseChange={(value) => setReleaseSelection({ country, value })}
+      onHeightChange={setPageIntroHeight}
+    />
+  );
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-5">
+        <CalibrationExplorerDataPrefetch release={release || undefined} />
+        {releaseHeader}
+        <LoadingBlock label="Loading microcosm release…" />
+      </div>
+    );
+  }
+  if (error || !data) {
+    return (
+      <div className="flex flex-col gap-5">
+        {releaseHeader}
+        <EmptyState
+          title="Microcosm release data unavailable"
+          description={error instanceof Error ? error.message : "Unknown error."}
+        />
+      </div>
+    );
+  }
+
+  const cal = data.calibration ?? { available: false };
+  const totalTargets = cal.total_targets ?? 0;
+  const includedTargets = cal.included_target_count ?? totalTargets;
+  const lossKind = cal.loss_kind;
+  const normalizedLoss = isNormalizedLoss(lossKind);
+  const diagnosticsStatus = cal.diagnostics_status ?? "ok";
+  const isNonDefault = cal.is_local_area === true || cal.is_default === false;
+  const labelVariantCount = cal.label_variants?.count ?? 0;
+  const labelVariantExamples = (cal.label_variants?.examples ?? []).slice(0, 2);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <CalibrationExplorerDataPrefetch release={release || undefined} />
+      {releaseHeader}
 
       <ArtifactDescriptionBanner description={cal.description} />
-
-      {isCandidate ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/80 bg-card px-4 py-3 shadow-[var(--elev-1)]">
-          <StatusPill tone="warning">
-            {candidateFromStagedBundle
-              ? "Unreleased · staged dataset"
-              : "Unreleased · staging candidate"}
-          </StatusPill>
-          <p className="text-sm text-muted-foreground">
-            This is a staging candidate, not a published release. Its diagnostics come from{" "}
-            {candidateFromStagedBundle
-              ? "the dataset bundle the run staged for inspection"
-              : "the run's staging telemetry"}
-            ; nothing here has been promoted.
-          </p>
-        </div>
-      ) : null}
 
       {labelVariantCount > 0 ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/80 bg-card px-4 py-3 shadow-[var(--elev-1)]">
@@ -300,7 +307,6 @@ export function MicrocosmOverviewView({
       <SectionCard title="Calibration map">
         <CalibrationExplorerMap
           release={release || undefined}
-          stagingRunId={stagingRunId}
           pageIntroHeight={pageIntroHeight}
         />
       </SectionCard>

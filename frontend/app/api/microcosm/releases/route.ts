@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server";
-import { countryRegistration } from "@/lib/microcosm/countries";
 
 import {
   loadPointerReleaseId,
   loadReleases,
-  microcosmRevision,
   parseCountry,
   scrub,
 } from "@/lib/microcosm/latest-artifact";
 
-export const revalidate = 21_600;
+export const revalidate = 60;
 
 export async function GET(request: Request) {
   const country = parseCountry(new URL(request.url).searchParams.get("country"));
-  const productionRelease = countryRegistration(country).production_release_id;
   try {
     const [releases, pointer] = await Promise.all([
       loadReleases(revalidate, country),
@@ -21,10 +18,9 @@ export async function GET(request: Request) {
     ]);
     return NextResponse.json(
       scrub({
-        latest_release_id: productionRelease ? null : pointer.release_id,
+        latest_release_id: pointer.release_id,
         default_release_id: pointer.release_id,
-        selection_mode: productionRelease ? "pinned_production" : "latest",
-        revision: microcosmRevision(country),
+        selection_mode: "dashboard_manifest",
         updated_at: pointer.updated_at,
         // Releases that carry the per-target diagnostics (compare-able).
         releases: releases.filter((r) => r.has_calibration),

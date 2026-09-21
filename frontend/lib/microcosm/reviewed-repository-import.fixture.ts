@@ -50,22 +50,33 @@ async function releaseTag(repo: string): Promise<string> {
   const route = (await ROUTES["hf-webhook"]()) as {
     POST: (request: Request) => Promise<Response>;
   };
-  const response = await route.POST(
-    new Request("https://fixture.example/api/hf-webhook", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-webhook-secret": process.env.HF_WEBHOOK_SECRET ?? "",
-      },
-      body: JSON.stringify({
-        repo: { name: repo },
-        updatedRefs: [
-          { ref: "refs/tags/fixture-release", oldSha: null, newSha: "fixture" },
-        ],
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    if (String(input).startsWith("https://api.github.com/")) {
+      return new Response(null, { status: 204 });
+    }
+    return originalFetch(input);
+  }) as typeof fetch;
+  try {
+    const response = await route.POST(
+      new Request("https://fixture.example/api/hf-webhook", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-webhook-secret": process.env.HF_WEBHOOK_SECRET ?? "",
+        },
+        body: JSON.stringify({
+          repo: { name: repo },
+          updatedRefs: [
+            { ref: "refs/tags/fixture-release", oldSha: null, newSha: "fixture" },
+          ],
+        }),
       }),
-    }),
-  );
-  return `${response.status}:${JSON.stringify(await response.json())}`;
+    );
+    return `${response.status}:${JSON.stringify(await response.json())}`;
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 }
 
 console.log(

@@ -1,21 +1,48 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import {
+  keepPreviousData,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { releaseLabel } from "@/components/shared/format";
 import {
   useCountry,
   type Country,
 } from "@/components/layout/country-context";
-import { PUBLISHED_RELEASE_STALE_TIME_MS } from "@/lib/api/cache-policy";
+import {
+  LATEST_RELEASE_STALE_TIME_MS,
+  PUBLISHED_RELEASE_STALE_TIME_MS,
+} from "@/lib/api/cache-policy";
 import { withBasePath } from "@/lib/base-path";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
-import type { CalibrationProvenance } from "@/lib/microcosm/target-loss-attribution";
-import type { TargetChangeMode } from "@/lib/microcosm/target-change";
-import type { TargetChangeTreeApiResponse } from "@/lib/microcosm/target-change-tree";
-import { HOSTED_US_RELEASE } from "@/lib/microcosm/production-release";
 import {
-  isStagingSelection,
-  stagingSelectionFor,
-} from "@/lib/microcosm/calibration-selection";
+  calibrationTreeResponseFromBundle,
+  calibrationTreeTargetDetailSelection,
+  calibrationTreeTargetsFromSummaries,
+  parseCalibrationTreeComparisonTargetDetail,
+  parseCalibrationTreeIndex,
+  parseCalibrationTreePart,
+  type CalibrationTreeArtifactPart,
+  type CalibrationTreeFilterIndexArtifact,
+  type CalibrationTreeIndexArtifact,
+  type CalibrationTreePart,
+  type CalibrationTreeComparisonTargetDetailResponse,
+  type CalibrationTreeTargetDetailsArtifact,
+  type CalibrationTreeTargetSummaryArtifact,
+  type CalibrationTreeTierArtifact,
+} from "@/lib/microcosm/calibration-tree-artifact";
+import type { CalibrationProvenance } from "@/lib/microcosm/target-loss-attribution";
+import type {
+  TargetChangeMode,
+  TargetChangeRow,
+} from "@/lib/microcosm/target-change";
+import type {
+  TargetChangeTreeApiResponse,
+  TargetChangeTreeResponse,
+} from "@/lib/microcosm/target-change-tree";
+import { HOSTED_US_RELEASE } from "@/lib/microcosm/production-release";
 import {
   hasCapability,
   type CountryCapability,
@@ -316,11 +343,34 @@ export interface MicrocosmReleaseEntry {
 export interface MicrocosmReleasesResponse {
   latest_release_id: string | null;
   default_release_id?: string;
-  selection_mode?: "pinned_production" | "latest";
+  selection_mode?: "dashboard_manifest";
   revision?: string;
   updated_at: string | null;
   releases: MicrocosmReleaseEntry[];
   all_releases: MicrocosmReleaseEntry[];
+}
+
+export interface MicrocosmCalibrationBuild {
+  buildArtifactId: string;
+  kind: "release" | "staging";
+  sourceId: string;
+  label: string;
+  releaseId: string | null;
+  stagingRunId: string | null;
+  hfRepo: string;
+  hfCommitSha: string;
+  treeSchemaVersion: 6;
+  indexSha256: string;
+  indexBytes: number;
+  createdAt: string | null;
+  updatedAt: string;
+}
+
+export interface MicrocosmCalibrationBuildManifest {
+  schemaVersion: 6;
+  country: Country;
+  latestReleaseBuildArtifactId: string | null;
+  builds: MicrocosmCalibrationBuild[];
 }
 
 export interface MicrocosmResponse {
@@ -328,10 +378,7 @@ export interface MicrocosmResponse {
   repo_type: string;
   revision: string;
   source: "huggingface_live" | string;
-  // `staging_candidate`: an unreleased staging run selected as
-  // `staging:<run_id>`; `staging_run_id` names the run.
-  selection_mode?: "pinned_production" | "latest" | "staging_candidate";
-  staging_run_id?: string | null;
+  selection_mode?: "dashboard_manifest" | "historical_release_tag";
   release_id: string;
   updated_at: string | null;
   source_artifacts: { name: string; path: string; url: string }[];
@@ -722,16 +769,6 @@ export interface ReformValidationResponse {
   source_artifact?: { name: string; path: string; url: string };
 }
 
-export function useMicrocosmCompare(a?: string, b?: string, enabled = true) {
-  const { country } = useCountry();
-  return useQuery({
-    queryKey: ["microcosm", "compare", "variables-v2", country, a, b],
-    queryFn: () => apiGet<MicrocosmComparison>("/microcosm/compare", { a, b, country }),
-    enabled: enabled && Boolean(a && b),
-    staleTime: 15 * 60 * 1000,
-  });
-}
-
 export function useMicrocosmStagingRuns() {
   const { country } = useCountry();
   const staging = hasCapability(country, "staging");
@@ -775,16 +812,43 @@ export function useMicrocosmStagingCompare(runId?: string, release = "latest") {
   });
 }
 
+function explorerApiParams(
+  state: ExplorerState,
+): Record<string, string | string[]> {
+  const result: Record<string, string | string[]> = {
+    breakdown: state.breakdown,
+    geography_level: state.filters.geographyLevels,
+    geography: state.filters.geographies,
+    fit_band: state.filters.fitBands,
+    comparison_fit: state.filters.comparisonFits,
+    status: state.filters.calibrationStatuses,
+  };
+  if (state.path.source && state.path.program) {
+    result.source = state.path.source;
+    result.program = state.path.program;
+    for (const dimension of state.path.dimensions) {
+      result[`dim.${dimension.key}`] = dimension.value;
+    }
+    if (state.path.target) result.target = state.path.target;
+  }
+  if (state.path.geography) result.path_geography = state.path.geography;
+  return result;
+}
+
 export function useMicrocosmStagingTargetChangeTree({
   runId,
   releaseId,
+  currentBuildArtifactId,
   mode,
   state,
+  enabled = true,
 }: {
   runId?: string;
   releaseId?: string;
+  currentBuildArtifactId?: string;
   mode: TargetChangeMode;
   state: ExplorerState;
+  enabled?: boolean;
 }) {
   const { country } = useCountry();
   return useQuery({
@@ -795,6 +859,7 @@ export function useMicrocosmStagingTargetChangeTree({
       country,
       runId,
       releaseId,
+      currentBuildArtifactId,
       mode,
       state,
     ],
@@ -804,16 +869,32 @@ export function useMicrocosmStagingTargetChangeTree({
         {
           ...explorerApiParams(state),
           run: runId,
-          release: releaseId,
+          ...microcosmStagingTargetChangeSourceParameters(
+            releaseId,
+            currentBuildArtifactId,
+          ),
           mode,
           country,
         },
       ),
     enabled:
+      enabled &&
       hasCapability(country, "staging") &&
-      Boolean(runId && releaseId && releaseId !== "latest"),
+      Boolean(
+        runId &&
+          (currentBuildArtifactId || (releaseId && releaseId !== "latest")),
+      ),
     staleTime: 30 * 1000,
   });
+}
+
+export function microcosmStagingTargetChangeSourceParameters(
+  releaseId?: string,
+  currentBuildArtifactId?: string,
+): { build: string } | { release: string | undefined } {
+  return currentBuildArtifactId
+    ? { build: currentBuildArtifactId }
+    : { release: releaseId };
 }
 
 export function useMicrocosmReleases() {
@@ -821,7 +902,19 @@ export function useMicrocosmReleases() {
   return useQuery({
     queryKey: ["microcosm", "releases", country],
     queryFn: () => apiGet<MicrocosmReleasesResponse>("/microcosm/releases", { country }),
-    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
+    staleTime: LATEST_RELEASE_STALE_TIME_MS,
+  });
+}
+
+export function useMicrocosmCalibrationBuildManifest() {
+  const { country } = useCountry();
+  return useQuery({
+    queryKey: ["microcosm", "calibration-build-manifest", country],
+    queryFn: () => apiGet<MicrocosmCalibrationBuildManifest>(
+      "/microcosm/tree-manifest",
+      { country },
+    ),
+    staleTime: LATEST_RELEASE_STALE_TIME_MS,
   });
 }
 
@@ -834,16 +927,15 @@ export function releaseRoleSuffix(entry: MicrocosmReleaseEntry): string {
   return "";
 }
 
-// Keep an immutable production default distinct from a live latest pointer.
+// The empty selection follows the dashboard manifest; explicit ids remain
+// historical release selections.
 export function releaseSelectOptions(
   data?: MicrocosmReleasesResponse,
 ): { value: string; label: string }[] {
   const releases = data?.releases ?? [];
   const defaultId = data?.default_release_id ?? data?.latest_release_id;
   const selectedDefault = releases.find((r) => r.release_id === defaultId);
-  const defaultLabel = data?.selection_mode === "pinned_production"
-    ? "Production default (pinned)"
-    : data ? "Latest" : "Default release";
+  const defaultLabel = data ? "Latest" : "Default release";
   return [
     {
       value: "",
@@ -858,29 +950,15 @@ export function releaseSelectOptions(
   ];
 }
 
-// Unreleased staging candidates (countries with the staging capability),
-// reviewable with the same pages as a release under a `staging:` selection.
-export function candidateSelectOptions(
-  country: Country,
-  data?: MicrocosmStagingRunsResponse,
-): { value: string; label: string }[] {
-  if (!hasCapability(country, "staging")) return [];
-  return (data?.runs ?? []).map((run) => ({
-    value: stagingSelectionFor(run.run_id),
-    label: `candidate · ${releaseLabel(run.run_id, run.updated_at)}${
-      run.status && run.status !== "completed" ? ` (${run.status})` : ""
-    }`,
-  }));
-}
-
 export function useMicrocosm(release?: string) {
   const { country } = useCountry();
   return useQuery({
     queryKey: ["microcosm", country, release ?? "latest"],
     queryFn: () =>
       apiGet<MicrocosmResponse>("/microcosm", { release: release || undefined, country }),
-    // A staging candidate's diagnostics can still change while its run lives.
-    staleTime: isStagingSelection(release) ? 30 * 1000 : PUBLISHED_RELEASE_STALE_TIME_MS,
+    staleTime: release
+      ? PUBLISHED_RELEASE_STALE_TIME_MS
+      : LATEST_RELEASE_STALE_TIME_MS,
   });
 }
 
@@ -935,32 +1013,10 @@ export function useMicrocosmTargetTreemap(release?: string, breakdown?: "program
         breakdown: breakdown || undefined,
         country,
       }),
-    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
+    staleTime: release
+      ? PUBLISHED_RELEASE_STALE_TIME_MS
+      : LATEST_RELEASE_STALE_TIME_MS,
   });
-}
-
-function explorerApiParams(
-  state: ExplorerState,
-): Record<string, string | string[]> {
-  const result: Record<string, string | string[]> = {
-    breakdown: state.breakdown,
-    geography_level: state.filters.geographyLevels,
-    geography: state.filters.geographies,
-    fit_band: state.filters.fitBands,
-    status: state.filters.calibrationStatuses,
-  };
-  if (state.path.source && state.path.program) {
-    result.source = state.path.source;
-    result.program = state.path.program;
-    for (const dimension of state.path.dimensions) {
-      result[`dim.${dimension.key}`] = dimension.value;
-    }
-    if (state.path.target) result.target = state.path.target;
-  }
-  if (state.path.geography) {
-    result.path_geography = state.path.geography;
-  }
-  return result;
 }
 
 export function useMicrocosmCalibrationTree(
@@ -968,46 +1024,542 @@ export function useMicrocosmCalibrationTree(
   source: MicrocosmCalibrationTreeSource,
 ) {
   const { country } = useCountry();
-  return useQuery<CalibrationTreeResponse>({
-    ...microcosmCalibrationTreeQueryOptions(state, source, country),
-    placeholderData: source.kind === "release" ? keepPreviousData : undefined,
+  const releaseQuery = usePublishedCalibrationTree(
+    state,
+    source.kind === "release" ? source.release : undefined,
+    country,
+    source.kind === "release",
+  );
+  const stagingQuery = useQuery({
+    ...microcosmStagingCalibrationTreeQueryOptions(
+      state,
+      source.kind === "staging" ? source.runId : "",
+      country,
+    ),
+    enabled: source.kind === "staging",
+    placeholderData: keepPreviousData,
   });
+  return source.kind === "staging"
+    ? {
+        ...stagingQuery,
+        filtersReady: true,
+        targetDetailIsLoading: false,
+        targetDetailError: null,
+        retryTargetDetail: () => {},
+      }
+    : releaseQuery;
 }
 
 export type MicrocosmCalibrationTreeSource =
   | { kind: "release"; release?: string }
   | { kind: "staging"; runId: string };
 
-export function microcosmCalibrationTreeQueryOptions(
-  state: ExplorerState,
-  source: MicrocosmCalibrationTreeSource,
+export async function fetchCalibrationTreePartsConcurrently<T>(
+  parts: readonly T[],
+  fetchPart: (part: T) => Promise<unknown>,
+): Promise<void> {
+  await Promise.all(parts.map((part) => fetchPart(part)));
+}
+
+export function microcosmCalibrationTreeIndexQueryOptions(
+  release: string | undefined,
   country: Country,
 ) {
-  const staging = source.kind === "staging";
-  const sourceId = staging ? source.runId : source.release ?? "latest";
   return {
     queryKey: [
       "microcosm",
-      ...(staging ? ["staging", "target-tree"] : ["target-tree"]),
+      "calibration-tree-part",
       country,
-      sourceId,
-      state,
+      release ?? "latest",
+      "index",
     ],
-    queryFn: () =>
-      apiGet<CalibrationTreeResponse>(
-        staging
-          ? "/microcosm/staging/target-tree"
-          : "/microcosm/target-tree",
-        {
-          ...explorerApiParams(state),
-          ...(staging
-            ? { run: source.runId }
-            : { release: source.release || undefined }),
+    queryFn: async (): Promise<CalibrationTreeIndexArtifact> => {
+      const index = parseCalibrationTreeIndex(await apiGet<unknown>("/microcosm/tree", {
+        release: release || undefined,
+        country,
+        part: "index",
+      }));
+      if (index.country !== country) {
+        throw new Error("Calibration tree index country does not match the request.");
+      }
+      return index;
+    },
+    staleTime: release
+      ? PUBLISHED_RELEASE_STALE_TIME_MS
+      : LATEST_RELEASE_STALE_TIME_MS,
+  };
+}
+
+function calibrationTreePartQueryOptions(
+  country: Country,
+  buildArtifactId: string,
+  part: Exclude<CalibrationTreePart, "index">,
+  request: {
+    endpoint?: string;
+    queryKeyPrefix?: string;
+    params?: Record<string, string>;
+  } = {},
+) {
+  const endpoint = request.endpoint ?? "/microcosm/tree";
+  const queryKeyPrefix = request.queryKeyPrefix ?? "calibration-tree-part";
+  return {
+    queryKey: [
+      "microcosm",
+      queryKeyPrefix,
+      country,
+      buildArtifactId,
+      part,
+    ],
+    queryFn: async (): Promise<CalibrationTreeArtifactPart> => {
+      const artifact = parseCalibrationTreePart(await apiGet<unknown>(endpoint, {
+        ...request.params,
+        country,
+        build: buildArtifactId,
+        part,
+      }), part);
+      if (
+        artifact.country !== country ||
+        artifact.buildArtifactId !== buildArtifactId
+      ) {
+        throw new Error(`Calibration tree part ${part} does not match the request.`);
+      }
+      return artifact;
+    },
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
+  };
+}
+
+export function microcosmComparisonTargetDetailQueryOptions(
+  country: Country,
+  buildArtifactId: string,
+  targetOrdinal: number,
+) {
+  return {
+    queryKey: [
+      "microcosm",
+      "calibration-comparison-target-detail",
+      country,
+      buildArtifactId,
+      targetOrdinal,
+    ],
+    queryFn: async (): Promise<CalibrationTreeComparisonTargetDetailResponse> => {
+      const detail = parseCalibrationTreeComparisonTargetDetail(
+        await apiGet<unknown>("/microcosm/comparison-tree/target-detail", {
           country,
-        },
+          build: buildArtifactId,
+          target: targetOrdinal,
+        }),
+      );
+      if (
+        detail.country !== country ||
+        detail.buildArtifactId !== buildArtifactId ||
+        detail.targetOrdinal !== targetOrdinal
+      ) {
+        throw new Error("Calibration comparison target detail does not match the request.");
+      }
+      return detail;
+    },
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
+  };
+}
+
+const DEFAULT_CALIBRATION_TREE_PART_REQUEST = {};
+
+function useCalibrationTreeBundle(
+  state: ExplorerState,
+  country: Country,
+  enabled: boolean,
+  indexQueryOptions: {
+    queryKey: readonly unknown[];
+    queryFn: () => Promise<CalibrationTreeIndexArtifact>;
+    staleTime: number;
+  },
+  partRequest: {
+    endpoint?: string;
+    queryKeyPrefix?: string;
+    params?: Record<string, string>;
+  } = DEFAULT_CALIBRATION_TREE_PART_REQUEST,
+) {
+  const queryClient = useQueryClient();
+  const indexQuery = useQuery({
+    ...indexQueryOptions,
+    enabled,
+  });
+  const index = indexQuery.data;
+  const buildArtifactId = index?.buildArtifactId ?? "";
+  const eagerDescriptors = useMemo(
+    () => index
+      ? [
+          index.parts.filterIndex,
+          ...index.parts.targetSummaries,
+          ...index.parts.tiers,
+        ]
+      : [],
+    [index],
+  );
+  const eagerQueries = useQueries({
+    queries: eagerDescriptors.map((descriptor) => ({
+      ...calibrationTreePartQueryOptions(
+        country,
+        buildArtifactId,
+        descriptor.part,
+        partRequest,
       ),
-    staleTime: staging ? 30 * 1000 : PUBLISHED_RELEASE_STALE_TIME_MS,
-    refetchInterval: staging ? 30 * 1000 : (false as const),
+      enabled: false,
+    })),
+  });
+  const loadedParts = new Map(
+    eagerQueries.flatMap((query) =>
+      query.data ? [[query.data.part, query.data] as const] : [],
+    ),
+  );
+  const loadedTiers = (index?.parts.tiers ?? []).flatMap((descriptor) => {
+    const artifact = loadedParts.get(descriptor.part);
+    return artifact?.part.startsWith("tier-")
+      ? [artifact as CalibrationTreeTierArtifact]
+      : [];
+  });
+  const loadedFilterIndex = loadedParts.get("filter-index");
+  const filterIndex = loadedFilterIndex?.part === "filter-index"
+    ? loadedFilterIndex as CalibrationTreeFilterIndexArtifact
+    : undefined;
+  const targetSummaries = (index?.parts.targetSummaries ?? []).flatMap(
+    (descriptor) => {
+      const artifact = loadedParts.get(descriptor.part);
+      return artifact?.part.startsWith("target-summary-")
+        ? [artifact as CalibrationTreeTargetSummaryArtifact]
+        : [];
+    },
+  );
+  const summariesComplete = Boolean(index) &&
+    targetSummaries.length === index!.parts.targetSummaries.length;
+  const targetSummaryVersion = index?.parts.targetSummaries.map((descriptor) => {
+    const queryIndex = eagerDescriptors.findIndex(
+      (candidate) => candidate.part === descriptor.part,
+    );
+    return eagerQueries[queryIndex]?.dataUpdatedAt ?? 0;
+  }).join(":") ?? "";
+  const targetSummaryResult = useMemo(() => {
+    if (!index || !summariesComplete) {
+      return { targets: undefined, error: null };
+    }
+    try {
+      return {
+        targets: calibrationTreeTargetsFromSummaries(index, targetSummaries),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        targets: undefined,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    }
+  // React Query preserves each artifact reference until its cached data changes.
+  // The update-time signature avoids rebuilding a potentially large target array
+  // on unrelated explorer-state renders.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, summariesComplete, targetSummaryVersion]);
+
+  useEffect(() => {
+    if (!enabled || !index) return;
+    void fetchCalibrationTreePartsConcurrently(
+      eagerDescriptors,
+      (descriptor) => queryClient.fetchQuery(
+        calibrationTreePartQueryOptions(
+          country,
+          index.buildArtifactId,
+          descriptor.part,
+          partRequest,
+        ),
+      ),
+    ).catch(() => {
+      // Each React Query observer retains its own error. Starting every request
+      // first ensures that one failed part does not prevent the browser from
+      // completing other requests that are already in flight.
+    });
+  }, [country, eagerDescriptors, enabled, index, partRequest, queryClient]);
+
+  const targetsById = useMemo(
+    () => new Map(
+      (targetSummaryResult.targets ?? []).map((target, targetOrdinal) => [
+        target.id,
+        { target, targetOrdinal },
+      ]),
+    ),
+    [targetSummaryResult.targets],
+  );
+  const selectedTarget = state.path.target
+    ? targetsById.get(state.path.target)
+    : undefined;
+  let detailDescriptor:
+    | CalibrationTreeIndexArtifact["parts"]["targetDetails"][number]
+    | undefined;
+  let detailLocationError: Error | null = null;
+  if (state.path.target && summariesComplete && !selectedTarget) {
+    detailLocationError = new Error(
+      `Calibration target ${state.path.target} is missing from the target-summary shards.`,
+    );
+  } else if (
+    selectedTarget &&
+    index?.parts.targetDetailStrategy === "shards"
+  ) {
+    try {
+      detailDescriptor = calibrationTreeTargetDetailSelection(
+        index,
+        selectedTarget.targetOrdinal,
+      ).descriptor;
+    } catch (error) {
+      detailDescriptor = undefined;
+      detailLocationError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+  const targetDetailQueryDefinitions: Array<
+    ReturnType<typeof calibrationTreePartQueryOptions>
+  > = detailDescriptor && enabled
+    ? [
+        calibrationTreePartQueryOptions(
+          country,
+          buildArtifactId,
+          detailDescriptor.part,
+          partRequest,
+        ),
+      ]
+    : [];
+  const targetDetailQueries = useQueries({ queries: targetDetailQueryDefinitions });
+  const targetDetailQuery = targetDetailQueries[0];
+  const fetchedTargetDetailShard = targetDetailQuery?.data?.part.startsWith("target-details-")
+    ? targetDetailQuery.data as CalibrationTreeTargetDetailsArtifact
+    : undefined;
+  const targetDetailRangeError = fetchedTargetDetailShard && detailDescriptor && (
+    fetchedTargetDetailShard.part !== detailDescriptor.part ||
+    fetchedTargetDetailShard.startTargetOrdinal !== detailDescriptor.startTargetOrdinal ||
+    fetchedTargetDetailShard.endTargetOrdinalExclusive !==
+      detailDescriptor.endTargetOrdinalExclusive
+  )
+    ? new Error(`Calibration tree part ${detailDescriptor.part} has an unexpected target range.`)
+    : null;
+  const targetDetailShard = targetDetailRangeError
+    ? undefined
+    : fetchedTargetDetailShard;
+  const comparisonTargetOrdinal =
+    index?.parts.targetDetailStrategy === "source-targets" && selectedTarget
+      ? selectedTarget.targetOrdinal
+      : -1;
+  const comparisonTargetDetailQuery = useQuery({
+    ...microcosmComparisonTargetDetailQueryOptions(
+      country,
+      buildArtifactId,
+      comparisonTargetOrdinal,
+    ),
+    enabled: enabled && comparisonTargetOrdinal >= 0,
+  });
+  const comparisonTargetDetail = comparisonTargetDetailQuery.data;
+  const comparisonTargetDetailError =
+    comparisonTargetDetail && selectedTarget &&
+    comparisonTargetDetail.targetId !== selectedTarget.target.id
+      ? new Error("Calibration comparison target detail does not match its summary.")
+      : null;
+  const data = index
+    ? calibrationTreeResponseFromBundle(
+        {
+          index,
+          tiers: loadedTiers,
+          filterIndex,
+          targetSummaries: targetSummaryResult.targets,
+          targetDetailShard,
+          selectedTargetDetail: comparisonTargetDetail && !comparisonTargetDetailError
+            ? {
+                targetOrdinal: comparisonTargetDetail.targetOrdinal,
+                target: comparisonTargetDetail.target,
+              }
+            : undefined,
+        },
+        state,
+      ) ?? undefined
+    : undefined;
+  const criticalPartError = eagerQueries.find((query, queryIndex) => {
+    const part = eagerDescriptors[queryIndex]?.part;
+    return query.error &&
+      (part === "filter-index" || part?.startsWith("target-summary-"));
+  })?.error;
+  const tierError = eagerQueries.find((query, queryIndex) =>
+    query.error && eagerDescriptors[queryIndex]?.part.startsWith("tier-"),
+  )?.error;
+  const error = indexQuery.error ||
+    targetSummaryResult.error ||
+    criticalPartError ||
+    (!data && tierError) ||
+    null;
+  const targetDetailError =
+    detailLocationError ||
+    targetDetailRangeError ||
+    comparisonTargetDetailError ||
+    targetDetailQuery?.error ||
+    comparisonTargetDetailQuery.error ||
+    null;
+
+  return {
+    index,
+    data,
+    error,
+    isLoading: indexQuery.isLoading || (Boolean(index) && !data && !error),
+    isFetching:
+      indexQuery.isFetching ||
+      eagerQueries.some((query) => query.isFetching),
+    isPlaceholderData: false,
+    filtersReady: Boolean(filterIndex && summariesComplete),
+    targetDetailIsLoading:
+      Boolean(state.path.target) &&
+      !targetDetailError &&
+      (
+        !summariesComplete ||
+        Boolean(detailDescriptor && !targetDetailShard) ||
+        Boolean(comparisonTargetOrdinal >= 0 && !comparisonTargetDetail)
+      ),
+    targetDetailError,
+    retryTargetDetail: () => {
+      void targetDetailQuery?.refetch();
+      if (comparisonTargetOrdinal >= 0) {
+        void comparisonTargetDetailQuery.refetch();
+      }
+    },
+  };
+}
+
+function usePublishedCalibrationTree(
+  state: ExplorerState,
+  release: string | undefined,
+  country: Country,
+  enabled: boolean,
+) {
+  const indexQueryOptions = useMemo(
+    () => microcosmCalibrationTreeIndexQueryOptions(release, country),
+    [country, release],
+  );
+  return useCalibrationTreeBundle(
+    state,
+    country,
+    enabled,
+    indexQueryOptions,
+  );
+}
+
+export function microcosmComparisonTreeIndexQueryOptions(
+  currentBuildArtifactId: string,
+  candidateBuildArtifactId: string,
+  mode: TargetChangeMode,
+  country: Country,
+) {
+  return {
+    queryKey: [
+      "microcosm",
+      "calibration-comparison-tree",
+      country,
+      currentBuildArtifactId,
+      candidateBuildArtifactId,
+      mode,
+      "index",
+    ],
+    queryFn: async (): Promise<CalibrationTreeIndexArtifact> => {
+      const index = parseCalibrationTreeIndex(
+        await apiGet<unknown>("/microcosm/comparison-tree", {
+          country,
+          a: currentBuildArtifactId,
+          b: candidateBuildArtifactId,
+          mode,
+          part: "index",
+        }),
+      );
+      if (
+        index.country !== country ||
+        index.build.kind !== "comparison" ||
+        index.comparison?.currentBuildArtifactId !== currentBuildArtifactId ||
+        index.comparison.candidateBuildArtifactId !== candidateBuildArtifactId ||
+        index.comparison.mode !== mode
+      ) {
+        throw new Error("Calibration comparison index does not match the request.");
+      }
+      return index;
+    },
+    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
+  };
+}
+
+export function useMicrocosmBuildComparisonTree({
+  currentBuildArtifactId,
+  candidateBuildArtifactId,
+  mode,
+  state,
+  enabled = true,
+}: {
+  currentBuildArtifactId?: string;
+  candidateBuildArtifactId?: string;
+  mode: TargetChangeMode;
+  state: ExplorerState;
+  enabled?: boolean;
+}) {
+  const { country } = useCountry();
+  const current = currentBuildArtifactId ?? "";
+  const candidate = candidateBuildArtifactId ?? "";
+  const indexQueryOptions = useMemo(
+    () => microcosmComparisonTreeIndexQueryOptions(
+      current,
+      candidate,
+      mode,
+      country,
+    ),
+    [candidate, country, current, mode],
+  );
+  const partRequest = useMemo(() => ({
+    endpoint: "/microcosm/comparison-tree",
+    queryKeyPrefix: "calibration-comparison-tree-part",
+    params: { mode },
+  }), [mode]);
+  const bundle = useCalibrationTreeBundle(
+    state,
+    country,
+    enabled && Boolean(current && candidate),
+    indexQueryOptions,
+    partRequest,
+  );
+  const comparison = bundle.index?.comparison;
+  const selectedTarget = bundle.data?.groups
+    .flatMap((group) => group.nodes)
+    .find((node) => node.kind === "target" && node.id === state.path.target)
+    ?.target as TargetChangeRow | undefined;
+  const data: TargetChangeTreeResponse | undefined =
+    bundle.data && comparison
+      ? {
+          ...bundle.data,
+          available: comparison.available,
+          reason: comparison.reason,
+          mode: comparison.mode,
+          current: comparison.current,
+          candidate: comparison.candidate,
+          methodology: comparison.methodology,
+          matching: comparison.matching,
+          summary: comparison.summary,
+          selectedTarget: selectedTarget ?? null,
+        }
+      : undefined;
+  return { ...bundle, data };
+}
+
+export function microcosmStagingCalibrationTreeQueryOptions(
+  state: ExplorerState,
+  runId: string,
+  country: Country,
+) {
+  return {
+    queryKey: ["microcosm", "staging", "target-tree", country, runId, state],
+    queryFn: () =>
+      apiGet<CalibrationTreeResponse>("/microcosm/staging/target-tree", {
+        ...explorerApiParams(state),
+        run: runId,
+        country,
+      }),
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
   };
 }
 

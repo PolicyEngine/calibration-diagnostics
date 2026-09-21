@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { MicrocosmTargetsView } from "@/components/microcosm/microcosm-targets-view";
+import { publishedReleaseSelection } from "@/lib/microcosm/calibration-selection";
 import { parseCountry } from "@/lib/microcosm/countries";
 
 interface MicrocosmTargetsPageProps {
@@ -25,7 +26,7 @@ export default async function MicrocosmTargetsPage({
         initialSource={rawSource ?? ""}
         initialLevel={rawLevel ?? ""}
         initialCountry={parseCountry(rawCountry)}
-        initialRelease={rawRelease ?? ""}
+        initialRelease={publishedReleaseSelection(rawRelease)}
         initialStep={rawStart === "explore" ? "pick" : "results"}
       />
     </AppShell>
