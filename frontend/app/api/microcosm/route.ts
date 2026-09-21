@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { stagingRunIdOf } from "@/lib/microcosm/calibration-selection";
+import {
+  isStagingSelection,
+  stagingRunIdOf,
+} from "@/lib/microcosm/calibration-selection";
 import { withBasePath } from "@/lib/base-path";
 
 import {
@@ -33,6 +36,12 @@ export async function GET(request: Request) {
     // same page as a release: its diagnostics come from the run's telemetry
     // or from the dataset bundle the run staged, never from releases/.
     const stagingRunId = stagingRunIdOf(release);
+    if (isStagingSelection(release) && stagingRunId == null) {
+      return NextResponse.json(
+        { detail: "A staging selection must include a run id." },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
     if (stagingRunId != null) {
       const cal = await loadSelectedCalibration(release, 0, country);
       const staging = stagingRepository(country);
