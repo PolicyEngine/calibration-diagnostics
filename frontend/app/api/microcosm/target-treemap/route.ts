@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 
 import {
   classifyApiError,
-  loadRelease,
   parseCountry,
   microcosmTargetTreemap,
   scrub,
 } from "@/lib/microcosm/latest-artifact";
+import { isStagingSelection } from "@/lib/microcosm/calibration-selection";
+import { loadSelectedCalibration } from "@/lib/microcosm/staging-artifact";
 
 export const revalidate = 21_600;
 export const runtime = "nodejs";
@@ -19,7 +20,10 @@ export async function GET(request: Request) {
   const rawBreakdown = params.get("breakdown");
   const breakdown = rawBreakdown === "geography" ? "geography" : "program";
   try {
-    const cal = await loadRelease(release, revalidate, country);
+    // A staging candidate (`staging:<run_id>`) is reviewed like a release; its
+    // diagnostics can still change, so it is never cached.
+    const staged = isStagingSelection(release);
+    const cal = await loadSelectedCalibration(release, staged ? 0 : revalidate, country);
     return NextResponse.json(
       scrub(
         microcosmTargetTreemap(
@@ -29,6 +33,7 @@ export async function GET(request: Request) {
           cal.target_loss_attribution.status !== "unavailable",
         ),
       ),
+      staged ? { headers: { "Cache-Control": "no-store" } } : undefined,
     );
   } catch (error) {
     const { status, body } = classifyApiError(error);

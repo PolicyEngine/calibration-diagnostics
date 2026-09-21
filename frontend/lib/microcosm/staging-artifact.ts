@@ -16,6 +16,11 @@ import {
 } from "@/lib/microcosm/latest-artifact";
 import { countryRegistration, hasCapability } from "@/lib/microcosm/countries";
 import {
+  STAGING_CALIBRATION_UNAVAILABLE_DETAIL,
+  StagingCalibrationUnavailableError,
+  stagingRunIdOf,
+} from "@/lib/microcosm/calibration-selection";
+import {
   type ReformValidation,
   buildReformValidation,
 } from "@/lib/microcosm/reforms";
@@ -724,6 +729,27 @@ export async function loadStagingCalibration(
     "huggingface_live",
     diagnostics?.sha256 ?? null,
   );
+}
+
+// Resolve a dashboard selection to its calibration: a published release id
+// through the release loader, or `staging:<run_id>` through the staging
+// loaders (a telemetry diagnostics artifact, else the run's staged bundle), so
+// the release pages review an unreleased candidate unchanged. A candidate
+// without diagnostics is a 404, not an upstream failure.
+export async function loadSelectedCalibration(
+  selection: string,
+  revalidate: number,
+  country: MicrocosmCountry = "us",
+): Promise<Calibration> {
+  const runId = stagingRunIdOf(selection);
+  if (runId == null) return loadRelease(selection, revalidate, country);
+  const unavailable = stagingUnavailableReason(country);
+  if (unavailable) throw new StagingCalibrationUnavailableError(unavailable);
+  const calibration = await loadStagingCalibration(runId, revalidate, country);
+  if (!calibration) {
+    throw new StagingCalibrationUnavailableError(STAGING_CALIBRATION_UNAVAILABLE_DETAIL);
+  }
+  return calibration;
 }
 
 export async function loadStagingTargetChangeDataset(

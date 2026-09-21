@@ -524,13 +524,18 @@ function usePrefetchCalibrationLevels({
 
 export function CalibrationExplorerDataPrefetch({
   release,
+  stagingRunId,
 }: {
   release?: string;
+  stagingRunId?: string;
 }) {
   const [state] = useState(createExplorerState);
   const source = useMemo<MicrocosmCalibrationTreeSource>(
-    () => ({ kind: "release", release }),
-    [release],
+    () =>
+      stagingRunId
+        ? { kind: "staging", runId: stagingRunId }
+        : { kind: "release", release },
+    [release, stagingRunId],
   );
   const { data, isPlaceholderData } = useMicrocosmCalibrationTree(state, source);
   usePrefetchCalibrationLevels({

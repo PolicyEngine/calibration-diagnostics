@@ -7,10 +7,11 @@ import {
 import { calibrationTreeRequestState } from "@/lib/microcosm/calibration-tree-request";
 import {
   classifyApiError,
-  loadRelease,
   parseCountry,
   scrub,
 } from "@/lib/microcosm/latest-artifact";
+import { isStagingSelection } from "@/lib/microcosm/calibration-selection";
+import { loadSelectedCalibration } from "@/lib/microcosm/staging-artifact";
 
 export const revalidate = 21_600;
 export const runtime = "nodejs";
@@ -21,7 +22,10 @@ export async function GET(request: Request) {
   const release = params.get("release") ?? "latest";
   const country = parseCountry(params.get("country"));
   try {
-    const calibration = await loadRelease(release, revalidate, country);
+    // A staging candidate (`staging:<run_id>`) is reviewed like a release; its
+    // diagnostics can still change, so it is never cached.
+    const staged = isStagingSelection(release);
+    const calibration = await loadSelectedCalibration(release, staged ? 0 : revalidate, country);
     const state = calibrationTreeRequestState(params);
     return NextResponse.json(
       scrub(
@@ -33,6 +37,7 @@ export async function GET(request: Request) {
           calibration.calibration_provenance,
         ),
       ),
+      staged ? { headers: { "Cache-Control": "no-store" } } : undefined,
     );
   } catch (error) {
     const { status, body } = classifyApiError(error);
