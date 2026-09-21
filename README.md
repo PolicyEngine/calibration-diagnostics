@@ -29,11 +29,14 @@ separate service layer — the Next.js API routes are the API layer.
 - **Compare versions** (`/microcosm/compare`) — diff two releases: targets matched
   by name, common targets get a fit change, and added/removed targets are
   surfaced.
-- **Staging runs** (`/microcosm/staging`) — monitor pre-release US Microcosm build
-  runs from the staging Hub repo: current stage, calibration loss progress,
-  final candidate diagnostics once uploaded, candidate-vs-current-release fit,
-  and a hierarchical map of weighted target-error increases and reductions.
-  Countries without a staging repository show an explicit unavailable state.
+- **Staging runs** (`/microcosm/staging`) — monitor pre-release Microcosm build
+  runs from a country's staging Hub repo: current stage, calibration loss
+  progress, final candidate diagnostics once they exist (uploaded with the
+  telemetry, or read from the dataset bundle the run staged under
+  `staged/<run_id>/` in the release repository), candidate-vs-current-release
+  fit, and a hierarchical map of weighted target-error increases and
+  reductions. Countries without a staging repository show an explicit
+  unavailable state.
 - **Calibration target investigations** (`docs/ai/`) — tool-independent procedures,
   specialist review responsibilities, and a reusable checklist for identifying
   the cause of a discrepant target from release artifacts and relevant source
@@ -53,7 +56,7 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 | `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks |
 | `GET /api/microcosm/compare?a=<id>&b=<id>` | Version-over-version diff |
 | `GET /api/microcosm/staging/runs` | List staging build runs |
-| `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and uploaded candidate diagnostics |
+| `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and its candidate diagnostics: an uploaded `calibration_diagnostics` telemetry artifact, or the `calibration_diagnostics.json` of the dataset bundle the run staged under `staged/<run_id>/` in the country's release repository (read at the commit the run recorded, digest-verified) |
 | `GET /api/microcosm/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
 | `GET /api/microcosm/staging/compare?run=<run_id>&release=latest` | Diff staging candidate against a published release |
 | `GET /api/microcosm/staging/target-change-tree?run=<run_id>&release=<resolved_id>&mode=reported\|shared&...` | One hierarchy level of weighted target-error changes for a staging candidate and an explicit current release |

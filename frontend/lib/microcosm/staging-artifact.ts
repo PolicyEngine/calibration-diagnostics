@@ -9,8 +9,10 @@ import {
   buildComparison,
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
+  loadCountryRepositoryHashedJson,
   loadRelease,
   microcosmCountryGeography,
+  microcosmRepo,
 } from "@/lib/microcosm/latest-artifact";
 import { countryRegistration, hasCapability } from "@/lib/microcosm/countries";
 import {
@@ -560,6 +562,98 @@ export async function loadStagingRuns(
   };
 }
 
+// A build that staged its finished dataset bundle records where it went in a
+// reviewed `staged_dataset` telemetry artifact: the release repository, the
+// `staged/<run_id>/` prefix, the commit and every file's digest. The bundle's
+// `calibration_diagnostics.json` is the same per-target artifact a release
+// carries, so an unreleased candidate can be inspected through the same views.
+const STAGED_BUNDLE_DIAGNOSTICS_FILE = "calibration_diagnostics.json";
+const STAGED_BUNDLE_LANDED = new Set(["uploaded", "already_staged"]);
+const STAGED_BUNDLE_PREFIX = /^staged\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const GIT_COMMIT_SHA = /^[0-9a-f]{40}$/;
+const SHA_256_HEX = /^[0-9a-f]{64}$/;
+
+async function loadStagedBundleCalibration(
+  runId: string,
+  runManifest: JsonObject | null,
+  progress: JsonObject | null,
+  candidateReleaseId: string,
+  revalidate: number,
+  country: MicrocosmCountry,
+): Promise<Calibration | null> {
+  const artifacts = objectOrNull(runManifest?.artifacts);
+  const stagedArtifact = objectOrNull(artifacts?.staged_dataset);
+  const receiptPath = stringValue(stagedArtifact?.staging_path);
+  if (!receiptPath) return null;
+  const receipt = await stagingHashedJsonOrNull(receiptPath, revalidate, country);
+  if (!receipt) return null;
+  if (receipt.sha256 !== stringValue(stagedArtifact?.sha256)) {
+    throw new IncompatibleStagingDataError(
+      "artifact staged_dataset digest does not match its run manifest declaration.",
+    );
+  }
+  const delivery = receipt.payload;
+  // A skipped, failed or disabled staging leaves nothing to read.
+  if (!STAGED_BUNDLE_LANDED.has(String(delivery.status))) return null;
+  if (stringValue(delivery.run_id) !== runId) {
+    throw new IncompatibleStagingDataError("staged dataset receipt names another run.");
+  }
+  const repository = stringValue(delivery.repository);
+  const prefix = stringValue(delivery.prefix);
+  const revision = stringValue(delivery.revision);
+  if (!repository || !prefix || !revision) {
+    throw new IncompatibleStagingDataError(
+      "staged dataset receipt is missing its repository, prefix or revision.",
+    );
+  }
+  // The release credential is only ever sent to the country's registered
+  // release repository, never to a repository a telemetry file names.
+  if (repository !== microcosmRepo(country)) {
+    throw new IncompatibleStagingDataError(
+      `staged dataset repository ${repository} is not ${microcosmCountryGeography(country)}'s ` +
+        "registered release repository; staged bundles are read only from there.",
+    );
+  }
+  if (!STAGED_BUNDLE_PREFIX.test(prefix) || prefix !== `staged/${runId}`) {
+    throw new IncompatibleStagingDataError("staged dataset prefix is not staged/<run_id>.");
+  }
+  if (!GIT_COMMIT_SHA.test(revision)) {
+    throw new IncompatibleStagingDataError("staged dataset revision is not a commit sha.");
+  }
+  const files = objectOrNull(delivery.files);
+  const declared = objectOrNull(files?.[STAGED_BUNDLE_DIAGNOSTICS_FILE]);
+  const expectedDigest = stringValue(declared?.sha256);
+  // A bundle without calibration diagnostics (a spine, say) has no target view.
+  if (!expectedDigest || !SHA_256_HEX.test(expectedDigest)) return null;
+  const diagnostics = await loadCountryRepositoryHashedJson(
+    `${prefix}/${STAGED_BUNDLE_DIAGNOSTICS_FILE}`,
+    revalidate,
+    country,
+    revision,
+  );
+  if (!diagnostics) {
+    throw new IncompatibleStagingDataError(
+      `staged bundle ${prefix} records ${STAGED_BUNDLE_DIAGNOSTICS_FILE} but the file is absent at revision ${revision}.`,
+    );
+  }
+  if (diagnostics.sha256 !== expectedDigest) {
+    throw new IncompatibleStagingDataError(
+      `staged bundle ${STAGED_BUNDLE_DIAGNOSTICS_FILE} does not match the digest the run recorded.`,
+    );
+  }
+  return buildCalibration(
+    diagnostics.payload,
+    candidateReleaseId,
+    stringValue(progress?.updated_at),
+    {},
+    {},
+    {},
+    country,
+    "huggingface_staged_bundle",
+    diagnostics.sha256,
+  );
+}
+
 export async function loadStagingCalibration(
   runId: string,
   revalidate: number,
@@ -585,7 +679,18 @@ export async function loadStagingCalibration(
     runManifest?.schema_version === 2
       ? stringValue(diagnosticsArtifact?.staging_path)
       : `runs/${runId}/calibration_diagnostics.json`;
-  if (!diagnosticsPath) return null;
+  if (!diagnosticsPath) {
+    // No telemetry diagnostics artifact: a run that staged its dataset bundle
+    // carries the same diagnostics there.
+    return loadStagedBundleCalibration(
+      runId,
+      runManifest,
+      progress,
+      candidateReleaseId,
+      revalidate,
+      country,
+    );
+  }
   const diagnostics =
     runManifest?.schema_version === 2
       ? await stagingHashedJsonOrNull(diagnosticsPath, revalidate, country)

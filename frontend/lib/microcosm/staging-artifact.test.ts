@@ -112,9 +112,12 @@ const originalFetch = globalThis.fetch;
 const originalUkRepo = process.env.POPULACE_UK_STAGING_HF_REPO;
 const originalUkRevision = process.env.POPULACE_UK_STAGING_HF_REVISION;
 const originalUkToken = process.env.POPULACE_UK_STAGING_HF_TOKEN;
+const originalHfToken = process.env.HF_TOKEN;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  if (originalHfToken == null) delete process.env.HF_TOKEN;
+  else process.env.HF_TOKEN = originalHfToken;
   if (originalUkRepo == null) delete process.env.POPULACE_UK_STAGING_HF_REPO;
   else process.env.POPULACE_UK_STAGING_HF_REPO = originalUkRepo;
   if (originalUkRevision == null) delete process.env.POPULACE_UK_STAGING_HF_REVISION;
@@ -724,4 +727,195 @@ test("rejects a successful non-array repository tree response", async () => {
   await expect(loadStagingRuns(0, "uk")).rejects.toThrow(
     /Incompatible staging data: runs tree response must be an array/,
   );
+});
+
+// --- staged dataset bundles (unreleased candidates) -------------------------
+
+const STAGED_RUN_ID = "uk-frs-calibration-attempt-20260920T170811Z-ce339e7c";
+const STAGED_REVISION = "40439a3f8d241cd361bb693488b42e7258623a00";
+const UK_RELEASE_REPO = "policyengine/populace-uk-private";
+
+function stagedDatasetReceipt(
+  runId: string,
+  diagnosticsSha256: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    contract_version: 1,
+    run_id: runId,
+    status: "uploaded",
+    mode: "local_and_remote",
+    repository: UK_RELEASE_REPO,
+    prefix: `staged/${runId}`,
+    revision: STAGED_REVISION,
+    error_code: null,
+    opt_out_reason: null,
+    files: {
+      "calibration_diagnostics.json": { bytes: 1, sha256: diagnosticsSha256 },
+      "microcosm_uk_2024_25.h5": { bytes: 1, sha256: "0".repeat(64) },
+    },
+    ...overrides,
+  };
+}
+
+function stagedRun(
+  runId: string,
+  receipt: Record<string, unknown>,
+): { manifest: Record<string, unknown>; receiptBody: string } {
+  const receiptBody = JSON.stringify(receipt);
+  const manifest = {
+    ...v2RunManifest(runId, "2026-09-20T17:16:00+00:00"),
+    operation_id: "uk_national_calibration",
+    pipeline: { id: "uk-frs-calibration", version: "2026.09" },
+    run_kind: "calibration",
+    artifacts: [
+      {
+        logical_name: "staged_dataset",
+        artifact_kind: "build_metadata",
+        contract_relative_path: "artifacts/staged_dataset.json",
+        media_type: "application/json",
+        sha256: createHash("sha256").update(receiptBody).digest("hex"),
+        classification: "non_row_level",
+      },
+    ],
+  };
+  return { manifest, receiptBody };
+}
+
+function stagedBundleFetch(
+  runId: string,
+  manifest: Record<string, unknown>,
+  receiptBody: string,
+  bundleBody: string | null,
+  requested: { url: string; authorization: string | null }[],
+): typeof fetch {
+  return (async (input, init) => {
+    const url = String(input);
+    requested.push({ url, authorization: new Headers(init?.headers).get("Authorization") });
+    if (url.endsWith(`/runs/${runId}/run_manifest.json`)) return Response.json(manifest);
+    if (url.endsWith(`/runs/${runId}/artifacts/staged_dataset.json`)) {
+      return new Response(receiptBody, { headers: { "Content-Type": "application/json" } });
+    }
+    if (
+      bundleBody != null &&
+      url ===
+        `https://huggingface.co/datasets/${UK_RELEASE_REPO}/resolve/${STAGED_REVISION}/staged/${runId}/calibration_diagnostics.json`
+    ) {
+      return new Response(bundleBody, { headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+}
+
+test("reads an unreleased candidate's calibration diagnostics from its staged bundle", async () => {
+  process.env.POPULACE_UK_STAGING_HF_TOKEN = "hf_test_staging_token";
+  process.env.HF_TOKEN = "hf_test_release_token";
+  const diagnostics = serializedDiagnostics();
+  const { manifest, receiptBody } = stagedRun(
+    STAGED_RUN_ID,
+    stagedDatasetReceipt(STAGED_RUN_ID, diagnostics.sha256),
+  );
+  const requested: { url: string; authorization: string | null }[] = [];
+  globalThis.fetch = stagedBundleFetch(
+    STAGED_RUN_ID,
+    manifest,
+    receiptBody,
+    diagnostics.body,
+    requested,
+  );
+
+  const calibration = await loadStagingCalibration(STAGED_RUN_ID, 0, "uk");
+  const detail = await loadStagingRun(STAGED_RUN_ID, 0, "uk");
+
+  expect(calibration?.source).toBe("huggingface_staged_bundle");
+  expect(calibration?.release_id).toBe(`${STAGED_RUN_ID}-candidate`);
+  expect(calibration?.rows).toHaveLength(1);
+  expect(calibration?.rows[0]?.final_estimate).toBe(95);
+  expect(detail.has_calibration).toBe(true);
+  expect(detail.calibration).not.toBeNull();
+  // The bundle is read at the commit the run recorded, with the release
+  // credential; the telemetry files keep the staging credential; the legacy
+  // runs/<id>/calibration_diagnostics.json path is never tried.
+  const bundle = requested.filter((r) => r.url.includes(`/resolve/${STAGED_REVISION}/`));
+  // Once per loader call above; the same pinned URL both times.
+  expect(new Set(bundle.map((r) => r.url))).toEqual(
+    new Set([
+      `https://huggingface.co/datasets/${UK_RELEASE_REPO}/resolve/${STAGED_REVISION}/staged/${STAGED_RUN_ID}/calibration_diagnostics.json`,
+    ]),
+  );
+  expect(bundle.length).toBeGreaterThan(0);
+  expect(bundle.every((r) => r.authorization === "Bearer hf_test_release_token")).toBe(true);
+  expect(
+    requested
+      .filter((r) => r.url.includes("populace-uk-staging"))
+      .every((r) => r.authorization === "Bearer hf_test_staging_token"),
+  ).toBe(true);
+  expect(
+    requested.some((r) => r.url.endsWith(`/runs/${STAGED_RUN_ID}/calibration_diagnostics.json`)),
+  ).toBe(false);
+  expect(JSON.stringify(detail)).not.toContain("hf_test_");
+});
+
+test("a run whose dataset staging was skipped has no calibration to inspect", async () => {
+  const diagnostics = serializedDiagnostics();
+  const { manifest, receiptBody } = stagedRun(
+    STAGED_RUN_ID,
+    stagedDatasetReceipt(STAGED_RUN_ID, diagnostics.sha256, {
+      status: "skipped",
+      repository: null,
+      revision: null,
+      files: {},
+    }),
+  );
+  const requested: { url: string; authorization: string | null }[] = [];
+  globalThis.fetch = stagedBundleFetch(STAGED_RUN_ID, manifest, receiptBody, null, requested);
+
+  expect(await loadStagingCalibration(STAGED_RUN_ID, 0, "uk")).toBeNull();
+  expect((await loadStagingRun(STAGED_RUN_ID, 0, "uk")).has_calibration).toBe(false);
+  expect(requested.some((r) => r.url.includes(UK_RELEASE_REPO))).toBe(false);
+});
+
+test("rejects a staged bundle whose diagnostics bytes do not match the recorded digest", async () => {
+  const diagnostics = serializedDiagnostics();
+  const { manifest, receiptBody } = stagedRun(
+    STAGED_RUN_ID,
+    stagedDatasetReceipt(STAGED_RUN_ID, "f".repeat(64)),
+  );
+  globalThis.fetch = stagedBundleFetch(STAGED_RUN_ID, manifest, receiptBody, diagnostics.body, []);
+
+  await expect(loadStagingCalibration(STAGED_RUN_ID, 0, "uk")).rejects.toThrow(
+    "does not match the digest the run recorded",
+  );
+});
+
+test("never sends the release credential to a repository the telemetry names", async () => {
+  process.env.HF_TOKEN = "hf_test_release_token";
+  const diagnostics = serializedDiagnostics();
+  const { manifest, receiptBody } = stagedRun(
+    STAGED_RUN_ID,
+    stagedDatasetReceipt(STAGED_RUN_ID, diagnostics.sha256, {
+      repository: "someone-else/not-the-release-repository",
+    }),
+  );
+  const requested: { url: string; authorization: string | null }[] = [];
+  globalThis.fetch = stagedBundleFetch(STAGED_RUN_ID, manifest, receiptBody, diagnostics.body, requested);
+
+  await expect(loadStagingCalibration(STAGED_RUN_ID, 0, "uk")).rejects.toThrow(
+    "registered release repository",
+  );
+  expect(requested.some((r) => r.url.includes("someone-else"))).toBe(false);
+});
+
+test("a staged bundle without calibration diagnostics has no target view", async () => {
+  const { manifest, receiptBody } = stagedRun(
+    STAGED_RUN_ID,
+    stagedDatasetReceipt(STAGED_RUN_ID, "0".repeat(64), {
+      files: { "spine.h5": { bytes: 1, sha256: "0".repeat(64) } },
+    }),
+  );
+  const requested: { url: string; authorization: string | null }[] = [];
+  globalThis.fetch = stagedBundleFetch(STAGED_RUN_ID, manifest, receiptBody, null, requested);
+
+  expect(await loadStagingCalibration(STAGED_RUN_ID, 0, "uk")).toBeNull();
+  expect(requested.some((r) => r.url.includes(UK_RELEASE_REPO))).toBe(false);
 });
