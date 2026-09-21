@@ -7,7 +7,7 @@ before modifying code or external storage.
 
 ## Establish scope and authorization
 
-1. Confirm the requested country, source kind, source ID, and exact Hugging Face commit.
+1. Confirm the requested country and whether release or staging history is in scope.
 2. Distinguish tree schema 6 from unrelated Microcosm artifact schemas.
 3. Treat Blob deletion, manifest updates, workflow dispatch, and publication as
    external state changes. Obtain explicit user authorization when the request
@@ -16,18 +16,21 @@ before modifying code or external storage.
 
 ## Inspect the source and current publication
 
-1. Resolve the release or finalized staging run to an immutable Hugging Face commit.
-2. Verify that the source directory contains calibration diagnostics and any
-   referenced manifests.
-3. Read `calibration-trees/manifest.json` and the selected `index.json.gz` when they
-   exist.
-4. Confirm that the country, source ID, build artifact ID, commit, source digests, and schema version
-   agree before drawing conclusions.
+1. Enumerate release directories plus immutable tags, or enumerate finalized
+   staging runs at an exact staging commit.
+2. Read `calibration-trees/manifest.json` and list the country's Blob prefix.
+3. For every existing source alias, decompress its `index.json.gz`; compare the
+   manifest digest and raw size, parse its country and build ID, and confirm
+   every referenced file exists with its declared gzip size.
+4. Treat a missing index or referenced file as repairable. Stop on a changed or
+   malformed index, identity mismatch, or compressed-size mismatch.
+5. Report a finalized run or release without diagnostics as ineligible. Stop if
+   a source declares diagnostics that are absent or have the wrong digest.
 
 ## Build and validate
 
-1. Run the publisher for an exact release or use its test helpers without
-   changing Blob storage.
+1. Run the appropriate reconciliation with `--dry-run` to avoid changing Blob
+   storage. Existing complete builds must be reported without rebuilding them.
 2. Confirm target ordinals cover `0` through `targetCount - 1`.
 3. For release and staging builds, confirm summary and detail descriptors each
    cover all target ordinals with contiguous, non-overlapping ranges. For
@@ -56,13 +59,20 @@ would assign different immutable paths to the same release.
    `latestReleaseBuildArtifactId` only when upstream `latest.json` still names
    the same release and commit.
 5. For staging publication, include only `passed`, `published`, or `completed`
-   runs and verify the staging branch remains at the webhook commit.
+   runs from the exact webhook commit.
 6. Report the source ID, build artifact ID, commit, part count, and measured sizes without reporting
    credentials.
 
-Release webhooks publish the affected release. Staging webhooks scan finalized
-successful runs. Run historical release backfill only when the user explicitly
-requests it.
+Every release webhook reconciles the full enumerated release history. Every
+staging webhook reconciles all finalized runs at that webhook commit. A complete
+entry is audited and skipped; only missing entries or missing files are built.
+There is no scheduled reconciliation, so the next webhook repairs omissions
+from an earlier failed or missed publication.
+
+US and UK must use the same resolver and publisher. Verify both direct staging
+diagnostics and UK staged-dataset receipts in tests, then run authenticated dry
+runs for both countries. Fix and repeat until both inventories complete without
+country-specific publication code.
 
 ## Replace pre-production artifacts
 

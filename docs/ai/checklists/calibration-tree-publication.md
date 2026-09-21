@@ -2,10 +2,13 @@
 
 ## Before building
 
-- [ ] Country, source kind, and source ID are explicit.
-- [ ] Hugging Face revision resolves to an exact commit.
+- [ ] Country and release/staging source kind are explicit.
+- [ ] Release tags resolve to exact commits, or staging inventory uses the exact webhook commit.
 - [ ] Required private-repository access works without exposing `HF_TOKEN`.
 - [ ] Source files and digests come from the same commit.
+- [ ] The manifest contains at most one build for each release ID or staging run ID.
+- [ ] Existing indexes match their manifest digest, raw size, country, and build ID.
+- [ ] Every index-referenced file exists with its declared gzip size.
 
 ## Bundle validation
 
@@ -29,7 +32,11 @@
 - [ ] Every upload passes gzip decompression and read-back verification.
 - [ ] The current upstream release still matches before manifest promotion.
 - [ ] Finalized staging publication includes only successful final statuses.
-- [ ] No historical backfill runs without an explicit request.
+- [ ] Complete builds are skipped before their diagnostics are loaded or their bundles are constructed.
+- [ ] Missing files are repaired only when the reconstructed index digest matches the manifest.
+- [ ] Missing or digest-mismatched declared diagnostics fail publication.
+- [ ] Sources with no diagnostics are reported as ineligible.
+- [ ] US and UK dry runs both use the shared resolver and publisher successfully.
 
 ## Deletion
 

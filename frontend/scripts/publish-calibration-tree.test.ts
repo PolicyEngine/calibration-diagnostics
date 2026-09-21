@@ -13,7 +13,7 @@ import { emptyCalibrationTreeManifest } from "../lib/microcosm/calibration-tree-
 
 const originalFetch = globalThis.fetch;
 
-test("publisher accepts latest, immutable release, backfill, and staging modes", () => {
+test("publisher accepts exact and historical reconciliation modes", () => {
   expect(parsePublisherOptions(["--country", "us", "--latest"])).toEqual({
     country: "us",
     mode: "latest",

@@ -121,14 +121,19 @@ removed targets read only the source side that exists.
 ```text
 release repository update
   -> POST <basePath>/api/hf-webhook
-  -> GitHub workflow_dispatch
-  -> resolve the release to an exact Hugging Face commit
-  -> fetch and hash source files at that commit
-  -> compile and validate schema-6 parts
-  -> upload filter postings, summary shards, detail shards, tiers, then index
-  -> add the build to manifest.json
-  -> update latestReleaseBuildArtifactId only if upstream latest is unchanged
+  -> one GitHub workflow_dispatch per webhook delivery
+  -> enumerate the union of release directories and immutable repository tags
+  -> resolve every eligible release to an exact Hugging Face commit
+  -> audit the existing Blob build for each release
+  -> skip complete builds without downloading their diagnostics
+  -> build and upload only missing builds or missing files
+  -> update latestReleaseBuildArtifactId from upstream latest.json
 ```
+
+A release directory or tag without calibration diagnostics is reported as
+ineligible and is not treated as an error. The next repository webhook repeats
+the inventory check, so it also finds a historical release missed by an older
+webhook. There is no scheduled reconciliation.
 
 ### Finalized staging builds
 
@@ -136,14 +141,30 @@ release repository update
 staging repository main-branch update
   -> POST <basePath>/api/hf-webhook
   -> GitHub workflow_dispatch with event_kind=staging
-  -> scan successful final statuses: passed, published, completed
-  -> fetch each run from the exact webhook commit
-  -> compile, validate, upload, and add immutable staging builds to manifest.json
-  -> verify the staging branch did not advance during publication
+  -> scan the exact webhook commit for passed, published, and completed runs
+  -> audit the existing Blob build for each finalized run
+  -> skip complete builds before reading their diagnostics
+  -> resolve either direct staging diagnostics or a staged-dataset receipt
+  -> build and upload only missing builds or missing files
 ```
 
 Active or failed staging runs remain on the live 30-second API path. Historical
-release backfill is never started by a webhook.
+staging runs with no calibration diagnostics are reported as ineligible. A
+declared diagnostics file that is missing or has the wrong digest fails the
+workflow.
+
+US and UK staging use the same inventory, source-normalization, build,
+validation, and Blob publication functions. Country registration supplies the
+repository and credential name. UK staging reads use
+`POPULACE_UK_STAGING_HF_TOKEN`; if a UK run points to a staged dataset in the UK
+release repository, that second read uses `HF_TOKEN`.
+
+For an existing manifest entry, the audit decompresses `index.json.gz`, checks
+its raw byte count and SHA-256 digest against the manifest, parses its country
+and build ID, and confirms that every file referenced by the index exists with
+the recorded compressed byte count. A missing index or referenced file is
+repairable. A changed index, malformed index, wrong identity, or compressed-size
+mismatch fails without overwriting immutable data.
 
 Set the GitHub repository variable `CALIBRATION_TREE_BUILD_ENABLED=FALSE` to
 disable both automated release and finalized-staging publication.
@@ -228,19 +249,31 @@ Never use a `NEXT_PUBLIC_` prefix for these values.
 5. Configure the same webhook secret on every release and staging Hugging Face
    repository.
 
-## Historical regeneration
+## Historical reconciliation
 
-Regeneration reads existing immutable Hugging Face artifacts; it does not rerun
-calibration:
+Reconciliation reads existing immutable Hugging Face artifacts; it does not
+rerun calibration. Use `--dry-run` to perform the inventory, audits, and any
+required in-memory builds without writing Blob data:
 
 ```sh
 cd frontend
-bun run publish:calibration-tree -- --country us --backfill
-bun run publish:calibration-tree -- --country uk --backfill
-bun run publish:calibration-tree -- --country be --backfill
-bun run publish:calibration-tree -- --country us --staging-finalized
-bun run publish:calibration-tree -- --country uk --staging-finalized
+bun run publish:calibration-tree -- --country us --reconcile-releases --dry-run
+bun run publish:calibration-tree -- --country uk --reconcile-releases --dry-run
+bun run publish:calibration-tree -- --country be --reconcile-releases --dry-run
+bun run publish:calibration-tree -- --country us --reconcile-staging --dry-run
+bun run publish:calibration-tree -- --country uk --reconcile-staging --dry-run
 ```
+
+Remove `--dry-run` to publish. For staging, an automated invocation also passes
+`--sha <webhook-commit>` so inventory and source files come from one immutable
+repository state. The GitHub workflow exposes the same `dry_run` option for an
+authenticated verification using Actions secrets.
+
+Each outcome is `complete`, `published`, `repaired`, or `ineligible`.
+`complete` means no bundle construction or source-diagnostics download occurred.
+`repaired` means the publisher deterministically rebuilt an existing identity
+and restored only missing files. Any reconstructed index must match the digest
+already recorded in the manifest.
 
 `CALIBRATION_TREE_MAX_RAW_BYTES` defaults to 100,000,000 bytes per file, in
 addition to the fixed summary- and detail-shard limits.
