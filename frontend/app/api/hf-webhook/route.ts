@@ -11,9 +11,9 @@ export const runtime = "nodejs";
 // Push endpoint — must run on every call, never served from cache.
 export const dynamic = "force-dynamic";
 
-// Hugging Face calls this endpoint for repository changes. New release tags
-// publish immutable tree artifacts; updates to the repository's main branch
-// re-read latest.json and advance the dashboard manifest when appropriate.
+// Hugging Face calls this endpoint for repository changes. A release or
+// staging update starts reconciliation of every eligible immutable source, so
+// a later delivery also repairs artifacts missed by an earlier delivery.
 interface UpdatedRef {
   ref: string;
   oldSha: string | null;
@@ -113,7 +113,6 @@ async function dispatchTreeBuild(input: TreeBuildDispatch): Promise<void> {
           event_kind: input.eventKind,
           release_id: input.releaseId ?? "",
           hf_commit_sha: input.hfCommitSha,
-          backfill: false,
         },
       }),
       signal: AbortSignal.timeout(15_000),
@@ -162,24 +161,25 @@ export async function POST(request: Request) {
   const { country } = registration;
 
   const dispatches: TreeBuildDispatch[] = registration.kind === "staging"
-    ? mainUpdates.map((updatedRef) => ({
+    ? mainUpdates.slice(-1).map((updatedRef) => ({
         country,
         eventKind: "staging" as const,
         hfCommitSha: updatedRef.newSha!,
       }))
-    : [
-        ...newTagRefs.map((updatedRef) => ({
+    : (() => {
+        const tagUpdate = newTagRefs.at(-1);
+        const mainUpdate = mainUpdates.at(-1);
+        const trigger = tagUpdate ?? mainUpdate;
+        if (!trigger) return [];
+        return [{
           country,
-          eventKind: "tag" as const,
-          releaseId: updatedRef.ref.slice(TAG_PREFIX.length),
-          hfCommitSha: updatedRef.newSha!,
-        })),
-        ...mainUpdates.map((updatedRef) => ({
-          country,
-          eventKind: "branch" as const,
-          hfCommitSha: updatedRef.newSha!,
-        })),
-      ];
+          eventKind: tagUpdate ? "tag" as const : "branch" as const,
+          ...(tagUpdate
+            ? { releaseId: tagUpdate.ref.slice(TAG_PREFIX.length) }
+            : {}),
+          hfCommitSha: trigger.newSha!,
+        }];
+      })();
   try {
     for (const dispatch of dispatches) await dispatchTreeBuild(dispatch);
   } catch (error) {

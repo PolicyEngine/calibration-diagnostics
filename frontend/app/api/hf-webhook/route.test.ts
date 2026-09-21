@@ -79,7 +79,7 @@ test("webhook acknowledges unrelated repositories without dispatching", async ()
   expect(fetched).toBe(false);
 });
 
-test("webhook dispatches tag and main-branch events to the publisher workflow", async () => {
+test("webhook coalesces tag and main-branch changes into one reconciliation", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   replaceFetch(async (
     input: string | URL | Request,
@@ -107,14 +107,15 @@ test("webhook dispatches tag and main-branch events to the publisher workflow", 
   }));
 
   expect(response.status).toBe(200);
-  expect(calls).toHaveLength(2);
+  expect(calls).toHaveLength(1);
   expect(calls[0].url).toContain(
     "/PolicyEngine/calibration-diagnostics/actions/workflows/publish-calibration-tree.yml/dispatches",
   );
   expect(calls[0].init.headers).toMatchObject({
     Authorization: "Bearer test-github-token",
   });
-  expect(JSON.parse(String(calls[0].init.body))).toMatchObject({
+  const dispatch = JSON.parse(String(calls[0].init.body));
+  expect(dispatch).toMatchObject({
     ref: "main",
     inputs: {
       country: "us",
@@ -123,17 +124,10 @@ test("webhook dispatches tag and main-branch events to the publisher workflow", 
       hf_commit_sha: tagSha,
     },
   });
-  expect(JSON.parse(String(calls[1].init.body))).toMatchObject({
-    inputs: {
-      country: "us",
-      event_kind: "branch",
-      release_id: "",
-      hf_commit_sha: branchSha,
-    },
-  });
+  expect(dispatch.inputs).not.toHaveProperty("backfill");
 });
 
-test("staging repository updates dispatch finalized-build publication", async () => {
+test("staging repository updates dispatch finalized-build reconciliation", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   replaceFetch(async (input, init) => {
     calls.push({ url: String(input), init: init ?? {} });

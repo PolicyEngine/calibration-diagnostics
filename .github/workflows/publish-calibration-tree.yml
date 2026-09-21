@@ -19,18 +19,13 @@ on:
           - branch
           - staging
       release_id:
-        description: Immutable Hugging Face release tag; omit to publish latest
+        description: Hugging Face release tag that triggered reconciliation
         required: false
         type: string
       hf_commit_sha:
-        description: Expected Hugging Face tag commit
+        description: Hugging Face commit that triggered reconciliation
         required: false
         type: string
-      backfill:
-        description: Publish every release that contains calibration diagnostics
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -60,21 +55,11 @@ jobs:
           set -euo pipefail
           args=(--country "${{ inputs.country }}")
           if [[ "${{ inputs.event_kind }}" == "staging" ]]; then
-            args+=(--staging-finalized)
-            if [[ -n "${{ inputs.hf_commit_sha }}" ]]; then
-              args+=(--sha "${{ inputs.hf_commit_sha }}")
-            fi
-          elif [[ "${{ inputs.backfill }}" == "true" ]]; then
-            args+=(--backfill)
-          elif [[ -n "${{ inputs.release_id }}" ]]; then
-            args+=(--release "${{ inputs.release_id }}")
+            args+=(--reconcile-staging)
             if [[ -n "${{ inputs.hf_commit_sha }}" ]]; then
               args+=(--sha "${{ inputs.hf_commit_sha }}")
             fi
           else
-            args+=(--latest)
-            if [[ -n "${{ inputs.hf_commit_sha }}" ]]; then
-              args+=(--sha "${{ inputs.hf_commit_sha }}")
-            fi
+            args+=(--reconcile-releases)
           fi
           bun run publish:calibration-tree -- "${args[@]}"
