@@ -29,6 +29,14 @@ const nextConfig: NextConfig = {
     // pre-rename `/populace` slug both bare and under the mount.
     return [
       ...apiAliases,
+      // The app's own domain root has nothing under it once mounted; send it
+      // to the mounted dashboard instead of a 404.
+      {
+        source: "/",
+        destination: `${BASE_PATH}/microcosm`,
+        basePath: false,
+        permanent: false,
+      },
       {
         source: "/api/microcosm_variable",
         destination: `${BASE_PATH}/api/microcosm_variable`,

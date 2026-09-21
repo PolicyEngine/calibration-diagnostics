@@ -143,6 +143,14 @@ export function readHierarchyTarget(row: JsonObject): HierarchyTargetIdentity {
   };
 }
 
+// Two publishers may spell one label with different capitalisation or
+// surrounding whitespace (ONS "Yorkshire and the Humber", MHCLG "Yorkshire
+// and The Humber" for region E12000003); that is one label, and the first
+// spelling seen is kept. A different wording is still a conflict.
+function labelIdentity(label: string): string {
+  return label.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function requireConsistentLabel(
   labels: Map<string, string>,
   id: string,
@@ -150,13 +158,13 @@ function requireConsistentLabel(
   kind: string,
 ): void {
   const existing = labels.get(id);
-  if (existing != null && existing !== label) {
+  if (existing != null && labelIdentity(existing) !== labelIdentity(label)) {
     throw new Error(
       `Schema 8 ${kind} ${id} has inconsistent labels: ` +
         `${existing} and ${label}.`,
     );
   }
-  labels.set(id, label);
+  if (existing == null) labels.set(id, label);
 }
 
 /** Require stable labels for every repeated hierarchy identifier in a file. */
