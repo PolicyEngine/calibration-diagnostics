@@ -323,6 +323,12 @@ test("schema 8 preserves the complete producer-authored hierarchy", () => {
     structured_dimensions: false,
     target_representation: "hierarchy",
   });
+  expect(cal.hierarchy_label_variants).toEqual([]);
+  expect(latestMicrocosmCalibrationSummary(cal).label_variants).toEqual({
+    count: 0,
+    entries: 0,
+    examples: [],
+  });
   expect(cal.rows[0]).toMatchObject({
     family: "obr/obr.efo_receipts",
     source: "obr",
@@ -2908,4 +2914,67 @@ test("the artifact's national geography label shapes rows without a geography", 
 test("the target page reports scope target counts for the release", () => {
   expect(page("").scope_counts).toEqual({ healthcare: 0 });
   expect(page("?scope=healthcare").scope_counts).toEqual({ healthcare: 0 });
+});
+
+
+test("schema 8 keeps the first spelling of an identifier two publishers label differently", () => {
+  const target = (
+    name: string,
+    provider: string,
+    geographyLabel: string,
+  ) => ({
+    name: `${name}@2025`,
+    target_name: name,
+    source: `${provider} citation`,
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 101,
+    hierarchy: {
+      provider: { id: provider, label: provider.toUpperCase() },
+      category: { id: `${provider}.count`, label: "Count", provider_id: provider },
+      geography: { id: "E06000001", label: geographyLabel, level: "local_authority" },
+      dimensions: [
+        {
+          id: "geography",
+          label: "Geography",
+          value_id: "e06000001",
+          value_label: geographyLabel,
+        },
+      ],
+      target: { id: name, label: `${name} target` },
+    },
+  });
+  const cal = buildCalibration(
+    {
+      schema_version: 8,
+      targets: [
+        target("hmrc.count", "hmrc", "Hartlepool UA"),
+        target("ons.count", "ons", "Hartlepool"),
+      ],
+    },
+    "schema-8-variants",
+  );
+
+  expect(cal.rows).toHaveLength(2);
+  expect(cal.hierarchy_label_variants).toEqual([
+    {
+      kind: "geography",
+      id: "local_authority E06000001",
+      labels: ["Hartlepool UA", "Hartlepool"],
+    },
+    {
+      kind: "dimension value",
+      id: "geography=e06000001",
+      labels: ["Hartlepool UA", "Hartlepool"],
+    },
+  ]);
+  // One identifier, varying as a geography and again as its dimension value.
+  expect(latestMicrocosmCalibrationSummary(cal).label_variants).toEqual({
+    count: 1,
+    entries: 2,
+    examples: [
+      'geography local_authority E06000001: "Hartlepool UA" · "Hartlepool"',
+      'dimension value geography=e06000001: "Hartlepool UA" · "Hartlepool"',
+    ],
+  });
 });

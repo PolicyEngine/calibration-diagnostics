@@ -22,7 +22,9 @@ separate service layer — the Next.js API routes are the API layer.
   release (or any release via `?release=`). The release picker also lists a
   country's staging candidates; selecting one (`?release=staging:<run_id>`)
   reviews that unreleased run with the same page, calibration map, and target
-  diagnostics, flagged as a candidate.
+  diagnostics, flagged as a candidate. An identifier that publishers label
+  differently (HMRC "Hartlepool UA", ONS "Hartlepool") is reported, not
+  refused: the first spelling is shown and the count surfaces on the page.
 - **Target diagnostics** (`/microcosm/targets`) — browse the calibration target
   surface by the quantity each constraint measures (e.g. *adjusted gross income*),
   then drill its breakdown dimensions (income band x return type x filing status,

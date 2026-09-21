@@ -130,7 +130,11 @@ describe("schema 8 hierarchy target reader", () => {
     ).toThrow("hierarchy.target.label");
   });
 
-  test("accepts labels that differ only in case or whitespace for one id", () => {
+  test("a file with one spelling per identifier reports no variants", () => {
+    expect(validateHierarchyTargets([row(), row()])).toEqual({ label_variants: [] });
+  });
+
+  test("labels that differ only in case or whitespace are one spelling", () => {
     const first = row();
     first.hierarchy.geography = {
       id: "E12000003",
@@ -143,20 +147,24 @@ describe("schema 8 hierarchy target reader", () => {
       label: " Yorkshire and The  Humber ",
       level: "region",
     };
-    expect(() => validateHierarchyTargets([first, second])).not.toThrow();
-    const third = row();
-    third.hierarchy.geography = {
-      id: "E12000003",
-      label: "Yorkshire",
-      level: "region",
-    };
-    expect(() => validateHierarchyTargets([first, third])).toThrow(
-      "geography region\u0000E12000003 has inconsistent labels",
-    );
+    expect(validateHierarchyTargets([first, second]).label_variants).toEqual([]);
   });
 
-  test("rejects conflicting labels for repeated ids across a file", () => {
-    expect(() =>
+  test("keeps the first spelling and reports an identifier two publishers label differently", () => {
+    const hmrc = row();
+    hmrc.hierarchy.geography = { id: "E06000001", label: "Hartlepool UA", level: "local_authority" };
+    const ons = row();
+    ons.hierarchy.geography = { id: "E06000001", label: "Hartlepool", level: "local_authority" };
+    const dwp = row();
+    dwp.hierarchy.geography = { id: "E06000001", label: "hartlepool", level: "local_authority" };
+    expect(validateHierarchyTargets([hmrc, ons, dwp]).label_variants).toEqual([
+      {
+        kind: "geography",
+        id: "local_authority E06000001",
+        labels: ["Hartlepool UA", "Hartlepool"],
+      },
+    ]);
+    expect(
       validateHierarchyTargets([
         row(),
         {
@@ -166,8 +174,14 @@ describe("schema 8 hierarchy target reader", () => {
             provider: { id: "obr", label: "Conflicting OBR label" },
           },
         },
-      ]),
-    ).toThrow("provider obr has inconsistent labels");
+      ]).label_variants,
+    ).toEqual([
+      {
+        kind: "provider",
+        id: "obr",
+        labels: ["Office for Budget Responsibility", "Conflicting OBR label"],
+      },
+    ]);
   });
 
   test("rejects a category reused under a different provider", () => {
@@ -179,29 +193,45 @@ describe("schema 8 hierarchy target reader", () => {
     );
   });
 
-  test("rejects conflicting Chronicle-owned labels across rows", () => {
+  test("reports every kind of Chronicle-owned label that varies across rows", () => {
     const geography = row();
     geography.hierarchy.geography.label = "Conflicting geography";
-    expect(() => validateHierarchyTargets([row(), geography])).toThrow(
-      "geography country",
-    );
+    expect(validateHierarchyTargets([row(), geography]).label_variants).toEqual([
+      {
+        kind: "geography",
+        id: "country K02000001",
+        labels: ["United Kingdom", "Conflicting geography"],
+      },
+    ]);
 
     const dimension = row();
     dimension.hierarchy.dimensions[0].label = "Conflicting dimension";
-    expect(() => validateHierarchyTargets([row(), dimension])).toThrow(
-      "dimension obr.efo_line",
-    );
+    expect(validateHierarchyTargets([row(), dimension]).label_variants).toEqual([
+      {
+        kind: "dimension",
+        id: "obr.efo_line",
+        labels: ["Economic and fiscal outlook line", "Conflicting dimension"],
+      },
+    ]);
 
     const dimensionValue = row();
     dimensionValue.hierarchy.dimensions[0].value_label = "Conflicting value";
-    expect(() => validateHierarchyTargets([row(), dimensionValue])).toThrow(
-      "dimension value obr.efo_line",
-    );
+    expect(validateHierarchyTargets([row(), dimensionValue]).label_variants).toEqual([
+      {
+        kind: "dimension value",
+        id: "obr.efo_line=income_tax",
+        labels: ["Income tax (gross of tax credits)", "Conflicting value"],
+      },
+    ]);
 
     const target = row();
     target.hierarchy.target.label = "Conflicting target";
-    expect(() => validateHierarchyTargets([row(), target])).toThrow(
-      "target obr.income_tax",
-    );
+    expect(validateHierarchyTargets([row(), target]).label_variants).toEqual([
+      {
+        kind: "target",
+        id: "obr.income_tax",
+        labels: ["Income tax receipts", "Conflicting target"],
+      },
+    ]);
   });
 });

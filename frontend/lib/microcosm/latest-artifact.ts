@@ -15,6 +15,7 @@ import { StagingCalibrationUnavailableError } from "@/lib/microcosm/calibration-
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
 import {
   readHierarchyTarget,
+  type HierarchyLabelVariant,
   validateHierarchyTargets,
 } from "./hierarchy-target-reader";
 import {
@@ -1794,6 +1795,9 @@ export interface Calibration {
   target_loss_basis: JsonObject | null;
   target_loss_attribution: FinalTargetLossAttribution;
   calibration_provenance: CalibrationProvenance;
+  // Identifiers this file labels more than one way across publishers (schema
+  // 8 hierarchy files only); the first spelling is the one shown.
+  hierarchy_label_variants: HierarchyLabelVariant[];
   build_manifest: JsonObject;
   release_manifest: JsonObject;
   // demographics.json geography_coverage: unweighted household-record counts
@@ -2019,9 +2023,10 @@ export function buildCalibration(
   const targets = (Array.isArray(diag.targets) ? (diag.targets as TargetRow[]) : []).map(
     normalizeDiagnosticsRow,
   );
-  if (targetRepresentation === "hierarchy") {
-    validateHierarchyTargets(targets);
-  }
+  const hierarchyLabelVariants =
+    targetRepresentation === "hierarchy"
+      ? validateHierarchyTargets(targets).label_variants
+      : [];
   const skipped = Array.isArray(diag.skipped) ? (diag.skipped as JsonObject[]) : [];
   const targetCompilation = asObject(asObject(buildManifest.gates).target_compilation);
   const droppedTargetNames = Array.isArray(targetCompilation.dropped_target_names)
@@ -2095,6 +2100,7 @@ export function buildCalibration(
     included_target_count: includedTargetCount,
     diagnostics_build: asObject(diag.build),
     diagnostic_warnings: normalizedAttribution.attribution.producer_warnings,
+    hierarchy_label_variants: hierarchyLabelVariants,
     target_loss_basis: Object.keys(asObject(diag.target_loss_basis)).length
       ? asObject(diag.target_loss_basis)
       : null,
@@ -2721,6 +2727,27 @@ function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
 }
 
 // --- shaped outputs ---------------------------------------------------------
+const LABEL_VARIANT_EXAMPLES = 5;
+
+// One identifier can vary as a geography and again as the matching dimension
+// value; the count is over distinct identifiers (the trailing id token), the
+// examples prefer the geography, provider, category and target kinds.
+export function hierarchyLabelVariantSummary(variants: HierarchyLabelVariant[]) {
+  const identifiers = new Set(
+    variants.map((variant) => variant.id.split(/[\s=]/).pop()?.toLowerCase() ?? variant.id),
+  );
+  const ordered = [...variants].sort(
+    (a, b) => Number(a.kind === "dimension value") - Number(b.kind === "dimension value"),
+  );
+  return {
+    count: identifiers.size,
+    entries: variants.length,
+    examples: ordered
+      .slice(0, LABEL_VARIANT_EXAMPLES)
+      .map((variant) => `${variant.kind} ${variant.id}: ${variant.labels.map((l) => `"${l}"`).join(" · ")}`),
+  };
+}
+
 export function latestMicrocosmCalibrationSummary(cal: Calibration) {
   return {
     available: true,
@@ -2749,6 +2776,7 @@ export function latestMicrocosmCalibrationSummary(cal: Calibration) {
     dropped_target_count: cal.dropped_target_names.length,
     included_target_count: cal.included_target_count,
     calibration_provenance: cal.calibration_provenance,
+    label_variants: hierarchyLabelVariantSummary(cal.hierarchy_label_variants),
     target_loss_attribution: targetLossAttributionSummary(cal.target_loss_attribution),
     total_targets: cal.rows.length,
     within_tolerance_count: withinToleranceCount(cal.rows),

@@ -271,6 +271,9 @@ export interface MicrocosmCalibration {
   dropped_target_count?: number;
   included_target_count?: number;
   calibration_provenance?: CalibrationProvenance;
+  // Identifiers this file labels more than one way across publishers; the
+  // first spelling is shown. Absent on responses that predate the field.
+  label_variants?: { count: number; entries: number; examples: string[] };
   target_loss_attribution?: {
     status: MicrocosmTargetLossAttributionStatus;
     aggregate: number | null;

@@ -130,6 +130,8 @@ export function MicrocosmOverviewView({
     data.source_repo,
     cal.country?.repository_visibility,
   );
+  const labelVariantCount = cal.label_variants?.count ?? 0;
+  const labelVariantExamples = (cal.label_variants?.examples ?? []).slice(0, 2);
   const publicationUrl =
     isCandidate && data.staging_run_id
       ? microcosmStagingRunUrl(data.source_repo, data.revision, data.staging_run_id)
@@ -200,6 +202,18 @@ export function MicrocosmOverviewView({
               ? "the dataset bundle the run staged for inspection"
               : "the run's staging telemetry"}
             ; nothing here has been promoted.
+          </p>
+        </div>
+      ) : null}
+
+      {labelVariantCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/80 bg-card px-4 py-3 shadow-[var(--elev-1)]">
+          <StatusPill tone="neutral">Publisher spellings vary</StatusPill>
+          <p className="text-sm text-muted-foreground">
+            {fmt(labelVariantCount, { digits: 0 })} identifier{labelVariantCount === 1 ? " is" : "s are"}{" "}
+            labelled differently by different publishers in this file
+            {labelVariantExamples.length ? ` (for example ${labelVariantExamples.join("; ")})` : ""}.
+            The first spelling is shown; one canonical spelling per identifier is tracked in Chronicle.
           </p>
         </div>
       ) : null}
