@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact, humanizeName, releaseLabel } from "@/components/shared/format";
+import { fmt, fmtCompact, humanizeName } from "@/components/shared/format";
 import {
   selectedReleaseForCountry,
   useCountry,
@@ -17,9 +17,9 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
-import { hasCapability } from "@/lib/microcosm/countries";
 import { sourceLabel } from "@/lib/microcosm/source-label";
 import {
+  candidateSelectOptions,
   releaseSelectOptions,
   useMicrocosmStagingRuns,
   useMicrocosmReleases,
@@ -524,14 +524,7 @@ export function MicrocosmTargetsView({
   const releaseOptions = useMemo(
     () => [
       ...releaseSelectOptions(releaseData),
-      // Candidate staging runs (countries with the staging capability),
-      // reviewable like a release pre-publish.
-      ...(hasCapability(country, "staging") ? (stagingData?.runs ?? []) : []).map((r) => ({
-        value: `staging:${r.run_id}`,
-        label: `candidate · ${releaseLabel(r.run_id, r.updated_at)}${
-          r.status && r.status !== "completed" ? ` (${r.status})` : ""
-        }`,
-      })),
+      ...candidateSelectOptions(country, stagingData),
     ],
     [releaseData, stagingData, country],
   );

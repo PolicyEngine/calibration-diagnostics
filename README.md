@@ -19,7 +19,12 @@ separate service layer — the Next.js API routes are the API layer.
 
 - **Release summary** (`/microcosm`) — calibration fit KPIs, target coverage,
   per-family fit, and worst-fit / biggest-improvement targets, for the current
-  release (or any release via `?release=`).
+  release (or any release via `?release=`). The release picker also lists a
+  country's staging candidates; selecting one (`?release=staging:<run_id>`)
+  reviews that unreleased run with the same page, calibration map, and target
+  diagnostics, flagged as a candidate. An identifier that publishers label
+  differently (HMRC "Hartlepool UA", ONS "Hartlepool") is reported, not
+  refused: the first spelling is shown and the count surfaces on the page.
 - **Target diagnostics** (`/microcosm/targets`) — browse the calibration target
   surface by the quantity each constraint measures (e.g. *adjusted gross income*),
   then drill its breakdown dimensions (income band x return type x filing status,
@@ -52,9 +57,9 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/microcosm/releases` | List published releases (newest first) |
-| `GET /api/microcosm?release=<id>` | Release summary (default: latest) |
-| `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics |
-| `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks |
+| `GET /api/microcosm?release=<id>` | Release summary (default: latest; `staging:<run_id>` reviews an unreleased staging candidate, never cached, 404 until it has diagnostics) |
+| `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics (`release` accepts `staging:<run_id>`) |
+| `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks (`release` accepts `staging:<run_id>`) |
 | `GET /api/microcosm/compare?a=<id>&b=<id>` | Version-over-version diff |
 | `GET /api/microcosm/staging/runs` | List staging build runs |
 | `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and its candidate diagnostics: an uploaded `calibration_diagnostics` telemetry artifact, or the `calibration_diagnostics.json` of the dataset bundle the run staged under `staged/<run_id>/` in the country's release repository (read at the commit the run recorded, digest-verified) |

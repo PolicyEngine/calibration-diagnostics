@@ -143,53 +143,77 @@ export function readHierarchyTarget(row: JsonObject): HierarchyTargetIdentity {
   };
 }
 
-// Two publishers may spell one label with different capitalisation or
-// surrounding whitespace (ONS "Yorkshire and the Humber", MHCLG "Yorkshire
-// and The Humber" for region E12000003); that is one label, and the first
-// spelling seen is kept. A different wording is still a conflict.
+export type HierarchyLabelKind =
+  | "provider"
+  | "category"
+  | "geography"
+  | "dimension"
+  | "dimension value"
+  | "target";
+
+/** One identifier a file labels more than one way. */
+export interface HierarchyLabelVariant {
+  kind: HierarchyLabelKind;
+  id: string;
+  // Distinct spellings in file order; the first is the one the dashboard shows.
+  labels: string[];
+}
+
+export interface HierarchyTargetValidation {
+  label_variants: HierarchyLabelVariant[];
+}
+
+// Chronicle keeps each publisher's own text for a name (chronicle#267: HMRC
+// writes "Hartlepool UA" where ONS writes "Hartlepool", DWP writes "Ynys Môn"
+// where HMRC writes "Ynys Mon"), and Microcosm requires one spelling only
+// within a target's own member facts. A file that spans publishers therefore
+// carries several spellings of one identifier legitimately, so a differing
+// label is reported, never refused: the first spelling seen is kept and the
+// rest are listed for the reader. Capitalisation and whitespace differences
+// (Unicode whitespace, as JS `\s` matches) are one spelling, not a variant.
 function labelIdentity(label: string): string {
   return label.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-function requireConsistentLabel(
-  labels: Map<string, string>,
-  id: string,
-  label: string,
-  kind: string,
-): void {
-  const existing = labels.get(id);
-  if (existing != null && labelIdentity(existing) !== labelIdentity(label)) {
-    throw new Error(
-      `Schema 8 ${kind} ${id} has inconsistent labels: ` +
-        `${existing} and ${label}.`,
-    );
+function recordLabel(labels: Map<string, string[]>, id: string, label: string): void {
+  const spellings = labels.get(id);
+  if (spellings == null) {
+    labels.set(id, [label]);
+    return;
   }
-  if (existing == null) labels.set(id, label);
+  const identity = labelIdentity(label);
+  if (!spellings.some((known) => labelIdentity(known) === identity)) {
+    spellings.push(label);
+  }
 }
 
-/** Require stable labels for every repeated hierarchy identifier in a file. */
-export function validateHierarchyTargets(rows: JsonObject[]): void {
-  const providers = new Map<string, string>();
-  const categories = new Map<string, string>();
+function variantsOf(
+  kind: HierarchyLabelKind,
+  labels: Map<string, string[]>,
+  displayId: (key: string) => string = (key) => key,
+): HierarchyLabelVariant[] {
+  return [...labels.entries()]
+    .filter(([, spellings]) => spellings.length > 1)
+    .map(([key, spellings]) => ({ kind, id: displayId(key), labels: [...spellings] }));
+}
+
+/**
+ * Read every row's hierarchy, refuse structural inconsistencies (a category
+ * under two providers), and report every identifier the file labels more
+ * than one way.
+ */
+export function validateHierarchyTargets(rows: JsonObject[]): HierarchyTargetValidation {
+  const providers = new Map<string, string[]>();
+  const categories = new Map<string, string[]>();
   const categoryProviders = new Map<string, string>();
-  const geographies = new Map<string, string>();
-  const dimensions = new Map<string, string>();
-  const dimensionValues = new Map<string, string>();
-  const targets = new Map<string, string>();
+  const geographies = new Map<string, string[]>();
+  const dimensions = new Map<string, string[]>();
+  const dimensionValues = new Map<string, string[]>();
+  const targets = new Map<string, string[]>();
   for (const row of rows) {
     const identity = readHierarchyTarget(row);
-    requireConsistentLabel(
-      providers,
-      identity.source,
-      identity.sourceLabel,
-      "provider",
-    );
-    requireConsistentLabel(
-      categories,
-      identity.variable,
-      identity.variableLabel,
-      "category",
-    );
+    recordLabel(providers, identity.source, identity.sourceLabel);
+    recordLabel(categories, identity.variable, identity.variableLabel);
     const categoryProvider = categoryProviders.get(identity.variable);
     if (categoryProvider != null && categoryProvider !== identity.source) {
       throw new Error(
@@ -198,31 +222,22 @@ export function validateHierarchyTargets(rows: JsonObject[]): void {
       );
     }
     categoryProviders.set(identity.variable, identity.source);
-    requireConsistentLabel(
-      geographies,
-      `${identity.level}\0${identity.geographyId}`,
-      identity.geography,
-      "geography",
-    );
+    recordLabel(geographies, `${identity.level}\0${identity.geographyId}`, identity.geography);
     for (const dimension of identity.dimensions) {
-      requireConsistentLabel(
-        dimensions,
-        dimension.key,
-        dimension.label,
-        "dimension",
-      );
-      requireConsistentLabel(
-        dimensionValues,
-        `${dimension.key}\0${dimension.value_id}`,
-        dimension.value,
-        "dimension value",
-      );
+      recordLabel(dimensions, dimension.key, dimension.label);
+      recordLabel(dimensionValues, `${dimension.key}\0${dimension.value_id}`, dimension.value);
     }
-    requireConsistentLabel(
-      targets,
-      identity.targetId,
-      identity.targetLabel,
-      "target",
-    );
+    recordLabel(targets, identity.targetId, identity.targetLabel);
   }
+  const joined = (separator: string) => (key: string) => key.split("\0").join(separator);
+  return {
+    label_variants: [
+      ...variantsOf("provider", providers),
+      ...variantsOf("category", categories),
+      ...variantsOf("geography", geographies, joined(" ")),
+      ...variantsOf("dimension", dimensions),
+      ...variantsOf("dimension value", dimensionValues, joined("=")),
+      ...variantsOf("target", targets),
+    ],
+  };
 }

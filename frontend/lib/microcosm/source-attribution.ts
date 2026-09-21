@@ -9,14 +9,18 @@ export interface MicrocosmSourceAttribution {
   href: string | null;
 }
 
+function huggingFaceRepoPath(sourceRepo: string): string {
+  return sourceRepo
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
 export function microcosmPublicationUrl(
   sourceRepo: string,
   releaseId: string,
 ): string {
-  const repoPath = sourceRepo
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
+  const repoPath = huggingFaceRepoPath(sourceRepo);
   return `https://huggingface.co/datasets/${repoPath}/tree/${encodeURIComponent(releaseId)}`;
 }
 
@@ -34,4 +38,15 @@ export function microcosmSourceAttribution(
         ? `https://huggingface.co/datasets/${sourceRepo}`
         : null,
   };
+}
+
+// A staging candidate has no release tag to open; its telemetry folder in the
+// country's staging repository is the inspectable location.
+export function microcosmStagingRunUrl(
+  stagingRepo: string,
+  revision: string,
+  runId: string,
+): string {
+  const repoPath = huggingFaceRepoPath(stagingRepo);
+  return `https://huggingface.co/datasets/${repoPath}/tree/${encodeURIComponent(revision)}/runs/${encodeURIComponent(runId)}`;
 }

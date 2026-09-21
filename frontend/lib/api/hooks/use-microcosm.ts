@@ -13,6 +13,10 @@ import type { TargetChangeMode } from "@/lib/microcosm/target-change";
 import type { TargetChangeTreeApiResponse } from "@/lib/microcosm/target-change-tree";
 import { HOSTED_US_RELEASE } from "@/lib/microcosm/production-release";
 import {
+  isStagingSelection,
+  stagingSelectionFor,
+} from "@/lib/microcosm/calibration-selection";
+import {
   hasCapability,
   type CountryCapability,
   type RepositoryVisibility,
@@ -267,6 +271,9 @@ export interface MicrocosmCalibration {
   dropped_target_count?: number;
   included_target_count?: number;
   calibration_provenance?: CalibrationProvenance;
+  // Identifiers this file labels more than one way across publishers; the
+  // first spelling is shown. Absent on responses that predate the field.
+  label_variants?: { count: number; entries: number; examples: string[] };
   target_loss_attribution?: {
     status: MicrocosmTargetLossAttributionStatus;
     aggregate: number | null;
@@ -321,6 +328,10 @@ export interface MicrocosmResponse {
   repo_type: string;
   revision: string;
   source: "huggingface_live" | string;
+  // `staging_candidate`: an unreleased staging run selected as
+  // `staging:<run_id>`; `staging_run_id` names the run.
+  selection_mode?: "pinned_production" | "latest" | "staging_candidate";
+  staging_run_id?: string | null;
   release_id: string;
   updated_at: string | null;
   source_artifacts: { name: string; path: string; url: string }[];
@@ -847,13 +858,29 @@ export function releaseSelectOptions(
   ];
 }
 
+// Unreleased staging candidates (countries with the staging capability),
+// reviewable with the same pages as a release under a `staging:` selection.
+export function candidateSelectOptions(
+  country: Country,
+  data?: MicrocosmStagingRunsResponse,
+): { value: string; label: string }[] {
+  if (!hasCapability(country, "staging")) return [];
+  return (data?.runs ?? []).map((run) => ({
+    value: stagingSelectionFor(run.run_id),
+    label: `candidate · ${releaseLabel(run.run_id, run.updated_at)}${
+      run.status && run.status !== "completed" ? ` (${run.status})` : ""
+    }`,
+  }));
+}
+
 export function useMicrocosm(release?: string) {
   const { country } = useCountry();
   return useQuery({
     queryKey: ["microcosm", country, release ?? "latest"],
     queryFn: () =>
       apiGet<MicrocosmResponse>("/microcosm", { release: release || undefined, country }),
-    staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
+    // A staging candidate's diagnostics can still change while its run lives.
+    staleTime: isStagingSelection(release) ? 30 * 1000 : PUBLISHED_RELEASE_STALE_TIME_MS,
   });
 }
 

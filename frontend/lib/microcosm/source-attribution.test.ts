@@ -1,3 +1,4 @@
+import { microcosmStagingRunUrl } from "./source-attribution";
 import { expect, test } from "bun:test";
 
 import {
@@ -54,4 +55,16 @@ test("the release artifact's repository visibility overrides the registration", 
     label: "Microcosm",
     href: "https://huggingface.co/datasets/policyengine/populace-us",
   });
+});
+
+test("a staging candidate opens its telemetry folder in the staging repository", () => {
+  expect(
+    microcosmStagingRunUrl(
+      "policyengine/populace-uk-staging",
+      "main",
+      "uk-frs-calibration-attempt-20260920T170811Z-ce339e7c",
+    ),
+  ).toBe(
+    "https://huggingface.co/datasets/policyengine/populace-uk-staging/tree/main/runs/uk-frs-calibration-attempt-20260920T170811Z-ce339e7c",
+  );
 });
