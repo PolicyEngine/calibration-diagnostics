@@ -2316,6 +2316,7 @@ async function loadLocalCalibrationRelease(
 export async function loadReleases(
   revalidate: number,
   country: MicrocosmCountry = "us",
+  revisionOverride?: string,
 ): Promise<ReleaseEntry[]> {
   const local = await loadLocalCalibrationRelease(country);
   if (local) {
@@ -2333,11 +2334,12 @@ export async function loadReleases(
   }
 
   const { repo, revision } = countryRepository(country);
+  const resolvedRevision = revisionOverride ?? revision;
   const files = new Map<string, Set<string>>();
   // The HF tree endpoint paginates (~1000 entries/page via a Link cursor);
   // follow every page so releases don't silently vanish as the repo grows.
   let url: string | null =
-    `https://huggingface.co/api/datasets/${repo}/tree/${revision}/releases?recursive=true`;
+    `https://huggingface.co/api/datasets/${repo}/tree/${resolvedRevision}/releases?recursive=true`;
   let page = 0;
   while (url && page < 50) {
     const res: Response = await hfFetch(url, revalidate);
@@ -2379,7 +2381,11 @@ export async function loadReleases(
       .map(async (entry) => {
         try {
           const manifest = await hfJson(
-            hfResolveUrl(`releases/${entry.release_id}/release_manifest.json`, country),
+            hfResolveUrl(
+              `releases/${entry.release_id}/release_manifest.json`,
+              country,
+              resolvedRevision,
+            ),
             revalidate,
           );
           Object.assign(entry, releaseRole(manifest));

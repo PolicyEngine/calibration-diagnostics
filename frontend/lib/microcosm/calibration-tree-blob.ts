@@ -1,13 +1,18 @@
 import {
   BlobPreconditionFailedError,
   get,
+  list,
   put,
   type GetBlobResult,
+  type ListBlobResultBlob,
 } from "@vercel/blob";
+import { createHash } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 
 import {
   calibrationTreePartPath,
+  parseCalibrationTreeIndex,
+  type CalibrationTreeIndexArtifact,
   type CalibrationTreePart,
 } from "./calibration-tree-artifact";
 import {
@@ -33,9 +38,10 @@ const MANIFEST_CACHE_SECONDS = 60;
 export interface CalibrationTreeBlobClient {
   get: typeof get;
   put: typeof put;
+  list?: typeof list;
 }
 
-const DEFAULT_BLOB_CLIENT: CalibrationTreeBlobClient = { get, put };
+const DEFAULT_BLOB_CLIENT: CalibrationTreeBlobClient = { get, put, list };
 
 function isManifestWriteConflict(error: unknown): boolean {
   return error instanceof BlobPreconditionFailedError ||
@@ -115,6 +121,116 @@ export async function getCalibrationTreeBlob(options: {
       ...tokenOption(options.token),
     },
   );
+}
+
+export async function listCalibrationTreeBlobs(options: {
+  country: MicrocosmCountry;
+  token?: string;
+  client?: CalibrationTreeBlobClient;
+}): Promise<Map<string, ListBlobResultBlob>> {
+  const client = options.client ?? DEFAULT_BLOB_CLIENT;
+  if (!client.list) throw new Error("Calibration tree Blob listing is unavailable.");
+  const blobs = new Map<string, ListBlobResultBlob>();
+  let cursor: string | undefined;
+  do {
+    const page = await client.list({
+      prefix: `calibration-trees/${options.country}/`,
+      limit: 1_000,
+      ...(cursor ? { cursor } : {}),
+      ...tokenOption(options.token),
+    });
+    for (const blob of page.blobs) blobs.set(blob.pathname, blob);
+    cursor = page.hasMore ? page.cursor : undefined;
+    if (page.hasMore && !cursor) {
+      throw new Error("Calibration tree Blob listing omitted its next cursor.");
+    }
+  } while (cursor);
+  return blobs;
+}
+
+export interface CalibrationTreeBuildAudit {
+  complete: boolean;
+  repairable: boolean;
+  reasons: string[];
+  index: CalibrationTreeIndexArtifact | null;
+}
+
+export async function auditCalibrationTreeBuild(options: {
+  country: MicrocosmCountry;
+  entry: CalibrationTreeManifestEntry;
+  blobs: Map<string, ListBlobResultBlob>;
+  token?: string;
+  client?: CalibrationTreeBlobClient;
+}): Promise<CalibrationTreeBuildAudit> {
+  const reasons: string[] = [];
+  const indexResult = await getCalibrationTreeBlob({
+    country: options.country,
+    buildArtifactId: options.entry.buildArtifactId,
+    part: "index",
+    token: options.token,
+    consistent: true,
+    client: options.client,
+  });
+  if (!indexResult) {
+    return {
+      complete: false,
+      repairable: true,
+      reasons: ["index is missing"],
+      index: null,
+    };
+  }
+  if (indexResult.statusCode !== 200) {
+    return {
+      complete: false,
+      repairable: false,
+      reasons: [`index returned status ${indexResult.statusCode}`],
+      index: null,
+    };
+  }
+
+  let index: CalibrationTreeIndexArtifact | null = null;
+  try {
+    const text = await calibrationTreeBlobText(indexResult.stream);
+    const bytes = Buffer.byteLength(text, "utf8");
+    const sha256 = createHash("sha256").update(text, "utf8").digest("hex");
+    if (bytes !== options.entry.indexBytes) reasons.push("index raw byte count differs");
+    if (sha256 !== options.entry.indexSha256) reasons.push("index digest differs");
+    index = parseCalibrationTreeIndex(JSON.parse(text));
+    if (index.country !== options.country) reasons.push("index country differs");
+    if (index.buildArtifactId !== options.entry.buildArtifactId) {
+      reasons.push("index build id differs");
+    }
+  } catch (error) {
+    reasons.push(
+      `index cannot be parsed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (!index) {
+    return { complete: false, repairable: false, reasons, index: null };
+  }
+
+  const descriptors = [
+    index.parts.filterIndex,
+    ...index.parts.targetSummaries,
+    ...index.parts.targetDetails,
+    ...index.parts.tiers,
+  ];
+  for (const descriptor of descriptors) {
+    const blob = options.blobs.get(descriptor.path);
+    if (!blob) {
+      reasons.push(`missing ${descriptor.path}`);
+    } else if (blob.size !== descriptor.gzipBytes) {
+      reasons.push(
+        `compressed byte count differs for ${descriptor.path}: ${blob.size} != ${descriptor.gzipBytes}`,
+      );
+    }
+  }
+  return {
+    complete: reasons.length === 0,
+    repairable: reasons.every((reason) => reason.startsWith("missing ")),
+    reasons,
+    index,
+  };
 }
 
 async function uploadCalibrationTreeFile(options: {

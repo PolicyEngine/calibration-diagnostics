@@ -68,3 +68,26 @@ test("manifest validation rejects mutable or malformed content identities", () =
     countries: {},
   })).toThrow("Unsupported calibration tree manifest schema 5");
 });
+
+test("manifest rejects two immutable builds for the same release or staging run", () => {
+  expect(() => parseCalibrationTreeManifest({
+    schemaVersion: 6,
+    countries: {
+      us: {
+        latestReleaseBuildArtifactId: null,
+        builds: [entry, { ...entry, buildArtifactId: "d".repeat(64) }],
+      },
+    },
+  })).toThrow("repeats a source alias");
+
+  const manifest = withCalibrationTreeManifestEntry(
+    emptyCalibrationTreeManifest(),
+    "us",
+    entry,
+  );
+  expect(() => withCalibrationTreeManifestEntry(
+    manifest,
+    "us",
+    { ...entry, buildArtifactId: "d".repeat(64) },
+  )).toThrow("already resolves to build");
+});

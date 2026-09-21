@@ -3,6 +3,8 @@ import { gunzipSync, gzipSync } from "node:zlib";
 
 import { buildCalibrationTreeBundle } from "./calibration-tree-bundle";
 import {
+  auditCalibrationTreeBuild,
+  listCalibrationTreeBlobs,
   readCalibrationTreeManifest,
   updateCalibrationTreeManifest,
   uploadCalibrationTreeBundle,
@@ -85,6 +87,21 @@ function memoryClient(transientManifestConflicts = 0) {
         contentDisposition: "inline",
       };
     }) as unknown as CalibrationTreeBlobClient["put"],
+    list: (async (options: { prefix?: string }) => {
+      const blobs = await Promise.all(
+        [...content.entries()]
+          .filter(([pathname]) => pathname.startsWith(options.prefix ?? ""))
+          .map(async ([pathname, body]) => ({
+            url: `https://blob.example/${pathname}`,
+            downloadUrl: `https://blob.example/${pathname}?download=1`,
+            pathname,
+            size: new Blob([body]).size,
+            uploadedAt: new Date("2026-09-15T12:00:00.000Z"),
+            etag: etags.get(pathname)!,
+          })),
+      );
+      return { blobs, hasMore: false };
+    }) as CalibrationTreeBlobClient["list"],
   };
   return { client, content, putCalls };
 }
@@ -155,6 +172,76 @@ test("bundle upload writes the index last, verifies every part, and is idempoten
     token: "publisher-token",
     client: store.client,
   })).rejects.toThrow("different content");
+});
+
+test("bundle audit verifies the index and every referenced compressed part", async () => {
+  const store = memoryClient();
+  const bundle = treeBundle();
+  const stored = await uploadCalibrationTreeBundle({
+    bundle,
+    token: "publisher-token",
+    client: store.client,
+  });
+  const entry = {
+    buildArtifactId: bundle.index.buildArtifactId,
+    kind: "release" as const,
+    sourceId: "microcosm-us-test",
+    label: "microcosm-us-test",
+    releaseId: "microcosm-us-test",
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-us",
+    hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
+    treeSchemaVersion: 6 as const,
+    indexSha256: stored.index.sha256,
+    indexBytes: stored.index.bytes,
+    createdAt: null,
+    updatedAt: "1970-01-01T00:00:00.000Z",
+  };
+  let blobs = await listCalibrationTreeBlobs({
+    country: "us",
+    token: "publisher-token",
+    client: store.client,
+  });
+  await expect(auditCalibrationTreeBuild({
+    country: "us",
+    entry,
+    blobs,
+    token: "publisher-token",
+    client: store.client,
+  })).resolves.toMatchObject({ complete: true, repairable: true, reasons: [] });
+
+  const missingPath = bundle.index.parts.targetDetails[0].path;
+  store.content.delete(missingPath);
+  blobs = await listCalibrationTreeBlobs({
+    country: "us",
+    token: "publisher-token",
+    client: store.client,
+  });
+  await expect(auditCalibrationTreeBuild({
+    country: "us",
+    entry,
+    blobs,
+    token: "publisher-token",
+    client: store.client,
+  })).resolves.toMatchObject({
+    complete: false,
+    repairable: true,
+    reasons: [`missing ${missingPath}`],
+  });
+
+  store.content.set(missingPath, gzipSync("wrong-size"));
+  blobs = await listCalibrationTreeBlobs({
+    country: "us",
+    token: "publisher-token",
+    client: store.client,
+  });
+  await expect(auditCalibrationTreeBuild({
+    country: "us",
+    entry,
+    blobs,
+    token: "publisher-token",
+    client: store.client,
+  })).resolves.toMatchObject({ complete: false, repairable: false });
 });
 
 test("manifest writes merge countries and conditionally replace the prior version", async () => {
@@ -233,7 +320,13 @@ test("manifest writes refresh and replace after wrapped Blob ETag conflicts", as
   });
   await updateCalibrationTreeManifest({
     country: "us",
-    entry: { ...entry, buildArtifactId: "a".repeat(64) },
+    entry: {
+      ...entry,
+      buildArtifactId: "a".repeat(64),
+      sourceId: "microcosm-us-second-test",
+      label: "microcosm-us-second-test",
+      releaseId: "microcosm-us-second-test",
+    },
     token: "publisher-token",
     client: store.client,
   });

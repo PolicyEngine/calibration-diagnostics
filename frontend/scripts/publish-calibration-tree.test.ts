@@ -7,7 +7,9 @@ import {
   publicationCreatedAt,
   readUpstreamLatest,
   resolvePublicationSourceSha,
+  manifestBuildForSource,
 } from "./publish-calibration-tree";
+import { emptyCalibrationTreeManifest } from "../lib/microcosm/calibration-tree-manifest";
 
 const originalFetch = globalThis.fetch;
 
@@ -55,6 +57,29 @@ test("publisher accepts latest, immutable release, backfill, and staging modes",
     mode: "staging-finalized",
     hfCommitSha: "abcdef1234567890abcdef1234567890abcdef12",
   });
+  expect(parsePublisherOptions([
+    "--country",
+    "us",
+    "--reconcile-releases",
+    "--dry-run",
+  ])).toEqual({
+    country: "us",
+    mode: "reconcile-releases",
+    dryRun: true,
+  });
+  expect(parsePublisherOptions([
+    "--country",
+    "uk",
+    "--reconcile-staging",
+    "--sha",
+    "ABCDEF1234567890ABCDEF1234567890ABCDEF12",
+    "--dry-run",
+  ])).toEqual({
+    country: "uk",
+    mode: "reconcile-staging",
+    hfCommitSha: "abcdef1234567890abcdef1234567890abcdef12",
+    dryRun: true,
+  });
 });
 
 test("publisher rejects ambiguous modes and unsafe release ids", () => {
@@ -64,6 +89,48 @@ test("publisher rejects ambiguous modes and unsafe release ids", () => {
   expect(() => parsePublisherOptions(["--release", "../latest"])).toThrow(
     "valid immutable release id",
   );
+  expect(() => parsePublisherOptions(["--latest", "--dry-run"])).toThrow(
+    "reconciliation modes",
+  );
+  expect(() => parsePublisherOptions([
+    "--reconcile-releases",
+    "--sha",
+    "1".repeat(40),
+  ])).toThrow("not valid for release-history reconciliation");
+});
+
+test("manifest lookup resolves one immutable source alias", () => {
+  const manifest = emptyCalibrationTreeManifest();
+  manifest.countries.us = {
+    latestReleaseBuildArtifactId: null,
+    builds: [{
+      buildArtifactId: "a".repeat(64),
+      kind: "staging",
+      sourceId: "us-staging-run",
+      label: "US staging run",
+      releaseId: null,
+      stagingRunId: "us-staging-run",
+      hfRepo: "policyengine/populace-us-staging",
+      hfCommitSha: "b".repeat(40),
+      treeSchemaVersion: 6,
+      indexSha256: "c".repeat(64),
+      indexBytes: 100,
+      createdAt: null,
+      updatedAt: "2026-09-22T00:00:00.000Z",
+    }],
+  };
+  expect(manifestBuildForSource(
+    manifest,
+    "us",
+    "staging",
+    "us-staging-run",
+  )?.buildArtifactId).toBe("a".repeat(64));
+  expect(manifestBuildForSource(
+    manifest,
+    "us",
+    "release",
+    "us-staging-run",
+  )).toBeNull();
 });
 
 test("publisher enforces configured artifact size limits", () => {

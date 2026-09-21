@@ -7,10 +7,16 @@ import {
   type CalibrationTreeBundleFile,
 } from "../lib/microcosm/calibration-tree-bundle";
 import {
+  auditCalibrationTreeBuild,
+  listCalibrationTreeBlobs,
+  readCalibrationTreeManifest,
   updateCalibrationTreeManifest,
   uploadCalibrationTreeBundle,
 } from "../lib/microcosm/calibration-tree-blob";
-import type { CalibrationTreeManifestEntry } from "../lib/microcosm/calibration-tree-manifest";
+import type {
+  CalibrationTreeManifest,
+  CalibrationTreeManifestEntry,
+} from "../lib/microcosm/calibration-tree-manifest";
 import { createHash } from "node:crypto";
 import {
   CalibrationReleaseNotFoundError,
@@ -34,15 +40,21 @@ import {
   resolveStagingRevisionSha,
   stagingRepository,
 } from "../lib/microcosm/staging-artifact";
-import { UnsupportedCalibrationDiagnosticsSchemaError } from "../lib/microcosm/target-representation";
 
 type JsonObject = Record<string, unknown>;
 
 export interface PublisherOptions {
   country: MicrocosmCountry;
-  mode: "latest" | "release" | "backfill" | "staging-finalized";
+  mode:
+    | "latest"
+    | "release"
+    | "backfill"
+    | "staging-finalized"
+    | "reconcile-releases"
+    | "reconcile-staging";
   releaseId?: string;
   hfCommitSha?: string;
+  dryRun?: boolean;
 }
 
 interface UpstreamLatest {
@@ -58,8 +70,23 @@ interface FetchedArtifact {
 
 const RELEASE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const DEFAULT_MAX_RAW_BYTES = 100_000_000;
+const FINAL_STAGING_STATUSES = new Set(["passed", "published", "completed"]);
 
 export class CalibrationTreeArtifactSizeError extends Error {}
+
+export interface ReconciliationOutcome {
+  sourceId: string;
+  status: "complete" | "published" | "repaired" | "ineligible";
+  buildArtifactId: string | null;
+  reason: string | null;
+}
+
+export interface ReconciliationReport {
+  country: MicrocosmCountry;
+  sourceKind: "releases" | "staging";
+  dryRun: boolean;
+  outcomes: ReconciliationOutcome[];
+}
 
 export function publicationCreatedAt(
   value: string | null | undefined,
@@ -186,7 +213,10 @@ export function parsePublisherOptions(argv: string[]): PublisherOptions {
     if (
       argument === "--latest" ||
       argument === "--backfill" ||
-      argument === "--staging-finalized"
+      argument === "--staging-finalized" ||
+      argument === "--reconcile-releases" ||
+      argument === "--reconcile-staging" ||
+      argument === "--dry-run"
     ) {
       flags.add(argument);
       continue;
@@ -211,18 +241,53 @@ export function parsePublisherOptions(argv: string[]): PublisherOptions {
     flags.has("--latest"),
     flags.has("--backfill"),
     flags.has("--staging-finalized"),
+    flags.has("--reconcile-releases"),
+    flags.has("--reconcile-staging"),
     values.has("--release"),
   ].filter(Boolean).length;
   if (selectedModes !== 1) {
     throw new Error(
-      "Specify exactly one of --latest, --release, --backfill, or --staging-finalized.",
+      "Specify exactly one publication mode.",
     );
   }
-  if (flags.has("--backfill")) return { country: countryValue, mode: "backfill" };
+  const dryRun = flags.has("--dry-run") || undefined;
+  if (
+    dryRun &&
+    (flags.has("--latest") || values.has("--release"))
+  ) {
+    throw new Error("--dry-run is supported only by reconciliation modes.");
+  }
+  if (
+    values.has("--sha") &&
+    (flags.has("--backfill") || flags.has("--reconcile-releases"))
+  ) {
+    throw new Error("--sha is not valid for release-history reconciliation.");
+  }
+  if (flags.has("--backfill")) {
+    return { country: countryValue, mode: "backfill", dryRun };
+  }
   if (flags.has("--staging-finalized")) {
     return {
       country: countryValue,
       mode: "staging-finalized",
+      dryRun,
+      ...(values.has("--sha")
+        ? { hfCommitSha: exactCommitSha(values.get("--sha"), "--sha") }
+        : {}),
+    };
+  }
+  if (flags.has("--reconcile-releases")) {
+    return {
+      country: countryValue,
+      mode: "reconcile-releases",
+      dryRun,
+    };
+  }
+  if (flags.has("--reconcile-staging")) {
+    return {
+      country: countryValue,
+      mode: "reconcile-staging",
+      dryRun,
       ...(values.has("--sha")
         ? { hfCommitSha: exactCommitSha(values.get("--sha"), "--sha") }
         : {}),
@@ -232,6 +297,7 @@ export function parsePublisherOptions(argv: string[]): PublisherOptions {
     return {
       country: countryValue,
       mode: "latest",
+      dryRun,
       ...(values.has("--sha")
         ? { hfCommitSha: exactCommitSha(values.get("--sha"), "--sha") }
         : {}),
@@ -241,6 +307,7 @@ export function parsePublisherOptions(argv: string[]): PublisherOptions {
     country: countryValue,
     mode: "release",
     releaseId: releaseId(values.get("--release")),
+    dryRun,
     ...(values.has("--sha")
       ? { hfCommitSha: exactCommitSha(values.get("--sha"), "--sha") }
       : {}),
@@ -282,6 +349,153 @@ export async function readUpstreamLatest(
     }),
     updatedAt,
   };
+}
+
+interface ReleaseCandidate {
+  releaseId: string;
+  hfCommitSha: string;
+  createdAt: string | null;
+}
+
+interface HfTagRef {
+  name: string;
+  targetCommit: string;
+}
+
+async function listReleaseTags(
+  country: MicrocosmCountry,
+): Promise<HfTagRef[]> {
+  const response = await fetch(
+    `https://huggingface.co/api/datasets/${microcosmRepo(country)}/refs`,
+    {
+      headers: hfHeaders(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`Hugging Face returned ${response.status} while listing release tags.`);
+  }
+  const payload = object(await response.json(), "Hugging Face refs");
+  if (!Array.isArray(payload.tags)) {
+    throw new Error("Hugging Face refs response has no tag list.");
+  }
+  return payload.tags.flatMap((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    const tag = value as JsonObject;
+    if (typeof tag.name !== "string" || typeof tag.targetCommit !== "string") return [];
+    if (!RELEASE_ID_RE.test(tag.name) || !/^[0-9a-f]{40,64}$/i.test(tag.targetCommit)) {
+      return [];
+    }
+    return [{ name: tag.name, targetCommit: tag.targetCommit.toLowerCase() }];
+  });
+}
+
+async function taggedReleaseHasDiagnostics(
+  country: MicrocosmCountry,
+  candidate: HfTagRef,
+): Promise<boolean> {
+  const response = await fetch(
+    `https://huggingface.co/api/datasets/${microcosmRepo(country)}/tree/` +
+      `${candidate.targetCommit}/releases/${encodeURIComponent(candidate.name)}?recursive=false`,
+    {
+      headers: hfHeaders(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+  if (response.status === 404) return false;
+  if (!response.ok) {
+    throw new Error(
+      `Hugging Face returned ${response.status} while inspecting release tag ${candidate.name}.`,
+    );
+  }
+  const entries = await response.json();
+  return Array.isArray(entries) && entries.some((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    return (value as JsonObject).path ===
+      `releases/${candidate.name}/calibration_diagnostics.json`;
+  });
+}
+
+async function enumerateReleaseCandidates(
+  country: MicrocosmCountry,
+): Promise<{
+  candidates: ReleaseCandidate[];
+  ineligible: ReconciliationOutcome[];
+}> {
+  const [releases, tags] = await Promise.all([
+    loadReleases(0, country),
+    listReleaseTags(country),
+  ]);
+  const tagsByName = new Map(tags.map((tag) => [tag.name, tag]));
+  const candidates = new Map<string, ReleaseCandidate>();
+  const ineligible: ReconciliationOutcome[] = [];
+
+  for (const release of releases) {
+    if (!release.has_calibration) continue;
+    const tag = tagsByName.get(release.release_id);
+    candidates.set(release.release_id, {
+      releaseId: release.release_id,
+      hfCommitSha: tag?.targetCommit ?? await resolveHfReleaseDirectorySha(
+        country,
+        release.release_id,
+        0,
+      ),
+      createdAt: publicationCreatedAt(release.date),
+    });
+  }
+  for (const tag of tags) {
+    if (candidates.has(tag.name)) continue;
+    if (await taggedReleaseHasDiagnostics(country, tag)) {
+      candidates.set(tag.name, {
+        releaseId: tag.name,
+        hfCommitSha: tag.targetCommit,
+        createdAt: publicationCreatedAt(tag.name),
+      });
+    } else {
+      ineligible.push({
+        sourceId: tag.name,
+        status: "ineligible",
+        buildArtifactId: null,
+        reason: "Release has no calibration diagnostics.",
+      });
+    }
+  }
+  for (const release of releases) {
+    if (!release.has_calibration && !ineligible.some((item) => item.sourceId === release.release_id)) {
+      ineligible.push({
+        sourceId: release.release_id,
+        status: "ineligible",
+        buildArtifactId: null,
+        reason: "Release has no calibration diagnostics.",
+      });
+    }
+  }
+  return {
+    candidates: [...candidates.values()].sort((left, right) =>
+      left.releaseId.localeCompare(right.releaseId)
+    ),
+    ineligible,
+  };
+}
+
+export function manifestBuildForSource(
+  manifest: CalibrationTreeManifest,
+  country: MicrocosmCountry,
+  kind: "release" | "staging",
+  sourceId: string,
+): CalibrationTreeManifestEntry | null {
+  const matches = (manifest.countries[country]?.builds ?? []).filter((entry) =>
+    entry.kind === kind &&
+    (kind === "release"
+      ? entry.releaseId === sourceId
+      : entry.stagingRunId === sourceId)
+  );
+  if (matches.length > 1) {
+    throw new Error(`Calibration source ${sourceId} has multiple manifest entries.`);
+  }
+  return matches[0] ?? null;
 }
 
 export function enforceConfiguredSizeLimits(file: CalibrationTreeBundleFile): {
@@ -338,13 +552,19 @@ async function publishRelease(
   blobToken: string,
   allowMissingReleaseTag = false,
   createdAt: string | null = null,
+  useExpectedShaExactly = false,
+  buildArtifactId?: string,
+  dryRun = false,
+  expectedIndexSha256?: string,
 ) {
-  const resolvedSha = await resolvePublicationSourceSha(
-    country,
-    id,
-    expectedSha,
-    allowMissingReleaseTag,
-  );
+  const resolvedSha = useExpectedShaExactly && expectedSha
+    ? exactCommitSha(expectedSha, "Exact source revision")
+    : await resolvePublicationSourceSha(
+        country,
+        id,
+        expectedSha,
+        allowMissingReleaseTag,
+      );
   if (expectedSha && expectedSha.toLowerCase() !== resolvedSha) {
     throw new Error(
       `Webhook commit ${expectedSha} does not match release ${id} commit ${resolvedSha}.`,
@@ -379,6 +599,7 @@ async function publishRelease(
   );
   const bundle = buildCalibrationTreeBundle({
     country,
+    ...(buildArtifactId ? { buildArtifactId } : {}),
     createdAt: publicationCreatedAt(id) ?? publicationCreatedAt(createdAt),
     releaseId: id,
     hfRepo: microcosmRepo(country),
@@ -406,10 +627,31 @@ async function publishRelease(
   const sizes = Object.fromEntries(
     bundle.files.map((file) => [file.part, enforceConfiguredSizeLimits(file)]),
   );
-  const stored = await uploadCalibrationTreeBundle({
-    bundle,
-    token: blobToken,
-  });
+  const builtIndex = bundle.files.find((candidate) => candidate.part === "index");
+  if (!builtIndex) throw new Error("Calibration tree bundle has no index.");
+  if (expectedIndexSha256 && builtIndex.sha256 !== expectedIndexSha256) {
+    throw new Error(
+      `Rebuilt calibration index differs from immutable manifest entry ${buildArtifactId}.`,
+    );
+  }
+  const stored = dryRun
+    ? {
+        files: bundle.files.map((file) => ({
+          pathname: file.path,
+          sha256: file.sha256,
+          bytes: file.rawBytes,
+          created: false,
+        })),
+        index: (() => {
+          return {
+            pathname: builtIndex.path,
+            sha256: builtIndex.sha256,
+            bytes: builtIndex.rawBytes,
+            created: false,
+          };
+        })(),
+      }
+    : await uploadCalibrationTreeBundle({ bundle, token: blobToken });
   return { bundle, stored, sizes };
 }
 
@@ -469,175 +711,364 @@ async function registerReleaseBuild(
   return entry;
 }
 
-async function publishFinalizedStagingBuilds(
+type ResolvedStagingSource = NonNullable<
+  Awaited<ReturnType<typeof resolveStagingCalibrationSource>>
+>;
+
+async function publishStagingSource(options: {
+  country: MicrocosmCountry;
+  runId: string;
+  source: ResolvedStagingSource;
+  repository: { repo: string };
+  revisionSha: string;
+  blobToken: string;
+  existing: CalibrationTreeManifestEntry | null;
+  existingIndex: Awaited<ReturnType<typeof auditCalibrationTreeBuild>>["index"];
+  dryRun: boolean;
+}) {
+  const {
+    country,
+    runId,
+    source,
+    repository,
+    revisionSha,
+    blobToken,
+    existing,
+    existingIndex,
+    dryRun,
+  } = options;
+  const { calibration } = source;
+  const candidateReleaseId = source.candidateReleaseId;
+  const bundle = buildCalibrationTreeBundle({
+    country,
+    ...(existing ? { buildArtifactId: existing.buildArtifactId } : {}),
+    buildKind: "staging",
+    sourceId: runId,
+    label: existingIndex?.build.label ?? candidateReleaseId,
+    createdAt: existingIndex?.build.createdAt ?? source.updatedAt,
+    releaseId: existingIndex?.build.releaseId ?? candidateReleaseId,
+    hfRepo: existing?.hfRepo ?? repository.repo,
+    hfCommitSha: existing?.hfCommitSha ?? revisionSha,
+    sourceArtifacts: existingIndex?.build.sourceArtifacts ?? {
+      ...source.sourceArtifacts,
+      demographics: null,
+    },
+    rows: calibration.rows,
+    calibrationProvenance: calibration.calibration_provenance,
+    lossAttributionAvailable:
+      calibration.target_loss_attribution.status !== "unavailable",
+    comparison: {
+      releaseId: calibration.release_id,
+      calibrationProvenance: calibration.calibration_provenance,
+      status: calibration.target_loss_attribution.status,
+      aggregate: calibration.target_loss_attribution.aggregate,
+      cap: calibration.target_loss_attribution.cap,
+      basisIdentifier: calibration.target_loss_attribution.basis_identifier,
+      targetRepresentation: calibration.target_schema.target_representation,
+    },
+  });
+  for (const file of bundle.files) enforceConfiguredSizeLimits(file);
+  const indexFile = bundle.files.find((file) => file.part === "index");
+  if (!indexFile) throw new Error("Calibration tree bundle has no index.");
+  if (existing && indexFile.sha256 !== existing.indexSha256) {
+    throw new Error(
+      `Rebuilt staging index differs from immutable manifest entry ${existing.buildArtifactId}.`,
+    );
+  }
+  const stored = dryRun
+    ? {
+        files: bundle.files.map((file) => ({
+          pathname: file.path,
+          sha256: file.sha256,
+          bytes: file.rawBytes,
+          created: false,
+        })),
+        index: {
+          pathname: indexFile.path,
+          sha256: indexFile.sha256,
+          bytes: indexFile.rawBytes,
+          created: false,
+        },
+      }
+    : await uploadCalibrationTreeBundle({ bundle, token: blobToken });
+  const entry: CalibrationTreeManifestEntry = existing ?? {
+    buildArtifactId: bundle.index.buildArtifactId,
+    kind: "staging",
+    sourceId: runId,
+    label: candidateReleaseId,
+    releaseId: null,
+    stagingRunId: runId,
+    hfRepo: repository.repo,
+    hfCommitSha: revisionSha,
+    treeSchemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
+    indexSha256: stored.index.sha256,
+    indexBytes: stored.index.bytes,
+    createdAt: source.updatedAt,
+    updatedAt: source.updatedAt ?? "1970-01-01T00:00:00.000Z",
+  };
+  return { bundle, stored, entry };
+}
+
+async function reconcileStagingBuilds(
   country: MicrocosmCountry,
   expectedSha: string | undefined,
   blobToken: string,
-): Promise<void> {
+  dryRun: boolean,
+): Promise<ReconciliationReport> {
   const repository = stagingRepository(country);
   if (!repository) {
     throw new Error(`Staging is not configured for ${country}.`);
   }
-  const revisionSha = await resolveStagingRevisionSha(country);
-  if (expectedSha && expectedSha !== revisionSha) {
-    throw new Error(
-      `Webhook commit ${expectedSha} is no longer the current staging revision ${revisionSha}.`,
-    );
-  }
+  const revisionSha = expectedSha
+    ? exactCommitSha(expectedSha, "Staging source revision")
+    : await resolveStagingRevisionSha(country);
   const runs = await loadStagingRuns(0, country, revisionSha);
   if (!runs.available) {
     throw new Error(runs.detail ?? "The staging repository is unavailable.");
   }
+  if (runs.incompatible_runs.length > 0) {
+    throw new Error(
+      `Staging inventory contains incompatible runs: ${runs.incompatible_runs
+        .map((run) => run.run_id)
+        .join(", ")}.`,
+    );
+  }
   const finalized = runs.runs.filter((run) =>
-    ["passed", "published", "completed"].includes(run.status ?? ""),
+    FINAL_STAGING_STATUSES.has(run.status ?? ""),
   );
+  let { manifest } = await readCalibrationTreeManifest({
+    token: blobToken,
+    consistent: true,
+  });
+  let blobs = await listCalibrationTreeBlobs({ country, token: blobToken });
+  const outcomes: ReconciliationOutcome[] = [];
 
   for (const run of finalized) {
+    const existing = manifestBuildForSource(
+      manifest,
+      country,
+      "staging",
+      run.run_id,
+    );
+    const audit = existing
+      ? await auditCalibrationTreeBuild({
+          country,
+          entry: existing,
+          blobs,
+          token: blobToken,
+        })
+      : null;
+    if (existing && audit?.complete) {
+      outcomes.push({
+        sourceId: run.run_id,
+        status: "complete",
+        buildArtifactId: existing.buildArtifactId,
+        reason: null,
+      });
+      continue;
+    }
+    if (audit && !audit.repairable) {
+      throw new Error(
+        `Staging build ${run.run_id} is corrupt and cannot be repaired automatically: ` +
+          audit.reasons.join("; "),
+      );
+    }
     const source = await resolveStagingCalibrationSource(
       run.run_id,
       0,
       country,
-      revisionSha,
+      existing?.hfCommitSha ?? revisionSha,
     );
     if (!source) {
-      console.warn(JSON.stringify({
-        country,
-        stagingRunId: run.run_id,
-        skipped: true,
+      if (existing) {
+        throw new Error(
+          `Incomplete staging build ${run.run_id} no longer has calibration diagnostics.`,
+        );
+      }
+      outcomes.push({
+        sourceId: run.run_id,
+        status: "ineligible",
+        buildArtifactId: null,
         reason: "Finalized staging run has no calibration diagnostics.",
-      }));
+      });
       continue;
     }
-    const { calibration } = source;
-    const candidateReleaseId = source.candidateReleaseId;
-    const bundle = buildCalibrationTreeBundle({
+    const published = await publishStagingSource({
       country,
-      buildKind: "staging",
-      sourceId: run.run_id,
-      label: candidateReleaseId,
-      createdAt: source.updatedAt,
-      releaseId: candidateReleaseId,
-      hfRepo: repository.repo,
-      hfCommitSha: revisionSha,
-      sourceArtifacts: {
-        ...source.sourceArtifacts,
-        demographics: null,
-      },
-      rows: calibration.rows,
-      calibrationProvenance: calibration.calibration_provenance,
-      lossAttributionAvailable:
-        calibration.target_loss_attribution.status !== "unavailable",
-      comparison: {
-        releaseId: calibration.release_id,
-        calibrationProvenance: calibration.calibration_provenance,
-        status: calibration.target_loss_attribution.status,
-        aggregate: calibration.target_loss_attribution.aggregate,
-        cap: calibration.target_loss_attribution.cap,
-        basisIdentifier: calibration.target_loss_attribution.basis_identifier,
-        targetRepresentation: calibration.target_schema.target_representation,
-      },
+      runId: run.run_id,
+      source,
+      repository,
+      revisionSha: existing?.hfCommitSha ?? revisionSha,
+      blobToken,
+      existing,
+      existingIndex: audit?.index ?? null,
+      dryRun,
     });
-    for (const file of bundle.files) enforceConfiguredSizeLimits(file);
-    const stored = await uploadCalibrationTreeBundle({ bundle, token: blobToken });
-    const entry: CalibrationTreeManifestEntry = {
-      buildArtifactId: bundle.index.buildArtifactId,
-      kind: "staging",
+    if (!dryRun) {
+      manifest = await updateCalibrationTreeManifest({
+        country,
+        entry: published.entry,
+        token: blobToken,
+      });
+      blobs = await listCalibrationTreeBlobs({ country, token: blobToken });
+      const verified = await auditCalibrationTreeBuild({
+        country,
+        entry: published.entry,
+        blobs,
+        token: blobToken,
+      });
+      if (!verified.complete) {
+        throw new Error(
+          `Staging build ${run.run_id} remains incomplete: ${verified.reasons.join("; ")}`,
+        );
+      }
+    }
+    outcomes.push({
       sourceId: run.run_id,
-      label: candidateReleaseId,
-      releaseId: null,
-      stagingRunId: run.run_id,
-      hfRepo: repository.repo,
-      hfCommitSha: revisionSha,
-      treeSchemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
-      indexSha256: stored.index.sha256,
-      indexBytes: stored.index.bytes,
-      createdAt: source.updatedAt,
-      updatedAt: source.updatedAt ?? "1970-01-01T00:00:00.000Z",
-    };
-    await updateCalibrationTreeManifest({ country, entry, token: blobToken });
-    console.log(JSON.stringify({
+      status: existing ? "repaired" : "published",
+      buildArtifactId: published.entry.buildArtifactId,
+      reason: dryRun ? "Dry run; no Blob writes performed." : null,
+    });
+  }
+  return { country, sourceKind: "staging", dryRun, outcomes };
+}
+
+async function reconcileReleaseBuilds(
+  country: MicrocosmCountry,
+  blobToken: string,
+  dryRun: boolean,
+): Promise<ReconciliationReport> {
+  const inventory = await enumerateReleaseCandidates(country);
+  let { manifest } = await readCalibrationTreeManifest({
+    token: blobToken,
+    consistent: true,
+  });
+  let blobs = await listCalibrationTreeBlobs({ country, token: blobToken });
+  const outcomes = [...inventory.ineligible];
+
+  for (const candidate of inventory.candidates) {
+    const existing = manifestBuildForSource(
+      manifest,
       country,
-      stagingRunId: run.run_id,
+      "release",
+      candidate.releaseId,
+    );
+    if (existing && existing.hfCommitSha !== candidate.hfCommitSha) {
+      throw new Error(
+        `Released dataset ${candidate.releaseId} changed from ${existing.hfCommitSha} ` +
+          `to ${candidate.hfCommitSha}.`,
+      );
+    }
+    const audit = existing
+      ? await auditCalibrationTreeBuild({
+          country,
+          entry: existing,
+          blobs,
+          token: blobToken,
+        })
+      : null;
+    if (existing && audit?.complete) {
+      outcomes.push({
+        sourceId: candidate.releaseId,
+        status: "complete",
+        buildArtifactId: existing.buildArtifactId,
+        reason: null,
+      });
+      continue;
+    }
+    if (audit && !audit.repairable) {
+      throw new Error(
+        `Release build ${candidate.releaseId} is corrupt and cannot be repaired automatically: ` +
+          audit.reasons.join("; "),
+      );
+    }
+    const published = await publishRelease(
+      country,
+      candidate.releaseId,
+      existing?.hfCommitSha ?? candidate.hfCommitSha,
+      blobToken,
+      false,
+      candidate.createdAt,
+      true,
+      existing?.buildArtifactId,
+      dryRun,
+      existing?.indexSha256,
+    );
+    const entry = existing ?? releaseManifestEntry(published);
+    if (!dryRun) {
+      manifest = await updateCalibrationTreeManifest({ country, entry, token: blobToken });
+      blobs = await listCalibrationTreeBlobs({ country, token: blobToken });
+      const verified = await auditCalibrationTreeBuild({
+        country,
+        entry,
+        blobs,
+        token: blobToken,
+      });
+      if (!verified.complete) {
+        throw new Error(
+          `Release build ${candidate.releaseId} remains incomplete: ${verified.reasons.join("; ")}`,
+        );
+      }
+    }
+    outcomes.push({
+      sourceId: candidate.releaseId,
+      status: existing ? "repaired" : "published",
       buildArtifactId: entry.buildArtifactId,
-      files: stored.files,
-    }));
+      reason: dryRun ? "Dry run; no Blob writes performed." : null,
+    });
   }
 
-  const verifiedSha = await resolveStagingRevisionSha(country);
-  if (verifiedSha !== revisionSha) {
-    throw new Error(
-      `Staging repository advanced from ${revisionSha} to ${verifiedSha} during publication.`,
-    );
+  const latest = await readUpstreamLatest(country);
+  const latestEntry = manifestBuildForSource(
+    manifest,
+    country,
+    "release",
+    latest.releaseId,
+  );
+  if (!dryRun) {
+    if (!latestEntry || latestEntry.hfCommitSha !== latest.hfCommitSha) {
+      throw new Error(
+        `Latest release ${latest.releaseId}@${latest.hfCommitSha} is not completely published.`,
+      );
+    }
+    await updateCalibrationTreeManifest({
+      country,
+      entry: latestEntry,
+      token: blobToken,
+      makeLatest: true,
+    });
   }
+  return { country, sourceKind: "releases", dryRun, outcomes };
 }
 
 export async function runPublisher(options: PublisherOptions): Promise<void> {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (!blobToken) throw new Error("BLOB_READ_WRITE_TOKEN is required.");
 
-  if (options.mode === "staging-finalized") {
-    await publishFinalizedStagingBuilds(
+  if (
+    options.mode === "staging-finalized" ||
+    options.mode === "reconcile-staging"
+  ) {
+    const report = await reconcileStagingBuilds(
       options.country,
       options.hfCommitSha,
       blobToken,
+      options.dryRun === true,
     );
+    console.log(JSON.stringify(report));
     return;
   }
 
-  if (options.mode === "backfill") {
-    const releases = (await loadReleases(0, options.country)).filter(
-      (entry) => entry.has_calibration,
-    );
-    for (const release of releases) {
-      try {
-        const published = await publishRelease(
-          options.country,
-          release.release_id,
-          undefined,
-          blobToken,
-          true,
-          publicationCreatedAt(release.date),
-        );
-        await registerReleaseBuild(options.country, published, blobToken);
-        console.log(JSON.stringify({
-          country: options.country,
-          releaseId: release.release_id,
-          hfCommitSha: published.bundle.index.build.hfCommitSha,
-          buildArtifactId: published.bundle.index.buildArtifactId,
-          files: published.stored.files,
-          sizes: published.sizes,
-        }));
-      } catch (error) {
-        if (
-          !(error instanceof UnsupportedCalibrationDiagnosticsSchemaError) &&
-          !(error instanceof CalibrationTreeArtifactSizeError) &&
-          !(error instanceof CalibrationReleaseNotFoundError)
-        ) {
-          throw error;
-        }
-        console.warn(JSON.stringify({
-          country: options.country,
-          releaseId: release.release_id,
-          skipped: true,
-          reason: error.message,
-        }));
-      }
-    }
-    const latest = await readUpstreamLatest(options.country);
-    const current = await publishRelease(
+  if (
+    options.mode === "backfill" ||
+    options.mode === "reconcile-releases"
+  ) {
+    const report = await reconcileReleaseBuilds(
       options.country,
-      latest.releaseId,
-      latest.hfCommitSha,
       blobToken,
-      true,
-      publicationCreatedAt(latest.updatedAt),
+      options.dryRun === true,
     );
-    const currentEntry = await registerReleaseBuild(
-      options.country,
-      current,
-      blobToken,
-    );
-    await promoteIfCurrent(options.country, current, currentEntry, blobToken);
+    console.log(JSON.stringify(report));
     return;
   }
 

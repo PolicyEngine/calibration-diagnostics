@@ -125,6 +125,14 @@ function parseCountryManifest(
   if (ids.size !== builds.length) {
     throw new Error(`Calibration tree manifest country ${country} repeats a build id.`);
   }
+  const aliases = builds.map((entry) =>
+    entry.kind === "release"
+      ? `release:${entry.releaseId}`
+      : `staging:${entry.stagingRunId}`
+  );
+  if (new Set(aliases).size !== aliases.length) {
+    throw new Error(`Calibration tree manifest country ${country} repeats a source alias.`);
+  }
   const latest = optionalIdentifier(
     parsed.latestReleaseBuildArtifactId,
     `${country}.latestReleaseBuildArtifactId`,
@@ -227,6 +235,18 @@ export function withCalibrationTreeManifestEntry(
   const previous = current.builds.find(
     (build) => build.buildArtifactId === entry.buildArtifactId,
   );
+  const aliasConflict = current.builds.find((build) =>
+    build.buildArtifactId !== entry.buildArtifactId &&
+    build.kind === entry.kind &&
+    (entry.kind === "release"
+      ? build.releaseId === entry.releaseId
+      : build.stagingRunId === entry.stagingRunId)
+  );
+  if (aliasConflict) {
+    throw new Error(
+      `Calibration source ${entry.sourceId} already resolves to build ${aliasConflict.buildArtifactId}.`,
+    );
+  }
   if (previous) {
     const immutableFields: Array<keyof CalibrationTreeManifestEntry> = [
       "buildArtifactId",
