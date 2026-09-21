@@ -60,6 +60,8 @@ export type CalibrationTreePart =
 export interface CalibrationTreeSourceArtifact {
   path: string;
   sha256: string;
+  hfRepo?: string;
+  hfCommitSha?: string;
 }
 
 export interface CalibrationTreeSourceArtifacts {
@@ -67,6 +69,9 @@ export interface CalibrationTreeSourceArtifacts {
   buildManifest: CalibrationTreeSourceArtifact | null;
   releaseManifest: CalibrationTreeSourceArtifact | null;
   demographics: CalibrationTreeSourceArtifact | null;
+  stagingRunManifest?: CalibrationTreeSourceArtifact | null;
+  stagingProgress?: CalibrationTreeSourceArtifact | null;
+  stagedDatasetReceipt?: CalibrationTreeSourceArtifact | null;
   comparisonCurrentIndex?: CalibrationTreeSourceArtifact | null;
   comparisonCandidateIndex?: CalibrationTreeSourceArtifact | null;
 }
@@ -1258,6 +1263,9 @@ function validateBuild(
     "buildManifest",
     "releaseManifest",
     "demographics",
+    "stagingRunManifest",
+    "stagingProgress",
+    "stagedDatasetReceipt",
     "comparisonCurrentIndex",
     "comparisonCandidateIndex",
   ]) {
@@ -1285,6 +1293,18 @@ function validateBuild(
     }
     if (typeof source.sha256 !== "string" || !SHA256_RE.test(source.sha256)) {
       throw new Error(`Calibration tree source ${key} has an invalid hash.`);
+    }
+    if (
+      source.hfRepo != null &&
+      (typeof source.hfRepo !== "string" || !source.hfRepo)
+    ) {
+      throw new Error(`Calibration tree source ${key} has an invalid repository.`);
+    }
+    if (
+      source.hfCommitSha != null &&
+      (typeof source.hfCommitSha !== "string" || !HF_COMMIT_RE.test(source.hfCommitSha))
+    ) {
+      throw new Error(`Calibration tree source ${key} has an invalid commit.`);
     }
   }
   if (!isCountry(country)) throw new Error("Calibration tree build country is invalid.");

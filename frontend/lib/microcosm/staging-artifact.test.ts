@@ -12,6 +12,7 @@ import {
   loadStagingTargetDiagnostics,
   MICROCOSM_STAGING_HF_REPO,
   MICROCOSM_STAGING_HF_REVISION,
+  resolveStagingCalibrationSource,
   stagingRepository,
   stagingResolveUrl,
   stagingTargetChangeCacheTtlSeconds,
@@ -259,6 +260,59 @@ test("loads version 2 calibration diagnostics from the declared artifact path", 
       url.endsWith(`/runs/${runId}/calibration_diagnostics.json`),
     ),
   ).toBe(false);
+});
+
+test("resolves publisher provenance at an explicit immutable staging revision", async () => {
+  const runId = "uk-calibration-publisher-source";
+  const revision = "a".repeat(40);
+  const diagnostics = serializedDiagnostics();
+  const manifest = {
+    ...v2RunManifest(runId, "2026-01-03T00:00:03+00:00"),
+    operation_id: "uk_national_calibration",
+    run_kind: "calibration",
+    artifacts: [{
+      logical_name: "calibration_diagnostics",
+      artifact_kind: "aggregate_diagnostics",
+      contract_relative_path: "artifacts/calibration_diagnostics.json",
+      media_type: "application/json",
+      sha256: diagnostics.sha256,
+      classification: "aggregate",
+    }],
+  };
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    expect(url).toContain(`/resolve/${revision}/`);
+    if (url.endsWith(`/runs/${runId}/run_manifest.json`)) {
+      return Response.json(manifest);
+    }
+    if (url.endsWith(`/runs/${runId}/progress.json`)) {
+      return new Response(null, { status: 404 });
+    }
+    if (url.endsWith(`/runs/${runId}/artifacts/calibration_diagnostics.json`)) {
+      return new Response(diagnostics.body);
+    }
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+
+  const source = await resolveStagingCalibrationSource(
+    runId,
+    0,
+    "uk",
+    revision,
+  );
+
+  expect(source?.calibration.rows).toHaveLength(1);
+  expect(source?.stagingRevision).toBe(revision);
+  expect(source?.sourceArtifacts.calibrationDiagnostics).toMatchObject({
+    path: `runs/${runId}/artifacts/calibration_diagnostics.json`,
+    sha256: diagnostics.sha256,
+    hfRepo: "policyengine/populace-uk-staging",
+    hfCommitSha: revision,
+  });
+  expect(source?.sourceArtifacts.stagingRunManifest).toMatchObject({
+    path: `runs/${runId}/run_manifest.json`,
+    hfCommitSha: revision,
+  });
 });
 
 test("rejects version 2 calibration diagnostics whose bytes do not match the declared digest", async () => {

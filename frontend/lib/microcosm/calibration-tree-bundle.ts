@@ -52,7 +52,18 @@ export function calibrationTreeBuildArtifactId(
   const sourceHashes = Object.fromEntries(
     Object.entries(input.sourceArtifacts)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([name, artifact]) => [name, artifact?.sha256 ?? null]),
+      .map(([name, artifact]) => [
+        name,
+        artifact == null
+          ? null
+          : {
+              sha256: artifact.sha256,
+              ...(artifact.hfRepo ? { hfRepo: artifact.hfRepo } : {}),
+              ...(artifact.hfCommitSha
+                ? { hfCommitSha: artifact.hfCommitSha }
+                : {}),
+            },
+      ]),
   );
   return sha256(JSON.stringify({
     schemaVersion: CALIBRATION_TREE_SCHEMA_VERSION,
