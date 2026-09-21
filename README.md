@@ -33,7 +33,8 @@ separate service layer — the Next.js API routes are the API layer.
   runs from a country's staging Hub repo: current stage, calibration loss
   progress, final candidate diagnostics once they exist (uploaded with the
   telemetry, or read from the dataset bundle the run staged under
-  `staged/<run_id>/` in the release repository), candidate-vs-current-release
+  `staged/<run_id>/` in the release repository, flagged as an unreleased staged
+  dataset wherever they are shown), candidate-vs-current-release
   fit, and a hierarchical map of weighted target-error increases and
   reductions. Countries without a staging repository show an explicit
   unavailable state.
