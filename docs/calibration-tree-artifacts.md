@@ -286,8 +286,10 @@ webhook.
 After enabling the webhook, replay a release-repository `main` update from the
 Hugging Face Activity page. Prefer a branch update rather than a release tag so
 the verification does not repeat a Slack release alert. Require an HTTP 200
-delivery, one `Publish calibration tree` workflow dispatch for the expected
-country, and a successful workflow. Then send one authenticated staging
+delivery. If the webhook has no prior delivery to replay, send an authenticated
+release `main`-update payload containing the repository's current commit SHA.
+Require one `Publish calibration tree` workflow dispatch for the expected
+country and a successful workflow. Then send one authenticated staging
 `main`-update payload and require a successful `event_kind=staging` workflow.
 Both reconciliations are idempotent: complete Blob builds are audited and
 skipped.
