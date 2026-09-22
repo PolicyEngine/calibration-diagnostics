@@ -22,7 +22,7 @@ afterEach(() => {
   else process.env.BLOB_READ_WRITE_TOKEN = originalToken;
 });
 
-test("an uncached exact pair is built once and redirected to its immutable bundle", async () => {
+test("an uncached exact pair redirects to its immutable bundle on the browser origin", async () => {
   process.env.BLOB_READ_WRITE_TOKEN = "blob-token";
   const builds: unknown[] = [];
   const handler = createCalibrationComparisonTreeHandler({
@@ -42,7 +42,7 @@ test("an uncached exact pair is built once and redirected to its immutable bundl
 
   expect(response.status).toBe(307);
   expect(response.headers.get("location")).toBe(
-    `https://dashboard.example/calibration/dashboard/api/microcosm/comparison-tree?country=us&mode=reported&part=index&build=${REPORTED}`,
+    `/calibration/dashboard/api/microcosm/comparison-tree?country=us&mode=reported&part=index&build=${REPORTED}`,
   );
   expect(builds).toEqual([{
     country: "us",

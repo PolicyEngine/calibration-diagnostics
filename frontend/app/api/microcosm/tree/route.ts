@@ -94,7 +94,7 @@ export function createCalibrationTreeHandler(
           status: 307,
           headers: {
             ...ALIAS_CACHE_HEADERS,
-            Location: destination.toString(),
+            Location: `${destination.pathname}${destination.search}`,
             "X-Microcosm-Release": location.releaseId,
             "X-HF-Commit": location.hfCommitSha,
             "X-Calibration-Build": location.buildArtifactId,

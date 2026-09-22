@@ -138,7 +138,7 @@ export function createCalibrationComparisonTreeHandler(
       return new NextResponse(null, {
         status: 307,
         headers: {
-          Location: destination.toString(),
+          Location: `${destination.pathname}${destination.search}`,
           "Cache-Control": "public, max-age=31536000, immutable",
           "X-Calibration-Comparison-Build": buildArtifactId,
         },
