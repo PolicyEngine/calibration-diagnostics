@@ -145,6 +145,10 @@ UV_PROJECT_ENVIRONMENT=.tmp/hosted-runtime uv run --no-sync \
   python -m pytest frontend/tests -q
 ```
 
+The hosted lookup accepts only the reviewed 2024 period. It passes a one-year
+`USMultiYearDataset` to the pinned country package so that the package does not
+create unused later-year copies of the input population.
+
 `/api/microcosm_variable?metadata=1` reports installed packages and the deployment
 commit, when available, without downloading a dataset. The mounted equivalent
 is `/calibration/dashboard/api/microcosm_variable?metadata=1`. Its

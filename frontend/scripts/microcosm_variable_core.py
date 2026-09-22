@@ -7,8 +7,9 @@ import math
 import os
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import PurePosixPath
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
@@ -255,6 +256,37 @@ def state_filtered_dataset(dataset_path: str, state: str) -> Any:
     )
 
 
+def single_year_simulation_dataset(dataset_path: str, state: str | None = None) -> Any:
+    """Return the reviewed input as a one-year multi-year dataset.
+
+    The pinned policyengine-us version automatically extends a
+    USSingleYearDataset through every economic-assumption year. The hosted
+    endpoint supports only the reviewed data year, so wrapping that input in a
+    USMultiYearDataset prevents unused years from being allocated.
+    """
+    try:
+        from policyengine_us.data import (
+            USMultiYearDataset,
+            USSingleYearDataset,
+        )
+    except Exception as exc:  # pragma: no cover - depends on host Python env.
+        raise VariableCalculationError(
+            f"Could not load native dataset dependencies: {exc}"
+        ) from exc
+
+    single_year = (
+        state_filtered_dataset(dataset_path, state)
+        if state is not None
+        else USSingleYearDataset(file_path=dataset_path)
+    )
+    if str(single_year.time_period) != DEFAULT_PERIOD:
+        raise VariableCalculationError(
+            f"The native dataset time period {single_year.time_period!r} "
+            f"does not match the reviewed year {DEFAULT_PERIOD}."
+        )
+    return USMultiYearDataset(datasets=[single_year])
+
+
 def calculate_variables(
     *,
     variables: list[str],
@@ -312,10 +344,7 @@ def calculate_variables(
                 cache_key,
                 dataset_path,
                 lambda: Microsimulation(
-                    dataset=(
-                        state_filtered_dataset(dataset_path, state)
-                        if state else dataset_path
-                    )
+                    dataset=single_year_simulation_dataset(dataset_path, state)
                 ),
             )
 

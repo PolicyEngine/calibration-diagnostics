@@ -32,6 +32,12 @@ actual deployed allocation and response resource measurements rather than assumi
 requested allocation is sufficient.
 The identical local SPM reference peaked at approximately 12 GB; an 8 GiB hosted
 allocation did not complete the calculation. The required gate below must still pass.
+The service loads only the reviewed 2024 input. It validates the native dataset year and
+wraps that `USSingleYearDataset` in a one-entry `USMultiYearDataset` before constructing
+the simulation. This compatibility step prevents the pinned country package from
+automatically allocating copies for later economic-assumption years. Remove the wrapper
+only after upgrading to a country-package version that supports an explicit extension
+end year, and qualify that upgrade with the same calculation checks.
 Only one native simulation stays resident: changing between national and state scopes
 evicts the preceding simulation before loading the next input tables. Same-scope requests
 can reuse it; mixed variable lists may rebuild when their scopes change.
