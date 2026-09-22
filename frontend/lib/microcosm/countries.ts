@@ -4,8 +4,8 @@
 // the registration or the release artifact's typed `country` block.
 //
 // Isomorphic: imported by client components and API routes alike, so it must
-// not import server-only modules or read `process.env`. Deployment overrides
-// for repositories are resolved server side in latest-artifact.ts.
+// not import server-only modules or read `process.env`. Repository resolvers
+// accept an explicit environment object from server-side callers.
 
 export const COUNTRY_CAPABILITIES = [
   "calibration",
@@ -21,6 +21,15 @@ export const COUNTRY_CAPABILITIES = [
 export type CountryCapability = (typeof COUNTRY_CAPABILITIES)[number];
 
 export type RepositoryVisibility = "public" | "private";
+
+export type RepositoryEnvironment = Readonly<
+  Record<string, string | undefined>
+>;
+
+export interface ResolvedRepository {
+  repo: string;
+  revision: string;
+}
 
 export interface CountryRegistration {
   // Default HF dataset repository and revision (the server may override both
@@ -178,6 +187,53 @@ export function countryCapabilities(country: MicrocosmCountry): readonly Country
 
 export function hasCapability(country: MicrocosmCountry, capability: CountryCapability): boolean {
   return countryCapabilities(country).includes(capability);
+}
+
+function configuredValue(
+  environment: RepositoryEnvironment,
+  variableName: string | undefined,
+  fallback: string,
+): string {
+  return (variableName ? environment[variableName] : undefined) ?? fallback;
+}
+
+export function resolveRegisteredRepository(
+  country: MicrocosmCountry,
+  environment: RepositoryEnvironment,
+): ResolvedRepository {
+  const registration = countryRegistration(country);
+  return {
+    repo: configuredValue(
+      environment,
+      registration.repo_env,
+      registration.repo,
+    ),
+    revision: configuredValue(
+      environment,
+      registration.revision_env,
+      registration.revision,
+    ),
+  };
+}
+
+export function resolveRegisteredStagingRepository(
+  country: MicrocosmCountry,
+  environment: RepositoryEnvironment,
+): ResolvedRepository | null {
+  const registration = countryRegistration(country);
+  if (!hasCapability(country, "staging") || !registration.staging) return null;
+  return {
+    repo: configuredValue(
+      environment,
+      registration.staging.repo_env,
+      registration.staging.repo,
+    ),
+    revision: configuredValue(
+      environment,
+      registration.staging.revision_env,
+      registration.staging.revision,
+    ),
+  };
 }
 
 export function isCountryCapability(value: unknown): value is CountryCapability {

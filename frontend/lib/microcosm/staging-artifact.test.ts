@@ -37,25 +37,18 @@ test("resolves staging repositories from each country registration", () => {
     "https://huggingface.co/datasets/policyengine/microcosm-am-staging-fixture/resolve/main/runs/am-fixture/progress.json",
   );
 
-  const originalRepo = process.env.POPULACE_STAGING_HF_REPO;
-  const originalRevision = process.env.POPULACE_STAGING_HF_REVISION;
-  try {
-    process.env.POPULACE_STAGING_HF_REPO = "policyengine/us-staging-override";
-    process.env.POPULACE_STAGING_HF_REVISION = "test-revision";
-    expect(stagingRepository("us")).toEqual({
-      repo: "policyengine/us-staging-override",
-      revision: "test-revision",
-    });
-    expect(stagingRepository("am")).toEqual({
-      repo: "policyengine/microcosm-am-staging-fixture",
-      revision: "main",
-    });
-  } finally {
-    if (originalRepo === undefined) delete process.env.POPULACE_STAGING_HF_REPO;
-    else process.env.POPULACE_STAGING_HF_REPO = originalRepo;
-    if (originalRevision === undefined) delete process.env.POPULACE_STAGING_HF_REVISION;
-    else process.env.POPULACE_STAGING_HF_REVISION = originalRevision;
-  }
+  const environment = {
+    POPULACE_STAGING_HF_REPO: "policyengine/us-staging-override",
+    POPULACE_STAGING_HF_REVISION: "test-revision",
+  };
+  expect(stagingRepository("us", environment)).toEqual({
+    repo: "policyengine/us-staging-override",
+    revision: "test-revision",
+  });
+  expect(stagingRepository("am", environment)).toEqual({
+    repo: "policyengine/microcosm-am-staging-fixture",
+    revision: "main",
+  });
 });
 
 test("loads Armenia staging telemetry from Armenia's registered repository", async () => {

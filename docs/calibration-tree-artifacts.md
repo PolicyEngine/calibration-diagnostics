@@ -246,8 +246,72 @@ Never use a `NEXT_PUBLIC_` prefix for these values.
    `token_env` name in both GitHub Actions and Vercel. The UK registration uses
    `POPULACE_UK_STAGING_HF_TOKEN`.
 4. Store `GITHUB_ACTIONS_DISPATCH_TOKEN` and `HF_WEBHOOK_SECRET` only in Vercel.
-5. Configure the same webhook secret on every release and staging Hugging Face
-   repository.
+
+### Hugging Face webhook
+
+Use one Hugging Face webhook for every registered production dataset. The
+webhook URL is the stable, public production domain:
+
+```text
+https://calibration-diagnostics.vercel.app/calibration/dashboard/api/hf-webhook
+```
+
+Do not use a generated deployment URL or
+`calibration-diagnostics-policy-engine.vercel.app`. Those URLs can require
+Vercel authentication and are not stable webhook targets. The production
+domain moves to new code only after the staged deployment is qualified and
+promoted as described in
+[Hosted variable runtime](../frontend/HOSTED_RUNTIME.md#promotion-and-rollback).
+
+Configure the webhook for repository events and watch these datasets:
+
+```text
+policyengine/populace-us
+policyengine/populace-us-staging
+policyengine/populace-uk-private
+policyengine/populace-uk-staging
+policyengine/populace-be-private
+```
+
+Update this watched list whenever a non-fixture release or staging repository
+is added to the country registry.
+
+The webhook secret must be the same high-entropy ASCII value stored as the
+sensitive Vercel Production variable `HF_WEBHOOK_SECRET`. Hugging Face sends it
+in `X-Webhook-Secret`; the browser and GitHub Actions do not receive it. When
+rotating the value, keep the webhook disabled, update Vercel, deploy and promote
+the application, then update the Hugging Face setting before re-enabling the
+webhook.
+
+After enabling the webhook, replay a release-repository `main` update from the
+Hugging Face Activity page. Prefer a branch update rather than a release tag so
+the verification does not repeat a Slack release alert. Require an HTTP 200
+delivery. If the webhook has no prior delivery to replay, send an authenticated
+release `main`-update payload containing the repository's current commit SHA.
+Require one `Publish calibration tree` workflow dispatch for the expected
+country and a successful workflow. Then send one authenticated staging
+`main`-update payload and require a successful `event_kind=staging` workflow.
+Both reconciliations are idempotent: complete Blob builds are audited and
+skipped.
+
+Failure meanings and recovery:
+
+- `401` from the application means the Hugging Face and Vercel secrets differ.
+- A Vercel authentication response means the webhook targets a protected URL
+  instead of the public production domain.
+- `502` from the application means GitHub rejected or did not receive the
+  workflow dispatch; check `GITHUB_ACTIONS_DISPATCH_TOKEN` and its Actions
+  permission.
+- A failed GitHub workflow means publication started but did not complete.
+  Rerun that workflow after correcting the reported error.
+- Hugging Face retries non-2xx deliveries and can suspend a repeatedly failing
+  webhook. Correct the failure, re-enable the webhook, and replay the delivery;
+  see the [Hugging Face delivery and retry documentation](https://huggingface.co/docs/hub/webhooks#delivery-and-retries).
+
+There is no scheduled reconciliation. A later webhook delivery inventories all
+eligible versions and repairs a missed publication. Set the GitHub repository
+variable `CALIBRATION_TREE_BUILD_ENABLED=FALSE` to leave the webhook active but
+skip publication jobs intentionally.
 
 ## Historical reconciliation
 

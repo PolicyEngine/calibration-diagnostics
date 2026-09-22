@@ -106,6 +106,9 @@ staged deployment's metadata and a genuine calculation before `vercel promote DE
 After promotion, repeat both through `calibration-diagnostics.vercel.app` and the
 `microcosm.institute/calibration/dashboard` mount. Retain manual promotion for future
 paired model/backend/frontend releases, or replace it with an equivalent tested gate.
+The public `calibration-diagnostics.vercel.app` domain is also the stable Hugging Face
+webhook origin. Do not point the webhook at a staged deployment URL or the protected
+`calibration-diagnostics-policy-engine.vercel.app` alias.
 
 Vercel now hosts only Next.js; the previous large-Python-function flag and Performance
 memory change are not prerequisites. Remove the obsolete preview-only large-function

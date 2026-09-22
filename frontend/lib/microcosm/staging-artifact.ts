@@ -15,7 +15,12 @@ import {
   microcosmRepo,
 } from "@/lib/microcosm/latest-artifact";
 import type { CalibrationTreeSourceArtifact } from "@/lib/microcosm/calibration-tree-artifact";
-import { countryRegistration, hasCapability } from "@/lib/microcosm/countries";
+import {
+  countryRegistration,
+  resolveRegisteredStagingRepository,
+  type RepositoryEnvironment,
+  type ResolvedRepository,
+} from "@/lib/microcosm/countries";
 import {
   type ReformValidation,
   buildReformValidation,
@@ -57,24 +62,15 @@ const stagingCalibrationCache = new Map<string, StagingCalibrationCacheEntry>();
 
 export const MICROCOSM_STAGING_HF_REPO_ENV = "POPULACE_STAGING_HF_REPO";
 export const MICROCOSM_STAGING_HF_REVISION_ENV = "POPULACE_STAGING_HF_REVISION";
-export interface StagingRepository {
-  repo: string;
-  revision: string;
-}
+export type StagingRepository = ResolvedRepository;
 
 // Resolve staging telemetry from the country registry. The exported US values
 // retain the legacy API and deployment-variable behavior for existing callers.
-export function stagingRepository(country: MicrocosmCountry): StagingRepository | null {
-  const staging = countryRegistration(country).staging;
-  if (!hasCapability(country, "staging") || !staging) return null;
-  return {
-    repo:
-      (staging.repo_env ? process.env[staging.repo_env] : undefined) ??
-      staging.repo,
-    revision:
-      (staging.revision_env ? process.env[staging.revision_env] : undefined) ??
-      staging.revision,
-  };
+export function stagingRepository(
+  country: MicrocosmCountry,
+  environment: RepositoryEnvironment = process.env,
+): StagingRepository | null {
+  return resolveRegisteredStagingRepository(country, environment);
 }
 
 export const MICROCOSM_STAGING_HF_REPO = stagingRepository("us")!.repo;
