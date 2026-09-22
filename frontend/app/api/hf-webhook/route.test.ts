@@ -1,52 +1,49 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 
+import type { HfWebhookConfig } from "@/lib/microcosm/hf-webhook-config";
 import {
-  countryRegistration,
-  selectableCountries,
-} from "@/lib/microcosm/countries";
-import { microcosmRepo } from "@/lib/microcosm/latest-artifact";
-import { stagingRepository } from "@/lib/microcosm/staging-artifact";
+  createHfWebhookHandler,
+  type HfWebhookHandlerDependencies,
+} from "@/lib/microcosm/hf-webhook-handler";
 
-import { POST } from "./route";
+const REPOSITORIES = {
+  usRelease: "example/us-release",
+  usStaging: "example/us-staging",
+  ukRelease: "example/uk-release",
+  ukStaging: "example/uk-staging",
+  beRelease: "example/be-release",
+} as const;
 
-const originalFetch = globalThis.fetch;
-const repositoryEnvNames = selectableCountries().flatMap((country) => {
-  const registration = countryRegistration(country);
-  return [
-    registration.repo_env,
-    registration.revision_env,
-    registration.staging?.repo_env,
-    registration.staging?.revision_env,
-  ].filter((name): name is string => name !== undefined);
-});
-const ENV_NAMES = Array.from(
-  new Set([
-    "HF_WEBHOOK_SECRET",
-    "GITHUB_ACTIONS_DISPATCH_TOKEN",
-    "CALIBRATION_TREE_GITHUB_REPOSITORY",
-    "CALIBRATION_TREE_GITHUB_WORKFLOW",
-    "SLACK_WEBHOOK_MICROCOSM_US_RELEASES",
-    ...repositoryEnvNames,
-  ]),
-);
-const originalEnv = Object.fromEntries(
-  ENV_NAMES.map((name) => [name, process.env[name]]),
-);
+const TEST_REPOSITORIES: HfWebhookConfig["repositories"] = new Map([
+  [REPOSITORIES.usRelease, { country: "us", kind: "release" }],
+  [REPOSITORIES.usStaging, { country: "us", kind: "staging" }],
+  [REPOSITORIES.ukRelease, { country: "uk", kind: "release" }],
+  [REPOSITORIES.ukStaging, { country: "uk", kind: "staging" }],
+  [REPOSITORIES.beRelease, { country: "be", kind: "release" }],
+]);
 
-beforeEach(() => {
-  for (const name of ENV_NAMES) delete process.env[name];
-  process.env.HF_WEBHOOK_SECRET = "test-webhook-secret";
-  process.env.GITHUB_ACTIONS_DISPATCH_TOKEN = "test-github-token";
-});
+function webhookConfig(
+  overrides: Partial<HfWebhookConfig> = {},
+): HfWebhookConfig {
+  return {
+    secret: "test-webhook-secret",
+    githubToken: "test-github-token",
+    githubRepository: "PolicyEngine/calibration-diagnostics",
+    githubWorkflow: "publish-calibration-tree.yml",
+    repositories: new Map(TEST_REPOSITORIES),
+    ...overrides,
+  };
+}
 
-afterEach(() => {
-  globalThis.fetch = originalFetch;
-  for (const name of ENV_NAMES) {
-    const value = originalEnv[name];
-    if (value == null) delete process.env[name];
-    else process.env[name] = value;
-  }
-});
+function handler(
+  fetchImplementation: HfWebhookHandlerDependencies["fetch"],
+  overrides: Partial<HfWebhookConfig> = {},
+) {
+  return createHfWebhookHandler(webhookConfig(overrides), {
+    fetch: fetchImplementation,
+    postReleaseAlert: async () => false,
+  });
+}
 
 function request(payload: unknown, secret = "test-webhook-secret") {
   return new Request("https://dashboard.example/api/hf-webhook", {
@@ -69,39 +66,32 @@ function querySecretRequest(payload: unknown, secret = "test-webhook-secret") {
   });
 }
 
-function replaceFetch(
-  implementation: (
-    input: string | URL | Request,
-    init?: RequestInit,
-  ) => Promise<Response>,
-) {
-  globalThis.fetch = Object.assign(implementation, {
-    preconnect: originalFetch.preconnect,
-  });
-}
-
 function testSha(index: number): string {
   return (index + 1).toString(16).padStart(40, "0");
 }
 
 test("webhook rejects invalid authentication before dispatching", async () => {
   let fetched = false;
-  replaceFetch(async () => {
+  const POST = handler(async () => {
     fetched = true;
     return new Response(null, { status: 204 });
   });
+
   const response = await POST(request({}, "wrong"));
+
   expect(response.status).toBe(401);
   expect(fetched).toBe(false);
 });
 
-test("webhook rejects requests when its server-side secret is missing", async () => {
-  delete process.env.HF_WEBHOOK_SECRET;
+test("webhook rejects requests when its configured secret is missing", async () => {
   let fetched = false;
-  replaceFetch(async () => {
-    fetched = true;
-    return new Response(null, { status: 204 });
-  });
+  const POST = handler(
+    async () => {
+      fetched = true;
+      return new Response(null, { status: 204 });
+    },
+    { secret: undefined },
+  );
 
   const response = await POST(request({}));
 
@@ -111,7 +101,7 @@ test("webhook rejects requests when its server-side secret is missing", async ()
 
 test("webhook accepts the documented query-parameter secret", async () => {
   let fetched = false;
-  replaceFetch(async () => {
+  const POST = handler(async () => {
     fetched = true;
     return new Response(null, { status: 204 });
   });
@@ -129,10 +119,11 @@ test("webhook accepts the documented query-parameter secret", async () => {
 
 test("webhook acknowledges unrelated repositories without dispatching", async () => {
   let fetched = false;
-  replaceFetch(async () => {
+  const POST = handler(async () => {
     fetched = true;
     return new Response(null, { status: 204 });
   });
+
   const response = await POST(
     request({
       repo: { name: "someone/unregistered" },
@@ -145,21 +136,23 @@ test("webhook acknowledges unrelated repositories without dispatching", async ()
       ],
     }),
   );
+
   expect(response.status).toBe(200);
   expect(fetched).toBe(false);
 });
 
 test("webhook coalesces tag and main-branch changes into one reconciliation", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
-  replaceFetch(async (input: string | URL | Request, init?: RequestInit) => {
+  const POST = handler(async (input, init) => {
     calls.push({ url: String(input), init: init ?? {} });
     return new Response(null, { status: 204 });
   });
   const tagSha = "1".repeat(40);
   const branchSha = "2".repeat(40);
+
   const response = await POST(
     request({
-      repo: { name: microcosmRepo("us") },
+      repo: { name: REPOSITORIES.usRelease },
       updatedRefs: [
         {
           ref: "refs/tags/microcosm-us-release",
@@ -196,63 +189,18 @@ test("webhook coalesces tag and main-branch changes into one reconciliation", as
   expect(dispatch.inputs).not.toHaveProperty("backfill");
 });
 
-test("release main-branch updates dispatch every registered country", async () => {
+test("release updates dispatch every configured release repository", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
-  replaceFetch(async (input, init) => {
+  const POST = handler(async (input, init) => {
     calls.push({ url: String(input), init: init ?? {} });
     return new Response(null, { status: 204 });
   });
-  const releases = selectableCountries().map((country, index) => ({
-    country,
-    repo: microcosmRepo(country),
-    sha: testSha(index),
-  }));
-
-  for (const { repo, country, sha } of releases) {
-    const response = await POST(
-      request({
-        repo: { name: repo },
-        updatedRefs: [
-          {
-            ref: "refs/heads/main",
-            oldSha: "3".repeat(40),
-            newSha: sha,
-          },
-        ],
-      }),
-    );
-    expect(response.status).toBe(200);
-    const dispatch = JSON.parse(String(calls.at(-1)?.init.body));
-    expect(dispatch).toMatchObject({
-      ref: "main",
-      inputs: {
-        country,
-        event_kind: "branch",
-        release_id: "",
-        hf_commit_sha: sha,
-      },
-    });
-  }
-
-  expect(calls).toHaveLength(releases.length);
-});
-
-test("staging main-branch updates dispatch every registered staging country", async () => {
-  const calls: Array<{ url: string; init: RequestInit }> = [];
-  replaceFetch(async (input, init) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    return new Response(null, { status: 204 });
-  });
-  const stagingRepositories = selectableCountries().flatMap(
-    (country, index) => {
-      const staging = stagingRepository(country);
-      return staging
-        ? [{ country, repo: staging.repo, sha: testSha(index + 8) }]
-        : [];
-    },
+  const releases = Array.from(TEST_REPOSITORIES.entries()).filter(
+    ([, registration]) => registration.kind === "release",
   );
 
-  for (const { repo, country, sha } of stagingRepositories) {
+  for (const [index, [repo, registration]] of releases.entries()) {
+    const sha = testSha(index);
     const response = await POST(
       request({
         repo: { name: repo },
@@ -269,7 +217,46 @@ test("staging main-branch updates dispatch every registered staging country", as
     expect(JSON.parse(String(calls.at(-1)?.init.body))).toMatchObject({
       ref: "main",
       inputs: {
-        country,
+        country: registration.country,
+        event_kind: "branch",
+        release_id: "",
+        hf_commit_sha: sha,
+      },
+    });
+  }
+
+  expect(calls).toHaveLength(releases.length);
+});
+
+test("staging updates dispatch every configured staging repository", async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const POST = handler(async (input, init) => {
+    calls.push({ url: String(input), init: init ?? {} });
+    return new Response(null, { status: 204 });
+  });
+  const stagingRepositories = Array.from(TEST_REPOSITORIES.entries()).filter(
+    ([, registration]) => registration.kind === "staging",
+  );
+
+  for (const [index, [repo, registration]] of stagingRepositories.entries()) {
+    const sha = testSha(index + 8);
+    const response = await POST(
+      request({
+        repo: { name: repo },
+        updatedRefs: [
+          {
+            ref: "refs/heads/main",
+            oldSha: "3".repeat(40),
+            newSha: sha,
+          },
+        ],
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(JSON.parse(String(calls.at(-1)?.init.body))).toMatchObject({
+      ref: "main",
+      inputs: {
+        country: registration.country,
         event_kind: "staging",
         release_id: "",
         hf_commit_sha: sha,
@@ -282,14 +269,14 @@ test("staging main-branch updates dispatch every registered staging country", as
 
 test("staging tag updates are acknowledged without dispatching", async () => {
   let fetched = false;
-  replaceFetch(async () => {
+  const POST = handler(async () => {
     fetched = true;
     return new Response(null, { status: 204 });
   });
 
   const response = await POST(
     request({
-      repo: { name: stagingRepository("us")!.repo },
+      repo: { name: REPOSITORIES.usStaging },
       updatedRefs: [
         {
           ref: "refs/tags/not-a-finalized-run",
@@ -306,10 +293,11 @@ test("staging tag updates are acknowledged without dispatching", async () => {
 });
 
 test("webhook returns a retriable server error when GitHub rejects dispatch", async () => {
-  replaceFetch(async () => new Response("forbidden", { status: 403 }));
+  const POST = handler(async () => new Response("forbidden", { status: 403 }));
+
   const response = await POST(
     request({
-      repo: { name: "policyengine/populace-us" },
+      repo: { name: REPOSITORIES.usRelease },
       updatedRefs: [
         {
           ref: "refs/heads/main",
@@ -319,6 +307,7 @@ test("webhook returns a retriable server error when GitHub rejects dispatch", as
       ],
     }),
   );
+
   expect(response.status).toBe(502);
   expect(await response.json()).toEqual({
     detail: "Unable to start calibration tree publication.",
