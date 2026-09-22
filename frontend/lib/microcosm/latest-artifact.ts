@@ -30,6 +30,7 @@ import {
   isCountry,
   isCountryCapability,
   parseCountry,
+  resolveRegisteredRepository,
   type CountryCapability,
   type MicrocosmCountry,
   type RepositoryVisibility,
@@ -77,10 +78,6 @@ interface MicrocosmCountryRepository {
   geography: string;
 }
 
-function envOverride(name: string | undefined): string | undefined {
-  return name == null ? undefined : process.env[name];
-}
-
 // Server-side view of a registration: the registry defaults with this
 // deployment's repository/revision overrides applied. Keep the national
 // geography beside the repository so downstream shaping does not require a
@@ -88,8 +85,7 @@ function envOverride(name: string | undefined): string | undefined {
 function resolveCountryRepository(country: MicrocosmCountry): MicrocosmCountryRepository {
   const registration = countryRegistration(country);
   return {
-    repo: envOverride(registration.repo_env) ?? registration.repo,
-    revision: envOverride(registration.revision_env) ?? registration.revision,
+    ...resolveRegisteredRepository(country, process.env),
     geography: registration.geography,
   };
 }

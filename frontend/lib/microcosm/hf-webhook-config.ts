@@ -1,8 +1,9 @@
 import {
-  countryRegistration,
-  hasCapability,
+  resolveRegisteredRepository,
+  resolveRegisteredStagingRepository,
   selectableCountries,
   type MicrocosmCountry,
+  type RepositoryEnvironment,
 } from "./countries";
 
 export interface WebhookRepositoryRegistration {
@@ -18,17 +19,7 @@ export interface HfWebhookConfig {
   repositories: ReadonlyMap<string, WebhookRepositoryRegistration>;
 }
 
-export type HfWebhookEnvironment = Readonly<
-  Record<string, string | undefined>
->;
-
-function configuredValue(
-  environment: HfWebhookEnvironment,
-  variableName: string | undefined,
-  fallback: string,
-): string {
-  return (variableName ? environment[variableName] : undefined) ?? fallback;
-}
+export type HfWebhookEnvironment = RepositoryEnvironment;
 
 export function resolveHfWebhookConfig(
   environment: HfWebhookEnvironment,
@@ -36,24 +27,18 @@ export function resolveHfWebhookConfig(
   const repositories = new Map<string, WebhookRepositoryRegistration>();
 
   for (const country of selectableCountries()) {
-    const registration = countryRegistration(country);
-    const releaseRepository = configuredValue(
-      environment,
-      registration.repo_env,
-      registration.repo,
-    );
-    repositories.set(releaseRepository.toLowerCase(), {
+    const releaseRepository = resolveRegisteredRepository(country, environment);
+    repositories.set(releaseRepository.repo.toLowerCase(), {
       country,
       kind: "release",
     });
 
-    if (hasCapability(country, "staging") && registration.staging) {
-      const stagingRepository = configuredValue(
-        environment,
-        registration.staging.repo_env,
-        registration.staging.repo,
-      );
-      repositories.set(stagingRepository.toLowerCase(), {
+    const stagingRepository = resolveRegisteredStagingRepository(
+      country,
+      environment,
+    );
+    if (stagingRepository) {
+      repositories.set(stagingRepository.repo.toLowerCase(), {
         country,
         kind: "staging",
       });

@@ -10,6 +10,8 @@ import {
   isCountry,
   isCountryCapability,
   parseCountry,
+  resolveRegisteredRepository,
+  resolveRegisteredStagingRepository,
   selectableCountries,
   type MicrocosmCountry,
 } from "./countries";
@@ -102,6 +104,32 @@ test("selectable countries follow registry order and exclude fixtures", () => {
   expect(countryRegistration("zz").fixture).toBe(true);
   expect(countryRegistration("am").fixture).toBe(true);
   expect(selectableCountries()).not.toContain("zz");
+});
+
+test("repository resolution applies explicit deployment overrides", () => {
+  expect(resolveRegisteredRepository("uk", {})).toEqual({
+    repo: "policyengine/populace-uk-private",
+    revision: "main",
+  });
+  expect(
+    resolveRegisteredRepository("uk", {
+      POPULACE_UK_HF_REPO: "example/uk-release",
+      POPULACE_UK_HF_REVISION: "release-revision",
+    }),
+  ).toEqual({
+    repo: "example/uk-release",
+    revision: "release-revision",
+  });
+  expect(
+    resolveRegisteredStagingRepository("uk", {
+      POPULACE_UK_STAGING_HF_REPO: "example/uk-staging",
+      POPULACE_UK_STAGING_HF_REVISION: "staging-revision",
+    }),
+  ).toEqual({
+    repo: "example/uk-staging",
+    revision: "staging-revision",
+  });
+  expect(resolveRegisteredStagingRepository("be", {})).toBeNull();
 });
 
 test("fixture registrations are valid countries without being selectable", () => {
