@@ -18,7 +18,7 @@ function resolver() {
   })) as CalibrationTreeRouteDependencies["resolveRelease"];
 }
 
-test("release aliases redirect to an exact immutable artifact URL", async () => {
+test("release aliases redirect to an exact immutable artifact on the browser origin", async () => {
   let blobRead = false;
   const handler = createCalibrationTreeHandler({
     resolveRelease: resolver(),
@@ -32,7 +32,7 @@ test("release aliases redirect to an exact immutable artifact URL", async () => 
   );
   expect(response.status).toBe(307);
   expect(response.headers.get("location")).toBe(
-    `https://dashboard.example/calibration/dashboard/api/microcosm/tree?country=us&part=index&build=${BUILD}`,
+    `/calibration/dashboard/api/microcosm/tree?country=us&part=index&build=${BUILD}`,
   );
   expect(response.headers.get("x-microcosm-release")).toBe("microcosm-us-release");
   expect(response.headers.get("vercel-cdn-cache-control")).toContain("max-age=60");
