@@ -1,17 +1,34 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 
+import {
+  countryRegistration,
+  selectableCountries,
+} from "@/lib/microcosm/countries";
+import { microcosmRepo } from "@/lib/microcosm/latest-artifact";
+import { stagingRepository } from "@/lib/microcosm/staging-artifact";
+
 import { POST } from "./route";
 
 const originalFetch = globalThis.fetch;
-const ENV_NAMES = [
-  "HF_WEBHOOK_SECRET",
-  "GITHUB_ACTIONS_DISPATCH_TOKEN",
-  "CALIBRATION_TREE_GITHUB_REPOSITORY",
-  "CALIBRATION_TREE_GITHUB_WORKFLOW",
-  "POPULACE_HF_REPO",
-  "POPULACE_HF_REVISION",
-  "SLACK_WEBHOOK_MICROCOSM_US_RELEASES",
-] as const;
+const repositoryEnvNames = selectableCountries().flatMap((country) => {
+  const registration = countryRegistration(country);
+  return [
+    registration.repo_env,
+    registration.revision_env,
+    registration.staging?.repo_env,
+    registration.staging?.revision_env,
+  ].filter((name): name is string => name !== undefined);
+});
+const ENV_NAMES = Array.from(
+  new Set([
+    "HF_WEBHOOK_SECRET",
+    "GITHUB_ACTIONS_DISPATCH_TOKEN",
+    "CALIBRATION_TREE_GITHUB_REPOSITORY",
+    "CALIBRATION_TREE_GITHUB_WORKFLOW",
+    "SLACK_WEBHOOK_MICROCOSM_US_RELEASES",
+    ...repositoryEnvNames,
+  ]),
+);
 const originalEnv = Object.fromEntries(
   ENV_NAMES.map((name) => [name, process.env[name]]),
 );
@@ -61,6 +78,10 @@ function replaceFetch(
   globalThis.fetch = Object.assign(implementation, {
     preconnect: originalFetch.preconnect,
   });
+}
+
+function testSha(index: number): string {
+  return (index + 1).toString(16).padStart(40, "0");
 }
 
 test("webhook rejects invalid authentication before dispatching", async () => {
@@ -138,7 +159,7 @@ test("webhook coalesces tag and main-branch changes into one reconciliation", as
   const branchSha = "2".repeat(40);
   const response = await POST(
     request({
-      repo: { name: "policyengine/populace-us" },
+      repo: { name: microcosmRepo("us") },
       updatedRefs: [
         {
           ref: "refs/tags/microcosm-us-release",
@@ -181,14 +202,13 @@ test("release main-branch updates dispatch every registered country", async () =
     calls.push({ url: String(input), init: init ?? {} });
     return new Response(null, { status: 204 });
   });
-  const releases = [
-    ["policyengine/populace-us", "us", "a"],
-    ["policyengine/populace-uk-private", "uk", "b"],
-    ["policyengine/populace-be-private", "be", "c"],
-  ] as const;
+  const releases = selectableCountries().map((country, index) => ({
+    country,
+    repo: microcosmRepo(country),
+    sha: testSha(index),
+  }));
 
-  for (const [repo, country, shaCharacter] of releases) {
-    const sha = shaCharacter.repeat(40);
+  for (const { repo, country, sha } of releases) {
     const response = await POST(
       request({
         repo: { name: repo },
@@ -223,13 +243,16 @@ test("staging main-branch updates dispatch every registered staging country", as
     calls.push({ url: String(input), init: init ?? {} });
     return new Response(null, { status: 204 });
   });
-  const stagingRepositories = [
-    ["policyengine/populace-us-staging", "us", "d"],
-    ["policyengine/populace-uk-staging", "uk", "e"],
-  ] as const;
+  const stagingRepositories = selectableCountries().flatMap(
+    (country, index) => {
+      const staging = stagingRepository(country);
+      return staging
+        ? [{ country, repo: staging.repo, sha: testSha(index + 8) }]
+        : [];
+    },
+  );
 
-  for (const [repo, country, shaCharacter] of stagingRepositories) {
-    const sha = shaCharacter.repeat(40);
+  for (const { repo, country, sha } of stagingRepositories) {
     const response = await POST(
       request({
         repo: { name: repo },
@@ -266,7 +289,7 @@ test("staging tag updates are acknowledged without dispatching", async () => {
 
   const response = await POST(
     request({
-      repo: { name: "policyengine/populace-us-staging" },
+      repo: { name: stagingRepository("us")!.repo },
       updatedRefs: [
         {
           ref: "refs/tags/not-a-finalized-run",
