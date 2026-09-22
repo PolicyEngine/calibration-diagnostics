@@ -11,6 +11,50 @@ that lock with `uv pip compile backend/requirements.txt --python-version 3.12
 --generate-hashes --output-file backend/requirements.lock` from the repository root.
 Upgrade the country model, Core, SPM and `scripts/hosted_release.json` together.
 
+## Automated production deployment
+
+`.github/workflows/deploy.yml` runs after the `CI` workflow succeeds for a push to
+`main`. It checks out the exact commit tested by CI and performs these operations in
+order:
+
+1. Deploy a commit-specific Modal application in the `main` Modal environment.
+2. Resolve the deployed `web_app` URL and verify its authenticated metadata.
+3. Build a production-targeted Vercel deployment with `--skip-domain`, using that Modal
+   URL and the same source commit.
+4. Verify the unaliased frontend metadata, then execute a real 2024 national threshold
+   calculation followed by a California income-tax calculation. Promotion requires the
+   reviewed package and data identities, verified H5 bytes, numeric results, and the
+   expected national-to-state cache transition.
+5. Promote the Vercel deployment and execute a California calculation through both
+   `calibration-diagnostics.vercel.app` and the mounted `microcosm.institute` route.
+
+The workflow names each backend `calibration-diagnostics-<12-character-commit>` so an
+older frontend continues to reference its matching backend during rollback. Retain these
+applications for the rollback window; remove them separately after they are no longer
+referenced by a deployable frontend.
+
+The workflow is fixed to Vercel project `calibration-diagnostics`
+(`prj_pL7dIJJ3M4hGcKr5pttWaOACVFtu`) in the PolicyEngine team
+(`team_xsyTmFLMLGbHH7Qxu70R5G4r`). `vercel.json` disables automatic Git deployment for
+`main` only, so pull-request previews remain enabled. Do not relink the workflow to a
+different project or remove `--skip-domain`; the frontend must not receive production
+traffic before its paired backend passes the deployment checks.
+
+Configure these GitHub Actions secrets before merging the workflow:
+
+- `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET`: deployment credentials for the PolicyEngine
+  Modal workspace and its `main` environment.
+- `MICROCOSM_MODAL_KEY` and `MICROCOSM_MODAL_SECRET`: credentials accepted by the
+  proxy-authenticated Modal function and passed to the Vercel server runtime.
+- `VERCEL_TOKEN`: permission to deploy and promote the fixed PolicyEngine Vercel project.
+- `VERCEL_AUTOMATION_BYPASS_SECRET`: permission for the workflow to call the protected,
+  unaliased Vercel deployment during verification.
+
+Missing credentials stop the workflow before it creates a Modal application. The Vercel
+project's existing production environment variables, including Blob credentials, remain
+managed by Vercel; the workflow supplies only the backend URL, proxy credentials, and
+source commit for the candidate deployment.
+
 ## Preview deployment
 
 Install the runtime lock into a separate environment, run the hosted Python tests and
@@ -31,7 +75,7 @@ holds the normal HF download; there is no Vercel RAM-backed HDF5 workaround. Obs
 actual deployed allocation and response resource measurements rather than assuming the
 requested allocation is sufficient.
 The identical local SPM reference peaked at approximately 12 GB; an 8 GiB hosted
-allocation did not complete the calculation. The required gate below must still pass.
+allocation did not complete the calculation. The required checks below must still pass.
 The service loads only the reviewed 2024 input. It validates the native dataset year and
 wraps that `USSingleYearDataset` in a one-entry `USMultiYearDataset` before constructing
 the simulation. This compatibility step prevents the pinned country package from
@@ -55,7 +99,7 @@ The Next deployment's `VERCEL_GIT_COMMIT_SHA` must match the backend's packaged 
 For local development against a remote backend, set `MICROCOSM_BACKEND_SOURCE_COMMIT`
 explicitly. Without a remote URL, local calculations still use the shared Python CLI.
 
-## Required calculation gate
+## Required calculation checks
 
 1. Verify direct authenticated backend metadata and both native-compatible and mounted
    Next metadata routes return JSON 200 with the expected source, model and configuration.
@@ -72,7 +116,7 @@ explicitly. Without a remote URL, local calculations still use the shared Python
    H5 SHA-256, exact model/source identity, `execution.simulation_cache_hits.national=false`
    and a non-null weighted result. Require comparison with a separately executed reference
    using the identical source, package tuple and immutable H5. An older Core version's
-   results are not a substitute, and an unavailable reference leaves this gate incomplete.
+   results are not a substitute, and an unavailable reference leaves this check incomplete.
 3. Preserve the request, response hash, execution ID, source/deployment identities,
    allocation, peak memory and elapsed time. Exercise a warm request separately and label
    its cache reuse. Test explicit blank fields (400), unsupported year/release (409),
@@ -90,11 +134,11 @@ explicitly. Without a remote URL, local calculations still use the shared Python
 
 ## Promotion and rollback
 
-Obtain independent review, Fable agreement and passing CI on the exact candidate. Before
-merging main, disable automatic domain assignment for the real Vercel production branch
-(the supported project setting is `autoAssignCustomDomains=false`) and read it back.
-Record all current production alias targets. This hold must precede main's automatic Git
-build; setting it after the merge is too late.
+Obtain independent review and passing CI on the exact candidate.
+`frontend/vercel.json` prevents Vercel's Git integration from deploying `main`; the
+backend-first GitHub workflow is the only production deployment path. Keep the project
+setting `autoAssignCustomDomains=false` as an additional protection against unintended
+domain assignment, and read it back when changing deployment configuration.
 Inspect the production-scoped environment entries before the build and require
 `POPULACE_HF_REPO` and `POPULACE_HF_REVISION` to be absent for the variable-calculation
 service. Its US data selection is compiled from the reviewed release, and a conflicting
@@ -104,14 +148,13 @@ If either variable is present, record and remove only those two conflicting calc
 overrides, with their prior settings retained for rollback. This specific check also
 applies to preview qualification. Do not print or change unrelated environment entries.
 
-Build/deploy the matching private production backend, then stage the exact frontend
-with production server-only URL/credentials. Use `vercel deploy --prod --skip-domain`
-for a CLI production build; do not omit the hold for the automatic Git build. Confirm
-that every production alias still targets its recorded prior deployment. Verify the
-staged deployment's metadata and a genuine calculation before `vercel promote DEPLOYMENT`.
-After promotion, repeat both through `calibration-diagnostics.vercel.app` and the
-`microcosm.institute/calibration/dashboard` mount. Retain manual promotion for future
-paired model/backend/frontend releases, or replace it with an equivalent tested gate.
+The production workflow deploys the matching private backend, stages the exact frontend
+with production server-only URL and credentials, verifies metadata and a genuine
+calculation, and only then runs `vercel promote`. After promotion, it checks a genuine
+calculation through `calibration-diagnostics.vercel.app` and the
+`microcosm.institute/calibration/dashboard` mount. A failure before promotion leaves the
+existing production aliases unchanged. A failure after promotion must be handled with
+the rollback procedure below.
 The public `calibration-diagnostics.vercel.app` domain is also the stable Hugging Face
 webhook origin. Do not point the webhook at a staged deployment URL or the protected
 `calibration-diagnostics-policy-engine.vercel.app` alias.
@@ -150,8 +193,8 @@ reviewed app/function/image/source receipts. Missing call-graph correlation leav
 the serving identity pending. A separate container-exec process is useful for
 package/RECORD/source-byte capture but does not replace this serving witness. The
 lightweight child demonstrates interpreter inheritance; it is not a scientific
-calculation receipt. Preserve the traffic hold and require the existing staged
-functional and deployment gates before production promotion.
+calculation receipt. Require the existing staged functional and deployment checks before
+production promotion.
 
 The witness reports whether both public Modal context IDs are present; this is
 an observation, not identity approval. Null parent module origins mean the module
