@@ -120,7 +120,7 @@ families. Next.js binds to `127.0.0.1`, and the launcher prints that exact URL
 to avoid hostname resolution selecting a different local process.
 
 Run the Python Chronicle evaluation harness and its public numerical adapter
-gate manually when reviewing Chronicle or dependency updates:
+validation manually when reviewing Chronicle or dependency updates:
 
 ```bash
 uv run python scripts/verify_evaluation_harness.py
@@ -144,6 +144,18 @@ UV_PROJECT_ENVIRONMENT=.tmp/hosted-runtime uv run --no-sync \
 UV_PROJECT_ENVIRONMENT=.tmp/hosted-runtime uv run --no-sync \
   python -m pytest frontend/tests -q
 ```
+
+The hosted lookup accepts only the reviewed 2024 period. It passes a one-year
+`USMultiYearDataset` to the pinned country package so that the package does not
+create unused later-year copies of the input population.
+
+Production deployment runs automatically after the exact `main` commit passes CI. The
+workflow deploys a commit-specific Modal backend first, builds an unaliased Vercel
+production candidate against that backend, runs real national and state calculations,
+and promotes the frontend only after those checks pass. Vercel Git deployment is disabled
+for `main` but remains enabled for pull-request previews. See
+[the hosted runtime procedure](frontend/HOSTED_RUNTIME.md#automated-production-deployment)
+for required secrets, project identities, verification, and rollback.
 
 `/api/microcosm_variable?metadata=1` reports installed packages and the deployment
 commit, when available, without downloading a dataset. The mounted equivalent

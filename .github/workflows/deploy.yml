@@ -1,0 +1,183 @@
+name: Deploy production
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+concurrency:
+  group: calibration-diagnostics-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  MODAL_ENVIRONMENT: main
+  VERCEL_CLI_VERSION: 58.8.0
+  VERCEL_ORG_ID: team_xsyTmFLMLGbHH7Qxu70R5G4r
+  VERCEL_PROJECT_ID: prj_pL7dIJJ3M4hGcKr5pttWaOACVFtu
+
+jobs:
+  deploy:
+    name: Modal backend, then Vercel frontend
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: Production
+    steps:
+      - name: Check out the tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Require deployment credentials
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          MICROCOSM_MODAL_KEY: ${{ secrets.MICROCOSM_MODAL_KEY }}
+          MICROCOSM_MODAL_SECRET: ${{ secrets.MICROCOSM_MODAL_SECRET }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          missing=()
+          for name in \
+            MODAL_TOKEN_ID MODAL_TOKEN_SECRET \
+            MICROCOSM_MODAL_KEY MICROCOSM_MODAL_SECRET \
+            VERCEL_TOKEN VERCEL_AUTOMATION_BYPASS_SECRET
+          do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} )); then
+            echo "Missing required production secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install deployment clients
+        run: |
+          uv venv --python 3.12 .deploy-venv
+          uv pip install --python .deploy-venv/bin/python modal==1.5.5
+          bunx --bun "vercel@${VERCEL_CLI_VERSION}" --version
+
+      - name: Define commit-specific backend name
+        id: identity
+        env:
+          SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          echo "source_commit=$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "modal_app=calibration-diagnostics-${SOURCE_COMMIT:0:12}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Modal backend
+        env:
+          CALIBRATION_MODAL_APP_NAME: ${{ steps.identity.outputs.modal_app }}
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: >-
+          .deploy-venv/bin/modal deploy backend/modal_app.py
+          --env "$MODAL_ENVIRONMENT"
+
+      - name: Resolve Modal backend URL
+        id: backend
+        env:
+          CALIBRATION_MODAL_APP_NAME: ${{ steps.identity.outputs.modal_app }}
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          backend_url="$(.deploy-venv/bin/python -c \
+            'import modal, os; url = modal.Function.from_name(os.environ["CALIBRATION_MODAL_APP_NAME"], "web_app", environment_name=os.environ["MODAL_ENVIRONMENT"]).get_web_url(); assert url; print(url)')"
+          if [[ ! "$backend_url" =~ ^https://.+\.modal\.run/?$ ]]; then
+            echo "Modal returned an invalid web URL." >&2
+            exit 1
+          fi
+          echo "::add-mask::$backend_url"
+          echo "url=${backend_url%/}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Modal backend metadata
+        env:
+          MICROCOSM_MODAL_KEY: ${{ secrets.MICROCOSM_MODAL_KEY }}
+          MICROCOSM_MODAL_SECRET: ${{ secrets.MICROCOSM_MODAL_SECRET }}
+        run: >-
+          .deploy-venv/bin/python frontend/scripts/deployment_smoke.py
+          --url "${{ steps.backend.outputs.url }}/api/microcosm_variable"
+          --source-commit "${{ steps.identity.outputs.source_commit }}"
+          --check metadata
+          --modal-key "$MICROCOSM_MODAL_KEY"
+          --modal-secret "$MICROCOSM_MODAL_SECRET"
+
+      - name: Build unaliased Vercel production candidate
+        id: frontend
+        env:
+          MICROCOSM_MODAL_KEY: ${{ secrets.MICROCOSM_MODAL_KEY }}
+          MICROCOSM_MODAL_SECRET: ${{ secrets.MICROCOSM_MODAL_SECRET }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          deployment_url="$(bunx --bun "vercel@${VERCEL_CLI_VERSION}" deploy . \
+            --cwd frontend \
+            --yes \
+            --prod \
+            --skip-domain \
+            --no-color \
+            --scope policy-engine \
+            --project "$VERCEL_PROJECT_ID" \
+            --token "$VERCEL_TOKEN" \
+            --env "MICROCOSM_CALCULATION_URL=${{ steps.backend.outputs.url }}" \
+            --env "MICROCOSM_MODAL_KEY=$MICROCOSM_MODAL_KEY" \
+            --env "MICROCOSM_MODAL_SECRET=$MICROCOSM_MODAL_SECRET" \
+            --env "MICROCOSM_BACKEND_SOURCE_COMMIT=${{ steps.identity.outputs.source_commit }}")"
+          if [[ ! "$deployment_url" =~ ^https://.+\.vercel\.app/?$ ]]; then
+            echo "Vercel returned an invalid deployment URL." >&2
+            exit 1
+          fi
+          echo "url=${deployment_url%/}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify staged frontend metadata
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: >-
+          .deploy-venv/bin/python frontend/scripts/deployment_smoke.py
+          --url "${{ steps.frontend.outputs.url }}/calibration/dashboard/api/microcosm_variable"
+          --source-commit "${{ steps.identity.outputs.source_commit }}"
+          --check metadata
+          --vercel-bypass-secret "$VERCEL_AUTOMATION_BYPASS_SECRET"
+
+      - name: Run staged national and state calculations
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: >-
+          .deploy-venv/bin/python frontend/scripts/deployment_smoke.py
+          --url "${{ steps.frontend.outputs.url }}/calibration/dashboard/api/microcosm_variable"
+          --source-commit "${{ steps.identity.outputs.source_commit }}"
+          --check full
+          --vercel-bypass-secret "$VERCEL_AUTOMATION_BYPASS_SECRET"
+
+      - name: Promote verified Vercel deployment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: >-
+          bunx --bun "vercel@${VERCEL_CLI_VERSION}" promote
+          "${{ steps.frontend.outputs.url }}"
+          --yes
+          --scope policy-engine
+          --token "$VERCEL_TOKEN"
+
+      - name: Verify promoted Vercel route
+        run: >-
+          .deploy-venv/bin/python frontend/scripts/deployment_smoke.py
+          --url "https://calibration-diagnostics.vercel.app/calibration/dashboard/api/microcosm_variable"
+          --source-commit "${{ steps.identity.outputs.source_commit }}"
+          --check state
+
+      - name: Verify promoted microcosm.institute route
+        run: >-
+          .deploy-venv/bin/python frontend/scripts/deployment_smoke.py
+          --url "https://microcosm.institute/calibration/dashboard/api/microcosm_variable"
+          --source-commit "${{ steps.identity.outputs.source_commit }}"
+          --check state
