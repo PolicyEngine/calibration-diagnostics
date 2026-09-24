@@ -39,6 +39,9 @@ The workflow is fixed to Vercel project `calibration-diagnostics`
 `main` only, so pull-request previews remain enabled. Do not relink the workflow to a
 different project or remove `--skip-domain`; the frontend must not receive production
 traffic before its paired backend passes the deployment checks.
+Run the Vercel CLI from the repository root. The Vercel project already configures
+`frontend` as its root directory, so setting the CLI working directory to `frontend`
+would make Vercel look for a nonexistent `frontend/frontend` directory.
 
 Configure these GitHub Actions secrets before merging the workflow:
 

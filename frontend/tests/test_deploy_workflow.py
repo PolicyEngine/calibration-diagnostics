@@ -48,6 +48,7 @@ def test_deployment_uses_exact_project_and_backend_first_order():
     )
     assert "--skip-domain" in frontend["run"]
     assert '--project "$VERCEL_PROJECT_ID"' in frontend["run"]
+    assert "--cwd frontend" not in frontend["run"]
 
 
 def test_vercel_disables_only_automatic_main_deployment():

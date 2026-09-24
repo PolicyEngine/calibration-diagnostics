@@ -120,7 +120,6 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           deployment_url="$(bunx --bun "vercel@${VERCEL_CLI_VERSION}" deploy . \
-            --cwd frontend \
             --yes \
             --prod \
             --skip-domain \
