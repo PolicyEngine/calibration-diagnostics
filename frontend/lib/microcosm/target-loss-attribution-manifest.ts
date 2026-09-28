@@ -61,7 +61,7 @@ const CONCEPT_BUDGET_WEIGHTING =
 
 // This manifest is required because older builds do not expose target-importance
 // weights in their diagnostic files. It was audited against every US release
-// eligible for the picker on 2026-08-18 and includes explicitly verified staging
+// eligible for the picker through 2026-09-29 and includes explicitly verified staging
 // candidates when needed. These fingerprints cover ordered diagnostic row names,
 // not downloaded files; runtime reconstruction must refuse an artifact whose
 // target surface changes.
@@ -412,6 +412,22 @@ export const HISTORICAL_ATTRIBUTION_SUPPORT: readonly HistoricalAttributionSuppo
     recipe: "concept_budget_sqrt_value_50_50_v3",
     expectedStatus: "exact_reconstructed",
     tolerance: FLOATING_POINT_TOLERANCE,
+  },
+  {
+    releaseId: "populace-us-2024-buildo-acs-local-767312d60-20260923T074941Z",
+    buildId: "populace-us-2024-buildo-acs-local-767312d60-20260923T074941Z",
+    diagnosticsSha256: "f39d10a72415eb85ac0faa231f7970bffcc408bd53ef0f05985ea8dd0ac94903",
+    buildSha: "767312d60",
+    producerCommit: null,
+    releaseFamily: "local_area",
+    diagnosticsSchema: null,
+    targetCount: 4459,
+    orderedTargetNamesSha256: "3ec3156612fa78d193055eaba7a5212b2bc21b533c037670cd7e8d3af7735500",
+    producerTargetSurfaceSha256: null,
+    weightingIdentifier: null,
+    recipe: "uniform_target_scale_cap_100pct_v1",
+    expectedStatus: "exact_reconstructed",
+    tolerance: SIX_DECIMAL_TOLERANCE,
   },
 ] as const;
 

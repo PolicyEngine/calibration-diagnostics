@@ -18,6 +18,10 @@ const KNOWN_UNVERSIONED_LEGACY_DIAGNOSTICS = new Map([
     "populace-us-2024-buildp-acs-local-592ae5d6-20260819T020303Z",
     "b6f05b652049f88c044f1907eeed13c378aea47aec9c6dd6518faa90d1a0dcd0",
   ],
+  [
+    "populace-us-2024-buildo-acs-local-767312d60-20260923T074941Z",
+    "f39d10a72415eb85ac0faa231f7970bffcc408bd53ef0f05985ea8dd0ac94903",
+  ],
 ]);
 
 /**

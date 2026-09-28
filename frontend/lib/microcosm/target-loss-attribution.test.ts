@@ -153,8 +153,8 @@ describe("schema-version-6 reported target-loss attribution", () => {
 
 describe("audited historical support manifest", () => {
   test("classifies every pinned release and staging candidate from all evidence", () => {
-    expect(HISTORICAL_ATTRIBUTION_SUPPORT).toHaveLength(23);
-    expect(new Set(HISTORICAL_ATTRIBUTION_SUPPORT.map((entry) => entry.releaseId)).size).toBe(23);
+    expect(HISTORICAL_ATTRIBUTION_SUPPORT).toHaveLength(24);
+    expect(new Set(HISTORICAL_ATTRIBUTION_SUPPORT.map((entry) => entry.releaseId)).size).toBe(24);
 
     for (const entry of HISTORICAL_ATTRIBUTION_SUPPORT) {
       expect(classifyHistoricalAttributionEvidence(evidence(entry))).toEqual({
@@ -167,7 +167,7 @@ describe("audited historical support manifest", () => {
       HISTORICAL_ATTRIBUTION_SUPPORT.filter(
         (entry) => entry.expectedStatus === "exact_reconstructed",
       ),
-    ).toHaveLength(17);
+    ).toHaveLength(18);
     expect(
       HISTORICAL_ATTRIBUTION_SUPPORT.filter((entry) => entry.expectedStatus === "derived"),
     ).toHaveLength(6);
@@ -192,6 +192,31 @@ describe("audited historical support manifest", () => {
     expect(classifyHistoricalAttributionEvidence(evidence(entry!))).toEqual({
       status: "exact_reconstructed",
       recipe: "newer_sqrt_value_50_50_v2",
+      reason: null,
+    });
+  });
+
+  test("pins the September 2026 local-area diagnostics", () => {
+    const entry = HISTORICAL_ATTRIBUTION_SUPPORT.find(
+      (candidate) =>
+        candidate.releaseId ===
+        "populace-us-2024-buildo-acs-local-767312d60-20260923T074941Z",
+    );
+
+    expect(entry).toMatchObject({
+      diagnosticsSha256:
+        "f39d10a72415eb85ac0faa231f7970bffcc408bd53ef0f05985ea8dd0ac94903",
+      buildSha: "767312d60",
+      diagnosticsSchema: null,
+      targetCount: 4459,
+      orderedTargetNamesSha256:
+        "3ec3156612fa78d193055eaba7a5212b2bc21b533c037670cd7e8d3af7735500",
+      recipe: "uniform_target_scale_cap_100pct_v1",
+      expectedStatus: "exact_reconstructed",
+    });
+    expect(classifyHistoricalAttributionEvidence(evidence(entry!))).toEqual({
+      status: "exact_reconstructed",
+      recipe: "uniform_target_scale_cap_100pct_v1",
       reason: null,
     });
   });
