@@ -10,6 +10,7 @@ import {
   differingPercentDigits,
   fmt,
   fmtCompact,
+  fmtDecimal,
   fmtMoney,
   fmtSignedMoney,
   shortReleaseId,
@@ -42,8 +43,9 @@ type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined
 
 function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  if (kind === "normalized_target_loss") return fmt(value, { digits: value < 1 ? 4 : 3 });
-  return fmtCompact(value);
+  return kind === "normalized_target_loss"
+    ? fmt(value, { pct: true, digits: 2 })
+    : fmtDecimal(value);
 }
 
 function pct(value: number | null | undefined) {
@@ -427,8 +429,8 @@ function RunInternalsPanel({
               <KpiCard
                 label={
                   runData.calibration.loss_kind === "normalized_target_loss"
-                    ? "Final normalized loss"
-                    : "Final raw loss"
+                    ? "Weighted target error"
+                    : "Raw optimizer loss"
                 }
                 value={fmtLoss(runData.calibration.final_loss, runData.calibration.loss_kind)}
                 hint={`initial ${fmtLoss(

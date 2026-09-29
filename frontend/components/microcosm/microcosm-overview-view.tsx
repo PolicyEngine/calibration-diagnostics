@@ -21,7 +21,7 @@ import {
   type Country,
 } from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact } from "@/components/shared/format";
+import { fmt, fmtCompact, fmtDecimal } from "@/components/shared/format";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { OverviewMetric } from "@/components/shared/overview-metric";
 import { PageHeader } from "@/components/shared/page-header";
@@ -58,9 +58,11 @@ function isNormalizedLoss(kind: LossKind): boolean {
   return kind === "normalized_target_loss";
 }
 
-export function fmtLoss(value: number | null | undefined): string {
+export function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  return fmt(value, { pct: true, digits: 2 });
+  return isNormalizedLoss(kind)
+    ? fmt(value, { pct: true, digits: 2 })
+    : fmtDecimal(value);
 }
 
 function MetricHelpLabel({ label, tooltip }: { label: string; tooltip: string }) {
@@ -235,6 +237,9 @@ export function MicrocosmOverviewView({
   const includedTargets = cal.included_target_count ?? totalTargets;
   const lossKind = cal.loss_kind;
   const normalizedLoss = isNormalizedLoss(lossKind);
+  const evenlyWeightedTargets =
+    cal.target_loss_attribution?.basis_identifier ===
+    "uniform_target_scale_cap_100pct_v1";
   const diagnosticsStatus = cal.diagnostics_status ?? "ok";
   const isNonDefault = cal.is_local_area === true || cal.is_default === false;
   const labelVariantCount = cal.label_variants?.count ?? 0;
@@ -296,12 +301,16 @@ export function MicrocosmOverviewView({
                 label={normalizedLoss ? "Weighted target error" : "Raw optimizer loss"}
                 tooltip={
                   normalizedLoss
-                    ? WEIGHTED_TARGET_ERROR_HELP
-                    : "Raw optimizer loss reported by this release. This dataset build weighted all targets evenly."
+                    ? `${WEIGHTED_TARGET_ERROR_HELP}${
+                        evenlyWeightedTargets
+                          ? " This dataset build weighted all targets evenly."
+                          : ""
+                      }`
+                    : "Raw optimizer loss reported by this release. Its scale is producer-defined and is not a percentage."
                 }
               />
             }
-            value={fmtLoss(cal.final_loss)}
+            value={fmtLoss(cal.final_loss, lossKind)}
           />
           <OverviewMetric
             label="Targets"

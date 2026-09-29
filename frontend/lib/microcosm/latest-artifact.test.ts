@@ -12,6 +12,7 @@ import beReleaseManifestFixture from "./fixtures/be-release/release_manifest.jso
 import {
   buildCalibration,
   buildComparison,
+  calibrationLossKind,
   diagnosticsDimensions,
   MICROCOSM_HF_REPO_ENV,
   MICROCOSM_BE_HF_REPO_ENV,
@@ -1864,6 +1865,15 @@ test("new target loss weighting metadata marks loss as normalized", () => {
   expect(latestMicrocosmCalibrationSummary(raw).loss_kind).toBe("raw_optimizer_objective");
   expect(buildComparison(raw, normalized).summary.losses_comparable).toBe(false);
   expect(buildComparison(raw, normalized).summary.loss_kind).toBe("mixed");
+});
+
+test("verified historical attribution marks a metadata-poor loss as normalized", () => {
+  expect(calibrationLossKind({}, {}, "exact_reconstructed")).toBe(
+    "normalized_target_loss",
+  );
+  expect(calibrationLossKind({}, {}, "reported")).toBe("normalized_target_loss");
+  expect(calibrationLossKind({}, {}, "derived")).toBe("raw_optimizer_objective");
+  expect(calibrationLossKind({}, {}, "unavailable")).toBe("raw_optimizer_objective");
 });
 
 test("dotted chronicle zero targets use structural-zero percentage errors", () => {

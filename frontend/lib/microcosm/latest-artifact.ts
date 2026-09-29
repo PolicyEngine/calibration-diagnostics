@@ -41,6 +41,7 @@ import {
   targetLossAttributionSummary,
   type CalibrationProvenance,
   type FinalTargetLossAttribution,
+  type TargetLossAttributionStatus,
   type TargetLossDiagnosticWarning,
 } from "./target-loss-attribution";
 import {
@@ -196,13 +197,16 @@ function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function calibrationLossKind(
+export function calibrationLossKind(
   diag: JsonObject,
   buildManifest: JsonObject,
+  attributionStatus: TargetLossAttributionStatus = "unavailable",
 ): CalibrationLossKind {
   const options = asObject(diag.options);
   const diagnosticsBuild = asObject(diag.build);
   if (
+    attributionStatus === "reported" ||
+    attributionStatus === "exact_reconstructed" ||
     (numberOrNull(diag.schema_version) != null &&
       Number(diag.schema_version) >= 6) ||
     diag.target_loss_basis != null ||
@@ -2094,7 +2098,11 @@ export function buildCalibration(
       numberOrNull(diag.top_1pct_weight_share),
     initial_loss: numberOrNull(diag.initial_loss),
     final_loss: numberOrNull(diag.final_loss),
-    loss_kind: calibrationLossKind(diag, buildManifest),
+    loss_kind: calibrationLossKind(
+      diag,
+      buildManifest,
+      normalizedAttribution.attribution.status,
+    ),
     fraction_within_10pct: numberOrNull(diag.fraction_within_10pct),
     loss_trajectory: Array.isArray(diag.loss_trajectory) ? (diag.loss_trajectory as number[]) : [],
     skipped,
