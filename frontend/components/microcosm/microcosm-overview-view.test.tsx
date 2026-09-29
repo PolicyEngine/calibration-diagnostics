@@ -2,7 +2,13 @@ import { expect, test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { MicrocosmReleaseHeader } from "./microcosm-overview-view";
+import { fmtLoss, MicrocosmReleaseHeader } from "./microcosm-overview-view";
+
+test("formats calibration loss as a percentage", () => {
+  expect(fmtLoss(0.015491)).toBe("1.55%");
+  expect(fmtLoss(0)).toBe("0.00%");
+  expect(fmtLoss(null)).toBe("—");
+});
 
 test("keeps the release selector available without selected release data", () => {
   const markup = renderToStaticMarkup(

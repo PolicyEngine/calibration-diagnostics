@@ -67,18 +67,6 @@ export function fmt(
   return value.toFixed(opts.digits ?? 4);
 }
 
-export function fmtDecimal(
-  value: number | null | undefined,
-  significantDigits = 4,
-): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("en-US", {
-    useGrouping: false,
-    maximumSignificantDigits: significantDigits,
-    maximumFractionDigits: 20,
-  }).format(value);
-}
-
 export function differingPercentDigits(
   left: number | null | undefined,
   right: number | null | undefined,
