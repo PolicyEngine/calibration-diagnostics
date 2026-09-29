@@ -74,7 +74,7 @@ function MetricHelpLabel({ label, tooltip }: { label: string; tooltip: string })
           <button
             type="button"
             aria-label={`About ${label}`}
-            className="inline-flex cursor-pointer items-center text-inherit"
+            className="inline-flex cursor-pointer items-center text-inherit tracking-normal"
           >
             <span
               aria-hidden="true"
