@@ -169,6 +169,16 @@ test("loads trimmed Belgium diagnostics without optional US artifact fields", ()
   expect(cal.diagnostics_status).toBe("ok");
   expect(cal.included_target_count).toBe(3);
   expect(cal.loss_trajectory).toEqual([]);
+  expect(cal).toMatchObject({
+    effective_sample_size: 560.7099759427821,
+    realized_max_weight_ratio: 49.58337498396423,
+    top_1pct_weight_share: 0.5115731886787078,
+  });
+  expect(latestMicrocosmCalibrationSummary(cal)).toMatchObject({
+    effective_sample_size: 560.7099759427821,
+    realized_max_weight_ratio: 49.58337498396423,
+    top_1pct_weight_share: 0.5115731886787078,
+  });
   expect(cal.description).toBe(
     "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
   );
