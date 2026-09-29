@@ -16,7 +16,7 @@ import {
   type Country,
 } from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact } from "@/components/shared/format";
+import { fmt, fmtCompact, fmtDecimal } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { OverviewMetric } from "@/components/shared/overview-metric";
@@ -57,8 +57,24 @@ function isNormalizedLoss(kind: LossKind): boolean {
 function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
   if (isNormalizedLoss(kind)) return fmt(value, { pct: true, digits: 2 });
-  if (value === 0) return "0";
-  return value.toExponential(3).replace("e+", "e");
+  return fmtDecimal(value);
+}
+
+function MetricHelpLabel({ label, tooltip }: { label: string; tooltip: string }) {
+  return (
+    <span className="inline-flex items-center justify-center gap-1">
+      <span>{label}</span>
+      <span className="inline-flex">
+        <HelpHint
+          label={<span className="sr-only">About {label}</span>}
+          tooltip={tooltip}
+          interaction="click"
+          underline={false}
+          inheritTypography
+        />
+      </span>
+    </span>
+  );
 }
 
 export function MicrocosmReleaseHeader({
@@ -258,16 +274,13 @@ export function MicrocosmOverviewView({
         <div className="mx-3 flex divide-x divide-border/70">
           <OverviewMetric
             label={
-              <HelpHint
+              <MetricHelpLabel
                 label={normalizedLoss ? "Weighted target error" : "Raw optimizer loss"}
                 tooltip={
                   normalizedLoss
                     ? WEIGHTED_TARGET_ERROR_HELP
-                    : "Raw optimizer loss reported by this release. Its scale is producer-defined and is not a percentage."
+                    : "Raw optimizer loss reported by this release. Its scale is producer-defined and is not a percentage. This dataset build weighted all targets evenly."
                 }
-                interaction="click"
-                underline={false}
-                inheritTypography
               />
             }
             value={fmtLoss(cal.final_loss, lossKind)}
@@ -278,24 +291,18 @@ export function MicrocosmOverviewView({
           />
           <OverviewMetric
             label={
-              <HelpHint
+              <MetricHelpLabel
                 label="Within 10% of target"
                 tooltip="Share of calibration targets whose final aggregate is within 10% of the target value."
-                interaction="click"
-                underline={false}
-                inheritTypography
               />
             }
             value={fmt(cal.fraction_within_10pct, { pct: true, digits: 1 })}
           />
           <OverviewMetric
             label={
-              <HelpHint
+              <MetricHelpLabel
                 label="Weighted synthetic households"
                 tooltip="Synthetic households with a non-zero calibrated weight in this release."
-                interaction="click"
-                underline={false}
-                inheritTypography
               />
             }
             value={cal.n_nonzero == null ? "—" : fmtCompact(cal.n_nonzero)}

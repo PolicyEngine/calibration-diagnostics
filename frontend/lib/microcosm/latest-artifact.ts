@@ -1114,7 +1114,7 @@ function enrichTargetRow(
     ? structuredIdentity.measure
     : dims[0] && MEASURES.has(dims[0])
       ? dims[0]
-      : measureFromMetadata(metadata);
+      : measureFromMetadata(metadata) ?? measureFromName(baseName.split(".").at(-1) ?? null);
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
   // Underscore identifiers and filter-decomposed targets use the structured
@@ -1135,7 +1135,10 @@ function enrichTargetRow(
     family: deriveFamily(baseName, parsed, usesArtifactFamily),
     state: hierarchyIdentity || structuredIdentity
       ? null
-      : stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
+      : stateFromGeoId(stringValue(metadata.ledger_geography_id)) ??
+        (parsed.level === "state" && /^[A-Z]{2}$/.test(parsed.geography)
+          ? parsed.geography
+          : deriveState(baseName)),
     geography,
     geography_id:
       hierarchyIdentity?.geographyId ??

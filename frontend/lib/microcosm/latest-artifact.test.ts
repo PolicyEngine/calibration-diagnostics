@@ -1215,6 +1215,46 @@ test("legacy Ledger metadata populates the complete Chronicle contract", () => {
   });
 });
 
+test("metadata-free dotted state targets retain geography and measure", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_broad.me.all.net_capital_gains_amount",
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 99,
+    },
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_broad.me.all.net_capital_gains_returns",
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 99,
+    },
+  ]);
+
+  expect(cal.rows.map((row) => ({
+    geography: row.geography,
+    level: row.level,
+    state: row.state,
+    measure: row.measure,
+    variable_key: row.variable_key,
+  }))).toEqual([
+    {
+      geography: "ME",
+      level: "state",
+      state: "ME",
+      measure: "total",
+      variable_key: "irs_soi / net capital gains · total",
+    },
+    {
+      geography: "ME",
+      level: "state",
+      state: "ME",
+      measure: "count",
+      variable_key: "irs_soi / net capital gains · count",
+    },
+  ]);
+});
+
 test("legacy geography and income metadata drive the explorer hierarchy", () => {
   const legacyTarget = (state: "ak" | "ca", geoId: string, band: string) => ({
     name: `irs_soi.ty2022.historic_table_2.state_agi.${state}.${band}.taxable_interest_amount@2024`,

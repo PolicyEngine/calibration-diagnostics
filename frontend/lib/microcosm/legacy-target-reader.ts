@@ -209,7 +209,7 @@ function legacyVariable(
 function parseDottedTarget(
   name: string,
   row: JsonObject,
-  _nationalGeography: string,
+  nationalGeography: string,
 ): ParsedLegacyTarget | null {
   if (!name.includes(".")) return null;
   const metadata = asObject(row.metadata);
@@ -233,7 +233,22 @@ function parseDottedTarget(
     .filter((value): value is string => Boolean(value && value !== variable))
     .join(" · ");
 
-  return { geography: "", level: "", source, variable, breakdown };
+  const stateMarkerIndex = parts.findIndex((part) => part.startsWith("state_"));
+  const state = stateMarkerIndex < 0
+    ? null
+    : parts
+        .slice(stateMarkerIndex + 1, stateMarkerIndex + 3)
+        .map((part) => part.toUpperCase())
+        .find((part) => STATE_ABBRS.has(part) && part !== "US") ?? null;
+  const national = parts.includes("us");
+
+  return {
+    geography: state ?? (national ? nationalGeography : ""),
+    level: state ? "state" : national ? "national" : "",
+    source,
+    variable,
+    breakdown,
+  };
 }
 
 function parseSlashTarget(name: string, nationalGeography: string): ParsedLegacyTarget {
