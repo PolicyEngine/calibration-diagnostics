@@ -16,6 +16,7 @@ import {
   type HierarchyLabelVariant,
   validateHierarchyTargets,
 } from "./hierarchy-target-reader";
+import { historicalWeightSummaryForDiagnostics } from "./historical-weight-summary";
 import {
   chroniclePublisherFromMetadata,
   qualifyingChildrenFromRecordSet,
@@ -40,6 +41,7 @@ import {
   targetLossAttributionSummary,
   type CalibrationProvenance,
   type FinalTargetLossAttribution,
+  type TargetLossAttributionStatus,
   type TargetLossDiagnosticWarning,
 } from "./target-loss-attribution";
 import {
@@ -195,13 +197,16 @@ function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function calibrationLossKind(
+export function calibrationLossKind(
   diag: JsonObject,
   buildManifest: JsonObject,
+  attributionStatus: TargetLossAttributionStatus = "unavailable",
 ): CalibrationLossKind {
   const options = asObject(diag.options);
   const diagnosticsBuild = asObject(diag.build);
   if (
+    attributionStatus === "reported" ||
+    attributionStatus === "exact_reconstructed" ||
     (numberOrNull(diag.schema_version) != null &&
       Number(diag.schema_version) >= 6) ||
     diag.target_loss_basis != null ||
@@ -1113,7 +1118,7 @@ function enrichTargetRow(
     ? structuredIdentity.measure
     : dims[0] && MEASURES.has(dims[0])
       ? dims[0]
-      : measureFromMetadata(metadata);
+      : measureFromMetadata(metadata) ?? measureFromName(baseName.split(".").at(-1) ?? null);
   const variableKey =
     variableKeyOf(parsed) + (measure ? ` · ${measure}` : "");
   // Underscore identifiers and filter-decomposed targets use the structured
@@ -1134,7 +1139,10 @@ function enrichTargetRow(
     family: deriveFamily(baseName, parsed, usesArtifactFamily),
     state: hierarchyIdentity || structuredIdentity
       ? null
-      : stateFromGeoId(stringValue(metadata.ledger_geography_id)) ?? deriveState(baseName),
+      : stateFromGeoId(stringValue(metadata.ledger_geography_id)) ??
+        (parsed.level === "state" && /^[A-Z]{2}$/.test(parsed.geography)
+          ? parsed.geography
+          : deriveState(baseName)),
     geography,
     geography_id:
       hierarchyIdentity?.geographyId ??
@@ -1761,6 +1769,9 @@ export interface Calibration {
   l0_lambda: number | null;
   n_nonzero: number | null;
   n_records: number | null;
+  effective_sample_size: number | null;
+  realized_max_weight_ratio: number | null;
+  top_1pct_weight_share: number | null;
   initial_loss: number | null;
   final_loss: number | null;
   loss_kind: CalibrationLossKind;
@@ -2047,6 +2058,10 @@ export function buildCalibration(
     releaseFamily: role.is_local_area ? "local_area" : "national",
     diagnosticsSha256,
   });
+  const historicalWeightSummary = historicalWeightSummaryForDiagnostics(
+    releaseId,
+    diagnosticsSha256,
+  );
   const rows = normalizedAttribution.rows;
   const includedTargetCount = rows.filter((row) => row.calibration_status === "included").length;
   return {
@@ -2069,14 +2084,25 @@ export function buildCalibration(
     release_id: String(diag.release_id ?? releaseId),
     updated_at: updatedAt,
     schema_version: diag.schema_version ?? null,
-    weight_entity: diag.weight_entity ?? null,
+    weight_entity: historicalWeightSummary?.weight_entity ?? diag.weight_entity ?? null,
     options: asObject(diag.options),
     l0_lambda: numberOrNull(diag.l0_lambda),
-    n_nonzero: numberOrNull(diag.n_nonzero),
-    n_records: numberOrNull(diag.n_records),
+    n_nonzero: historicalWeightSummary?.n_nonzero ?? numberOrNull(diag.n_nonzero),
+    n_records: historicalWeightSummary?.n_records ?? numberOrNull(diag.n_records),
+    effective_sample_size:
+      historicalWeightSummary?.effective_sample_size ??
+      numberOrNull(diag.effective_sample_size),
+    realized_max_weight_ratio: numberOrNull(diag.realized_max_weight_ratio),
+    top_1pct_weight_share:
+      historicalWeightSummary?.top_1pct_weight_share ??
+      numberOrNull(diag.top_1pct_weight_share),
     initial_loss: numberOrNull(diag.initial_loss),
     final_loss: numberOrNull(diag.final_loss),
-    loss_kind: calibrationLossKind(diag, buildManifest),
+    loss_kind: calibrationLossKind(
+      diag,
+      buildManifest,
+      normalizedAttribution.attribution.status,
+    ),
     fraction_within_10pct: numberOrNull(diag.fraction_within_10pct),
     loss_trajectory: Array.isArray(diag.loss_trajectory) ? (diag.loss_trajectory as number[]) : [],
     skipped,
@@ -2777,6 +2803,9 @@ export function latestMicrocosmCalibrationSummary(cal: Calibration) {
     l0_lambda: cal.l0_lambda,
     n_nonzero: cal.n_nonzero,
     n_records: cal.n_records,
+    effective_sample_size: cal.effective_sample_size,
+    realized_max_weight_ratio: cal.realized_max_weight_ratio,
+    top_1pct_weight_share: cal.top_1pct_weight_share,
     initial_loss: cal.initial_loss,
     final_loss: cal.final_loss,
     loss_kind: cal.loss_kind,

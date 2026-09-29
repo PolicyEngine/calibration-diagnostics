@@ -24,17 +24,33 @@ describe("calibration target representation", () => {
   });
 
   test("reads only the exact audited unversioned local-area artifacts", () => {
-    const releaseId =
-      "populace-us-2024-buildp-acs-local-592ae5d6-20260819T020303Z";
-    const sha256 =
-      "b6f05b652049f88c044f1907eeed13c378aea47aec9c6dd6518faa90d1a0dcd0";
+    const auditedArtifacts = [
+      {
+        releaseId:
+          "populace-us-2024-buildo-acs-local-77e2061-20260724T110908Z",
+        sha256:
+          "54251f2209c2e71bb1cce9f5626a3e59879847747156e873de51011c8e8b508f",
+      },
+      {
+        releaseId:
+          "populace-us-2024-buildp-acs-local-592ae5d6-20260819T020303Z",
+        sha256:
+          "b6f05b652049f88c044f1907eeed13c378aea47aec9c6dd6518faa90d1a0dcd0",
+      },
+      {
+        releaseId:
+          "populace-us-2024-buildo-acs-local-767312d60-20260923T074941Z",
+        sha256:
+          "f39d10a72415eb85ac0faa231f7970bffcc408bd53ef0f05985ea8dd0ac94903",
+      },
+    ];
 
-    expect(
-      targetRepresentationForDiagnosticsArtifact(undefined, {
-        releaseId,
-        sha256,
-      }),
-    ).toBe("legacy");
+    for (const identity of auditedArtifacts) {
+      expect(
+        targetRepresentationForDiagnosticsArtifact(undefined, identity),
+      ).toBe("legacy");
+    }
+    const { releaseId, sha256 } = auditedArtifacts.at(-1)!;
     expect(() =>
       targetRepresentationForDiagnosticsArtifact(undefined, {
         releaseId,

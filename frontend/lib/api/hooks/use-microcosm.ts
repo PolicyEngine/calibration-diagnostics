@@ -282,6 +282,9 @@ export interface MicrocosmCalibration {
   l0_lambda?: number | null;
   n_nonzero?: number | null;
   n_records?: number | null;
+  effective_sample_size?: number | null;
+  realized_max_weight_ratio?: number | null;
+  top_1pct_weight_share?: number | null;
   geography_coverage?: {
     unit?: string;
     states?: GeographyCoverageBlock | null;

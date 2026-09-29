@@ -2,10 +2,18 @@ import { expect, test } from "bun:test";
 
 import {
   differingPercentDigits,
+  fmtDecimal,
   fmtUnitValue,
   releaseLabel,
   shortReleaseId,
 } from "./format";
+
+test("raw values use decimal notation", () => {
+  expect(fmtDecimal(0.015491)).toBe("0.01549");
+  expect(fmtDecimal(0.0000001234)).toBe("0.0000001234");
+  expect(fmtDecimal(751_000_000_000)).toBe("751000000000");
+  expect(fmtDecimal(null)).toBe("—");
+});
 
 test("percent comparison precision increases until the rendered values differ", () => {
   expect(differingPercentDigits(0.041234, 0.041236)).toBe(3);

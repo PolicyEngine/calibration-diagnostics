@@ -1,7 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button } from "@policyengine/ui-kit";
+import {
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@policyengine/ui-kit";
 
 import {
   CalibrationExplorerDataPrefetch,
@@ -16,8 +21,7 @@ import {
   type Country,
 } from "@/components/layout/country-context";
 import { EmptyState } from "@/components/shared/empty-state";
-import { fmt, fmtCompact } from "@/components/shared/format";
-import { HelpHint } from "@/components/shared/help-hint";
+import { fmt, fmtCompact, fmtDecimal } from "@/components/shared/format";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { OverviewMetric } from "@/components/shared/overview-metric";
 import { PageHeader } from "@/components/shared/page-header";
@@ -54,11 +58,43 @@ function isNormalizedLoss(kind: LossKind): boolean {
   return kind === "normalized_target_loss";
 }
 
-function fmtLoss(value: number | null | undefined, kind: LossKind): string {
+export function fmtLoss(value: number | null | undefined, kind: LossKind): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  if (isNormalizedLoss(kind)) return fmt(value, { pct: true, digits: 2 });
-  if (value === 0) return "0";
-  return value.toExponential(3).replace("e+", "e");
+  return isNormalizedLoss(kind)
+    ? fmt(value, { pct: true, digits: 2 })
+    : fmtDecimal(value);
+}
+
+function MetricHelpLabel({ label, tooltip }: { label: string; tooltip: string }) {
+  return (
+    <span className="inline-flex items-center justify-center gap-1">
+      <span>{label}</span>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={`About ${label}`}
+            className="inline-flex cursor-pointer items-center text-inherit tracking-normal"
+          >
+            <span
+              aria-hidden="true"
+              className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border bg-card text-[10px] font-normal leading-none text-muted-foreground"
+            >
+              ?
+            </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          sideOffset={8}
+          collisionPadding={12}
+          className="z-[100] max-h-[var(--radix-popper-available-height)] w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto border-border bg-popover p-3 text-left text-xs font-normal normal-case leading-snug tracking-normal text-popover-foreground shadow-lg"
+        >
+          {tooltip}
+        </PopoverContent>
+      </Popover>
+    </span>
+  );
 }
 
 export function MicrocosmReleaseHeader({
@@ -201,6 +237,9 @@ export function MicrocosmOverviewView({
   const includedTargets = cal.included_target_count ?? totalTargets;
   const lossKind = cal.loss_kind;
   const normalizedLoss = isNormalizedLoss(lossKind);
+  const evenlyWeightedTargets =
+    cal.target_loss_attribution?.basis_identifier ===
+    "uniform_target_scale_cap_100pct_v1";
   const diagnosticsStatus = cal.diagnostics_status ?? "ok";
   const isNonDefault = cal.is_local_area === true || cal.is_default === false;
   const labelVariantCount = cal.label_variants?.count ?? 0;
@@ -258,16 +297,17 @@ export function MicrocosmOverviewView({
         <div className="mx-3 flex divide-x divide-border/70">
           <OverviewMetric
             label={
-              <HelpHint
+              <MetricHelpLabel
                 label={normalizedLoss ? "Weighted target error" : "Raw optimizer loss"}
                 tooltip={
                   normalizedLoss
-                    ? WEIGHTED_TARGET_ERROR_HELP
+                    ? `${WEIGHTED_TARGET_ERROR_HELP}${
+                        evenlyWeightedTargets
+                          ? " This dataset build weighted all targets evenly."
+                          : ""
+                      }`
                     : "Raw optimizer loss reported by this release. Its scale is producer-defined and is not a percentage."
                 }
-                interaction="click"
-                underline={false}
-                inheritTypography
               />
             }
             value={fmtLoss(cal.final_loss, lossKind)}
@@ -278,24 +318,18 @@ export function MicrocosmOverviewView({
           />
           <OverviewMetric
             label={
-              <HelpHint
+              <MetricHelpLabel
                 label="Within 10% of target"
                 tooltip="Share of calibration targets whose final aggregate is within 10% of the target value."
-                interaction="click"
-                underline={false}
-                inheritTypography
               />
             }
             value={fmt(cal.fraction_within_10pct, { pct: true, digits: 1 })}
           />
           <OverviewMetric
             label={
-              <HelpHint
+              <MetricHelpLabel
                 label="Weighted synthetic households"
                 tooltip="Synthetic households with a non-zero calibrated weight in this release."
-                interaction="click"
-                underline={false}
-                inheritTypography
               />
             }
             value={cal.n_nonzero == null ? "—" : fmtCompact(cal.n_nonzero)}

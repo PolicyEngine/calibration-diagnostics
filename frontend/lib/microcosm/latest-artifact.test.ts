@@ -12,6 +12,7 @@ import beReleaseManifestFixture from "./fixtures/be-release/release_manifest.jso
 import {
   buildCalibration,
   buildComparison,
+  calibrationLossKind,
   diagnosticsDimensions,
   MICROCOSM_HF_REPO_ENV,
   MICROCOSM_BE_HF_REPO_ENV,
@@ -169,6 +170,16 @@ test("loads trimmed Belgium diagnostics without optional US artifact fields", ()
   expect(cal.diagnostics_status).toBe("ok");
   expect(cal.included_target_count).toBe(3);
   expect(cal.loss_trajectory).toEqual([]);
+  expect(cal).toMatchObject({
+    effective_sample_size: 560.7099759427821,
+    realized_max_weight_ratio: 49.58337498396423,
+    top_1pct_weight_share: 0.5115731886787078,
+  });
+  expect(latestMicrocosmCalibrationSummary(cal)).toMatchObject({
+    effective_sample_size: 560.7099759427821,
+    realized_max_weight_ratio: 49.58337498396423,
+    top_1pct_weight_share: 0.5115731886787078,
+  });
   expect(cal.description).toBe(
     "Microcosm-BE: synthetic Belgian population calibrated to Belgian administrative and national-accounts targets (sums of Chronicle facts; surveys validation-only). Support records: US survey donor pool, reweighted; a Belgian donor pool is the planned upgrade. Cross-engine agreement is evidence about the encodings.",
   );
@@ -1205,6 +1216,46 @@ test("legacy Ledger metadata populates the complete Chronicle contract", () => {
   });
 });
 
+test("metadata-free dotted state targets retain geography and measure", () => {
+  const cal = calibration([
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_broad.me.all.net_capital_gains_amount",
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 99,
+    },
+    {
+      name: "irs_soi.ty2022.historic_table_2.state_broad.me.all.net_capital_gains_returns",
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 99,
+    },
+  ]);
+
+  expect(cal.rows.map((row) => ({
+    geography: row.geography,
+    level: row.level,
+    state: row.state,
+    measure: row.measure,
+    variable_key: row.variable_key,
+  }))).toEqual([
+    {
+      geography: "ME",
+      level: "state",
+      state: "ME",
+      measure: "total",
+      variable_key: "irs_soi / net capital gains · total",
+    },
+    {
+      geography: "ME",
+      level: "state",
+      state: "ME",
+      measure: "count",
+      variable_key: "irs_soi / net capital gains · count",
+    },
+  ]);
+});
+
 test("legacy geography and income metadata drive the explorer hierarchy", () => {
   const legacyTarget = (state: "ak" | "ca", geoId: string, band: string) => ({
     name: `irs_soi.ty2022.historic_table_2.state_agi.${state}.${band}.taxable_interest_amount@2024`,
@@ -1814,6 +1865,15 @@ test("new target loss weighting metadata marks loss as normalized", () => {
   expect(latestMicrocosmCalibrationSummary(raw).loss_kind).toBe("raw_optimizer_objective");
   expect(buildComparison(raw, normalized).summary.losses_comparable).toBe(false);
   expect(buildComparison(raw, normalized).summary.loss_kind).toBe("mixed");
+});
+
+test("verified historical attribution marks a metadata-poor loss as normalized", () => {
+  expect(calibrationLossKind({}, {}, "exact_reconstructed")).toBe(
+    "normalized_target_loss",
+  );
+  expect(calibrationLossKind({}, {}, "reported")).toBe("normalized_target_loss");
+  expect(calibrationLossKind({}, {}, "derived")).toBe("raw_optimizer_objective");
+  expect(calibrationLossKind({}, {}, "unavailable")).toBe("raw_optimizer_objective");
 });
 
 test("dotted chronicle zero targets use structural-zero percentage errors", () => {
