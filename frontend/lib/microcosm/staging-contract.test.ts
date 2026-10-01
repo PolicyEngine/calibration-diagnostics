@@ -377,3 +377,26 @@ describe("version 2", () => {
     ).toThrow(/disagree on candidate_id/);
   });
 });
+
+test("version 1 failure tracebacks are not served", () => {
+  const failed = {
+    time: "2026-09-26T13:48:00+00:00",
+    type: "stage",
+    status: "failed",
+    stage: "failed",
+    message: "Release gates failed",
+    details: { error_type: "RuntimeError", traceback: "File \"/Users/builder/run.py\", line 1" },
+  };
+  const [event] = parseStagingEvents(`${JSON.stringify(failed)}\n`);
+  expect(event.details).toEqual({ error_type: "RuntimeError" });
+  expect(event.message).toBe("Release gates failed");
+
+  const progress = parseStagingProgress({
+    schema_version: 1,
+    run_id: "run-a",
+    status: "failed",
+    stage: "failed",
+    details: failed.details,
+  });
+  expect(progress.details).toEqual({ error_type: "RuntimeError" });
+});

@@ -463,12 +463,24 @@ function parseRunEnvelope(payload: JsonObject, label: string): {
   return { runId, candidateId, releaseId, pipeline, failure, delivery };
 }
 
+// Version 1 telemetry has no content policy. Its failure path records the
+// Python traceback in `details` (microcosm staging.py `fail()`), which can carry
+// build-machine paths; the dashboard serves staging documents publicly, so the
+// traceback is dropped here. The error type and message are kept.
+function withoutTraceback(payload: JsonObject): JsonObject {
+  const details = payload.details;
+  if (!details || typeof details !== "object" || Array.isArray(details)) return payload;
+  if (!("traceback" in details)) return payload;
+  const { traceback: _traceback, ...rest } = details as JsonObject;
+  return { ...payload, details: rest };
+}
+
 export function parseStagingProgress(value: unknown): JsonObject {
   const payload = objectValue(value, "progress");
   const schemaVersion = version(payload, "progress");
   if (schemaVersion === 1) {
     const runId = stringValue(payload.run_id, "progress run_id");
-    return { ...payload, run_id: runId };
+    return { ...withoutTraceback(payload), run_id: runId };
   }
   assertExactKeys(payload, "version 2 progress", [
     "schema_name",
@@ -675,7 +687,7 @@ export function parseStagingEvents(text: string | null): JsonObject[] {
         throw new IncompatibleStagingDataError(`event ${index} is not valid JSON.`);
       }
       const schemaVersion = version(payload, "event", { allowUnversionedV1: true });
-      if (schemaVersion === 1) return payload;
+      if (schemaVersion === 1) return withoutTraceback(payload);
       assertExactKeys(payload, `event ${index}`, [
         "schema_name",
         "schema_version",

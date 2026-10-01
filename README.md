@@ -44,6 +44,14 @@ dashboard API layer.
   fit, and a hierarchical map of weighted target-error increases and
   reductions. Countries without a staging repository show an explicit
   unavailable state.
+- **Build progress** (the second tab of Staging candidates,
+  `/microcosm/staging?view=progress`) — follow a build run while it runs,
+  from the staging repository or from the `runs/<run_id>/` telemetry folders a
+  Microcosm build writes on the machine it runs on: a stage timeline, an
+  expected finish time with a 90% range, calibration speed, where build time
+  goes across past runs of the same pipeline, and which checks fail and how
+  much compute had run when they did. See
+  [the build progress notes](docs/build-monitor.md).
 - **Calibration target investigations** (`docs/ai/`) — tool-independent procedures,
   specialist review responsibilities, and a reusable checklist for identifying
   the cause of a discrepant target from release artifacts and relevant source
@@ -67,6 +75,8 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 | `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics for a published release |
 | `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one published target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks |
 | `GET /api/microcosm/compare?a=<id>&b=<id>` | Version-over-version diff |
+| `GET /api/microcosm/builds?country=<code>&source=local\|staging` | Every build run from one source as a stage timeline |
+| `GET /api/microcosm/builds/run?id=<run_id>&country=<code>&source=local\|staging` | One run's timeline and completion forecast, with stage-time and gate-failure statistics for its pipeline |
 | `GET /api/microcosm/staging/runs` | List staging build runs |
 | `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and its candidate diagnostics: an uploaded `calibration_diagnostics` telemetry artifact, or the `calibration_diagnostics.json` of the dataset bundle the run staged under `staged/<run_id>/` in the country's release repository (read at the commit the run recorded, digest-verified) |
 | `GET /api/microcosm/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
