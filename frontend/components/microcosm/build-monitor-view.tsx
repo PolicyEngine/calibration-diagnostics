@@ -23,7 +23,6 @@ import {
   type BuildRunSource,
   type BuildRunState,
   type BuildTimeline,
-  type CalibrationPoint,
   type FailureClassStat,
   type GateStat,
   type PhaseTotals,
@@ -286,9 +285,6 @@ export function BuildMonitorView({
         <>
           <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} />
           <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
-          {data.run.calibration.length ? (
-            <CalibrationCard points={data.run.calibration} forecast={data.forecast} />
-          ) : null}
           <TimeBudgetCard
             pipelineLabel={data.run.pipeline_label}
             pipelineRuns={data.pipeline_runs}
@@ -413,6 +409,12 @@ function RunOverview({
                   }${
                     forecast.stage_work
                       ? ` · ${forecast.stage_work.done} of ${forecast.stage_work.total} done`
+                      : ""
+                  }${
+                    forecast.calibration
+                      ? ` · epoch ${forecast.calibration.epoch} of ${forecast.calibration.epochs}${
+                          forecast.calibration.pass > 0 ? `, pass ${forecast.calibration.pass + 1}` : ""
+                        } at ${forecast.calibration.seconds_per_epoch.toFixed(2)} s/epoch`
                       : ""
                   }`
                 : !running && pace != null
@@ -819,102 +821,6 @@ function PhaseLegend() {
         Expected
       </span>
     </div>
-  );
-}
-
-function CalibrationCard({
-  points,
-  forecast,
-}: {
-  points: CalibrationPoint[];
-  forecast: BuildForecast | null;
-}) {
-  const losses = points.filter((point) => point.loss != null && point.loss > 0);
-  const last = points[points.length - 1];
-  const passes = new Set(points.map((point) => point.pass)).size;
-  const rate = forecast?.calibration ?? null;
-  const W = 640;
-  const H = 160;
-  const pad = 6;
-  const logs = losses.map((point) => Math.log10(point.loss as number));
-  const min = Math.min(...logs);
-  const max = Math.max(...logs);
-  const span = max - min || 1;
-  const byPass = new Map<number, string[]>();
-  losses.forEach((point, index) => {
-    const x = pad + (index / Math.max(1, losses.length - 1)) * (W - 2 * pad);
-    const y = pad + (1 - (logs[index] - min) / span) * (H - 2 * pad);
-    const list = byPass.get(point.pass) ?? [];
-    list.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-    byPass.set(point.pass, list);
-  });
-  return (
-    <SectionCard
-      title="Calibration"
-      description={
-        passes > 1
-          ? `${passes} solver passes (size search or refits restart the epoch counter). Loss on a log scale.`
-          : "Solver loss by epoch, on a log scale."
-      }
-    >
-      <div className="grid gap-4 lg:grid-cols-[1fr_16rem]">
-        {losses.length > 1 ? (
-          <div className="relative">
-            <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground">
-              {(10 ** max).toPrecision(3)}
-            </span>
-            <span className="absolute bottom-0 left-0 text-[10px] tabular-nums text-muted-foreground">
-              {(10 ** min).toPrecision(3)}
-            </span>
-            <svg
-              viewBox={`0 0 ${W} ${H}`}
-              preserveAspectRatio="none"
-              className="h-40 w-full"
-              role="img"
-              aria-label="Calibration loss"
-            >
-              {[...byPass].map(([pass, coords]) => (
-                <polyline
-                  key={pass}
-                  points={coords.join(" ")}
-                  fill="none"
-                  stroke={pass % 2 ? "var(--chart-3)" : "var(--chart-1)"}
-                  strokeWidth={1.5}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
-            </svg>
-          </div>
-        ) : (
-          <EmptyState title="Not enough loss points yet." variant="compact" />
-        )}
-        <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs lg:grid-cols-1">
-          <div>
-            <dt className="text-muted-foreground">Epoch</dt>
-            <dd className="text-sm font-semibold tabular-nums">
-              {last?.epoch ?? "—"} of {last?.epochs ?? "—"}
-              {passes > 1 ? ` · pass ${last.pass + 1}` : ""}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Latest loss</dt>
-            <dd className="text-sm font-semibold tabular-nums">{last?.loss != null ? last.loss.toPrecision(4) : "—"}</dd>
-          </div>
-          {rate ? (
-            <>
-              <div>
-                <dt className="text-muted-foreground">Speed</dt>
-                <dd className="text-sm font-semibold tabular-nums">{rate.seconds_per_epoch.toFixed(2)} s/epoch</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">This pass ends in</dt>
-                <dd className="text-sm font-semibold tabular-nums">{fmtDuration(rate.remaining_ms)}</dd>
-              </div>
-            </>
-          ) : null}
-        </dl>
-      </div>
-    </SectionCard>
   );
 }
 
