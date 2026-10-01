@@ -613,7 +613,6 @@ function TimelineCard({
   forecast: BuildForecast | null;
   nowMs: number;
 }) {
-  const [showAll, setShowAll] = useState(false);
   const failedStages = new Set(
     run.spans.filter((span) => span.depth === 0 && span.status === "failed").map((span) => span.start_ms),
   );
@@ -648,14 +647,9 @@ function TimelineCard({
   const domain = Math.max(1, elapsed, p90Offset ?? 0, ...rows.map((row) => row.end)) * 1.02;
   const pct = (ms: number) => `${Math.min(100, Math.max(0, (ms / domain) * 100))}%`;
   const width = (start: number, end: number) => `${Math.max(0.25, ((end - start) / domain) * 100)}%`;
-  const threshold = domain * 0.01;
-  const visible = showAll
-    ? rows
-    : rows.filter((row) => row.end - row.start >= threshold || row.status === "running" || row.status === "failed");
-  const hidden = rows.length - visible.length;
-  const hiddenMs = rows
-    .filter((row) => !visible.includes(row))
-    .reduce((sum, row) => sum + (row.end - row.start), 0);
+  // Every stage gets a row, however short: a seconds-long stage is still a
+  // step the build went through.
+  const visible = rows;
   const ticks = axisTicks(domain);
 
   if (!rows.length) {
@@ -685,17 +679,6 @@ function TimelineCard({
         run.state === "running"
           ? "Solid bars are stages that ran; hatched bars are what comparable runs did next, stretched to the forecast. The band marks the 90% finish range."
           : "Each stage of the run on one time axis."
-      }
-      actions={
-        hidden || showAll ? (
-          <button
-            type="button"
-            onClick={() => setShowAll((value) => !value)}
-            className="text-xs font-medium text-primary hover:underline"
-          >
-            {showAll ? "Hide short stages" : `Show ${hidden} short stages`}
-          </button>
-        ) : undefined
       }
     >
       <div className="flex flex-col gap-1">
@@ -730,12 +713,6 @@ function TimelineCard({
               labelLeft={row.end / domain > 0.85}
             />
           ))}
-          {hidden && !showAll ? (
-            <>
-              <div className="truncate text-muted-foreground">{hidden} short stages</div>
-              <div className="text-muted-foreground">{fmtDuration(hiddenMs)} in total</div>
-            </>
-          ) : null}
 
           <div />
           <div className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground">
