@@ -76,7 +76,8 @@ const FAILURE_CLASS_LABEL: Record<string, string> = {
   out_of_memory: "Out of memory",
   refused: "Refused before building",
   error: "Error",
-  stopped_without_final_event: "Stopped without a final event",
+  stopped_without_final_event: "Stopped without a final event (killed)",
+  abandoned_early: "Stopped within 2 min of starting (test or abort)",
   unclassified: "Failed, no class recorded",
 };
 
@@ -1124,18 +1125,40 @@ function GatesCard({
                   <th className="pb-1.5 font-medium">Kind</th>
                   <th className="pb-1.5 text-right font-medium">Runs</th>
                   <th className="pb-1.5 text-right font-medium">Compute lost (median)</th>
-                  <th className="pb-1.5 pl-3 font-medium">Latest</th>
+                  <th className="pb-1.5 pl-3 font-medium">Stopped in</th>
+                  <th className="pb-1.5 pl-3 font-medium">Most common reasons</th>
                 </tr>
               </thead>
               <tbody>
                 {failureClasses.map((stat) => (
                   <tr key={stat.failure_class} className="border-t border-border/60">
-                    <td className="py-1.5 pr-2 font-medium">{failureClassLabel(stat.failure_class)}</td>
+                    <td className="py-1.5 pr-2 font-medium">
+                      {failureClassLabel(stat.failure_class)}
+                      {stat.inferred ? (
+                        <span
+                          className="ml-1 font-normal text-muted-foreground"
+                          title="These runs recorded no class; it is inferred from the error type, message and failing stage."
+                        >
+                          ({stat.inferred === stat.runs ? "inferred" : `${stat.inferred} inferred`})
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="py-1.5 text-right tabular-nums">
                       {stat.runs} of {pipelineRuns}
                     </td>
                     <td className="py-1.5 text-right tabular-nums">{fmtDuration(stat.median_compute_lost_ms)}</td>
-                    <td className="truncate py-1.5 pl-3 font-mono text-muted-foreground">{stat.last_run_id}</td>
+                    <td className="py-1.5 pl-3 text-muted-foreground">
+                      {stat.stages
+                        .slice(0, 3)
+                        .map((item) => `${formatStageName(item.stage)}${item.count > 1 ? ` (${item.count})` : ""}`)
+                        .join(" · ") || "—"}
+                    </td>
+                    <td className="py-1.5 pl-3 text-muted-foreground">
+                      {stat.reasons
+                        .slice(0, 2)
+                        .map((item) => `${item.reason}${item.count > 1 ? ` (${item.count})` : ""}`)
+                        .join(" · ") || "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

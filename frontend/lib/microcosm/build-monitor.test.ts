@@ -567,13 +567,40 @@ describe("process telemetry (resources, work, heartbeat, failure class)", () => 
       T0 + min(300),
     );
     failed.failure = { ...failed.failure!, failure_class: "gate_refused" };
-    const stalled = buildTimeline(v1Run("quiet", [["target_compilation", 0]]), T0 + STALL_MS + min(1));
+    // Went silent 30 minutes in: a kill, not an abort.
+    const stalled = buildTimeline(
+      v1Run("quiet", [
+        ["load_base_frame", 0],
+        ["target_compilation", min(30)],
+      ]),
+      T0 + min(30) + STALL_MS + min(1),
+    );
     const stats = failureClassStatistics([failed, stalled, buildTimeline(passedRun("ok", 0), T0)]);
     expect(stats.map((stat) => [stat.failure_class, stat.runs])).toEqual([
       ["gate_refused", 1],
       ["stopped_without_final_event", 1],
     ]);
     expect(stats[0].median_compute_lost_ms).toBe(min(200));
+    expect(stats[0].inferred).toBe(0);
+    expect(stats[1].stages).toEqual([{ stage: "target_compilation", count: 1 }]);
+  });
+
+  test("old failures without a class get an inferred one", () => {
+    const gate = buildTimeline(
+      v1Run("old-gate", [["release_gates", 0]], { end: ["failed", min(5), "Release gates failed: QRF tail"] }),
+      T0 + min(10),
+    );
+    const crash = buildTimeline(
+      v1Run("old-crash", [["export_dataset", 0]], { end: ["failed", min(5), "KeyError: 'weights'"] }),
+      T0 + min(10),
+    );
+    const early = buildTimeline(v1Run("aborted", [["target_registry", 0]]), T0 + STALL_MS + min(1));
+    const stats = failureClassStatistics([gate, crash, early]);
+    const byClass = Object.fromEntries(stats.map((stat) => [stat.failure_class, stat]));
+    expect(byClass.gate_refused.inferred).toBe(1);
+    expect(byClass.gate_refused.reasons).toEqual([{ reason: "Release gates failed", count: 1 }]);
+    expect(byClass.error.stages).toEqual([{ stage: "export_dataset", count: 1 }]);
+    expect(byClass.abandoned_early.runs).toBe(1);
   });
 });
 
