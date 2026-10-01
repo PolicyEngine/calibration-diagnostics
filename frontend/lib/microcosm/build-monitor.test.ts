@@ -375,6 +375,19 @@ describe("forecastCompletion", () => {
     expect(forecast.note).toContain("longer than in any comparable run");
   });
 
+  test("a stalled run's elapsed time ends at its last sign of life", () => {
+    const stalled = buildTimeline(
+      v1Run("silent", [
+        ["load_base_frame", 0],
+        ["target_compilation", min(10)],
+      ]),
+      T0 + 90 * 24 * 60 * 60 * 1000,
+    );
+    expect(stalled.state).toBe("stalled");
+    const forecast = forecastCompletion(stalled, history, T0 + 90 * 24 * 60 * 60 * 1000)!;
+    expect(forecast.elapsed_ms).toBe(min(10));
+  });
+
   test("says so when there is no history", () => {
     const live = buildTimeline(v1Run("alone", [["load_base_frame", 0]]), T0 + min(1));
     const forecast = forecastCompletion(live, [], T0 + min(1))!;

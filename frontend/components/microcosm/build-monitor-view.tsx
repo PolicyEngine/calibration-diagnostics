@@ -425,8 +425,9 @@ function RunOverview({
 
         {run.state === "stalled" ? (
           <div className="rounded-md border px-3 py-2 text-sm pill-warn">
-            No telemetry for {fmtDuration(silentFor)}. A build killed by the operating system (out of memory) or
-            interrupted never writes a final event, so this run is probably dead. Check the build machine.
+            {elapsed != null && elapsed < 2 * 60_000
+              ? `This run went silent ${fmtDuration(elapsed)} after it started, most likely a test or an aborted launch.`
+              : `No telemetry for ${fmtDuration(silentFor)}. A build killed by the operating system (out of memory) or interrupted never writes a final event, so this run is probably dead. Check the build machine.`}
           </div>
         ) : null}
 
@@ -482,7 +483,10 @@ function axisTicks(domainMs: number): number[] {
     60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000, 15 * 60_000, 30 * 60_000, 3_600_000,
     2 * 3_600_000, 4 * 3_600_000, 6 * 3_600_000, 12 * 3_600_000,
   ];
-  const step = steps.find((candidate) => domainMs / candidate <= 8) ?? 24 * 3_600_000;
+  const day = 24 * 3_600_000;
+  const step =
+    steps.find((candidate) => domainMs / candidate <= 8) ??
+    Math.ceil(domainMs / 8 / day) * day;
   const ticks: number[] = [];
   for (let t = 0; t <= domainMs; t += step) ticks.push(t);
   return ticks;
