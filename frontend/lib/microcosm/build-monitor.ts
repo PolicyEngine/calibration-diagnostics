@@ -1006,7 +1006,9 @@ export function forecastCompletion(
 ): BuildForecast | null {
   if (run.started_ms == null) return null;
   const runStart = run.started_ms;
-  const elapsed = (run.ended_ms ?? nowMs) - runStart;
+  // A stalled run's last sign of life ends it, not the present.
+  const elapsed =
+    (run.ended_ms ?? (run.state === "stalled" ? run.updated_ms : null) ?? nowMs) - runStart;
   const history = comparableHistory(run, runs);
   // Runs that reached the end, whether or not their gates passed.
   const finished = history.filter(
