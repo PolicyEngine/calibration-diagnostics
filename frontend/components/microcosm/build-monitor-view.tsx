@@ -178,7 +178,13 @@ export function BuildMonitorView({
     if (!runs.some((run) => run.run_id === selected)) {
       const preferred = runs.find((run) => run.run_id === preferredRunId);
       const running = runs.find((run) => run.state === "running");
-      setSelected((preferred ?? running ?? runs[0]).run_id);
+      // Otherwise the newest run that got going: one that went silent within
+      // two minutes of starting (a test or an abort) shows almost nothing.
+      const substantial = runs.find((run) => {
+        const duration = runDurationMs(run, Date.now());
+        return duration != null && duration >= 2 * 60_000;
+      });
+      setSelected((preferred ?? running ?? substantial ?? runs[0]).run_id);
     }
   }, [runs, selected, preferredRunId]);
 
