@@ -23,13 +23,16 @@ import {
   type BuildRunSource,
   type BuildRunState,
   type BuildTimeline,
-  type CalibrationPoint,
+  type FailureClassStat,
   type GateStat,
   type PhaseTotals,
   type StageForecast,
   type StageStat,
   formatStageName,
   runDurationMs,
+  stageCores,
+  stageMemoryBytes,
+  type StageSpan,
 } from "@/lib/microcosm/build-monitor";
 
 const PHASE_COLOR: Record<BuildPhase, string> = {
@@ -64,6 +67,38 @@ const STATE_SWATCH: Record<BuildRunState, string> = {
   failed: "swatch-neg",
   stalled: "swatch-warn",
 };
+
+const FAILURE_CLASS_LABEL: Record<string, string> = {
+  gate_refused: "Gate refused",
+  terminated: "Terminated (SIGTERM)",
+  interrupted: "Interrupted",
+  out_of_memory: "Out of memory",
+  refused: "Refused before building",
+  error: "Error",
+  stopped_without_final_event: "Stopped without a final event (killed)",
+  abandoned_early: "Stopped within 2 min of starting (test or abort)",
+  unclassified: "Failed, no class recorded",
+};
+
+function failureClassLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return FAILURE_CLASS_LABEL[value] ?? formatStageName(value);
+}
+
+function fmtBytes(bytes: number | null | undefined): string {
+  if (bytes == null || !Number.isFinite(bytes)) return "—";
+  const gb = bytes / 1e9;
+  return gb >= 10 ? `${Math.round(gb)} GB` : `${gb.toFixed(1)} GB`;
+}
+
+function plural(unit: string): string {
+  return /(s|x|ch|sh)$/.test(unit) ? `${unit}es` : `${unit}s`;
+}
+
+function fmtCores(cores: number | null | undefined): string {
+  if (cores == null || !Number.isFinite(cores)) return "—";
+  return cores >= 10 ? cores.toFixed(0) : cores.toFixed(1);
+}
 
 export function fmtDuration(ms: number | null | undefined): string {
   if (ms == null || !Number.isFinite(ms)) return "—";
@@ -256,9 +291,6 @@ export function BuildMonitorView({
         <>
           <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} />
           <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
-          {data.run.calibration.length ? (
-            <CalibrationCard points={data.run.calibration} forecast={data.forecast} />
-          ) : null}
           <TimeBudgetCard
             pipelineLabel={data.run.pipeline_label}
             pipelineRuns={data.pipeline_runs}
@@ -268,6 +300,7 @@ export function BuildMonitorView({
           />
           <GatesCard
             stats={data.gate_stats}
+            failureClasses={data.failure_classes ?? []}
             catalog={data.gate_catalog}
             pipelineRuns={data.pipeline_runs}
           />
@@ -317,6 +350,9 @@ function RunOverview({
       description={[
         `Started ${fmtClock(run.started_ms, nowMs)}`,
         running || run.state === "stalled" ? `last telemetry ${fmtDuration(silentFor)} ago` : null,
+        run.heartbeat_ms != null && (running || run.state === "stalled")
+          ? `heartbeat ${fmtDuration(nowMs - run.heartbeat_ms)} ago`
+          : null,
         run.source === "local" ? "local run folder" : "staging repository",
       ]
         .filter(Boolean)
@@ -380,6 +416,12 @@ function RunOverview({
                     forecast.stage_work
                       ? ` · ${forecast.stage_work.done} of ${forecast.stage_work.total} done`
                       : ""
+                  }${
+                    forecast.calibration
+                      ? ` · epoch ${forecast.calibration.epoch} of ${forecast.calibration.epochs}${
+                          forecast.calibration.pass > 0 ? `, pass ${forecast.calibration.pass + 1}` : ""
+                        } at ${forecast.calibration.seconds_per_epoch.toFixed(2)} s/epoch`
+                      : ""
                   }`
                 : !running && pace != null
                   ? "Stage time against comparable runs"
@@ -414,6 +456,23 @@ function RunOverview({
                   : "No comparable runs"}
               </span>
             </div>
+          </div>
+        ) : null}
+
+        <ResourceLine run={run} />
+
+        {run.delivery?.uploads === "local_only" ? (
+          <div className="rounded-md border px-3 py-2 text-xs pill-warn">
+            This run did not reach the staging repository
+            {run.delivery.reason ? ` (${run.delivery.reason})` : ""}, so only this machine can see it.
+            {run.schema_version === 1 ? (
+              <>
+                {" "}Upload it from any machine with a staging token:{" "}
+                <code className="font-mono">
+                  uv run python tools/restage_us_staging_run.py --run-dir &lt;run folder&gt;
+                </code>
+              </>
+            ) : null}
           </div>
         ) : null}
 
@@ -452,6 +511,11 @@ function RunOverview({
         {run.failure ? (
           <div className="rounded-md border px-3 py-2 text-sm pill-neg">
             <div className="font-medium">
+              {failureClassLabel(run.failure.failure_class) ? (
+                <span className="mr-2 rounded border border-current px-1.5 py-0.5 text-[11px]">
+                  {failureClassLabel(run.failure.failure_class)}
+                </span>
+              ) : null}
               Failed{run.failure.stage ? ` in ${formatStageName(run.failure.stage)}` : ""}
               {run.failure.error_type ? ` (${run.failure.error_type})` : ""}
               {run.started_ms != null && run.ended_ms != null
@@ -467,6 +531,30 @@ function RunOverview({
       </div>
     </SectionCard>
   );
+}
+
+// What the machine is doing: cores the current (or last) stage keeps busy,
+// memory now against the machine's, and what produced the run. Shown only
+// when the run reports resources.
+function ResourceLine({ run }: { run: BuildTimeline }) {
+  const topSpans = run.spans.filter((span) => span.depth === 0);
+  const current = topSpans.find((span) => span.end_ms == null) ?? topSpans[topSpans.length - 1];
+  const cores = current ? stageCores(current) : null;
+  const host = run.identity;
+  if (!run.resources && !host) return null;
+  const parts = [
+    cores != null && current
+      ? `${fmtCores(cores)}${host?.cpu_count ? ` of ${host.cpu_count}` : ""} cores busy in ${formatStageName(current.stage)}`
+      : null,
+    run.resources?.rss_bytes != null
+      ? `memory ${fmtBytes(run.resources.rss_bytes)}${host?.memory_bytes ? ` of ${fmtBytes(host.memory_bytes)}` : ""}`
+      : null,
+    run.resources?.peak_rss_bytes != null ? `peak ${fmtBytes(run.resources.peak_rss_bytes)}` : null,
+    host?.git_commit ? `commit ${host.git_commit.slice(0, 8)}` : null,
+    host?.runtime["policyengine-us"] ? `policyengine-us ${host.runtime["policyengine-us"]}` : null,
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return <p className="text-xs text-muted-foreground">{parts.join(" · ")}</p>;
 }
 
 function FailureLines({ run }: { run: BuildTimeline }) {
@@ -513,6 +601,7 @@ interface TimelineRow {
   end: number;
   status: StageForecast["status"] | "failed";
   basis: StageForecast["basis"];
+  span: StageSpan | null;
 }
 
 function TimelineCard({
@@ -527,7 +616,14 @@ function TimelineCard({
   const failedStages = new Set(
     run.spans.filter((span) => span.depth === 0 && span.status === "failed").map((span) => span.start_ms),
   );
+  const spanAt = new Map(
+    run.spans.filter((span) => span.depth === 0).map((span) => [span.start_ms, span]),
+  );
   const rows: TimelineRow[] = (forecast?.stages ?? []).map((stage, index) => ({
+    span:
+      stage.status === "pending" || run.started_ms == null
+        ? null
+        : (spanAt.get(run.started_ms + stage.start_offset_ms) ?? null),
     key: `${stage.stage}-${index}`,
     stage: stage.stage,
     phase: stage.phase,
@@ -684,6 +780,9 @@ function TimelineStageRow({
           {fmtDuration(row.end - row.start)}
           {label ? ` · ${label}` : ""}
           {row.basis === "measured_rate" ? " (measured rate)" : ""}
+          {row.span && stageCores(row.span) != null ? ` · ${fmtCores(stageCores(row.span))} cores` : ""}
+          {row.span && stageMemoryBytes(row.span) != null ? ` · ${fmtBytes(stageMemoryBytes(row.span))}` : ""}
+          {row.span?.work ? ` · ${row.span.work.done} of ${row.span.work.total} ${plural(row.span.work.unit ?? "unit")}` : ""}
         </span>
         {nowLeft ? <div className="absolute top-0 h-5 w-px bg-foreground/30" style={{ left: nowLeft }} /> : null}
       </div>
@@ -709,102 +808,6 @@ function PhaseLegend() {
         Expected
       </span>
     </div>
-  );
-}
-
-function CalibrationCard({
-  points,
-  forecast,
-}: {
-  points: CalibrationPoint[];
-  forecast: BuildForecast | null;
-}) {
-  const losses = points.filter((point) => point.loss != null && point.loss > 0);
-  const last = points[points.length - 1];
-  const passes = new Set(points.map((point) => point.pass)).size;
-  const rate = forecast?.calibration ?? null;
-  const W = 640;
-  const H = 160;
-  const pad = 6;
-  const logs = losses.map((point) => Math.log10(point.loss as number));
-  const min = Math.min(...logs);
-  const max = Math.max(...logs);
-  const span = max - min || 1;
-  const byPass = new Map<number, string[]>();
-  losses.forEach((point, index) => {
-    const x = pad + (index / Math.max(1, losses.length - 1)) * (W - 2 * pad);
-    const y = pad + (1 - (logs[index] - min) / span) * (H - 2 * pad);
-    const list = byPass.get(point.pass) ?? [];
-    list.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-    byPass.set(point.pass, list);
-  });
-  return (
-    <SectionCard
-      title="Calibration"
-      description={
-        passes > 1
-          ? `${passes} solver passes (size search or refits restart the epoch counter). Loss on a log scale.`
-          : "Solver loss by epoch, on a log scale."
-      }
-    >
-      <div className="grid gap-4 lg:grid-cols-[1fr_16rem]">
-        {losses.length > 1 ? (
-          <div className="relative">
-            <span className="absolute left-0 top-0 text-[10px] tabular-nums text-muted-foreground">
-              {(10 ** max).toPrecision(3)}
-            </span>
-            <span className="absolute bottom-0 left-0 text-[10px] tabular-nums text-muted-foreground">
-              {(10 ** min).toPrecision(3)}
-            </span>
-            <svg
-              viewBox={`0 0 ${W} ${H}`}
-              preserveAspectRatio="none"
-              className="h-40 w-full"
-              role="img"
-              aria-label="Calibration loss"
-            >
-              {[...byPass].map(([pass, coords]) => (
-                <polyline
-                  key={pass}
-                  points={coords.join(" ")}
-                  fill="none"
-                  stroke={pass % 2 ? "var(--chart-3)" : "var(--chart-1)"}
-                  strokeWidth={1.5}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
-            </svg>
-          </div>
-        ) : (
-          <EmptyState title="Not enough loss points yet." variant="compact" />
-        )}
-        <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs lg:grid-cols-1">
-          <div>
-            <dt className="text-muted-foreground">Epoch</dt>
-            <dd className="text-sm font-semibold tabular-nums">
-              {last?.epoch ?? "—"} of {last?.epochs ?? "—"}
-              {passes > 1 ? ` · pass ${last.pass + 1}` : ""}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Latest loss</dt>
-            <dd className="text-sm font-semibold tabular-nums">{last?.loss != null ? last.loss.toPrecision(4) : "—"}</dd>
-          </div>
-          {rate ? (
-            <>
-              <div>
-                <dt className="text-muted-foreground">Speed</dt>
-                <dd className="text-sm font-semibold tabular-nums">{rate.seconds_per_epoch.toFixed(2)} s/epoch</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">This pass ends in</dt>
-                <dd className="text-sm font-semibold tabular-nums">{fmtDuration(rate.remaining_ms)}</dd>
-              </div>
-            </>
-          ) : null}
-        </dl>
-      </div>
-    </SectionCard>
   );
 }
 
@@ -840,6 +843,9 @@ function TimeBudgetCard({
   );
   const longest = Math.max(1, ...history.map((run) => run.total_ms ?? 0));
   const maxMedian = Math.max(1, ...byMedian.map((stat) => stat.median_ms));
+  const hasResources = stats.some(
+    (stat) => stat.cores_median != null || stat.memory_max_bytes != null,
+  );
 
   return (
     <SectionCard
@@ -886,6 +892,16 @@ function TimeBudgetCard({
                     <HelpHint label="p90" tooltip="90% of runs finished this stage within this time." />
                   </th>
                   <th className="pb-1.5 text-right font-medium">Share</th>
+                  {hasResources ? (
+                    <>
+                      <th className="pb-1.5 text-right font-medium">
+                        <HelpHint label="Cores" tooltip="Median cores the stage kept busy: CPU seconds over wall seconds." />
+                      </th>
+                      <th className="pb-1.5 text-right font-medium">
+                        <HelpHint label="Memory" tooltip="Largest resident memory seen at the stage's start or end." />
+                      </th>
+                    </>
+                  ) : null}
                   <th className="pb-1.5 text-right font-medium">Runs</th>
                   <th className="pb-1.5 text-right font-medium">Failed</th>
                 </tr>
@@ -905,6 +921,12 @@ function TimeBudgetCard({
                     <td className="py-1.5 text-right tabular-nums">{fmtDuration(stat.median_ms)}</td>
                     <td className="py-1.5 text-right tabular-nums">{fmtDuration(stat.p90_ms)}</td>
                     <td className="py-1.5 text-right tabular-nums">{Math.round(stat.share * 100)}%</td>
+                    {hasResources ? (
+                      <>
+                        <td className="py-1.5 text-right tabular-nums">{fmtCores(stat.cores_median)}</td>
+                        <td className="py-1.5 text-right tabular-nums">{fmtBytes(stat.memory_max_bytes)}</td>
+                      </>
+                    ) : null}
                     <td className="py-1.5 text-right tabular-nums">{stat.samples}</td>
                     <td className={`py-1.5 text-right tabular-nums ${stat.failures ? "tone-neg font-medium" : ""}`}>{stat.failures || "—"}</td>
                   </tr>
@@ -970,10 +992,12 @@ function RunHistoryRow({ run, longest, selected }: { run: PhaseTotals; longest: 
 
 function GatesCard({
   stats,
+  failureClasses,
   catalog,
   pipelineRuns,
 }: {
   stats: GateStat[];
+  failureClasses: FailureClassStat[];
   catalog: CatalogGate[] | null;
   pipelineRuns: number;
 }) {
@@ -985,6 +1009,56 @@ function GatesCard({
       description="Which checks stop builds, and how much compute had already run when they did. A check that fails late is a candidate for the preflight or dry run."
     >
       <div className="flex flex-col gap-5">
+        {failureClasses.length ? (
+          <div className="overflow-x-auto">
+            <div className="mb-1.5 text-xs font-medium text-muted-foreground">Why runs stop</div>
+            <table className="w-full min-w-[30rem] text-xs">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="pb-1.5 font-medium">Kind</th>
+                  <th className="pb-1.5 text-right font-medium">Runs</th>
+                  <th className="pb-1.5 text-right font-medium">Compute lost (median)</th>
+                  <th className="pb-1.5 pl-3 font-medium">Stopped in</th>
+                  <th className="pb-1.5 pl-3 font-medium">Most common reasons</th>
+                </tr>
+              </thead>
+              <tbody>
+                {failureClasses.map((stat) => (
+                  <tr key={stat.failure_class} className="border-t border-border/60">
+                    <td className="py-1.5 pr-2 font-medium">
+                      {failureClassLabel(stat.failure_class)}
+                      {stat.inferred ? (
+                        <span
+                          className="ml-1 font-normal text-muted-foreground"
+                          title="These runs recorded no class; it is inferred from the error type, message and failing stage."
+                        >
+                          ({stat.inferred === stat.runs ? "inferred" : `${stat.inferred} inferred`})
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums">
+                      {stat.runs} of {pipelineRuns}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums">{fmtDuration(stat.median_compute_lost_ms)}</td>
+                    <td className="py-1.5 pl-3 text-muted-foreground">
+                      {stat.stages
+                        .slice(0, 3)
+                        .map((item) => `${formatStageName(item.stage)}${item.count > 1 ? ` (${item.count})` : ""}`)
+                        .join(" · ") || "—"}
+                    </td>
+                    <td className="py-1.5 pl-3 text-muted-foreground">
+                      {stat.reasons
+                        .slice(0, 2)
+                        .map((item) => `${item.reason}${item.count > 1 ? ` (${item.count})` : ""}`)
+                        .join(" · ") || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
         {stats.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[36rem] text-xs">

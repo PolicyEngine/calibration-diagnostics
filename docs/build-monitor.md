@@ -83,6 +83,23 @@ calibration (20 checkpoints, 80% inside the 90% bound) and 17% for UK FRS
 spine builds (12 checkpoints, 67% inside). UK local candidates vary in how many solver passes they run, so
 their forecasts are poor until a pipeline has more runs.
 
+## Process telemetry
+
+When a run reports it (US release builds with microcosm's process telemetry
+on), the tab also reads:
+
+- `resources` on each stage event and in the progress document: cores a stage
+  kept busy (CPU seconds over wall seconds) and memory at its start and end,
+  shown per stage and as medians across runs;
+- `heartbeat_at`: a run that sends heartbeats is marked stalled after five
+  minutes without one, instead of six hours;
+- `work` in the progress document (batches done of the stage's total, with the
+  time they took): the current stage's remaining time comes from this measured
+  rate rather than from past runs;
+- `failure_class`, `failed_during` and `elapsed_seconds` on a failed run, and
+  the run manifest's `identity` (commit, runtime, CPU count, memory). "Why runs
+  stop" counts runs by failure class with the compute each class threw away.
+
 ## Limits
 
 - A stage that reports no progress is silent until it ends. The US target

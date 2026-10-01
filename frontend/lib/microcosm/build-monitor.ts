@@ -31,6 +31,9 @@ export const BUILD_PHASES: { id: BuildPhase; label: string }[] = [
 // A run with no telemetry for this long is reported as stalled. Matches the
 // staging page; a killed process (OOM, jetsam) never writes a terminal event.
 export const STALL_MS = 6 * 60 * 60 * 1000;
+// A run that sends heartbeats (every 60 s) is stalled once five are missed:
+// the process was most likely killed (out of memory, SIGKILL).
+export const HEARTBEAT_STALE_MS = 5 * 60 * 1000;
 const HISTORY_LIMIT = 12;
 const MARKER_STAGES = new Set(["created", "complete", "failed"]);
 const GATE_PATTERN =
@@ -61,6 +64,51 @@ export interface StageSpan {
   refused: boolean;
   // Work-unit progress the stage reports while it runs (batches, chunks).
   progress: StageProgressPoint[];
+  // Batches done of the stage's total, with the time they took, from the
+  // run's progress document while the stage runs.
+  work: StageWork | null;
+  // Process resources when the stage started and ended (or the latest
+  // heartbeat while it runs).
+  resources_start: ResourceSnapshot | null;
+  resources_end: ResourceSnapshot | null;
+}
+
+// CPU seconds the process has used so far (user and system, finished child
+// processes included) and its memory, as a run reports them.
+export interface ResourceSnapshot {
+  time_ms: number;
+  cpu_seconds: number | null;
+  rss_bytes: number | null;
+  peak_rss_bytes: number | null;
+}
+
+export interface StageWork {
+  done: number;
+  total: number;
+  unit: string | null;
+  elapsed_seconds: number;
+  updated_ms: number;
+  details: JsonObject;
+}
+
+// Whether a run's telemetry reached the staging repository. `local_only`
+// runs kept it on the build machine (no write token, uploads failed, or a
+// local-only run); `uploaded` says how many files reached the repository.
+export interface RunDelivery {
+  uploads: "local_only" | "uploaded" | "disabled" | "unknown";
+  repository: string | null;
+  reason: string | null;
+  attempts: number | null;
+  successes: number | null;
+}
+
+// What produced a run, from its run manifest.
+export interface RunIdentity {
+  git_commit: string | null;
+  platform: string | null;
+  cpu_count: number | null;
+  memory_bytes: number | null;
+  runtime: Record<string, string>;
 }
 
 export interface StageProgressPoint {
@@ -83,6 +131,9 @@ export interface BuildFailure {
   stage: string | null;
   message: string | null;
   error_type: string | null;
+  // gate_refused, terminated, interrupted, out_of_memory, refused or error,
+  // as the run recorded it; null when it recorded none.
+  failure_class: string | null;
 }
 
 export interface BuildTimeline {
@@ -100,6 +151,11 @@ export interface BuildTimeline {
   failure: BuildFailure | null;
   spans: StageSpan[];
   calibration: CalibrationPoint[];
+  heartbeat_ms: number | null;
+  // The latest resources the run reported.
+  resources: ResourceSnapshot | null;
+  identity: RunIdentity | null;
+  delivery: RunDelivery | null;
 }
 
 function str(value: unknown): string | null {
@@ -193,13 +249,100 @@ function runState(
   rawStatus: string | null,
   updatedMs: number | null,
   nowMs: number,
+  stallMs: number = STALL_MS,
 ): BuildRunState {
   if (rawStatus === "passed" || rawStatus === "completed" || rawStatus === "published") {
     return "passed";
   }
   if (rawStatus === "failed") return "failed";
-  if (updatedMs != null && nowMs - updatedMs > STALL_MS) return "stalled";
+  if (updatedMs != null && nowMs - updatedMs > stallMs) return "stalled";
   return "running";
+}
+
+function resourceSnapshot(value: unknown, at: number | null): ResourceSnapshot | null {
+  const resources = obj(value);
+  if (!resources || at == null) return null;
+  const user = num(resources.cpu_user_seconds);
+  const system = num(resources.cpu_system_seconds);
+  return {
+    time_ms: at,
+    cpu_seconds: user == null && system == null ? null : (user ?? 0) + (system ?? 0),
+    rss_bytes: num(resources.rss_bytes),
+    peak_rss_bytes: num(resources.peak_rss_bytes),
+  };
+}
+
+function stageWork(value: unknown): (StageWork & { stage: string | null }) | null {
+  const work = obj(value);
+  const done = num(work?.done);
+  const total = num(work?.total);
+  const elapsed = num(work?.elapsed_seconds);
+  const updated = timeMs(work?.updated_at);
+  if (done == null || total == null || elapsed == null || updated == null) return null;
+  return {
+    stage: str(work?.stage),
+    done,
+    total,
+    unit: str(work?.unit),
+    elapsed_seconds: elapsed,
+    updated_ms: updated,
+    details: obj(work?.details) ?? {},
+  };
+}
+
+function runDelivery(documents: BuildRunDocuments): RunDelivery | null {
+  // Version 1: the run manifest records a failed write check.
+  const check = obj(documents.run_manifest?.delivery_check);
+  if (check) {
+    return {
+      uploads: "local_only",
+      repository: str(check.repository),
+      reason: str(check.reason),
+      attempts: null,
+      successes: null,
+    };
+  }
+  // Version 2: the delivery block counts every upload.
+  const delivery = obj(documents.progress?.delivery) ?? obj(documents.run_manifest?.delivery);
+  if (!delivery) return null;
+  const mode = str(delivery.mode);
+  const attempts = num(delivery.upload_attempts);
+  const successes = num(delivery.upload_successes);
+  const uploads: RunDelivery["uploads"] =
+    delivery.enabled === false || mode === "disabled"
+      ? "disabled"
+      : mode === "local_only"
+        ? "local_only"
+        : successes != null && successes > 0
+          ? "uploaded"
+          : attempts
+            ? "local_only"
+            : "unknown";
+  return {
+    uploads,
+    repository: str(delivery.configured_repository),
+    reason:
+      str(delivery.opt_out_reason) ??
+      (str(delivery.last_error_code) ? `last upload error: ${str(delivery.last_error_code)}` : null),
+    attempts,
+    successes,
+  };
+}
+
+function runIdentity(manifest: JsonObject | null): RunIdentity | null {
+  const identity = obj(manifest?.identity);
+  if (!identity) return null;
+  const host = obj(identity.host);
+  const runtime = obj(identity.runtime) ?? {};
+  return {
+    git_commit: str(identity.git_commit),
+    platform: str(host?.platform),
+    cpu_count: num(host?.cpu_count),
+    memory_bytes: num(host?.memory_bytes),
+    runtime: Object.fromEntries(
+      Object.entries(runtime).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+    ),
+  };
 }
 
 function eventTime(event: JsonObject): number | null {
@@ -228,6 +371,9 @@ function newSpan(
     is_gate: isGateStage(stage),
     refused: false,
     progress: [],
+    work: null,
+    resources_start: resourceSnapshot(event.resources, startMs),
+    resources_end: null,
   };
 }
 
@@ -280,6 +426,7 @@ function spansFromTransitions(events: JsonObject[]): {
     if (stage === "complete" || stage === "failed") {
       if (current) {
         current.end_ms = time;
+        current.resources_end = resourceSnapshot(event.resources, time);
         if (stage === "failed") markFailed(current, event);
         else if (current.status === "running") current.status = "completed";
       }
@@ -294,6 +441,7 @@ function spansFromTransitions(events: JsonObject[]): {
     }
     if (current) {
       current.end_ms = time;
+      current.resources_end = resourceSnapshot(event.resources, time);
       if (current.status === "running") current.status = "completed";
     }
     current = newSpan(stage, 0, time, event);
@@ -438,15 +586,28 @@ export function buildTimeline(
   const calibration = calibrationPoints(documents.calibration_progress, progress);
   const startedMs =
     timeMs(identity?.started_at) ?? (eventTimes.length ? Math.min(...eventTimes) : null);
+  const heartbeatMs = timeMs(progress?.heartbeat_at);
+  const work = stageWork(progress?.work);
   const updatedCandidates = [
     timeMs(progress?.updated_at),
+    heartbeatMs,
+    work?.updated_ms ?? null,
     eventTimes.length ? Math.max(...eventTimes) : null,
     calibration.length ? calibration[calibration.length - 1].time_ms : null,
   ].filter((t): t is number => t != null);
   const updatedMs = updatedCandidates.length ? Math.max(...updatedCandidates) : null;
+  const latestResources = resourceSnapshot(
+    progress?.resources,
+    heartbeatMs ?? timeMs(progress?.updated_at),
+  );
 
   const rawStatus = str(progress?.status) ?? str(documents.run_manifest?.status);
-  let state = runState(rawStatus, updatedMs, nowMs);
+  let state = runState(
+    rawStatus,
+    updatedMs,
+    nowMs,
+    heartbeatMs != null ? HEARTBEAT_STALE_MS : STALL_MS,
+  );
   if (state === "running" && terminal?.stage === "failed") state = "failed";
   if (state === "running" && terminal?.stage === "complete") state = "passed";
   if (state === "passed" && spans.some((span) => span.refused)) {
@@ -458,6 +619,16 @@ export function buildTimeline(
   // Close what is still open: a finished run ends its open stages at the end
   // of the run; a stalled run ends them at its last sign of life.
   const closeAt = finished ? endedMs : state === "stalled" ? updatedMs : null;
+  // The open stage's latest resources and work come from the progress
+  // document (heartbeat and work reports).
+  const openTopSpan = spans.find((span) => span.depth === 0 && span.end_ms == null) ?? null;
+  if (openTopSpan && latestResources && latestResources.time_ms >= openTopSpan.start_ms) {
+    openTopSpan.resources_end = openTopSpan.resources_end ?? latestResources;
+  }
+  if (state === "running" && openTopSpan && work && work.stage === openTopSpan.stage) {
+    const { stage: _stage, ...stageWorkValue } = work;
+    openTopSpan.work = stageWorkValue;
+  }
   if (closeAt != null) {
     const openSpans = spans.filter((span) => span.end_ms == null);
     for (const span of openSpans) {
@@ -477,6 +648,7 @@ export function buildTimeline(
       stage: gate.stage,
       message: `The run finished, but its gates refused the candidate (${gate.message ?? "blocking failures"}).`,
       error_type: null,
+      failure_class: "gate_refused",
     };
   } else if (state === "failed") {
     const v2Failure = obj(progress?.failure);
@@ -490,6 +662,7 @@ export function buildTimeline(
         failedSpan?.message ??
         str(progress?.message),
       error_type: str(v2Failure?.error_type) ?? str(terminalDetails?.error_type),
+      failure_class: str(terminalDetails?.failure_class),
     };
   }
 
@@ -511,7 +684,29 @@ export function buildTimeline(
     failure,
     spans,
     calibration,
+    heartbeat_ms: heartbeatMs,
+    resources: latestResources,
+    identity: runIdentity(documents.run_manifest),
+    delivery: runDelivery(documents),
   };
+}
+
+// Cores a stage kept busy on average: CPU seconds over wall seconds.
+export function stageCores(span: StageSpan): number | null {
+  const start = span.resources_start;
+  const end = span.resources_end;
+  if (start?.cpu_seconds == null || end?.cpu_seconds == null) return null;
+  const wall = (end.time_ms - start.time_ms) / 1000;
+  if (wall < 1) return null;
+  return Math.max(0, end.cpu_seconds - start.cpu_seconds) / wall;
+}
+
+// Largest resident memory seen at the stage's start or end.
+export function stageMemoryBytes(span: StageSpan): number | null {
+  const values = [span.resources_start?.rss_bytes, span.resources_end?.rss_bytes].filter(
+    (value): value is number => value != null,
+  );
+  return values.length ? Math.max(...values) : null;
 }
 
 export function topLevelSpans(timeline: BuildTimeline): StageSpan[] {
@@ -550,6 +745,10 @@ export interface StageStat {
   // Median start, measured from the start of the run.
   median_offset_ms: number;
   share: number;
+  // Median cores kept busy and the largest memory seen, when runs report
+  // resources.
+  cores_median: number | null;
+  memory_max_bytes: number | null;
 }
 
 // Durations of top-level stages across runs. Completed stages of failed runs
@@ -557,18 +756,33 @@ export interface StageStat {
 export function stageStatistics(history: BuildTimeline[]): StageStat[] {
   const byStage = new Map<
     string,
-    { durations: number[]; offsets: number[]; failures: number; phase: BuildPhase; gate: boolean }
+    {
+      durations: number[];
+      offsets: number[];
+      failures: number;
+      phase: BuildPhase;
+      gate: boolean;
+      cores: number[];
+      memory: number[];
+    }
   >();
   for (const run of history) {
-    const seen = new Map<string, { duration: number; offset: number; failed: boolean }>();
+    const seen = new Map<
+      string,
+      { duration: number; offset: number; failed: boolean; cores: number | null; memory: number | null }
+    >();
     for (const span of topLevelSpans(run)) {
       if (span.end_ms == null || run.started_ms == null) continue;
       // Re-entered stages (v1 transitions back into a stage) sum per run.
       const previous = seen.get(span.stage);
+      const cores = stageCores(span);
+      const memory = stageMemoryBytes(span);
       seen.set(span.stage, {
         duration: (previous?.duration ?? 0) + (span.end_ms - span.start_ms),
         offset: previous?.offset ?? span.start_ms - run.started_ms,
         failed: (previous?.failed ?? false) || span.status === "failed",
+        cores: cores ?? previous?.cores ?? null,
+        memory: Math.max(memory ?? 0, previous?.memory ?? 0) || null,
       });
       if (!byStage.has(span.stage)) {
         byStage.set(span.stage, {
@@ -577,6 +791,8 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
           failures: 0,
           phase: span.phase,
           gate: span.is_gate,
+          cores: [],
+          memory: [],
         });
       }
     }
@@ -585,6 +801,8 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
       entry.durations.push(sample.duration);
       entry.offsets.push(sample.offset);
       if (sample.failed) entry.failures += 1;
+      if (sample.cores != null) entry.cores.push(sample.cores);
+      if (sample.memory != null) entry.memory.push(sample.memory);
     }
   }
   const stats: StageStat[] = [...byStage].map(([stage, entry]) => ({
@@ -598,6 +816,8 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
     max_ms: Math.max(...entry.durations),
     median_offset_ms: quantile(entry.offsets, 0.5),
     share: 0,
+    cores_median: entry.cores.length ? quantile(entry.cores, 0.5) : null,
+    memory_max_bytes: entry.memory.length ? Math.max(...entry.memory) : null,
   }));
   const total = stats.reduce((sum, stat) => sum + stat.median_ms, 0);
   for (const stat of stats) stat.share = total > 0 ? stat.median_ms / total : 0;
@@ -674,7 +894,22 @@ export interface StageWorkRate {
 
 // Remaining time of a stage from the work units it reports, at the rate of
 // its recent samples.
-export function stageWorkRate(span: StageSpan | null): StageWorkRate | null {
+export function stageWorkRate(
+  span: StageSpan | null,
+  nowMs: number = Date.now(),
+): StageWorkRate | null {
+  const work = span?.work;
+  if (work && work.done > 0 && work.total > 0) {
+    // Reported work carries its own elapsed time, so one snapshot is a rate;
+    // time since that snapshot counts against what was left then.
+    const perUnitMs = (work.elapsed_seconds * 1000) / work.done;
+    const remainingThen = perUnitMs * Math.max(0, work.total - work.done);
+    return {
+      done: work.done,
+      total: work.total,
+      remaining_ms: Math.max(0, remainingThen - Math.max(0, nowMs - work.updated_ms)),
+    };
+  }
   if (!span || span.progress.length < 2) return null;
   const last = span.progress[span.progress.length - 1];
   const window = span.progress.filter((point) => point.total === last.total).slice(-30);
@@ -830,7 +1065,7 @@ export function forecastCompletion(
     current != null &&
     rate != null &&
     (current.phase === "calibrate" || /calibrat/.test(current.stage));
-  const work = stageWorkRate(current);
+  const work = stageWorkRate(current, nowMs);
   const rateFloor = Math.max(calibrating ? rate!.remaining_ms : 0, work?.remaining_ms ?? 0);
 
   // Past runs that reached the anchor stage.
@@ -872,7 +1107,15 @@ export function forecastCompletion(
   } else if (calibrating || work) {
     method = "rate_only";
   }
-  if (calibrating || work) {
+  // A stage that reports its own batches is timed by them: its measured
+  // rate is specific to this run, where history only says what other runs
+  // took. Wait for a few units so the rate means something. The solver's
+  // epoch rate stays a floor, because size search and refits repeat passes.
+  const measured = current?.work != null && work != null && work.done >= Math.min(3, work.total);
+  if (measured) {
+    currentRange = { p50: work!.remaining_ms, p90: work!.remaining_ms * 1.25 };
+    overrunning = false;
+  } else if (calibrating || work) {
     currentRange = {
       p50: Math.max(currentRange.p50, rateFloor),
       p90: Math.max(currentRange.p90, rateFloor),
@@ -1037,6 +1280,117 @@ export function gateStatistics(runs: BuildTimeline[]): GateStat[] {
         .sort((a, b) => b.count - a.count),
     }))
     .sort((a, b) => (b.median_offset_ms ?? 0) * b.failures - (a.median_offset_ms ?? 0) * a.failures);
+}
+
+export interface FailureClassStat {
+  failure_class: string;
+  runs: number;
+  // Runs whose class the dashboard inferred (from the error type, message
+  // and failing stage) because the run recorded none.
+  inferred: number;
+  // Median wall time already spent when runs of this kind stopped.
+  median_compute_lost_ms: number | null;
+  // Where runs of this kind stopped, most frequent first.
+  stages: { stage: string; count: number }[];
+  // Their most frequent failure messages.
+  reasons: { reason: string; count: number }[];
+  last_run_id: string | null;
+}
+
+// A run that went silent this soon, having barely started, was most likely a
+// test or an aborted launch rather than a crash.
+const ABANDONED_WITHIN_MS = 2 * 60 * 1000;
+const INFERRED_GATE = /\bgates? (?:failed|refused)\b|\brefus/i;
+
+// The class a failed run would have recorded, for runs from before failure
+// classes existed: the same rules microcosm's classify_failure applies.
+export function inferFailureClass(run: BuildTimeline): string {
+  const type = run.failure?.error_type ?? "";
+  if (type === "BuildTerminatedError") return "terminated";
+  if (type === "KeyboardInterrupt") return "interrupted";
+  if (type === "MemoryError") return "out_of_memory";
+  const failedGate = run.spans.some((span) => span.is_gate && span.status === "failed");
+  if (failedGate || INFERRED_GATE.test(run.failure?.message ?? "")) return "gate_refused";
+  if (type === "SystemExit") return "refused";
+  return type ? "error" : "unclassified";
+}
+
+function stoppedStage(run: BuildTimeline): string | null {
+  const top = run.spans.filter((span) => span.depth === 0);
+  return run.failure?.stage ?? top[top.length - 1]?.stage ?? run.current_stage;
+}
+
+// Why runs stopped, by kind. A recorded class wins; otherwise it is inferred.
+// Blocked runs count as gate refusals. A run that went silent is a kill
+// (stopped without a final event) unless it went silent within two minutes of
+// starting, which reads as a test or an aborted launch.
+export function failureClassStatistics(runs: BuildTimeline[]): FailureClassStat[] {
+  interface Entry {
+    lost: number[];
+    runs: number;
+    inferred: number;
+    stages: Map<string, number>;
+    reasons: Map<string, number>;
+    last: BuildTimeline | null;
+  }
+  const byClass = new Map<string, Entry>();
+  const sorted = [...runs].sort((a, b) => (a.started_ms ?? 0) - (b.started_ms ?? 0));
+  for (const run of sorted) {
+    let failureClass: string | null = null;
+    let inferred = false;
+    const end = run.ended_ms ?? run.updated_ms;
+    const lost = run.started_ms != null && end != null ? end - run.started_ms : null;
+    if (run.state === "failed") {
+      failureClass = run.failure?.failure_class ?? null;
+      if (!failureClass) {
+        failureClass = inferFailureClass(run);
+        inferred = true;
+      }
+    } else if (run.state === "blocked") {
+      failureClass = "gate_refused";
+    } else if (run.state === "stalled") {
+      failureClass =
+        lost != null && lost < ABANDONED_WITHIN_MS
+          ? "abandoned_early"
+          : "stopped_without_final_event";
+    }
+    if (!failureClass) continue;
+    const entry: Entry = byClass.get(failureClass) ?? {
+      lost: [],
+      runs: 0,
+      inferred: 0,
+      stages: new Map(),
+      reasons: new Map(),
+      last: null,
+    };
+    entry.runs += 1;
+    if (inferred) entry.inferred += 1;
+    if (lost != null) entry.lost.push(lost);
+    const stage = stoppedStage(run);
+    if (stage) entry.stages.set(stage, (entry.stages.get(stage) ?? 0) + 1);
+    const lines = run.spans
+      .filter((span) => span.status === "failed")
+      .flatMap((span) => span.failures.map(failureReason));
+    const message = run.failure?.message ? failureReason(run.failure.message) : null;
+    for (const reason of new Set(lines.length ? lines : message ? [message] : [])) {
+      entry.reasons.set(reason, (entry.reasons.get(reason) ?? 0) + 1);
+    }
+    entry.last = run;
+    byClass.set(failureClass, entry);
+  }
+  const ranked = (counts: Map<string, number>) =>
+    [...counts].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count);
+  return [...byClass]
+    .map(([failureClass, entry]) => ({
+      failure_class: failureClass,
+      runs: entry.runs,
+      inferred: entry.inferred,
+      median_compute_lost_ms: entry.lost.length ? quantile(entry.lost, 0.5) : null,
+      stages: ranked(entry.stages).map(({ key, count }) => ({ stage: key, count })),
+      reasons: ranked(entry.reasons).map(({ key, count }) => ({ reason: key, count })),
+      last_run_id: entry.last?.run_id ?? null,
+    }))
+    .sort((a, b) => b.runs - a.runs);
 }
 
 export interface PhaseTotals {
