@@ -1,16 +1,19 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  HEARTBEAT_STALE_MS,
   type BuildRunDocuments,
   type BuildTimeline,
   buildTimeline,
   calibrationRate,
+  failureClassStatistics,
   failureReason,
   forecastCompletion,
   formatStageName,
   gateStatistics,
   isGateStage,
   phaseTotals,
+  stageCores,
   stagePhase,
   stageStatistics,
   STALL_MS,
@@ -119,6 +122,7 @@ describe("buildTimeline, version 1 transitions", () => {
       stage: "qbi_input_gate",
       message: "Release gates failed: QBI",
       error_type: "RuntimeError",
+      failure_class: null,
     });
   });
 
@@ -444,5 +448,131 @@ describe("cross-run statistics", () => {
     expect(totals.total_ms).toBe(min(90));
     // Target registry (1 min) and target compilation (60 min).
     expect(totals.phases.compile).toBe(min(61));
+  });
+});
+
+
+describe("process telemetry (resources, work, heartbeat, failure class)", () => {
+  const resources = (cpu: number, rss: number) => ({
+    cpu_user_seconds: cpu,
+    cpu_system_seconds: 0,
+    rss_bytes: rss,
+    peak_rss_bytes: rss,
+  });
+  function instrumented(extra: Record<string, unknown> = {}): BuildRunDocuments {
+    const events = [
+      { time: at(0), type: "stage", status: "running", stage: "created", details: {} },
+      { time: at(0), type: "stage", status: "running", stage: "load_base_frame", details: {}, resources: resources(0, 2e9) },
+      { time: at(min(10)), type: "stage", status: "running", stage: "target_compilation", details: {}, resources: resources(3000, 9e9) },
+    ];
+    return {
+      run_id: "inst",
+      source: "local",
+      country: "us",
+      progress: {
+        schema_version: 1,
+        run_id: "inst",
+        status: "running",
+        stage: "target_compilation",
+        started_at: at(0),
+        updated_at: at(min(10)),
+        heartbeat_at: at(min(40)),
+        resources: resources(4800, 12e9),
+        work: {
+          stage: "target_compilation",
+          done: 531,
+          total: 2124,
+          unit: "engine batch",
+          elapsed_seconds: 1800,
+          updated_at: at(min(40)),
+          details: { pass_name: "base" },
+        },
+        ...extra,
+      },
+      run_manifest: {
+        schema_version: 1,
+        run_id: "inst",
+        identity: { git_commit: "3598c38d", host: { cpu_count: 18, memory_bytes: 128e9, platform: "macOS" }, runtime: { "policyengine-us": "2.2.1" } },
+      },
+      calibration_progress: null,
+      events,
+    };
+  }
+
+  test("a stage's cores come from CPU seconds over wall seconds", () => {
+    const run = buildTimeline(instrumented(), T0 + min(40));
+    const [load, compile] = run.spans;
+    // 3,000 CPU seconds over 600 s: five cores busy while loading.
+    expect(stageCores(load)).toBeCloseTo(5);
+    // The open stage uses the heartbeat: 1,800 CPU seconds over 1,800 s.
+    expect(stageCores(compile)).toBeCloseTo(1);
+    expect(run.identity?.cpu_count).toBe(18);
+    expect(run.identity?.git_commit).toBe("3598c38d");
+  });
+
+  test("reported batches give the current stage a measured remaining time", () => {
+    const run = buildTimeline(instrumented(), T0 + min(40));
+    expect(run.spans[1].work?.done).toBe(531);
+    const forecast = forecastCompletion(run, [], T0 + min(40))!;
+    // 1,800 s for 531 batches, 1,593 left: about 5,400 s.
+    expect(forecast.stage_work?.remaining_ms).toBeCloseTo((1800 * 1000 * 1593) / 531, -3);
+    expect(forecast.method).toBe("rate_only");
+  });
+
+  test("measured batches outrank history for the current stage", () => {
+    const history = [passedRun("h1", -min(1000)), passedRun("h2", -min(800))].map((documents) =>
+      buildTimeline(documents, T0),
+    );
+    // Target compilation started at 10 min; 30 of 40 batches done in 30 s,
+    // where comparable runs took 60 min for the whole stage.
+    const live = buildTimeline(
+      {
+        ...v1Run("fast", PASSED_STAGES.slice(0, 4) as [string, number][]),
+        progress: {
+          schema_version: 1,
+          run_id: "fast",
+          status: "running",
+          stage: "target_compilation",
+          started_at: at(0),
+          updated_at: at(min(10) + 30_000),
+          work: {
+            stage: "target_compilation",
+            done: 30,
+            total: 40,
+            unit: "engine batch",
+            elapsed_seconds: 30,
+            updated_at: at(min(10) + 30_000),
+            details: {},
+          },
+        },
+      },
+      T0 + min(10) + 30_000,
+    );
+    const forecast = forecastCompletion(live, history, T0 + min(10) + 30_000)!;
+    // 10 s of compilation left, then the 20 min comparable runs took after it.
+    expect(forecast.remaining_p50_ms).toBe(10_000 + min(20));
+    expect(forecast.overrunning).toBe(false);
+  });
+
+  test("a missed heartbeat marks the run stalled within minutes", () => {
+    const alive = buildTimeline(instrumented(), T0 + min(42));
+    expect(alive.state).toBe("running");
+    const dead = buildTimeline(instrumented(), T0 + min(40) + HEARTBEAT_STALE_MS + 1);
+    expect(dead.state).toBe("stalled");
+  });
+
+  test("failures are counted by the class the run recorded", () => {
+    const failed = buildTimeline(
+      v1Run("gate", [["release_gates", 0]], { end: ["failed", min(200), "Release gates failed: x"] }),
+      T0 + min(300),
+    );
+    failed.failure = { ...failed.failure!, failure_class: "gate_refused" };
+    const stalled = buildTimeline(v1Run("quiet", [["target_compilation", 0]]), T0 + STALL_MS + min(1));
+    const stats = failureClassStatistics([failed, stalled, buildTimeline(passedRun("ok", 0), T0)]);
+    expect(stats.map((stat) => [stat.failure_class, stat.runs])).toEqual([
+      ["gate_refused", 1],
+      ["stopped_without_final_event", 1],
+    ]);
+    expect(stats[0].median_compute_lost_ms).toBe(min(200));
   });
 });

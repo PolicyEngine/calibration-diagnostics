@@ -8,6 +8,8 @@ import {
   type StageStat,
   buildTimeline,
   compactTimeline,
+  type FailureClassStat,
+  failureClassStatistics,
   forecastCompletion,
   gateStatistics,
   phaseTotals,
@@ -56,6 +58,7 @@ export interface BuildRunResponse {
   pipeline_runs: number;
   stage_stats: StageStat[];
   gate_stats: GateStat[];
+  failure_classes: FailureClassStat[];
   phase_totals: PhaseTotals[];
   gate_catalog: CatalogGate[] | null;
 }
@@ -220,6 +223,7 @@ export async function loadBuildRun(
     pipeline_runs: pipelineRuns.length,
     stage_stats: stageStatistics(pipelineRuns.filter((timeline) => timeline.state !== "running")),
     gate_stats: gateStatistics(pipelineRuns),
+    failure_classes: failureClassStatistics(pipelineRuns),
     phase_totals: pipelineRuns.map((timeline) => phaseTotals(timeline, nowMs)),
     gate_catalog: gateCatalogForPipeline(run.pipeline),
   };
