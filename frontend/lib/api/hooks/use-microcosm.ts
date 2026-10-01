@@ -15,6 +15,8 @@ import {
   PUBLISHED_RELEASE_STALE_TIME_MS,
 } from "@/lib/api/cache-policy";
 import { withBasePath } from "@/lib/base-path";
+import type { BuildRunSource } from "@/lib/microcosm/build-monitor";
+import type { BuildRunResponse, BuildRunsResponse } from "@/lib/microcosm/build-runs";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
 import {
@@ -1593,5 +1595,32 @@ export function useMicrocosmTargetDiagnostics(params: {
       apiGet<MicrocosmTargetDiagnostics>("/microcosm/target-diagnostics", { ...params, country }),
     placeholderData: keepPreviousData,
     staleTime: 15 * 60 * 1000,
+  });
+}
+
+// Build monitor: local run folders (when the server enables them) or the
+// staging repository. Local runs refresh faster because reading them is free.
+export function useBuildRuns(source: BuildRunSource, enabled = true) {
+  const { country } = useCountry();
+  return useQuery({
+    queryKey: ["microcosm", "builds", source, country],
+    queryFn: () => apiGet<BuildRunsResponse>("/microcosm/builds", { source, country }),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 1000,
+    refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+  });
+}
+
+export function useBuildRun(source: BuildRunSource, runId?: string) {
+  const { country } = useCountry();
+  return useQuery({
+    queryKey: ["microcosm", "builds", "run", source, country, runId],
+    queryFn: () =>
+      apiGet<BuildRunResponse>("/microcosm/builds/run", { source, country, id: runId }),
+    enabled: Boolean(runId),
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 1000,
+    refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
   });
 }

@@ -1,10 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { useCountry } from "@/components/layout/country-context";
 import { CalibrationExplorerDataPrefetch } from "@/components/microcosm/calibration-explorer-map";
+import { BuildMonitorView } from "@/components/microcosm/build-monitor-view";
 import { StagingCalibrationMapPanel } from "@/components/microcosm/staging-calibration-map-panel";
+import {
+  parseStagingTab,
+  StagingPageTabs,
+  type StagingTab,
+} from "@/components/microcosm/staging-page-tabs";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
   differingPercentDigits,
@@ -747,6 +754,18 @@ function ScoreRow({
 
 export function MicrocosmStagingView() {
   const { country } = useCountry();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<StagingTab>(() => parseStagingTab(searchParams.get("view")));
+  // The run selected on either tab, so switching tabs keeps the same run.
+  const [runId, setRunId] = useState("");
+
+  const changeTab = useCallback((next: StagingTab) => {
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === "candidate") url.searchParams.delete("view");
+    else url.searchParams.set("view", next);
+    window.history.replaceState(null, "", url);
+  }, []);
 
   if (!hasCapability(country, "staging")) {
     return (
@@ -760,10 +779,23 @@ export function MicrocosmStagingView() {
     );
   }
 
-  return <MicrocosmStagingRunsView />;
+  const tabs = <StagingPageTabs value={tab} onChange={changeTab} />;
+  return tab === "progress" ? (
+    <BuildMonitorView tabs={tabs} preferredRunId={runId || undefined} onRunChange={setRunId} />
+  ) : (
+    <MicrocosmStagingRunsView tabs={tabs} preferredRunId={runId || undefined} onRunChange={setRunId} />
+  );
 }
 
-function MicrocosmStagingRunsView() {
+function MicrocosmStagingRunsView({
+  tabs,
+  preferredRunId,
+  onRunChange,
+}: {
+  tabs?: ReactNode;
+  preferredRunId?: string;
+  onRunChange?: (runId: string) => void;
+}) {
   const { data: runsData, isLoading: runsLoading, error: runsError } = useMicrocosmStagingRuns();
   const runs = runsData?.runs ?? [];
   const [selectedRun, setSelectedRun] = useState("");
@@ -775,9 +807,21 @@ function MicrocosmStagingRunsView() {
     setSelectedRun(runId);
   }, []);
 
+  const selectRun = useCallback(
+    (runId: string) => {
+      resetRunVisualState(runId);
+      onRunChange?.(runId);
+    },
+    [onRunChange, resetRunVisualState],
+  );
+
   useEffect(() => {
-    if (!selectedRun && runs[0]) resetRunVisualState(runs[0].run_id);
-  }, [resetRunVisualState, runs, selectedRun]);
+    if (selectedRun || !runs[0]) return;
+    // Open the run carried over from the Build progress tab when it is a
+    // staging run; otherwise the newest.
+    const preferred = runs.find((run) => run.run_id === preferredRunId);
+    resetRunVisualState((preferred ?? runs[0]).run_id);
+  }, [preferredRunId, resetRunVisualState, runs, selectedRun]);
 
   const { data: runData, isLoading: runLoading, error: runError } =
     useMicrocosmStagingRun(selectedRun);
@@ -851,13 +895,14 @@ function MicrocosmStagingRunsView() {
       <PageHeader
         eyebrow="Microcosm · staging"
         title="Staging candidates"
+        status={tabs}
         description="Monitor Microcosm build candidates before they are promoted to the published Hugging Face release channel."
         actions={
           <RunSelect
             runs={runs}
             selected={selectedRun}
             placeholder={runSelectPlaceholder}
-            onSelect={resetRunVisualState}
+            onSelect={selectRun}
           />
         }
         onHeightChange={setPageIntroHeight}

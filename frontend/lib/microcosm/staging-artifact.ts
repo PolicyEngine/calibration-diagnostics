@@ -1144,6 +1144,45 @@ export async function loadStagingRun(
   };
 }
 
+// Telemetry only (progress, manifest, calibration progress, events), without
+// the candidate diagnostics loadStagingRun also resolves. The build monitor
+// reads every run this way to time stages across runs.
+export async function loadStagingRunTelemetry(
+  runId: string,
+  revalidate: number,
+  country: MicrocosmCountry = "us",
+) {
+  assertSafeReleaseId(runId, "run");
+  const [progressRaw, runManifestRaw, calibrationProgressRaw, eventsText] =
+    await Promise.all([
+      stagingJsonOrNull(`runs/${runId}/progress.json`, revalidate, country),
+      stagingJsonOrNull(`runs/${runId}/run_manifest.json`, revalidate, country),
+      stagingJsonOrNull(`runs/${runId}/calibration_progress.json`, revalidate, country),
+      stagingTextOrNull(`runs/${runId}/events.ndjson`, revalidate, country),
+    ]);
+  const progress = progressRaw == null ? null : parseStagingProgress(progressRaw);
+  const runManifest =
+    runManifestRaw == null ? null : parseStagingManifest(runManifestRaw);
+  const calibrationProgress =
+    calibrationProgressRaw == null
+      ? null
+      : parseStagingCalibrationProgress(calibrationProgressRaw);
+  const events = parseStagingEvents(eventsText);
+  validateStagingRunConsistency(runId, {
+    progress,
+    runManifest,
+    calibrationProgress,
+    events,
+  });
+  return {
+    run_id: runId,
+    progress,
+    run_manifest: runManifest,
+    calibration_progress: calibrationProgress,
+    events,
+  };
+}
+
 export async function loadStagingReformValidationRaw(
   runId: string,
   revalidate: number,
