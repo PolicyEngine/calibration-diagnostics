@@ -452,6 +452,21 @@ function RunOverview({
 
         <ResourceLine run={run} />
 
+        {run.delivery?.uploads === "local_only" ? (
+          <div className="rounded-md border px-3 py-2 text-xs pill-warn">
+            This run did not reach the staging repository
+            {run.delivery.reason ? ` (${run.delivery.reason})` : ""}, so only this machine can see it.
+            {run.schema_version === 1 ? (
+              <>
+                {" "}Upload it from any machine with a staging token:{" "}
+                <code className="font-mono">
+                  uv run python tools/restage_us_staging_run.py --run-dir &lt;run folder&gt;
+                </code>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
         {forecast?.note && running ? (
           <p className="text-xs text-muted-foreground">{forecast.note}</p>
         ) : null}

@@ -91,6 +91,17 @@ export interface StageWork {
   details: JsonObject;
 }
 
+// Whether a run's telemetry reached the staging repository. `local_only`
+// runs kept it on the build machine (no write token, uploads failed, or a
+// local-only run); `uploaded` says how many files reached the repository.
+export interface RunDelivery {
+  uploads: "local_only" | "uploaded" | "disabled" | "unknown";
+  repository: string | null;
+  reason: string | null;
+  attempts: number | null;
+  successes: number | null;
+}
+
 // What produced a run, from its run manifest.
 export interface RunIdentity {
   git_commit: string | null;
@@ -144,6 +155,7 @@ export interface BuildTimeline {
   // The latest resources the run reported.
   resources: ResourceSnapshot | null;
   identity: RunIdentity | null;
+  delivery: RunDelivery | null;
 }
 
 function str(value: unknown): string | null {
@@ -275,6 +287,45 @@ function stageWork(value: unknown): (StageWork & { stage: string | null }) | nul
     elapsed_seconds: elapsed,
     updated_ms: updated,
     details: obj(work?.details) ?? {},
+  };
+}
+
+function runDelivery(documents: BuildRunDocuments): RunDelivery | null {
+  // Version 1: the run manifest records a failed write check.
+  const check = obj(documents.run_manifest?.delivery_check);
+  if (check) {
+    return {
+      uploads: "local_only",
+      repository: str(check.repository),
+      reason: str(check.reason),
+      attempts: null,
+      successes: null,
+    };
+  }
+  // Version 2: the delivery block counts every upload.
+  const delivery = obj(documents.progress?.delivery) ?? obj(documents.run_manifest?.delivery);
+  if (!delivery) return null;
+  const mode = str(delivery.mode);
+  const attempts = num(delivery.upload_attempts);
+  const successes = num(delivery.upload_successes);
+  const uploads: RunDelivery["uploads"] =
+    delivery.enabled === false || mode === "disabled"
+      ? "disabled"
+      : mode === "local_only"
+        ? "local_only"
+        : successes != null && successes > 0
+          ? "uploaded"
+          : attempts
+            ? "local_only"
+            : "unknown";
+  return {
+    uploads,
+    repository: str(delivery.configured_repository),
+    reason:
+      str(delivery.opt_out_reason) ??
+      (str(delivery.last_error_code) ? `last upload error: ${str(delivery.last_error_code)}` : null),
+    attempts,
+    successes,
   };
 }
 
@@ -636,6 +687,7 @@ export function buildTimeline(
     heartbeat_ms: heartbeatMs,
     resources: latestResources,
     identity: runIdentity(documents.run_manifest),
+    delivery: runDelivery(documents),
   };
 }
 

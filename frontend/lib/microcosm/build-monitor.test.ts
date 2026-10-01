@@ -576,3 +576,55 @@ describe("process telemetry (resources, work, heartbeat, failure class)", () => 
     expect(stats[0].median_compute_lost_ms).toBe(min(200));
   });
 });
+
+
+describe("delivery to the staging repository", () => {
+  test("a version 1 run that failed its write check is flagged local only", () => {
+    const documents = v1Run("local", [["target_compilation", 0]]);
+    documents.run_manifest = {
+      schema_version: 1,
+      run_id: "local",
+      delivery_check: {
+        uploads: "local_only",
+        repository: "policyengine/populace-us-staging",
+        reason: "no Hugging Face token is configured",
+      },
+    };
+    const run = buildTimeline(documents, T0 + min(1));
+    expect(run.delivery).toEqual({
+      uploads: "local_only",
+      repository: "policyengine/populace-us-staging",
+      reason: "no Hugging Face token is configured",
+      attempts: null,
+      successes: null,
+    });
+  });
+
+  test("a version 2 run reports what reached the repository", () => {
+    const run = buildTimeline(
+      {
+        ...v1Run("uk", [["calibration", 0]]),
+        progress: {
+          schema_version: 2,
+          run_id: "uk",
+          status: "running",
+          current_stage: "calibration",
+          started_at: at(0),
+          updated_at: at(min(1)),
+          delivery: {
+            mode: "local_and_remote",
+            enabled: true,
+            configured_repository: "policyengine/populace-uk-staging",
+            upload_attempts: 3,
+            upload_successes: 0,
+            last_error_code: "UPLOAD_FAILED",
+            opt_out_reason: null,
+          },
+        },
+      },
+      T0 + min(1),
+    );
+    expect(run.delivery?.uploads).toBe("local_only");
+    expect(run.delivery?.reason).toBe("last upload error: UPLOAD_FAILED");
+  });
+});
