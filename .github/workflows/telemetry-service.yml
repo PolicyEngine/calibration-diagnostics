@@ -1,0 +1,181 @@
+name: Telemetry service
+
+on:
+  pull_request:
+    paths:
+      - telemetry-service/**
+      - .github/workflows/telemetry-service.yml
+  push:
+    branches: [main]
+    paths:
+      - telemetry-service/**
+      - .github/workflows/telemetry-service.yml
+  workflow_dispatch:
+
+concurrency:
+  group: telemetry-service-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Test, lint, and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: telemetry-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --frozen --dev
+      - run: uv run pytest -q
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: docker build --tag microcosm-telemetry:validation .
+
+  deploy:
+    name: Deploy verified image to Cloud Run
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: Production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_ID: ${{ vars.TELEMETRY_GCP_PROJECT_ID }}
+      REGION: ${{ vars.TELEMETRY_GCP_REGION }}
+      ARTIFACT_REPOSITORY: ${{ vars.TELEMETRY_ARTIFACT_REPOSITORY }}
+      CLOUD_SQL_CONNECTION: ${{ vars.TELEMETRY_CLOUD_SQL_CONNECTION }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ vars.TELEMETRY_RUNTIME_SERVICE_ACCOUNT }}
+      SERVICE: microcosm-telemetry
+      IMAGE_NAME: collector
+      DATABASE_SECRET: microcosm-telemetry-database-url
+      JWT_SECRET: microcosm-telemetry-jwt-secret
+      READ_SECRET: microcosm-telemetry-read-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require deployment configuration
+        run: |
+          missing=()
+          for name in \
+            PROJECT_ID REGION ARTIFACT_REPOSITORY CLOUD_SQL_CONNECTION \
+            RUNTIME_SERVICE_ACCOUNT
+          do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} )); then
+            echo "Missing telemetry deployment configuration: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.TELEMETRY_GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.TELEMETRY_GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Artifact Registry authentication
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push immutable image
+        id: image
+        run: |
+          image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/${IMAGE_NAME}:${GITHUB_SHA}"
+          docker build --file telemetry-service/Dockerfile --tag "$image" telemetry-service
+          docker push "$image"
+          echo "uri=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Capture the current production revision
+        id: previous
+        run: |
+          service_json="$(gcloud run services describe "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --format=json)"
+          revision="$(jq -er '
+            [.status.traffic[]? | select((.percent // 0) == 100) | .revisionName]
+            | if length == 1 then .[0]
+              else error("expected exactly one production revision")
+              end
+          ' <<<"$service_json")"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy an isolated candidate revision
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --platform managed \
+            --image "${{ steps.image.outputs.uri }}" \
+            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+            --add-cloudsql-instances "$CLOUD_SQL_CONNECTION" \
+            --set-secrets "DATABASE_URL=${DATABASE_SECRET}:latest,TELEMETRY_JWT_SECRET=${JWT_SECRET}:latest,TELEMETRY_READ_TOKEN=${READ_SECRET}:latest" \
+            --min 1 \
+            --max 10 \
+            --cpu 1 \
+            --memory 512Mi \
+            --concurrency 40 \
+            --timeout 30 \
+            --allow-unauthenticated \
+            --default-url \
+            --startup-probe "httpGet.path=/health,httpGet.port=8080,timeoutSeconds=10,periodSeconds=10,failureThreshold=12" \
+            --no-traffic \
+            --tag candidate \
+            --quiet
+
+      - name: Resolve and verify the candidate revision
+        id: candidate
+        run: |
+          service_json="$(gcloud run services describe "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --format=json)"
+          revision="$(jq -er '.status.latestCreatedRevisionName' <<<"$service_json")"
+          url="$(jq -er '
+            .status.traffic[]
+            | select(.tag == "candidate")
+            | .url
+          ' <<<"$service_json")"
+          curl --fail --show-error --silent \
+            --retry 12 --retry-all-errors --retry-delay 5 \
+            "${url}/health"
+          {
+            echo "revision=$revision"
+            echo "url=$url"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Promote the verified revision
+        id: promote
+        run: |
+          gcloud run services update-traffic "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions "${{ steps.candidate.outputs.revision }}=100" \
+            --quiet
+
+      - name: Verify the stable service address
+        run: |
+          stable_url="$(gcloud run services describe "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --format='value(status.url)')"
+          curl --fail --show-error --silent \
+            --retry 12 --retry-all-errors --retry-delay 5 \
+            "${stable_url}/health"
+
+      - name: Restore the previous revision after failed stable verification
+        if: failure() && steps.promote.outcome == 'success'
+        run: |
+          gcloud run services update-traffic "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions "${{ steps.previous.outputs.revision }}=100" \
+            --quiet

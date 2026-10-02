@@ -49,6 +49,10 @@ def test_deployment_uses_exact_project_and_backend_first_order():
     assert "--skip-domain" in frontend["run"]
     assert '--project "$VERCEL_PROJECT_ID"' in frontend["run"]
     assert "--cwd frontend" not in frontend["run"]
+    assert "MICROCOSM_TELEMETRY_COLLECTOR_URL" in frontend["env"]
+    assert "MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN" in frontend["env"]
+    assert "--env \"MICROCOSM_TELEMETRY_COLLECTOR_URL=" in frontend["run"]
+    assert "--env \"MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN=" in frontend["run"]
 
 
 def test_vercel_disables_only_automatic_main_deployment():

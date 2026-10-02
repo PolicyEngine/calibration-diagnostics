@@ -215,6 +215,27 @@ describe("buildTimeline, version 2 lifecycle", () => {
     expect(run.current_stage).toBe("calibration");
   });
 
+  test("uses observer elapsed time for completion-only graph nodes", () => {
+    const run = buildTimeline(
+      {
+        ...documents,
+        events: [
+          v2Event(1, 0, "created", "started"),
+          v2Event(2, min(3), "uk.full.target_selection", "completed", {
+            event_type: "stage",
+            details: { done: 4, total: 10, elapsed_seconds: 30 },
+          }),
+        ],
+      },
+      T0 + min(3),
+    );
+
+    expect(run.spans[0].end_ms! - run.spans[0].start_ms).toBe(30_000);
+    expect(run.spans[0].progress).toEqual([
+      { done: 4, total: 10, time_ms: T0 + min(3) },
+    ]);
+  });
+
   test("keeps smoke runs apart from full runs of the same pipeline", () => {
     const smoke = buildTimeline(
       { ...documents, progress: { ...documents.progress!, run_kind: "smoke" } },

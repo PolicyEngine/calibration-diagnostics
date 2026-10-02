@@ -24,6 +24,11 @@ import {
   localRunRoots,
 } from "@/lib/microcosm/local-build-runs";
 import { loadStagingRuns, loadStagingRunTelemetry } from "@/lib/microcosm/staging-artifact";
+import {
+  collectorConfigured,
+  loadCollectorRun,
+  loadCollectorRuns,
+} from "@/lib/microcosm/telemetry-collector";
 
 // Server-side assembly for the build monitor: load every run's telemetry from
 // one source, turn it into timelines, and derive the forecast and cross-run
@@ -114,7 +119,7 @@ async function loadLocal(country: MicrocosmCountry): Promise<LoadedRuns> {
   return { available: true, detail: null, documents, problems };
 }
 
-async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
+async function loadHuggingFaceStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
   if (!hasCapability(country, "staging")) {
     return {
       available: false,
@@ -156,6 +161,72 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
     }),
   );
   return { available: true, detail: null, documents, problems };
+}
+
+async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
+  const summaries = await loadCollectorRuns(country);
+  const documents: BuildRunDocuments[] = [];
+  const problems: BuildRunProblem[] = [];
+  await Promise.all(
+    summaries.slice(0, STAGING_RUN_LIMIT).map(async (summary) => {
+      const key = `collector:${country}:${summary.run_id}`;
+      const cached = stagingRunCache.get(key);
+      if (cached?.final) {
+        documents.push(cached.documents);
+        return;
+      }
+      try {
+        const loaded = await loadCollectorRun(summary.run_id, country);
+        stagingRunCache.set(key, { documents: loaded, final: isFinal(loaded) });
+        documents.push(loaded);
+      } catch (error) {
+        problems.push({ run_id: summary.run_id, detail: message(error) });
+      }
+    }),
+  );
+  return { available: true, detail: null, documents, problems };
+}
+
+async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
+  const hosted: LoadedRuns[] = [];
+  const sourceProblems: BuildRunProblem[] = [];
+  if (collectorConfigured()) {
+    try {
+      hosted.push(await loadCollector(country));
+    } catch (error) {
+      sourceProblems.push({
+        run_id: "collector",
+        detail: message(error),
+      });
+    }
+  }
+  try {
+    hosted.push(await loadHuggingFaceStaging(country));
+  } catch (error) {
+    sourceProblems.push({
+      run_id: "hugging-face-history",
+      detail: message(error),
+    });
+  }
+  const available = hosted.some((source) => source.available);
+  const byId = new Map<string, BuildRunDocuments>();
+  // Historical Hugging Face documents enter first; collector documents are
+  // newer and replace the same run id during the migration period.
+  for (const source of [...hosted].reverse()) {
+    for (const document of source.documents) byId.set(document.run_id, document);
+  }
+  return {
+    available,
+    detail: available
+      ? null
+      : hosted.map((source) => source.detail).filter(Boolean).join(" ") ||
+        "Hosted build telemetry is unavailable.",
+    documents: [...byId.values()],
+    problems: [
+      ...hosted.flatMap((source) => source.problems),
+      ...sourceProblems,
+    ],
+  };
 }
 
 function loadRuns(source: BuildRunSource, country: MicrocosmCountry): Promise<LoadedRuns> {
@@ -204,6 +275,16 @@ export async function loadBuildRun(
   const all = timelines(loaded.documents, nowMs);
   let run = all.find((timeline) => timeline.run_id === runId) ?? null;
   // A running staging run may be newer than the cached list; read it fresh.
+  if (source === "staging" && (run == null || run.state === "running")) {
+    if (collectorConfigured()) {
+      try {
+        const telemetry = await loadCollectorRun(runId, country);
+        run = buildTimeline(telemetry, nowMs);
+      } catch (error) {
+        if (run == null && !hasCapability(country, "staging")) throw error;
+      }
+    }
+  }
   if (source === "staging" && (run == null || run.state === "running")) {
     try {
       const telemetry = await loadStagingRunTelemetry(runId, 0, country);
