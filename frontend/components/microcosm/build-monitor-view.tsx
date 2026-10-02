@@ -150,7 +150,11 @@ function SourceToggle({
         ? "Run folders on this machine"
         : "Set MICROCOSM_LOCAL_RUNS_DIR and restart the dashboard",
     },
-    { id: "staging", label: "Staging repository", hint: "Runs uploaded to Hugging Face staging" },
+    {
+      id: "staging",
+      label: "Hosted runs",
+      hint: "Live collector runs plus historical Hugging Face telemetry",
+    },
   ];
   return (
     <div role="radiogroup" aria-label="Run source" className="inline-flex rounded-md border border-border p-0.5">
@@ -193,12 +197,12 @@ export function BuildMonitorView({
 }) {
   const [chosenSource, setChosenSource] = useState<BuildRunSource | null>(null);
   // The local listing answers instantly and says whether local runs are on;
-  // the staging repository is read only once it is the chosen source.
+  // hosted telemetry is read only once it is the chosen source.
   const local = useBuildRuns("local");
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
   // Open local runs when this machine has them, unless the run carried over
-  // from the Candidate tab exists only in the staging repository.
+  // from the Candidate tab exists only in hosted telemetry.
   const preferLocal =
     localEnabled &&
     (!preferredRunId || localRuns.some((run) => run.run_id === preferredRunId));
@@ -271,7 +275,7 @@ export function BuildMonitorView({
         <EmptyState title="Build runs unavailable" description={String(list.error.message)} />
       ) : list.data && !list.data.available ? (
         <EmptyState
-          title={source === "local" ? "Local runs are off" : "Staging runs unavailable"}
+          title={source === "local" ? "Local runs are off" : "Hosted runs unavailable"}
           description={list.data.detail ?? undefined}
         />
       ) : !runs.length ? (
@@ -280,7 +284,7 @@ export function BuildMonitorView({
           description={
             source === "local"
               ? `No run folders (progress.json and events.ndjson) under ${list.data?.roots.join(", ") || "the configured directory"}.`
-              : "The staging repository has no runs for this country."
+              : "The collector and historical staging repository have no runs for this country."
           }
         />
       ) : detail.isLoading && !data ? (
@@ -353,7 +357,7 @@ function RunOverview({
         run.heartbeat_ms != null && (running || run.state === "stalled")
           ? `heartbeat ${fmtDuration(nowMs - run.heartbeat_ms)} ago`
           : null,
-        run.source === "local" ? "local run folder" : "staging repository",
+        run.source === "local" ? "local run folder" : "hosted telemetry",
       ]
         .filter(Boolean)
         .join(" · ")}

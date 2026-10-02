@@ -488,14 +488,27 @@ function spansFromLifecycle(events: JsonObject[]): {
         break;
       }
     }
-    // A completion without a start is an instantaneous stage.
+    const details = obj(event.details);
+    const reportedElapsed = num(details?.elapsed_seconds);
+    const inferredStart =
+      index < 0 && reportedElapsed != null && reportedElapsed >= 0
+        ? Math.max(0, time - reportedElapsed * 1000)
+        : time;
+    // A completion without a start uses its reported elapsed time when the
+    // graph observer provides one; otherwise it remains instantaneous.
     const span =
-      index >= 0 ? open.splice(index, 1)[0] : newSpan(stage, open.length, time, event);
-    if (index < 0) spans.push(span);
+      index >= 0
+        ? open.splice(index, 1)[0]
+        : newSpan(stage, open.length, inferredStart, event);
+    if (index < 0) {
+      span.resources_start = null;
+      spans.push(span);
+    }
     span.end_ms = time;
+    span.resources_end = resourceSnapshot(event.resources, time);
+    recordProgress(span, event, time);
     if (status === "failed") markFailed(span, event);
     else span.status = "completed";
-    const details = obj(event.details);
     const blocking = num(details?.blocking_failure_count);
     if (blocking) {
       span.status = "failed";

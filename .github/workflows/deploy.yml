@@ -40,6 +40,8 @@ jobs:
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
           MICROCOSM_MODAL_KEY: ${{ secrets.MICROCOSM_MODAL_KEY }}
           MICROCOSM_MODAL_SECRET: ${{ secrets.MICROCOSM_MODAL_SECRET }}
+          MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN: ${{ secrets.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN }}
+          MICROCOSM_TELEMETRY_COLLECTOR_URL: ${{ vars.MICROCOSM_TELEMETRY_COLLECTOR_URL }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
@@ -47,6 +49,8 @@ jobs:
           for name in \
             MODAL_TOKEN_ID MODAL_TOKEN_SECRET \
             MICROCOSM_MODAL_KEY MICROCOSM_MODAL_SECRET \
+            MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN \
+            MICROCOSM_TELEMETRY_COLLECTOR_URL \
             VERCEL_TOKEN VERCEL_AUTOMATION_BYPASS_SECRET
           do
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
@@ -117,6 +121,8 @@ jobs:
         env:
           MICROCOSM_MODAL_KEY: ${{ secrets.MICROCOSM_MODAL_KEY }}
           MICROCOSM_MODAL_SECRET: ${{ secrets.MICROCOSM_MODAL_SECRET }}
+          MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN: ${{ secrets.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN }}
+          MICROCOSM_TELEMETRY_COLLECTOR_URL: ${{ vars.MICROCOSM_TELEMETRY_COLLECTOR_URL }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           deployment_url="$(bunx --bun "vercel@${VERCEL_CLI_VERSION}" deploy . \
@@ -130,6 +136,8 @@ jobs:
             --env "MICROCOSM_CALCULATION_URL=${{ steps.backend.outputs.url }}" \
             --env "MICROCOSM_MODAL_KEY=$MICROCOSM_MODAL_KEY" \
             --env "MICROCOSM_MODAL_SECRET=$MICROCOSM_MODAL_SECRET" \
+            --env "MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN=$MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN" \
+            --env "MICROCOSM_TELEMETRY_COLLECTOR_URL=$MICROCOSM_TELEMETRY_COLLECTOR_URL" \
             --env "MICROCOSM_BACKEND_SOURCE_COMMIT=${{ steps.identity.outputs.source_commit }}")"
           if [[ ! "$deployment_url" =~ ^https://.+\.vercel\.app/?$ ]]; then
             echo "Vercel returned an invalid deployment URL." >&2
