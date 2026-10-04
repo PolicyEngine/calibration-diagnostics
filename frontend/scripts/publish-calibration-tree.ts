@@ -20,6 +20,7 @@ import type {
 import { createHash } from "node:crypto";
 import {
   CalibrationReleaseNotFoundError,
+  resolveHfReleaseDirectoryCommit,
   resolveHfReleaseDirectorySha,
   resolveHfRevisionSha,
 } from "../lib/microcosm/calibration-release-locator";
@@ -94,9 +95,13 @@ export function publicationCreatedAt(
   const candidate = value?.trim();
   if (!candidate) return null;
 
-  const compact = /(?:^|[-_])(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?$/.exec(
-    candidate,
-  );
+  // A compact date or instant at the end of the id, optionally followed by
+  // the attempt suffix microcosm's assembler puts on an immutable cut tag
+  // (`<release>-<YYYYMMDDTHHMMSSZ>-<8 hex>`).
+  const compact =
+    /(?:^|[-_])(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?(?:-[0-9a-f]{8})?$/.exec(
+      candidate,
+    );
   if (compact) {
     const [, year, month, day, hour = "00", minute = "00", second = "00"] =
       compact;
@@ -435,14 +440,19 @@ async function enumerateReleaseCandidates(
   for (const release of releases) {
     if (!release.has_calibration) continue;
     const tag = tagsByName.get(release.release_id);
+    // A release named by its line (`microcosm-uk-2024-25-national`) carries
+    // no timestamp; its publication time is the newest commit behind its
+    // directory, which is also the exact source commit when no tag exists.
+    const directory = tag && publicationCreatedAt(release.date) !== null
+      ? null
+      : await resolveHfReleaseDirectoryCommit(country, release.release_id, 0);
     candidates.set(release.release_id, {
       releaseId: release.release_id,
-      hfCommitSha: tag?.targetCommit ?? await resolveHfReleaseDirectorySha(
-        country,
-        release.release_id,
-        0,
-      ),
-      createdAt: publicationCreatedAt(release.date),
+      hfCommitSha: tag?.targetCommit ?? directory!.sha,
+      createdAt: publicationCreatedAt(release.date) ??
+        publicationCreatedAt(release.release_id) ??
+        directory?.committedAt ??
+        null,
     });
   }
   for (const tag of tags) {
@@ -451,7 +461,13 @@ async function enumerateReleaseCandidates(
       candidates.set(tag.name, {
         releaseId: tag.name,
         hfCommitSha: tag.targetCommit,
-        createdAt: publicationCreatedAt(tag.name),
+        createdAt: publicationCreatedAt(tag.name) ??
+          (await resolveHfReleaseDirectoryCommit(
+            country,
+            tag.name,
+            0,
+            tag.targetCommit,
+          )).committedAt,
       });
     } else {
       ineligible.push({
@@ -697,7 +713,9 @@ function releaseManifestEntry(
     indexSha256: published.stored.index.sha256,
     indexBytes: published.stored.index.bytes,
     createdAt: build.createdAt,
-    updatedAt: build.createdAt ?? "1970-01-01T00:00:00.000Z",
+    // Never a placeholder: a null date lets the release loader read the
+    // publication time from the Hugging Face tree instead of showing 1970.
+    updatedAt: build.createdAt,
   };
 }
 
@@ -804,7 +822,7 @@ async function publishStagingSource(options: {
     indexSha256: stored.index.sha256,
     indexBytes: stored.index.bytes,
     createdAt: source.updatedAt,
-    updatedAt: source.updatedAt ?? "1970-01-01T00:00:00.000Z",
+    updatedAt: source.updatedAt,
   };
   return { bundle, stored, entry };
 }

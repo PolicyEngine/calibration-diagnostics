@@ -90,9 +90,33 @@ export async function resolveHfReleaseDirectorySha(
   release: string,
   revalidate = 0,
 ): Promise<string> {
+  const commit = await resolveHfReleaseDirectoryCommit(country, release, revalidate);
+  return commit.sha;
+}
+
+export interface HfReleaseDirectoryCommit {
+  /** The newest commit that last changed a file of the release directory. */
+  sha: string;
+  /** That commit's date as an RFC 3339 instant: when the release was published. */
+  committedAt: string;
+}
+
+/**
+ * The newest commit behind a release directory and when it was made.
+ *
+ * Release ids no longer have to carry a timestamp (microcosm's national
+ * releases are named by line, `microcosm-uk-2024-25-national`, and their
+ * immutable cut tags end in an attempt suffix), so the publication time comes
+ * from the repository's own history rather than from the id.
+ */
+export async function resolveHfReleaseDirectoryCommit(
+  country: MicrocosmCountry,
+  release: string,
+  revalidate = 0,
+  revision: string = repositoryRevision(country),
+): Promise<HfReleaseDirectoryCommit> {
   const safeRelease = safeReleaseId(release);
   const repo = repository(country);
-  const revision = repositoryRevision(country);
   const prefix = `releases/${safeRelease}/`;
   const response = await fetch(
     `https://huggingface.co/api/datasets/${repo}/tree/` +
@@ -158,7 +182,10 @@ export async function resolveHfReleaseDirectorySha(
       `Hugging Face release ${release} has no source files for ${country}.`,
     );
   }
-  return commits[0].id;
+  return {
+    sha: commits[0].id,
+    committedAt: new Date(commits[0].date).toISOString(),
+  };
 }
 
 export async function resolveCalibrationRelease(
@@ -186,6 +213,8 @@ export function calibrationReleaseFromManifest(
     buildArtifactId: entry.buildArtifactId,
     releaseId: entry.releaseId,
     hfCommitSha: entry.hfCommitSha,
+    // Null when the publisher could not date the release; the release loader
+    // then reads the publication time from the Hugging Face tree.
     updatedAt: entry.updatedAt,
   };
 }

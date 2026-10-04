@@ -168,6 +168,12 @@ test("publisher normalizes compact release dates for manifest sorting", () => {
   );
   expect(publicationCreatedAt("release-without-a-date")).toBeNull();
   expect(publicationCreatedAt("20261340")).toBeNull();
+  // microcosm's immutable cut tags end in the calibration attempt's suffix;
+  // the line-named release id itself carries no date.
+  expect(
+    publicationCreatedAt("microcosm-uk-2024-25-national-20261002T230158Z-5c6b3f68"),
+  ).toBe("2026-10-02T23:01:58.000Z");
+  expect(publicationCreatedAt("microcosm-uk-2024-25-national")).toBeNull();
 });
 
 test("latest publication uses its exact source commit when no release tag exists", async () => {

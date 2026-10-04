@@ -22,7 +22,8 @@ export interface CalibrationTreeManifestEntry {
   indexSha256: string;
   indexBytes: number;
   createdAt: string | null;
-  updatedAt: string;
+  /** Null when the publisher could not date the build; never a placeholder. */
+  updatedAt: string | null;
 }
 
 export interface CalibrationTreeCountryManifest {

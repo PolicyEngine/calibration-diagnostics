@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 
 import {
   calibrationReleaseFromManifest,
+  resolveHfReleaseDirectoryCommit,
   resolveHfReleaseDirectorySha,
   resolveHfRevisionSha,
 } from "./calibration-release-locator";
@@ -97,4 +98,37 @@ test("untagged release resolution requires calibration diagnostics", async () =>
     "be",
     "microcosm-be-history",
   )).rejects.toThrow("has no calibration diagnostics");
+});
+
+test("a line-named release's publication time is its directory's newest commit", async () => {
+  // microcosm-uk-2024-25-national carries no timestamp in its id, so the
+  // publisher dates it from the repository history, at the tag's revision
+  // when one is given.
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requested.push(String(input));
+    return Response.json([
+      {
+        type: "file",
+        path: "releases/microcosm-uk-2024-25-national/calibration_diagnostics.json",
+        lastCommit: { id: "a".repeat(40), date: "2026-10-04T18:57:22.000Z" },
+      },
+      {
+        type: "file",
+        path: "releases/microcosm-uk-2024-25-national/release_manifest.json",
+        lastCommit: { id: "b".repeat(40), date: "2026-10-04T18:50:00.000Z" },
+      },
+    ]);
+  }) as typeof fetch;
+  expect(await resolveHfReleaseDirectoryCommit(
+    "uk",
+    "microcosm-uk-2024-25-national",
+    0,
+    "microcosm-uk-2024-25-national-20261002T230158Z-5c6b3f68",
+  )).toEqual({ sha: "a".repeat(40), committedAt: "2026-10-04T18:57:22.000Z" });
+  expect(requested).toEqual([
+    "https://huggingface.co/api/datasets/policyengine/populace-uk-private/tree/" +
+      "microcosm-uk-2024-25-national-20261002T230158Z-5c6b3f68/releases/" +
+      "microcosm-uk-2024-25-national?recursive=false&expand=true",
+  ]);
 });
