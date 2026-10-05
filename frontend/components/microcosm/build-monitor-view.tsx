@@ -39,6 +39,7 @@ import {
   type StageStat,
   formatStageName,
   runDurationMs,
+  sameStageSequence,
   solverPassLabel,
   solverSegments,
   stageCores,
@@ -89,8 +90,7 @@ const FAILURE_CLASS_LABEL: Record<string, string> = {
   out_of_memory: "Out of memory",
   refused: "Refused before building",
   error: "Error",
-  stopped_without_final_event: "Stopped without a final event (killed)",
-  abandoned_early: "Stopped within 2 min of starting (test or abort)",
+  stopped_without_final_event: "Stopped without a final event",
   unclassified: "Failed, no class recorded",
 };
 
@@ -135,16 +135,33 @@ function fmtClock(ms: number | null | undefined, nowMs: number): string {
   return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
 }
 
-function runOptionLabel(run: BuildTimeline): string {
+// A run in the run selector: its state, start, length and where it is or
+// stopped. The selector groups runs by pipeline; the overview shows the id.
+function runOptionLabel(run: BuildTimeline, nowMs: number): string {
   const started = run.started_ms
     ? new Date(run.started_ms).toLocaleString(undefined, {
         month: "short",
         day: "numeric",
-        hour: "2-digit",
+        hour: "numeric",
         minute: "2-digit",
       })
     : "unknown start";
-  return `${STATE_LABEL[run.state]} · ${run.pipeline_label} · ${started} · ${run.run_id}`;
+  const duration = runDurationMs(run, nowMs);
+  const top = run.spans.filter((span) => span.depth === 0);
+  const lastStage = top[top.length - 1]?.stage ?? run.current_stage;
+  const where =
+    run.state === "running"
+      ? run.current_stage && `in ${formatStageName(run.current_stage)}`
+      : run.state === "failed"
+        ? (run.failure?.stage ?? lastStage) && `failed in ${formatStageName(run.failure?.stage ?? lastStage!)}`
+        : run.state === "blocked"
+          ? run.failure?.stage && `refused at ${formatStageName(run.failure.stage)}`
+          : run.state === "stalled"
+            ? lastStage && `went silent in ${formatStageName(lastStage)}`
+            : null;
+  return [STATE_LABEL[run.state], started, duration != null ? fmtDuration(duration) : null, where]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function SourceToggle({
@@ -221,19 +238,31 @@ export function BuildMonitorView({
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
   const [selected, setSelected] = useState("");
+  // The selector groups runs by pipeline, and puts runs whose stages differ
+  // from the pipeline's newest run (an older build driver) in a group of
+  // their own, as the forecast and statistics leave them out.
+  const runGroups = useMemo(() => {
+    const newest = new Map<string, BuildTimeline>();
+    for (const run of runs) if (!newest.has(run.pipeline)) newest.set(run.pipeline, run);
+    return new Map(
+      runs.map((run) => [
+        run.run_id,
+        sameStageSequence(newest.get(run.pipeline)!, run)
+          ? run.pipeline_label
+          : `${run.pipeline_label} · earlier stage sequence`,
+      ]),
+    );
+  }, [runs]);
 
   useEffect(() => {
     if (!runs.length) return;
     if (!runs.some((run) => run.run_id === selected)) {
       const preferred = runs.find((run) => run.run_id === preferredRunId);
       const running = runs.find((run) => run.state === "running");
-      // Otherwise the newest run that got going: one that went silent within
-      // two minutes of starting (a test or an abort) shows almost nothing.
-      const substantial = runs.find((run) => {
-        const duration = runDurationMs(run, Date.now());
-        return duration != null && duration >= 2 * 60_000;
-      });
-      setSelected((preferred ?? running ?? substantial ?? runs[0]).run_id);
+      // Otherwise the newest run that ended with a final event (finished,
+      // blocked or failed), whose telemetry says how it ended.
+      const ended = runs.find((run) => run.state !== "stalled");
+      setSelected((preferred ?? running ?? ended ?? runs[0]).run_id);
     }
   }, [runs, selected, preferredRunId]);
 
@@ -272,7 +301,11 @@ export function BuildMonitorView({
               value={selected}
               options={
                 runs.length
-                  ? runs.map((run) => ({ value: run.run_id, label: runOptionLabel(run) }))
+                  ? runs.map((run) => ({
+                      value: run.run_id,
+                      label: runOptionLabel(run, list.data?.now_ms ?? Date.now()),
+                      group: runGroups.get(run.run_id),
+                    }))
                   : [{ value: "", label: list.isLoading ? "Loading runs…" : "No runs" }]
               }
               onChange={selectRun}
@@ -532,11 +565,11 @@ function RunOverview({
 
         {run.state === "stalled" ? (
           <div className="rounded-md border px-3 py-2 text-sm pill-warn">
-            {elapsed != null && elapsed < 2 * 60_000
-              ? `This run went silent ${fmtDuration(elapsed)} after it started, most likely a test or an aborted launch.`
-              : silentFor != null && silentFor > 24 * 3_600_000
-                ? `This run stopped on ${fmtClock(run.updated_ms, nowMs)} without a final event, ${fmtDuration(elapsed)} after it started. A build killed by the operating system (out of memory) or interrupted never writes one.`
-                : `No telemetry for ${fmtDuration(silentFor)}. A build killed by the operating system (out of memory) or interrupted never writes a final event, so this run is probably dead. Check the build machine.`}
+            {`The last telemetry came ${fmtDuration(elapsed)} after the run started, ${
+              silentFor != null && silentFor > 24 * 3_600_000
+                ? `on ${fmtClock(run.updated_ms, nowMs)}`
+                : `${fmtDuration(silentFor)} ago`
+            }, and the run wrote no final event. The telemetry does not say why it stopped, or whether the process is still working without reporting.`}
           </div>
         ) : null}
 

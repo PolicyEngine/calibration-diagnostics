@@ -601,7 +601,7 @@ describe("process telemetry (resources, work, heartbeat, failure class)", () => 
       T0 + min(300),
     );
     failed.failure = { ...failed.failure!, failure_class: "gate_refused" };
-    // Went silent 30 minutes in: a kill, not an abort.
+    // Went silent 30 minutes in, with no final event.
     const stalled = buildTimeline(
       v1Run("quiet", [
         ["load_base_frame", 0],
@@ -628,13 +628,15 @@ describe("process telemetry (resources, work, heartbeat, failure class)", () => 
       v1Run("old-crash", [["export_dataset", 0]], { end: ["failed", min(5), "KeyError: 'weights'"] }),
       T0 + min(10),
     );
-    const early = buildTimeline(v1Run("aborted", [["target_registry", 0]]), T0 + STALL_MS + min(1));
+    // Went silent seconds in: the telemetry gives no cause, however short.
+    const early = buildTimeline(v1Run("early", [["target_registry", 0]]), T0 + STALL_MS + min(1));
     const stats = failureClassStatistics([gate, crash, early]);
     const byClass = Object.fromEntries(stats.map((stat) => [stat.failure_class, stat]));
     expect(byClass.gate_refused.inferred).toBe(1);
     expect(byClass.gate_refused.reasons).toEqual([{ reason: "Release gates failed", count: 1 }]);
     expect(byClass.error.stages).toEqual([{ stage: "export_dataset", count: 1 }]);
-    expect(byClass.abandoned_early.runs).toBe(1);
+    expect(byClass.stopped_without_final_event.runs).toBe(1);
+    expect(byClass.abandoned_early).toBeUndefined();
   });
 });
 

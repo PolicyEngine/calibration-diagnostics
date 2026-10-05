@@ -1612,9 +1612,6 @@ export interface FailureClassStat {
   last_run_id: string | null;
 }
 
-// A run that went silent this soon, having barely started, was most likely a
-// test or an aborted launch rather than a crash.
-const ABANDONED_WITHIN_MS = 2 * 60 * 1000;
 const INFERRED_GATE = /\bgates? (?:failed|refused)\b|\brefus/i;
 
 // The class a failed run would have recorded, for runs from before failure
@@ -1636,9 +1633,8 @@ function stoppedStage(run: BuildTimeline): string | null {
 }
 
 // Why runs stopped, by kind. A recorded class wins; otherwise it is inferred.
-// Blocked runs count as gate refusals. A run that went silent is a kill
-// (stopped without a final event) unless it went silent within two minutes of
-// starting, which reads as a test or an aborted launch.
+// Blocked runs count as gate refusals. A run that went silent stopped without
+// a final event; its telemetry does not say why, so it gets no cause.
 export function failureClassStatistics(runs: BuildTimeline[]): FailureClassStat[] {
   interface Entry {
     lost: number[];
@@ -1664,10 +1660,7 @@ export function failureClassStatistics(runs: BuildTimeline[]): FailureClassStat[
     } else if (run.state === "blocked") {
       failureClass = "gate_refused";
     } else if (run.state === "stalled") {
-      failureClass =
-        lost != null && lost < ABANDONED_WITHIN_MS
-          ? "abandoned_early"
-          : "stopped_without_final_event";
+      failureClass = "stopped_without_final_event";
     }
     if (!failureClass) continue;
     const entry: Entry = byClass.get(failureClass) ?? {
