@@ -8,11 +8,12 @@ import {
   type StageStat,
   buildTimeline,
   compactTimeline,
-  type FailureClassStat,
-  failureClassStatistics,
+  type StopStat,
+  stopStatistics,
   forecastCompletion,
   gateStatistics,
   phaseTotals,
+  sameStageSequence,
   stageStatistics,
 } from "@/lib/microcosm/build-monitor";
 import {
@@ -70,9 +71,12 @@ export interface BuildRunResponse {
   run: BuildTimeline;
   forecast: BuildForecast | null;
   pipeline_runs: number;
+  // Runs of the same pipeline left out of the statistics and forecast
+  // because they went through a different stage sequence.
+  other_sequence_runs: number;
   stage_stats: StageStat[];
   gate_stats: GateStat[];
-  failure_classes: FailureClassStat[];
+  stop_stats: StopStat[];
   phase_totals: PhaseTotals[];
   gate_catalog: CatalogGate[] | null;
 }
@@ -389,8 +393,12 @@ export async function loadBuildRun(
     ...all.filter((timeline) => timeline.run_id !== runId),
     run,
   ];
-  const pipelineRuns = currentRuns.filter(
+  const samePipeline = currentRuns.filter(
     (timeline) => timeline.pipeline === run!.pipeline,
+  );
+  const pipelineRuns = samePipeline.filter(
+    (timeline) =>
+      timeline.run_id === run!.run_id || sameStageSequence(run!, timeline),
   );
   return {
     source,
@@ -399,11 +407,12 @@ export async function loadBuildRun(
     run,
     forecast: forecastCompletion(run, currentRuns, nowMs),
     pipeline_runs: pipelineRuns.length,
-    stage_stats: stageStatistics(
-      pipelineRuns.filter((timeline) => timeline.state !== "running"),
-    ),
+    other_sequence_runs: samePipeline.length - pipelineRuns.length,
+    // Running runs count with the stages they have finished; the open stage
+    // has no end yet and is skipped.
+    stage_stats: stageStatistics(pipelineRuns),
     gate_stats: gateStatistics(pipelineRuns),
-    failure_classes: failureClassStatistics(pipelineRuns),
+    stop_stats: stopStatistics(pipelineRuns),
     phase_totals: pipelineRuns.map((timeline) => phaseTotals(timeline, nowMs)),
     gate_catalog: gateCatalogForPipeline(run.pipeline),
   };

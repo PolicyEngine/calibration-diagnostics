@@ -424,3 +424,39 @@ body::before {
 .animate-loading-bar {
   animation: loading-bar 1.4s ease-in-out infinite;
 }
+
+/* A running stage on the build timeline: stripes that move along its bar,
+   and a blinking dot by its label. Still for viewers who reduce motion. */
+@keyframes running-stripes {
+  from {
+    background-position: 16px 0, 0 0;
+  }
+  to {
+    background-position: 0 0, 0 0;
+  }
+}
+
+.bar-running {
+  animation: running-stripes 0.8s linear infinite;
+}
+
+@keyframes live-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.live-blink {
+  animation: live-blink 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-running,
+  .live-blink {
+    animation: none;
+  }
+}
