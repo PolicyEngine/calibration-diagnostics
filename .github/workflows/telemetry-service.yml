@@ -23,6 +23,21 @@ jobs:
   validate:
     name: Test, lint, and build
     runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/telemetry_test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: telemetry_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d telemetry_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: telemetry-service
@@ -33,13 +48,17 @@ jobs:
           python-version: "3.13"
       - run: uv sync --frozen --dev
       - run: uv run pytest -q
+      - run: DATABASE_URL="$TEST_DATABASE_URL" uv run python -m telemetry_collector.migrate
+      - run: DATABASE_URL="$TEST_DATABASE_URL" uv run alembic check
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: docker build --tag microcosm-telemetry:validation .
 
   deploy:
     name: Deploy verified image to Cloud Run
-    if: github.event_name != 'pull_request'
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -54,6 +73,7 @@ jobs:
       CLOUD_SQL_CONNECTION: ${{ vars.TELEMETRY_CLOUD_SQL_CONNECTION }}
       RUNTIME_SERVICE_ACCOUNT: ${{ vars.TELEMETRY_RUNTIME_SERVICE_ACCOUNT }}
       SERVICE: microcosm-telemetry
+      MIGRATION_JOB: microcosm-telemetry-migrate
       IMAGE_NAME: collector
       DATABASE_SECRET: microcosm-telemetry-database-url
       JWT_SECRET: microcosm-telemetry-jwt-secret
@@ -108,6 +128,30 @@ jobs:
           ' <<<"$service_json")"
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
+      - name: Configure the database migration job
+        run: |
+          gcloud run jobs deploy "$MIGRATION_JOB" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --image "${{ steps.image.outputs.uri }}" \
+            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+            --set-cloudsql-instances "$CLOUD_SQL_CONNECTION" \
+            --set-secrets "DATABASE_URL=${DATABASE_SECRET}:latest" \
+            --command uv \
+            --args "run,--no-sync,python,-m,telemetry_collector.migrate" \
+            --tasks 1 \
+            --max-retries 0 \
+            --task-timeout 10m \
+            --quiet
+
+      - name: Apply database migrations
+        run: |
+          gcloud run jobs execute "$MIGRATION_JOB" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --wait \
+            --quiet
+
       - name: Deploy an isolated candidate revision
         run: |
           gcloud run deploy "$SERVICE" \
@@ -119,7 +163,7 @@ jobs:
             --add-cloudsql-instances "$CLOUD_SQL_CONNECTION" \
             --set-secrets "DATABASE_URL=${DATABASE_SECRET}:latest,TELEMETRY_JWT_SECRET=${JWT_SECRET}:latest,TELEMETRY_READ_TOKEN=${READ_SECRET}:latest" \
             --min 1 \
-            --max 10 \
+            --max 4 \
             --cpu 1 \
             --memory 512Mi \
             --concurrency 40 \
@@ -146,7 +190,7 @@ jobs:
           ' <<<"$service_json")"
           curl --fail --show-error --silent \
             --retry 12 --retry-all-errors --retry-delay 5 \
-            "${url}/health"
+            "${url}/ready"
           {
             echo "revision=$revision"
             echo "url=$url"
@@ -169,7 +213,7 @@ jobs:
             --format='value(status.url)')"
           curl --fail --show-error --silent \
             --retry 12 --retry-all-errors --retry-delay 5 \
-            "${stable_url}/health"
+            "${stable_url}/ready"
 
       - name: Restore the previous revision after failed stable verification
         if: failure() && steps.promote.outcome == 'success'
