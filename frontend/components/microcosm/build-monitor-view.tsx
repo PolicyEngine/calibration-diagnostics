@@ -54,6 +54,9 @@ const PHASE_COLOR: Record<BuildPhase, string> = {
   export: "var(--chart-5)",
 };
 const FAILED_COLOR = "var(--destructive)";
+// Light stripes laid over a running stage's bar; `bar-running` moves them.
+const RUNNING_STRIPES =
+  "linear-gradient(45deg, rgb(255 255 255 / 0.32) 25%, transparent 25%, transparent 50%, rgb(255 255 255 / 0.32) 50%, rgb(255 255 255 / 0.32) 75%, transparent 75%, transparent)";
 const PENDING_FILL =
   "repeating-linear-gradient(135deg, color-mix(in srgb, var(--border-strong) 55%, transparent) 0 4px, transparent 4px 8px)";
 
@@ -732,6 +735,8 @@ function placeLabel(
   areaWidth: number | null,
   startFraction: number,
   endFraction: number,
+  // Room taken by anything drawn before the text (the live dot).
+  leadWidth = 0,
 ): { text: string; place: LabelPlace } {
   if (areaWidth == null) {
     const place: LabelPlace =
@@ -743,7 +748,7 @@ function placeLabel(
   const right = areaWidth - endFraction * areaWidth;
   for (let count = parts.length; count >= 1; count -= 1) {
     const text = parts.slice(0, count).join(" · ");
-    const needed = labelWidth(text);
+    const needed = labelWidth(text) + leadWidth;
     if (right >= needed) return { text, place: "right" };
     if (bar >= needed) return { text, place: "inside" };
     if (left >= needed) return { text, place: "left" };
@@ -838,18 +843,31 @@ function TimelineCard({
     );
   }
 
-  const barStyle = (row: TimelineRow) => ({
-    left: pct(row.start),
-    width: width(row.start, row.end),
-    background:
-      row.status === "pending"
-        ? PENDING_FILL
-        : row.status === "failed"
-          ? FAILED_COLOR
-          : PHASE_COLOR[row.phase],
-    // Stretches without epochs are drawn faint, passes at full strength.
-    opacity: row.segment && !row.segment.pass ? 0.35 : row.status === "running" ? 0.75 : 1,
-  });
+  const barStyle = (row: TimelineRow): CSSProperties => {
+    const place = {
+      left: pct(row.start),
+      width: width(row.start, row.end),
+      // Stretches without epochs are drawn faint, passes at full strength.
+      opacity: row.segment && !row.segment.pass ? 0.35 : 1,
+    };
+    if (row.status === "running") {
+      // Moving stripes; solid up to now, faded where the bar runs on to the
+      // forecast end.
+      const color = PHASE_COLOR[row.phase];
+      const done =
+        row.end > row.start ? Math.min(100, Math.max(0, ((elapsed - row.start) / (row.end - row.start)) * 100)) : 100;
+      return {
+        ...place,
+        backgroundImage: `${RUNNING_STRIPES}, linear-gradient(to right, ${color} ${done}%, color-mix(in srgb, ${color} 35%, transparent) ${done}%)`,
+        backgroundSize: "16px 16px, 100% 100%",
+      };
+    }
+    return {
+      ...place,
+      background:
+        row.status === "pending" ? PENDING_FILL : row.status === "failed" ? FAILED_COLOR : PHASE_COLOR[row.phase],
+    };
+  };
 
   return (
     <SectionCard
@@ -868,7 +886,7 @@ function TimelineCard({
             {rows.map((row) => (
               <div
                 key={`whole-${row.key}`}
-                className="absolute top-0 h-full"
+                className={`absolute top-0 h-full ${row.status === "running" ? "bar-running" : ""}`}
                 style={barStyle(row)}
                 title={`${row.label}: ${fmtDuration(row.end - row.start)}`}
               />
@@ -961,33 +979,54 @@ function TimelineStageRow({
     row.span?.work ? `${row.span.work.done} of ${row.span.work.total} ${plural(row.span.work.unit ?? "unit")}` : null,
   ].filter((part): part is string => Boolean(part));
   const full = parts.join(" · ");
-  const { text, place: labelPlace } = placeLabel(parts, areaWidth, startFraction, endFraction);
+  const running = row.status === "running";
+  const { text, place: labelPlace } = placeLabel(parts, areaWidth, startFraction, endFraction, running ? 10 : 0);
+  const swatchSize = row.segment ? "h-1.5 w-1.5" : "h-2 w-2";
+  const swatchColor = row.status === "failed" ? FAILED_COLOR : PHASE_COLOR[row.phase];
   return (
     <>
       <div
         className={`flex min-w-0 items-center gap-1.5 ${row.segment ? "pl-3.5 text-muted-foreground" : ""}`}
         title={row.segment ? row.label : row.stage}
       >
+        {running ? (
+          // A pulsing dot marks what is running now.
+          <span aria-hidden="true" className={`relative flex shrink-0 ${swatchSize}`}>
+            <span
+              className="absolute inline-flex h-full w-full rounded-full opacity-60 motion-safe:animate-ping"
+              style={{ background: swatchColor }}
+            />
+            <span className="relative inline-flex h-full w-full rounded-full" style={{ background: swatchColor }} />
+          </span>
+        ) : (
+          <span
+            aria-hidden="true"
+            className={`shrink-0 rounded-sm ${swatchSize}`}
+            style={{ background: swatchColor, opacity: row.segment && !row.segment.pass ? 0.35 : 1 }}
+          />
+        )}
         <span
-          aria-hidden="true"
-          className={`shrink-0 rounded-sm ${row.segment ? "h-1.5 w-1.5" : "h-2 w-2"}`}
-          style={{
-            background: row.status === "failed" ? FAILED_COLOR : PHASE_COLOR[row.phase],
-            opacity: row.segment && !row.segment.pass ? 0.35 : 1,
-          }}
-        />
-        <span className={`truncate ${row.status === "pending" ? "text-muted-foreground" : ""}`}>{row.label}</span>
+          className={`truncate ${
+            row.status === "pending" ? "text-muted-foreground" : running ? "font-medium text-foreground" : ""
+          }`}
+        >
+          {row.label}
+        </span>
       </div>
       {/* Labels that do not fit are clipped; the tooltip has the full text. */}
       <div className="relative h-5 overflow-hidden" title={`${row.label}: ${full}`}>
-        <div
-          className={`absolute top-0.5 h-4 rounded-sm ${row.status === "running" ? "animate-pulse" : ""}`}
-          style={barStyle}
-        />
+        <div className={`absolute top-0.5 h-4 rounded-sm ${running ? "bar-running" : ""}`} style={barStyle} />
         <span
           className={`absolute top-0.5 whitespace-nowrap text-[10px] leading-4 ${
-            labelPlace === "inside" ? "pl-1.5 text-foreground" : labelPlace === "left" ? "pr-1 text-muted-foreground" : "pl-1 text-muted-foreground"
-          }`}
+            labelPlace === "inside"
+              ? // On moving stripes the text needs a plain backing to stay readable.
+                running
+                ? "ml-1 rounded-sm bg-background/85 px-1"
+                : "pl-1.5"
+              : labelPlace === "left"
+                ? "pr-1"
+                : "pl-1"
+          } ${running || labelPlace === "inside" ? "font-medium text-foreground" : "text-muted-foreground"}`}
           style={
             labelPlace === "inside"
               ? { left: barStyle.left }
@@ -996,6 +1035,12 @@ function TimelineStageRow({
                 : { left: `calc(${barStyle.left} + ${barStyle.width})` }
           }
         >
+          {running ? (
+            <span
+              aria-hidden="true"
+              className="live-blink swatch-info mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
+            />
+          ) : null}
           {text}
         </span>
         {nowLeft ? <div className="absolute top-0 h-5 w-px bg-foreground/30" style={{ left: nowLeft }} /> : null}
