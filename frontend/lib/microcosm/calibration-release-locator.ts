@@ -90,34 +90,7 @@ export async function resolveHfReleaseDirectorySha(
   release: string,
   revalidate = 0,
 ): Promise<string> {
-  const commit = await resolveHfReleaseDirectoryCommit(country, release, revalidate);
-  return commit.sha;
-}
-
-export interface HfReleaseDirectoryCommit {
-  /** The newest commit that last changed a file of the release directory. */
-  sha: string;
-  /** That commit's date as an RFC 3339 instant: when the release was published. */
-  committedAt: string;
-}
-
-/**
- * The newest commit behind a release directory and when it was made.
- *
- * Release ids no longer have to carry a timestamp (microcosm's national
- * releases are named by line, `microcosm-uk-2024-25-national`, and their
- * immutable cut tags end in an attempt suffix), so the publication time comes
- * from the repository's own history rather than from the id. For a line
- * directory that each cut rewrites, that is the latest cut's publication
- * time at the given revision: when the release was published, not when it
- * was built (`release_manifest.build.built_at`).
- */
-export async function resolveHfReleaseDirectoryCommit(
-  country: MicrocosmCountry,
-  release: string,
-  revalidate = 0,
-  revision: string = repositoryRevision(country),
-): Promise<HfReleaseDirectoryCommit> {
+  const revision = repositoryRevision(country);
   const safeRelease = safeReleaseId(release);
   const repo = repository(country);
   const prefix = `releases/${safeRelease}/`;
@@ -185,10 +158,56 @@ export async function resolveHfReleaseDirectoryCommit(
       `Hugging Face release ${release} has no source files for ${country}.`,
     );
   }
-  return {
-    sha: commits[0].id,
-    committedAt: new Date(commits[0].date).toISOString(),
-  };
+  return commits[0].id;
+}
+
+/**
+ * When a Hugging Face commit was made: the one publication timestamp.
+ *
+ * Every calibration build pins the exact repository commit its bytes come
+ * from (`hfCommitSha`), so its publication time is that commit's date, read
+ * from the repository's commit log, whether the build is being published,
+ * reconciled or loaded. Release ids and tag names are not a source:
+ * microcosm's national releases are named by line
+ * (`microcosm-uk-2024-25-national`) and their immutable cut tags end in an
+ * attempt suffix. When the commit cannot be read this fails rather than
+ * substituting a timestamp with different semantics.
+ */
+export async function resolveHfCommitPublishedAt(
+  country: MicrocosmCountry,
+  sha: string,
+  revalidate = 0,
+): Promise<string> {
+  const commitSha = sha.toLowerCase();
+  if (!/^[0-9a-f]{40,64}$/.test(commitSha)) {
+    throw new Error(`Hugging Face commit ${sha} is not a commit SHA.`);
+  }
+  const repo = repository(country);
+  const response = await fetch(
+    `https://huggingface.co/api/datasets/${repo}/commits/${commitSha}?limit=1`,
+    {
+      headers: hfHeaders(),
+      ...(revalidate <= 0
+        ? { cache: "no-store" as const }
+        : { next: { revalidate } }),
+    },
+  );
+  if (response.status === 404) {
+    throw new CalibrationReleaseNotFoundError(
+      `Hugging Face commit ${sha} was not found for ${country}.`,
+    );
+  }
+  if (!response.ok) {
+    throw new Error(`Hugging Face commit lookup failed with ${response.status}.`);
+  }
+  const commits = (await response.json()) as Array<{ id?: unknown; date?: unknown }>;
+  const first = Array.isArray(commits) ? commits[0] : undefined;
+  const id = typeof first?.id === "string" ? first.id.toLowerCase() : "";
+  const date = typeof first?.date === "string" ? Date.parse(first.date) : Number.NaN;
+  if (id !== commitSha || !Number.isFinite(date)) {
+    throw new Error(`Hugging Face returned invalid commit metadata for ${sha}.`);
+  }
+  return new Date(date).toISOString();
 }
 
 export async function resolveCalibrationRelease(
@@ -216,8 +235,9 @@ export function calibrationReleaseFromManifest(
     buildArtifactId: entry.buildArtifactId,
     releaseId: entry.releaseId,
     hfCommitSha: entry.hfCommitSha,
-    // Null when the publisher could not date the release; the release loader
-    // then reads the publication time from the Hugging Face tree.
+    // Null only on an entry written before the publication timestamp was
+    // read from the pinned commit; the release loader then reads it from
+    // that same commit.
     updatedAt: entry.updatedAt,
   };
 }

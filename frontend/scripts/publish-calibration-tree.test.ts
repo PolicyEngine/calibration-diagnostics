@@ -4,12 +4,18 @@ import {
   CalibrationTreeArtifactSizeError,
   enforceConfiguredSizeLimits,
   parsePublisherOptions,
-  publicationCreatedAt,
+  reconcileReleaseBuilds,
+  withPublicationTimestamp,
   readUpstreamLatest,
   resolvePublicationSourceSha,
   manifestBuildForSource,
 } from "./publish-calibration-tree";
-import { emptyCalibrationTreeManifest } from "../lib/microcosm/calibration-tree-manifest";
+import {
+  emptyCalibrationTreeManifest,
+  withCalibrationTreeManifestEntry,
+  type CalibrationTreeManifest,
+  type CalibrationTreeManifestEntry,
+} from "../lib/microcosm/calibration-tree-manifest";
 
 const originalFetch = globalThis.fetch;
 
@@ -155,31 +161,6 @@ test("publisher enforces configured artifact size limits", () => {
   }
 });
 
-test("publisher normalizes compact release dates for manifest sorting", () => {
-  expect(publicationCreatedAt("20260915")).toBe("2026-09-15T00:00:00.000Z");
-  expect(publicationCreatedAt("20260728T011454Z")).toBe(
-    "2026-07-28T01:14:54.000Z",
-  );
-  expect(
-    publicationCreatedAt("populace-us-2024-spm-20260728T011454Z"),
-  ).toBe("2026-07-28T01:14:54.000Z");
-  expect(publicationCreatedAt("2026-09-16T12:00:00Z")).toBe(
-    "2026-09-16T12:00:00.000Z",
-  );
-  expect(publicationCreatedAt("release-without-a-date")).toBeNull();
-  expect(publicationCreatedAt("20261340")).toBeNull();
-  // microcosm's immutable cut tags end in the calibration attempt's suffix;
-  // the line-named release id itself carries no date.
-  expect(
-    publicationCreatedAt("microcosm-uk-2024-25-national-20261002T230158Z-5c6b3f68"),
-  ).toBe("2026-10-02T23:01:58.000Z");
-  expect(publicationCreatedAt("microcosm-uk-2024-25-national")).toBeNull();
-  // The suffix is read only after an instant: after a bare date an all-digit
-  // tail is the later date, and a hex tail is no date at all.
-  expect(publicationCreatedAt("a-20261002-20261003")).toBe("2026-10-03T00:00:00.000Z");
-  expect(publicationCreatedAt("release-20261002-deadbeef")).toBeNull();
-});
-
 test("latest publication uses its exact source commit when no release tag exists", async () => {
   const sourceSha = "1".repeat(40);
   const requested: string[] = [];
@@ -224,6 +205,138 @@ test("an exact supplied commit supports a release without a matching tag", async
       sourceSha,
       false,
     )).resolves.toBe(sourceSha);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a stored entry takes its pinned commit's publication timestamp, once", () => {
+  const entry: CalibrationTreeManifestEntry = {
+    buildArtifactId: "d".repeat(64),
+    kind: "release",
+    sourceId: "microcosm-uk-2024-25-national",
+    label: "microcosm-uk-2024-25-national",
+    releaseId: "microcosm-uk-2024-25-national",
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-uk-private",
+    hfCommitSha: "f".repeat(40),
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: null,
+    updatedAt: "1970-01-01T00:00:00.000Z",
+  };
+  const stamped = withPublicationTimestamp(entry, "2026-10-04T18:57:22.000Z");
+  expect(stamped).toEqual({
+    ...entry,
+    createdAt: "2026-10-04T18:57:22.000Z",
+    updatedAt: "2026-10-04T18:57:22.000Z",
+  });
+  expect(withPublicationTimestamp(stamped, "2026-10-04T18:57:22.000Z")).toBe(stamped);
+});
+
+test("reconciliation replaces a complete entry's epoch placeholder with the commit date", async () => {
+  // The production symptom: the UK national release was published with an
+  // entry whose bundle is complete but whose updatedAt is the 1970
+  // placeholder. Reconciliation must rewrite the stored metadata from the
+  // pinned commit's date without re-publishing the bundle.
+  const repo = "policyengine/populace-uk-private";
+  const releaseId = "microcosm-uk-2024-25-national";
+  const sha = "f".repeat(40);
+  const publishedAt = "2026-10-04T18:57:22.000Z";
+  const stale: CalibrationTreeManifestEntry = {
+    buildArtifactId: "d".repeat(64),
+    kind: "release",
+    sourceId: releaseId,
+    label: releaseId,
+    releaseId,
+    stagingRunId: null,
+    hfRepo: repo,
+    hfCommitSha: sha,
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: null,
+    updatedAt: "1970-01-01T00:00:00.000Z",
+  };
+  let manifest: CalibrationTreeManifest = withCalibrationTreeManifestEntry(
+    emptyCalibrationTreeManifest(),
+    "uk",
+    stale,
+    true,
+  );
+  const writes: Array<{ entry: CalibrationTreeManifestEntry; makeLatest?: boolean }> = [];
+  const store = {
+    readManifest: async () => manifest,
+    listBlobs: async () => new Map(),
+    audit: async () => ({ complete: true, repairable: true, reasons: [], index: null }),
+    updateManifest: async (entry: CalibrationTreeManifestEntry, makeLatest?: boolean) => {
+      writes.push({ entry, makeLatest });
+      manifest = withCalibrationTreeManifestEntry(manifest, "uk", entry, makeLatest);
+      return manifest;
+    },
+  };
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.includes(`/api/datasets/${repo}/tree/main/releases?recursive=true`)) {
+      return Response.json([
+        { type: "file", path: `releases/${releaseId}/calibration_diagnostics.json` },
+        { type: "file", path: `releases/${releaseId}/release_manifest.json` },
+      ]);
+    }
+    if (url.includes(`/api/datasets/${repo}/refs`)) {
+      return Response.json({ tags: [] });
+    }
+    if (url.includes(`/tree/main/releases/${releaseId}?recursive=false&expand=true`)) {
+      return Response.json([
+        {
+          type: "file",
+          path: `releases/${releaseId}/calibration_diagnostics.json`,
+          lastCommit: { id: sha, date: publishedAt },
+        },
+        {
+          type: "file",
+          path: `releases/${releaseId}/release_manifest.json`,
+          lastCommit: { id: sha, date: publishedAt },
+        },
+      ]);
+    }
+    if (url.includes(`/api/datasets/${repo}/commits/${sha}?limit=1`)) {
+      return Response.json([{ id: sha, date: publishedAt, title: "Publish" }]);
+    }
+    if (url.includes(`/api/datasets/${repo}/revision/main`)) {
+      return Response.json({ sha });
+    }
+    if (url.includes(`/api/datasets/${repo}/revision/${releaseId}`)) {
+      return new Response(null, { status: 404 });
+    }
+    if (url.endsWith("/latest.json")) {
+      return Response.json({ release_id: releaseId, updated_at: "2026-10-04T18:58:18+00:00" });
+    }
+    if (url.endsWith(`/releases/${releaseId}/release_manifest.json`)) {
+      return Response.json({});
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+  try {
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    const outcome = report.outcomes.find((item) => item.sourceId === releaseId);
+    expect(outcome?.status).toBe("repaired");
+    expect(outcome?.reason).toContain(publishedAt);
+    const stored = manifest.countries.uk?.builds.find(
+      (build) => build.releaseId === releaseId,
+    );
+    expect(stored?.createdAt).toBe(publishedAt);
+    expect(stored?.updatedAt).toBe(publishedAt);
+    expect(stored?.hfCommitSha).toBe(sha);
+    expect(stored?.indexSha256).toBe(stale.indexSha256);
+    // The timestamp came from the commit log at the pinned revision, and the
+    // bundle itself was not re-published.
+    expect(requested.some((url) => url.includes(`/commits/${sha}?limit=1`))).toBe(true);
+    expect(writes.map((write) => write.entry.updatedAt)).toEqual([publishedAt, publishedAt]);
+    expect(writes[1]?.makeLatest).toBe(true);
   } finally {
     globalThis.fetch = originalFetch;
   }

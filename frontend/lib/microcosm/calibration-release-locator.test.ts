@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 
 import {
   calibrationReleaseFromManifest,
-  resolveHfReleaseDirectoryCommit,
+  resolveHfCommitPublishedAt,
   resolveHfReleaseDirectorySha,
   resolveHfRevisionSha,
 } from "./calibration-release-locator";
@@ -100,35 +100,35 @@ test("untagged release resolution requires calibration diagnostics", async () =>
   )).rejects.toThrow("has no calibration diagnostics");
 });
 
-test("a line-named release's publication time is its directory's newest commit", async () => {
+test("a build's publication timestamp is its pinned commit's date", async () => {
   // microcosm-uk-2024-25-national carries no timestamp in its id, so the
-  // publisher dates it from the repository history, at the tag's revision
-  // when one is given.
+  // one source is the commit log at the exact revision the build pins.
+  const sha = "a".repeat(40);
   const requested: string[] = [];
   globalThis.fetch = (async (input: string | URL | Request) => {
     requested.push(String(input));
     return Response.json([
-      {
-        type: "file",
-        path: "releases/microcosm-uk-2024-25-national/calibration_diagnostics.json",
-        lastCommit: { id: "a".repeat(40), date: "2026-10-04T18:57:22.000Z" },
-      },
-      {
-        type: "file",
-        path: "releases/microcosm-uk-2024-25-national/release_manifest.json",
-        lastCommit: { id: "b".repeat(40), date: "2026-10-04T18:50:00.000Z" },
-      },
+      { id: sha.toUpperCase(), date: "2026-10-04T18:57:22.000Z", title: "Publish" },
+      { id: "b".repeat(40), date: "2026-10-02T23:15:56.000Z", title: "Stage" },
     ]);
   }) as typeof fetch;
-  expect(await resolveHfReleaseDirectoryCommit(
-    "uk",
-    "microcosm-uk-2024-25-national",
-    0,
-    "microcosm-uk-2024-25-national-20261002T230158Z-5c6b3f68",
-  )).toEqual({ sha: "a".repeat(40), committedAt: "2026-10-04T18:57:22.000Z" });
+  expect(await resolveHfCommitPublishedAt("uk", sha)).toBe("2026-10-04T18:57:22.000Z");
   expect(requested).toEqual([
-    "https://huggingface.co/api/datasets/policyengine/populace-uk-private/tree/" +
-      "microcosm-uk-2024-25-national-20261002T230158Z-5c6b3f68/releases/" +
-      "microcosm-uk-2024-25-national?recursive=false&expand=true",
+    `https://huggingface.co/api/datasets/policyengine/populace-uk-private/commits/${sha}?limit=1`,
   ]);
+});
+
+test("a commit log that does not start at the pinned commit is refused", async () => {
+  globalThis.fetch = (async (_input: string | URL | Request) =>
+    Response.json([{ id: "c".repeat(40), date: "2026-10-04T18:57:22.000Z" }])
+  ) as typeof fetch;
+  await expect(resolveHfCommitPublishedAt("uk", "a".repeat(40))).rejects.toThrow(
+    "invalid commit metadata",
+  );
+  globalThis.fetch = (async (_input: string | URL | Request) =>
+    new Response(null, { status: 404 })
+  ) as typeof fetch;
+  await expect(resolveHfCommitPublishedAt("uk", "a".repeat(40))).rejects.toThrow(
+    "was not found",
+  );
 });

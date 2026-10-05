@@ -34,7 +34,6 @@ import {
   releaseCountry,
   releasePresentation,
   releasePublisherLabels,
-  releasePublishedAtFromTree,
   releaseRole,
   UK_LOCAL_CALIBRATION_DIR_ENV,
   type ArtifactCountry,
@@ -1319,23 +1318,6 @@ test("legacy geography and income metadata drive the explorer hierarchy", () => 
     "1 to 10k",
     "10k to 25k",
   ]);
-});
-
-test("release publish date prefers the release manifest commit date", () => {
-  expect(
-    releasePublishedAtFromTree([
-      {
-        type: "file",
-        path: "releases/rel/calibration_diagnostics.json",
-        lastCommit: { date: "2026-07-23T02:08:36.000Z" },
-      },
-      {
-        type: "file",
-        path: "releases/rel/release_manifest.json",
-        lastCommit: { date: "2026-07-23T02:08:37.000Z" },
-      },
-    ]),
-  ).toBe("2026-07-23T02:08:37.000Z");
 });
 
 test("FIPS admin target collapses to a measure family", () => {

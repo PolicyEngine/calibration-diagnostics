@@ -12,7 +12,9 @@ import {
   readCalibrationTreeManifest,
   updateCalibrationTreeManifest,
   uploadCalibrationTreeBundle,
+  type CalibrationTreeBuildAudit,
 } from "../lib/microcosm/calibration-tree-blob";
+import type { ListBlobResultBlob } from "@vercel/blob";
 import type {
   CalibrationTreeManifest,
   CalibrationTreeManifestEntry,
@@ -20,7 +22,7 @@ import type {
 import { createHash } from "node:crypto";
 import {
   CalibrationReleaseNotFoundError,
-  resolveHfReleaseDirectoryCommit,
+  resolveHfCommitPublishedAt,
   resolveHfReleaseDirectorySha,
   resolveHfRevisionSha,
 } from "../lib/microcosm/calibration-release-locator";
@@ -87,48 +89,6 @@ export interface ReconciliationReport {
   sourceKind: "releases" | "staging";
   dryRun: boolean;
   outcomes: ReconciliationOutcome[];
-}
-
-export function publicationCreatedAt(
-  value: string | null | undefined,
-): string | null {
-  const candidate = value?.trim();
-  if (!candidate) return null;
-
-  // A compact date or instant at the end of the id. An instant may carry the
-  // attempt suffix microcosm's assembler puts on an immutable cut tag
-  // (`<release>-<YYYYMMDDTHHMMSSZ>-<8 hex>`); a bare date never does, so a
-  // trailing all-digit "suffix" is read as the later date it is.
-  const compact =
-    /(?:^|[-_])(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z(?:-[0-9a-f]{8})?)?$/.exec(
-      candidate,
-    );
-  if (compact) {
-    const [, year, month, day, hour = "00", minute = "00", second = "00"] =
-      compact;
-    const date = new Date(Date.UTC(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour),
-      Number(minute),
-      Number(second),
-    ));
-    if (
-      date.getUTCFullYear() !== Number(year) ||
-      date.getUTCMonth() !== Number(month) - 1 ||
-      date.getUTCDate() !== Number(day) ||
-      date.getUTCHours() !== Number(hour) ||
-      date.getUTCMinutes() !== Number(minute) ||
-      date.getUTCSeconds() !== Number(second)
-    ) {
-      return null;
-    }
-    return date.toISOString();
-  }
-
-  const timestamp = Date.parse(candidate);
-  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
 function sha256Text(value: string): string {
@@ -360,7 +320,8 @@ export async function readUpstreamLatest(
 interface ReleaseCandidate {
   releaseId: string;
   hfCommitSha: string;
-  createdAt: string | null;
+  /** The pinned commit's date: the build's publication timestamp. */
+  createdAt: string;
 }
 
 interface HfTagRef {
@@ -441,26 +402,16 @@ async function enumerateReleaseCandidates(
   for (const release of releases) {
     if (!release.has_calibration) continue;
     const tag = tagsByName.get(release.release_id);
-    // A release named by its line (`microcosm-uk-2024-25-national`) carries
-    // no timestamp; its publication time is the newest commit behind its
-    // directory, read at the tag's revision when one exists so the date and
-    // the bytes come from the same cut, and the exact source commit when no
-    // tag exists.
-    const directory = tag && publicationCreatedAt(release.date) !== null
-      ? null
-      : await resolveHfReleaseDirectoryCommit(
-          country,
-          release.release_id,
-          0,
-          tag?.targetCommit,
-        );
+    // The build pins the tag's commit, or the newest commit behind the
+    // release directory when no tag exists; its publication time is that
+    // commit's date and nothing else (the release id carries none:
+    // microcosm's national releases are named by line).
+    const hfCommitSha = tag?.targetCommit ??
+      await resolveHfReleaseDirectorySha(country, release.release_id, 0);
     candidates.set(release.release_id, {
       releaseId: release.release_id,
-      hfCommitSha: tag?.targetCommit ?? directory!.sha,
-      createdAt: publicationCreatedAt(release.date) ??
-        publicationCreatedAt(release.release_id) ??
-        directory?.committedAt ??
-        null,
+      hfCommitSha,
+      createdAt: await resolveHfCommitPublishedAt(country, hfCommitSha, 0),
     });
   }
   for (const tag of tags) {
@@ -469,13 +420,7 @@ async function enumerateReleaseCandidates(
       candidates.set(tag.name, {
         releaseId: tag.name,
         hfCommitSha: tag.targetCommit,
-        createdAt: publicationCreatedAt(tag.name) ??
-          (await resolveHfReleaseDirectoryCommit(
-            country,
-            tag.name,
-            0,
-            tag.targetCommit,
-          )).committedAt,
+        createdAt: await resolveHfCommitPublishedAt(country, tag.targetCommit, 0),
       });
     } else {
       ineligible.push({
@@ -575,7 +520,6 @@ async function publishRelease(
   expectedSha: string | undefined,
   blobToken: string,
   allowMissingReleaseTag = false,
-  createdAt: string | null = null,
   useExpectedShaExactly = false,
   buildArtifactId?: string,
   dryRun = false,
@@ -594,6 +538,9 @@ async function publishRelease(
       `Webhook commit ${expectedSha} does not match release ${id} commit ${resolvedSha}.`,
     );
   }
+  // The publication timestamp is the resolved commit's date, the same
+  // source reconciliation and the release loader read.
+  const publishedAt = await resolveHfCommitPublishedAt(country, resolvedSha, 0);
   const prefix = `releases/${id}`;
   const [diagnostics, buildManifest, releaseManifest, demographics] =
     await Promise.all([
@@ -624,7 +571,7 @@ async function publishRelease(
   const bundle = buildCalibrationTreeBundle({
     country,
     ...(buildArtifactId ? { buildArtifactId } : {}),
-    createdAt: publicationCreatedAt(id) ?? publicationCreatedAt(createdAt),
+    createdAt: publishedAt,
     releaseId: id,
     hfRepo: microcosmRepo(country),
     hfCommitSha: resolvedSha,
@@ -721,9 +668,59 @@ function releaseManifestEntry(
     indexSha256: published.stored.index.sha256,
     indexBytes: published.stored.index.bytes,
     createdAt: build.createdAt,
-    // Never a placeholder: a null date lets the release loader read the
-    // publication time from the Hugging Face tree instead of showing 1970.
     updatedAt: build.createdAt,
+  };
+}
+
+/**
+ * The stored entry carrying the publication timestamp of its pinned commit.
+ *
+ * The same object comes back when it already does; otherwise a copy with
+ * `createdAt` and `updatedAt` set to it, which reconciliation writes over
+ * the stored metadata (the 1970 placeholder earlier publishers wrote, or a
+ * date parsed from a release id) without re-publishing the bundle.
+ */
+export function withPublicationTimestamp(
+  entry: CalibrationTreeManifestEntry,
+  publishedAt: string,
+): CalibrationTreeManifestEntry {
+  if (entry.createdAt === publishedAt && entry.updatedAt === publishedAt) {
+    return entry;
+  }
+  return { ...entry, createdAt: publishedAt, updatedAt: publishedAt };
+}
+
+/** The manifest and bundle store a release reconciliation reads and writes. */
+export interface ReleaseReconciliationStore {
+  readManifest(): Promise<CalibrationTreeManifest>;
+  listBlobs(): Promise<Map<string, ListBlobResultBlob>>;
+  audit(
+    entry: CalibrationTreeManifestEntry,
+    blobs: Map<string, ListBlobResultBlob>,
+  ): Promise<CalibrationTreeBuildAudit>;
+  updateManifest(
+    entry: CalibrationTreeManifestEntry,
+    makeLatest?: boolean,
+  ): Promise<CalibrationTreeManifest>;
+}
+
+function blobReleaseReconciliationStore(
+  country: MicrocosmCountry,
+  blobToken: string,
+): ReleaseReconciliationStore {
+  return {
+    readManifest: async () =>
+      (await readCalibrationTreeManifest({ token: blobToken, consistent: true })).manifest,
+    listBlobs: () => listCalibrationTreeBlobs({ country, token: blobToken }),
+    audit: (entry, blobs) =>
+      auditCalibrationTreeBuild({ country, entry, blobs, token: blobToken }),
+    updateManifest: (entry, makeLatest) =>
+      updateCalibrationTreeManifest({
+        country,
+        entry,
+        token: blobToken,
+        ...(makeLatest ? { makeLatest } : {}),
+      }),
   };
 }
 
@@ -959,17 +956,15 @@ async function reconcileStagingBuilds(
   return { country, sourceKind: "staging", dryRun, outcomes };
 }
 
-async function reconcileReleaseBuilds(
+export async function reconcileReleaseBuilds(
   country: MicrocosmCountry,
   blobToken: string,
   dryRun: boolean,
+  store: ReleaseReconciliationStore = blobReleaseReconciliationStore(country, blobToken),
 ): Promise<ReconciliationReport> {
   const inventory = await enumerateReleaseCandidates(country);
-  let { manifest } = await readCalibrationTreeManifest({
-    token: blobToken,
-    consistent: true,
-  });
-  let blobs = await listCalibrationTreeBlobs({ country, token: blobToken });
+  let manifest = await store.readManifest();
+  let blobs = await store.listBlobs();
   const outcomes = [...inventory.ineligible];
 
   for (const candidate of inventory.candidates) {
@@ -985,20 +980,32 @@ async function reconcileReleaseBuilds(
           `to ${candidate.hfCommitSha}.`,
       );
     }
-    const audit = existing
-      ? await auditCalibrationTreeBuild({
-          country,
-          entry: existing,
-          blobs,
-          token: blobToken,
-        })
-      : null;
+    const audit = existing ? await store.audit(existing, blobs) : null;
     if (existing && audit?.complete) {
+      // The bundle stands; the stored metadata may still carry a timestamp
+      // from an older source (the 1970 placeholder, or one parsed from the
+      // release id) and is corrected in place from the pinned commit.
+      const stamped = withPublicationTimestamp(existing, candidate.createdAt);
+      if (stamped === existing) {
+        outcomes.push({
+          sourceId: candidate.releaseId,
+          status: "complete",
+          buildArtifactId: existing.buildArtifactId,
+          reason: null,
+        });
+        continue;
+      }
+      if (!dryRun) {
+        manifest = await store.updateManifest(stamped);
+      }
       outcomes.push({
         sourceId: candidate.releaseId,
-        status: "complete",
+        status: "repaired",
         buildArtifactId: existing.buildArtifactId,
-        reason: null,
+        reason:
+          `Publication timestamp set to ${candidate.createdAt} ` +
+          `(stored ${existing.updatedAt ?? "null"}).` +
+          (dryRun ? " Dry run; no Blob writes performed." : ""),
       });
       continue;
     }
@@ -1014,22 +1021,18 @@ async function reconcileReleaseBuilds(
       existing?.hfCommitSha ?? candidate.hfCommitSha,
       blobToken,
       false,
-      candidate.createdAt,
       true,
       existing?.buildArtifactId,
       dryRun,
       existing?.indexSha256,
     );
-    const entry = existing ?? releaseManifestEntry(published);
+    const entry = existing
+      ? withPublicationTimestamp(existing, candidate.createdAt)
+      : releaseManifestEntry(published);
     if (!dryRun) {
-      manifest = await updateCalibrationTreeManifest({ country, entry, token: blobToken });
-      blobs = await listCalibrationTreeBlobs({ country, token: blobToken });
-      const verified = await auditCalibrationTreeBuild({
-        country,
-        entry,
-        blobs,
-        token: blobToken,
-      });
+      manifest = await store.updateManifest(entry);
+      blobs = await store.listBlobs();
+      const verified = await store.audit(entry, blobs);
       if (!verified.complete) {
         throw new Error(
           `Release build ${candidate.releaseId} remains incomplete: ${verified.reasons.join("; ")}`,
@@ -1057,12 +1060,7 @@ async function reconcileReleaseBuilds(
         `Latest release ${latest.releaseId}@${latest.hfCommitSha} is not completely published.`,
       );
     }
-    await updateCalibrationTreeManifest({
-      country,
-      entry: latestEntry,
-      token: blobToken,
-      makeLatest: true,
-    });
+    await store.updateManifest(latestEntry, true);
   }
   return { country, sourceKind: "releases", dryRun, outcomes };
 }
@@ -1111,7 +1109,6 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
     selection.hfCommitSha,
     blobToken,
     options.mode === "latest",
-    publicationCreatedAt(selection.updatedAt),
   );
   const entry = await registerReleaseBuild(options.country, published, blobToken);
   const promoted = await promoteIfCurrent(
