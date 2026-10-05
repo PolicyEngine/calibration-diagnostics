@@ -174,6 +174,10 @@ test("publisher normalizes compact release dates for manifest sorting", () => {
     publicationCreatedAt("microcosm-uk-2024-25-national-20261002T230158Z-5c6b3f68"),
   ).toBe("2026-10-02T23:01:58.000Z");
   expect(publicationCreatedAt("microcosm-uk-2024-25-national")).toBeNull();
+  // The suffix is read only after an instant: after a bare date an all-digit
+  // tail is the later date, and a hex tail is no date at all.
+  expect(publicationCreatedAt("a-20261002-20261003")).toBe("2026-10-03T00:00:00.000Z");
+  expect(publicationCreatedAt("release-20261002-deadbeef")).toBeNull();
 });
 
 test("latest publication uses its exact source commit when no release tag exists", async () => {

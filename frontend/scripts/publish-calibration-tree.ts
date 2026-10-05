@@ -95,11 +95,12 @@ export function publicationCreatedAt(
   const candidate = value?.trim();
   if (!candidate) return null;
 
-  // A compact date or instant at the end of the id, optionally followed by
-  // the attempt suffix microcosm's assembler puts on an immutable cut tag
-  // (`<release>-<YYYYMMDDTHHMMSSZ>-<8 hex>`).
+  // A compact date or instant at the end of the id. An instant may carry the
+  // attempt suffix microcosm's assembler puts on an immutable cut tag
+  // (`<release>-<YYYYMMDDTHHMMSSZ>-<8 hex>`); a bare date never does, so a
+  // trailing all-digit "suffix" is read as the later date it is.
   const compact =
-    /(?:^|[-_])(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?(?:-[0-9a-f]{8})?$/.exec(
+    /(?:^|[-_])(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z(?:-[0-9a-f]{8})?)?$/.exec(
       candidate,
     );
   if (compact) {
@@ -442,10 +443,17 @@ async function enumerateReleaseCandidates(
     const tag = tagsByName.get(release.release_id);
     // A release named by its line (`microcosm-uk-2024-25-national`) carries
     // no timestamp; its publication time is the newest commit behind its
-    // directory, which is also the exact source commit when no tag exists.
+    // directory, read at the tag's revision when one exists so the date and
+    // the bytes come from the same cut, and the exact source commit when no
+    // tag exists.
     const directory = tag && publicationCreatedAt(release.date) !== null
       ? null
-      : await resolveHfReleaseDirectoryCommit(country, release.release_id, 0);
+      : await resolveHfReleaseDirectoryCommit(
+          country,
+          release.release_id,
+          0,
+          tag?.targetCommit,
+        );
     candidates.set(release.release_id, {
       releaseId: release.release_id,
       hfCommitSha: tag?.targetCommit ?? directory!.sha,

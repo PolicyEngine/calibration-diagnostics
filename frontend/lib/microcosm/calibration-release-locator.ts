@@ -107,7 +107,10 @@ export interface HfReleaseDirectoryCommit {
  * Release ids no longer have to carry a timestamp (microcosm's national
  * releases are named by line, `microcosm-uk-2024-25-national`, and their
  * immutable cut tags end in an attempt suffix), so the publication time comes
- * from the repository's own history rather than from the id.
+ * from the repository's own history rather than from the id. For a line
+ * directory that each cut rewrites, that is the latest cut's publication
+ * time at the given revision: when the release was published, not when it
+ * was built (`release_manifest.build.built_at`).
  */
 export async function resolveHfReleaseDirectoryCommit(
   country: MicrocosmCountry,
