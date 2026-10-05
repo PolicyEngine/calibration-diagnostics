@@ -66,6 +66,18 @@ The forecast compares the run with finished runs of the same pipeline from
 the same source (version 2 runs by pipeline id; version 1 US runs as one
 release pipeline), up to the 12 most recent.
 
+Runs of one pipeline can still differ in what they do: UK local candidates kept
+the pipeline id `uk-local-candidate` 0.1.0 when cloning and surface resolution
+moved into target compilation (September against October 2026). So a past run
+counts only when it went through the same stages as this run over the stretch
+both reached; more than one stage, and more than a fifth of the stages, found in
+only one of them mark a different stage sequence. Those runs are left out of the
+forecast and the "Where build time goes" and "Checks and gates" statistics, and
+the time budget says how many were left out. A stage added to a long pipeline
+(the FRS spine gains one every few weeks) does not split its history. Until a
+run reaches the stage where the sequences part, older runs still count; a new
+pipeline version from the producer is the reliable fix.
+
 - The rest of the current stage comes from past durations of that stage that
   ran longer than this one has so far. When a stage reports progress (the
   calibration epoch counter, or `done`/`total`, `batch`/`batches` and similar
@@ -73,7 +85,18 @@ release pipeline), up to the 12 most recent.
 - Everything after the current stage comes from the time between that stage's
   end and the run's end in each past run, so gaps between stages count.
 - Both scale by the run's pace: how long its finished stages took against
-  their typical durations.
+  their typical durations. Typical durations come only from runs that finished
+  the stage; a stage that failed, or the last stage of a stalled run, stopped
+  early and does not count. "Where build time goes" uses the same rule, counts
+  the stages a running run has finished, shows "stopped early in N runs" for
+  the rest, and splits a typical run by phase only once a run has finished.
+- During calibration, the solver passes come from the epoch counter: it
+  restarts at each pass, and each row names its phase (`size_search`,
+  `size_refit`). The remaining solve is the rest of the current pass at its
+  epoch rate, plus the size-search passes past runs needed beyond this run's
+  count, each as long as this run's own search passes. Pass counts come from
+  runs with the same stage sequence; when none has finished the solve, runs of
+  the pipeline with another sequence stand in and the note says so.
 - The 90% bound adds the two parts' spreads and stays at least 30% above the
   median, because a handful of runs understates the spread.
 
@@ -82,6 +105,13 @@ of each finished run gave a median error of 21% of run time for UK national
 calibration (20 checkpoints, 80% inside the 90% bound) and 17% for UK FRS
 spine builds (12 checkpoints, 67% inside). UK local candidates vary in how many solver passes they run, so
 their forecasts are poor until a pipeline has more runs.
+
+The timeline splits a calibration stage into its solver passes, each with its
+epochs and seconds per epoch, and shows time with no epochs logged (before the
+first epoch, between passes, after the last) as faint bars. In the UK candidate
+run of 2026-10-05, that showed a 41-minute setup, a 2-hour stretch with no
+epochs after the first pass, and passes at 4.1–5.1 s per epoch against 1.8 in
+September.
 
 ## Process telemetry
 
@@ -97,8 +127,16 @@ on), the tab also reads:
   time they took): the current stage's remaining time comes from this measured
   rate rather than from past runs;
 - `failure_class`, `failed_during` and `elapsed_seconds` on a failed run, and
-  the run manifest's `identity` (commit, runtime, CPU count, memory). "Why runs
-  stop" counts runs by failure class with the compute each class threw away.
+  the run manifest's `identity` (commit, runtime, CPU count, memory).
+
+"Why runs stop" groups the runs that did not finish by how they ended
+(failed, refused by gates, went silent) and the stage they stopped in, with
+the median run time spent by then and what the runs recorded: error types and
+codes, failure classes, and messages or gate failure lines. It shows recorded
+values only. A run that recorded nothing says so, and a run that went silent
+wrote no final event, so it has nothing about the cause. "Run history" lists
+every run of the pipeline, newest first, on one time scale; selecting a row
+opens that run, and runs with a different stage sequence are listed apart.
 
 ## Limits
 
@@ -113,3 +151,7 @@ on), the tab also reads:
   Microcosm commit it was read from.
 - The base population build (`build_us_puf_support_base.py`) writes only
   `stage_profile.json`, not run telemetry, so it does not appear here.
+- The staging source shows a notice when its newest run is more than 14 days
+  old: builds run with `--no-staging`, or whose uploads failed, never reach
+  it. The hosted dashboard offers only the staging repository; the local
+  source appears where `MICROCOSM_LOCAL_RUNS_DIR` is set.
