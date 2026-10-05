@@ -18,7 +18,6 @@ function documents(
   const finished = status === "completed";
   return {
     run_id: runId,
-    source: "staging",
     country: "us",
     progress: {
       schema_version: 2,

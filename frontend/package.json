@@ -9,8 +9,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "publish:calibration-tree": "bun run scripts/publish-calibration-tree.ts",
-    "test:dev-port": "node --test scripts/available-port.node-test.mjs",
-    "replay:build-run": "bun run scripts/replay-build-run.ts"
+    "test:dev-port": "node --test scripts/available-port.node-test.mjs"
   },
   "dependencies": {
     "@policyengine/ui-kit": "^0.9.0",

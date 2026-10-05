@@ -1,7 +1,6 @@
 import {
   type BuildForecast,
   type BuildRunDocuments,
-  type BuildRunSource,
   type BuildTimeline,
   type GateStat,
   type PhaseTotals,
@@ -24,12 +23,6 @@ import {
   type MicrocosmCountry,
 } from "@/lib/microcosm/countries";
 import {
-  discoverLocalRuns,
-  loadLocalRunDocuments,
-  localRunCountry,
-  localRunRoots,
-} from "@/lib/microcosm/local-build-runs";
-import {
   loadStagingRuns,
   loadStagingRunTelemetry,
 } from "@/lib/microcosm/staging-artifact";
@@ -39,12 +32,12 @@ import {
   loadCollectorRuns,
 } from "@/lib/microcosm/telemetry-collector";
 
-// Server-side assembly for the build monitor: load every run's telemetry from
-// one source, turn it into timelines, and derive the forecast and cross-run
-// statistics for the selected run's pipeline.
+// Server-side assembly for the build monitor: combine hosted telemetry, turn
+// it into timelines, and derive the forecast and cross-run statistics for the
+// selected run's pipeline.
 
-const STAGING_LIST_TTL_MS = 30_000;
-const STAGING_RUN_LIMIT = 60;
+const HOSTED_LIST_TTL_MS = 30_000;
+const HOSTED_RUN_LIMIT = 60;
 
 export interface BuildRunProblem {
   run_id: string;
@@ -52,19 +45,15 @@ export interface BuildRunProblem {
 }
 
 export interface BuildRunsResponse {
-  source: BuildRunSource;
   country: MicrocosmCountry;
   available: boolean;
   detail: string | null;
-  local_enabled: boolean;
-  roots: string[];
   now_ms: number;
   runs: BuildTimeline[];
   problems: BuildRunProblem[];
 }
 
 export interface BuildRunResponse {
-  source: BuildRunSource;
   country: MicrocosmCountry;
   now_ms: number;
   run: BuildTimeline;
@@ -83,8 +72,8 @@ interface CachedRun {
 }
 
 // Finished staging runs never change, so their telemetry is fetched once.
-const stagingRunCache = new Map<string, CachedRun>();
-const stagingListCache = new Map<
+const hostedRunCache = new Map<string, CachedRun>();
+const hostedListCache = new Map<
   string,
   { expiresAt: number; promise: Promise<LoadedRuns> }
 >();
@@ -115,7 +104,6 @@ const hostedRunLoaders: HostedRunLoaders = {
   loadCollector: loadCollectorRun,
   loadHistory: async (runId, country) => ({
     ...(await loadStagingRunTelemetry(runId, 0, country)),
-    source: "staging",
     country,
   }),
 };
@@ -127,33 +115,6 @@ function message(error: unknown): string {
 function isFinal(documents: BuildRunDocuments): boolean {
   const status = documents.progress?.status ?? documents.run_manifest?.status;
   return status === "passed" || status === "completed" || status === "failed";
-}
-
-async function loadLocal(country: MicrocosmCountry): Promise<LoadedRuns> {
-  const roots = localRunRoots();
-  if (!roots.length) {
-    return {
-      available: false,
-      detail:
-        "Local runs are off. Set MICROCOSM_LOCAL_RUNS_DIR to the folder your builds write to.",
-      documents: [],
-      problems: [],
-    };
-  }
-  const locations = await discoverLocalRuns(roots);
-  const documents: BuildRunDocuments[] = [];
-  const problems: BuildRunProblem[] = [];
-  await Promise.all(
-    locations.map(async (location) => {
-      try {
-        const loaded = await loadLocalRunDocuments(location, country);
-        if (localRunCountry(loaded) === country) documents.push(loaded);
-      } catch (error) {
-        problems.push({ run_id: location.run_id, detail: message(error) });
-      }
-    }),
-  );
-  return { available: true, detail: null, documents, problems };
 }
 
 async function loadHuggingFaceStaging(
@@ -186,9 +147,9 @@ async function loadHuggingFaceStaging(
   );
   const documents: BuildRunDocuments[] = [];
   await Promise.all(
-    list.runs.slice(0, STAGING_RUN_LIMIT).map(async (summary) => {
+    list.runs.slice(0, HOSTED_RUN_LIMIT).map(async (summary) => {
       const key = `${country}:${summary.run_id}`;
-      const cached = stagingRunCache.get(key);
+      const cached = hostedRunCache.get(key);
       if (cached?.final) {
         documents.push(cached.documents);
         return;
@@ -201,10 +162,9 @@ async function loadHuggingFaceStaging(
         );
         const loaded: BuildRunDocuments = {
           ...telemetry,
-          source: "staging",
           country,
         };
-        stagingRunCache.set(key, { documents: loaded, final: isFinal(loaded) });
+        hostedRunCache.set(key, { documents: loaded, final: isFinal(loaded) });
         documents.push(loaded);
       } catch (error) {
         problems.push({ run_id: summary.run_id, detail: message(error) });
@@ -219,16 +179,16 @@ async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
   const documents: BuildRunDocuments[] = [];
   const problems: BuildRunProblem[] = [];
   await Promise.all(
-    summaries.slice(0, STAGING_RUN_LIMIT).map(async (summary) => {
+    summaries.slice(0, HOSTED_RUN_LIMIT).map(async (summary) => {
       const key = `collector:${country}:${summary.run_id}`;
-      const cached = stagingRunCache.get(key);
+      const cached = hostedRunCache.get(key);
       if (cached?.final) {
         documents.push(cached.documents);
         return;
       }
       try {
         const loaded = await loadCollectorRun(summary.run_id, country);
-        stagingRunCache.set(key, { documents: loaded, final: isFinal(loaded) });
+        hostedRunCache.set(key, { documents: loaded, final: isFinal(loaded) });
         documents.push(loaded);
       } catch (error) {
         problems.push({ run_id: summary.run_id, detail: message(error) });
@@ -238,7 +198,7 @@ async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
   return { available: true, detail: null, documents, problems };
 }
 
-async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
+async function loadHosted(country: MicrocosmCountry): Promise<LoadedRuns> {
   const hosted: LoadedRuns[] = [];
   const sourceProblems: BuildRunProblem[] = [];
   if (collectorConfigured()) {
@@ -283,20 +243,16 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
   };
 }
 
-function loadRuns(
-  source: BuildRunSource,
-  country: MicrocosmCountry,
-): Promise<LoadedRuns> {
-  if (source === "local") return loadLocal(country);
+function loadRuns(country: MicrocosmCountry): Promise<LoadedRuns> {
   const key = country;
-  const cached = stagingListCache.get(key);
+  const cached = hostedListCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.promise;
-  const promise = loadStaging(country);
-  stagingListCache.set(key, {
-    expiresAt: Date.now() + STAGING_LIST_TTL_MS,
+  const promise = loadHosted(country);
+  hostedListCache.set(key, {
+    expiresAt: Date.now() + HOSTED_LIST_TTL_MS,
     promise,
   });
-  promise.catch(() => stagingListCache.delete(key));
+  promise.catch(() => hostedListCache.delete(key));
   return promise;
 }
 
@@ -339,18 +295,14 @@ export async function refreshHostedRun(
 }
 
 export async function loadBuildRuns(
-  source: BuildRunSource,
   country: MicrocosmCountry,
 ): Promise<BuildRunsResponse> {
   const nowMs = Date.now();
-  const loaded = await loadRuns(source, country);
+  const loaded = await loadRuns(country);
   return {
-    source,
     country,
     available: loaded.available,
     detail: loaded.detail,
-    local_enabled: localRunRoots().length > 0,
-    roots: source === "local" ? localRunRoots() : [],
     now_ms: nowMs,
     runs: timelines(loaded.documents, nowMs).map(compactTimeline),
     problems: loaded.problems,
@@ -358,18 +310,16 @@ export async function loadBuildRuns(
 }
 
 export async function loadBuildRun(
-  source: BuildRunSource,
   country: MicrocosmCountry,
   runId: string,
 ): Promise<BuildRunResponse | null> {
   const nowMs = Date.now();
-  const loaded = await loadRuns(source, country);
+  const loaded = await loadRuns(country);
   const all = timelines(loaded.documents, nowMs);
   let run = all.find((timeline) => timeline.run_id === runId) ?? null;
   // A running hosted run may be newer than the cached list. The live
   // collector is authoritative when it responds; staged files are fallback.
-  if (source === "staging")
-    run = await refreshHostedRun(run, country, runId, nowMs);
+  run = await refreshHostedRun(run, country, runId, nowMs);
   if (run == null) return null;
   const currentRuns = [
     ...all.filter((timeline) => timeline.run_id !== runId),
@@ -379,7 +329,6 @@ export async function loadBuildRun(
     (timeline) => timeline.pipeline === run!.pipeline,
   );
   return {
-    source,
     country,
     now_ms: nowMs,
     run,

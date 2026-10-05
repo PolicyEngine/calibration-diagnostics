@@ -20,7 +20,6 @@ import {
   BUILD_PHASES,
   type BuildForecast,
   type BuildPhase,
-  type BuildRunSource,
   type BuildRunState,
   type BuildTimeline,
   type FailureClassStat,
@@ -133,56 +132,6 @@ function runOptionLabel(run: BuildTimeline): string {
   return `${STATE_LABEL[run.state]} · ${run.pipeline_label} · ${started} · ${run.run_id}`;
 }
 
-function SourceToggle({
-  source,
-  localEnabled,
-  onChange,
-}: {
-  source: BuildRunSource;
-  localEnabled: boolean;
-  onChange: (source: BuildRunSource) => void;
-}) {
-  const options: { id: BuildRunSource; label: string; hint: string }[] = [
-    {
-      id: "local",
-      label: "Local runs",
-      hint: localEnabled
-        ? "Run folders on this machine"
-        : "Set MICROCOSM_LOCAL_RUNS_DIR and restart the dashboard",
-    },
-    {
-      id: "staging",
-      label: "Hosted runs",
-      hint: "Live collector runs plus historical Hugging Face telemetry",
-    },
-  ];
-  return (
-    <div role="radiogroup" aria-label="Run source" className="inline-flex rounded-md border border-border p-0.5">
-      {options.map((option) => {
-        const active = option.id === source;
-        const disabled = option.id === "local" && !localEnabled;
-        return (
-          <button
-            key={option.id}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={option.label}
-            disabled={disabled}
-            title={option.hint}
-            onClick={() => onChange(option.id)}
-            className={`h-8 rounded px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 // The Build progress tab of the Staging candidates page. `preferredRunId`
 // carries the run selected on the Candidate tab; a run picked here is
 // reported back through `onRunChange` so the other tab opens on it.
@@ -195,20 +144,7 @@ export function BuildMonitorView({
   preferredRunId?: string;
   onRunChange?: (runId: string) => void;
 }) {
-  const [chosenSource, setChosenSource] = useState<BuildRunSource | null>(null);
-  // The local listing answers instantly and says whether local runs are on;
-  // hosted telemetry is read only once it is the chosen source.
-  const local = useBuildRuns("local");
-  const localEnabled = local.data?.local_enabled ?? false;
-  const localRuns = local.data?.runs ?? [];
-  // Open local runs when this machine has them, unless the run carried over
-  // from the Candidate tab exists only in hosted telemetry.
-  const preferLocal =
-    localEnabled &&
-    (!preferredRunId || localRuns.some((run) => run.run_id === preferredRunId));
-  const source: BuildRunSource = chosenSource ?? (preferLocal ? "local" : "staging");
-  const staging = useBuildRuns("staging", source === "staging" && !local.isLoading);
-  const list = source === "local" ? local : staging;
+  const list = useBuildRuns();
   const runs = list.data?.runs ?? [];
   const [selected, setSelected] = useState("");
 
@@ -232,7 +168,7 @@ export function BuildMonitorView({
     onRunChange?.(runId);
   };
 
-  const detail = useBuildRun(source, selected || undefined);
+  const detail = useBuildRun(selected || undefined);
   const data = detail.data;
   const nowMs = data?.now_ms ?? Date.now();
 
@@ -244,48 +180,34 @@ export function BuildMonitorView({
         status={tabs}
         description="Follow a build while it runs, see when it should finish, and find where build time goes and which checks fail late."
         actions={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <SourceToggle
-              source={source}
-              localEnabled={localEnabled}
-              onChange={(next) => {
-                setChosenSource(next);
-                setSelected("");
-              }}
-            />
-            <ToolbarSelect
-              label="Run"
-              value={selected}
-              options={
-                runs.length
-                  ? runs.map((run) => ({ value: run.run_id, label: runOptionLabel(run) }))
-                  : [{ value: "", label: list.isLoading ? "Loading runs…" : "No runs" }]
-              }
-              onChange={selectRun}
-              disabled={!runs.length}
-              className="w-[30rem] max-w-full"
-            />
-          </div>
+          <ToolbarSelect
+            label="Run"
+            value={selected}
+            options={
+              runs.length
+                ? runs.map((run) => ({ value: run.run_id, label: runOptionLabel(run) }))
+                : [{ value: "", label: list.isLoading ? "Loading runs…" : "No runs" }]
+            }
+            onChange={selectRun}
+            disabled={!runs.length}
+            className="w-[30rem] max-w-full"
+          />
         }
       />
 
-      {(list.isLoading || local.isLoading) && !runs.length ? (
+      {list.isLoading && !runs.length ? (
         <LoadingBlock label="Loading build runs…" />
       ) : list.error ? (
         <EmptyState title="Build runs unavailable" description={String(list.error.message)} />
       ) : list.data && !list.data.available ? (
         <EmptyState
-          title={source === "local" ? "Local runs are off" : "Hosted runs unavailable"}
+          title="Hosted runs unavailable"
           description={list.data.detail ?? undefined}
         />
       ) : !runs.length ? (
         <EmptyState
           title="No build runs found"
-          description={
-            source === "local"
-              ? `No run folders (progress.json and events.ndjson) under ${list.data?.roots.join(", ") || "the configured directory"}.`
-              : "The collector and historical staging repository have no runs for this country."
-          }
+          description="The collector and historical staging repository have no runs for this country."
         />
       ) : detail.isLoading && !data ? (
         <LoadingBlock label="Loading run…" />
@@ -357,7 +279,7 @@ function RunOverview({
         run.heartbeat_ms != null && (running || run.state === "stalled")
           ? `heartbeat ${fmtDuration(nowMs - run.heartbeat_ms)} ago`
           : null,
-        run.source === "local" ? "local run folder" : "hosted telemetry",
+        "hosted telemetry",
       ]
         .filter(Boolean)
         .join(" · ")}

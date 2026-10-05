@@ -15,7 +15,6 @@ import {
   PUBLISHED_RELEASE_STALE_TIME_MS,
 } from "@/lib/api/cache-policy";
 import { withBasePath } from "@/lib/base-path";
-import type { BuildRunSource } from "@/lib/microcosm/build-monitor";
 import type { BuildRunResponse, BuildRunsResponse } from "@/lib/microcosm/build-runs";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
@@ -1598,29 +1597,27 @@ export function useMicrocosmTargetDiagnostics(params: {
   });
 }
 
-// Build monitor: local run folders (when the server enables them) or the
-// staging repository. Local runs refresh faster because reading them is free.
-export function useBuildRuns(source: BuildRunSource, enabled = true) {
+// Build monitor: live collector records plus historical staging telemetry.
+export function useBuildRuns() {
   const { country } = useCountry();
   return useQuery({
-    queryKey: ["microcosm", "builds", source, country],
-    queryFn: () => apiGet<BuildRunsResponse>("/microcosm/builds", { source, country }),
-    enabled,
+    queryKey: ["microcosm", "builds", country],
+    queryFn: () => apiGet<BuildRunsResponse>("/microcosm/builds", { country }),
     placeholderData: keepPreviousData,
     staleTime: 5 * 1000,
-    refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+    refetchInterval: 30 * 1000,
   });
 }
 
-export function useBuildRun(source: BuildRunSource, runId?: string) {
+export function useBuildRun(runId?: string) {
   const { country } = useCountry();
   return useQuery({
-    queryKey: ["microcosm", "builds", "run", source, country, runId],
+    queryKey: ["microcosm", "builds", "run", country, runId],
     queryFn: () =>
-      apiGet<BuildRunResponse>("/microcosm/builds/run", { source, country, id: runId }),
+      apiGet<BuildRunResponse>("/microcosm/builds/run", { country, id: runId }),
     enabled: Boolean(runId),
     placeholderData: keepPreviousData,
     staleTime: 5 * 1000,
-    refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+    refetchInterval: 30 * 1000,
   });
 }
