@@ -80,6 +80,7 @@ export interface BuildRunResponse {
 interface CachedRun {
   documents: BuildRunDocuments;
   final: boolean;
+  collector_version: string | null;
 }
 
 // Finished staging runs never change, so their telemetry is fetched once.
@@ -204,7 +205,11 @@ async function loadHuggingFaceStaging(
           source: "staging",
           country,
         };
-        stagingRunCache.set(key, { documents: loaded, final: isFinal(loaded) });
+        stagingRunCache.set(key, {
+          documents: loaded,
+          final: isFinal(loaded),
+          collector_version: null,
+        });
         documents.push(loaded);
       } catch (error) {
         problems.push({ run_id: summary.run_id, detail: message(error) });
@@ -222,13 +227,24 @@ async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
     summaries.slice(0, STAGING_RUN_LIMIT).map(async (summary) => {
       const key = `collector:${country}:${summary.run_id}`;
       const cached = stagingRunCache.get(key);
-      if (cached?.final) {
+      const summaryFinal = ["passed", "completed", "failed"].includes(
+        summary.status,
+      );
+      if (
+        cached?.final &&
+        summaryFinal &&
+        cached.collector_version === summary.updated_at
+      ) {
         documents.push(cached.documents);
         return;
       }
       try {
         const loaded = await loadCollectorRun(summary.run_id, country);
-        stagingRunCache.set(key, { documents: loaded, final: isFinal(loaded) });
+        stagingRunCache.set(key, {
+          documents: loaded,
+          final: isFinal(loaded),
+          collector_version: summary.updated_at,
+        });
         documents.push(loaded);
       } catch (error) {
         problems.push({ run_id: summary.run_id, detail: message(error) });
@@ -316,8 +332,6 @@ export async function refreshHostedRun(
   nowMs: number,
   loaders: HostedRunLoaders = hostedRunLoaders,
 ): Promise<BuildTimeline | null> {
-  if (current != null && current.state !== "running") return current;
-
   let collectorError: unknown = null;
   if (loaders.collectorConfigured()) {
     try {

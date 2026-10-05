@@ -131,9 +131,10 @@ describe("refreshHostedRun", () => {
     expect(run).toBe(current);
   });
 
-  test("does not refresh a completed run", async () => {
+  test("refreshes a completed run because a later producer can reopen it", async () => {
     const current = buildTimeline(documents("run-1", "completed"), NOW);
-    let calls = 0;
+    let collectorCalls = 0;
+    let historyCalls = 0;
     const run = await refreshHostedRun(
       current,
       "us",
@@ -141,18 +142,19 @@ describe("refreshHostedRun", () => {
       NOW,
       loaders({
         loadCollector: async () => {
-          calls += 1;
+          collectorCalls += 1;
           return documents("run-1", "running");
         },
         loadHistory: async () => {
-          calls += 1;
+          historyCalls += 1;
           return documents("run-1", "running");
         },
       }),
     );
 
-    expect(run).toBe(current);
-    expect(calls).toBe(0);
+    expect(run?.state).toBe("running");
+    expect(collectorCalls).toBe(1);
+    expect(historyCalls).toBe(0);
   });
 
   test("surfaces collector failure when no staged history exists", async () => {

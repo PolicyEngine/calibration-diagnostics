@@ -47,12 +47,26 @@ test("loads every collector list page and authenticates server-side", async () =
     );
     if (!url.searchParams.has("before")) {
       return Response.json({
-        runs: [{ run_id: "new", country_code: "US" }],
+        runs: [
+          {
+            run_id: "new",
+            country_code: "US",
+            status: "running",
+            updated_at: "2026-10-02T00:00:00Z",
+          },
+        ],
         next_before: "2026-10-01T00:00:00Z",
       });
     }
     return Response.json({
-      runs: [{ run_id: "old", country_code: "US" }],
+      runs: [
+        {
+          run_id: "old",
+          country_code: "US",
+          status: "completed",
+          updated_at: "2026-10-01T00:00:00Z",
+        },
+      ],
       next_before: null,
     });
   }) as typeof fetch;

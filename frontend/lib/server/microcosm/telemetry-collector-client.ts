@@ -12,6 +12,8 @@ export const TELEMETRY_COLLECTOR_READ_TOKEN_ENV =
 export interface CollectorRunSummary extends JsonObject {
   run_id: string;
   country_code: string;
+  status: string;
+  updated_at: string;
 }
 
 interface CollectorRunPage {
@@ -87,6 +89,8 @@ function parseRunSummary(value: unknown): CollectorRunSummary {
     ...row,
     run_id: stringValue(row.run_id, "run_id"),
     country_code: stringValue(row.country_code, "country_code"),
+    status: stringValue(row.status, "status"),
+    updated_at: stringValue(row.updated_at, "updated_at"),
   };
 }
 
