@@ -1086,11 +1086,23 @@ function TimeBudgetCard({
   selected: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const byMedian = useMemo(() => [...stats].sort((a, b) => b.median_ms - a.median_ms), [stats]);
+  // Typical times come only from stages that ran to their end; a stage that
+  // only ever stopped early (a failure, a stall) has none.
+  const byMedian = useMemo(
+    () =>
+      [...stats].sort(
+        (a, b) => (b.finished_median_ms ?? -1) - (a.finished_median_ms ?? -1) || b.samples - a.samples,
+      ),
+    [stats],
+  );
   const shown = expanded ? byMedian : byMedian.slice(0, 10);
+  // A typical run exists only once a run of this stage sequence has finished.
+  const anyFinished = totals.some((run) => run.state === "passed" || run.state === "blocked");
   const phaseShare = useMemo(() => {
     const sums = new Map<BuildPhase, number>();
-    for (const stat of stats) sums.set(stat.phase, (sums.get(stat.phase) ?? 0) + stat.median_ms);
+    for (const stat of stats) {
+      sums.set(stat.phase, (sums.get(stat.phase) ?? 0) + (stat.finished_median_ms ?? 0));
+    }
     const total = [...sums.values()].reduce((a, b) => a + b, 0);
     return BUILD_PHASES.map((phase) => ({
       ...phase,
@@ -1103,7 +1115,7 @@ function TimeBudgetCard({
     [totals],
   );
   const longest = Math.max(1, ...history.map((run) => run.total_ms ?? 0));
-  const maxMedian = Math.max(1, ...byMedian.map((stat) => stat.median_ms));
+  const maxMedian = Math.max(1, ...byMedian.map((stat) => stat.finished_median_ms ?? 0));
   const hasResources = stats.some(
     (stat) => stat.cores_median != null || stat.memory_max_bytes != null,
   );
@@ -1112,7 +1124,7 @@ function TimeBudgetCard({
     <SectionCard
       title="Where build time goes"
       descriptionClassName="max-w-none"
-      description={`Typical stage durations across ${pipelineRuns} ${pipelineLabel} run${pipelineRuns === 1 ? "" : "s"} from this source. Completed stages of failed runs count too.${
+      description={`Typical stage times across ${pipelineRuns} ${pipelineLabel} run${pipelineRuns === 1 ? "" : "s"} from this source, from stages that ran to their end (in finished, failed and running runs). A stage cut short by a failure or a stall counts as stopped early, not as a time.${
         otherSequenceRuns
           ? ` ${otherSequenceRuns} other run${otherSequenceRuns === 1 ? "" : "s"} of this pipeline went through a different stage sequence and ${otherSequenceRuns === 1 ? "is" : "are"} left out here and in the forecast.`
           : ""
@@ -1122,30 +1134,36 @@ function TimeBudgetCard({
         <EmptyState title="No finished stages to measure yet." variant="compact" />
       ) : (
         <div className="flex flex-col gap-5">
-          <div>
-            <div className="mb-1.5 text-xs font-medium text-muted-foreground">Share of a typical run, by phase</div>
-            <div className="flex h-4 w-full overflow-hidden rounded">
-              {phaseShare
-                .filter((phase) => phase.share > 0)
-                .map((phase) => (
-                  <div
-                    key={phase.id}
-                    style={{ width: `${phase.share * 100}%`, background: PHASE_COLOR[phase.id] }}
-                    title={`${phase.label}: ${fmtDuration(phase.ms)} (${Math.round(phase.share * 100)}%)`}
-                  />
-                ))}
+          {!anyFinished ? (
+            <p className="text-xs text-muted-foreground">
+              No run with this stage sequence has finished yet, so there is no typical run to split by phase.
+            </p>
+          ) : (
+            <div>
+              <div className="mb-1.5 text-xs font-medium text-muted-foreground">Share of a typical run, by phase</div>
+              <div className="flex h-4 w-full overflow-hidden rounded">
+                {phaseShare
+                  .filter((phase) => phase.share > 0)
+                  .map((phase) => (
+                    <div
+                      key={phase.id}
+                      style={{ width: `${phase.share * 100}%`, background: PHASE_COLOR[phase.id] }}
+                      title={`${phase.label}: ${fmtDuration(phase.ms)} (${Math.round(phase.share * 100)}%)`}
+                    />
+                  ))}
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {phaseShare
+                  .filter((phase) => phase.share > 0)
+                  .map((phase) => (
+                    <span key={phase.id} className="inline-flex items-center gap-1.5">
+                      <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: PHASE_COLOR[phase.id] }} />
+                      {phase.label} {Math.round(phase.share * 100)}% · {fmtDuration(phase.ms)}
+                    </span>
+                  ))}
+              </div>
             </div>
-            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {phaseShare
-                .filter((phase) => phase.share > 0)
-                .map((phase) => (
-                  <span key={phase.id} className="inline-flex items-center gap-1.5">
-                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: PHASE_COLOR[phase.id] }} />
-                    {phase.label} {Math.round(phase.share * 100)}% · {fmtDuration(phase.ms)}
-                  </span>
-                ))}
-            </div>
-          </div>
+          )}
 
           {/* Cells carry side padding so a highlighted row's wash reaches past
               its text; the negative margin keeps the text in line with the
@@ -1159,7 +1177,7 @@ function TimeBudgetCard({
                   <th className="hidden w-[30%] pb-1.5 font-medium @xl:table-cell">Typical</th>
                   <th className="pb-1.5 text-right font-medium">Median</th>
                   <th className="pb-1.5 text-right font-medium">
-                    <HelpHint label="p90" tooltip="90% of runs finished this stage within this time." />
+                    <HelpHint label="p90" tooltip="90% of the runs that finished this stage did so within this time." />
                   </th>
                   <th className="pb-1.5 text-right font-medium">Share</th>
                   {hasResources ? (
@@ -1172,7 +1190,9 @@ function TimeBudgetCard({
                       </th>
                     </>
                   ) : null}
-                  <th className="pb-1.5 text-right font-medium">Runs</th>
+                  <th className="pb-1.5 text-right font-medium">
+                    <HelpHint label="Runs" tooltip="Runs that reached this stage, whether or not it ran to its end." />
+                  </th>
                   <th className="pb-1.5 text-right font-medium">Failed</th>
                 </tr>
               </thead>
@@ -1184,16 +1204,30 @@ function TimeBudgetCard({
                         <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-sm" style={{ background: PHASE_COLOR[stat.phase] }} />
                         {formatStageName(stat.stage)}
                       </span>
+                      {stat.cut_short ? (
+                        <div className="pl-3.5 text-[11px] text-muted-foreground">
+                          stopped early in {stat.cut_short} run{stat.cut_short === 1 ? "" : "s"}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="hidden py-1.5 @xl:table-cell">
-                      <div
-                        className="h-2 rounded-sm"
-                        style={{ width: `${Math.max(0.5, (stat.median_ms / maxMedian) * 100)}%`, background: PHASE_COLOR[stat.phase] }}
-                      />
+                      {stat.finished_median_ms != null ? (
+                        <div
+                          className="h-2 rounded-sm"
+                          style={{
+                            width: `${Math.max(0.5, (stat.finished_median_ms / maxMedian) * 100)}%`,
+                            background: PHASE_COLOR[stat.phase],
+                          }}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">no run finished it</span>
+                      )}
                     </td>
-                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.median_ms)}</td>
-                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.p90_ms)}</td>
-                    <td className="py-1.5 text-right tabular-nums">{Math.round(stat.share * 100)}%</td>
+                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.finished_median_ms)}</td>
+                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.finished_p90_ms)}</td>
+                    <td className="py-1.5 text-right tabular-nums">
+                      {stat.finished_median_ms != null ? `${Math.round(stat.share * 100)}%` : "—"}
+                    </td>
                     {hasResources ? (
                       <>
                         <td className="py-1.5 text-right tabular-nums">{fmtCores(stat.cores_median)}</td>

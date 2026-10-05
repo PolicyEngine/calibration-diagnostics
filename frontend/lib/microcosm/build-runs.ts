@@ -229,7 +229,9 @@ export async function loadBuildRun(
     forecast: forecastCompletion(run, all, nowMs),
     pipeline_runs: pipelineRuns.length,
     other_sequence_runs: samePipeline.length - pipelineRuns.length,
-    stage_stats: stageStatistics(pipelineRuns.filter((timeline) => timeline.state !== "running")),
+    // Running runs count with the stages they have finished; the open stage
+    // has no end yet and is skipped.
+    stage_stats: stageStatistics(pipelineRuns),
     gate_stats: gateStatistics(pipelineRuns),
     failure_classes: failureClassStatistics(pipelineRuns),
     phase_totals: pipelineRuns.map((timeline) => phaseTotals(timeline, nowMs)),

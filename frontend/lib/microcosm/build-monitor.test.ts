@@ -459,9 +459,13 @@ describe("cross-run statistics", () => {
     const stats = stageStatistics([...runs, stalled]);
     const gates = stats.find((stat) => stat.stage === "release_gates")!;
     expect(gates.finished_median_ms).toBeNull();
+    expect(gates.cut_short).toBe(1);
+    // A stage no run finished takes no share of the typical run.
+    expect(gates.share).toBe(0);
     const compile = stats.find((stat) => stat.stage === "target_compilation")!;
     // The stalled run's 0-minute compilation counts in the median only.
     expect(compile.samples).toBe(3);
+    expect(compile.cut_short).toBe(1);
     expect(compile.finished_median_ms).toBe(min(60));
   });
 

@@ -875,6 +875,8 @@ export interface StageStat {
   // run finished the stage. Pace and "typical" use these.
   finished_median_ms: number | null;
   finished_p90_ms: number | null;
+  // Runs where the stage stopped early.
+  cut_short: number;
   // Median start, measured from the start of the run.
   median_offset_ms: number;
   share: number;
@@ -965,13 +967,15 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
     max_ms: Math.max(...entry.durations),
     finished_median_ms: entry.finished.length ? quantile(entry.finished, 0.5) : null,
     finished_p90_ms: entry.finished.length ? quantile(entry.finished, 0.9) : null,
+    cut_short: entry.durations.length - entry.finished.length,
     median_offset_ms: quantile(entry.offsets, 0.5),
     share: 0,
     cores_median: entry.cores.length ? quantile(entry.cores, 0.5) : null,
     memory_max_bytes: entry.memory.length ? Math.max(...entry.memory) : null,
   }));
-  const total = stats.reduce((sum, stat) => sum + stat.median_ms, 0);
-  for (const stat of stats) stat.share = total > 0 ? stat.median_ms / total : 0;
+  // Shares of the typical time of stages that ran to their end.
+  const total = stats.reduce((sum, stat) => sum + (stat.finished_median_ms ?? 0), 0);
+  for (const stat of stats) stat.share = total > 0 ? (stat.finished_median_ms ?? 0) / total : 0;
   return stats.sort((a, b) => a.median_offset_ms - b.median_offset_ms);
 }
 

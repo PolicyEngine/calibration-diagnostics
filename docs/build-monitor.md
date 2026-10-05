@@ -87,7 +87,9 @@ pipeline version from the producer is the reliable fix.
 - Both scale by the run's pace: how long its finished stages took against
   their typical durations. Typical durations come only from runs that finished
   the stage; a stage that failed, or the last stage of a stalled run, stopped
-  early and does not count.
+  early and does not count. "Where build time goes" uses the same rule, counts
+  the stages a running run has finished, shows "stopped early in N runs" for
+  the rest, and splits a typical run by phase only once a run has finished.
 - During calibration, the solver passes come from the epoch counter: it
   restarts at each pass, and each row names its phase (`size_search`,
   `size_refit`). The remaining solve is the rest of the current pass at its
