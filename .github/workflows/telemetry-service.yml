@@ -98,9 +98,22 @@ jobs:
         id: image
         run: telemetry-service/scripts/deploy.sh build-and-push-image
 
-      - name: Capture the current production revision
-        id: previous
-        run: telemetry-service/scripts/deploy.sh capture-production-revision
+      - name: Deploy an isolated maintenance revision
+        run: telemetry-service/scripts/deploy.sh deploy-maintenance
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
+
+      - name: Resolve and verify the maintenance revision
+        id: maintenance
+        run: telemetry-service/scripts/deploy.sh resolve-and-verify-maintenance
+
+      - name: Route traffic to maintenance mode
+        run: telemetry-service/scripts/deploy.sh route-production-traffic
+        env:
+          REVISION: ${{ steps.maintenance.outputs.revision }}
+
+      - name: Wait for old requests to finish
+        run: telemetry-service/scripts/deploy.sh wait-for-cutover
 
       - name: Configure the database migration job
         run: telemetry-service/scripts/deploy.sh configure-migration-job
@@ -120,16 +133,9 @@ jobs:
         run: telemetry-service/scripts/deploy.sh resolve-and-verify-candidate
 
       - name: Promote the verified revision
-        id: promote
         run: telemetry-service/scripts/deploy.sh route-production-traffic
         env:
           REVISION: ${{ steps.candidate.outputs.revision }}
 
       - name: Verify the stable service address
         run: telemetry-service/scripts/deploy.sh verify-stable-service
-
-      - name: Restore the previous revision after failed stable verification
-        if: failure() && steps.promote.outcome == 'success'
-        run: telemetry-service/scripts/deploy.sh route-production-traffic
-        env:
-          REVISION: ${{ steps.previous.outputs.revision }}
