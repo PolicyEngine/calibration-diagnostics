@@ -82,18 +82,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Require deployment configuration
-        run: |
-          missing=()
-          for name in \
-            PROJECT_ID REGION ARTIFACT_REPOSITORY CLOUD_SQL_CONNECTION \
-            RUNTIME_SERVICE_ACCOUNT
-          do
-            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
-          done
-          if (( ${#missing[@]} )); then
-            echo "Missing telemetry deployment configuration: ${missing[*]}" >&2
-            exit 1
-          fi
+        run: telemetry-service/scripts/deploy.sh require-configuration
 
       - uses: google-github-actions/auth@v2
         with:
@@ -107,119 +96,40 @@ jobs:
 
       - name: Build and push immutable image
         id: image
-        run: |
-          image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/${IMAGE_NAME}:${GITHUB_SHA}"
-          docker build --file telemetry-service/Dockerfile --tag "$image" telemetry-service
-          docker push "$image"
-          echo "uri=$image" >> "$GITHUB_OUTPUT"
+        run: telemetry-service/scripts/deploy.sh build-and-push-image
 
       - name: Capture the current production revision
         id: previous
-        run: |
-          service_json="$(gcloud run services describe "$SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --format=json)"
-          revision="$(jq -er '
-            [.status.traffic[]? | select((.percent // 0) == 100) | .revisionName]
-            | if length == 1 then .[0]
-              else error("expected exactly one production revision")
-              end
-          ' <<<"$service_json")"
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+        run: telemetry-service/scripts/deploy.sh capture-production-revision
 
       - name: Configure the database migration job
-        run: |
-          gcloud run jobs deploy "$MIGRATION_JOB" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --image "${{ steps.image.outputs.uri }}" \
-            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
-            --set-cloudsql-instances "$CLOUD_SQL_CONNECTION" \
-            --set-secrets "DATABASE_URL=${DATABASE_SECRET}:latest" \
-            --command uv \
-            --args "run,--no-sync,python,-m,telemetry_collector.migrate" \
-            --tasks 1 \
-            --max-retries 0 \
-            --task-timeout 10m \
-            --quiet
+        run: telemetry-service/scripts/deploy.sh configure-migration-job
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
 
       - name: Apply database migrations
-        run: |
-          gcloud run jobs execute "$MIGRATION_JOB" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --wait \
-            --quiet
+        run: telemetry-service/scripts/deploy.sh apply-migrations
 
       - name: Deploy an isolated candidate revision
-        run: |
-          gcloud run deploy "$SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --platform managed \
-            --image "${{ steps.image.outputs.uri }}" \
-            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
-            --add-cloudsql-instances "$CLOUD_SQL_CONNECTION" \
-            --set-secrets "DATABASE_URL=${DATABASE_SECRET}:latest,TELEMETRY_JWT_SECRET=${JWT_SECRET}:latest,TELEMETRY_READ_TOKEN=${READ_SECRET}:latest" \
-            --min 1 \
-            --max 4 \
-            --cpu 1 \
-            --memory 512Mi \
-            --concurrency 40 \
-            --timeout 30 \
-            --allow-unauthenticated \
-            --default-url \
-            --startup-probe "httpGet.path=/health,httpGet.port=8080,timeoutSeconds=10,periodSeconds=10,failureThreshold=12" \
-            --no-traffic \
-            --tag candidate \
-            --quiet
+        run: telemetry-service/scripts/deploy.sh deploy-candidate
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
 
       - name: Resolve and verify the candidate revision
         id: candidate
-        run: |
-          service_json="$(gcloud run services describe "$SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --format=json)"
-          revision="$(jq -er '.status.latestCreatedRevisionName' <<<"$service_json")"
-          url="$(jq -er '
-            .status.traffic[]
-            | select(.tag == "candidate")
-            | .url
-          ' <<<"$service_json")"
-          curl --fail --show-error --silent \
-            --retry 12 --retry-all-errors --retry-delay 5 \
-            "${url}/ready"
-          {
-            echo "revision=$revision"
-            echo "url=$url"
-          } >> "$GITHUB_OUTPUT"
+        run: telemetry-service/scripts/deploy.sh resolve-and-verify-candidate
 
       - name: Promote the verified revision
         id: promote
-        run: |
-          gcloud run services update-traffic "$SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --to-revisions "${{ steps.candidate.outputs.revision }}=100" \
-            --quiet
+        run: telemetry-service/scripts/deploy.sh route-production-traffic
+        env:
+          REVISION: ${{ steps.candidate.outputs.revision }}
 
       - name: Verify the stable service address
-        run: |
-          stable_url="$(gcloud run services describe "$SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --format='value(status.url)')"
-          curl --fail --show-error --silent \
-            --retry 12 --retry-all-errors --retry-delay 5 \
-            "${stable_url}/ready"
+        run: telemetry-service/scripts/deploy.sh verify-stable-service
 
       - name: Restore the previous revision after failed stable verification
         if: failure() && steps.promote.outcome == 'success'
-        run: |
-          gcloud run services update-traffic "$SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --to-revisions "${{ steps.previous.outputs.revision }}=100" \
-            --quiet
+        run: telemetry-service/scripts/deploy.sh route-production-traffic
+        env:
+          REVISION: ${{ steps.previous.outputs.revision }}
