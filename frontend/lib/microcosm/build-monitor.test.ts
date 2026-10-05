@@ -6,7 +6,7 @@ import {
   type BuildTimeline,
   buildTimeline,
   calibrationRate,
-  failureClassStatistics,
+  stopStatistics,
   failureReason,
   forecastCompletion,
   formatStageName,
@@ -124,7 +124,9 @@ describe("buildTimeline, version 1 transitions", () => {
       stage: "qbi_input_gate",
       message: "Release gates failed: QBI",
       error_type: "RuntimeError",
+      error_code: null,
       failure_class: null,
+      diagnostic_reference: null,
     });
   });
 
@@ -595,7 +597,7 @@ describe("process telemetry (resources, work, heartbeat, failure class)", () => 
     expect(dead.state).toBe("stalled");
   });
 
-  test("failures are counted by the class the run recorded", () => {
+  test("stops are grouped by how and where runs ended, with only what they recorded", () => {
     const failed = buildTimeline(
       v1Run("gate", [["release_gates", 0]], { end: ["failed", min(200), "Release gates failed: x"] }),
       T0 + min(300),
@@ -609,34 +611,69 @@ describe("process telemetry (resources, work, heartbeat, failure class)", () => 
       ]),
       T0 + min(30) + STALL_MS + min(1),
     );
-    const stats = failureClassStatistics([failed, stalled, buildTimeline(passedRun("ok", 0), T0)]);
-    expect(stats.map((stat) => [stat.failure_class, stat.runs])).toEqual([
-      ["gate_refused", 1],
-      ["stopped_without_final_event", 1],
+    const stops = stopStatistics([failed, stalled, buildTimeline(passedRun("ok", 0), T0)]);
+    expect(stops.map((stop) => [stop.outcome, stop.stage, stop.runs])).toEqual([
+      ["failed", "release_gates", 1],
+      ["stalled", "target_compilation", 1],
     ]);
-    expect(stats[0].median_compute_lost_ms).toBe(min(200));
-    expect(stats[0].inferred).toBe(0);
-    expect(stats[1].stages).toEqual([{ stage: "target_compilation", count: 1 }]);
+    expect(stops[0].median_time_at_stop_ms).toBe(min(200));
+    expect(stops[0].error_types).toEqual([{ value: "RuntimeError", count: 1 }]);
+    expect(stops[0].failure_classes).toEqual([{ value: "gate_refused", count: 1 }]);
+    expect(stops[0].reasons).toEqual([{ value: "Release gates failed", count: 1 }]);
+    // A silent run reports nothing, and nothing is made up for it.
+    expect(stops[1].unexplained).toBe(1);
+    expect(stops[1].error_types).toEqual([]);
   });
 
-  test("old failures without a class get an inferred one", () => {
-    const gate = buildTimeline(
-      v1Run("old-gate", [["release_gates", 0]], { end: ["failed", min(5), "Release gates failed: QRF tail"] }),
-      T0 + min(10),
-    );
+  test("a failure without a recorded class gets none", () => {
     const crash = buildTimeline(
       v1Run("old-crash", [["export_dataset", 0]], { end: ["failed", min(5), "KeyError: 'weights'"] }),
       T0 + min(10),
     );
-    // Went silent seconds in: the telemetry gives no cause, however short.
-    const early = buildTimeline(v1Run("early", [["target_registry", 0]]), T0 + STALL_MS + min(1));
-    const stats = failureClassStatistics([gate, crash, early]);
-    const byClass = Object.fromEntries(stats.map((stat) => [stat.failure_class, stat]));
-    expect(byClass.gate_refused.inferred).toBe(1);
-    expect(byClass.gate_refused.reasons).toEqual([{ reason: "Release gates failed", count: 1 }]);
-    expect(byClass.error.stages).toEqual([{ stage: "export_dataset", count: 1 }]);
-    expect(byClass.stopped_without_final_event.runs).toBe(1);
-    expect(byClass.abandoned_early).toBeUndefined();
+    const [stop] = stopStatistics([crash]);
+    expect(stop.failure_classes).toEqual([]);
+    expect(stop.error_types).toEqual([{ value: "RuntimeError", count: 1 }]);
+    expect(stop.unexplained).toBe(0);
+  });
+
+  test("a version 2 failure keeps its error code and where the details are", () => {
+    const run = buildTimeline(
+      {
+        run_id: "uk-failed",
+        source: "staging",
+        country: "uk",
+        progress: {
+          schema_version: 2,
+          run_id: "uk-failed",
+          country_code: "GB",
+          pipeline: { id: "uk-local-candidate", version: "0.1.0" },
+          started_at: at(0),
+          updated_at: at(min(30)),
+          status: "failed",
+          failure: {
+            error_code: "BUILD_FAILED",
+            error_type: "NodeRejectedError",
+            message: "The build failed during target_compilation.",
+            local_diagnostic_reference: "logs/uk-failed.txt",
+          },
+        },
+        run_manifest: null,
+        calibration_progress: null,
+        events: [
+          { schema_version: 2, sequence: 1, event_type: "stage", stage_id: "target_compilation", status: "started", timestamp: at(0), details: {} },
+          { schema_version: 2, sequence: 2, event_type: "stage", stage_id: "target_compilation", status: "failed", timestamp: at(min(30)), details: {} },
+        ],
+      },
+      T0 + min(31),
+    );
+    expect(run.failure).toMatchObject({
+      stage: "target_compilation",
+      error_type: "NodeRejectedError",
+      error_code: "BUILD_FAILED",
+      diagnostic_reference: "logs/uk-failed.txt",
+    });
+    const [stop] = stopStatistics([run]);
+    expect(stop.error_codes).toEqual([{ value: "BUILD_FAILED", count: 1 }]);
   });
 });
 

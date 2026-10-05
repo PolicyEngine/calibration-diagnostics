@@ -8,8 +8,8 @@ import {
   type StageStat,
   buildTimeline,
   compactTimeline,
-  type FailureClassStat,
-  failureClassStatistics,
+  type StopStat,
+  stopStatistics,
   forecastCompletion,
   gateStatistics,
   phaseTotals,
@@ -62,7 +62,7 @@ export interface BuildRunResponse {
   other_sequence_runs: number;
   stage_stats: StageStat[];
   gate_stats: GateStat[];
-  failure_classes: FailureClassStat[];
+  stop_stats: StopStat[];
   phase_totals: PhaseTotals[];
   gate_catalog: CatalogGate[] | null;
 }
@@ -233,7 +233,7 @@ export async function loadBuildRun(
     // has no end yet and is skipped.
     stage_stats: stageStatistics(pipelineRuns),
     gate_stats: gateStatistics(pipelineRuns),
-    failure_classes: failureClassStatistics(pipelineRuns),
+    stop_stats: stopStatistics(pipelineRuns),
     phase_totals: pipelineRuns.map((timeline) => phaseTotals(timeline, nowMs)),
     gate_catalog: gateCatalogForPipeline(run.pipeline),
   };

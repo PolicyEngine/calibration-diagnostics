@@ -127,8 +127,16 @@ on), the tab also reads:
   time they took): the current stage's remaining time comes from this measured
   rate rather than from past runs;
 - `failure_class`, `failed_during` and `elapsed_seconds` on a failed run, and
-  the run manifest's `identity` (commit, runtime, CPU count, memory). "Why runs
-  stop" counts runs by failure class with the compute each class threw away.
+  the run manifest's `identity` (commit, runtime, CPU count, memory).
+
+"Why runs stop" groups the runs that did not finish by how they ended
+(failed, refused by gates, went silent) and the stage they stopped in, with
+the median run time spent by then and what the runs recorded: error types and
+codes, failure classes, and messages or gate failure lines. It shows recorded
+values only. A run that recorded nothing says so, and a run that went silent
+wrote no final event, so it has nothing about the cause. "Run history" lists
+every run of the pipeline, newest first, on one time scale; selecting a row
+opens that run, and runs with a different stage sequence are listed apart.
 
 ## Limits
 

@@ -30,7 +30,8 @@ import {
   type BuildRunSource,
   type BuildRunState,
   type BuildTimeline,
-  type FailureClassStat,
+  type StopOutcome,
+  type StopStat,
   type GateStat,
   type PhaseTotals,
   type SolverForecast,
@@ -38,10 +39,12 @@ import {
   type StageForecast,
   type StageStat,
   formatStageName,
+  phaseTotals,
   runDurationMs,
   sameStageSequence,
   solverPassLabel,
   solverSegments,
+  spanDurationMs,
   stageCores,
   stageMemoryBytes,
   type StageSpan,
@@ -135,6 +138,19 @@ function fmtClock(ms: number | null | undefined, nowMs: number): string {
   return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
 }
 
+// The stage a run is in, or stopped in, to follow its state label
+// ("Failed · in Target compilation", "Blocked by gates · at Gate battery").
+function runWhere(run: BuildTimeline): string | null {
+  if (run.state === "passed") return null;
+  const top = run.spans.filter((span) => span.depth === 0);
+  const stage =
+    run.state === "running"
+      ? (run.current_stage ?? top[top.length - 1]?.stage)
+      : (run.failure?.stage ?? top[top.length - 1]?.stage ?? run.current_stage);
+  if (!stage) return null;
+  return `${run.state === "blocked" ? "at" : "in"} ${formatStageName(stage)}`;
+}
+
 // A run in the run selector: its state, start, length and where it is or
 // stopped. The selector groups runs by pipeline; the overview shows the id.
 function runOptionLabel(run: BuildTimeline, nowMs: number): string {
@@ -147,19 +163,7 @@ function runOptionLabel(run: BuildTimeline, nowMs: number): string {
       })
     : "unknown start";
   const duration = runDurationMs(run, nowMs);
-  const top = run.spans.filter((span) => span.depth === 0);
-  const lastStage = top[top.length - 1]?.stage ?? run.current_stage;
-  const where =
-    run.state === "running"
-      ? run.current_stage && `in ${formatStageName(run.current_stage)}`
-      : run.state === "failed"
-        ? (run.failure?.stage ?? lastStage) && `failed in ${formatStageName(run.failure?.stage ?? lastStage!)}`
-        : run.state === "blocked"
-          ? run.failure?.stage && `refused at ${formatStageName(run.failure.stage)}`
-          : run.state === "stalled"
-            ? lastStage && `went silent in ${formatStageName(lastStage)}`
-            : null;
-  return [STATE_LABEL[run.state], started, duration != null ? fmtDuration(duration) : null, where]
+  return [STATE_LABEL[run.state], started, duration != null ? fmtDuration(duration) : null, runWhere(run)]
     .filter(Boolean)
     .join(" · ");
 }
@@ -343,17 +347,19 @@ export function BuildMonitorView({
           <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />
           <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} />
           <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
+          <RunHistoryCard runs={runs} selected={data.run} nowMs={nowMs} onSelect={selectRun} />
           <TimeBudgetCard
+            run={data.run}
+            nowMs={nowMs}
             pipelineLabel={data.run.pipeline_label}
             pipelineRuns={data.pipeline_runs}
             otherSequenceRuns={data.other_sequence_runs ?? 0}
             stats={data.stage_stats}
             totals={data.phase_totals}
-            selected={data.run.run_id}
           />
           <GatesCard
             stats={data.gate_stats}
-            failureClasses={data.failure_classes ?? []}
+            stops={data.stop_stats ?? []}
             catalog={data.gate_catalog}
             pipelineRuns={data.pipeline_runs}
           />
@@ -593,14 +599,24 @@ function RunOverview({
                   {failureClassLabel(run.failure.failure_class)}
                 </span>
               ) : null}
-              Failed{run.failure.stage ? ` in ${formatStageName(run.failure.stage)}` : ""}
-              {run.failure.error_type ? ` (${run.failure.error_type})` : ""}
+              {run.state === "blocked" ? "Refused by gates" : "Failed"}
+              {run.failure.stage ? ` ${run.state === "blocked" ? "at" : "in"} ${formatStageName(run.failure.stage)}` : ""}
               {run.started_ms != null && run.ended_ms != null
                 ? ` after ${fmtDuration(run.ended_ms - run.started_ms)}`
                 : ""}
+              {[run.failure.error_type, run.failure.error_code].filter(Boolean).map((value) => (
+                <span key={value} className="ml-2 rounded border border-current px-1.5 py-px font-mono text-[11px] font-normal">
+                  {value}
+                </span>
+              ))}
             </div>
             {run.failure.message ? (
               <p className="mt-1 whitespace-pre-wrap break-words text-xs">{run.failure.message}</p>
+            ) : null}
+            {run.failure.diagnostic_reference ? (
+              <p className="mt-1 text-xs">
+                Details on the build machine: <code className="font-mono">{run.failure.diagnostic_reference}</code>
+              </p>
             ) : null}
             <FailureLines run={run} />
           </div>
@@ -1103,34 +1119,110 @@ function PhaseLegend() {
   );
 }
 
+// What one run did in each of its top-level stages: how long it spent there
+// and how the stage ended for it.
+interface RunStage {
+  ms: number;
+  status: "completed" | "running" | "failed" | "silent";
+}
+
+function runStages(run: BuildTimeline, nowMs: number): Map<string, RunStage> {
+  const top = run.spans.filter((span) => span.depth === 0);
+  const last = top[top.length - 1];
+  const stages = new Map<string, RunStage>();
+  for (const span of top) {
+    const status: RunStage["status"] =
+      span.end_ms == null
+        ? "running"
+        : span.status === "failed"
+          ? "failed"
+          : run.state === "stalled" && span === last
+            ? "silent"
+            : "completed";
+    const previous = stages.get(span.stage);
+    stages.set(span.stage, {
+      ms: (previous?.ms ?? 0) + spanDurationMs(span, nowMs),
+      status: previous?.status === "failed" ? "failed" : status,
+    });
+  }
+  return stages;
+}
+
+// A stage this run is in that no compared run has finished yet.
+function emptyStat(span: StageSpan): StageStat {
+  return {
+    stage: span.stage,
+    phase: span.phase,
+    is_gate: span.is_gate,
+    samples: 0,
+    failures: 0,
+    median_ms: 0,
+    p90_ms: 0,
+    max_ms: 0,
+    finished_median_ms: null,
+    finished_p90_ms: null,
+    cut_short: 0,
+    median_offset_ms: 0,
+    share: 0,
+    cores_median: null,
+    memory_max_bytes: null,
+  };
+}
+
+function ThisRunCell({ stage }: { stage: RunStage | undefined }) {
+  if (!stage) return <span className="text-muted-foreground">—</span>;
+  if (stage.status === "running") {
+    return (
+      <span className="inline-flex items-center gap-1 font-medium">
+        <span aria-hidden="true" className="live-blink swatch-info inline-block h-1.5 w-1.5 rounded-full" />
+        {fmtDuration(stage.ms)} so far
+      </span>
+    );
+  }
+  if (stage.status === "failed") return <span className="tone-neg">failed after {fmtDuration(stage.ms)}</span>;
+  if (stage.status === "silent") return <span>went silent after {fmtDuration(stage.ms)}</span>;
+  return <span>{fmtDuration(stage.ms)}</span>;
+}
+
 function TimeBudgetCard({
+  run,
+  nowMs,
   pipelineLabel,
   pipelineRuns,
   otherSequenceRuns,
   stats,
   totals,
-  selected,
 }: {
+  run: BuildTimeline;
+  nowMs: number;
   pipelineLabel: string;
   pipelineRuns: number;
   otherSequenceRuns: number;
   stats: StageStat[];
   totals: PhaseTotals[];
-  selected: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  // Typical times come only from stages that ran to their end; a stage that
-  // only ever stopped early (a failure, a stall) has none.
-  const byMedian = useMemo(
-    () =>
-      [...stats].sort(
-        (a, b) => (b.finished_median_ms ?? -1) - (a.finished_median_ms ?? -1) || b.samples - a.samples,
-      ),
-    [stats],
-  );
-  const shown = expanded ? byMedian : byMedian.slice(0, 10);
+  const thisRun = useMemo(() => runStages(run, nowMs), [run, nowMs]);
+  // Every stage a compared run reached, plus any this run is in that none
+  // has finished yet (its open stage). Longest typical time first; stages
+  // without one follow by this run's time in them.
+  const rows = useMemo(() => {
+    const known = new Set(stats.map((stat) => stat.stage));
+    const extra = run.spans
+      .filter((span) => span.depth === 0 && !known.has(span.stage))
+      .filter((span, index, spans) => spans.findIndex((other) => other.stage === span.stage) === index)
+      .map(emptyStat);
+    const key = (stat: StageStat) => stat.finished_median_ms ?? thisRun.get(stat.stage)?.ms ?? 0;
+    return [...stats, ...extra].sort(
+      (a, b) =>
+        Number(b.finished_median_ms != null) - Number(a.finished_median_ms != null) ||
+        key(b) - key(a) ||
+        b.samples - a.samples,
+    );
+  }, [stats, run, thisRun]);
+  const shown = expanded ? rows : rows.slice(0, 10);
   // A typical run exists only once a run of this stage sequence has finished.
-  const anyFinished = totals.some((run) => run.state === "passed" || run.state === "blocked");
+  const anyFinished = totals.some((total) => total.state === "passed" || total.state === "blocked");
   const phaseShare = useMemo(() => {
     const sums = new Map<BuildPhase, number>();
     for (const stat of stats) {
@@ -1143,12 +1235,7 @@ function TimeBudgetCard({
       share: total ? (sums.get(phase.id) ?? 0) / total : 0,
     }));
   }, [stats]);
-  const history = useMemo(
-    () => [...totals].sort((a, b) => (b.started_ms ?? 0) - (a.started_ms ?? 0)).slice(0, 16),
-    [totals],
-  );
-  const longest = Math.max(1, ...history.map((run) => run.total_ms ?? 0));
-  const maxMedian = Math.max(1, ...byMedian.map((stat) => stat.finished_median_ms ?? 0));
+  const maxMedian = Math.max(1, ...rows.map((stat) => stat.finished_median_ms ?? 0));
   const hasResources = stats.some(
     (stat) => stat.cores_median != null || stat.memory_max_bytes != null,
   );
@@ -1157,14 +1244,14 @@ function TimeBudgetCard({
     <SectionCard
       title="Where build time goes"
       descriptionClassName="max-w-none"
-      description={`Typical stage times across ${pipelineRuns} ${pipelineLabel} run${pipelineRuns === 1 ? "" : "s"} from this source, from stages that ran to their end (in finished, failed and running runs). A stage cut short by a failure or a stall counts as stopped early, not as a time.${
+      description={`Stage times across the ${pipelineRuns} ${pipelineLabel} run${pipelineRuns === 1 ? "" : "s"} from this source that went through this run's stages, this run included. A typical time comes only from runs that completed the stage; "This run" shows the selected run on its own.${
         otherSequenceRuns
           ? ` ${otherSequenceRuns} other run${otherSequenceRuns === 1 ? "" : "s"} of this pipeline went through a different stage sequence and ${otherSequenceRuns === 1 ? "is" : "are"} left out here and in the forecast.`
           : ""
       }`}
     >
-      {!stats.length ? (
-        <EmptyState title="No finished stages to measure yet." variant="compact" />
+      {!rows.length ? (
+        <EmptyState title="No stages to measure yet." variant="compact" />
       ) : (
         <div className="flex flex-col gap-5">
           {!anyFinished ? (
@@ -1198,19 +1285,18 @@ function TimeBudgetCard({
             </div>
           )}
 
-          {/* Cells carry side padding so a highlighted row's wash reaches past
-              its text; the negative margin keeps the text in line with the
-              card's other content. */}
+          {/* The negative margin keeps the cells' side padding from pushing the
+              text out of line with the card's other content. */}
           <div className="@container -mx-2 overflow-x-auto">
             <table className="w-full text-xs [&_td]:px-2 [&_th]:px-2">
               <thead className="text-left text-muted-foreground">
                 <tr className="whitespace-nowrap">
                   <th className="pb-1.5 font-medium">Stage</th>
                   {/* In a narrow card the bar gives way to the stage names. */}
-                  <th className="hidden w-[30%] pb-1.5 font-medium @xl:table-cell">Typical</th>
+                  <th className="hidden w-[24%] pb-1.5 font-medium @2xl:table-cell">Typical</th>
                   <th className="pb-1.5 text-right font-medium">Median</th>
                   <th className="pb-1.5 text-right font-medium">
-                    <HelpHint label="p90" tooltip="90% of the runs that finished this stage did so within this time." />
+                    <HelpHint label="p90" tooltip="90% of the runs that completed this stage did so within this time." />
                   </th>
                   <th className="pb-1.5 text-right font-medium">Share</th>
                   {hasResources ? (
@@ -1224,73 +1310,72 @@ function TimeBudgetCard({
                     </>
                   ) : null}
                   <th className="pb-1.5 text-right font-medium">
-                    <HelpHint label="Runs" tooltip="Runs that reached this stage, whether or not it ran to its end." />
+                    <HelpHint
+                      label="Completed"
+                      tooltip="Runs that ran this stage to its end, of the runs that reached it. Only these give the typical times; the rest failed in it or went silent in it."
+                    />
                   </th>
-                  <th className="pb-1.5 text-right font-medium">Failed</th>
+                  <th className="pb-1.5 text-right font-medium">
+                    <HelpHint label="This run" tooltip="The selected run's time in this stage, and how the stage ended for it." />
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {shown.map((stat) => (
-                  <tr key={stat.stage} className={`border-t border-border/60 ${stat.failures ? "row-neg" : ""}`}>
-                    <td className="py-1.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-sm" style={{ background: PHASE_COLOR[stat.phase] }} />
-                        {formatStageName(stat.stage)}
-                      </span>
-                      {stat.cut_short ? (
-                        <div className="pl-3.5 text-[11px] text-muted-foreground">
-                          stopped early in {stat.cut_short} run{stat.cut_short === 1 ? "" : "s"}
-                        </div>
+                {shown.map((stat) => {
+                  const completed = stat.samples - stat.cut_short;
+                  const silent = stat.cut_short - stat.failures;
+                  return (
+                    <tr key={stat.stage} className="border-t border-border/60 align-top">
+                      <td className="whitespace-nowrap py-1.5">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-sm" style={{ background: PHASE_COLOR[stat.phase] }} />
+                          {formatStageName(stat.stage)}
+                        </span>
+                      </td>
+                      <td className="hidden py-1.5 align-middle @2xl:table-cell">
+                        {stat.finished_median_ms != null ? (
+                          <div
+                            className="h-2 rounded-sm"
+                            style={{
+                              width: `${Math.max(0.5, (stat.finished_median_ms / maxMedian) * 100)}%`,
+                              background: PHASE_COLOR[stat.phase],
+                            }}
+                          />
+                        ) : null}
+                      </td>
+                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.finished_median_ms)}</td>
+                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.finished_p90_ms)}</td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        {stat.finished_median_ms != null ? `${Math.round(stat.share * 100)}%` : "—"}
+                      </td>
+                      {hasResources ? (
+                        <>
+                          <td className="py-1.5 text-right tabular-nums">{fmtCores(stat.cores_median)}</td>
+                          <td className="py-1.5 text-right tabular-nums">{fmtBytes(stat.memory_max_bytes)}</td>
+                        </>
                       ) : null}
-                    </td>
-                    <td className="hidden py-1.5 @xl:table-cell">
-                      {stat.finished_median_ms != null ? (
-                        <div
-                          className="h-2 rounded-sm"
-                          style={{
-                            width: `${Math.max(0.5, (stat.finished_median_ms / maxMedian) * 100)}%`,
-                            background: PHASE_COLOR[stat.phase],
-                          }}
-                        />
-                      ) : (
-                        <span className="text-muted-foreground">no run finished it</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.finished_median_ms)}</td>
-                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.finished_p90_ms)}</td>
-                    <td className="py-1.5 text-right tabular-nums">
-                      {stat.finished_median_ms != null ? `${Math.round(stat.share * 100)}%` : "—"}
-                    </td>
-                    {hasResources ? (
-                      <>
-                        <td className="py-1.5 text-right tabular-nums">{fmtCores(stat.cores_median)}</td>
-                        <td className="py-1.5 text-right tabular-nums">{fmtBytes(stat.memory_max_bytes)}</td>
-                      </>
-                    ) : null}
-                    <td className="py-1.5 text-right tabular-nums">{stat.samples}</td>
-                    <td className={`py-1.5 text-right tabular-nums ${stat.failures ? "tone-neg font-medium" : ""}`}>{stat.failures || "—"}</td>
-                  </tr>
-                ))}
+                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
+                        {stat.samples ? `${completed} of ${stat.samples}` : "—"}
+                        {stat.failures ? <div className="tone-neg text-[11px]">{stat.failures} failed</div> : null}
+                        {silent > 0 ? <div className="text-[11px] text-muted-foreground">{silent} went silent</div> : null}
+                      </td>
+                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
+                        <ThisRunCell stage={thisRun.get(stat.stage)} />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-            {byMedian.length > 10 ? (
+            {rows.length > 10 ? (
               <button
                 type="button"
                 onClick={() => setExpanded((value) => !value)}
-                className="mt-2 text-xs font-medium text-primary hover:underline"
+                className="mt-2 px-2 text-xs font-medium text-primary hover:underline"
               >
-                {expanded ? "Show the 10 longest" : `Show all ${byMedian.length} stages`}
+                {expanded ? "Show the 10 longest" : `Show all ${rows.length} stages`}
               </button>
             ) : null}
-          </div>
-
-          <div>
-            <div className="mb-1.5 text-xs font-medium text-muted-foreground">Run history (newest first)</div>
-            <div className="grid grid-cols-[minmax(7rem,10rem)_1fr_auto] items-center gap-x-3 gap-y-1 text-xs">
-              {history.map((run) => (
-                <RunHistoryRow key={run.run_id} run={run} longest={longest} selected={run.run_id === selected} />
-              ))}
-            </div>
           </div>
         </div>
       )}
@@ -1298,46 +1383,236 @@ function TimeBudgetCard({
   );
 }
 
-function RunHistoryRow({ run, longest, selected }: { run: PhaseTotals; longest: number; selected: boolean }) {
-  const total = run.total_ms ?? 0;
-  const label = run.started_ms
-    ? new Date(run.started_ms).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-    : run.run_id;
+// Every run of the selected run's pipeline, newest first, as a list to open
+// runs from. Runs whose stages differ from the selected run's are listed
+// apart, as its statistics and forecast leave them out.
+function RunHistoryCard({
+  runs,
+  selected,
+  nowMs,
+  onSelect,
+}: {
+  runs: BuildTimeline[];
+  selected: BuildTimeline;
+  nowMs: number;
+  onSelect: (runId: string) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const pipelineRuns = runs.filter((run) => run.pipeline === selected.pipeline);
+  const same = pipelineRuns.filter(
+    (run) => run.run_id === selected.run_id || sameStageSequence(selected, run),
+  );
+  const other = pipelineRuns.filter((run) => !same.includes(run));
+  const totals = new Map(pipelineRuns.map((run) => [run.run_id, phaseTotals(run, nowMs)]));
+  const longest = Math.max(1, ...[...totals.values()].map((total) => total.total_ms ?? 0));
+  const limit = 12;
+  const shownSame = showAll ? same : same.slice(0, limit);
+  const shownOther = showAll ? other : other.slice(0, Math.max(0, limit - shownSame.length));
+  const hidden = pipelineRuns.length - shownSame.length - shownOther.length;
+  const phases = BUILD_PHASES.filter((phase) =>
+    [...totals.values()].some((total) => total.phases[phase.id] > 0),
+  );
+
+  const row = (run: BuildTimeline) => (
+    <RunHistoryItem
+      key={run.run_id}
+      run={run}
+      total={totals.get(run.run_id)!}
+      longest={longest}
+      selected={run.run_id === selected.run_id}
+      onSelect={onSelect}
+    />
+  );
+
   return (
-    <>
-      <div className={`flex min-w-0 items-center gap-1.5 ${selected ? "font-semibold" : ""}`} title={run.run_id}>
-        <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${STATE_SWATCH[run.state]}`} />
-        <span className="truncate">{label}</span>
+    <SectionCard
+      title="Run history"
+      descriptionClassName="max-w-none"
+      description={`Every ${selected.pipeline_label} run from this source, newest first, with how long it ran and how it ended. Bars share one time scale and split by phase. Select a run to open it.`}
+    >
+      <div className="flex flex-col gap-1">
+        {shownSame.map(row)}
+        {shownOther.length ? (
+          <>
+            <div className="mt-3 border-t border-border px-2 pb-1 pt-3 text-xs text-muted-foreground">
+              Different stage sequence · left out of this run&apos;s statistics and forecast
+            </div>
+            <div className="opacity-70">{shownOther.map(row)}</div>
+          </>
+        ) : null}
+        {hidden > 0 || showAll ? (
+          <button
+            type="button"
+            onClick={() => setShowAll((value) => !value)}
+            className="mt-1 self-start px-2 text-xs font-medium text-primary hover:underline"
+          >
+            {showAll ? "Show fewer runs" : `Show all ${pipelineRuns.length} runs`}
+          </button>
+        ) : null}
+        {phases.length ? (
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 px-2 text-xs text-muted-foreground">
+            {phases.map((phase) => (
+              <span key={phase.id} className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: PHASE_COLOR[phase.id] }} />
+                {phase.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
-      <div className="flex h-3 overflow-hidden rounded-sm bg-muted/40" style={{ width: `${Math.max(1, (total / longest) * 100)}%` }}>
+    </SectionCard>
+  );
+}
+
+function RunHistoryItem({
+  run,
+  total,
+  longest,
+  selected,
+  onSelect,
+}: {
+  run: BuildTimeline;
+  total: PhaseTotals;
+  longest: number;
+  selected: boolean;
+  onSelect: (runId: string) => void;
+}) {
+  const ms = total.total_ms ?? 0;
+  const running = run.state === "running";
+  const where = runWhere(run);
+  const started = run.started_ms
+    ? new Date(run.started_ms).toLocaleString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "Unknown start";
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(run.run_id)}
+      aria-current={selected ? "true" : undefined}
+      title={run.run_id}
+      className={`grid w-full grid-cols-[minmax(9rem,15rem)_1fr_auto] items-center gap-x-3 rounded-md px-2 py-1.5 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        selected ? "bg-primary/5 ring-1 ring-primary/30" : "hover:bg-muted/50"
+      }`}
+    >
+      <span className="flex min-w-0 items-start gap-2">
+        {running ? (
+          <span aria-hidden="true" className="relative mt-1 flex h-2 w-2 shrink-0">
+            <span className={`absolute inline-flex h-full w-full rounded-full opacity-60 motion-safe:animate-ping ${STATE_SWATCH[run.state]}`} />
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${STATE_SWATCH[run.state]}`} />
+          </span>
+        ) : (
+          <span aria-hidden="true" className={`mt-1 h-2 w-2 shrink-0 rounded-full ${STATE_SWATCH[run.state]}`} />
+        )}
+        <span className="flex min-w-0 flex-col">
+          <span className={`truncate ${selected ? "font-semibold" : "font-medium"}`}>{started}</span>
+          <span className="truncate text-muted-foreground">
+            {STATE_LABEL[run.state]}
+            {where ? ` · ${where}` : ""}
+          </span>
+        </span>
+      </span>
+      <span className="relative flex h-3 overflow-hidden rounded-sm bg-muted/40" style={{ width: `${Math.max(1, (ms / longest) * 100)}%` }}>
         {BUILD_PHASES.map((phase) => {
-          const ms = run.phases[phase.id];
-          if (!ms || !total) return null;
+          const phaseMs = total.phases[phase.id];
+          if (!phaseMs || !ms) return null;
           return (
-            <div
+            <span
               key={phase.id}
-              style={{ width: `${(ms / total) * 100}%`, background: PHASE_COLOR[phase.id] }}
-              title={`${phase.label}: ${fmtDuration(ms)}`}
+              style={{ width: `${(phaseMs / ms) * 100}%`, background: PHASE_COLOR[phase.id] }}
+              title={`${phase.label}: ${fmtDuration(phaseMs)}`}
             />
           );
         })}
-      </div>
-      <div className="whitespace-nowrap text-right tabular-nums text-muted-foreground">
-        {fmtDuration(total)}
-        {run.state !== "passed" ? ` · ${STATE_LABEL[run.state].toLowerCase()}` : ""}
-      </div>
-    </>
+        {running ? (
+          <span
+            aria-hidden="true"
+            className="bar-running absolute inset-0"
+            style={{ backgroundImage: RUNNING_STRIPES, backgroundSize: "16px 16px" }}
+          />
+        ) : null}
+      </span>
+      <span className={`whitespace-nowrap text-right tabular-nums ${running ? "font-medium" : "text-muted-foreground"}`}>
+        {fmtDuration(ms)}
+        {running ? " so far" : ""}
+      </span>
+    </button>
+  );
+}
+
+const STOP_OUTCOME_LABEL: Record<StopOutcome, string> = {
+  failed: "Failed",
+  blocked: "Refused by gates",
+  stalled: "Went silent",
+};
+
+// What a group of stopped runs recorded about the stop, as recorded: error
+// types and codes, failure classes, and messages or failure lines.
+function RecordedValues({ stat }: { stat: StopStat }) {
+  if (stat.outcome === "stalled") {
+    return <span className="text-muted-foreground">No final event, so nothing about the cause</span>;
+  }
+  const times = (count: number) => (stat.runs > 1 && count > 1 ? ` ×${count}` : "");
+  const codes = [
+    ...stat.error_types.map((item) => ({ ...item, title: "Error type" })),
+    ...stat.error_codes.map((item) => ({ ...item, title: "Error code" })),
+  ];
+  return (
+    <div className="flex flex-col gap-1">
+      {codes.length || stat.failure_classes.length ? (
+        <div className="flex flex-wrap gap-1">
+          {codes.map((item) => (
+            <span
+              key={`${item.title}-${item.value}`}
+              title={item.title}
+              className="rounded border border-border px-1.5 py-px font-mono text-[11px]"
+            >
+              {item.value}
+              {times(item.count)}
+            </span>
+          ))}
+          {stat.failure_classes.map((item) => (
+            <span
+              key={`class-${item.value}`}
+              title="Failure class the run recorded"
+              className="rounded border border-border px-1.5 py-px text-[11px]"
+            >
+              {failureClassLabel(item.value)}
+              {times(item.count)}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {stat.reasons.slice(0, 3).map((item) => (
+        <span key={item.value} className="break-words text-muted-foreground">
+          {item.value}
+          {times(item.count)}
+        </span>
+      ))}
+      {stat.reasons.length > 3 ? (
+        <span className="text-muted-foreground">and {stat.reasons.length - 3} more</span>
+      ) : null}
+      {stat.unexplained ? (
+        <span className="text-muted-foreground">
+          {stat.unexplained === stat.runs ? "Nothing recorded" : `${stat.unexplained} recorded nothing`}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
 function GatesCard({
   stats,
-  failureClasses,
+  stops,
   catalog,
   pipelineRuns,
 }: {
   stats: GateStat[];
-  failureClasses: FailureClassStat[];
+  stops: StopStat[];
   catalog: CatalogGate[] | null;
   pipelineRuns: number;
 }) {
@@ -1345,92 +1620,43 @@ function GatesCard({
   const [openPositions, setOpenPositions] = useState<Set<string>>(new Set());
   return (
     <SectionCard
-      title="Checks and gates"
+      title="Why runs stop"
       descriptionClassName="max-w-none"
-      description="Which checks stop builds, and how much compute had already run when they did. A check that fails late is a candidate for the preflight or dry run."
+      description={`Runs of this pipeline and stage sequence that did not finish (${stops.reduce((sum, stop) => sum + stop.runs, 0)} of ${pipelineRuns}): where and how they stopped, how far into the run, and what their telemetry recorded. Only recorded values show; a run that recorded nothing says so.`}
     >
       <div className="flex flex-col gap-5">
-        {failureClasses.length ? (
-          <div className="overflow-x-auto">
-            <div className="mb-1.5 text-xs font-medium text-muted-foreground">Why runs stop</div>
-            <table className="w-full text-xs">
+        {stops.length ? (
+          <div className="-mx-2 overflow-x-auto">
+            <table className="w-full text-xs [&_td]:px-2 [&_th]:px-2">
               <thead className="text-left text-muted-foreground">
-                <tr>
-                  <th className="pb-1.5 font-medium">Kind</th>
+                <tr className="whitespace-nowrap">
+                  <th className="pb-1.5 font-medium">Stopped in</th>
+                  <th className="pb-1.5 font-medium">How</th>
                   <th className="pb-1.5 text-right font-medium">Runs</th>
-                  <th className="pb-1.5 text-right font-medium">Compute lost (median)</th>
-                  <th className="pb-1.5 pl-3 font-medium">Stopped in</th>
-                  <th className="pb-1.5 pl-3 font-medium">Most common reasons</th>
-                </tr>
-              </thead>
-              <tbody>
-                {failureClasses.map((stat) => (
-                  <tr key={stat.failure_class} className="border-t border-border/60">
-                    <td className="py-1.5 pr-2 font-medium">
-                      {failureClassLabel(stat.failure_class)}
-                      {stat.inferred ? (
-                        <span
-                          className="ml-1 font-normal text-muted-foreground"
-                          title="These runs recorded no class; it is inferred from the error type, message and failing stage."
-                        >
-                          ({stat.inferred === stat.runs ? "inferred" : `${stat.inferred} inferred`})
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-1.5 text-right tabular-nums">
-                      {stat.runs} of {pipelineRuns}
-                    </td>
-                    <td className="py-1.5 text-right tabular-nums">{fmtDuration(stat.median_compute_lost_ms)}</td>
-                    <td className="py-1.5 pl-3 text-muted-foreground">
-                      {stat.stages
-                        .slice(0, 3)
-                        .map((item) => `${formatStageName(item.stage)}${item.count > 1 ? ` (${item.count})` : ""}`)
-                        .join(" · ") || "—"}
-                    </td>
-                    <td className="py-1.5 pl-3 text-muted-foreground">
-                      {stat.reasons
-                        .slice(0, 2)
-                        .map((item) => `${item.reason}${item.count > 1 ? ` (${item.count})` : ""}`)
-                        .join(" · ") || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-
-        {stats.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="text-left text-muted-foreground">
-                <tr>
-                  <th className="pb-1.5 font-medium">Check</th>
-                  <th className="pb-1.5 text-right font-medium">Failed</th>
                   <th className="pb-1.5 text-right font-medium">
                     <HelpHint
-                      label="Compute lost"
-                      tooltip="Median time into the build when the check failed: the run time a failure there throws away."
+                      label="Time at stop"
+                      tooltip="Median time from the start of the run to where it stopped: the run time a stop there throws away."
                     />
                   </th>
-                  <th className="pb-1.5 pl-3 font-medium">Most common reasons</th>
+                  <th className="w-1/2 pb-1.5 font-medium">What the runs recorded</th>
                 </tr>
               </thead>
               <tbody>
-                {stats.map((stat) => (
-                  <tr key={stat.gate} className="border-t border-border/60 align-top">
-                    <td className="py-1.5 pr-2 font-medium">{formatStageName(stat.gate)}</td>
-                    <td className="py-1.5 text-right tabular-nums">
-                      {stat.failures} of {pipelineRuns}
+                {stops.map((stop) => (
+                  <tr key={`${stop.outcome}-${stop.stage}`} className="border-t border-border/60 align-top">
+                    <td className="whitespace-nowrap py-1.5 font-medium">
+                      {stop.stage ? formatStageName(stop.stage) : "—"}
                     </td>
-                    <td className="py-1.5 text-right tabular-nums">{fmtDuration(stat.median_offset_ms)}</td>
-                    <td className="py-1.5 pl-3 text-muted-foreground">
-                      {stat.reasons.length
-                        ? stat.reasons
-                            .slice(0, 3)
-                            .map((reason) => `${reason.reason}${reason.count > 1 ? ` (${reason.count})` : ""}`)
-                            .join(" · ")
-                        : stat.last_message ?? "—"}
+                    <td className={`whitespace-nowrap py-1.5 ${stop.outcome === "stalled" ? "" : "tone-neg"}`}>
+                      {STOP_OUTCOME_LABEL[stop.outcome]}
+                    </td>
+                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{stop.runs}</td>
+                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
+                      {fmtDuration(stop.median_time_at_stop_ms)}
+                    </td>
+                    <td className="py-1.5">
+                      <RecordedValues stat={stop} />
                     </td>
                   </tr>
                 ))}
@@ -1439,10 +1665,53 @@ function GatesCard({
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            No check has failed in the {pipelineRuns} run{pipelineRuns === 1 ? "" : "s"} from this source. Passing checks
-            write no telemetry, so only failures show here.
+            No run of this pipeline and stage sequence failed, was refused by its gates or went silent.
           </p>
         )}
+
+        {stats.length ? (
+          <div className="-mx-2 overflow-x-auto">
+            <div className="mb-1.5 px-2 text-xs font-medium text-muted-foreground">Checks that failed</div>
+            <table className="w-full text-xs [&_td]:px-2 [&_th]:px-2">
+              <thead className="text-left text-muted-foreground">
+                <tr className="whitespace-nowrap">
+                  <th className="pb-1.5 font-medium">Check</th>
+                  <th className="pb-1.5 text-right font-medium">Failed</th>
+                  <th className="pb-1.5 text-right font-medium">
+                    <HelpHint
+                      label="Time at failure"
+                      tooltip="Median time into the build when the check failed: the run time a failure there throws away."
+                    />
+                  </th>
+                  <th className="w-1/2 pb-1.5 font-medium">Most common reasons</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.map((stat) => (
+                  <tr key={stat.gate} className="border-t border-border/60 align-top">
+                    <td className="whitespace-nowrap py-1.5 font-medium">{formatStageName(stat.gate)}</td>
+                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
+                      {stat.failures} of {pipelineRuns}
+                    </td>
+                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.median_offset_ms)}</td>
+                    <td className="py-1.5 text-muted-foreground">
+                      {stat.reasons.length
+                        ? stat.reasons
+                            .slice(0, 3)
+                            .map((reason) => `${reason.reason}${reason.count > 1 ? ` ×${reason.count}` : ""}`)
+                            .join(" · ")
+                        : stat.last_message ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : catalog ? (
+          <p className="text-xs text-muted-foreground">
+            No check failed in these runs. Checks that pass write no telemetry, so only failures would show here.
+          </p>
+        ) : null}
 
         {catalog ? (
           <div className="flex flex-col gap-3">

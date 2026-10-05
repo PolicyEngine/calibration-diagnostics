@@ -148,9 +148,13 @@ export interface BuildFailure {
   stage: string | null;
   message: string | null;
   error_type: string | null;
+  // A machine-readable code (version 2), such as BUILD_FAILED.
+  error_code: string | null;
   // gate_refused, terminated, interrupted, out_of_memory, refused or error,
   // as the run recorded it; null when it recorded none.
   failure_class: string | null;
+  // Where the build machine keeps the details (version 2), when it says.
+  diagnostic_reference: string | null;
 }
 
 export interface BuildTimeline {
@@ -775,7 +779,9 @@ export function buildTimeline(
       stage: gate.stage,
       message: `The run finished, but its gates refused the candidate (${gate.message ?? "blocking failures"}).`,
       error_type: null,
+      error_code: null,
       failure_class: "gate_refused",
+      diagnostic_reference: null,
     };
   } else if (state === "failed") {
     const v2Failure = obj(progress?.failure);
@@ -789,7 +795,9 @@ export function buildTimeline(
         failedSpan?.message ??
         str(progress?.message),
       error_type: str(v2Failure?.error_type) ?? str(terminalDetails?.error_type),
+      error_code: str(v2Failure?.error_code),
       failure_class: str(terminalDetails?.failure_class),
+      diagnostic_reference: str(v2Failure?.local_diagnostic_reference),
     };
   }
 
@@ -1597,34 +1605,32 @@ export function gateStatistics(runs: BuildTimeline[]): GateStat[] {
     .sort((a, b) => (b.median_offset_ms ?? 0) * b.failures - (a.median_offset_ms ?? 0) * a.failures);
 }
 
-export interface FailureClassStat {
-  failure_class: string;
-  runs: number;
-  // Runs whose class the dashboard inferred (from the error type, message
-  // and failing stage) because the run recorded none.
-  inferred: number;
-  // Median wall time already spent when runs of this kind stopped.
-  median_compute_lost_ms: number | null;
-  // Where runs of this kind stopped, most frequent first.
-  stages: { stage: string; count: number }[];
-  // Their most frequent failure messages.
-  reasons: { reason: string; count: number }[];
-  last_run_id: string | null;
+// How a run that did not finish ended: a recorded failure, a refusal by its
+// gates at the end of the run, or silence with no final event.
+export type StopOutcome = "failed" | "blocked" | "stalled";
+
+export interface RecordedCount {
+  value: string;
+  count: number;
 }
 
-const INFERRED_GATE = /\bgates? (?:failed|refused)\b|\brefus/i;
-
-// The class a failed run would have recorded, for runs from before failure
-// classes existed: the same rules microcosm's classify_failure applies.
-export function inferFailureClass(run: BuildTimeline): string {
-  const type = run.failure?.error_type ?? "";
-  if (type === "BuildTerminatedError") return "terminated";
-  if (type === "KeyboardInterrupt") return "interrupted";
-  if (type === "MemoryError") return "out_of_memory";
-  const failedGate = run.spans.some((span) => span.is_gate && span.status === "failed");
-  if (failedGate || INFERRED_GATE.test(run.failure?.message ?? "")) return "gate_refused";
-  if (type === "SystemExit") return "refused";
-  return type ? "error" : "unclassified";
+export interface StopStat {
+  outcome: StopOutcome;
+  stage: string | null;
+  runs: number;
+  // Median run time from the start to where the runs stopped: what a stop
+  // there throws away.
+  median_time_at_stop_ms: number | null;
+  // What the runs wrote about the stop, most frequent first. Only recorded
+  // values; nothing here is inferred.
+  error_types: RecordedCount[];
+  error_codes: RecordedCount[];
+  failure_classes: RecordedCount[];
+  // Failure messages, or the gate and check failure lines.
+  reasons: RecordedCount[];
+  // Runs that recorded none of the above.
+  unexplained: number;
+  last_run_id: string | null;
 }
 
 function stoppedStage(run: BuildTimeline): string | null {
@@ -1632,73 +1638,84 @@ function stoppedStage(run: BuildTimeline): string | null {
   return run.failure?.stage ?? top[top.length - 1]?.stage ?? run.current_stage;
 }
 
-// Why runs stopped, by kind. A recorded class wins; otherwise it is inferred.
-// Blocked runs count as gate refusals. A run that went silent stopped without
-// a final event; its telemetry does not say why, so it gets no cause.
-export function failureClassStatistics(runs: BuildTimeline[]): FailureClassStat[] {
+// Runs that did not finish, grouped by how they ended and the stage they
+// stopped in, with what each group recorded. A run that went silent wrote
+// no final event, so it has nothing to report about why.
+export function stopStatistics(runs: BuildTimeline[]): StopStat[] {
   interface Entry {
-    lost: number[];
+    outcome: StopOutcome;
+    stage: string | null;
+    times: number[];
     runs: number;
-    inferred: number;
-    stages: Map<string, number>;
+    errorTypes: Map<string, number>;
+    errorCodes: Map<string, number>;
+    classes: Map<string, number>;
     reasons: Map<string, number>;
+    unexplained: number;
     last: BuildTimeline | null;
   }
-  const byClass = new Map<string, Entry>();
+  const count = (map: Map<string, number>, value: string | null | undefined) => {
+    if (value) map.set(value, (map.get(value) ?? 0) + 1);
+  };
+  const groups = new Map<string, Entry>();
   const sorted = [...runs].sort((a, b) => (a.started_ms ?? 0) - (b.started_ms ?? 0));
   for (const run of sorted) {
-    let failureClass: string | null = null;
-    let inferred = false;
-    const end = run.ended_ms ?? run.updated_ms;
-    const lost = run.started_ms != null && end != null ? end - run.started_ms : null;
-    if (run.state === "failed") {
-      failureClass = run.failure?.failure_class ?? null;
-      if (!failureClass) {
-        failureClass = inferFailureClass(run);
-        inferred = true;
-      }
-    } else if (run.state === "blocked") {
-      failureClass = "gate_refused";
-    } else if (run.state === "stalled") {
-      failureClass = "stopped_without_final_event";
-    }
-    if (!failureClass) continue;
-    const entry: Entry = byClass.get(failureClass) ?? {
-      lost: [],
+    if (run.state !== "failed" && run.state !== "blocked" && run.state !== "stalled") continue;
+    const outcome: StopOutcome = run.state;
+    const stage = stoppedStage(run);
+    const key = `${outcome}:${stage ?? ""}`;
+    const entry: Entry = groups.get(key) ?? {
+      outcome,
+      stage,
+      times: [],
       runs: 0,
-      inferred: 0,
-      stages: new Map(),
+      errorTypes: new Map(),
+      errorCodes: new Map(),
+      classes: new Map(),
       reasons: new Map(),
+      unexplained: 0,
       last: null,
     };
     entry.runs += 1;
-    if (inferred) entry.inferred += 1;
-    if (lost != null) entry.lost.push(lost);
-    const stage = stoppedStage(run);
-    if (stage) entry.stages.set(stage, (entry.stages.get(stage) ?? 0) + 1);
+    const end = run.ended_ms ?? run.updated_ms;
+    if (run.started_ms != null && end != null) entry.times.push(end - run.started_ms);
+    const failure = outcome === "stalled" ? null : run.failure;
     const lines = run.spans
       .filter((span) => span.status === "failed")
       .flatMap((span) => span.failures.map(failureReason));
-    const message = run.failure?.message ? failureReason(run.failure.message) : null;
-    for (const reason of new Set(lines.length ? lines : message ? [message] : [])) {
-      entry.reasons.set(reason, (entry.reasons.get(reason) ?? 0) + 1);
+    // A refusal's own message is the dashboard's summary; its failure lines
+    // are what the gates recorded.
+    const message = outcome === "failed" && failure?.message ? failureReason(failure.message) : null;
+    const reasons = new Set(lines.length ? lines : message ? [message] : []);
+    count(entry.errorTypes, failure?.error_type);
+    count(entry.errorCodes, failure?.error_code);
+    if (outcome === "failed") count(entry.classes, failure?.failure_class);
+    for (const reason of reasons) count(entry.reasons, reason);
+    if (!failure?.error_type && !failure?.error_code && !(outcome === "failed" && failure?.failure_class) && !reasons.size) {
+      entry.unexplained += 1;
     }
     entry.last = run;
-    byClass.set(failureClass, entry);
+    groups.set(key, entry);
   }
-  const ranked = (counts: Map<string, number>) =>
-    [...counts].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count);
-  return [...byClass]
-    .map(([failureClass, entry]) => ({
-      failure_class: failureClass,
+  const ranked = (map: Map<string, number>) =>
+    [...map].map(([value, n]) => ({ value, count: n })).sort((a, b) => b.count - a.count);
+  return [...groups.values()]
+    .map((entry) => ({
+      outcome: entry.outcome,
+      stage: entry.stage,
       runs: entry.runs,
-      inferred: entry.inferred,
-      median_compute_lost_ms: entry.lost.length ? quantile(entry.lost, 0.5) : null,
-      stages: ranked(entry.stages).map(({ key, count }) => ({ stage: key, count })),
-      reasons: ranked(entry.reasons).map(({ key, count }) => ({ reason: key, count })),
+      median_time_at_stop_ms: entry.times.length ? quantile(entry.times, 0.5) : null,
+      error_types: ranked(entry.errorTypes),
+      error_codes: ranked(entry.errorCodes),
+      failure_classes: ranked(entry.classes),
+      reasons: ranked(entry.reasons),
+      unexplained: entry.unexplained,
       last_run_id: entry.last?.run_id ?? null,
     }))
-    .sort((a, b) => b.runs - a.runs);
+    .sort(
+      (a, b) =>
+        b.runs * (b.median_time_at_stop_ms ?? 0) - a.runs * (a.median_time_at_stop_ms ?? 0) || b.runs - a.runs,
+    );
 }
 
 export interface PhaseTotals {
