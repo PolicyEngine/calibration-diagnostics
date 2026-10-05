@@ -23,18 +23,58 @@ checks stop builds. The run selected on either tab carries over to the other.
   reads version 1 and version 2 run documents from each country's Hugging Face
   staging repository. A collector record replaces a historical record with the
   same run id.
+- **Local run folders.** The dashboard can still inspect legacy or diagnostic
+  run folders on the same machine. Point it at the directory that holds them:
 
-## Testing
+  ```bash
+  MICROCOSM_LOCAL_RUNS_DIR=/path/to/build/output make dev
+  ```
 
-Unit tests cover both telemetry schemas, forecasts, validation failures, and
-hosted-source precedence in `frontend/lib/microcosm/build-monitor.test.ts` and
-`frontend/lib/microcosm/build-runs.test.ts`.
+  The server searches up to six levels below each directory (separate several
+  with `:`) for folders that hold `progress.json` and `events.ndjson`, skipping
+  checkpoint trees and hidden folders. Local runs are off unless the variable
+  is set, so a hosted deployment never reads its own filesystem.
+
+## Testing without a build
+
+- **Replay a recorded run.** Any run folder (a build's local
+  `staging/runs/<run_id>/`, or one downloaded from the staging repository)
+  can be played back as a live run, compressed in time:
+
+  ```bash
+  cd frontend
+  bun run replay:build-run --from <run folder> --to /tmp/replays --speed 4
+  MICROCOSM_LOCAL_RUNS_DIR=/tmp/replays make -C .. dev
+  ```
+
+  At `--speed` above 1 the run outpaces the history its forecast compares
+  against, so the expected finish runs long; use `--speed 1` to check the
+  forecast itself.
+- **Run a real UK smoke build.** The UK spine build runs end to end on
+  Microcosm's synthetic fixture, with no licensed data or token, and writes
+  real version 2 telemetry locally (the same command Microcosm's
+  `integration-uk` CI job runs):
+
+  ```bash
+  cd <microcosm checkout>
+  uv sync --all-packages --locked --extra uk
+  uv run python tools/build_uk_frs_spine.py \
+    --synthetic-fixture-dir packages/microcosm-graph/tests/fixtures/parity/uk_spine/sources \
+    --spine-h5 /tmp/smoke/uk-smoke.h5 --sample-fraction 1.0 --sample-seed 42 \
+    --smoke --staging-local-only --staging-dir /tmp/smoke/staging
+  ```
+
+  With `MICROCOSM_LOCAL_RUNS_DIR=/tmp/smoke` the run appears on the UK
+  Build progress tab as it builds.
+- **Unit tests** cover both telemetry schemas, the forecast, gate refusals and
+  local discovery: `frontend/lib/microcosm/build-monitor.test.ts` and
+  `local-build-runs.test.ts`.
 
 ## Forecast
 
-The forecast compares the run with finished hosted runs of the same pipeline
-(version 2 runs by pipeline id; version 1 US runs as one release pipeline), up
-to the 12 most recent.
+The forecast compares the run with finished runs of the same pipeline from
+the same source (version 2 runs by pipeline id; version 1 US runs as one
+release pipeline), up to the 12 most recent.
 
 - The rest of the current stage comes from past durations of that stage that
   ran longer than this one has so far. When a stage reports progress (the
@@ -50,9 +90,8 @@ to the 12 most recent.
 Replaying the 18 staging runs recorded by 2026-10-01 at 20%, 40%, 60% and 80%
 of each finished run gave a median error of 21% of run time for UK national
 calibration (20 checkpoints, 80% inside the 90% bound) and 17% for UK FRS
-spine builds (12 checkpoints, 67% inside). UK candidate builds vary in how many
-solver passes they run, so their forecasts are poor until a pipeline has more
-runs.
+spine builds (12 checkpoints, 67% inside). UK local candidates vary in how many solver passes they run, so
+their forecasts are poor until a pipeline has more runs.
 
 ## Process telemetry
 

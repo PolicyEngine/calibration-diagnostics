@@ -86,6 +86,7 @@ test("loads run documents without exposing the read token", async () => {
 
   expect(run).toMatchObject({
     run_id: "run-1",
+    source: "staging",
     country: "us",
     progress: { schema_version: 2, status: "running" },
   });

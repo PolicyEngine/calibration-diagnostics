@@ -1,6 +1,7 @@
-// Build monitor model. Turns Microcosm telemetry from the hosted collector or
-// historical Hugging Face records into stage spans, a completion forecast
-// from comparable past runs, and cross-run timing and validation statistics.
+// Build monitor model. Turns Microcosm staging telemetry — a local run folder
+// or a run in the Hugging Face staging repository — into stage spans, a
+// completion forecast from comparable past runs, and cross-run timing and
+// gate statistics.
 //
 // Both telemetry schemas are supported:
 // - version 1 (US fiscal-refresh release): every event is a transition into a
@@ -12,6 +13,7 @@
 
 type JsonObject = Record<string, unknown>;
 
+export type BuildRunSource = "local" | "staging";
 // `blocked`: the process ran to the end but its gates refused the candidate.
 // UK builds close such runs as `completed` (microcosm full_build_cli), so the
 // monitor reads the gate counts to tell them apart.
@@ -39,6 +41,7 @@ const GATE_PATTERN =
 
 export interface BuildRunDocuments {
   run_id: string;
+  source: BuildRunSource;
   country: string;
   progress: JsonObject | null;
   run_manifest: JsonObject | null;
@@ -135,6 +138,7 @@ export interface BuildFailure {
 
 export interface BuildTimeline {
   run_id: string;
+  source: BuildRunSource;
   country: string;
   pipeline: string;
   pipeline_label: string;
@@ -679,6 +683,7 @@ export function buildTimeline(
   const pipeline = pipelineIdentity(documents, schemaVersion);
   return {
     run_id: documents.run_id,
+    source: documents.source,
     country: documents.country,
     pipeline: pipeline.key,
     pipeline_label: pipeline.label,

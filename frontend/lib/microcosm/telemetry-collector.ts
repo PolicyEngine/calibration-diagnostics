@@ -148,6 +148,7 @@ export async function loadCollectorRun(
   }
   return {
     run_id: runId,
+    source: "staging",
     country,
     progress:
       payload.progress == null ? null : objectValue(payload.progress, "progress"),

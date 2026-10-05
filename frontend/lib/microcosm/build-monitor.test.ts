@@ -55,6 +55,7 @@ function v1Run(
   const last = events[events.length - 1];
   return {
     run_id: runId,
+    source: "local",
     country: "us",
     progress: {
       schema_version: 1,
@@ -165,6 +166,7 @@ describe("buildTimeline, version 2 lifecycle", () => {
 
   const documents: BuildRunDocuments = {
     run_id: "uk-1",
+    source: "staging",
     country: "uk",
     progress: {
       schema_version: 2,
@@ -283,6 +285,7 @@ describe("gate refusals in completed version 2 runs", () => {
     });
     return {
       run_id: "uk-2",
+      source: "local",
       country: "uk",
       progress: {
         schema_version: 2,
@@ -498,6 +501,7 @@ describe("process telemetry (resources, work, heartbeat, failure class)", () => 
     ];
     return {
       run_id: "inst",
+      source: "local",
       country: "us",
       progress: {
         schema_version: 1,
