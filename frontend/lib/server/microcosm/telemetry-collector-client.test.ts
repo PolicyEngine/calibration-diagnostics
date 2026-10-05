@@ -4,7 +4,7 @@ import {
   collectorConfigured,
   loadCollectorRun,
   loadCollectorRuns,
-} from "@/lib/microcosm/telemetry-collector";
+} from "@/lib/server/microcosm/telemetry-collector-client";
 
 const originalFetch = globalThis.fetch;
 const originalUrl = process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL;

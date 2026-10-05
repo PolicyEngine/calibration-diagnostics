@@ -37,7 +37,7 @@ import {
   collectorConfigured,
   loadCollectorRun,
   loadCollectorRuns,
-} from "@/lib/microcosm/telemetry-collector";
+} from "@/lib/server/microcosm/telemetry-collector-client";
 
 // Server-side assembly for the build monitor: load every run's telemetry from
 // one source, turn it into timelines, and derive the forecast and cross-run

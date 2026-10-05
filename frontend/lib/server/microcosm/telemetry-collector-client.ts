@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { BuildRunDocuments } from "@/lib/microcosm/build-monitor";
 import type { MicrocosmCountry } from "@/lib/microcosm/countries";
 
