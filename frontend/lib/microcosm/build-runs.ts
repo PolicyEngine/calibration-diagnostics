@@ -13,6 +13,7 @@ import {
   forecastCompletion,
   gateStatistics,
   phaseTotals,
+  sameStageSequence,
   stageStatistics,
 } from "@/lib/microcosm/build-monitor";
 import { type CatalogGate, gateCatalogForPipeline } from "@/lib/microcosm/build-gate-catalog";
@@ -56,6 +57,9 @@ export interface BuildRunResponse {
   run: BuildTimeline;
   forecast: BuildForecast | null;
   pipeline_runs: number;
+  // Runs of the same pipeline left out of the statistics and forecast
+  // because they went through a different stage sequence.
+  other_sequence_runs: number;
   stage_stats: StageStat[];
   gate_stats: GateStat[];
   failure_classes: FailureClassStat[];
@@ -213,7 +217,10 @@ export async function loadBuildRun(
     }
   }
   if (run == null) return null;
-  const pipelineRuns = all.filter((timeline) => timeline.pipeline === run!.pipeline);
+  const samePipeline = all.filter((timeline) => timeline.pipeline === run!.pipeline);
+  const pipelineRuns = samePipeline.filter(
+    (timeline) => timeline.run_id === run!.run_id || sameStageSequence(run!, timeline),
+  );
   return {
     source,
     country,
@@ -221,6 +228,7 @@ export async function loadBuildRun(
     run,
     forecast: forecastCompletion(run, all, nowMs),
     pipeline_runs: pipelineRuns.length,
+    other_sequence_runs: samePipeline.length - pipelineRuns.length,
     stage_stats: stageStatistics(pipelineRuns.filter((timeline) => timeline.state !== "running")),
     gate_stats: gateStatistics(pipelineRuns),
     failure_classes: failureClassStatistics(pipelineRuns),

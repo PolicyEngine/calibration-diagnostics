@@ -1,6 +1,13 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -26,10 +33,14 @@ import {
   type FailureClassStat,
   type GateStat,
   type PhaseTotals,
+  type SolverForecast,
+  type SolverSegment,
   type StageForecast,
   type StageStat,
   formatStageName,
   runDurationMs,
+  solverPassLabel,
+  solverSegments,
   stageCores,
   stageMemoryBytes,
   type StageSpan,
@@ -240,15 +251,19 @@ export function BuildMonitorView({
         status={tabs}
         description="Follow a build while it runs, see when it should finish, and find where build time goes and which checks fail late."
         actions={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <SourceToggle
-              source={source}
-              localEnabled={localEnabled}
-              onChange={(next) => {
-                setChosenSource(next);
-                setSelected("");
-              }}
-            />
+          <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
+            {/* A hosted dashboard never reads local run folders, so it
+                offers only the staging repository. */}
+            {localEnabled ? (
+              <SourceToggle
+                source={source}
+                localEnabled={localEnabled}
+                onChange={(next) => {
+                  setChosenSource(next);
+                  setSelected("");
+                }}
+              />
+            ) : null}
             <ToolbarSelect
               label="Run"
               value={selected}
@@ -289,11 +304,13 @@ export function BuildMonitorView({
         <EmptyState title="Run unavailable" description={String(detail.error.message)} />
       ) : data ? (
         <>
+          <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />
           <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} />
           <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
           <TimeBudgetCard
             pipelineLabel={data.run.pipeline_label}
             pipelineRuns={data.pipeline_runs}
+            otherSequenceRuns={data.other_sequence_runs ?? 0}
             stats={data.stage_stats}
             totals={data.phase_totals}
             selected={data.run.run_id}
@@ -308,6 +325,7 @@ export function BuildMonitorView({
             <SectionCard
               title="Runs that could not be read"
               description="Their telemetry does not match the staging contract."
+              descriptionClassName="max-w-none"
             >
               <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
                 {list.data.problems.map((problem) => (
@@ -320,6 +338,29 @@ export function BuildMonitorView({
           ) : null}
         </>
       ) : null}
+    </div>
+  );
+}
+
+// Runs reach the staging repository only when a build uploads them, so a
+// quiet source usually means builds ran without staging, not that none ran.
+const STALE_SOURCE_MS = 14 * 24 * 3_600_000;
+
+function StaleSourceNotice({
+  runs,
+  source,
+  nowMs,
+}: {
+  runs: BuildTimeline[];
+  source: BuildRunSource;
+  nowMs: number;
+}) {
+  const newest = Math.max(0, ...runs.map((run) => run.started_ms ?? 0));
+  if (source !== "staging" || !newest || nowMs - newest < STALE_SOURCE_MS) return null;
+  return (
+    <div className="rounded-md border px-3 py-2 text-sm pill-warn">
+      The newest run in the staging repository started {fmtDuration(nowMs - newest)} ago. Builds that ran with{" "}
+      <code className="font-mono">--no-staging</code>, or whose uploads failed, do not appear here.
     </div>
   );
 }
@@ -422,7 +463,7 @@ function RunOverview({
                           forecast.calibration.pass > 0 ? `, pass ${forecast.calibration.pass + 1}` : ""
                         } at ${forecast.calibration.seconds_per_epoch.toFixed(2)} s/epoch`
                       : ""
-                  }`
+                  }${forecast.solver ? ` · ${searchProgress(forecast.solver)}` : ""}`
                 : !running && pace != null
                   ? "Stage time against comparable runs"
                   : undefined
@@ -451,9 +492,7 @@ function RunOverview({
                 {pace != null
                   ? `Running ${pace >= 1 ? `${pace.toFixed(2)}× slower` : `${(1 / pace).toFixed(2)}× faster`} than comparable runs · `
                   : ""}
-                {forecast?.basis_runs.length
-                  ? `Forecast from ${forecast.basis_runs.length} comparable run${forecast.basis_runs.length === 1 ? "" : "s"}`
-                  : "No comparable runs"}
+                {forecastBasis(forecast)}
               </span>
             </div>
           </div>
@@ -492,7 +531,9 @@ function RunOverview({
           <div className="rounded-md border px-3 py-2 text-sm pill-warn">
             {elapsed != null && elapsed < 2 * 60_000
               ? `This run went silent ${fmtDuration(elapsed)} after it started, most likely a test or an aborted launch.`
-              : `No telemetry for ${fmtDuration(silentFor)}. A build killed by the operating system (out of memory) or interrupted never writes a final event, so this run is probably dead. Check the build machine.`}
+              : silentFor != null && silentFor > 24 * 3_600_000
+                ? `This run stopped on ${fmtClock(run.updated_ms, nowMs)} without a final event, ${fmtDuration(elapsed)} after it started. A build killed by the operating system (out of memory) or interrupted never writes one.`
+                : `No telemetry for ${fmtDuration(silentFor)}. A build killed by the operating system (out of memory) or interrupted never writes a final event, so this run is probably dead. Check the build machine.`}
           </div>
         ) : null}
 
@@ -531,6 +572,32 @@ function RunOverview({
       </div>
     </SectionCard>
   );
+}
+
+// What the forecast rests on: finished runs of the same pipeline and stage
+// sequence, or only this run's own measured rate.
+function forecastBasis(forecast: BuildForecast | null): string {
+  if (!forecast || forecast.method === "none") return "No comparable runs";
+  if (forecast.method === "rate_only") {
+    return forecast.solver
+      ? "Forecast from this run's epoch rate and past size-search pass counts"
+      : "Forecast from this run's measured rate";
+  }
+  const count = forecast.finished_runs;
+  return `Forecast from ${count} finished comparable run${count === 1 ? "" : "s"}`;
+}
+
+function searchProgress(solver: SolverForecast): string {
+  const past = solver.history_search_passes.filter((count) => count > 0);
+  const range = past.length
+    ? Math.min(...past) === Math.max(...past)
+      ? `${past[0]}`
+      : `${Math.min(...past)}–${Math.max(...past)}`
+    : null;
+  const search = solver.search_passes
+    ? `size-search pass ${solver.search_passes}`
+    : `${solverPassLabel(solver.pass).toLowerCase()}, before the size search`;
+  return range ? `${search}; past runs needed ${range}` : search;
 }
 
 // What the machine is doing: cores the current (or last) stage keeps busy,
@@ -596,12 +663,117 @@ function tickLabel(ms: number): string {
 interface TimelineRow {
   key: string;
   stage: string;
+  label: string;
   phase: BuildPhase;
   start: number;
   end: number;
   status: StageForecast["status"] | "failed";
   basis: StageForecast["basis"];
   span: StageSpan | null;
+  // A stretch inside a calibration stage (a solver pass, or time with no
+  // epochs logged), shown indented under its stage.
+  segment: SolverSegment | null;
+}
+
+// A pass's epochs and speed, most telling first: where a running pass is,
+// how fast a finished one went.
+function segmentDetail(segment: SolverSegment, open: boolean): string[] {
+  const pass = segment.pass;
+  if (!pass) return [];
+  const progress =
+    pass.last_epoch != null && pass.epochs != null
+      ? pass.complete
+        ? `${pass.epochs} epochs`
+        : open
+          ? `epoch ${pass.last_epoch} of ${pass.epochs}`
+          : `stopped at epoch ${pass.last_epoch} of ${pass.epochs}`
+      : null;
+  const speed = pass.last_epoch
+    ? `${((pass.end_ms - pass.start_ms) / 1000 / pass.last_epoch).toFixed(1)} s/epoch`
+    : null;
+  const parts = pass.complete ? [speed, progress] : [progress, speed];
+  return parts.filter((part): part is string => part != null);
+}
+
+// The width of an element, kept current as it resizes.
+function useElementWidth(): [(element: HTMLElement | null) => void, number | null] {
+  const [element, setElement] = useState<HTMLElement | null>(null);
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!element) return;
+    const update = () => setWidth(element.getBoundingClientRect().width);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [element]);
+  return [setElement, width];
+}
+
+// Width of a bar label in the timeline's 10 px type: measured on a canvas in
+// the browser, estimated where there is none.
+let labelContext: CanvasRenderingContext2D | null | undefined;
+function labelWidth(text: string): number {
+  if (labelContext === undefined) {
+    labelContext = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
+    if (labelContext) labelContext.font = `10px ${getComputedStyle(document.body).fontFamily}`;
+  }
+  const measured = labelContext ? labelContext.measureText(text).width : text.length * 5.6;
+  return measured * 1.05 + 8;
+}
+
+type LabelPlace = "inside" | "left" | "right";
+
+// Where a bar's label goes: right of the bar, inside it, or left of it,
+// whichever holds it whole. When none does, the least important parts are
+// dropped (the tooltip keeps them all) until it fits.
+function placeLabel(
+  parts: string[],
+  areaWidth: number | null,
+  startFraction: number,
+  endFraction: number,
+): { text: string; place: LabelPlace } {
+  if (areaWidth == null) {
+    const place: LabelPlace =
+      endFraction - startFraction > 0.45 ? "inside" : endFraction > 0.85 ? "left" : "right";
+    return { text: parts.join(" · "), place };
+  }
+  const left = startFraction * areaWidth;
+  const bar = (endFraction - startFraction) * areaWidth;
+  const right = areaWidth - endFraction * areaWidth;
+  for (let count = parts.length; count >= 1; count -= 1) {
+    const text = parts.slice(0, count).join(" · ");
+    const needed = labelWidth(text);
+    if (right >= needed) return { text, place: "right" };
+    if (bar >= needed) return { text, place: "inside" };
+    if (left >= needed) return { text, place: "left" };
+  }
+  const place: LabelPlace = right >= left && right >= bar ? "right" : bar >= left ? "inside" : "left";
+  return { text: parts[0] ?? "", place };
+}
+
+function solverRows(
+  row: TimelineRow,
+  run: BuildTimeline,
+  runStart: number,
+  nowOffset: number,
+): TimelineRow[] {
+  if (!row.span || !run.solver_passes?.length) return [];
+  return solverSegments(row.span, run, runStart + nowOffset).map((segment, index) => {
+    const open = segment.end_ms == null;
+    return {
+      key: `${row.key}-segment-${index}`,
+      stage: row.stage,
+      label: segment.label,
+      phase: row.phase,
+      start: segment.start_ms - runStart,
+      end: Math.max(segment.start_ms, segment.end_ms ?? runStart + nowOffset) - runStart,
+      status: open ? "running" : "done",
+      basis: "observed",
+      span: null,
+      segment,
+    };
+  });
 }
 
 function TimelineCard({
@@ -613,6 +785,7 @@ function TimelineCard({
   forecast: BuildForecast | null;
   nowMs: number;
 }) {
+  const [measureArea, areaWidth] = useElementWidth();
   const failedStages = new Set(
     run.spans.filter((span) => span.depth === 0 && span.status === "failed").map((span) => span.start_ms),
   );
@@ -626,6 +799,8 @@ function TimelineCard({
         : (spanAt.get(run.started_ms + stage.start_offset_ms) ?? null),
     key: `${stage.stage}-${index}`,
     stage: stage.stage,
+    label: formatStageName(stage.stage),
+    segment: null,
     phase: stage.phase,
     start: stage.start_offset_ms,
     end: Math.max(stage.end_offset_ms, stage.start_offset_ms),
@@ -648,8 +823,11 @@ function TimelineCard({
   const pct = (ms: number) => `${Math.min(100, Math.max(0, (ms / domain) * 100))}%`;
   const width = (start: number, end: number) => `${Math.max(0.25, ((end - start) / domain) * 100)}%`;
   // Every stage gets a row, however short: a seconds-long stage is still a
-  // step the build went through.
-  const visible = rows;
+  // step the build went through. A stage that ran the solver is followed by
+  // its passes and the stretches between them.
+  const visible = rows.flatMap((row) =>
+    run.started_ms == null ? [row] : [row, ...solverRows(row, run, run.started_ms, elapsed)],
+  );
   const ticks = axisTicks(domain);
 
   if (!rows.length) {
@@ -669,29 +847,30 @@ function TimelineCard({
         : row.status === "failed"
           ? FAILED_COLOR
           : PHASE_COLOR[row.phase],
-    opacity: row.status === "running" ? 0.75 : 1,
+    // Stretches without epochs are drawn faint, passes at full strength.
+    opacity: row.segment && !row.segment.pass ? 0.35 : row.status === "running" ? 0.75 : 1,
   });
 
   return (
     <SectionCard
       title="Timeline"
+      descriptionClassName="max-w-none"
       description={
         run.state === "running"
-          ? "Solid bars are stages that ran; hatched bars are what comparable runs did next, stretched to the forecast. The band marks the 90% finish range."
-          : "Each stage of the run on one time axis."
+          ? "Solid bars are stages that ran; hatched bars are what comparable runs did next, stretched to the forecast. The band marks the 90% finish range. Calibration is split into its solver passes; faint bars are time with no epochs logged."
+          : "Each stage of the run on one time axis. Calibration is split into its solver passes; faint bars are time with no epochs logged."
       }
     >
       <div className="flex flex-col gap-1">
-        <PhaseLegend />
         <div className="mt-2 grid grid-cols-[minmax(8rem,14rem)_1fr] gap-x-3 gap-y-1 text-xs">
           <div className="font-medium text-muted-foreground">Whole run</div>
-          <div className="relative h-6 rounded bg-muted/40">
+          <div ref={measureArea} className="relative h-6 rounded bg-muted/40">
             {rows.map((row) => (
               <div
                 key={`whole-${row.key}`}
                 className="absolute top-0 h-full"
                 style={barStyle(row)}
-                title={`${formatStageName(row.stage)}: ${fmtDuration(row.end - row.start)}`}
+                title={`${row.label}: ${fmtDuration(row.end - row.start)}`}
               />
             ))}
             {p50Offset != null && p90Offset != null ? (
@@ -710,7 +889,10 @@ function TimelineCard({
               row={row}
               barStyle={barStyle(row)}
               nowLeft={run.state === "running" ? pct(elapsed) : null}
-              labelLeft={row.end / domain > 0.85}
+              nowOffset={run.state === "running" ? elapsed : null}
+              areaWidth={areaWidth}
+              startFraction={Math.min(1, row.start / domain)}
+              endFraction={Math.min(1, Math.max(row.end, row.start + 0.0025 * domain) / domain)}
             />
           ))}
 
@@ -722,6 +904,9 @@ function TimelineCard({
               </span>
             ))}
           </div>
+        </div>
+        <div className="mt-3">
+          <PhaseLegend />
         </div>
       </div>
     </SectionCard>
@@ -740,13 +925,20 @@ function TimelineStageRow({
   row,
   barStyle,
   nowLeft,
-  labelLeft,
+  nowOffset,
+  areaWidth,
+  startFraction,
+  endFraction,
 }: {
   row: TimelineRow;
   barStyle: CSSProperties;
   nowLeft: string | null;
-  // Bars ending near the right edge carry their label on the left.
-  labelLeft: boolean;
+  nowOffset: number | null;
+  // The bar area's width in pixels (null before it is measured), and the
+  // bar's ends as fractions of it.
+  areaWidth: number | null;
+  startFraction: number;
+  endFraction: number;
 }) {
   const label =
     row.status === "running"
@@ -756,33 +948,55 @@ function TimelineStageRow({
         : row.status === "failed"
           ? "failed"
           : null;
+  // Most important first: a label that does not fit loses its last parts.
+  const parts = [
+    row.status === "running" && !row.segment && nowOffset != null && row.end > nowOffset + 60_000
+      ? `${fmtDuration(nowOffset - row.start)} so far, about ${fmtDuration(row.end - row.start)} in all`
+      : fmtDuration(row.end - row.start),
+    // A solver pass's epochs say more than that it is running.
+    ...(row.segment ? segmentDetail(row.segment, row.status === "running") : []),
+    label && row.basis === "measured_rate" ? `${label} (measured rate)` : label,
+    row.span && stageCores(row.span) != null ? `${fmtCores(stageCores(row.span))} cores` : null,
+    row.span && stageMemoryBytes(row.span) != null ? fmtBytes(stageMemoryBytes(row.span)) : null,
+    row.span?.work ? `${row.span.work.done} of ${row.span.work.total} ${plural(row.span.work.unit ?? "unit")}` : null,
+  ].filter((part): part is string => Boolean(part));
+  const full = parts.join(" · ");
+  const { text, place: labelPlace } = placeLabel(parts, areaWidth, startFraction, endFraction);
   return (
     <>
-      <div className="flex min-w-0 items-center gap-1.5" title={row.stage}>
-        <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-sm" style={{ background: row.status === "failed" ? FAILED_COLOR : PHASE_COLOR[row.phase] }} />
-        <span className={`truncate ${row.status === "pending" ? "text-muted-foreground" : ""}`}>{formatStageName(row.stage)}</span>
+      <div
+        className={`flex min-w-0 items-center gap-1.5 ${row.segment ? "pl-3.5 text-muted-foreground" : ""}`}
+        title={row.segment ? row.label : row.stage}
+      >
+        <span
+          aria-hidden="true"
+          className={`shrink-0 rounded-sm ${row.segment ? "h-1.5 w-1.5" : "h-2 w-2"}`}
+          style={{
+            background: row.status === "failed" ? FAILED_COLOR : PHASE_COLOR[row.phase],
+            opacity: row.segment && !row.segment.pass ? 0.35 : 1,
+          }}
+        />
+        <span className={`truncate ${row.status === "pending" ? "text-muted-foreground" : ""}`}>{row.label}</span>
       </div>
-      <div className="relative h-5">
+      {/* Labels that do not fit are clipped; the tooltip has the full text. */}
+      <div className="relative h-5 overflow-hidden" title={`${row.label}: ${full}`}>
         <div
           className={`absolute top-0.5 h-4 rounded-sm ${row.status === "running" ? "animate-pulse" : ""}`}
           style={barStyle}
         />
         <span
-          className={`absolute top-0.5 whitespace-nowrap text-[10px] leading-4 text-muted-foreground ${
-            labelLeft ? "pr-1" : "pl-1"
+          className={`absolute top-0.5 whitespace-nowrap text-[10px] leading-4 ${
+            labelPlace === "inside" ? "pl-1.5 text-foreground" : labelPlace === "left" ? "pr-1 text-muted-foreground" : "pl-1 text-muted-foreground"
           }`}
           style={
-            labelLeft
-              ? { right: `calc(100% - ${barStyle.left})` }
-              : { left: `calc(${barStyle.left} + ${barStyle.width})` }
+            labelPlace === "inside"
+              ? { left: barStyle.left }
+              : labelPlace === "left"
+                ? { right: `calc(100% - ${barStyle.left})` }
+                : { left: `calc(${barStyle.left} + ${barStyle.width})` }
           }
         >
-          {fmtDuration(row.end - row.start)}
-          {label ? ` · ${label}` : ""}
-          {row.basis === "measured_rate" ? " (measured rate)" : ""}
-          {row.span && stageCores(row.span) != null ? ` · ${fmtCores(stageCores(row.span))} cores` : ""}
-          {row.span && stageMemoryBytes(row.span) != null ? ` · ${fmtBytes(stageMemoryBytes(row.span))}` : ""}
-          {row.span?.work ? ` · ${row.span.work.done} of ${row.span.work.total} ${plural(row.span.work.unit ?? "unit")}` : ""}
+          {text}
         </span>
         {nowLeft ? <div className="absolute top-0 h-5 w-px bg-foreground/30" style={{ left: nowLeft }} /> : null}
       </div>
@@ -814,12 +1028,14 @@ function PhaseLegend() {
 function TimeBudgetCard({
   pipelineLabel,
   pipelineRuns,
+  otherSequenceRuns,
   stats,
   totals,
   selected,
 }: {
   pipelineLabel: string;
   pipelineRuns: number;
+  otherSequenceRuns: number;
   stats: StageStat[];
   totals: PhaseTotals[];
   selected: string;
@@ -850,7 +1066,12 @@ function TimeBudgetCard({
   return (
     <SectionCard
       title="Where build time goes"
-      description={`Typical stage durations across ${pipelineRuns} ${pipelineLabel} run${pipelineRuns === 1 ? "" : "s"} from this source. Completed stages of failed runs count too.`}
+      descriptionClassName="max-w-none"
+      description={`Typical stage durations across ${pipelineRuns} ${pipelineLabel} run${pipelineRuns === 1 ? "" : "s"} from this source. Completed stages of failed runs count too.${
+        otherSequenceRuns
+          ? ` ${otherSequenceRuns} other run${otherSequenceRuns === 1 ? "" : "s"} of this pipeline went through a different stage sequence and ${otherSequenceRuns === 1 ? "is" : "are"} left out here and in the forecast.`
+          : ""
+      }`}
     >
       {!stats.length ? (
         <EmptyState title="No finished stages to measure yet." variant="compact" />
@@ -881,12 +1102,16 @@ function TimeBudgetCard({
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[36rem] text-xs">
+          {/* Cells carry side padding so a highlighted row's wash reaches past
+              its text; the negative margin keeps the text in line with the
+              card's other content. */}
+          <div className="@container -mx-2 overflow-x-auto">
+            <table className="w-full text-xs [&_td]:px-2 [&_th]:px-2">
               <thead className="text-left text-muted-foreground">
-                <tr>
+                <tr className="whitespace-nowrap">
                   <th className="pb-1.5 font-medium">Stage</th>
-                  <th className="pb-1.5 font-medium">Typical</th>
+                  {/* In a narrow card the bar gives way to the stage names. */}
+                  <th className="hidden w-[30%] pb-1.5 font-medium @xl:table-cell">Typical</th>
                   <th className="pb-1.5 text-right font-medium">Median</th>
                   <th className="pb-1.5 text-right font-medium">
                     <HelpHint label="p90" tooltip="90% of runs finished this stage within this time." />
@@ -909,17 +1134,20 @@ function TimeBudgetCard({
               <tbody>
                 {shown.map((stat) => (
                   <tr key={stat.stage} className={`border-t border-border/60 ${stat.failures ? "row-neg" : ""}`}>
-                    <td className="py-1.5 pr-2">
+                    <td className="py-1.5">
                       <span className="inline-flex items-center gap-1.5">
-                        <span aria-hidden="true" className="h-2 w-2 rounded-sm" style={{ background: PHASE_COLOR[stat.phase] }} />
+                        <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-sm" style={{ background: PHASE_COLOR[stat.phase] }} />
                         {formatStageName(stat.stage)}
                       </span>
                     </td>
-                    <td className="w-[30%] py-1.5 pr-2">
-                      <div className="h-2 rounded-sm" style={{ width: `${(stat.median_ms / maxMedian) * 100}%`, background: PHASE_COLOR[stat.phase] }} />
+                    <td className="hidden py-1.5 @xl:table-cell">
+                      <div
+                        className="h-2 rounded-sm"
+                        style={{ width: `${Math.max(0.5, (stat.median_ms / maxMedian) * 100)}%`, background: PHASE_COLOR[stat.phase] }}
+                      />
                     </td>
-                    <td className="py-1.5 text-right tabular-nums">{fmtDuration(stat.median_ms)}</td>
-                    <td className="py-1.5 text-right tabular-nums">{fmtDuration(stat.p90_ms)}</td>
+                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.median_ms)}</td>
+                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.p90_ms)}</td>
                     <td className="py-1.5 text-right tabular-nums">{Math.round(stat.share * 100)}%</td>
                     {hasResources ? (
                       <>
@@ -1006,13 +1234,14 @@ function GatesCard({
   return (
     <SectionCard
       title="Checks and gates"
+      descriptionClassName="max-w-none"
       description="Which checks stop builds, and how much compute had already run when they did. A check that fails late is a candidate for the preflight or dry run."
     >
       <div className="flex flex-col gap-5">
         {failureClasses.length ? (
           <div className="overflow-x-auto">
             <div className="mb-1.5 text-xs font-medium text-muted-foreground">Why runs stop</div>
-            <table className="w-full min-w-[30rem] text-xs">
+            <table className="w-full text-xs">
               <thead className="text-left text-muted-foreground">
                 <tr>
                   <th className="pb-1.5 font-medium">Kind</th>
@@ -1061,7 +1290,7 @@ function GatesCard({
 
         {stats.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[36rem] text-xs">
+            <table className="w-full text-xs">
               <thead className="text-left text-muted-foreground">
                 <tr>
                   <th className="pb-1.5 font-medium">Check</th>

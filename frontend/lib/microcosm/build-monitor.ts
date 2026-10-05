@@ -127,6 +127,23 @@ export interface CalibrationPoint {
   phase: string | null;
 }
 
+// One run of the solver from epoch 0 to its last logged epoch. A size search
+// or refit repeats the solver, so calibration can hold many passes.
+export interface SolverPass {
+  index: number;
+  phase: string | null;
+  // Estimated time of epoch 0: the first logged epoch, back-dated at the
+  // pass's own rate (the first row is logged some epochs in).
+  start_ms: number;
+  // False when a single row logged mid-pass gives no rate to back-date with.
+  start_known: boolean;
+  // The last logged epoch.
+  end_ms: number;
+  last_epoch: number | null;
+  epochs: number | null;
+  complete: boolean;
+}
+
 export interface BuildFailure {
   stage: string | null;
   message: string | null;
@@ -151,6 +168,8 @@ export interface BuildTimeline {
   failure: BuildFailure | null;
   spans: StageSpan[];
   calibration: CalibrationPoint[];
+  // A summary of the calibration points, kept when the points are dropped.
+  solver_passes: SolverPass[];
   heartbeat_ms: number | null;
   // The latest resources the run reported.
   resources: ResourceSnapshot | null;
@@ -568,6 +587,114 @@ function calibrationPoints(
   return points;
 }
 
+export function solverPasses(points: CalibrationPoint[]): SolverPass[] {
+  const passes: SolverPass[] = [];
+  let previousEnd: number | null = null;
+  for (let start = 0; start < points.length; ) {
+    let end = start;
+    while (end + 1 < points.length && points[end + 1].pass === points[start].pass) end += 1;
+    const first = points[start];
+    const last = points[end];
+    let startMs = first.time_ms;
+    let startKnown = !first.epoch;
+    const epochs = (last.epoch ?? 0) - (first.epoch ?? 0);
+    if (first.epoch != null && first.epoch > 0 && epochs > 0 && last.time_ms > first.time_ms) {
+      const msPerEpoch = (last.time_ms - first.time_ms) / epochs;
+      startMs = first.time_ms - first.epoch * msPerEpoch;
+      startKnown = true;
+    }
+    if (previousEnd != null) startMs = Math.max(startMs, previousEnd);
+    passes.push({
+      index: first.pass,
+      phase: points.slice(start, end + 1).find((point) => point.phase)?.phase ?? null,
+      start_ms: startMs,
+      start_known: startKnown,
+      end_ms: last.time_ms,
+      last_epoch: last.epoch,
+      epochs: last.epochs,
+      complete: last.epoch != null && last.epochs != null && last.epoch >= last.epochs,
+    });
+    previousEnd = last.time_ms;
+    start = end + 1;
+  }
+  return passes;
+}
+
+export function isSearchPass(pass: SolverPass): boolean {
+  return /search/.test(pass.phase ?? "");
+}
+
+export function solverPassLabel(pass: SolverPass): string {
+  const phase = pass.phase ? ` · ${formatStageName(pass.phase).toLowerCase()}` : "";
+  return `Solver pass ${pass.index + 1}${phase}`;
+}
+
+// A stretch inside a calibration stage: the time before the first epoch,
+// each solver pass, and time between or after passes with no epochs logged.
+export interface SolverSegment {
+  kind: "before" | "pass" | "between" | "after";
+  label: string;
+  start_ms: number;
+  // null while it is still going.
+  end_ms: number | null;
+  pass: SolverPass | null;
+}
+
+// Stretches without epochs shorter than this are folded into the next pass.
+const SOLVER_GAP_MS = 60_000;
+
+// The stretches of a top-level stage that holds solver passes, in order. A
+// pass belongs to the stage that was open when its last epoch was logged.
+export function solverSegments(
+  span: StageSpan,
+  run: Pick<BuildTimeline, "solver_passes" | "state">,
+  nowMs: number = Date.now(),
+): SolverSegment[] {
+  const spanEnd = span.end_ms ?? Number.POSITIVE_INFINITY;
+  const passes = run.solver_passes.filter(
+    (pass) => pass.end_ms >= span.start_ms && pass.end_ms <= spanEnd,
+  );
+  if (!passes.length) return [];
+  const open = span.end_ms == null && run.state === "running";
+  const segments: SolverSegment[] = [];
+  let cursor = span.start_ms;
+  passes.forEach((pass, position) => {
+    // A pass with an unknown start gets no stretch before it.
+    const start = pass.start_known ? Math.max(pass.start_ms, cursor) : cursor;
+    const gap = start - cursor >= SOLVER_GAP_MS;
+    if (gap) {
+      segments.push({
+        kind: position === 0 ? "before" : "between",
+        label: position === 0 ? "Before the first epoch" : "No epochs logged",
+        start_ms: cursor,
+        end_ms: start,
+        pass: null,
+      });
+    }
+    const last = position === passes.length - 1;
+    segments.push({
+      kind: "pass",
+      label: solverPassLabel(pass),
+      start_ms: gap ? start : cursor,
+      end_ms: last && open && !pass.complete ? null : pass.end_ms,
+      pass,
+    });
+    cursor = pass.end_ms;
+  });
+  const lastPass = passes[passes.length - 1];
+  const tailEnd = span.end_ms ?? (open && lastPass.complete ? nowMs : null);
+  if (tailEnd != null && tailEnd - cursor >= SOLVER_GAP_MS) {
+    segments.push({
+      kind: "after",
+      label: open ? "No epochs since the last pass" : "After the last pass",
+      start_ms: cursor,
+      end_ms: span.end_ms,
+      pass: null,
+    });
+  }
+  return segments;
+}
+
 export function buildTimeline(
   documents: BuildRunDocuments,
   nowMs: number = Date.now(),
@@ -684,6 +811,7 @@ export function buildTimeline(
     failure,
     spans,
     calibration,
+    solver_passes: solverPasses(calibration),
     heartbeat_ms: heartbeatMs,
     resources: latestResources,
     identity: runIdentity(documents.run_manifest),
@@ -742,6 +870,11 @@ export interface StageStat {
   median_ms: number;
   p90_ms: number;
   max_ms: number;
+  // Median and p90 of the runs where the stage ran to its end: a stage that
+  // failed, or the last stage of a stalled run, stopped early. Null when no
+  // run finished the stage. Pace and "typical" use these.
+  finished_median_ms: number | null;
+  finished_p90_ms: number | null;
   // Median start, measured from the start of the run.
   median_offset_ms: number;
   share: number;
@@ -758,6 +891,7 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
     string,
     {
       durations: number[];
+      finished: number[];
       offsets: number[];
       failures: number;
       phase: BuildPhase;
@@ -769,9 +903,18 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
   for (const run of history) {
     const seen = new Map<
       string,
-      { duration: number; offset: number; failed: boolean; cores: number | null; memory: number | null }
+      {
+        duration: number;
+        offset: number;
+        failed: boolean;
+        cut_short: boolean;
+        cores: number | null;
+        memory: number | null;
+      }
     >();
-    for (const span of topLevelSpans(run)) {
+    const top = topLevelSpans(run);
+    const last = top[top.length - 1];
+    for (const span of top) {
       if (span.end_ms == null || run.started_ms == null) continue;
       // Re-entered stages (v1 transitions back into a stage) sum per run.
       const previous = seen.get(span.stage);
@@ -781,12 +924,17 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
         duration: (previous?.duration ?? 0) + (span.end_ms - span.start_ms),
         offset: previous?.offset ?? span.start_ms - run.started_ms,
         failed: (previous?.failed ?? false) || span.status === "failed",
+        cut_short:
+          (previous?.cut_short ?? false) ||
+          span.status === "failed" ||
+          (run.state === "stalled" && span === last),
         cores: cores ?? previous?.cores ?? null,
         memory: Math.max(memory ?? 0, previous?.memory ?? 0) || null,
       });
       if (!byStage.has(span.stage)) {
         byStage.set(span.stage, {
           durations: [],
+          finished: [],
           offsets: [],
           failures: 0,
           phase: span.phase,
@@ -799,6 +947,7 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
     for (const [stage, sample] of seen) {
       const entry = byStage.get(stage)!;
       entry.durations.push(sample.duration);
+      if (!sample.cut_short) entry.finished.push(sample.duration);
       entry.offsets.push(sample.offset);
       if (sample.failed) entry.failures += 1;
       if (sample.cores != null) entry.cores.push(sample.cores);
@@ -814,6 +963,8 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
     median_ms: quantile(entry.durations, 0.5),
     p90_ms: quantile(entry.durations, 0.9),
     max_ms: Math.max(...entry.durations),
+    finished_median_ms: entry.finished.length ? quantile(entry.finished, 0.5) : null,
+    finished_p90_ms: entry.finished.length ? quantile(entry.finished, 0.9) : null,
     median_offset_ms: quantile(entry.offsets, 0.5),
     share: 0,
     cores_median: entry.cores.length ? quantile(entry.cores, 0.5) : null,
@@ -822,6 +973,37 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
   const total = stats.reduce((sum, stat) => sum + stat.median_ms, 0);
   for (const stat of stats) stat.share = total > 0 ? stat.median_ms / total : 0;
   return stats.sort((a, b) => a.median_offset_ms - b.median_offset_ms);
+}
+
+// Whether two runs of a pipeline went through the same stages. A pipeline id
+// can outlive a change of build driver (UK local candidates kept theirs when
+// cloning and surface resolution moved into target compilation), and timing
+// from the old stage layout misleads a forecast for the new one.
+//
+// Only the stretch both runs cover is compared: up to the furthest stage of
+// `run` that `other` also reached, and in `other` up to its last stage from
+// that stretch, so a run that stopped early still matches. Order inside the
+// stretch is ignored. The runs differ when more than one stage, and more than
+// a fifth of the stages, appear in only one of them; a stage added to a long
+// pipeline does not split its history.
+export function sameStageSequence(run: BuildTimeline, other: BuildTimeline): boolean {
+  const order = (timeline: BuildTimeline) => [...new Set(topLevelSpans(timeline).map((span) => span.stage))];
+  const ours = order(run);
+  const theirs = order(other);
+  if (!ours.length || !theirs.length) return true;
+  const theirIndex = new Map(theirs.map((stage, index) => [stage, index]));
+  let cut = -1;
+  ours.forEach((stage, index) => {
+    if (theirIndex.has(stage)) cut = index;
+  });
+  if (cut < 0) return false;
+  const ourStretch = ours.slice(0, cut + 1);
+  const theirCut = Math.max(...ourStretch.filter((stage) => theirIndex.has(stage)).map((stage) => theirIndex.get(stage)!));
+  const a = new Set(ourStretch);
+  const b = new Set(theirs.slice(0, theirCut + 1));
+  const union = new Set([...a, ...b]);
+  const differing = [...union].filter((stage) => a.has(stage) !== b.has(stage)).length;
+  return differing <= 1 || differing <= 0.2 * union.size;
 }
 
 export function comparableHistory(
@@ -833,6 +1015,7 @@ export function comparableHistory(
       (other) =>
         other.run_id !== run.run_id &&
         other.pipeline === run.pipeline &&
+        sameStageSequence(run, other) &&
         other.state !== "running" &&
         other.started_ms != null &&
         topLevelSpans(other).some((span) => span.end_ms != null),
@@ -937,12 +1120,12 @@ export function paceFactor(
   let observed = 0;
   let typical = 0;
   for (const span of topLevelSpans(run)) {
-    const stat = stats.get(span.stage);
-    if (!stat || stat.median_ms < 20_000) continue;
+    const median = stats.get(span.stage)?.finished_median_ms;
+    if (median == null || median < 20_000) continue;
     const duration = (span.end_ms ?? nowMs) - span.start_ms;
-    if (span.end_ms == null && duration <= stat.median_ms) continue;
+    if (span.end_ms == null && duration <= median) continue;
     observed += duration;
-    typical += stat.median_ms;
+    typical += median;
   }
   if (typical < 60_000) return null;
   return Math.min(3, Math.max(0.5, observed / typical));
@@ -960,6 +1143,9 @@ export interface StageForecast {
 
 export interface BuildForecast {
   basis_runs: string[];
+  // Comparable runs that reached the end, which the forecast's history
+  // comes from.
+  finished_runs: number;
   method: "milestone" | "run_total" | "rate_only" | "none" | "finished";
   pace: number | null;
   elapsed_ms: number;
@@ -974,9 +1160,122 @@ export interface BuildForecast {
   current_stage_p90_ms: number | null;
   overrunning: boolean;
   calibration: CalibrationRate | null;
+  solver: SolverForecast | null;
   stage_work: StageWorkRate | null;
   stages: StageForecast[];
   note: string | null;
+}
+
+export interface SolverForecast {
+  pass: SolverPass;
+  // Size-search passes this run has started, the current one included.
+  search_passes: number;
+  // Size-search passes each past run needed. When no past run shares this
+  // run's stage sequence, runs of the pipeline with another sequence stand
+  // in, and `history_same_sequence` is false.
+  history_search_passes: number[];
+  history_same_sequence: boolean;
+  // More size-search passes expected after the current one; null when this
+  // run has already needed more than any past run.
+  remaining_passes_p50: number | null;
+  remaining_passes_p90: number | null;
+  // A typical size-search pass in this run, idle time to the next pass
+  // included.
+  pass_ms: number | null;
+  remaining_p50_ms: number;
+  remaining_p90_ms: number;
+}
+
+// The solver is done once a later top-level stage has started.
+function finishedSolving(run: BuildTimeline): boolean {
+  const last = run.solver_passes[run.solver_passes.length - 1];
+  return last != null && topLevelSpans(run).some((span) => span.start_ms > last.end_ms);
+}
+
+function searchPassCount(run: BuildTimeline): number {
+  return run.solver_passes.filter(isSearchPass).length;
+}
+
+// How much solving is left: the rest of the current pass at its epoch rate,
+// plus the size-search passes past runs needed beyond the count this run has
+// reached, each at the length of this run's own search passes. Null when
+// neither this run nor its pipeline's past runs searched.
+export function solverForecast(
+  run: BuildTimeline,
+  runs: BuildTimeline[],
+  rate: CalibrationRate | null,
+): SolverForecast | null {
+  const passes = run.solver_passes;
+  const current = passes[passes.length - 1];
+  if (!current) return null;
+  const solved = runs.filter(
+    (other) =>
+      other.run_id !== run.run_id &&
+      other.pipeline === run.pipeline &&
+      other.state !== "running" &&
+      finishedSolving(other),
+  );
+  const same = solved.filter((other) => sameStageSequence(run, other));
+  const basis = same.length ? same : solved;
+  const counts = basis.map(searchPassCount);
+  const searched = passes.filter(isSearchPass).length;
+  if (!searched && !counts.some((count) => count > 0)) return null;
+
+  // Past runs that needed at least as many passes as this one has started.
+  const more = counts.filter((count) => count >= searched).map((count) => count - searched);
+  const lengths = passes
+    .slice(0, -1)
+    .map((pass, index) => (isSearchPass(pass) ? passes[index + 1].start_ms - pass.start_ms : null))
+    .filter((value): value is number => value != null && value > 0);
+  const projected =
+    rate && current.epochs != null ? rate.seconds_per_epoch * current.epochs * 1000 : null;
+  const passMs = lengths.length
+    ? quantile(lengths, 0.5)
+    : (projected ?? (current.complete ? current.end_ms - current.start_ms : null));
+  const currentLeft = current.complete ? 0 : (rate?.remaining_ms ?? 0);
+  const p50 = more.length ? quantile(more, 0.5) : null;
+  const p90 = more.length ? quantile(more, 0.9) : null;
+  return {
+    pass: current,
+    search_passes: searched,
+    history_search_passes: counts,
+    history_same_sequence: same.length > 0,
+    remaining_passes_p50: p50,
+    remaining_passes_p90: p90,
+    pass_ms: passMs,
+    remaining_p50_ms: currentLeft + (p50 ?? 0) * (passMs ?? 0),
+    remaining_p90_ms: currentLeft + (p90 ?? 0) * (passMs ?? 0),
+  };
+}
+
+function roughDuration(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  return minutes < 90 ? `${minutes} min` : `${(ms / 3_600_000).toFixed(1)} h`;
+}
+
+function passCountRange(counts: number[]): string {
+  const low = Math.min(...counts);
+  const high = Math.max(...counts);
+  return low === high ? `${low}` : `${low}–${high}`;
+}
+
+function solverNote(solver: SolverForecast): string | null {
+  const searched = solver.history_search_passes.filter((count) => count > 0);
+  if (!searched.length) return null;
+  const source = solver.history_same_sequence
+    ? ""
+    : " (runs with an earlier stage sequence, as no finished run shares this one)";
+  const history = `Past runs of this pipeline needed ${passCountRange(searched)} size-search passes${source}.`;
+  if (solver.remaining_passes_p50 == null) {
+    return `${history} This run has started ${solver.search_passes}, more than any of them, so how many remain is unknown.`;
+  }
+  const left = solver.history_search_passes
+    .filter((count) => count >= solver.search_passes)
+    .map((count) => count - solver.search_passes);
+  const more = passCountRange(left);
+  return `${history} After this pass, about ${more} more are expected${
+    solver.pass_ms ? `, at about ${roughDuration(solver.pass_ms)} each` : ""
+  }.`;
 }
 
 interface Range {
@@ -1028,6 +1327,7 @@ export function forecastCompletion(
     }));
   const base = {
     basis_runs: history.map((other) => other.run_id),
+    finished_runs: finished.length,
     elapsed_ms: elapsed,
   };
 
@@ -1047,6 +1347,7 @@ export function forecastCompletion(
       current_stage_p90_ms: null,
       overrunning: false,
       calibration: null,
+      solver: null,
       stage_work: null,
       stages: done,
       note: null,
@@ -1061,12 +1362,18 @@ export function forecastCompletion(
   const anchorBlock = anchor ? stageBlock(run, anchor.stage) : null;
   const currentElapsed = current && anchorBlock ? nowMs - anchorBlock.start_ms : null;
   const currentStat = current ? stats.get(current.stage) : undefined;
-  const calibrating =
-    current != null &&
-    rate != null &&
-    (current.phase === "calibrate" || /calibrat/.test(current.stage));
+  const solving =
+    current != null && (current.phase === "calibrate" || /calibrat/.test(current.stage));
+  const calibrating = solving && rate != null;
+  const solver = solving ? solverForecast(run, runs, rate) : null;
   const work = stageWorkRate(current, nowMs);
-  const rateFloor = Math.max(calibrating ? rate!.remaining_ms : 0, work?.remaining_ms ?? 0);
+  const rateFloor = Math.max(
+    calibrating ? rate!.remaining_ms : 0,
+    work?.remaining_ms ?? 0,
+    solver?.remaining_p50_ms ?? 0,
+  );
+  const rateFloorP90 = Math.max(rateFloor, solver?.remaining_p90_ms ?? 0);
+  const measuredLeft = calibrating || work != null || solver != null;
 
   // Past runs that reached the anchor stage.
   const durations: number[] = [];
@@ -1104,21 +1411,21 @@ export function forecastCompletion(
     const totals = range(finished.map((other) => (other.ended_ms! - other.started_ms!) * scale))!;
     afterRange = { p50: Math.max(0, totals.p50 - elapsed), p90: Math.max(0, totals.p90 - elapsed) };
     overrunning = totals.p90 < elapsed;
-  } else if (calibrating || work) {
+  } else if (measuredLeft) {
     method = "rate_only";
   }
   // A stage that reports its own batches is timed by them: its measured
   // rate is specific to this run, where history only says what other runs
   // took. Wait for a few units so the rate means something. The solver's
-  // epoch rate stays a floor, because size search and refits repeat passes.
+  // epoch rate, with the size-search passes still expected, stays a floor.
   const measured = current?.work != null && work != null && work.done >= Math.min(3, work.total);
   if (measured) {
     currentRange = { p50: work!.remaining_ms, p90: work!.remaining_ms * 1.25 };
     overrunning = false;
-  } else if (calibrating || work) {
+  } else if (measuredLeft) {
     currentRange = {
       p50: Math.max(currentRange.p50, rateFloor),
-      p90: Math.max(currentRange.p90, rateFloor),
+      p90: Math.max(currentRange.p90, rateFloorP90),
     };
   }
 
@@ -1149,7 +1456,7 @@ export function forecastCompletion(
       end_offset_ms: cursor + currentRemaining,
       status: "running",
       basis:
-        (calibrating || work) && rateFloor >= currentRemaining
+        measuredLeft && rateFloor >= currentRemaining
           ? "measured_rate"
           : method === "milestone"
             ? "history"
@@ -1186,17 +1493,20 @@ export function forecastCompletion(
 
   let note: string | null = null;
   if (!finished.length) {
-    note =
-      calibrating || work
-        ? "No finished comparable runs yet; the estimate covers the current stage only."
-        : "No finished comparable runs yet, so there is nothing to forecast from.";
+    note = measuredLeft
+      ? `No finished run of this pipeline and stage sequence yet; the estimate covers ${
+          current ? formatStageName(current.stage).toLowerCase() : "the current stage"
+        } only, not the stages after it.`
+      : "No finished run of this pipeline and stage sequence yet, so there is nothing to forecast from.";
   } else if (method === "run_total") {
     note = "No finished run reached this stage; the estimate uses typical total run time.";
   } else if (overrunning) {
     note = "This stage has already run longer than in any comparable run, so the estimate is uncertain.";
-  } else if (calibrating) {
+  } else if (calibrating && !solver) {
     note = "Solver passes can repeat (size search, refits); later passes count only through past runs.";
   }
+  const passes = solver ? solverNote(solver) : null;
+  if (passes) note = note ? `${note} ${passes}` : passes;
   return {
     ...base,
     method,
@@ -1208,10 +1518,11 @@ export function forecastCompletion(
     fraction_complete: p50 != null && elapsed + p50 > 0 ? elapsed / (elapsed + p50) : null,
     current_stage: current?.stage ?? null,
     current_stage_elapsed_ms: currentElapsed,
-    current_stage_typical_ms: currentStat ? currentStat.median_ms : null,
-    current_stage_p90_ms: currentStat ? currentStat.p90_ms : null,
+    current_stage_typical_ms: currentStat?.finished_median_ms ?? null,
+    current_stage_p90_ms: currentStat?.finished_p90_ms ?? null,
     overrunning,
     calibration: calibrating ? rate : null,
+    solver,
     stage_work: work,
     stages,
     note,

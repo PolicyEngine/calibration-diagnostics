@@ -13,6 +13,8 @@ import {
   gateStatistics,
   isGateStage,
   phaseTotals,
+  sameStageSequence,
+  solverSegments,
   stageCores,
   stagePhase,
   stageStatistics,
@@ -397,7 +399,7 @@ describe("forecastCompletion", () => {
     const forecast = forecastCompletion(live, [], T0 + min(1))!;
     expect(forecast.method).toBe("none");
     expect(forecast.remaining_p50_ms).toBeNull();
-    expect(forecast.note).toContain("No finished comparable runs");
+    expect(forecast.note).toContain("No finished run of this pipeline");
   });
 });
 
@@ -446,6 +448,21 @@ describe("cross-run statistics", () => {
     expect(compile.samples).toBe(2);
     expect(compile.median_ms).toBe(min(60));
     expect(stats.find((stat) => stat.stage === "release_gates")!.failures).toBe(1);
+  });
+
+  test("a stage cut short by a failure or a stall has no finished time", () => {
+    const stalled = buildTimeline(
+      v1Run("s", [["target_compilation", 0]], { status: "running" }),
+      T0 + STALL_MS + min(1),
+    );
+    expect(stalled.state).toBe("stalled");
+    const stats = stageStatistics([...runs, stalled]);
+    const gates = stats.find((stat) => stat.stage === "release_gates")!;
+    expect(gates.finished_median_ms).toBeNull();
+    const compile = stats.find((stat) => stat.stage === "target_compilation")!;
+    // The stalled run's 0-minute compilation counts in the median only.
+    expect(compile.samples).toBe(3);
+    expect(compile.finished_median_ms).toBe(min(60));
   });
 
   test("gate statistics measure compute lost and group reasons", () => {
@@ -666,5 +683,241 @@ describe("delivery to the staging repository", () => {
     );
     expect(run.delivery?.uploads).toBe("local_only");
     expect(run.delivery?.reason).toBe("last upload error: UPLOAD_FAILED");
+  });
+});
+
+describe("solver passes inside calibration", () => {
+  interface PassSpec {
+    phase?: string;
+    // Epoch 0, measured from the start of the run.
+    start: number;
+    msPerEpoch: number;
+    epochs: number;
+    // The last logged epoch; defaults to all of them.
+    upTo?: number;
+  }
+
+  // A version 2 run: top-level stages as [stage, start, end] offsets (end
+  // null while it runs) and solver passes logged every 10 epochs.
+  function ukRun(
+    runId: string,
+    start: number,
+    stages: [string, number, number | null][],
+    passes: PassSpec[],
+    options: { status?: string; now?: number } = {},
+  ): BuildRunDocuments {
+    let sequence = 0;
+    const event = (offset: number, stage: string, status: string) => ({
+      schema_version: 2,
+      sequence: ++sequence,
+      run_id: runId,
+      event_type: "stage",
+      stage,
+      stage_id: stage,
+      status,
+      time: at(start + offset),
+      timestamp: at(start + offset),
+      message: null,
+      details: {},
+    });
+    const events: Record<string, unknown>[] = [event(0, "created", "started")];
+    for (const [stage, from, to] of stages) {
+      events.push(event(from, stage, "started"));
+      if (to != null) events.push(event(to, stage, "completed"));
+    }
+    const status = options.status ?? "running";
+    const last = Math.max(...stages.map(([, from, to]) => to ?? from));
+    if (status === "completed") events.push(event(last, "complete", "completed"));
+    const rows = passes.flatMap((pass) => {
+      const out: Record<string, unknown>[] = [];
+      for (let epoch = 10; epoch <= (pass.upTo ?? pass.epochs); epoch += 10) {
+        out.push({
+          epoch,
+          epochs: pass.epochs,
+          loss: 1 / epoch,
+          phase: pass.phase ?? null,
+          time: at(start + pass.start + epoch * pass.msPerEpoch),
+        });
+      }
+      return out;
+    });
+    return {
+      run_id: runId,
+      source: "staging",
+      country: "uk",
+      progress: {
+        schema_version: 2,
+        run_id: runId,
+        country_code: "GB",
+        pipeline: { id: "uk-local-candidate", version: "0.1.0" },
+        started_at: at(start),
+        updated_at: at(start + Math.max(last, ...rows.map((row) => Date.parse(String(row.time)) - T0 - start))),
+        status,
+      },
+      run_manifest: null,
+      calibration_progress: { events: rows },
+      events,
+    };
+  }
+
+  const hour = 60 * min(1);
+  // A search pass: 100 epochs at 30 s each, 50 min.
+  const search = (startOffset: number, extra: Partial<PassSpec> = {}): PassSpec => ({
+    phase: "size_search",
+    start: startOffset,
+    msPerEpoch: 30_000,
+    epochs: 100,
+    ...extra,
+  });
+
+  // The old layout: cloning and surface resolution before calibration, then
+  // eight size-search passes and a gate battery.
+  function oldLayoutRun(runId: string, start: number, searchPasses: number): BuildRunDocuments {
+    const passes = [
+      { start: min(20), msPerEpoch: 30_000, epochs: 100 },
+      ...Array.from({ length: searchPasses }, (_, index) => search(min(71) + index * min(51))),
+    ];
+    const calibrationEnd = min(71) + searchPasses * min(51) + min(1);
+    return ukRun(
+      runId,
+      start,
+      [
+        ["input_pinning", 0, 1000],
+        ["target_compilation", 2000, min(5)],
+        ["cloning", min(5), min(6)],
+        ["surface_resolution", min(6), min(15)],
+        ["calibration", min(15), calibrationEnd],
+        ["gate_battery", calibrationEnd, calibrationEnd + min(1)],
+      ],
+      passes,
+      { status: "completed" },
+    );
+  }
+
+  // The new layout: target compilation does the cloning; calibration runs a
+  // dense pass, a long stretch without epochs, then size-search passes.
+  const NOW = min(16 * 60);
+  const live = buildTimeline(
+    ukRun(
+      "live",
+      0,
+      [
+        ["input_pinning", 0, 1000],
+        ["target_compilation", 2000, 2 * hour],
+        ["calibration", 2 * hour, null],
+      ],
+      [
+        { start: 2 * hour + min(40), msPerEpoch: 30_000, epochs: 100 },
+        search(5 * hour),
+        search(5 * hour + min(50) + 20_000),
+        search(6 * hour + min(40) + 40_000, { upTo: 30 }),
+      ],
+    ),
+    T0 + 6 * hour + min(56),
+  );
+
+  test("passes are back-dated to epoch 0 and keep their phase", () => {
+    expect(live.solver_passes.map((pass) => [pass.index, pass.phase, pass.complete])).toEqual([
+      [0, null, true],
+      [1, "size_search", true],
+      [2, "size_search", true],
+      [3, "size_search", false],
+    ]);
+    // The first row is logged at epoch 10, five minutes in.
+    expect(live.solver_passes[0].start_ms).toBe(T0 + 2 * hour + min(40));
+  });
+
+  test("calibration splits into setup, passes and stretches without epochs", () => {
+    const calibration = live.spans.find((span) => span.stage === "calibration")!;
+    const segments = solverSegments(calibration, live, T0 + 6 * hour + min(56));
+    expect(segments.map((segment) => [segment.kind, segment.label])).toEqual([
+      ["before", "Before the first epoch"],
+      ["pass", "Solver pass 1"],
+      ["between", "No epochs logged"],
+      ["pass", "Solver pass 2 · size search"],
+      ["pass", "Solver pass 3 · size search"],
+      ["pass", "Solver pass 4 · size search"],
+    ]);
+    expect(segments[0].end_ms! - segments[0].start_ms).toBe(min(40));
+    // The 20 s between search passes folds into the next pass.
+    expect(segments[4].start_ms).toBe(segments[3].end_ms!);
+    // The running pass stays open.
+    expect(segments[5].end_ms).toBeNull();
+  });
+
+  test("a pass known from one mid-pass row gets no stretch before it", () => {
+    const run = buildTimeline(
+      ukRun("single", 0, [["calibration", 0, null]], [{ start: hour, msPerEpoch: 30_000, epochs: 100, upTo: 10 }]),
+      T0 + 2 * hour,
+    );
+    expect(run.solver_passes[0].start_known).toBe(false);
+    const segments = solverSegments(run.spans[0], run, T0 + 2 * hour);
+    expect(segments.map((segment) => segment.kind)).toEqual(["pass"]);
+    expect(segments[0].start_ms).toBe(T0);
+  });
+
+  test("a pipeline whose stages moved is not compared with its old layout", () => {
+    const old = buildTimeline(oldLayoutRun("old", -10 * 24 * hour, 8), T0);
+    expect(sameStageSequence(live, old)).toBe(false);
+    expect(sameStageSequence(old, live)).toBe(false);
+    // A run of the new layout that stopped in target compilation still matches.
+    const early = buildTimeline(
+      ukRun("early", -24 * hour, [["input_pinning", 0, 1000], ["target_compilation", 2000, hour]], [], {
+        status: "failed",
+      }),
+      T0,
+    );
+    expect(sameStageSequence(live, early)).toBe(true);
+  });
+
+  test("one stage added to a long pipeline keeps its history", () => {
+    const stages = (names: string[]): [string, number, number][] =>
+      names.map((name, index) => [name, index * 1000, index * 1000 + 500]);
+    const names = Array.from({ length: 12 }, (_, index) => `step_${index}`);
+    const before = buildTimeline(ukRun("before", 0, stages(names), [], { status: "completed" }), T0 + hour);
+    const after = buildTimeline(
+      ukRun("after", 0, stages([...names.slice(0, 6), "new_step", ...names.slice(6)]), [], { status: "completed" }),
+      T0 + hour,
+    );
+    expect(sameStageSequence(after, before)).toBe(true);
+  });
+
+  test("expected size-search passes come from past runs and say when the layout differs", () => {
+    const history = [
+      buildTimeline(oldLayoutRun("old-10", -20 * 24 * hour, 10), T0),
+      buildTimeline(oldLayoutRun("old-8", -10 * 24 * hour, 8), T0),
+    ];
+    const forecast = forecastCompletion(live, [live, ...history], T0 + 6 * hour + min(56))!;
+    // Neither old run shares the live run's stage sequence.
+    expect(forecast.basis_runs).toEqual([]);
+    const solver = forecast.solver!;
+    expect(solver.search_passes).toBe(3);
+    expect(solver.history_search_passes.sort()).toEqual([10, 8].sort());
+    expect(solver.history_same_sequence).toBe(false);
+    expect(solver.remaining_passes_p50).toBe(6);
+    // Search passes in the live run take 50 min 20 s, idle time included.
+    expect(solver.pass_ms).toBe(min(50) + 20_000);
+    // The current pass has 70 epochs left at 30 s each.
+    expect(solver.remaining_p50_ms).toBe(70 * 30_000 + 6 * (min(50) + 20_000));
+    expect(forecast.remaining_p50_ms).toBe(solver.remaining_p50_ms);
+    expect(forecast.note).toContain("needed 8–10 size-search passes");
+    expect(forecast.note).toContain("earlier stage sequence");
+    expect(forecast.note).toContain("about 5–7 more");
+    expect(forecast.note).toContain("covers calibration only");
+  });
+
+  test("a run that needed more passes than any past run says the count is unknown", () => {
+    const history = [buildTimeline(oldLayoutRun("old-2", -20 * 24 * hour, 2), T0)];
+    const forecast = forecastCompletion(live, [live, ...history], T0 + 6 * hour + min(56))!;
+    expect(forecast.solver!.remaining_passes_p50).toBeNull();
+    expect(forecast.remaining_p50_ms).toBe(70 * 30_000);
+    expect(forecast.note).toContain("more than any of them");
+  });
+
+  test("runs without size search keep the epoch-rate forecast", () => {
+    const run = buildTimeline(passedRun("plain", 0), T0 + min(200));
+    expect(run.solver_passes).toEqual([]);
+    const forecast = forecastCompletion(run, [run], T0 + min(200))!;
+    expect(forecast.solver).toBeNull();
   });
 });
