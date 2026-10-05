@@ -11,14 +11,10 @@ checks stop builds. The run selected on either tab carries over to the other.
   telemetry emitter service. The build sends events to its private local
   socket; that service samples the build process tree, stores unsent events in
   a bounded SQLite retry queue, authenticates with the ambient Hugging Face
-  credential, and delivers events to the hosted collector. Configure the
-  dashboard server with both values below. The read credential stays on the
-  server:
-
-  ```bash
-  MICROCOSM_TELEMETRY_COLLECTOR_URL=https://microcosm-telemetry-389282473430.us-central1.run.app
-  MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN=<dashboard read credential>
-  ```
+  credential, and delivers events to the hosted collector. The dashboard
+  server receives the collector address and its independent read credential
+  from the deployment environment. Neither value belongs in documentation or
+  browser-visible configuration.
 
   A missing credential, a user outside the PolicyEngine Hugging Face
   organization, or an unavailable network does not stop a build. Events remain
