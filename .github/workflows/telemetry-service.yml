@@ -72,12 +72,12 @@ jobs:
       ARTIFACT_REPOSITORY: ${{ vars.TELEMETRY_ARTIFACT_REPOSITORY }}
       CLOUD_SQL_CONNECTION: ${{ vars.TELEMETRY_CLOUD_SQL_CONNECTION }}
       RUNTIME_SERVICE_ACCOUNT: ${{ vars.TELEMETRY_RUNTIME_SERVICE_ACCOUNT }}
-      SERVICE: microcosm-telemetry
-      MIGRATION_JOB: microcosm-telemetry-migrate
-      IMAGE_NAME: collector
-      DATABASE_SECRET: microcosm-telemetry-database-url
-      JWT_SECRET: microcosm-telemetry-jwt-secret
-      READ_SECRET: microcosm-telemetry-read-token
+      SERVICE: ${{ vars.TELEMETRY_SERVICE }}
+      MIGRATION_JOB: ${{ vars.TELEMETRY_MIGRATION_JOB }}
+      IMAGE_NAME: ${{ vars.TELEMETRY_IMAGE_NAME }}
+      DATABASE_SECRET_NAME: ${{ vars.TELEMETRY_DATABASE_SECRET_NAME }}
+      JWT_SECRET_NAME: ${{ vars.TELEMETRY_JWT_SECRET_NAME }}
+      READ_SECRET_NAME: ${{ vars.TELEMETRY_READ_SECRET_NAME }}
     steps:
       - uses: actions/checkout@v4
 
