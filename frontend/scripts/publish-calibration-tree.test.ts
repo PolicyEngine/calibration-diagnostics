@@ -226,12 +226,15 @@ test("an exact supplied commit supports a release without a matching tag", async
 });
 
 const UK_REPO = "policyengine/populace-uk-private";
+// A repository the entry recorded at publication that is not the one the
+// country currently configures: the migration must read the entry's own.
+const RECORDED_REPO = "policyengine/populace-uk-archive";
 const UK_RELEASE = "microcosm-uk-2024-25-national";
 const UK_SHA = "f".repeat(40);
 const UK_PUBLISHED_AT = "2026-10-04T18:57:22.000Z";
 
 /** The production entry: a complete bundle whose metadata carries the placeholder. */
-function placeholderEntry(): CalibrationTreeManifestEntry {
+function placeholderEntry(hfRepo = UK_REPO): CalibrationTreeManifestEntry {
   return {
     buildArtifactId: "d".repeat(64),
     kind: "release",
@@ -239,7 +242,7 @@ function placeholderEntry(): CalibrationTreeManifestEntry {
     label: UK_RELEASE,
     releaseId: UK_RELEASE,
     stagingRunId: null,
-    hfRepo: UK_REPO,
+    hfRepo,
     hfCommitSha: UK_SHA,
     treeSchemaVersion: 6,
     indexSha256: "e".repeat(64),
@@ -270,7 +273,7 @@ test("the timestamp migration sets a legacy entry's updatedAt from its own commi
   // Starts from a complete manifest entry carrying the epoch placeholder,
   // runs the migration, and checks the stored entry receives the canonical
   // publication timestamp: the date of the commit the entry already pins.
-  const stale = placeholderEntry();
+  const stale = placeholderEntry(RECORDED_REPO);
   const staging: CalibrationTreeManifestEntry = {
     ...stale,
     buildArtifactId: "9".repeat(64),
@@ -294,8 +297,14 @@ test("the timestamp migration sets a legacy entry's updatedAt from its own commi
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input);
     requested.push(url);
-    if (url === `https://huggingface.co/api/datasets/${UK_REPO}/commits/${UK_SHA}?limit=1`) {
+    // Only the recorded repository knows the commit; the country's current
+    // repository would answer 404, as it would for an entry published under
+    // an earlier configuration.
+    if (url === `https://huggingface.co/api/datasets/${RECORDED_REPO}/commits/${UK_SHA}?limit=1`) {
       return Response.json([{ id: UK_SHA, date: UK_PUBLISHED_AT, title: "Publish" }]);
+    }
+    if (url.includes(`/api/datasets/${UK_REPO}/commits/`)) {
+      return new Response(null, { status: 404 });
     }
     throw new Error(`Unexpected URL ${url}`);
   }) as typeof fetch;
@@ -305,6 +314,7 @@ test("the timestamp migration sets a legacy entry's updatedAt from its own commi
       {
         buildArtifactId: stale.buildArtifactId,
         releaseId: UK_RELEASE,
+        hfRepo: RECORDED_REPO,
         hfCommitSha: UK_SHA,
         from: "1970-01-01T00:00:00.000Z",
         to: UK_PUBLISHED_AT,
@@ -325,10 +335,11 @@ test("the timestamp migration sets a legacy entry's updatedAt from its own commi
     );
     expect(store.current().countries.uk?.builds.find((build) => build.kind === "staging"))
       .toEqual(staging);
-    // Only the entry's own commit was read, once per run.
+    // Only the entry's own commit, in the entry's own repository, was read,
+    // once per run.
     expect(requested).toEqual([
-      `https://huggingface.co/api/datasets/${UK_REPO}/commits/${UK_SHA}?limit=1`,
-      `https://huggingface.co/api/datasets/${UK_REPO}/commits/${UK_SHA}?limit=1`,
+      `https://huggingface.co/api/datasets/${RECORDED_REPO}/commits/${UK_SHA}?limit=1`,
+      `https://huggingface.co/api/datasets/${RECORDED_REPO}/commits/${UK_SHA}?limit=1`,
     ]);
 
     const again = await migrateReleaseTimestamps("uk", "blob-token", false, store);

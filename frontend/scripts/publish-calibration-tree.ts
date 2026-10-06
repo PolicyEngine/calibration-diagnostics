@@ -24,6 +24,7 @@ import {
   CalibrationReleaseNotFoundError,
   resolveHfCommitPublishedAt,
   resolveHfReleaseDirectorySha,
+  resolveHfRepositoryCommitPublishedAt,
   resolveHfRevisionSha,
 } from "../lib/microcosm/calibration-release-locator";
 import {
@@ -1042,6 +1043,7 @@ export async function reconcileReleaseBuilds(
 interface TimestampMigrationOutcome {
   buildArtifactId: string;
   releaseId: string;
+  hfRepo: string;
   hfCommitSha: string;
   from: string | null;
   to: string;
@@ -1061,8 +1063,9 @@ interface TimestampMigrationReport {
  * A one-time metadata migration for entries written by earlier publishers,
  * which dated a release from its id or tag name and wrote the 1970
  * placeholder when that failed. It reads only the manifest: each release
- * entry's own hfCommitSha names the authoritative commit, whose date
- * becomes updatedAt. Nothing else moves: createdAt stays as stored (it is
+ * entry's own hfRepo and hfCommitSha name the authoritative commit, whose
+ * date becomes updatedAt; the current deployment's repository configuration
+ * plays no part. Nothing else moves: createdAt stays as stored (it is
  * sealed in the immutable index, null on legacy builds), and the build id,
  * index digest, shard descriptors and the latest-release selection are
  * preserved. Staging entries keep their telemetry time. Idempotent; a dry
@@ -1079,10 +1082,15 @@ export async function migrateReleaseTimestamps(
   const outcomes: TimestampMigrationOutcome[] = [];
   for (const entry of manifest.countries[country]?.builds ?? []) {
     if (entry.kind !== "release" || !entry.releaseId) continue;
-    const publishedAt = await resolveHfCommitPublishedAt(country, entry.hfCommitSha, 0);
+    const publishedAt = await resolveHfRepositoryCommitPublishedAt(
+      entry.hfRepo,
+      entry.hfCommitSha,
+      0,
+    );
     const outcome = {
       buildArtifactId: entry.buildArtifactId,
       releaseId: entry.releaseId,
+      hfRepo: entry.hfRepo,
       hfCommitSha: entry.hfCommitSha,
       from: entry.updatedAt,
       to: publishedAt,

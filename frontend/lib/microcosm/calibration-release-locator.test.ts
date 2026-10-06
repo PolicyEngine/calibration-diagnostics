@@ -3,6 +3,7 @@ import { afterEach, expect, test } from "bun:test";
 import {
   calibrationReleaseFromManifest,
   resolveHfCommitPublishedAt,
+  resolveHfRepositoryCommitPublishedAt,
   resolveHfReleaseDirectorySha,
   resolveHfRevisionSha,
 } from "./calibration-release-locator";
@@ -131,4 +132,22 @@ test("a commit log that does not start at the pinned commit is refused", async (
   await expect(resolveHfCommitPublishedAt("uk", "a".repeat(40))).rejects.toThrow(
     "was not found",
   );
+});
+
+test("a recorded repository's commit is read from that repository, not the country's", async () => {
+  const sha = "a".repeat(40);
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requested.push(String(input));
+    return Response.json([{ id: sha, date: "2026-10-04T18:57:22.000Z" }]);
+  }) as typeof fetch;
+  expect(
+    await resolveHfRepositoryCommitPublishedAt("policyengine/populace-uk-archive", sha),
+  ).toBe("2026-10-04T18:57:22.000Z");
+  expect(requested).toEqual([
+    `https://huggingface.co/api/datasets/policyengine/populace-uk-archive/commits/${sha}?limit=1`,
+  ]);
+  await expect(
+    resolveHfRepositoryCommitPublishedAt("not a repository id", sha),
+  ).rejects.toThrow("owner/name");
 });
