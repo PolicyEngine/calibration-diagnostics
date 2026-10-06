@@ -7,11 +7,24 @@ checks stop builds. The run selected on either tab carries over to the other.
 
 ## Sources
 
-- **Local runs.** Every Microcosm build writes telemetry to a run folder on
-  the machine it runs on, whether or not it uploads to staging. The US release
-  writes `<release_root>/staging/runs/<run_id>/` (or `--staging-dir`); the UK
-  builds write their local staging directory. Point the dashboard at the
-  folder that holds them and run it on that machine:
+- **Hosted collector.** Current Microcosm builds automatically start a local
+  telemetry emitter service. The build sends events to its private local
+  socket; that service samples the build process tree, stores unsent events in
+  a bounded SQLite retry queue, authenticates with the ambient Hugging Face
+  credential, and delivers events to the hosted collector. The dashboard
+  server receives the collector address and its independent read credential
+  from the deployment environment. Neither value belongs in documentation or
+  browser-visible configuration.
+
+  A missing credential, a user outside the PolicyEngine Hugging Face
+  organization, or an unavailable network does not stop a build. Events remain
+  in the local retry queue for a later Microcosm run to deliver.
+- **Historical Hugging Face telemetry.** During migration, the hosted view also
+  reads version 1 and version 2 run documents from each country's Hugging Face
+  staging repository. A collector record replaces a historical record with the
+  same run id.
+- **Local run folders.** The dashboard can still inspect legacy or diagnostic
+  run folders on the same machine. Point it at the directory that holds them:
 
   ```bash
   MICROCOSM_LOCAL_RUNS_DIR=/path/to/build/output make dev
@@ -21,9 +34,6 @@ checks stop builds. The run selected on either tab carries over to the other.
   with `:`) for folders that hold `progress.json` and `events.ndjson`, skipping
   checkpoint trees and hidden folders. Local runs are off unless the variable
   is set, so a hosted deployment never reads its own filesystem.
-- **Staging repository.** The same views over the runs a build uploaded to the
-  country's staging repository. A US build uploads unless it runs with
-  `--no-staging` or without a Hugging Face token.
 
 ## Testing without a build
 
@@ -115,8 +125,7 @@ September.
 
 ## Process telemetry
 
-When a run reports it (US release builds with microcosm's process telemetry
-on), the tab also reads:
+The local telemetry emitter service reports:
 
 - `resources` on each stage event and in the progress document: cores a stage
   kept busy (CPU seconds over wall seconds) and memory at its start and end,
@@ -138,16 +147,22 @@ wrote no final event, so it has nothing about the cause. "Run history" lists
 every run of the pipeline, newest first, on one time scale; selecting a row
 opens that run, and runs with a different stage sequence are listed apart.
 
+The US release reports each engine batch during target compilation and each
+batch during post-export scoring. UK graph builds report each completed graph
+node through the executor's read-only observer hook. Network delivery is never
+performed by the build process.
+
 ## Limits
 
-- A stage that reports no progress is silent until it ends. The US target
-  compilation runs for hours this way; until it emits batch progress, a slow
-  compilation and a killed process look alike until the stage overruns.
-- A process killed by the operating system writes no final event. The run
-  shows as stalled after six hours without telemetry.
-- Passing gates write no telemetry, so the gate statistics count failures
-  only. The US gate catalog in `frontend/lib/microcosm/build-gate-catalog.ts`
-  lists every check the US release runs and where it sits; it is pinned to the
+- Work inside a library call that exposes neither batch progress nor graph-node
+  completion remains silent between heartbeats.
+- If the build process exits without a final event while the local telemetry
+  emitter service survives, the service records an unexpected-process-exit
+  failure. If the operating system kills both processes, the dashboard marks
+  the run stalled after its heartbeat expires.
+- Some passing validation checks do not produce individual events. The US
+  validation catalog in `frontend/lib/microcosm/build-gate-catalog.ts` lists
+  every check the release runs and where it sits; it is pinned to the
   Microcosm commit it was read from.
 - The base population build (`build_us_puf_support_base.py`) writes only
   `stage_profile.json`, not run telemetry, so it does not appear here.

@@ -16,15 +16,29 @@ import {
   sameStageSequence,
   stageStatistics,
 } from "@/lib/microcosm/build-monitor";
-import { type CatalogGate, gateCatalogForPipeline } from "@/lib/microcosm/build-gate-catalog";
-import { hasCapability, type MicrocosmCountry } from "@/lib/microcosm/countries";
+import {
+  type CatalogGate,
+  gateCatalogForPipeline,
+} from "@/lib/microcosm/build-gate-catalog";
+import {
+  hasCapability,
+  type MicrocosmCountry,
+} from "@/lib/microcosm/countries";
 import {
   discoverLocalRuns,
   loadLocalRunDocuments,
   localRunCountry,
   localRunRoots,
 } from "@/lib/microcosm/local-build-runs";
-import { loadStagingRuns, loadStagingRunTelemetry } from "@/lib/microcosm/staging-artifact";
+import {
+  loadStagingRuns,
+  loadStagingRunTelemetry,
+} from "@/lib/microcosm/staging-artifact";
+import {
+  collectorConfigured,
+  loadCollectorRun,
+  loadCollectorRuns,
+} from "@/lib/server/microcosm/telemetry-collector-client";
 
 // Server-side assembly for the build monitor: load every run's telemetry from
 // one source, turn it into timelines, and derive the forecast and cross-run
@@ -70,11 +84,15 @@ export interface BuildRunResponse {
 interface CachedRun {
   documents: BuildRunDocuments;
   final: boolean;
+  collector_version: string | null;
 }
 
 // Finished staging runs never change, so their telemetry is fetched once.
 const stagingRunCache = new Map<string, CachedRun>();
-const stagingListCache = new Map<string, { expiresAt: number; promise: Promise<LoadedRuns> }>();
+const stagingListCache = new Map<
+  string,
+  { expiresAt: number; promise: Promise<LoadedRuns> }
+>();
 
 interface LoadedRuns {
   available: boolean;
@@ -82,6 +100,30 @@ interface LoadedRuns {
   documents: BuildRunDocuments[];
   problems: BuildRunProblem[];
 }
+
+export interface HostedRunLoaders {
+  collectorConfigured: () => boolean;
+  hasStagingHistory: (country: MicrocosmCountry) => boolean;
+  loadCollector: (
+    runId: string,
+    country: MicrocosmCountry,
+  ) => Promise<BuildRunDocuments>;
+  loadHistory: (
+    runId: string,
+    country: MicrocosmCountry,
+  ) => Promise<BuildRunDocuments>;
+}
+
+const hostedRunLoaders: HostedRunLoaders = {
+  collectorConfigured,
+  hasStagingHistory: (country) => hasCapability(country, "staging"),
+  loadCollector: loadCollectorRun,
+  loadHistory: async (runId, country) => ({
+    ...(await loadStagingRunTelemetry(runId, 0, country)),
+    source: "staging",
+    country,
+  }),
+};
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -97,7 +139,8 @@ async function loadLocal(country: MicrocosmCountry): Promise<LoadedRuns> {
   if (!roots.length) {
     return {
       available: false,
-      detail: "Local runs are off. Set MICROCOSM_LOCAL_RUNS_DIR to the folder your builds write to.",
+      detail:
+        "Local runs are off. Set MICROCOSM_LOCAL_RUNS_DIR to the folder your builds write to.",
       documents: [],
       problems: [],
     };
@@ -118,7 +161,9 @@ async function loadLocal(country: MicrocosmCountry): Promise<LoadedRuns> {
   return { available: true, detail: null, documents, problems };
 }
 
-async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
+async function loadHuggingFaceStaging(
+  country: MicrocosmCountry,
+): Promise<LoadedRuns> {
   if (!hasCapability(country, "staging")) {
     return {
       available: false,
@@ -131,15 +176,19 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
   if (!list.available) {
     return {
       available: false,
-      detail: ("detail" in list ? list.detail : null) ?? "Staging runs are unavailable.",
+      detail:
+        ("detail" in list ? list.detail : null) ??
+        "Staging runs are unavailable.",
       documents: [],
       problems: [],
     };
   }
-  const problems: BuildRunProblem[] = (list.incompatible_runs ?? []).map((run) => ({
-    run_id: run.run_id,
-    detail: run.detail,
-  }));
+  const problems: BuildRunProblem[] = (list.incompatible_runs ?? []).map(
+    (run) => ({
+      run_id: run.run_id,
+      detail: run.detail,
+    }),
+  );
   const documents: BuildRunDocuments[] = [];
   await Promise.all(
     list.runs.slice(0, STAGING_RUN_LIMIT).map(async (summary) => {
@@ -150,9 +199,21 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
         return;
       }
       try {
-        const telemetry = await loadStagingRunTelemetry(summary.run_id, 0, country);
-        const loaded: BuildRunDocuments = { ...telemetry, source: "staging", country };
-        stagingRunCache.set(key, { documents: loaded, final: isFinal(loaded) });
+        const telemetry = await loadStagingRunTelemetry(
+          summary.run_id,
+          0,
+          country,
+        );
+        const loaded: BuildRunDocuments = {
+          ...telemetry,
+          source: "staging",
+          country,
+        };
+        stagingRunCache.set(key, {
+          documents: loaded,
+          final: isFinal(loaded),
+          collector_version: null,
+        });
         documents.push(loaded);
       } catch (error) {
         problems.push({ run_id: summary.run_id, detail: message(error) });
@@ -162,21 +223,137 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
   return { available: true, detail: null, documents, problems };
 }
 
-function loadRuns(source: BuildRunSource, country: MicrocosmCountry): Promise<LoadedRuns> {
+async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
+  const summaries = await loadCollectorRuns(country);
+  const documents: BuildRunDocuments[] = [];
+  const problems: BuildRunProblem[] = [];
+  await Promise.all(
+    summaries.slice(0, STAGING_RUN_LIMIT).map(async (summary) => {
+      const key = `collector:${country}:${summary.run_id}`;
+      const cached = stagingRunCache.get(key);
+      const summaryFinal = ["passed", "completed", "failed"].includes(
+        summary.status,
+      );
+      if (
+        cached?.final &&
+        summaryFinal &&
+        cached.collector_version === summary.updated_at
+      ) {
+        documents.push(cached.documents);
+        return;
+      }
+      try {
+        const loaded = await loadCollectorRun(summary.run_id, country);
+        stagingRunCache.set(key, {
+          documents: loaded,
+          final: isFinal(loaded),
+          collector_version: summary.updated_at,
+        });
+        documents.push(loaded);
+      } catch (error) {
+        problems.push({ run_id: summary.run_id, detail: message(error) });
+      }
+    }),
+  );
+  return { available: true, detail: null, documents, problems };
+}
+
+async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
+  const hosted: LoadedRuns[] = [];
+  const sourceProblems: BuildRunProblem[] = [];
+  if (collectorConfigured()) {
+    try {
+      hosted.push(await loadCollector(country));
+    } catch (error) {
+      sourceProblems.push({
+        run_id: "collector",
+        detail: message(error),
+      });
+    }
+  }
+  try {
+    hosted.push(await loadHuggingFaceStaging(country));
+  } catch (error) {
+    sourceProblems.push({
+      run_id: "hugging-face-history",
+      detail: message(error),
+    });
+  }
+  const available = hosted.some((source) => source.available);
+  const byId = new Map<string, BuildRunDocuments>();
+  // Historical Hugging Face documents enter first; collector documents are
+  // newer and replace the same run id during the migration period.
+  for (const source of [...hosted].reverse()) {
+    for (const document of source.documents)
+      byId.set(document.run_id, document);
+  }
+  return {
+    available,
+    detail: available
+      ? null
+      : hosted
+          .map((source) => source.detail)
+          .filter(Boolean)
+          .join(" ") || "Hosted build telemetry is unavailable.",
+    documents: [...byId.values()],
+    problems: [
+      ...hosted.flatMap((source) => source.problems),
+      ...sourceProblems,
+    ],
+  };
+}
+
+function loadRuns(
+  source: BuildRunSource,
+  country: MicrocosmCountry,
+): Promise<LoadedRuns> {
   if (source === "local") return loadLocal(country);
   const key = country;
   const cached = stagingListCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.promise;
   const promise = loadStaging(country);
-  stagingListCache.set(key, { expiresAt: Date.now() + STAGING_LIST_TTL_MS, promise });
+  stagingListCache.set(key, {
+    expiresAt: Date.now() + STAGING_LIST_TTL_MS,
+    promise,
+  });
   promise.catch(() => stagingListCache.delete(key));
   return promise;
 }
 
-function timelines(documents: BuildRunDocuments[], nowMs: number): BuildTimeline[] {
+function timelines(
+  documents: BuildRunDocuments[],
+  nowMs: number,
+): BuildTimeline[] {
   return documents
     .map((document) => buildTimeline(document, nowMs))
     .sort((a, b) => (b.started_ms ?? 0) - (a.started_ms ?? 0));
+}
+
+export async function refreshHostedRun(
+  current: BuildTimeline | null,
+  country: MicrocosmCountry,
+  runId: string,
+  nowMs: number,
+  loaders: HostedRunLoaders = hostedRunLoaders,
+): Promise<BuildTimeline | null> {
+  let collectorError: unknown = null;
+  if (loaders.collectorConfigured()) {
+    try {
+      return buildTimeline(await loaders.loadCollector(runId, country), nowMs);
+    } catch (error) {
+      collectorError = error;
+    }
+  }
+  if (!loaders.hasStagingHistory(country)) {
+    if (current == null && collectorError != null) throw collectorError;
+    return current;
+  }
+  try {
+    return buildTimeline(await loaders.loadHistory(runId, country), nowMs);
+  } catch (error) {
+    if (current == null) throw error;
+    return current;
+  }
 }
 
 export async function loadBuildRuns(
@@ -207,26 +384,28 @@ export async function loadBuildRun(
   const loaded = await loadRuns(source, country);
   const all = timelines(loaded.documents, nowMs);
   let run = all.find((timeline) => timeline.run_id === runId) ?? null;
-  // A running staging run may be newer than the cached list; read it fresh.
-  if (source === "staging" && (run == null || run.state === "running")) {
-    try {
-      const telemetry = await loadStagingRunTelemetry(runId, 0, country);
-      run = buildTimeline({ ...telemetry, source, country }, nowMs);
-    } catch (error) {
-      if (run == null) throw error;
-    }
-  }
+  // A running hosted run may be newer than the cached list. The live
+  // collector is authoritative when it responds; staged files are fallback.
+  if (source === "staging")
+    run = await refreshHostedRun(run, country, runId, nowMs);
   if (run == null) return null;
-  const samePipeline = all.filter((timeline) => timeline.pipeline === run!.pipeline);
+  const currentRuns = [
+    ...all.filter((timeline) => timeline.run_id !== runId),
+    run,
+  ];
+  const samePipeline = currentRuns.filter(
+    (timeline) => timeline.pipeline === run!.pipeline,
+  );
   const pipelineRuns = samePipeline.filter(
-    (timeline) => timeline.run_id === run!.run_id || sameStageSequence(run!, timeline),
+    (timeline) =>
+      timeline.run_id === run!.run_id || sameStageSequence(run!, timeline),
   );
   return {
     source,
     country,
     now_ms: nowMs,
     run,
-    forecast: forecastCompletion(run, all, nowMs),
+    forecast: forecastCompletion(run, currentRuns, nowMs),
     pipeline_runs: pipelineRuns.length,
     other_sequence_runs: samePipeline.length - pipelineRuns.length,
     // Running runs count with the stages they have finished; the open stage
