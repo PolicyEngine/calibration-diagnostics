@@ -90,9 +90,9 @@ export async function resolveHfReleaseDirectorySha(
   release: string,
   revalidate = 0,
 ): Promise<string> {
+  const revision = repositoryRevision(country);
   const safeRelease = safeReleaseId(release);
   const repo = repository(country);
-  const revision = repositoryRevision(country);
   const prefix = `releases/${safeRelease}/`;
   const response = await fetch(
     `https://huggingface.co/api/datasets/${repo}/tree/` +
@@ -161,6 +161,69 @@ export async function resolveHfReleaseDirectorySha(
   return commits[0].id;
 }
 
+/**
+ * When a Hugging Face commit was made: the one publication timestamp.
+ *
+ * Every calibration build pins the exact repository commit its bytes come
+ * from (`hfRepo` and `hfCommitSha`), so its publication time is that
+ * commit's date, read from that repository's commit log, whether the build
+ * is being published, migrated or loaded. A commit is identified by
+ * repository and SHA together, so callers holding recorded provenance pass
+ * the recorded repository rather than the one the current deployment
+ * configures. Release ids and tag names are not a source: microcosm's
+ * national releases are named by line (`microcosm-uk-2024-25-national`)
+ * and their immutable cut tags end in an attempt suffix. When the commit
+ * cannot be read this fails rather than substituting a timestamp with
+ * different semantics.
+ */
+export async function resolveHfRepositoryCommitPublishedAt(
+  repo: string,
+  sha: string,
+  revalidate = 0,
+): Promise<string> {
+  if (!/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repo)) {
+    throw new Error(`Hugging Face repository ${repo} is not an owner/name id.`);
+  }
+  const commitSha = sha.toLowerCase();
+  if (!/^[0-9a-f]{40,64}$/.test(commitSha)) {
+    throw new Error(`Hugging Face commit ${sha} is not a commit SHA.`);
+  }
+  const response = await fetch(
+    `https://huggingface.co/api/datasets/${repo}/commits/${commitSha}?limit=1`,
+    {
+      headers: hfHeaders(),
+      ...(revalidate <= 0
+        ? { cache: "no-store" as const }
+        : { next: { revalidate } }),
+    },
+  );
+  if (response.status === 404) {
+    throw new CalibrationReleaseNotFoundError(
+      `Hugging Face commit ${sha} was not found in ${repo}.`,
+    );
+  }
+  if (!response.ok) {
+    throw new Error(`Hugging Face commit lookup failed with ${response.status}.`);
+  }
+  const commits = (await response.json()) as Array<{ id?: unknown; date?: unknown }>;
+  const first = Array.isArray(commits) ? commits[0] : undefined;
+  const id = typeof first?.id === "string" ? first.id.toLowerCase() : "";
+  const date = typeof first?.date === "string" ? Date.parse(first.date) : Number.NaN;
+  if (id !== commitSha || !Number.isFinite(date)) {
+    throw new Error(`Hugging Face returned invalid commit metadata for ${sha}.`);
+  }
+  return new Date(date).toISOString();
+}
+
+/** The publication timestamp of a commit in the country's configured repository. */
+export async function resolveHfCommitPublishedAt(
+  country: MicrocosmCountry,
+  sha: string,
+  revalidate = 0,
+): Promise<string> {
+  return resolveHfRepositoryCommitPublishedAt(repository(country), sha, revalidate);
+}
+
 export async function resolveCalibrationRelease(
   country: MicrocosmCountry,
   requestedRelease: string,
@@ -186,6 +249,9 @@ export function calibrationReleaseFromManifest(
     buildArtifactId: entry.buildArtifactId,
     releaseId: entry.releaseId,
     hfCommitSha: entry.hfCommitSha,
+    // Null only on an entry written before the publication timestamp was
+    // read from the pinned commit; the release loader then reads it from
+    // that same commit.
     updatedAt: entry.updatedAt,
   };
 }

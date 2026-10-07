@@ -2,6 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 
 import {
   calibrationReleaseFromManifest,
+  resolveHfCommitPublishedAt,
+  resolveHfRepositoryCommitPublishedAt,
   resolveHfReleaseDirectorySha,
   resolveHfRevisionSha,
 } from "./calibration-release-locator";
@@ -97,4 +99,55 @@ test("untagged release resolution requires calibration diagnostics", async () =>
     "be",
     "microcosm-be-history",
   )).rejects.toThrow("has no calibration diagnostics");
+});
+
+test("a build's publication timestamp is its pinned commit's date", async () => {
+  // microcosm-uk-2024-25-national carries no timestamp in its id, so the
+  // one source is the commit log at the exact revision the build pins.
+  const sha = "a".repeat(40);
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requested.push(String(input));
+    return Response.json([
+      { id: sha.toUpperCase(), date: "2026-10-04T18:57:22.000Z", title: "Publish" },
+      { id: "b".repeat(40), date: "2026-10-02T23:15:56.000Z", title: "Stage" },
+    ]);
+  }) as typeof fetch;
+  expect(await resolveHfCommitPublishedAt("uk", sha)).toBe("2026-10-04T18:57:22.000Z");
+  expect(requested).toEqual([
+    `https://huggingface.co/api/datasets/policyengine/populace-uk-private/commits/${sha}?limit=1`,
+  ]);
+});
+
+test("a commit log that does not start at the pinned commit is refused", async () => {
+  globalThis.fetch = (async (_input: string | URL | Request) =>
+    Response.json([{ id: "c".repeat(40), date: "2026-10-04T18:57:22.000Z" }])
+  ) as typeof fetch;
+  await expect(resolveHfCommitPublishedAt("uk", "a".repeat(40))).rejects.toThrow(
+    "invalid commit metadata",
+  );
+  globalThis.fetch = (async (_input: string | URL | Request) =>
+    new Response(null, { status: 404 })
+  ) as typeof fetch;
+  await expect(resolveHfCommitPublishedAt("uk", "a".repeat(40))).rejects.toThrow(
+    "was not found",
+  );
+});
+
+test("a recorded repository's commit is read from that repository, not the country's", async () => {
+  const sha = "a".repeat(40);
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requested.push(String(input));
+    return Response.json([{ id: sha, date: "2026-10-04T18:57:22.000Z" }]);
+  }) as typeof fetch;
+  expect(
+    await resolveHfRepositoryCommitPublishedAt("policyengine/populace-uk-archive", sha),
+  ).toBe("2026-10-04T18:57:22.000Z");
+  expect(requested).toEqual([
+    `https://huggingface.co/api/datasets/policyengine/populace-uk-archive/commits/${sha}?limit=1`,
+  ]);
+  await expect(
+    resolveHfRepositoryCommitPublishedAt("not a repository id", sha),
+  ).rejects.toThrow("owner/name");
 });

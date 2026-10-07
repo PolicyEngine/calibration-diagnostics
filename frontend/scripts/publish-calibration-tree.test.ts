@@ -4,12 +4,18 @@ import {
   CalibrationTreeArtifactSizeError,
   enforceConfiguredSizeLimits,
   parsePublisherOptions,
-  publicationCreatedAt,
+  migrateReleaseTimestamps,
+  reconcileReleaseBuilds,
   readUpstreamLatest,
   resolvePublicationSourceSha,
   manifestBuildForSource,
 } from "./publish-calibration-tree";
-import { emptyCalibrationTreeManifest } from "../lib/microcosm/calibration-tree-manifest";
+import {
+  emptyCalibrationTreeManifest,
+  withCalibrationTreeManifestEntry,
+  type CalibrationTreeManifest,
+  type CalibrationTreeManifestEntry,
+} from "../lib/microcosm/calibration-tree-manifest";
 
 const originalFetch = globalThis.fetch;
 
@@ -80,6 +86,21 @@ test("publisher accepts exact and historical reconciliation modes", () => {
     hfCommitSha: "abcdef1234567890abcdef1234567890abcdef12",
     dryRun: true,
   });
+  expect(parsePublisherOptions([
+    "--country",
+    "uk",
+    "--migrate-release-timestamps",
+    "--dry-run",
+  ])).toEqual({
+    country: "uk",
+    mode: "migrate-release-timestamps",
+    dryRun: true,
+  });
+  expect(() => parsePublisherOptions([
+    "--migrate-release-timestamps",
+    "--sha",
+    "ABCDEF1234567890ABCDEF1234567890ABCDEF12",
+  ])).toThrow("reads each entry's own commit");
 });
 
 test("publisher rejects ambiguous modes and unsafe release ids", () => {
@@ -155,21 +176,6 @@ test("publisher enforces configured artifact size limits", () => {
   }
 });
 
-test("publisher normalizes compact release dates for manifest sorting", () => {
-  expect(publicationCreatedAt("20260915")).toBe("2026-09-15T00:00:00.000Z");
-  expect(publicationCreatedAt("20260728T011454Z")).toBe(
-    "2026-07-28T01:14:54.000Z",
-  );
-  expect(
-    publicationCreatedAt("populace-us-2024-spm-20260728T011454Z"),
-  ).toBe("2026-07-28T01:14:54.000Z");
-  expect(publicationCreatedAt("2026-09-16T12:00:00Z")).toBe(
-    "2026-09-16T12:00:00.000Z",
-  );
-  expect(publicationCreatedAt("release-without-a-date")).toBeNull();
-  expect(publicationCreatedAt("20261340")).toBeNull();
-});
-
 test("latest publication uses its exact source commit when no release tag exists", async () => {
   const sourceSha = "1".repeat(40);
   const requested: string[] = [];
@@ -214,6 +220,173 @@ test("an exact supplied commit supports a release without a matching tag", async
       sourceSha,
       false,
     )).resolves.toBe(sourceSha);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+const UK_REPO = "policyengine/populace-uk-private";
+// A repository the entry recorded at publication that is not the one the
+// country currently configures: the migration must read the entry's own.
+const RECORDED_REPO = "policyengine/populace-uk-archive";
+const UK_RELEASE = "microcosm-uk-2024-25-national";
+const UK_SHA = "f".repeat(40);
+const UK_PUBLISHED_AT = "2026-10-04T18:57:22.000Z";
+
+/** The production entry: a complete bundle whose metadata carries the placeholder. */
+function placeholderEntry(hfRepo = UK_REPO): CalibrationTreeManifestEntry {
+  return {
+    buildArtifactId: "d".repeat(64),
+    kind: "release",
+    sourceId: UK_RELEASE,
+    label: UK_RELEASE,
+    releaseId: UK_RELEASE,
+    stagingRunId: null,
+    hfRepo,
+    hfCommitSha: UK_SHA,
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: null,
+    updatedAt: "1970-01-01T00:00:00.000Z",
+  };
+}
+
+function memoryStore(initial: CalibrationTreeManifest) {
+  let manifest = initial;
+  const writes: Array<{ entry: CalibrationTreeManifestEntry; makeLatest?: boolean }> = [];
+  return {
+    writes,
+    current: () => manifest,
+    readManifest: async () => manifest,
+    listBlobs: async () => new Map(),
+    audit: async () => ({ complete: true, repairable: true, reasons: [], index: null }),
+    updateManifest: async (entry: CalibrationTreeManifestEntry, makeLatest?: boolean) => {
+      writes.push({ entry, makeLatest });
+      manifest = withCalibrationTreeManifestEntry(manifest, "uk", entry, makeLatest);
+      return manifest;
+    },
+  };
+}
+
+test("the timestamp migration sets a legacy entry's updatedAt from its own commit", async () => {
+  // Starts from a complete manifest entry carrying the epoch placeholder,
+  // runs the migration, and checks the stored entry receives the canonical
+  // publication timestamp: the date of the commit the entry already pins.
+  const stale = placeholderEntry(RECORDED_REPO);
+  const staging: CalibrationTreeManifestEntry = {
+    ...stale,
+    buildArtifactId: "9".repeat(64),
+    kind: "staging",
+    sourceId: "uk-frs-calibration-attempt-test",
+    label: "candidate",
+    releaseId: null,
+    stagingRunId: "uk-frs-calibration-attempt-test",
+    hfCommitSha: "8".repeat(40),
+    createdAt: "2026-10-02T23:15:56.000Z",
+    updatedAt: "2026-10-02T23:15:56.000Z",
+  };
+  const store = memoryStore(
+    withCalibrationTreeManifestEntry(
+      withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", stale, true),
+      "uk",
+      staging,
+    ),
+  );
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    requested.push(url);
+    // Only the recorded repository knows the commit; the country's current
+    // repository would answer 404, as it would for an entry published under
+    // an earlier configuration.
+    if (url === `https://huggingface.co/api/datasets/${RECORDED_REPO}/commits/${UK_SHA}?limit=1`) {
+      return Response.json([{ id: UK_SHA, date: UK_PUBLISHED_AT, title: "Publish" }]);
+    }
+    if (url.includes(`/api/datasets/${UK_REPO}/commits/`)) {
+      return new Response(null, { status: 404 });
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+  try {
+    const planned = await migrateReleaseTimestamps("uk", "blob-token", true, store);
+    expect(planned.outcomes).toEqual([
+      {
+        buildArtifactId: stale.buildArtifactId,
+        releaseId: UK_RELEASE,
+        hfRepo: RECORDED_REPO,
+        hfCommitSha: UK_SHA,
+        from: "1970-01-01T00:00:00.000Z",
+        to: UK_PUBLISHED_AT,
+        status: "planned",
+      },
+    ]);
+    expect(store.writes).toHaveLength(0);
+
+    const migrated = await migrateReleaseTimestamps("uk", "blob-token", false, store);
+    expect(migrated.outcomes[0]?.status).toBe("migrated");
+    const stored = store.current().countries.uk?.builds.find(
+      (build) => build.releaseId === UK_RELEASE,
+    );
+    // Only updatedAt moves: createdAt stays as the immutable index sealed it.
+    expect(stored).toEqual({ ...stale, updatedAt: UK_PUBLISHED_AT });
+    expect(store.current().countries.uk?.latestReleaseBuildArtifactId).toBe(
+      stale.buildArtifactId,
+    );
+    expect(store.current().countries.uk?.builds.find((build) => build.kind === "staging"))
+      .toEqual(staging);
+    // Only the entry's own commit, in the entry's own repository, was read,
+    // once per run.
+    expect(requested).toEqual([
+      `https://huggingface.co/api/datasets/${RECORDED_REPO}/commits/${UK_SHA}?limit=1`,
+      `https://huggingface.co/api/datasets/${RECORDED_REPO}/commits/${UK_SHA}?limit=1`,
+    ]);
+
+    const again = await migrateReleaseTimestamps("uk", "blob-token", false, store);
+    expect(again.outcomes[0]?.status).toBe("current");
+    expect(store.writes).toHaveLength(1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("release reconciliation leaves a complete entry's metadata to the migration", async () => {
+  const stale = placeholderEntry();
+  const store = memoryStore(
+    withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", stale, true),
+  );
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.includes(`/api/datasets/${UK_REPO}/tree/main/releases?recursive=true`)) {
+      return Response.json([
+        { type: "file", path: `releases/${UK_RELEASE}/calibration_diagnostics.json` },
+        { type: "file", path: `releases/${UK_RELEASE}/release_manifest.json` },
+      ]);
+    }
+    if (url.includes(`/api/datasets/${UK_REPO}/refs`)) return Response.json({ tags: [] });
+    if (url.includes(`/tree/main/releases/${UK_RELEASE}?recursive=false&expand=true`)) {
+      return Response.json([
+        {
+          type: "file",
+          path: `releases/${UK_RELEASE}/calibration_diagnostics.json`,
+          lastCommit: { id: UK_SHA, date: UK_PUBLISHED_AT },
+        },
+      ]);
+    }
+    if (url.includes(`/api/datasets/${UK_REPO}/revision/main`)) return Response.json({ sha: UK_SHA });
+    if (url.includes(`/api/datasets/${UK_REPO}/revision/${UK_RELEASE}`)) {
+      return new Response(null, { status: 404 });
+    }
+    if (url.endsWith("/latest.json")) return Response.json({ release_id: UK_RELEASE });
+    if (url.endsWith(`/releases/${UK_RELEASE}/release_manifest.json`)) return Response.json({});
+    // No commit-log lookup belongs here; reconciliation does not date entries.
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+  try {
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    expect(report.outcomes.find((item) => item.sourceId === UK_RELEASE)?.status).toBe("complete");
+    expect(store.current().countries.uk?.builds).toEqual([stale]);
+    expect(store.writes.map((write) => write.makeLatest)).toEqual([true]);
   } finally {
     globalThis.fetch = originalFetch;
   }

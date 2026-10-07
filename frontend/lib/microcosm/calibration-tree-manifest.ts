@@ -22,7 +22,8 @@ export interface CalibrationTreeManifestEntry {
   indexSha256: string;
   indexBytes: number;
   createdAt: string | null;
-  updatedAt: string;
+  /** Null when the publisher could not date the build; never a placeholder. */
+  updatedAt: string | null;
 }
 
 export interface CalibrationTreeCountryManifest {
@@ -264,7 +265,14 @@ export function withCalibrationTreeManifestEntry(
       throw new Error(`Calibration build ${entry.buildArtifactId} is immutable.`);
     }
   }
-  const builds = previous ? current.builds : [...current.builds, entry];
+  // A build's content identity is immutable; its metadata (label and the
+  // publication timestamps) is replaced, so a reconciliation can correct a
+  // stored timestamp without re-publishing the bundle.
+  const builds = previous
+    ? current.builds.map((build) =>
+        build.buildArtifactId === entry.buildArtifactId ? entry : build,
+      )
+    : [...current.builds, entry];
   const latestReleaseBuildArtifactId = makeLatest
     ? entry.buildArtifactId
     : current.latestReleaseBuildArtifactId;
