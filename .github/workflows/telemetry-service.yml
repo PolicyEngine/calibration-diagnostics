@@ -143,11 +143,11 @@ jobs:
         run: telemetry-service/scripts/deploy.sh resolve-and-verify-candidate
 
       - name: Exercise staging authentication, writes, and reads
-        run: telemetry-service/scripts/qualify-staging.sh
+        run: telemetry-service/scripts/qualify-deployment.sh
         env:
           COLLECTOR_URL: ${{ steps.candidate.outputs.url }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          STAGING_READ_TOKEN: ${{ secrets.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN }}
+          TELEMETRY_HF_QUALIFICATION_TOKEN: ${{ secrets.TELEMETRY_HF_QUALIFICATION_TOKEN }}
+          TELEMETRY_READ_TOKEN: ${{ secrets.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN }}
 
       - name: Promote the verified revision
         run: telemetry-service/scripts/deploy.sh route-service-traffic
@@ -238,6 +238,13 @@ jobs:
       - name: Resolve and verify the candidate revision
         id: candidate
         run: telemetry-service/scripts/deploy.sh resolve-and-verify-candidate
+
+      - name: Exercise production authentication, writes, and reads
+        run: telemetry-service/scripts/qualify-deployment.sh
+        env:
+          COLLECTOR_URL: ${{ steps.candidate.outputs.url }}
+          TELEMETRY_HF_QUALIFICATION_TOKEN: ${{ secrets.TELEMETRY_HF_QUALIFICATION_TOKEN }}
+          TELEMETRY_READ_TOKEN: ${{ secrets.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN }}
 
       - name: Promote the verified revision
         run: telemetry-service/scripts/deploy.sh route-service-traffic
