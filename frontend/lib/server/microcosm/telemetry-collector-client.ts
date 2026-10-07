@@ -2,12 +2,13 @@ import "server-only";
 
 import type { BuildRunDocuments } from "@/lib/microcosm/build-monitor";
 import type { MicrocosmCountry } from "@/lib/microcosm/countries";
+import { secretManager, validSecretVersion } from "@/lib/server/secret-manager";
 
 type JsonObject = Record<string, unknown>;
 
 export const TELEMETRY_COLLECTOR_URL_ENV = "MICROCOSM_TELEMETRY_COLLECTOR_URL";
-export const TELEMETRY_COLLECTOR_READ_TOKEN_ENV =
-  "MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN";
+export const TELEMETRY_READ_SECRET_VERSION_ENV =
+  "MICROCOSM_TELEMETRY_READ_SECRET_VERSION";
 
 export interface CollectorRunSummary extends JsonObject {
   run_id: string;
@@ -37,21 +38,28 @@ function stringValue(value: unknown, label: string): string {
 
 function collectorConfiguration(
   environment: Record<string, string | undefined> = process.env,
-): { baseUrl: string; readToken: string } | null {
+): { baseUrl: string; secretVersion: string } | null {
   const rawUrl = environment[TELEMETRY_COLLECTOR_URL_ENV]?.trim();
-  const readToken = environment[TELEMETRY_COLLECTOR_READ_TOKEN_ENV]?.trim();
-  if (!rawUrl || !readToken) return null;
+  const secretVersion = environment[TELEMETRY_READ_SECRET_VERSION_ENV]?.trim();
+  if (!rawUrl || !secretVersion) return null;
+  if (!validSecretVersion(secretVersion)) {
+    throw new Error("Invalid telemetry read credential resource.");
+  }
   const url = new URL(rawUrl);
   const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
   if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
-    throw new Error("Telemetry collector URL must use HTTPS except on localhost.");
+    throw new Error(
+      "Telemetry collector URL must use HTTPS except on localhost.",
+    );
   }
   if (url.username || url.password || url.search || url.hash) {
-    throw new Error("Telemetry collector URL must not contain credentials or query data.");
+    throw new Error(
+      "Telemetry collector URL must not contain credentials or query data.",
+    );
   }
   return {
     baseUrl: url.toString().replace(/\/$/, ""),
-    readToken,
+    secretVersion,
   };
 }
 
@@ -69,12 +77,15 @@ async function collectorJson(path: string): Promise<JsonObject> {
   const configuration = collectorConfiguration();
   if (!configuration) {
     throw new Error(
-      `Configure ${TELEMETRY_COLLECTOR_URL_ENV} and ${TELEMETRY_COLLECTOR_READ_TOKEN_ENV}.`,
+      `Configure ${TELEMETRY_COLLECTOR_URL_ENV} and ${TELEMETRY_READ_SECRET_VERSION_ENV}.`,
     );
   }
+  const readToken = await secretManager.readVersion(
+    configuration.secretVersion,
+  );
   const response = await fetch(`${configuration.baseUrl}${path}`, {
     cache: "no-store",
-    headers: { "X-Telemetry-Read-Token": configuration.readToken },
+    headers: { "X-Telemetry-Read-Token": readToken },
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) {
@@ -157,7 +168,9 @@ export async function loadCollectorRun(
     source: "staging",
     country,
     progress:
-      payload.progress == null ? null : objectValue(payload.progress, "progress"),
+      payload.progress == null
+        ? null
+        : objectValue(payload.progress, "progress"),
     run_manifest:
       payload.run_manifest == null
         ? null
