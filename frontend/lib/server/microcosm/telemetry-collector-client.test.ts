@@ -1,4 +1,5 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
+import { secretManager } from "@/lib/server/secret-manager";
 
 import {
   collectorConfigured,
@@ -8,32 +9,39 @@ import {
 
 const originalFetch = globalThis.fetch;
 const originalUrl = process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL;
-const originalToken = process.env.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN;
+const originalSecretVersion =
+  process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION;
+const secretVersion =
+  "projects/test-project/secrets/collector-read/versions/latest";
+const readSecret = spyOn(secretManager, "readVersion");
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
   if (originalUrl == null) delete process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL;
   else process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL = originalUrl;
-  if (originalToken == null) {
-    delete process.env.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN;
+  readSecret.mockReset();
+  if (originalSecretVersion == null) {
+    delete process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION;
   } else {
-    process.env.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN = originalToken;
+    process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION = originalSecretVersion;
   }
 });
 
 function configure() {
   process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL = "https://telemetry.example";
-  process.env.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN = "secret-read-token";
+  process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION = secretVersion;
+  readSecret.mockResolvedValue("secret-read-token");
 }
 
-test("collector configuration requires both server values", () => {
+test("collector configuration requires an address and secret resource", () => {
   delete process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL;
-  delete process.env.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN;
+  delete process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION;
   expect(collectorConfigured()).toBe(false);
   process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL = "https://telemetry.example";
   expect(collectorConfigured()).toBe(false);
-  process.env.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN = "token";
+  process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION = secretVersion;
   expect(collectorConfigured()).toBe(true);
+  expect(readSecret).not.toHaveBeenCalled();
 });
 
 test("loads every collector list page and authenticates server-side", async () => {
@@ -77,6 +85,7 @@ test("loads every collector list page and authenticates server-side", async () =
   expect(calls).toHaveLength(2);
   expect(calls[0].searchParams.get("country")).toBe("US");
   expect(calls[1].searchParams.get("before")).toBe("2026-10-01T00:00:00Z");
+  expect(readSecret).toHaveBeenCalledWith(secretVersion);
 });
 
 test("loads run documents without exposing the read token", async () => {
@@ -105,4 +114,15 @@ test("loads run documents without exposing the read token", async () => {
     progress: { schema_version: 2, status: "running" },
   });
   expect(JSON.stringify(run)).not.toContain("secret-read-token");
+});
+
+test("does not call the collector when Secret Manager access fails", async () => {
+  configure();
+  readSecret.mockRejectedValue(new Error("Secret Manager unavailable"));
+  const fetchSpy = spyOn(globalThis, "fetch");
+  await expect(loadCollectorRuns("us")).rejects.toThrow(
+    "Secret Manager unavailable",
+  );
+  expect(fetchSpy).not.toHaveBeenCalled();
+  fetchSpy.mockRestore();
 });

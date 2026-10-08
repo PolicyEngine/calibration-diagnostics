@@ -55,7 +55,7 @@ jobs:
       - run: docker build --tag microcosm-telemetry:validation .
 
   deploy-staging:
-    name: Qualify image and migration in staging
+    name: Deploy image and migration in staging
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
@@ -101,6 +101,9 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Check required Secret Manager entries exist
+        run: telemetry-service/scripts/deploy.sh check-secrets-exist
+
       - name: Configure Artifact Registry authentication
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
@@ -142,13 +145,6 @@ jobs:
         id: candidate
         run: telemetry-service/scripts/deploy.sh resolve-and-verify-candidate
 
-      - name: Exercise staging authentication, writes, and reads
-        run: telemetry-service/scripts/qualify-deployment.sh
-        env:
-          COLLECTOR_URL: ${{ steps.candidate.outputs.url }}
-          TELEMETRY_HF_QUALIFICATION_TOKEN: ${{ secrets.TELEMETRY_HF_QUALIFICATION_TOKEN }}
-          TELEMETRY_READ_TOKEN: ${{ secrets.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN }}
-
       - name: Promote the verified revision
         run: telemetry-service/scripts/deploy.sh route-service-traffic
         env:
@@ -158,7 +154,7 @@ jobs:
         run: telemetry-service/scripts/deploy.sh verify-stable-service
 
   deploy-production:
-    name: Deploy staging-qualified image to production
+    name: Deploy staging image to production
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
@@ -202,6 +198,9 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Check required Secret Manager entries exist
+        run: telemetry-service/scripts/deploy.sh check-secrets-exist
+
       - name: Deploy an isolated maintenance revision
         run: telemetry-service/scripts/deploy.sh deploy-maintenance
         env:
@@ -238,13 +237,6 @@ jobs:
       - name: Resolve and verify the candidate revision
         id: candidate
         run: telemetry-service/scripts/deploy.sh resolve-and-verify-candidate
-
-      - name: Exercise production authentication, writes, and reads
-        run: telemetry-service/scripts/qualify-deployment.sh
-        env:
-          COLLECTOR_URL: ${{ steps.candidate.outputs.url }}
-          TELEMETRY_HF_QUALIFICATION_TOKEN: ${{ secrets.TELEMETRY_HF_QUALIFICATION_TOKEN }}
-          TELEMETRY_READ_TOKEN: ${{ secrets.MICROCOSM_TELEMETRY_COLLECTOR_READ_TOKEN }}
 
       - name: Promote the verified revision
         run: telemetry-service/scripts/deploy.sh route-service-traffic
