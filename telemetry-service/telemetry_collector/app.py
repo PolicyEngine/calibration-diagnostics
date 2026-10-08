@@ -29,6 +29,7 @@ from telemetry_collector.auth import (
 from telemetry_collector.models import (
     CollectorToken,
     EventBatch,
+    GraphPublicationAuthorization,
     PageCursor,
     RunRegistration,
 )
@@ -376,6 +377,18 @@ def create_app(
                 detail="The Hugging Face user is not a PolicyEngine organization member.",
             )
         return _issue_session_token(settings, principal)
+
+    @application.post("/v1/auth/graph-publication/authorize")
+    def authorize_graph_publication(
+        request: GraphPublicationAuthorization,
+        claims: SessionTokenClaims = Depends(session_claims),
+    ) -> dict[str, str]:
+        """Authorize immutable graph publication without requiring a run."""
+        if settings.required_huggingface_org not in claims.organizations:
+            raise HTTPException(
+                status_code=403, detail="PolicyEngine membership is required."
+            )
+        return {**request.model_dump(), "subject": claims.subject}
 
     @application.post("/v1/runs", status_code=status.HTTP_201_CREATED)
     def register_run(

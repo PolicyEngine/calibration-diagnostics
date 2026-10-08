@@ -96,3 +96,11 @@ class CollectorToken(BaseModel):
     access_token: str
     token_type: Literal["bearer"] = "bearer"
     expires_in: int
+
+
+class GraphPublicationAuthorization(BaseModel):
+    """A graph publication independent of telemetry run registration."""
+
+    model_config = ConfigDict(extra="forbid")
+    publication_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    inventory_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")

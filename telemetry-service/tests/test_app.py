@@ -73,6 +73,76 @@ def register(client: TestClient, session_token: str) -> None:
     assert response.json() == {"registered": True}
 
 
+def test_graph_publication_authorization_needs_no_registered_run() -> None:
+    store = FakeTelemetryStore()
+    client = TestClient(
+        create_app(
+            settings=settings(),
+            store=store,
+            huggingface_authenticator=StubHuggingFaceAuthenticator(),
+        )
+    )
+    token = exchange(client)
+    request = {"publication_id": "standalone-graph", "inventory_sha256": "a" * 64}
+    response = client.post(
+        "/v1/auth/graph-publication/authorize",
+        json=request,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {**request, "subject": "hf-user-1"}
+    assert (
+        client.get(
+            "/v1/runs", headers={"X-Telemetry-Read-Token": settings().read_token}
+        ).json()["runs"]
+        == []
+    )
+
+
+@pytest.mark.parametrize("authorization", [None, "Bearer invalid", "Bearer hf_example"])
+def test_graph_publication_authorization_rejects_missing_or_invalid_session(
+    authorization,
+) -> None:
+    client = TestClient(
+        create_app(
+            settings=settings(),
+            store=FakeTelemetryStore(),
+            huggingface_authenticator=StubHuggingFaceAuthenticator(),
+        )
+    )
+    response = client.post(
+        "/v1/auth/graph-publication/authorize",
+        json={"publication_id": "graph-1", "inventory_sha256": "a" * 64},
+        headers={} if authorization is None else {"Authorization": authorization},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"publication_id": "../bad"},
+        {"inventory_sha256": "bad"},
+        {"run_id": "not-required"},
+    ],
+)
+def test_graph_publication_authorization_validates_request(patch) -> None:
+    client = TestClient(
+        create_app(
+            settings=settings(),
+            store=FakeTelemetryStore(),
+            huggingface_authenticator=StubHuggingFaceAuthenticator(),
+        )
+    )
+    token = exchange(client)
+    response = client.post(
+        "/v1/auth/graph-publication/authorize",
+        json={"publication_id": "graph-1", "inventory_sha256": "a" * 64, **patch},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
+
+
 def test_exchange_ingest_and_read_run() -> None:
     store = FakeTelemetryStore()
     authenticator = StubHuggingFaceAuthenticator()
