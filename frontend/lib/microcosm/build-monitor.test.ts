@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, test } from "bun:test";
 
 import {
@@ -20,6 +23,11 @@ import {
   stageStatistics,
   STALL_MS,
 } from "./build-monitor";
+import {
+  parseStagingEvents,
+  parseStagingManifest,
+  parseStagingProgress,
+} from "./staging-contract";
 
 const T0 = Date.parse("2026-09-26T10:00:00Z");
 const min = (n: number) => n * 60_000;
@@ -127,6 +135,7 @@ describe("buildTimeline, version 1 transitions", () => {
       error_code: null,
       failure_class: null,
       diagnostic_reference: null,
+      block: null,
     });
   });
 
@@ -319,7 +328,12 @@ describe("gate refusals in completed version 2 runs", () => {
     );
     expect(run.state).toBe("blocked");
     expect(run.failure?.stage).toBe("gate_battery");
+    expect(run.failure?.block).toBeNull();
     expect(run.spans[0].failures).toEqual(["coverage: failed", "loss: blocked"]);
+    // The refusal is inferred from gate counts, so no class is counted as recorded.
+    const [stop] = stopStatistics([run]);
+    expect(stop.failure_classes).toEqual([]);
+    expect(stop.reasons.map((reason) => reason.value)).toEqual(["coverage", "loss"]);
   });
 
   test("a clean gate battery leaves the run finished", () => {
@@ -983,5 +997,200 @@ describe("solver passes inside calibration", () => {
     expect(run.solver_passes).toEqual([]);
     const forecast = forecastCompletion(run, [run], T0 + min(200))!;
     expect(forecast.solver).toBeNull();
+  });
+});
+
+describe("version 3 outcomes", () => {
+  const FIXTURES = join(import.meta.dir, "fixtures", "staging-contract", "v3");
+  const fixtureText = (path: string) => readFileSync(join(FIXTURES, path)).toString();
+  const fixtureJson = (path: string) => JSON.parse(fixtureText(path)) as Record<string, unknown>;
+
+  // A run folder from the copied Microcosm fixtures, read as the staging page reads it.
+  function fixtureRun(root: string, runId: string): BuildRunDocuments {
+    return {
+      run_id: runId,
+      source: "staging",
+      country: "uk",
+      progress: parseStagingProgress(fixtureJson(`${root}/progress.json`)),
+      run_manifest: parseStagingManifest(fixtureJson(`${root}/run_manifest.json`)),
+      calibration_progress: null,
+      events: parseStagingEvents(fixtureText(`${root}/events.ndjson`)),
+    };
+  }
+
+  const FIXTURE_END = Date.parse("2026-01-05T00:00:03+00:00");
+
+  test("a run blocked at the terminal gates reads as blocked with its gates", () => {
+    const run = buildTimeline(
+      fixtureRun("blocked/runs/uk-blocked-v3-fixture", "uk-blocked-v3-fixture"),
+      FIXTURE_END + min(1),
+    );
+    expect(run.schema_version).toBe(3);
+    expect(run.state).toBe("blocked");
+    expect(run.ended_ms).toBe(FIXTURE_END);
+    expect(run.failure).toEqual({
+      stage: "gate_battery",
+      message: "The gates refused the candidate at terminal (1 blocking failure: uk_target_fit).",
+      error_type: null,
+      error_code: null,
+      failure_class: "gate_refused",
+      diagnostic_reference: null,
+      block: { phase: "terminal", blocking_failure_count: 1, blocking_gate_ids: ["uk_target_fit"] },
+    });
+    // The terminal event is a marker, not a stage of its own.
+    expect(run.spans.map((span) => span.stage)).toEqual(["target_compilation", "gate_battery"]);
+    expect(run.spans[1]).toMatchObject({ refused: true, failures: ["uk_target_fit: failed"] });
+
+    const [stop] = stopStatistics([run]);
+    expect(stop).toMatchObject({ outcome: "blocked", stage: "gate_battery", unexplained: 0 });
+    expect(stop.failure_classes).toEqual([{ value: "gate_refused", count: 1 }]);
+    expect(stop.reasons).toEqual([{ value: "uk_target_fit", count: 1 }]);
+  });
+
+  test("a run blocked at preflight, without gate counts, reads as blocked from its block", () => {
+    const event = (sequence: number, offset: number, stage: string, status: string, details: Record<string, unknown> = {}) => ({
+      schema_version: 3,
+      sequence,
+      run_id: "uk-preflight",
+      event_type: "stage",
+      stage,
+      stage_id: stage,
+      status,
+      time: at(offset),
+      message: null,
+      details,
+    });
+    const block = { phase: "preflight", blocking_failure_count: 2, blocking_gate_ids: [] };
+    const documents: BuildRunDocuments = {
+      run_id: "uk-preflight",
+      source: "staging",
+      country: "uk",
+      progress: {
+        schema_version: 3,
+        run_id: "uk-preflight",
+        country_code: "GB",
+        pipeline: { id: "uk_local_candidate", version: "2026.10" },
+        started_at: at(0),
+        updated_at: at(min(5)),
+        status: "blocked",
+        current_stage: "blocked",
+        failure: null,
+        block,
+      },
+      run_manifest: null,
+      calibration_progress: null,
+      events: [
+        event(1, 0, "created", "started"),
+        event(2, min(1), "uk.full.gates.preflight", "started"),
+        event(3, min(4), "uk.full.gates.preflight", "completed"),
+        event(4, min(5), "blocked", "blocked", block),
+      ],
+    };
+
+    // A recorded end: the run never goes stalled, however long ago it ended.
+    const run = buildTimeline(documents, T0 + min(5) + STALL_MS + min(1));
+    expect(run.state).toBe("blocked");
+    expect(run.failure).toMatchObject({
+      stage: null,
+      message: "The gates refused the candidate at preflight (2 blocking failures, no gate named).",
+      failure_class: "gate_refused",
+      block,
+    });
+    const [stop] = stopStatistics([run]);
+    expect(stop).toMatchObject({ outcome: "blocked", stage: "uk.full.gates.preflight", unexplained: 0 });
+    expect(stop.failure_classes).toEqual([{ value: "gate_refused", count: 1 }]);
+    expect(stop.reasons).toEqual([{ value: "2 blocking failures, no gate named", count: 1 }]);
+  });
+
+  test("a version 3 completed run is not inferred blocked from gate counts", () => {
+    const documents = fixtureRun("completed-spine/runs/uk-spine-v3-fixture", "uk-spine-v3-fixture");
+    const complete = documents.events[documents.events.length - 1];
+    // A gate battery that reports blocking failures, before the run completes.
+    const gates = {
+      ...complete,
+      stage: "gate_battery",
+      stage_id: "gate_battery",
+      message: null,
+      details: { blocking_failure_count: 1 },
+    };
+    const run = buildTimeline(
+      {
+        ...documents,
+        events: [
+          ...documents.events.slice(0, -1),
+          gates,
+          { ...complete, sequence: Number(complete.sequence) + 1 },
+        ],
+      },
+      Date.parse("2026-01-03T00:00:00Z"),
+    );
+    expect(run.spans.find((span) => span.stage === "gate_battery")?.refused).toBe(true);
+    expect(run.state).toBe("passed");
+  });
+
+  test("a version 3 failed run carries its code and class into the stop statistics", () => {
+    const run = buildTimeline(
+      fixtureRun("failed/runs/uk-failed-v3-fixture", "uk-failed-v3-fixture"),
+      Date.parse("2026-01-04T00:00:03+00:00"),
+    );
+    expect(run.state).toBe("failed");
+    expect(run.failure).toEqual({
+      stage: "input_verification",
+      message: "The build failed during input_verification.",
+      error_type: "RuntimeError",
+      error_code: "BUILD_FAILED",
+      failure_class: "error",
+      diagnostic_reference: "diagnostics/operator-error.txt",
+      block: null,
+    });
+    const [stop] = stopStatistics([run]);
+    expect(stop.error_codes).toEqual([{ value: "BUILD_FAILED", count: 1 }]);
+    expect(stop.failure_classes).toEqual([{ value: "error", count: 1 }]);
+  });
+
+  test("a collector run closed by a blocked run event reads its block from that event", () => {
+    const details = {
+      phase: "terminal",
+      blocking_failure_count: 3,
+      blocking_gate_ids: ["a", "b", "c", "d", "e", "f"],
+      gate_statuses: { a: "failed" },
+    };
+    const run = buildTimeline(
+      {
+        run_id: "collector-blocked",
+        source: "staging",
+        country: "uk",
+        // The collector's documents keep the version 2 layout.
+        progress: {
+          schema_version: 2,
+          run_id: "collector-blocked",
+          country_code: "GB",
+          pipeline: { id: "uk_local_candidate", version: "collector-v1" },
+          started_at: at(0),
+          updated_at: at(min(9)),
+          status: "blocked",
+          current_stage: "blocked",
+          failure: null,
+        },
+        run_manifest: null,
+        calibration_progress: null,
+        events: [
+          { schema_version: 2, sequence: 1, event_type: "stage", stage_id: "calibrating", status: "started", timestamp: at(0), details: {} },
+          { schema_version: 2, sequence: 2, event_type: "stage", stage_id: "calibrating", status: "completed", timestamp: at(min(8)), details: {} },
+          { schema_version: 2, sequence: 3, event_type: "stage", stage_id: "blocked", status: "blocked", timestamp: at(min(9)), details },
+        ],
+      },
+      T0 + min(10),
+    );
+    expect(run.state).toBe("blocked");
+    expect(run.ended_ms).toBe(T0 + min(9));
+    expect(run.failure?.block).toEqual({
+      phase: "terminal",
+      blocking_failure_count: 3,
+      blocking_gate_ids: ["a", "b", "c", "d", "e", "f"],
+    });
+    expect(run.failure?.message).toBe(
+      "The gates refused the candidate at terminal (3 blocking failures: a, b, c, d, e and 1 more).",
+    );
   });
 });

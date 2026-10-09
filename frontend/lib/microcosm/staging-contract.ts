@@ -9,7 +9,9 @@ export class IncompatibleStagingDataError extends Error {
   }
 }
 
-const V2_SCHEMAS = {
+// Versions 2 and 3 share these names. Version 3 adds the `blocked` run status
+// with its `block` details, and `failure_class` on failures.
+const STRUCTURED_SCHEMAS = {
   manifest: "microcosm.staging.run-manifest",
   progress: "microcosm.staging.progress",
   calibration: "microcosm.staging.calibration-progress",
@@ -173,11 +175,21 @@ function nullableBoundedString(
   return value === null ? null : boundedString(value, label, options);
 }
 
+export type StagingSchemaVersion = 1 | 2 | 3;
+
+// Versions 2 and later are the structured contract; version 1 is the US
+// transition layout.
+export function isStructuredStagingDocument(
+  document: JsonObject | null | undefined,
+): boolean {
+  return typeof document?.schema_version === "number" && document.schema_version >= 2;
+}
+
 function version(
   payload: JsonObject,
-  kind: keyof typeof V2_SCHEMAS,
+  kind: keyof typeof STRUCTURED_SCHEMAS,
   options: { allowUnversionedV1?: boolean } = {},
-): 1 | 2 {
+): StagingSchemaVersion {
   if (payload.schema_version === 1) {
     if (payload.schema_name != null) {
       throw new IncompatibleStagingDataError(
@@ -186,13 +198,13 @@ function version(
     }
     return 1;
   }
-  if (payload.schema_version === 2) {
-    if (payload.schema_name !== V2_SCHEMAS[kind]) {
+  if (payload.schema_version === 2 || payload.schema_version === 3) {
+    if (payload.schema_name !== STRUCTURED_SCHEMAS[kind]) {
       throw new IncompatibleStagingDataError(
-        `expected ${V2_SCHEMAS[kind]} version 2, received ${String(payload.schema_name)}.`,
+        `expected ${STRUCTURED_SCHEMAS[kind]} version ${payload.schema_version}, received ${String(payload.schema_name)}.`,
       );
     }
-    return 2;
+    return payload.schema_version;
   }
   if (options.allowUnversionedV1 && payload.schema_version == null && payload.schema_name == null) {
     return 1;
@@ -394,15 +406,22 @@ function parseDelivery(value: unknown, envelopeRunId: string): JsonObject {
   return delivery;
 }
 
-function parseFailure(value: unknown): JsonObject | null {
+const FAILURE_FIELDS = [
+  "error_code",
+  "error_type",
+  "message",
+  "local_diagnostic_reference",
+] as const;
+
+function parseFailure(value: unknown, schemaVersion: 2 | 3): JsonObject | null {
   if (value === null) return null;
-  const failure = objectValue(value, "version 2 failure");
-  assertExactKeys(failure, "version 2 failure", [
-    "error_code",
-    "error_type",
-    "message",
-    "local_diagnostic_reference",
-  ]);
+  const label = `version ${schemaVersion} failure`;
+  const failure = objectValue(value, label);
+  assertExactKeys(
+    failure,
+    label,
+    schemaVersion === 3 ? [...FAILURE_FIELDS, "failure_class"] : FAILURE_FIELDS,
+  );
   if (typeof failure.error_code !== "string" || !/^[A-Z0-9_]+$/.test(failure.error_code)) {
     throw new IncompatibleStagingDataError("failure error_code is invalid.");
   }
@@ -418,15 +437,52 @@ function parseFailure(value: unknown): JsonObject | null {
     "failure local_diagnostic_reference",
     { maximum: 200 },
   );
+  if (
+    schemaVersion === 3 &&
+    failure.failure_class !== null &&
+    (typeof failure.failure_class !== "string" ||
+      !/^[a-z][a-z0-9_]*$/.test(failure.failure_class))
+  ) {
+    throw new IncompatibleStagingDataError("failure failure_class is invalid.");
+  }
   return failure;
 }
 
-function parseRunEnvelope(payload: JsonObject, label: string): {
+// Version 3: which gate phase refused the candidate, and which gates. The gate
+// ids may be empty when the refusal named no gate; the count is at least one.
+function parseBlock(value: unknown): JsonObject | null {
+  if (value === null) return null;
+  const block = objectValue(value, "version 3 block");
+  assertExactKeys(block, "version 3 block", [
+    "phase",
+    "blocking_failure_count",
+    "blocking_gate_ids",
+  ]);
+  safeIdentifier(block.phase, "block phase");
+  integerValue(block.blocking_failure_count, "block blocking_failure_count", 1);
+  if (!Array.isArray(block.blocking_gate_ids)) {
+    throw new IncompatibleStagingDataError("block blocking_gate_ids must be an array.");
+  }
+  for (const [index, gateId] of block.blocking_gate_ids.entries()) {
+    boundedString(gateId, `block blocking_gate_ids ${index}`, {
+      minimum: 1,
+      maximum: 200,
+    });
+  }
+  return block;
+}
+
+function parseRunEnvelope(
+  payload: JsonObject,
+  label: string,
+  schemaVersion: 2 | 3,
+): {
   runId: string;
   candidateId: string;
   releaseId: string | null;
   pipeline: JsonObject;
   failure: JsonObject | null;
+  block: JsonObject | null;
   delivery: JsonObject;
 } {
   const runId = safeIdentifier(payload.run_id, `${label} run_id`);
@@ -446,21 +502,30 @@ function parseRunEnvelope(payload: JsonObject, label: string): {
   }
   dateTimeValue(payload.started_at, `${label} started_at`);
   dateTimeValue(payload.updated_at, `${label} updated_at`);
-  const status = enumValue(payload.status, `${label} status`, [
-    "running",
-    "completed",
-    "failed",
-  ] as const);
+  const status = enumValue(
+    payload.status,
+    `${label} status`,
+    schemaVersion === 3
+      ? (["running", "completed", "blocked", "failed"] as const)
+      : (["running", "completed", "failed"] as const),
+  );
   safeIdentifier(payload.current_stage, `${label} current_stage`);
   const delivery = parseDelivery(payload.delivery, runId);
-  const failure = parseFailure(payload.failure);
+  const failure = parseFailure(payload.failure, schemaVersion);
   if (status === "failed" && failure == null) {
     throw new IncompatibleStagingDataError(`${label} failed status requires failure data.`);
   }
   if (status !== "failed" && failure != null) {
     throw new IncompatibleStagingDataError(`${label} non-failed status cannot contain failure data.`);
   }
-  return { runId, candidateId, releaseId, pipeline, failure, delivery };
+  const block = schemaVersion === 3 ? parseBlock(payload.block) : null;
+  if (status === "blocked" && block == null) {
+    throw new IncompatibleStagingDataError(`${label} blocked status requires block data.`);
+  }
+  if (status !== "blocked" && block != null) {
+    throw new IncompatibleStagingDataError(`${label} non-blocked status cannot contain block data.`);
+  }
+  return { runId, candidateId, releaseId, pipeline, failure, block, delivery };
 }
 
 // Version 1 telemetry has no content policy. Its failure path records the
@@ -482,7 +547,7 @@ export function parseStagingProgress(value: unknown): JsonObject {
     const runId = stringValue(payload.run_id, "progress run_id");
     return { ...withoutTraceback(payload), run_id: runId };
   }
-  assertExactKeys(payload, "version 2 progress", [
+  assertExactKeys(payload, `version ${schemaVersion} progress`, [
     "schema_name",
     "schema_version",
     ...RUN_FIELDS,
@@ -491,8 +556,9 @@ export function parseStagingProgress(value: unknown): JsonObject {
     "message",
     "details",
     "failure",
+    ...(schemaVersion === 3 ? ["block"] : []),
   ]);
-  const envelope = parseRunEnvelope(payload, "progress");
+  const envelope = parseRunEnvelope(payload, "progress", schemaVersion);
   const sample = parseSample(payload.sample);
   nullableBoundedString(payload.message, "progress message", { maximum: 500 });
   objectValue(payload.details, "progress details");
@@ -504,6 +570,7 @@ export function parseStagingProgress(value: unknown): JsonObject {
     pipeline: envelope.pipeline,
     sample,
     failure: envelope.failure,
+    block: envelope.block,
     stage: payload.current_stage,
     delivery: envelope.delivery,
   };
@@ -563,7 +630,7 @@ export function parseStagingManifest(value: unknown): JsonObject {
     const runId = stringValue(payload.run_id, "run manifest run_id");
     return { ...payload, run_id: runId };
   }
-  assertExactKeys(payload, "version 2 run manifest", [
+  assertExactKeys(payload, `version ${schemaVersion} run manifest`, [
     "schema_name",
     "schema_version",
     ...RUN_FIELDS,
@@ -571,9 +638,10 @@ export function parseStagingManifest(value: unknown): JsonObject {
     "delivery",
     "artifacts",
     "failure",
+    ...(schemaVersion === 3 ? ["block"] : []),
     "paths",
   ]);
-  const envelope = parseRunEnvelope(payload, "run manifest");
+  const envelope = parseRunEnvelope(payload, "run manifest", schemaVersion);
   const sample = parseSample(payload.sample);
   const paths = objectValue(payload.paths, "run manifest paths");
   assertExactKeys(paths, "run manifest paths", [
@@ -602,6 +670,7 @@ export function parseStagingManifest(value: unknown): JsonObject {
     pipeline: envelope.pipeline,
     sample,
     failure: envelope.failure,
+    block: envelope.block,
     stage: payload.current_stage,
     delivery: envelope.delivery,
     artifacts: parseArtifacts(payload.artifacts, envelope.runId),
@@ -616,7 +685,7 @@ export function parseStagingCalibrationProgress(value: unknown): JsonObject {
     throw new IncompatibleStagingDataError("calibration events must be an array.");
   }
   if (schemaVersion === 1) return payload;
-  assertExactKeys(payload, "version 2 calibration progress", [
+  assertExactKeys(payload, `version ${schemaVersion} calibration progress`, [
     "schema_name",
     "schema_version",
     "run_id",
@@ -708,12 +777,13 @@ export function parseStagingEvents(text: string | null): JsonObject[] {
       ] as const);
       safeIdentifier(payload.run_id, `event ${index} run_id`);
       const stageId = safeIdentifier(payload.stage_id, `event ${index} stage_id`);
-      enumValue(payload.status, `event ${index} status`, [
-        "started",
-        "completed",
-        "failed",
-        "progress",
-      ] as const);
+      enumValue(
+        payload.status,
+        `event ${index} status`,
+        schemaVersion === 3
+          ? (["started", "completed", "failed", "progress", "blocked"] as const)
+          : (["started", "completed", "failed", "progress"] as const),
+      );
       nullableBoundedString(payload.message, `event ${index} message`, { maximum: 500 });
       objectValue(payload.details, `event ${index} details`);
       return {
@@ -722,12 +792,14 @@ export function parseStagingEvents(text: string | null): JsonObject[] {
         time: timestamp,
       };
     });
-  const v2 = events.filter((event) => event.schema_version === 2);
+  const structured = events.filter(isStructuredStagingDocument);
   if (
-    v2.length &&
-    v2.some((event, index) => event.sequence !== index + 1)
+    structured.length &&
+    structured.some((event, index) => event.sequence !== index + 1)
   ) {
-    throw new IncompatibleStagingDataError("version 2 event sequence is not contiguous.");
+    throw new IncompatibleStagingDataError(
+      `version ${String(structured[0].schema_version)} event sequence is not contiguous.`,
+    );
   }
   return events;
 }
@@ -765,12 +837,12 @@ export function validateStagingRunConsistency(
   const versions = new Set(
     allDocuments.map((document) => document.schema_version ?? 1),
   );
-  if (versions.has(2) && versions.size !== 1) {
+  if (versions.size !== 1) {
     throw new IncompatibleStagingDataError(
-      "a run cannot mix version 1 and version 2 documents.",
+      `a run cannot mix document versions ${[...versions].sort().join(" and ")}.`,
     );
   }
-  if (!versions.has(2)) return;
+  if (versions.has(1)) return;
 
   for (const [label, document] of [
     ["progress", progress],

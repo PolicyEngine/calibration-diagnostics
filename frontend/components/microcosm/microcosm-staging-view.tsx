@@ -97,7 +97,7 @@ function statusTone(status: string | null | undefined): StatusTone {
     return "success";
   }
   if (status === "failed") return "danger";
-  if (status === "stalled") return "warning";
+  if (status === "blocked" || status === "stalled") return "warning";
   if (status === "running" || status === "queued") return "info";
   return "neutral";
 }
@@ -297,15 +297,25 @@ function agoLabel(value: string | null | undefined): string {
 function detailChips(details: unknown): [string, string][] {
   if (!details || typeof details !== "object") return [];
   return Object.entries(details as Record<string, unknown>)
-    .filter(([, v]) => v == null || ["string", "number", "boolean"].includes(typeof v))
+    .filter(
+      ([, v]) =>
+        v == null ||
+        ["string", "number", "boolean"].includes(typeof v) ||
+        // A list of names, such as the gates that refused a candidate.
+        (Array.isArray(v) && v.every((item) => typeof item === "string")),
+    )
     .slice(0, 8)
     .map(([k, v]) => {
       const num = typeof v === "number";
-      const shown = num
-        ? Math.abs(v as number) >= 1000
-          ? fmtCompact(v as number)
-          : fmt(v as number, { digits: Math.abs(v as number) < 1 ? 4 : 2 })
-        : String(v);
+      const shown = Array.isArray(v)
+        ? v.length
+          ? v.join(", ")
+          : "none"
+        : num
+          ? Math.abs(v as number) >= 1000
+            ? fmtCompact(v as number)
+            : fmt(v as number, { digits: Math.abs(v as number) < 1 ? 4 : 2 })
+          : String(v);
       return [k, shown] as [string, string];
     });
 }
@@ -488,6 +498,7 @@ function RunInternalsPanel({
                         : null;
                     const chips = detailChips(event.details);
                     const failed = event.status === "failed";
+                    const blocked = event.status === "blocked";
                     return (
                       <tr
                         key={index}
@@ -500,12 +511,13 @@ function RunInternalsPanel({
                             {String(event.stage ?? "—")}
                           </span>
                           {failed && <StatusPill tone="danger">failed</StatusPill>}
+                          {blocked && <StatusPill tone="warning">blocked</StatusPill>}
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
                           {timeLabel(time)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
-                          {index === all.length - 1 && event.stage !== "complete" && !failed
+                          {index === all.length - 1 && event.stage !== "complete" && !failed && !blocked
                             ? status === "stalled"
                               ? "⚠ last event"
                               : "…"

@@ -163,6 +163,20 @@ function v2RunManifest(
   };
 }
 
+// Version 3 adds `block`, required on every run document (null unless blocked).
+function v3RunManifest(
+  runId: string,
+  updatedAt: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    ...v2RunManifest(runId, updatedAt),
+    schema_version: 3,
+    block: null,
+    ...overrides,
+  };
+}
+
 function calibrationDiagnostics() {
   return {
     schema_version: 6,
@@ -339,6 +353,51 @@ test("rejects version 2 calibration diagnostics whose bytes do not match the dec
   await expect(loadStagingCalibration(runId, 0, "uk")).rejects.toThrow(
     /digest does not match its run manifest declaration/,
   );
+});
+
+test("a version 3 run reads its declared diagnostics and checks their digest", async () => {
+  const diagnostics = serializedDiagnostics();
+  const declared = (runId: string, sha256: string) =>
+    v3RunManifest(runId, "2026-01-03T00:00:03+00:00", {
+      operation_id: "uk_national_calibration",
+      run_kind: "calibration",
+      artifacts: [
+        {
+          logical_name: "calibration_diagnostics",
+          artifact_kind: "aggregate_diagnostics",
+          contract_relative_path: "artifacts/calibration_diagnostics.json",
+          media_type: "application/json",
+          sha256,
+          classification: "aggregate",
+        },
+      ],
+    });
+  const manifests = new Map([
+    ["uk-v3-diagnostics", declared("uk-v3-diagnostics", diagnostics.sha256)],
+    ["uk-v3-digest-mismatch", declared("uk-v3-digest-mismatch", "0".repeat(64))],
+  ]);
+  const requested: string[] = [];
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    requested.push(url);
+    const manifest = /\/runs\/([^/]+)\/run_manifest\.json$/.exec(url);
+    if (manifest && manifests.has(manifest[1])) {
+      return Response.json(manifests.get(manifest[1]));
+    }
+    if (url.endsWith("/artifacts/calibration_diagnostics.json")) {
+      return new Response(diagnostics.body);
+    }
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+
+  const calibration = await loadStagingCalibration("uk-v3-diagnostics", 0, "uk");
+  expect(calibration?.rows).toHaveLength(1);
+  expect(
+    requested.some((url) => url.endsWith("/runs/uk-v3-diagnostics/calibration_diagnostics.json")),
+  ).toBe(false);
+  await expect(
+    loadStagingCalibration("uk-v3-digest-mismatch", 0, "uk"),
+  ).rejects.toThrow(/digest does not match its run manifest declaration/);
 });
 
 test("keeps the version 1 calibration diagnostics path", async () => {
@@ -555,6 +614,52 @@ test("discovers and orders version 2 runs from paginated manifests only", async 
   expect(requested.some((url) => url.includes("/directory/"))).toBe(false);
 });
 
+test("lists version 3 runs, blocked ones included, beside version 2 runs", async () => {
+  const manifests = new Map<string, Record<string, unknown>>([
+    ["older-v2", v2RunManifest("older-v2", "2026-01-02T00:00:00+00:00")],
+    [
+      "blocked-v3",
+      v3RunManifest("blocked-v3", "2026-01-03T00:00:00+00:00", {
+        status: "blocked",
+        current_stage: "blocked",
+        block: {
+          phase: "preflight",
+          blocking_failure_count: 1,
+          blocking_gate_ids: ["uk_target_fit"],
+        },
+      }),
+    ],
+  ]);
+  const requested: string[] = [];
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.includes("/api/datasets/")) {
+      return Response.json([
+        { type: "file", path: "runs/older-v2/run_manifest.json" },
+        { type: "file", path: "runs/blocked-v3/run_manifest.json" },
+      ]);
+    }
+    const match = /\/runs\/([^/]+)\/run_manifest\.json$/.exec(url);
+    if (match && manifests.has(match[1])) {
+      return Response.json(manifests.get(match[1]));
+    }
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+
+  const result = await loadStagingRuns(0, "uk");
+
+  expect(result.incompatible_runs).toEqual([]);
+  expect(
+    result.runs.map((run) => [run.run_id, run.schema_version, run.status, run.stage]),
+  ).toEqual([
+    ["blocked-v3", 3, "blocked", "blocked"],
+    ["older-v2", 2, "completed", "complete"],
+  ]);
+  // Structured runs never fall back to the version 1 run index.
+  expect(requested.some((url) => url.endsWith("/runs.json"))).toBe(false);
+});
+
 test("reports a version 2 manifest whose run id differs from its path", async () => {
   globalThis.fetch = (async (input) => {
     const url = String(input);
@@ -697,6 +802,7 @@ test("target-change cache duration follows whether a run can still change", () =
   expect(stagingTargetChangeCacheTtlSeconds("published")).toBe(21_600);
   expect(stagingTargetChangeCacheTtlSeconds("completed")).toBe(21_600);
   expect(stagingTargetChangeCacheTtlSeconds("failed")).toBe(21_600);
+  expect(stagingTargetChangeCacheTtlSeconds("blocked")).toBe(21_600);
   expect(stagingTargetChangeCacheTtlSeconds("running")).toBe(30);
   expect(stagingTargetChangeCacheTtlSeconds("stalled")).toBe(30);
   expect(stagingTargetChangeCacheTtlSeconds(null)).toBe(30);

@@ -19,8 +19,15 @@ checks stop builds. The run selected on either tab carries over to the other.
   A missing credential, a user outside the PolicyEngine Hugging Face
   organization, or an unavailable network does not stop a build. Events remain
   in the local retry queue for a later Microcosm run to deliver.
+
+  The collector rebuilds each run's documents from its events. They declare
+  `schema_version: 2` so the monitor reads them with the version 2 lifecycle,
+  but they are the collector's own shape: they can carry version 3's `blocked`
+  status, `block` and failure classes, and they are not validated against the
+  staging contract (`staging-contract.ts`). That contract applies only to staged
+  run documents, from the Hugging Face staging repository or a local run folder.
 - **Historical Hugging Face telemetry.** During migration, the hosted view also
-  reads version 1 and version 2 run documents from each country's Hugging Face
+  reads version 1, 2 and 3 run documents from each country's Hugging Face
   staging repository. A collector record replaces a historical record with the
   same run id.
 - **Local run folders.** The dashboard can still inspect legacy or diagnostic
@@ -66,14 +73,14 @@ checks stop builds. The run selected on either tab carries over to the other.
 
   With `MICROCOSM_LOCAL_RUNS_DIR=/tmp/smoke` the run appears on the UK
   Build progress tab as it builds.
-- **Unit tests** cover both telemetry schemas, the forecast, gate refusals and
+- **Unit tests** cover every telemetry schema, the forecast, gate refusals and
   local discovery: `frontend/lib/microcosm/build-monitor.test.ts` and
   `local-build-runs.test.ts`.
 
 ## Forecast
 
 The forecast compares the run with finished runs of the same pipeline from
-the same source (version 2 runs by pipeline id; version 1 US runs as one
+the same source (version 2 and 3 runs by pipeline id; version 1 US runs as one
 release pipeline), up to the 12 most recent.
 
 Runs of one pipeline can still differ in what they do: UK local candidates kept
@@ -143,7 +150,12 @@ The local telemetry emitter service reports:
 the median run time spent by then and what the runs recorded: error types and
 codes, failure classes, and messages or gate failure lines. It shows recorded
 values only. A run that recorded nothing says so, and a run that went silent
-wrote no final event, so it has nothing about the cause. "Run history" lists
+wrote no final event, so it has nothing about the cause. A version 3 run records
+a refusal itself: status `blocked`, with the gate phase (`preflight`,
+`terminal`, ...) and the gates that refused, which may be none by name. A
+version 2 run closed a refusal as `completed`; the monitor reads it from the
+gate battery's blocking failure count, so it is not counted as a recorded
+failure class. "Run history" lists
 every run of the pipeline, newest first, on one time scale; selecting a row
 opens that run, and runs with a different stage sequence are listed apart.
 
