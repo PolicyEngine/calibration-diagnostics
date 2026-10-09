@@ -158,6 +158,18 @@ calculation through `calibration-diagnostics.vercel.app` and the
 `microcosm.institute/calibration/dashboard` mount. A failure before promotion leaves the
 existing production aliases unchanged. A failure after promotion must be handled with
 the rollback procedure below.
+
+The workflow requires the existing Actions `HF_TOKEN` secret and passes it to
+the candidate as a server-only runtime environment variable. This credential
+must read every registered private release repository and US staging. UK staging retains its
+separate `POPULACE_UK_STAGING_HF_TOKEN` deployment configuration. Before
+promotion, `frontend/scripts/calibration-deployment-smoke.ts` checks each
+registered country's calibration summary and release inventory, and every
+supported staging inventory. It requires available calibration targets, a
+consistent selected release, and staging `available: true`; an HTTP 200 alone
+does not qualify staging. The same check runs against the public dashboard
+after promotion. Public US calculations alone do not qualify private release
+access.
 The public `calibration-diagnostics.vercel.app` domain is also the stable Hugging Face
 webhook origin. Do not point the webhook at a staged deployment URL or the protected
 `calibration-diagnostics-policy-engine.vercel.app` alias.
