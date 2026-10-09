@@ -100,6 +100,8 @@ const FAILURE_CLASS_LABEL: Record<string, string> = {
   error: "Error",
   build_failure: "Build failure",
   unexpected_process_exit: "Process exited unexpectedly",
+  // The US fiscal-refresh release refused a gates dry run before its stop point
+  // (microcosm tools/build_us_fiscal_refresh_release.py).
   dry_run_refusal: "Refused in a dry run",
   stopped_without_final_event: "Stopped without a final event",
   unclassified: "Failed, no class recorded",
