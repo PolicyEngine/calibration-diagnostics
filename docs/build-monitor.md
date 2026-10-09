@@ -19,6 +19,13 @@ checks stop builds. The run selected on either tab carries over to the other.
   A missing credential, a user outside the PolicyEngine Hugging Face
   organization, or an unavailable network does not stop a build. Events remain
   in the local retry queue for a later Microcosm run to deliver.
+
+  The collector rebuilds each run's documents from its events. They declare
+  `schema_version: 2` so the monitor reads them with the version 2 lifecycle,
+  but they are the collector's own shape: they can carry version 3's `blocked`
+  status, `block` and failure classes, and they are not validated against the
+  staging contract (`staging-contract.ts`). That contract applies only to staged
+  run documents, from the Hugging Face staging repository or a local run folder.
 - **Historical Hugging Face telemetry.** During migration, the hosted view also
   reads version 1, 2 and 3 run documents from each country's Hugging Face
   staging repository. A collector record replaces a historical record with the
