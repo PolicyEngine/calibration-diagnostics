@@ -17,7 +17,7 @@ CONFIGURATION = (
     "MICROCOSM_TELEMETRY_COLLECTOR_URL",
     "VERCEL_TOKEN",
     "VERCEL_AUTOMATION_BYPASS_SECRET",
-    "HF_TOKEN",
+    "HF_RELEASE_READ_TOKEN",
 )
 
 
@@ -27,15 +27,17 @@ def _environment():
 
 def test_missing_release_credential_stops_deployment_without_printing_secrets():
     environment = _environment()
-    environment.pop("HF_TOKEN")
+    environment.pop("HF_RELEASE_READ_TOKEN")
+    environment["HF_TOKEN"] = "test-publisher-token"
     result = subprocess.run(
         ["bash", str(SCRIPT), "require-configuration"],
         env=environment,
         capture_output=True,
         text=True,
+        check=False,
     )
     assert result.returncode != 0
-    assert "HF_TOKEN" in result.stderr
+    assert "HF_RELEASE_READ_TOKEN" in result.stderr
     assert "test-" not in result.stdout + result.stderr
 
 
@@ -45,6 +47,7 @@ def test_complete_configuration_passes():
         env=_environment(),
         capture_output=True,
         text=True,
+        check=False,
     )
     assert result.returncode == 0
 
@@ -75,11 +78,12 @@ def test_frontend_receives_release_token_as_server_environment(tmp_path):
         env=environment,
         capture_output=True,
         text=True,
+        check=False,
     )
     assert result.returncode == 0
     arguments = json.loads(arguments_file.read_text())
-    token_argument = "HF_TOKEN=test-HF_TOKEN"
+    token_argument = "HF_TOKEN=test-HF_RELEASE_READ_TOKEN"
     assert token_argument in arguments
     assert arguments[arguments.index(token_argument) - 1] == "--env"
     assert not any("NEXT_PUBLIC_HF" in argument for argument in arguments)
-    assert "test-HF_TOKEN" not in result.stdout + result.stderr
+    assert "test-HF_RELEASE_READ_TOKEN" not in result.stdout + result.stderr

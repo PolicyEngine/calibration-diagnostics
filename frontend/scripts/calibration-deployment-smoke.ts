@@ -8,12 +8,14 @@ import {
 
 type JsonObject = Record<string, unknown>;
 type Fetcher = (url: string | URL, init?: RequestInit) => Promise<Response>;
+const RETRY_BACKOFF_MS = [1000, 2000];
 
 interface CalibrationDeploymentOptions {
   // The mounted dashboard root, e.g. https://candidate.vercel.app/calibration/dashboard.
   url: string;
   bypassSecret?: string;
   fetcher?: Fetcher;
+  sleep?: (milliseconds: number) => Promise<void>;
 }
 
 interface CalibrationDeploymentReceipt {
@@ -27,6 +29,40 @@ function record(value: unknown, label: string): JsonObject {
     throw new Error(`${label} must be a JSON object.`);
   }
   return value as JsonObject;
+}
+
+async function errorDetail(
+  response: Response,
+  options: CalibrationDeploymentOptions,
+): Promise<string> {
+  if (!response.headers.get("content-type")?.includes("application/json"))
+    return "";
+  try {
+    const body: unknown = await response.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) return "";
+    const rawDetail = (body as JsonObject).detail;
+    if (typeof rawDetail !== "string") return "";
+    let detail = rawDetail;
+    const credentials = [
+      options.bypassSecret,
+      ...Object.entries(process.env)
+        .filter(([name]) => /(?:TOKEN|SECRET|KEY)$/.test(name))
+        .map(([, value]) => value),
+    ];
+    for (const credential of credentials) {
+      if (credential) detail = detail.split(credential).join("[redacted]");
+    }
+    return detail
+      .replace(/\bhf_[A-Za-z0-9_-]+\b/g, "[redacted]")
+      .replace(/\bBearer\s+\S+/gi, "[redacted]")
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 200);
+  } catch {
+    // Invalid/HTML error responses must not interfere with 5xx retries.
+    return "";
+  }
 }
 
 async function requestJson(
@@ -44,22 +80,67 @@ async function requestJson(
   url.pathname = `${url.pathname.replace(/\/$/, "")}/api/microcosm${path}`;
   url.searchParams.set("country", country);
   const fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
-  const response = await fetcher(url, {
-    headers: options.bypassSecret
-      ? { "x-vercel-protection-bypass": options.bypassSecret }
-      : {},
-    cache: "no-store",
-    // Never forward a preview's bypass credential to a redirect destination.
-    redirect: "error",
-    signal: AbortSignal.timeout(300_000),
-  });
-  if (response.status !== 200) {
-    throw new Error(`${country} ${label} returned HTTP ${response.status}.`);
+  const sleep =
+    options.sleep ??
+    ((milliseconds) =>
+      new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+  for (let attempt = 0; attempt <= RETRY_BACKOFF_MS.length; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetcher(url, {
+        headers: options.bypassSecret
+          ? { "x-vercel-protection-bypass": options.bypassSecret }
+          : {},
+        cache: "no-store",
+        // Never forward a preview's bypass credential to a redirect destination.
+        redirect: "error",
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch {
+      if (attempt < RETRY_BACKOFF_MS.length) {
+        await sleep(RETRY_BACKOFF_MS[attempt]);
+        continue;
+      }
+      // Fetch exceptions can contain credentials or arbitrary response text.
+      throw new Error(
+        `${country} ${label} failed after 3 attempts due to a network error.`,
+      );
+    }
+    if (
+      response.status >= 500 &&
+      response.status <= 599 &&
+      attempt < RETRY_BACKOFF_MS.length
+    ) {
+      await sleep(RETRY_BACKOFF_MS[attempt]);
+      continue;
+    }
+    if (response.status !== 200) {
+      const detail = await errorDetail(response, options);
+      throw new Error(
+        `${country} ${label} returned HTTP ${response.status}${detail ? `: ${detail}` : "."}`,
+      );
+    }
+    if (!response.headers.get("content-type")?.includes("application/json")) {
+      throw new Error(`${country} ${label} did not return JSON.`);
+    }
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(`${country} ${label} did not return valid JSON.`);
+      }
+      if (attempt < RETRY_BACKOFF_MS.length) {
+        await sleep(RETRY_BACKOFF_MS[attempt]);
+        continue;
+      }
+      throw new Error(
+        `${country} ${label} failed after 3 attempts due to a network error.`,
+      );
+    }
+    return record(body, `${country} ${label}`);
   }
-  if (!response.headers.get("content-type")?.includes("application/json")) {
-    throw new Error(`${country} ${label} did not return JSON.`);
-  }
-  return record(await response.json(), `${country} ${label}`);
+  throw new Error(`${country} ${label} exceeded its request attempts.`);
 }
 
 export async function verifyCalibrationDeployment(

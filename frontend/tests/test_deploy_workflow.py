@@ -96,7 +96,11 @@ def test_deployment_supplies_private_release_secret_and_checks_views_before_prom
         "Build unaliased Vercel production candidate",
     ):
         step = next(step for step in steps if step.get("name") == name)
-        assert step["env"]["HF_TOKEN"] == "${{ secrets.HF_TOKEN }}"
+        assert (
+            step["env"]["HF_RELEASE_READ_TOKEN"]
+            == "${{ secrets.HF_RELEASE_READ_TOKEN }}"
+        )
+        assert "HF_TOKEN" not in step["env"]
     names = [step.get("name") for step in steps]
     check_name = "Verify staged calibration releases and staging"
     assert names.index(check_name) < names.index("Promote verified Vercel deployment")
@@ -170,6 +174,7 @@ def test_publication_dispatch_preserves_dry_run_and_selects_one_mode(
         },
         capture_output=True,
         text=True,
+        check=False,
     )
     assert result.returncode == 0
     expected = [
@@ -184,3 +189,40 @@ def test_publication_dispatch_preserves_dry_run_and_selects_one_mode(
         expected.extend(["--sha", "a" * 40])
     expected.append("--dry-run")
     assert json.loads(arguments_file.read_text()) == expected
+
+
+def test_publisher_retains_its_separate_write_credential():
+    workflow = yaml.load(
+        (ROOT / ".github/workflows/publish-calibration-tree.yml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    publisher = workflow["jobs"]["publish"]
+    assert publisher["env"]["HF_TOKEN"] == "${{ secrets.HF_TOKEN }}"
+
+
+@pytest.mark.parametrize("exit_code", [0, 17])
+def test_post_promotion_qualification_preserves_status_and_points_to_rollback(
+    tmp_path, exit_code
+):
+    steps = _workflow()["jobs"]["deploy"]["steps"]
+    step = next(
+        step
+        for step in steps
+        if step.get("name") == "Verify promoted calibration releases and staging"
+    )
+    stub = tmp_path / "bun"
+    stub.write_text(f"#!/usr/bin/env bash\nexit {exit_code}\n")
+    stub.chmod(0o755)
+    result = subprocess.run(
+        ["bash", "-e", "-c", step["run"]],
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == exit_code
+    if exit_code:
+        assert "frontend/HOSTED_RUNTIME.md#promotion-and-rollback" in result.stderr
+        assert "vercel rollback PREVIOUS_DEPLOYMENT" in result.stderr
+    else:
+        assert "rollback" not in result.stdout + result.stderr
