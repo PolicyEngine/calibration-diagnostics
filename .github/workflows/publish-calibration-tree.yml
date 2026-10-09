@@ -39,11 +39,14 @@ permissions:
 # One publisher at a time: every country writes the same manifest. With the
 # default single-slot queue, a newer dispatch replaces any dispatch still
 # pending (GitHub cancels the older pending run), so a burst of Hugging Face
-# webhooks collapses to the running job plus the newest commit. That is the
-# right outcome for reconciliation, which reads the newest commit's state.
-# During a UK staging build each 300 s telemetry cycle makes about six
-# single-file Hub commits, hence about six dispatches; most are cancelled
-# before they take a runner (730 of 878 on Oct 6-7).
+# webhooks collapses to the running job plus the most recently dispatched
+# commit, whose state reconciliation then reads. During a UK staging build
+# each 300 s telemetry cycle makes about six single-file Hub commits, hence
+# about six dispatches; most are cancelled before they take a runner.
+# The slot is shared across countries and event kinds, so a pending release,
+# manual or migrate dispatch is replaced too. Nothing reconciles on a
+# schedule: the next webhook from that repository, or a manual dispatch,
+# repairs it.
 concurrency:
   group: calibration-tree-manifest-publication
   cancel-in-progress: false
