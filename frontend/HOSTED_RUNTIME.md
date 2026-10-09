@@ -52,11 +52,14 @@ Configure these GitHub Actions secrets before merging the workflow:
 - `VERCEL_TOKEN`: permission to deploy and promote the fixed PolicyEngine Vercel project.
 - `VERCEL_AUTOMATION_BYPASS_SECRET`: permission for the workflow to call the protected,
   unaliased Vercel deployment during verification.
+- `HF_RELEASE_READ_TOKEN`: a dedicated fine-grained Hugging Face read-only token scoped
+  to the registered private release repositories and `policyengine/populace-us-staging`.
+  Keep the publisher's separate `HF_TOKEN` secret unchanged.
 
 Missing credentials stop the workflow before it creates a Modal application. The Vercel
 project's existing production environment variables, including Blob credentials, remain
-managed by Vercel; the workflow supplies only the backend URL, proxy credentials, and
-source commit for the candidate deployment.
+managed by Vercel; the workflow supplies the backend URL, proxy credentials, release read
+token, and source commit for the candidate deployment.
 
 ## Preview deployment
 
@@ -158,6 +161,27 @@ calculation through `calibration-diagnostics.vercel.app` and the
 `microcosm.institute/calibration/dashboard` mount. A failure before promotion leaves the
 existing production aliases unchanged. A failure after promotion must be handled with
 the rollback procedure below.
+
+The workflow requires the dedicated Actions `HF_RELEASE_READ_TOKEN` secret and passes it
+to the candidate as server-only runtime `HF_TOKEN`. Use a fine-grained read-only credential
+scoped to every registered private release repository and US staging; never reuse the
+publisher's write credential for the dashboard. UK staging retains its
+separate `POPULACE_UK_STAGING_HF_TOKEN` deployment configuration. Before
+promotion, `frontend/scripts/calibration-deployment-smoke.ts` checks each
+registered country's calibration summary and release inventory, and every
+supported staging inventory. It requires available calibration targets, a
+consistent selected release, and staging `available: true`; an HTTP 200 alone
+does not qualify staging. The same check runs against the public dashboard
+after promotion. Public US calculations alone do not qualify private release
+access.
+
+Calibration qualification retries network failures and HTTP 5xx twice, with short
+increasing backoff and a 60-second timeout per attempt. HTTP 4xx, malformed successful
+responses, and unavailable or inconsistent data fail immediately. If the post-promotion
+check fails, the workflow reports failure while production aliases already point at the
+candidate. The release owner must follow the rollback procedure below and run
+`vercel rollback PREVIOUS_DEPLOYMENT`; the workflow does not roll back automatically.
+
 The public `calibration-diagnostics.vercel.app` domain is also the stable Hugging Face
 webhook origin. Do not point the webhook at a staged deployment URL or the protected
 `calibration-diagnostics-policy-engine.vercel.app` alias.

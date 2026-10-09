@@ -39,6 +39,7 @@ jobs:
 
       - name: Require deployment credentials
         env:
+          HF_RELEASE_READ_TOKEN: ${{ secrets.HF_RELEASE_READ_TOKEN }}
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
           MICROCOSM_MODAL_KEY: ${{ secrets.MICROCOSM_MODAL_KEY }}
@@ -107,6 +108,7 @@ jobs:
       - name: Build unaliased Vercel production candidate
         id: frontend
         env:
+          HF_RELEASE_READ_TOKEN: ${{ secrets.HF_RELEASE_READ_TOKEN }}
           MICROCOSM_MODAL_KEY: ${{ secrets.MICROCOSM_MODAL_KEY }}
           MICROCOSM_MODAL_SECRET: ${{ secrets.MICROCOSM_MODAL_SECRET }}
           MICROCOSM_TELEMETRY_COLLECTOR_URL: ${{ vars.MICROCOSM_TELEMETRY_COLLECTOR_URL }}
@@ -135,6 +137,14 @@ jobs:
           --check full
           --vercel-bypass-secret "$VERCEL_AUTOMATION_BYPASS_SECRET"
 
+      - name: Verify staged calibration releases and staging
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: >-
+          bun run frontend/scripts/calibration-deployment-smoke.ts
+          --url "${{ steps.frontend.outputs.url }}/calibration/dashboard"
+          --vercel-bypass-secret "$VERCEL_AUTOMATION_BYPASS_SECRET"
+
       - name: Promote verified Vercel deployment
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -158,3 +168,12 @@ jobs:
           --url "https://microcosm.institute/calibration/dashboard/api/microcosm_variable"
           --source-commit "${{ steps.identity.outputs.source_commit }}"
           --check state
+
+      - name: Verify promoted calibration releases and staging
+        run: |
+          bun run frontend/scripts/calibration-deployment-smoke.ts \
+          --url "https://calibration-diagnostics.vercel.app/calibration/dashboard" || {
+            qualification_status=$?
+            echo "::error::Post-promotion calibration qualification failed. Production aliases already point at this candidate. Follow frontend/HOSTED_RUNTIME.md#promotion-and-rollback and run vercel rollback PREVIOUS_DEPLOYMENT." >&2
+            exit "$qualification_status"
+          }
