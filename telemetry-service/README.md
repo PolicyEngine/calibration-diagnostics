@@ -15,6 +15,16 @@ the authenticated Hugging Face user owns the referenced run and that each
 producer was registered first. The raw Hugging Face token is neither logged nor
 written to Postgres.
 
+The same session credential authorizes immutable graph publication through
+`POST /v1/auth/graph-publication/authorize`. The request contains a publication
+ID and inventory SHA-256; the response binds both to the authenticated user.
+This operation needs no telemetry run or producer registration and writes no
+collector data. The independent runs application calls it server-side before
+authorizing uploads or finalizing a publication. It keeps object storage and
+public graph reads outside this service. Raw Hugging Face credentials still go
+only to the exchange endpoint; no JWT signing secret is shared with the runs
+application, and no new runtime environment variable is required here.
+
 The dashboard query endpoints require `X-Telemetry-Read-Token`. The dashboard
 server retrieves this credential from Google Secret Manager at runtime. Vercel
 authenticates using its OIDC identity; the credential is never returned to the
