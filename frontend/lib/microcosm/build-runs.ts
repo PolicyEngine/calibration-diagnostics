@@ -129,9 +129,12 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+// A run in one of these statuses has ended and its telemetry no longer changes.
+const FINAL_STATUSES = new Set(["passed", "completed", "blocked", "failed"]);
+
 function isFinal(documents: BuildRunDocuments): boolean {
   const status = documents.progress?.status ?? documents.run_manifest?.status;
-  return status === "passed" || status === "completed" || status === "failed";
+  return typeof status === "string" && FINAL_STATUSES.has(status);
 }
 
 async function loadLocal(country: MicrocosmCountry): Promise<LoadedRuns> {
@@ -231,9 +234,7 @@ async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
     summaries.slice(0, STAGING_RUN_LIMIT).map(async (summary) => {
       const key = `collector:${country}:${summary.run_id}`;
       const cached = stagingRunCache.get(key);
-      const summaryFinal = ["passed", "completed", "failed"].includes(
-        summary.status,
-      );
+      const summaryFinal = FINAL_STATUSES.has(summary.status);
       if (
         cached?.final &&
         summaryFinal &&

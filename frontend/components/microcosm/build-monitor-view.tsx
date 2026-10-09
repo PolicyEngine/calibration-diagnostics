@@ -91,8 +91,16 @@ const FAILURE_CLASS_LABEL: Record<string, string> = {
   terminated: "Terminated (SIGTERM)",
   interrupted: "Interrupted",
   out_of_memory: "Out of memory",
-  refused: "Refused before building",
+  // The build exited non-zero without raising and without a recorded gate block.
+  refused: "Refused without a gate block",
+  // A sampled spine build hit a named edge and discarded the attempt.
+  aborted: "Rung aborted",
+  // The gates refused, but the block's details could not be recorded.
+  unrecorded_gate_block: "Gate block not recorded",
   error: "Error",
+  build_failure: "Build failure",
+  unexpected_process_exit: "Process exited unexpectedly",
+  dry_run_refusal: "Refused in a dry run",
   stopped_without_final_event: "Stopped without a final event",
   unclassified: "Failed, no class recorded",
 };
@@ -479,7 +487,7 @@ function RunOverview({
               running && forecast?.remaining_p90_ms != null
                 ? `Up to ${fmtDuration(forecast.remaining_p90_ms)} (90%)`
                 : run.failure?.stage
-                  ? `Failed in ${formatStageName(run.failure.stage)}`
+                  ? `${run.state === "blocked" ? "Refused at" : "Failed in"} ${formatStageName(run.failure.stage)}`
                   : undefined
             }
             size="sm"

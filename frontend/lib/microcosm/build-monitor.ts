@@ -3,19 +3,21 @@
 // completion forecast from comparable past runs, and cross-run timing and
 // gate statistics.
 //
-// Both telemetry schemas are supported:
+// Every telemetry schema is supported:
 // - version 1 (US fiscal-refresh release): every event is a transition into a
 //   stage, so a stage lasts until the next event. Passing gates are silent;
 //   failing gates emit a `failed` transition, and `telemetry.fail` appends a
 //   terminal `failed` stage carrying the error.
 // - version 2 (UK): explicit `started` / `completed` / `failed` events that
 //   nest, plus `calibration` events that are progress, not stages.
+// - version 3 (UK): version 2 plus a `blocked` run status with the gate phase
+//   and gates that refused the candidate, and a class on every failure.
 
 type JsonObject = Record<string, unknown>;
 
 export type BuildRunSource = "local" | "staging";
-// `blocked`: the process ran to the end but its gates refused the candidate.
-// UK builds close such runs as `completed` (microcosm full_build_cli), so the
+// `blocked`: the gates refused the candidate. Version 3 records it as the run's
+// status; version 2 UK builds closed such runs as `completed`, so for those the
 // monitor reads the gate counts to tell them apart.
 export type BuildRunState = "running" | "passed" | "blocked" | "failed" | "stalled";
 export type BuildPhase = "setup" | "checks" | "compile" | "calibrate" | "export";
@@ -35,7 +37,7 @@ export const STALL_MS = 6 * 60 * 60 * 1000;
 // the process was most likely killed (out of memory, SIGKILL).
 export const HEARTBEAT_STALE_MS = 5 * 60 * 1000;
 const HISTORY_LIMIT = 12;
-const MARKER_STAGES = new Set(["created", "complete", "failed"]);
+const MARKER_STAGES = new Set(["created", "complete", "failed", "blocked"]);
 const GATE_PATTERN =
   /(^|_)(gate|gates|check|checks|validation|composition|presence|smoke|audit|evaluation)(_|$)/;
 
@@ -148,13 +150,24 @@ export interface BuildFailure {
   stage: string | null;
   message: string | null;
   error_type: string | null;
-  // A machine-readable code (version 2), such as BUILD_FAILED.
+  // A machine-readable code (version 2 and later), such as BUILD_FAILED.
   error_code: string | null;
-  // gate_refused, terminated, interrupted, out_of_memory, refused or error,
-  // as the run recorded it; null when it recorded none.
+  // gate_refused for a refusal by the gates; otherwise the class the run
+  // recorded (terminated, interrupted, out_of_memory, error, ...), or null.
   failure_class: string | null;
-  // Where the build machine keeps the details (version 2), when it says.
+  // Where the build machine keeps the details (version 2 and later), when it says.
   diagnostic_reference: string | null;
+  // The refusal a version 3 run recorded; null when it recorded none (a
+  // version 2 refusal is inferred from its gate counts).
+  block: RecordedBlock | null;
+}
+
+export interface RecordedBlock {
+  // The gate phase that refused the candidate: preflight, terminal, ...
+  phase: string | null;
+  blocking_failure_count: number | null;
+  // Empty when the refusal named no gate.
+  blocking_gate_ids: string[];
 }
 
 export interface BuildTimeline {
@@ -163,7 +176,7 @@ export interface BuildTimeline {
   country: string;
   pipeline: string;
   pipeline_label: string;
-  schema_version: 1 | 2;
+  schema_version: 1 | 2 | 3;
   state: BuildRunState;
   started_ms: number | null;
   updated_ms: number | null;
@@ -246,13 +259,13 @@ export function formatStageName(stage: string): string {
 
 function pipelineIdentity(
   documents: BuildRunDocuments,
-  schemaVersion: 1 | 2,
+  schemaVersion: 1 | 2 | 3,
 ): { key: string; label: string } {
   const identity = documents.progress ?? documents.run_manifest;
   const pipeline = obj(identity?.pipeline);
   const pipelineId = str(pipeline?.id);
   const country = str(identity?.country_code) ?? documents.country.toUpperCase();
-  if (schemaVersion === 2 && pipelineId) {
+  if (schemaVersion >= 2 && pipelineId) {
     // A smoke run on a synthetic fixture is not comparable with a full run of
     // the same pipeline, so the run kind is part of the key.
     const kind = str(identity?.run_kind);
@@ -278,6 +291,7 @@ function runState(
     return "passed";
   }
   if (rawStatus === "failed") return "failed";
+  if (rawStatus === "blocked") return "blocked";
   if (updatedMs != null && nowMs - updatedMs > stallMs) return "stalled";
   return "running";
 }
@@ -475,7 +489,7 @@ function spansFromTransitions(events: JsonObject[]): {
   return { spans, terminal };
 }
 
-// Version 2: explicit, nestable started/completed/failed events.
+// Version 2 and later: explicit, nestable started/completed/failed events.
 function spansFromLifecycle(events: JsonObject[]): {
   spans: StageSpan[];
   terminal: { stage: string; event: JsonObject; time: number } | null;
@@ -712,19 +726,53 @@ export function solverSegments(
   return segments;
 }
 
+// The refusal a version 3 run recorded: on its run documents, or in the
+// details of its terminal `blocked` event (the collector's copy).
+function recordedBlock(
+  documents: BuildRunDocuments,
+  terminal: { stage: string; event: JsonObject } | null,
+): RecordedBlock | null {
+  const block =
+    obj(documents.progress?.block) ??
+    obj(documents.run_manifest?.block) ??
+    (terminal?.stage === "blocked" ? obj(terminal.event.details) : null);
+  if (!block) return null;
+  return {
+    phase: str(block.phase),
+    blocking_failure_count: num(block.blocking_failure_count),
+    blocking_gate_ids: stringList(block.blocking_gate_ids),
+  };
+}
+
+const BLOCK_GATES_SHOWN = 5;
+
+// "3 blocking failures: coverage, fit, loss", or "2 blocking failures, no gate named".
+function blockSummary(block: RecordedBlock): string {
+  const count = block.blocking_failure_count;
+  const failures =
+    count == null ? "blocking failures" : `${count} blocking failure${count === 1 ? "" : "s"}`;
+  const gates = block.blocking_gate_ids;
+  if (!gates.length) return `${failures}, no gate named`;
+  const shown = gates.slice(0, BLOCK_GATES_SHOWN).join(", ");
+  const more = gates.length > BLOCK_GATES_SHOWN ? ` and ${gates.length - BLOCK_GATES_SHOWN} more` : "";
+  return `${failures}: ${shown}${more}`;
+}
+
 export function buildTimeline(
   documents: BuildRunDocuments,
   nowMs: number = Date.now(),
 ): BuildTimeline {
   const progress = documents.progress;
   const identity = progress ?? documents.run_manifest;
-  const schemaVersion: 1 | 2 = identity?.schema_version === 2 ? 2 : 1;
+  const declaredVersion = num(identity?.schema_version);
+  const schemaVersion: 1 | 2 | 3 =
+    declaredVersion != null && declaredVersion >= 3 ? 3 : declaredVersion === 2 ? 2 : 1;
   const events = [...documents.events].sort((a, b) => {
     const seq = (num(a.sequence) ?? 0) - (num(b.sequence) ?? 0);
     return seq || (eventTime(a) ?? 0) - (eventTime(b) ?? 0);
   });
   const { spans, terminal } =
-    schemaVersion === 2 ? spansFromLifecycle(events) : spansFromTransitions(events);
+    schemaVersion >= 2 ? spansFromLifecycle(events) : spansFromTransitions(events);
 
   const eventTimes = events.map(eventTime).filter((t): t is number => t != null);
   const calibration = calibrationPoints(documents.calibration_progress, progress);
@@ -754,7 +802,10 @@ export function buildTimeline(
   );
   if (state === "running" && terminal?.stage === "failed") state = "failed";
   if (state === "running" && terminal?.stage === "complete") state = "passed";
-  if (state === "passed" && spans.some((span) => span.refused)) {
+  if (state === "running" && terminal?.stage === "blocked") state = "blocked";
+  // Version 3 records a refusal as `blocked`; a version 2 run closed it as
+  // completed, with the blocking failures in its gate battery's details.
+  if (schemaVersion === 2 && state === "passed" && spans.some((span) => span.refused)) {
     state = "blocked";
   }
   const finished = state === "passed" || state === "blocked" || state === "failed";
@@ -787,30 +838,35 @@ export function buildTimeline(
 
   let failure: BuildFailure | null = null;
   if (state === "blocked") {
-    const gate = spans.find((span) => span.refused)!;
+    const gate = spans.find((span) => span.refused) ?? null;
+    const block = recordedBlock(documents, terminal);
     failure = {
-      stage: gate.stage,
-      message: `The run finished, but its gates refused the candidate (${gate.message ?? "blocking failures"}).`,
+      stage: gate?.stage ?? null,
+      message: block
+        ? `The gates refused the candidate${block.phase ? ` at ${block.phase}` : ""} (${blockSummary(block)}).`
+        : `The run finished, but its gates refused the candidate (${gate?.message ?? "blocking failures"}).`,
       error_type: null,
       error_code: null,
       failure_class: "gate_refused",
       diagnostic_reference: null,
+      block,
     };
   } else if (state === "failed") {
-    const v2Failure = obj(progress?.failure);
+    const runFailure = obj(progress?.failure);
     const failedSpan = [...spans].reverse().find((span) => span.status === "failed") ?? null;
     const terminalDetails = obj(terminal?.event.details);
     failure = {
       stage: failedSpan?.stage ?? null,
       message:
-        str(v2Failure?.message) ??
+        str(runFailure?.message) ??
         (terminal?.stage === "failed" ? str(terminal.event.message) : null) ??
         failedSpan?.message ??
         str(progress?.message),
-      error_type: str(v2Failure?.error_type) ?? str(terminalDetails?.error_type),
-      error_code: str(v2Failure?.error_code),
-      failure_class: str(terminalDetails?.failure_class),
-      diagnostic_reference: str(v2Failure?.local_diagnostic_reference),
+      error_type: str(runFailure?.error_type) ?? str(terminalDetails?.error_type),
+      error_code: str(runFailure?.error_code) ?? str(terminalDetails?.error_code),
+      failure_class: str(runFailure?.failure_class) ?? str(terminalDetails?.failure_class),
+      diagnostic_reference: str(runFailure?.local_diagnostic_reference),
+      block: null,
     };
   }
 
@@ -1697,14 +1753,23 @@ export function stopStatistics(runs: BuildTimeline[]): StopStat[] {
       .filter((span) => span.status === "failed")
       .flatMap((span) => span.failures.map(failureReason));
     // A refusal's own message is the dashboard's summary; its failure lines
-    // are what the gates recorded.
+    // are what the gates recorded, or else the gates its block names.
     const message = outcome === "failed" && failure?.message ? failureReason(failure.message) : null;
-    const reasons = new Set(lines.length ? lines : message ? [message] : []);
+    const block = failure?.block ?? null;
+    const blockLines = block
+      ? block.blocking_gate_ids.length
+        ? block.blocking_gate_ids
+        : [blockSummary(block)]
+      : [];
+    const reasons = new Set(lines.length ? lines : message ? [message] : blockLines);
+    // A failure's class is recorded, and so is a version 3 refusal; a
+    // version 2 refusal is inferred from gate counts, so its class is not counted.
+    const recordedClass = outcome === "failed" || block != null ? failure?.failure_class : null;
     count(entry.errorTypes, failure?.error_type);
     count(entry.errorCodes, failure?.error_code);
-    if (outcome === "failed") count(entry.classes, failure?.failure_class);
+    count(entry.classes, recordedClass);
     for (const reason of reasons) count(entry.reasons, reason);
-    if (!failure?.error_type && !failure?.error_code && !(outcome === "failed" && failure?.failure_class) && !reasons.size) {
+    if (!failure?.error_type && !failure?.error_code && !recordedClass && !reasons.size) {
       entry.unexplained += 1;
     }
     entry.last = run;

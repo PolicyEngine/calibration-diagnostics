@@ -15,20 +15,25 @@ import {
 } from "./staging-contract";
 
 const FIXTURES = join(import.meta.dir, "fixtures", "staging-contract");
+// Version 3 is copied byte for byte from microcosm
+// packages/microcosm-build/tests/fixtures/staging/v3.
 const MANIFEST_DIGESTS = {
   v1: "165d24caf29b82afdb0ce241b65d088da552abd59d6ddabf4b2183b9a61be75b",
   v2: "0d54c630088152b4fb4a7b7a9853c851233d0be76579f949331ae4bcd7b455e5",
+  v3: "e31a5e337840e24d7a1203b83eb1a5039eeb5f35777a895ab6ab28163bf3def5",
 };
 
-function bytes(version: "v1" | "v2", path: string): Buffer {
+type FixtureVersion = keyof typeof MANIFEST_DIGESTS;
+
+function bytes(version: FixtureVersion, path: string): Buffer {
   return readFileSync(join(FIXTURES, version, path));
 }
 
-function json(version: "v1" | "v2", path: string): Record<string, unknown> {
+function json(version: FixtureVersion, path: string): Record<string, unknown> {
   return JSON.parse(bytes(version, path).toString());
 }
 
-for (const version of ["v1", "v2"] as const) {
+for (const version of ["v1", "v2", "v3"] as const) {
   test(`${version} fixture files match the Microcosm digest manifest`, () => {
     const manifest = bytes(version, "SHA256SUMS");
     expect(createHash("sha256").update(manifest).digest("hex")).toBe(
@@ -375,6 +380,194 @@ describe("version 2", () => {
         calibrationProgress,
       }),
     ).toThrow(/disagree on candidate_id/);
+  });
+});
+
+describe("version 3", () => {
+  const blockedRoot = "blocked/runs/uk-blocked-v3-fixture";
+  const failedRoot = "failed/runs/uk-failed-v3-fixture";
+  const runs = [
+    ["uk-spine-v3-fixture", "completed-spine/runs/uk-spine-v3-fixture"],
+    ["uk-calibration-v3-fixture", "calibration/runs/uk-calibration-v3-fixture"],
+    ["uk-failed-v3-fixture", failedRoot],
+    ["uk-blocked-v3-fixture", blockedRoot],
+  ] as const;
+
+  test("reads every fixture run as one consistent version 3 run", () => {
+    for (const [runId, root] of runs) {
+      const manifest = parseStagingManifest(json("v3", `${root}/run_manifest.json`));
+      const paths = manifest.paths as Record<string, unknown>;
+      expect(() =>
+        validateStagingRunConsistency(runId, {
+          progress: parseStagingProgress(json("v3", `${root}/progress.json`)),
+          runManifest: manifest,
+          calibrationProgress: paths.calibration_progress
+            ? parseStagingCalibrationProgress(
+                json("v3", `${root}/calibration_progress.json`),
+              )
+            : null,
+          events: parseStagingEvents(bytes("v3", `${root}/events.ndjson`).toString()),
+        }),
+      ).not.toThrow();
+      expect(manifest.schema_version).toBe(3);
+    }
+  });
+
+  test("a blocked run carries its block and ends with a blocked event", () => {
+    const block = {
+      phase: "terminal",
+      blocking_failure_count: 1,
+      blocking_gate_ids: ["uk_target_fit"],
+    };
+    const manifest = parseStagingManifest(json("v3", `${blockedRoot}/run_manifest.json`));
+    const progress = parseStagingProgress(json("v3", `${blockedRoot}/progress.json`));
+    const events = parseStagingEvents(
+      bytes("v3", `${blockedRoot}/events.ndjson`).toString(),
+    );
+
+    expect(manifest).toMatchObject({ status: "blocked", failure: null, block });
+    expect(progress).toMatchObject({ status: "blocked", stage: "blocked", failure: null, block });
+    expect(events[events.length - 1]).toMatchObject({
+      stage: "blocked",
+      status: "blocked",
+      details: { ...block, gate_statuses: { uk_target_fit: "failed" } },
+    });
+  });
+
+  test("a failure carries its class, and a block may name no gate", () => {
+    const failed = parseStagingProgress(json("v3", `${failedRoot}/progress.json`));
+    expect(failed.failure).toMatchObject({
+      error_code: "BUILD_FAILED",
+      failure_class: "error",
+    });
+    expect(failed.block).toBeNull();
+
+    const source = json("v3", `${blockedRoot}/progress.json`);
+    const unnamed = parseStagingProgress({
+      ...source,
+      block: { phase: "preflight", blocking_failure_count: 2, blocking_gate_ids: [] },
+    });
+    expect(unnamed.block).toEqual({
+      phase: "preflight",
+      blocking_failure_count: 2,
+      blocking_gate_ids: [],
+    });
+    expect(
+      parseStagingProgress({
+        ...json("v3", `${failedRoot}/progress.json`),
+        failure: {
+          ...(failed.failure as Record<string, unknown>),
+          failure_class: null,
+        },
+      }).failure,
+    ).toMatchObject({ failure_class: null });
+  });
+
+  test("rejects failures and blocks that break the version 3 rules", () => {
+    const failedSource = json("v3", `${failedRoot}/progress.json`);
+    const failure = failedSource.failure as Record<string, unknown>;
+    const blockedSource = json("v3", `${blockedRoot}/progress.json`);
+    const block = blockedSource.block as Record<string, unknown>;
+    const withoutBlock = { ...blockedSource };
+    delete withoutBlock.block;
+    const { failure_class: _class, ...version2Failure } = failure;
+
+    const cases: [Record<string, unknown>, RegExp][] = [
+      [
+        { ...failedSource, failure: { ...failure, traceback: "File \"x.py\"" } },
+        /version 3 failure contains unexpected field traceback/,
+      ],
+      [{ ...failedSource, failure: version2Failure }, /version 3 failure is missing failure_class/],
+      [
+        { ...failedSource, failure: { ...failure, failure_class: "OutOfMemory" } },
+        /failure_class is invalid/,
+      ],
+      [{ ...failedSource, block }, /non-blocked status cannot contain block data/],
+      [{ ...blockedSource, block: null }, /blocked status requires block data/],
+      [
+        { ...blockedSource, failure, current_stage: "blocked" },
+        /non-failed status cannot contain failure data/,
+      ],
+      [withoutBlock, /version 3 progress is missing block/],
+      [
+        { ...blockedSource, block: { ...block, blocking_failure_count: 0 } },
+        /blocking_failure_count must be an integer greater than or equal to 1/,
+      ],
+      [
+        { ...blockedSource, block: { ...block, blocking_gate_ids: [""] } },
+        /blocking_gate_ids 0 must be a string between 1 and 200 characters/,
+      ],
+      [
+        { ...blockedSource, block: { ...block, gate_statuses: {} } },
+        /version 3 block contains unexpected field gate_statuses/,
+      ],
+      [
+        { ...blockedSource, block: { ...block, phase: "pre flight" } },
+        /block phase must be a safe identifier/,
+      ],
+    ];
+    for (const [payload, error] of cases) {
+      expect(() => parseStagingProgress(payload)).toThrow(error);
+    }
+    expect(() =>
+      parseStagingManifest({
+        ...json("v3", `${failedRoot}/run_manifest.json`),
+        block,
+      }),
+    ).toThrow(/non-blocked status cannot contain block data/);
+  });
+
+  test("version 2 documents do not accept version 3 fields", () => {
+    const root = "completed-spine/runs/uk-spine-v2-fixture";
+    const progress = json("v2", `${root}/progress.json`);
+    const failedProgress = json("v2", "failed/runs/uk-failed-v2-fixture/progress.json");
+    const event = JSON.parse(
+      bytes("v2", `${root}/events.ndjson`).toString().trim().split("\n")[0],
+    ) as Record<string, unknown>;
+
+    expect(() => parseStagingProgress({ ...progress, block: null })).toThrow(
+      /version 2 progress contains unexpected field block/,
+    );
+    expect(() =>
+      parseStagingProgress({ ...progress, status: "blocked", current_stage: "blocked" }),
+    ).toThrow(/progress status is unsupported/);
+    expect(() =>
+      parseStagingProgress({
+        ...failedProgress,
+        failure: {
+          ...(failedProgress.failure as Record<string, unknown>),
+          failure_class: "error",
+        },
+      }),
+    ).toThrow(/version 2 failure contains unexpected field failure_class/);
+    expect(() =>
+      parseStagingEvents(JSON.stringify({ ...event, status: "blocked" })),
+    ).toThrow(/status is unsupported/);
+  });
+
+  test("events stay contiguous and a run cannot mix versions 2 and 3", () => {
+    const lines = bytes("v3", `${blockedRoot}/events.ndjson`).toString().trim().split("\n");
+    expect(() => parseStagingEvents([lines[0], lines[2]].join("\n"))).toThrow(
+      /version 3 event sequence is not contiguous/,
+    );
+
+    const v2Root = "completed-spine/runs/uk-spine-v2-fixture";
+    const v3Root = "completed-spine/runs/uk-spine-v3-fixture";
+    const v2Progress = parseStagingProgress({
+      ...json("v2", `${v2Root}/progress.json`),
+      run_id: "uk-spine-v3-fixture",
+      candidate_id: "uk-spine-v3-fixture",
+      delivery: {
+        ...(json("v2", `${v2Root}/progress.json`).delivery as Record<string, unknown>),
+        run_id: "uk-spine-v3-fixture",
+      },
+    });
+    expect(() =>
+      validateStagingRunConsistency("uk-spine-v3-fixture", {
+        progress: v2Progress,
+        runManifest: parseStagingManifest(json("v3", `${v3Root}/run_manifest.json`)),
+      }),
+    ).toThrow(/a run cannot mix document versions 2 and 3/);
   });
 });
 
