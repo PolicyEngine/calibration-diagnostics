@@ -91,3 +91,19 @@ test("manifest rejects two immutable builds for the same release or staging run"
     { ...entry, buildArtifactId: "d".repeat(64) },
   )).toThrow("already resolves to build");
 });
+
+test("re-adding a build replaces its metadata and keeps its content identity immutable", () => {
+  const placeholder = { ...entry, createdAt: null, updatedAt: "1970-01-01T00:00:00.000Z" };
+  const stamped = { ...entry, createdAt: "2026-10-04T18:57:22.000Z", updatedAt: "2026-10-04T18:57:22.000Z" };
+  const manifest = withCalibrationTreeManifestEntry(
+    withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "us", placeholder, true),
+    "us",
+    stamped,
+  );
+  expect(calibrationTreeManifestEntry(manifest, "us", { releaseId: entry.releaseId! })).toEqual(stamped);
+  expect(manifest.countries.us?.builds).toHaveLength(1);
+  expect(manifest.countries.us?.latestReleaseBuildArtifactId).toBe(entry.buildArtifactId);
+  expect(() =>
+    withCalibrationTreeManifestEntry(manifest, "us", { ...stamped, indexSha256: "f".repeat(64) }),
+  ).toThrow("immutable");
+});

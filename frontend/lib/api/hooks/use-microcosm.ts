@@ -368,7 +368,7 @@ export interface MicrocosmCalibrationBuild {
   indexSha256: string;
   indexBytes: number;
   createdAt: string | null;
-  updatedAt: string;
+  updatedAt: string | null;
 }
 
 export interface MicrocosmCalibrationBuildManifest {

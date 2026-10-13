@@ -51,7 +51,10 @@ import {
 } from "./target-representation";
 import { readStructuredTarget } from "./structured-target-reader";
 import { matchTargetSurfaces } from "./target-surface-matcher";
-import { resolveCalibrationRelease } from "./calibration-release-locator";
+import {
+  resolveCalibrationRelease,
+  resolveHfCommitPublishedAt,
+} from "./calibration-release-locator";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
@@ -2192,35 +2195,6 @@ export async function loadCountryRepositoryHashedJson(
   return parseHashedJsonArtifact(new Uint8Array(await res.arrayBuffer()));
 }
 
-export function releasePublishedAtFromTree(tree: unknown): string | null {
-  if (!Array.isArray(tree)) return null;
-  const entries = tree
-    .map((entry) => asObject(entry))
-    .filter((entry) => entry.type === "file" && typeof entry.path === "string");
-  const preferred =
-    entries.find((entry) => String(entry.path).endsWith("/release_manifest.json")) ??
-    entries.find((entry) => String(entry.path).endsWith("/calibration_diagnostics.json")) ??
-    entries[0];
-  const date = asObject(preferred?.lastCommit).date;
-  return typeof date === "string" && date.length > 0 ? date : null;
-}
-
-async function loadReleasePublishedAt(
-  releaseId: string,
-  revalidate: number,
-  country: MicrocosmCountry,
-  revisionOverride?: string,
-): Promise<string | null> {
-  const { repo, revision } = countryRepository(country);
-  const resolvedRevision = revisionOverride ?? revision;
-  const url =
-    `https://huggingface.co/api/datasets/${repo}/tree/${resolvedRevision}/releases/${releaseId}` +
-    "?recursive=false&expand=true";
-  const res = await hfFetch(url, revalidate);
-  if (!res.ok) throw new Error(`HF tree failed ${res.status}: ${url}`);
-  return releasePublishedAtFromTree(await res.json());
-}
-
 export interface ReleaseEntry {
   release_id: string;
   date: string;
@@ -2502,14 +2476,13 @@ async function loadReleaseUncached(
     hfJson(hfResolveUrl(`${prefix}/build_manifest.json`, country, location.hfCommitSha), revalidate).catch(() => ({})),
     hfJson(hfResolveUrl(`${prefix}/release_manifest.json`, country, location.hfCommitSha), revalidate).catch(() => ({})),
     hfJson(hfResolveUrl(`${prefix}/demographics.json`, country, location.hfCommitSha), revalidate).catch(() => ({})),
+    // The manifest entry's timestamp is the pinned commit's date; an entry
+    // written before that was recorded is dated from the same commit here.
     updatedAt
       ? Promise.resolve(updatedAt)
-      : loadReleasePublishedAt(
-          id,
-          revalidate,
-          country,
-          location.hfCommitSha,
-        ).catch(() => null),
+      : resolveHfCommitPublishedAt(country, location.hfCommitSha, revalidate).catch(
+          () => null,
+        ),
   ]);
   return buildCalibration(
     diagnosticsArtifact.payload,

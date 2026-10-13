@@ -247,6 +247,15 @@ Never use a `NEXT_PUBLIC_` prefix for these values.
    `POPULACE_UK_STAGING_HF_TOKEN`.
 4. Store `GITHUB_ACTIONS_DISPATCH_TOKEN` and `HF_WEBHOOK_SECRET` only in Vercel.
 
+To correct legacy release timestamps after PR #200, dispatch **Publish
+calibration tree** with country `uk`, event kind `migrate-timestamps`, and
+`dry_run: true`. Review the planned changes, then repeat with `dry_run: false`.
+The migration uses each manifest entry's recorded repository and immutable
+commit, and preserves build identity and the current latest-release selection.
+Use event kind `manual` separately to reconcile releases and align the
+dashboard's latest selection with the upstream pointer. Both operations use
+the existing Actions credentials and require no local secret download.
+
 ### Hugging Face webhook
 
 Use one Hugging Face webhook for every registered production dataset. The

@@ -33,12 +33,14 @@ import { buildTargetChangeDatasetFromSummaryAndCalibration } from "@/lib/microco
 import { loadCalibrationComparisonSource } from "@/lib/microcosm/calibration-comparison-blob";
 import {
   IncompatibleStagingDataError,
+  isStructuredStagingDocument,
   parseStagingCalibrationProgress,
   parseStagingEvents,
   parseStagingManifest,
   parseStagingProgress,
   parseStagingRunIndex,
   validateStagingRunConsistency,
+  type StagingSchemaVersion,
 } from "@/lib/microcosm/staging-contract";
 
 type JsonObject = Record<string, unknown>;
@@ -338,7 +340,7 @@ export interface StagingRunSummary {
   country_code: string | null;
   run_kind: string | null;
   non_release: boolean | null;
-  schema_version: 1 | 2 | null;
+  schema_version: StagingSchemaVersion | null;
   status: string | null;
   stage: string | null;
   started_at: string | null;
@@ -364,7 +366,7 @@ export interface StagingRunDetail {
   country_code: string | null;
   run_kind: string | null;
   non_release: boolean | null;
-  schema_version: 1 | 2 | null;
+  schema_version: StagingSchemaVersion | null;
   delivery: JsonObject | null;
   progress: JsonObject | null;
   run_manifest: JsonObject | null;
@@ -385,8 +387,8 @@ function booleanValue(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
 
-function schemaVersionValue(value: unknown): 1 | 2 | null {
-  return value === 1 || value === 2 ? value : null;
+function schemaVersionValue(value: unknown): StagingSchemaVersion | null {
+  return value === 1 || value === 2 || value === 3 ? value : null;
 }
 
 function objectOrNull(value: unknown): JsonObject | null {
@@ -396,7 +398,7 @@ function objectOrNull(value: unknown): JsonObject | null {
 }
 
 export function stagingTargetChangeCacheTtlSeconds(status: unknown): number {
-  return ["passed", "published", "completed", "failed"].includes(
+  return ["passed", "published", "completed", "blocked", "failed"].includes(
     String(status ?? "").trim(),
   )
     ? TARGET_CHANGE_FINAL_CACHE_SECONDS
@@ -433,7 +435,7 @@ function summaryFromManifest(
     country_code: stringValue(manifest.country_code),
     run_kind: stringValue(manifest.run_kind),
     non_release: booleanValue(manifest.non_release),
-    schema_version: 2,
+    schema_version: schemaVersionValue(manifest.schema_version),
     status: stringValue(manifest.status),
     stage: stringValue(manifest.stage),
     started_at: stringValue(manifest.started_at),
@@ -533,11 +535,9 @@ export async function loadStagingRuns(
   const incompatibleRuns = manifestResults.flatMap(({ problem }) =>
     problem == null ? [] : [problem],
   );
-  const v2Manifests = listedManifests.filter(
-    (manifest) => manifest.schema_version === 2,
-  );
-  const v2ManifestIds = new Set(
-    v2Manifests.map((manifest) => String(manifest.run_id)),
+  const structuredManifests = listedManifests.filter(isStructuredStagingDocument);
+  const structuredManifestIds = new Set(
+    structuredManifests.map((manifest) => String(manifest.run_id)),
   );
   const v1ManifestIds = new Set(
     listedManifests
@@ -586,7 +586,7 @@ export async function loadStagingRuns(
   const v1RunIds = new Set(v1ManifestIds);
   if (index?.schema_version === 1) {
     for (const runId of listedRunIds) {
-      if (!v2ManifestIds.has(runId)) v1RunIds.add(runId);
+      if (!structuredManifestIds.has(runId)) v1RunIds.add(runId);
     }
   }
   const missing = [...v1RunIds]
@@ -607,7 +607,7 @@ export async function loadStagingRuns(
     }),
   );
   for (const run of fetched) byId.set(run.run_id, run);
-  for (const manifest of v2Manifests) {
+  for (const manifest of structuredManifests) {
     const runId = String(manifest.run_id);
     byId.set(runId, summaryFromManifest(runId, manifest));
   }
@@ -853,10 +853,10 @@ export async function resolveStagingCalibrationSource(
     runId;
   const artifacts = objectOrNull(runManifest?.artifacts);
   const diagnosticsArtifact = objectOrNull(artifacts?.calibration_diagnostics);
-  const diagnosticsPath =
-    runManifest?.schema_version === 2
-      ? stringValue(diagnosticsArtifact?.staging_path)
-      : `runs/${runId}/calibration_diagnostics.json`;
+  const structured = isStructuredStagingDocument(runManifest);
+  const diagnosticsPath = structured
+    ? stringValue(diagnosticsArtifact?.staging_path)
+    : `runs/${runId}/calibration_diagnostics.json`;
   if (!diagnosticsPath) {
     // No telemetry diagnostics artifact: a run that staged its dataset bundle
     // carries the same diagnostics there.
@@ -879,7 +879,7 @@ export async function resolveStagingCalibrationSource(
     staging.revision,
   );
   if (!diagnostics) {
-    if (runManifest?.schema_version === 2 && diagnosticsArtifact) {
+    if (structured && diagnosticsArtifact) {
       throw new IncompatibleStagingDataError(
         "artifact calibration_diagnostics is declared but absent.",
       );
@@ -887,10 +887,7 @@ export async function resolveStagingCalibrationSource(
     return null;
   }
   const expectedDigest = stringValue(diagnosticsArtifact?.sha256);
-  if (
-    runManifest?.schema_version === 2 &&
-    diagnostics.sha256 !== expectedDigest
-  ) {
+  if (structured && diagnostics.sha256 !== expectedDigest) {
     throw new IncompatibleStagingDataError(
       `artifact calibration_diagnostics digest does not match its run manifest declaration.`,
     );

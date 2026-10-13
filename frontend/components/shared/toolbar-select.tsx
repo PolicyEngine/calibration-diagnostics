@@ -5,6 +5,8 @@ import { useId } from "react";
 interface Option {
   value: string;
   label: string;
+  // Options that share a group are listed together under its name.
+  group?: string;
 }
 
 interface Props {
@@ -15,6 +17,31 @@ interface Props {
   disabled?: boolean;
   className?: string;
   layout?: "inline" | "stacked";
+}
+
+// Options in their order, under an <optgroup> per group when any option names
+// one (groups in the order they first appear).
+function renderOptions(options: Option[]) {
+  const option = (o: Option) => (
+    <option key={o.value} value={o.value}>
+      {o.label}
+    </option>
+  );
+  if (!options.some((o) => o.group)) return options.map(option);
+  const groups = new Map<string, Option[]>();
+  for (const o of options) {
+    const key = o.group ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), o]);
+  }
+  return [...groups].map(([group, members]) =>
+    group ? (
+      <optgroup key={group} label={group}>
+        {members.map(option)}
+      </optgroup>
+    ) : (
+      members.map(option)
+    ),
+  );
 }
 
 /**
@@ -60,11 +87,7 @@ export function ToolbarSelect({
           onChange={(e) => onChange(e.target.value)}
           className={selectClassName}
         >
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
+          {renderOptions(options)}
         </select>
         <svg
           width="10"
@@ -99,13 +122,11 @@ export function ToolbarSelect({
         onChange={(e) => onChange(e.target.value)}
         // Hide the native chevron, leave room on the right for ours.
         className={selectClassName}
-        style={{ paddingLeft: `${Math.min(label.length * 7 + 16, 112)}px` }}
+        // Room for the inline label: its 12 px offset, the text with its colon
+        // (about 7 px a character) and a 6 px gap before the value.
+        style={{ paddingLeft: `${Math.min(12 + (label.length + 1) * 7 + 6, 120)}px` }}
       >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
+        {renderOptions(options)}
       </select>
       <svg
         width="10"

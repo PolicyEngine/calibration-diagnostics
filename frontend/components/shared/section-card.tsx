@@ -6,6 +6,9 @@ import { Card, CardContent, Text } from "@policyengine/ui-kit";
 interface SectionCardProps {
   title: ReactNode;
   description?: ReactNode;
+  // Overrides the description's reading width (max-w-2xl), for cards whose
+  // description reads better across the full card.
+  descriptionClassName?: string;
   actions?: ReactNode;
   footer?: ReactNode;
   padded?: boolean;
@@ -17,6 +20,7 @@ interface SectionCardProps {
 export function SectionCard({
   title,
   description,
+  descriptionClassName = "max-w-2xl",
   actions,
   footer,
   padded = true,
@@ -38,7 +42,7 @@ export function SectionCard({
             {title}
           </div>
           {description && (
-            <Text size="xs" c="dimmed" className="mt-1 max-w-2xl leading-snug">
+            <Text size="xs" c="dimmed" className={`mt-1 leading-snug ${descriptionClassName}`}>
               {description}
             </Text>
           )}

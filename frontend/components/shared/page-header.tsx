@@ -48,7 +48,9 @@ export function PageHeader({
         ref={headerRef}
         className="sticky top-0 z-20 -mx-4 flex flex-wrap items-start justify-between gap-4 border-b border-border bg-background/85 px-4 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:-mx-6 md:px-6"
       >
-        <div className="min-w-0 flex-1">
+        {/* The title keeps room for itself; actions that do not fit beside it
+            move to their own line instead of squeezing it. */}
+        <div className="min-w-[min(100%,18rem)] flex-1">
           <div className="site-eyebrow mb-1">{eyebrow}</div>
           <div className="flex flex-wrap items-center gap-3">
             <Title order={2}>{title}</Title>
@@ -56,7 +58,7 @@ export function PageHeader({
           </div>
         </div>
         {actions && (
-          <div className="flex max-w-full shrink-0 items-center gap-2 *:min-w-0">{actions}</div>
+          <div className="flex min-w-0 max-w-full shrink-0 items-center gap-2 *:min-w-0">{actions}</div>
         )}
       </div>
       {description && (

@@ -94,3 +94,18 @@ test("distinguishes build-manifest loading, error, empty, and ready states", () 
     buildCount: 2,
   })).toBe("ready");
 });
+
+test("an undated calibration build sorts after every dated one", () => {
+  const builds = [
+    { buildArtifactId: "undated-b", createdAt: null, updatedAt: null },
+    {
+      buildArtifactId: "dated",
+      createdAt: "2026-10-04T18:57:22Z",
+      updatedAt: "2026-10-04T18:57:22Z",
+    },
+    { buildArtifactId: "undated-a", createdAt: null, updatedAt: null },
+  ];
+  expect(
+    calibrationBuildsNewestFirst(builds).map((build) => build.buildArtifactId),
+  ).toEqual(["dated", "undated-a", "undated-b"]);
+});
