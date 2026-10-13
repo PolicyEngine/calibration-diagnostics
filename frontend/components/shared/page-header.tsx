@@ -40,12 +40,13 @@ export function PageHeader({
   // The title row + actions (e.g. the release selector) are rendered as a
   // sibling of the description rather than wrapped in a short <header>, so the
   // sticky bar's containing block is the tall page content and it stays pinned
-  // to the top through the whole scroll.
+  // to the top through the whole scroll. Its bleed (-mx / px) matches AppShell's
+  // content gutter: 16 px below md, 24 px from md up.
   return (
     <>
       <div
         ref={headerRef}
-        className="sticky top-0 z-20 -mx-6 flex flex-wrap items-start justify-between gap-4 border-b border-border bg-background/85 px-6 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/75"
+        className="sticky top-0 z-20 -mx-4 flex flex-wrap items-start justify-between gap-4 border-b border-border bg-background/85 px-4 pb-3 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:-mx-6 md:px-6"
       >
         <div className="min-w-0 flex-1">
           <div className="site-eyebrow mb-1">{eyebrow}</div>
@@ -54,7 +55,9 @@ export function PageHeader({
             {status}
           </div>
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        {actions && (
+          <div className="flex max-w-full shrink-0 items-center gap-2 *:min-w-0">{actions}</div>
+        )}
       </div>
       {description && (
         <Text

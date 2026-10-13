@@ -772,7 +772,7 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
           )}
         </div>
 
-        <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+        <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground max-md:flex-wrap">
           <span>Reached:</span>
           {[
             [1.0, "100%"],
@@ -798,33 +798,35 @@ export function ModelCoverageView({ initialPath = "" }: { initialPath?: string }
         description="Leaf directories with the most rule variables no dashboard check would catch — the concentrated unknown-unknowns."
         padded={false}
       >
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="px-3 py-2 font-semibold">Path</th>
-              <th className="px-3 py-2 text-right font-semibold">Rules</th>
-              <th className="px-3 py-2 text-right font-semibold">Reached</th>
-              <th className="px-3 py-2 text-right font-semibold">Unreached</th>
-              <th className="px-3 py-2 font-semibold">Unreached variables</th>
-            </tr>
-          </thead>
-          <tbody>
-            {worstPockets(data.tree).map(({ path, rules, reached: pocketReached, unreached }) => (
-              <tr key={path} className="border-b border-border/60 align-top last:border-b-0">
-                <td className="px-3 py-2 font-mono text-xs">{path.replace(/^variables\//, "")}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{rules}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{pocketReached}</td>
-                <td className="px-3 py-2 text-right font-medium tabular-nums tone-neg">
-                  {unreached.length}
-                </td>
-                <td className="max-w-xl px-3 py-2 font-mono text-[11px] leading-snug text-muted-foreground">
-                  {unreached.slice(0, 8).join(", ")}
-                  {unreached.length > 8 ? ", …" : ""}
-                </td>
+        <div className="max-md:overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+                <th className="px-3 py-2 font-semibold">Path</th>
+                <th className="px-3 py-2 text-right font-semibold">Rules</th>
+                <th className="px-3 py-2 text-right font-semibold">Reached</th>
+                <th className="px-3 py-2 text-right font-semibold">Unreached</th>
+                <th className="px-3 py-2 font-semibold">Unreached variables</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {worstPockets(data.tree).map(({ path, rules, reached: pocketReached, unreached }) => (
+                <tr key={path} className="border-b border-border/60 align-top last:border-b-0">
+                  <td className="px-3 py-2 font-mono text-xs">{path.replace(/^variables\//, "")}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{rules}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{pocketReached}</td>
+                  <td className="px-3 py-2 text-right font-medium tabular-nums tone-neg">
+                    {unreached.length}
+                  </td>
+                  <td className="max-w-xl px-3 py-2 font-mono text-[11px] leading-snug text-muted-foreground">
+                    {unreached.slice(0, 8).join(", ")}
+                    {unreached.length > 8 ? ", …" : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </SectionCard>
     </div>
   );

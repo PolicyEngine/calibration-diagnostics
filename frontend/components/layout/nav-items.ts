@@ -74,6 +74,16 @@ export function isActive(pathname: string, item: NavItem): boolean {
   return matches(item.href) || (item.also ?? []).some((href) => pathname.startsWith(href));
 }
 
+// The page the reader is on, for the phone-width nav bar's location label.
+// Drill-down routes that no item claims (e.g. /microcosm/targets) return
+// undefined.
+export function activeNavItem(
+  pathname: string,
+  groups: readonly { items: readonly NavItem[] }[],
+): NavItem | undefined {
+  return groups.flatMap((group) => group.items).find((item) => isActive(pathname, item));
+}
+
 export function navLinkAttributes(
   item: NavItem,
 ): { target?: "_blank"; rel?: "noopener noreferrer" } {

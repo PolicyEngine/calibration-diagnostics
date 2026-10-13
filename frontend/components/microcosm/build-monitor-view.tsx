@@ -683,44 +683,50 @@ function TimelineCard({
     >
       <div className="flex flex-col gap-1">
         <PhaseLegend />
-        <div className="mt-2 grid grid-cols-[minmax(8rem,14rem)_1fr] gap-x-3 gap-y-1 text-xs">
-          <div className="font-medium text-muted-foreground">Whole run</div>
-          <div className="relative h-6 rounded bg-muted/40">
-            {rows.map((row) => (
-              <div
-                key={`whole-${row.key}`}
-                className="absolute top-0 h-full"
-                style={barStyle(row)}
-                title={`${formatStageName(row.stage)}: ${fmtDuration(row.end - row.start)}`}
+        {/* Below md the timeline scrolls inside the card, like the tables, rather
+            than squeezing the track and spilling bar labels past the page; the
+            top and bottom padding keep the "now" marker and the axis labels
+            inside that scroll box. */}
+        <div className="mt-2 max-md:mt-0 max-md:overflow-x-auto max-md:pb-1 max-md:pt-4">
+          <div className="grid grid-cols-[minmax(8rem,14rem)_1fr] gap-x-3 gap-y-1 text-xs max-md:min-w-[36rem] max-md:grid-cols-[8rem_1fr]">
+            <div className="font-medium text-muted-foreground">Whole run</div>
+            <div className="relative h-6 rounded bg-muted/40">
+              {rows.map((row) => (
+                <div
+                  key={`whole-${row.key}`}
+                  className="absolute top-0 h-full"
+                  style={barStyle(row)}
+                  title={`${formatStageName(row.stage)}: ${fmtDuration(row.end - row.start)}`}
+                />
+              ))}
+              {p50Offset != null && p90Offset != null ? (
+                <div
+                  className="absolute -top-1 h-8 border-x border-dashed border-foreground/40 bg-foreground/5"
+                  style={{ left: pct(p50Offset), width: width(p50Offset, p90Offset) }}
+                  title={`Finish between ${fmtDuration(p50Offset)} and ${fmtDuration(p90Offset)} after start`}
+                />
+              ) : null}
+              {run.state === "running" ? <NowLine left={pct(elapsed)} /> : null}
+            </div>
+
+            {visible.map((row) => (
+              <TimelineStageRow
+                key={row.key}
+                row={row}
+                barStyle={barStyle(row)}
+                nowLeft={run.state === "running" ? pct(elapsed) : null}
+                labelLeft={row.end / domain > 0.85}
               />
             ))}
-            {p50Offset != null && p90Offset != null ? (
-              <div
-                className="absolute -top-1 h-8 border-x border-dashed border-foreground/40 bg-foreground/5"
-                style={{ left: pct(p50Offset), width: width(p50Offset, p90Offset) }}
-                title={`Finish between ${fmtDuration(p50Offset)} and ${fmtDuration(p90Offset)} after start`}
-              />
-            ) : null}
-            {run.state === "running" ? <NowLine left={pct(elapsed)} /> : null}
-          </div>
 
-          {visible.map((row) => (
-            <TimelineStageRow
-              key={row.key}
-              row={row}
-              barStyle={barStyle(row)}
-              nowLeft={run.state === "running" ? pct(elapsed) : null}
-              labelLeft={row.end / domain > 0.85}
-            />
-          ))}
-
-          <div />
-          <div className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground">
-            {ticks.map((tick) => (
-              <span key={tick} className="absolute -translate-x-1/2 pt-0.5 tabular-nums" style={{ left: pct(tick) }}>
-                {tickLabel(tick)}
-              </span>
-            ))}
+            <div />
+            <div className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground">
+              {ticks.map((tick) => (
+                <span key={tick} className="absolute -translate-x-1/2 pt-0.5 tabular-nums" style={{ left: pct(tick) }}>
+                  {tickLabel(tick)}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>

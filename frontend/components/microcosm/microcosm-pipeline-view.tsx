@@ -85,13 +85,13 @@ export function MicrocosmPipelineView() {
                     key={step.id}
                     className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-4 shadow-[var(--elev-1)]"
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2 max-md:flex-wrap">
                       <div className="text-sm font-medium leading-tight text-foreground">
                         {step.title}
                       </div>
                       <StatusPill tone="neutral">{step.id}</StatusPill>
                     </div>
-                    <div className="font-mono text-[11px] leading-snug text-primary/80">
+                    <div className="font-mono text-[11px] leading-snug text-primary/80 max-md:break-all">
                       {step.code}
                     </div>
                     <div className="text-xs leading-snug text-muted-foreground">

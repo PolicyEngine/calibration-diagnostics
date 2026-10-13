@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import { hasCapability, selectableCountries } from "@/lib/microcosm/countries";
 
 import {
+  activeNavItem,
   isActive,
   navGroupsForCountry,
   navItemHref,
@@ -128,4 +129,14 @@ test("shows Cross-dataset navigation for every selectable country", () => {
         .some((item) => item.href === "/microcosm/datasets"),
     ).toBe(true);
   }
+});
+
+test("names the page the reader is on for the phone-width nav bar", () => {
+  const uk = navGroupsForCountry("uk");
+  expect(activeNavItem("/microcosm/staging", uk)?.label).toBe("Staging candidates");
+  expect(activeNavItem("/microcosm", uk)?.label).toBe("Calibration fit");
+  expect(activeNavItem("/microcosm/datasets", uk)?.label).toBe("Cross-dataset");
+  // Drill-downs no item claims, and pages the country does not serve, have no label.
+  expect(activeNavItem("/microcosm/targets", uk)).toBeUndefined();
+  expect(activeNavItem("/microcosm/staging", navGroupsForCountry("be"))).toBeUndefined();
 });

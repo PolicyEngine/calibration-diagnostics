@@ -29,11 +29,14 @@ export function SiteHeader() {
         <a className="site-brand" href="/">
           <Wordmark />
         </a>
-        <span className="site-crumb-sep" aria-hidden="true">
+        {/* → the calibration strategy essay the dashboard sits beneath; this
+            middle step yields on phone widths (see .site-crumb-parent) */}
+        <span className="site-crumb-sep site-crumb-parent" aria-hidden="true">
           /
         </span>
-        {/* → the calibration strategy essay the dashboard sits beneath */}
-        <a href="/calibration">calibration</a>
+        <a className="site-crumb-parent" href="/calibration">
+          calibration
+        </a>
         <span className="site-crumb-sep" aria-hidden="true">
           /
         </span>
