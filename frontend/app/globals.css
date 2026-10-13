@@ -208,6 +208,13 @@ body::before {
   color: var(--amber);
   white-space: nowrap;
 }
+/* the full trail (wordmark / calibration / dashboard) runs under the GitHub
+   mark at phone widths; drop the middle step there and keep brand → dashboard */
+@media (max-width: 479.98px) {
+  .site-crumb-parent {
+    display: none;
+  }
+}
 
 .site-nav-links {
   display: flex;

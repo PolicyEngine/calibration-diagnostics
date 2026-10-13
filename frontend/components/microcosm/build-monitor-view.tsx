@@ -943,7 +943,9 @@ function TimelineCard({
       }
     >
       <div className="flex flex-col gap-1">
-        <div className="mt-2 grid grid-cols-[minmax(8rem,14rem)_1fr] gap-x-3 gap-y-1 text-xs">
+        {/* Below md the stage names keep 8rem so the bar track gets the rest of
+            a phone's width instead of what is left after a 14rem name column. */}
+        <div className="mt-2 grid grid-cols-[minmax(8rem,14rem)_1fr] gap-x-3 gap-y-1 text-xs max-md:grid-cols-[8rem_1fr]">
           <div className="font-medium text-muted-foreground">Whole run</div>
           <div ref={measureArea} className="relative h-6 rounded bg-muted/40">
             {rows.map((row) => (

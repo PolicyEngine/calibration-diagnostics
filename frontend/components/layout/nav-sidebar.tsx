@@ -15,7 +15,7 @@ import {
   selectableCountries,
 } from "@/lib/microcosm/countries";
 
-export function NavSidebar() {
+export function NavSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const pathname = usePathname();
   const { country, setCountry } = useCountry();
   const dataset = countryRegistration(country);
@@ -74,6 +74,7 @@ export function NavSidebar() {
                     key={item.href}
                     href={navItemHref(item, country)}
                     {...navLinkAttributes(item)}
+                    onClick={onNavigate}
                     className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-[13px] leading-tight transition-colors ${
                       active
                         ? "bg-primary/10 font-medium text-primary"
