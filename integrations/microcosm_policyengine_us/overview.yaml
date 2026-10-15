@@ -16,8 +16,9 @@ alignment_policy:
 source:
   source_id: populace_us_policyengine_us_2024
   source_type: model_dataset_pair
-  dataset_version: populace-us-2024@populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z
-  model_version: policyengine-us==1.764.6
+  # The release .py 6.4.1 certifies: Build P plus is_spm_independent_minor_role.
+  dataset_version: populace-us-2024@populace-us-2024-spm-20260915
+  model_version: policyengine[us]==6.4.1
   jurisdictions: [US]
   population_period: calendar_year:2024
   policy_period: tax_year:2024
