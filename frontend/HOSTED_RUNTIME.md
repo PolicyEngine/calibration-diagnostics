@@ -51,8 +51,13 @@ To upgrade:
 1. Bump `policyengine[us]` in `backend/requirements.txt` and regenerate the lock.
 2. Read the new .py's `data_releases.us` bundle entry, and set `hosted_release.json`'s
    data identity and `packages` to what that .py certifies and pins.
-3. Refresh the manifest fixtures under `tests/fixtures/`, then qualify the deployment
-   with the checks below.
+3. Refresh the manifest fixtures under `tests/fixtures/`.
+4. Regenerate `public/variable-catalog.json` in the hosted environment with
+   `python frontend/scripts/generate_variable_catalog.py`. It builds the catalog from a
+   simulation over the reviewed H5, verified by SHA-256 (`--dataset-file` reuses a
+   local copy), never from the country package's default dataset, and records the
+   release and package versions it used.
+5. Qualify the deployment with the checks below.
 
 ## Automated production deployment
 
