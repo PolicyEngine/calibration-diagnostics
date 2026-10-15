@@ -227,11 +227,11 @@ async function loadHuggingFaceStaging(
 }
 
 async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
-  const summaries = await loadCollectorRuns(country);
+  const summaries = await loadCollectorRuns(country, STAGING_RUN_LIMIT);
   const documents: BuildRunDocuments[] = [];
   const problems: BuildRunProblem[] = [];
   await Promise.all(
-    summaries.slice(0, STAGING_RUN_LIMIT).map(async (summary) => {
+    summaries.map(async (summary) => {
       const key = `collector:${country}:${summary.run_id}`;
       const cached = stagingRunCache.get(key);
       const summaryFinal = FINAL_STATUSES.has(summary.status);
