@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit && tsc --noEmit -p packages/calibration-tree",
-    "publish:calibration-tree": "bun run scripts/publish-calibration-tree.ts",
+    "publish:calibration-tree": "bun run packages/calibration-tree/src/publish-calibration-tree.ts",
     "test:dev-port": "node --test scripts/available-port.node-test.mjs",
     "replay:build-run": "bun run scripts/replay-build-run.ts"
   },

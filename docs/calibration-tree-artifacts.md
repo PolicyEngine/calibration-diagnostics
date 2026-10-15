@@ -6,14 +6,14 @@ the hierarchy. Schemas 1 through 5 are unsupported.
 
 ## Code
 
-The builder, the schema-6 types, parsers and serializers, the Blob I/O, and
-the release and staging readers the builder reads from live in the
-`@policyengine/calibration-tree` workspace package at
-`frontend/packages/calibration-tree/`. The dashboard and the publisher import
-it through its subpath exports, such as
-`@policyengine/calibration-tree/calibration-tree-bundle`. The package imports
-only its own modules, Node built-ins and `@vercel/blob`, and its boundary test
-enforces that.
+The builder, the schema-6 types, parsers and serializers, the Blob I/O, the
+release and staging readers the builder reads from, and the publisher
+(`src/publish-calibration-tree.ts`, run by `bun run publish:calibration-tree`)
+live in the `@policyengine/calibration-tree` workspace package at
+`frontend/packages/calibration-tree/`. The dashboard imports it through its
+subpath exports, such as `@policyengine/calibration-tree/calibration-tree-bundle`.
+The package imports only its own modules, Node built-ins and `@vercel/blob`,
+and its boundary test enforces that.
 
 `src/fixtures/calibration-tree-golden.json` records the exact bytes the builder
 writes for representative US and UK release and staging inputs, the

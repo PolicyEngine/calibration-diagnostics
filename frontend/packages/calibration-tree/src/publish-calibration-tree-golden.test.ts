@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 
-import recordedGoldens from "../packages/calibration-tree/src/fixtures/calibration-tree-golden.json";
+import recordedGoldens from "./fixtures/calibration-tree-golden.json";
 import {
   emptyCalibrationTreeManifest,
   withCalibrationTreeManifestEntry,
@@ -12,11 +12,11 @@ import {
   withRegisteredRepositories,
   type CalibrationTreeGoldenRecord,
   type GoldenReleaseInput,
-} from "../packages/calibration-tree/src/test-support/calibration-tree-golden-cases";
+} from "./test-support/calibration-tree-golden-cases";
 import {
   reconcileReleaseBuilds,
   type CalibrationManifestStore,
-} from "./publish-calibration-tree";
+} from "@policyengine/calibration-tree/publish-calibration-tree";
 
 // A repair rebuilds a published release whose index went missing and refuses
 // any rebuilt index whose digest differs from the manifest entry. Seeding the

@@ -15,7 +15,7 @@ import {
   withCalibrationTreeManifestEntry,
   type CalibrationTreeManifest,
   type CalibrationTreeManifestEntry,
-} from "@policyengine/calibration-tree/calibration-tree-manifest";
+} from "./calibration-tree-manifest";
 
 const originalFetch = globalThis.fetch;
 

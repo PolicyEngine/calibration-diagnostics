@@ -22,6 +22,7 @@
     "./latest-artifact": "./src/latest-artifact.ts",
     "./legacy-target-reader": "./src/legacy-target-reader.ts",
     "./program-label": "./src/program-label.ts",
+    "./publish-calibration-tree": "./src/publish-calibration-tree.ts",
     "./reforms": "./src/reforms.ts",
     "./source-label": "./src/source-label.ts",
     "./source-labels": "./src/source-labels.ts",
@@ -36,6 +37,7 @@
     "./target-surface-matcher": "./src/target-surface-matcher.ts"
   },
   "scripts": {
+    "publish:calibration-tree": "bun run src/publish-calibration-tree.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
