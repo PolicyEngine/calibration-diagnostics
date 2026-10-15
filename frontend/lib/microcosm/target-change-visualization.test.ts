@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 import type {
   CalibrationTreeGroup,
   CalibrationTreeMetrics,
-} from "./calibration-tree";
-import type { TargetChangeRow } from "./target-change";
+} from "@policyengine/calibration-tree/calibration-tree";
+import type { TargetChangeRow } from "@policyengine/calibration-tree/target-change";
 import {
   formatTargetChange,
   targetChangeDetailValues,

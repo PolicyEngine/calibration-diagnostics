@@ -3,9 +3,9 @@ import { describe, expect, test } from "bun:test";
 import {
   createExplorerState,
   type ExplorerState,
-} from "./calibration-explorer";
-import type { Calibration } from "./latest-artifact";
-import { buildTargetChangeDataset } from "./target-change";
+} from "@policyengine/calibration-tree/calibration-explorer";
+import type { Calibration } from "@policyengine/calibration-tree/latest-artifact";
+import { buildTargetChangeDataset } from "@policyengine/calibration-tree/target-change";
 import { buildTargetChangeTree } from "./target-change-tree";
 
 interface RowInput {

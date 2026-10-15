@@ -6,7 +6,7 @@ import {
   DEFAULT_COUNTRY,
   countryRegistration,
   type MicrocosmCountry,
-} from "../microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 interface CountryArtifactConfig {
   countryCode: string;

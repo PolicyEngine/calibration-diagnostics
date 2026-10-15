@@ -1,7 +1,7 @@
 import type { GetBlobResult } from "@vercel/blob";
 import { NextResponse } from "next/server";
 
-import { calibrationTreeBlobText } from "./calibration-tree-blob";
+import { calibrationTreeBlobText } from "@policyengine/calibration-tree/calibration-tree-blob";
 
 function acceptsGzip(request: Request): boolean {
   return (request.headers.get("accept-encoding") ?? "")

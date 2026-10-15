@@ -1,2 +1,7 @@
+[install]
+# Keep the hoisted node_modules layout that Next.js and Vercel build against.
+# Bun otherwise installs a project with workspaces using its isolated linker.
+linker = "hoisted"
+
 [test]
 preload = ["./test/setup.ts"]

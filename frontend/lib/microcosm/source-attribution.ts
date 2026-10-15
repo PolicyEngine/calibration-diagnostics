@@ -2,7 +2,7 @@ import {
   countryRegistration,
   type MicrocosmCountry,
   type RepositoryVisibility,
-} from "./countries";
+} from "@policyengine/calibration-tree/countries";
 
 export interface MicrocosmSourceAttribution {
   label: string;

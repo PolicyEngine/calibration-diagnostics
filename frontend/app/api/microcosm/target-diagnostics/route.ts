@@ -6,7 +6,7 @@ import {
   loadRelease,
   parseCountry,
   scrub,
-} from "@/lib/microcosm/latest-artifact";
+} from "@policyengine/calibration-tree/latest-artifact";
 
 export const revalidate = 21_600;
 export const runtime = "nodejs";

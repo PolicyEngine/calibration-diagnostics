@@ -2,12 +2,12 @@ import type { Placed } from "@/lib/treemap/squarify";
 import type {
   CalibrationTreeChangeMetrics,
   CalibrationTreeGroup,
-} from "./calibration-tree";
+} from "@policyengine/calibration-tree/calibration-tree";
 import { aggregateCalibrationTreeMetrics } from "./calibration-treemap-layout";
 import type {
   TargetChangeMode,
   TargetChangeRow,
-} from "./target-change";
+} from "@policyengine/calibration-tree/target-change";
 
 export type TargetChangeDirection = "increase" | "reduction";
 

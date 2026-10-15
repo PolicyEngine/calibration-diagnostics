@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { readCalibrationTreeManifest } from "@/lib/microcosm/calibration-tree-blob";
-import { calibrationTreeCountryManifest } from "@/lib/microcosm/calibration-tree-manifest";
+import { readCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-blob";
+import { calibrationTreeCountryManifest } from "@policyengine/calibration-tree/calibration-tree-manifest";
 import {
   isCountry,
   selectableCountries,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

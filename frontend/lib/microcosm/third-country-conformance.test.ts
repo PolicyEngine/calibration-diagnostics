@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { isCountry as isClientCountry } from "@/components/layout/country-context";
 import { navGroupsForCountry } from "@/components/layout/nav-items";
-import { countryCapabilities, selectableCountries } from "@/lib/microcosm/countries";
-import { sourceAuthorityLabel } from "@/lib/source-labels";
+import { countryCapabilities, selectableCountries } from "@policyengine/calibration-tree/countries";
+import { sourceAuthorityLabel } from "@policyengine/calibration-tree/source-labels";
 
 import diagnosticsFixture from "./fixtures/zz-release/calibration_diagnostics.json";
 import releaseManifestFixture from "./fixtures/zz-release/release_manifest.json";
@@ -17,7 +17,7 @@ import {
   microcosmRevision,
   microcosmTargetTreemap,
   parseCountry,
-} from "./latest-artifact";
+} from "@policyengine/calibration-tree/latest-artifact";
 
 const COUNTRY = "zz" as const;
 const RELEASE_ID = "microcosm-zz-2026-conformance";

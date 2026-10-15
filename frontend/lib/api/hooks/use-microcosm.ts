@@ -17,8 +17,8 @@ import {
 import { withBasePath } from "@/lib/base-path";
 import type { BuildRunSource } from "@/lib/microcosm/build-monitor";
 import type { BuildRunResponse, BuildRunsResponse } from "@/lib/microcosm/build-runs";
-import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
-import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
+import type { ExplorerState } from "@policyengine/calibration-tree/calibration-explorer";
+import type { CalibrationTreeResponse } from "@policyengine/calibration-tree/calibration-tree";
 import {
   calibrationTreeResponseFromBundle,
   calibrationTreeTargetDetailSelection,
@@ -34,12 +34,12 @@ import {
   type CalibrationTreeTargetDetailsArtifact,
   type CalibrationTreeTargetSummaryArtifact,
   type CalibrationTreeTierArtifact,
-} from "@/lib/microcosm/calibration-tree-artifact";
-import type { CalibrationProvenance } from "@/lib/microcosm/target-loss-attribution";
+} from "@policyengine/calibration-tree/calibration-tree-artifact";
+import type { CalibrationProvenance } from "@policyengine/calibration-tree/target-loss-attribution";
 import type {
   TargetChangeMode,
   TargetChangeRow,
-} from "@/lib/microcosm/target-change";
+} from "@policyengine/calibration-tree/target-change";
 import type {
   TargetChangeTreeApiResponse,
   TargetChangeTreeResponse,
@@ -49,7 +49,7 @@ import {
   hasCapability,
   type CountryCapability,
   type RepositoryVisibility,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 import { apiGet } from "../client";
 
 export interface MicrocosmGates {

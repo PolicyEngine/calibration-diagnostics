@@ -15,7 +15,7 @@ import {
   withCalibrationTreeManifestEntry,
   type CalibrationTreeManifest,
   type CalibrationTreeManifestEntry,
-} from "../lib/microcosm/calibration-tree-manifest";
+} from "@policyengine/calibration-tree/calibration-tree-manifest";
 
 const originalFetch = globalThis.fetch;
 

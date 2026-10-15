@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { hasCapability } from "@/lib/microcosm/countries";
+import { hasCapability } from "@policyengine/calibration-tree/countries";
 import {
   loadPointerReleaseId,
   parseCountry,
   scrub,
-} from "@/lib/microcosm/latest-artifact";
-import { loadStagingComparison } from "@/lib/microcosm/staging-artifact";
+} from "@policyengine/calibration-tree/latest-artifact";
+import { loadStagingComparison } from "@policyengine/calibration-tree/staging-artifact";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
