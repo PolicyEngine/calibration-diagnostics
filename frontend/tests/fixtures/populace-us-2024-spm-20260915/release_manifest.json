@@ -1,0 +1,108 @@
+{
+  "artifacts": {
+    "build_manifest": {
+      "kind": "evidence",
+      "path": "build_manifest.json",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "f3fd734867324bca7619f5f083a8115e32104bea3948d48723b345cfd39fa03b"
+    },
+    "calibration_diagnostics": {
+      "kind": "evidence",
+      "path": "calibration_diagnostics.json",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "870449b44e86b13b25bcea1a57f0e7af37f4d4db18be815eea3acdf9fe6eb40e"
+    },
+    "parent_build_manifest": {
+      "kind": "evidence",
+      "path": "parent_build_manifest.json",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "1990e8fd37ce66f499b8e6600c5896701bb07015be132a12de64e321a2edc67e"
+    },
+    "parent_release_manifest": {
+      "kind": "evidence",
+      "path": "parent_release_manifest.json",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "dd949ba3c4c7a56aff8442c6db5a031d2c84c3da59f5d14832f468c358604506"
+    },
+    "populace_us_2024": {
+      "kind": "microdata",
+      "path": "populace_us_2024.h5",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "6496cc4393d4d3c6574f76eca231de5898c803b9067645591fd5c4d3e65aee84"
+    },
+    "source_enrichment": {
+      "kind": "evidence",
+      "path": "source_enrichment.json",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "85329907b2b9c4299855b0970b1f24ede5819d3b16c312eb7400b4203bd71203"
+    },
+    "source_enrichment_compatibility": {
+      "kind": "diagnostics",
+      "path": "source_enrichment_compatibility.json",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "63109acffd486453c99c476dece6b0154cc5388e5a430830a30744a2249444d1"
+    },
+    "source_spm_independence_provenance": {
+      "kind": "evidence",
+      "path": "source_spm_independence_provenance.json",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "265e844178ed3856d68c1638820f3089e0e1e1363aa4677e33bebb37cbd5bff3"
+    },
+    "source_spm_person_independence": {
+      "kind": "evidence",
+      "path": "source_spm_person_independence.csv",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "22b5968d90fecfeef7614583e493fe10cc16bda8b5be82e6f49a5bc2102d3ce5"
+    },
+    "us_source_coverage": {
+      "kind": "evidence",
+      "path": "us_source_coverage.json",
+      "repo_id": "policyengine/populace-us",
+      "revision": "populace-us-2024-spm-20260915",
+      "sha256": "6406c8686c292015a5bc7265a42402f89935f9395a8b63510efdd4d9562e7ff5"
+    }
+  },
+  "build": {
+    "build_id": "populace-us-2024-spm-20260915",
+    "built_with_core_package": {
+      "name": "policyengine-core",
+      "version": "3.32.5"
+    },
+    "built_with_model_package": {
+      "name": "policyengine-us",
+      "version": "2.2.1"
+    }
+  },
+  "compatible_core_packages": [
+    {
+      "name": "policyengine-core",
+      "specifier": "==3.32.5"
+    }
+  ],
+  "compatible_model_packages": [
+    {
+      "basis": "publisher_claim",
+      "declared_by": "Max Ghenis via Claude, 2026-09-15: same H5 bytes as populace-us-2024-spm-20260909; native loader path, role variable and dataset pin unchanged across 2.0.x\u20132.2.x; see PolicyEngine/policyengine-us#9467",
+      "name": "policyengine-us",
+      "specifier": ">=2.0.0,<2.3"
+    }
+  ],
+  "data_package": {
+    "name": "microcosm-data",
+    "version": "0.1.0"
+  },
+  "default_datasets": {
+    "national": "populace_us_2024"
+  },
+  "release_type": "source_enrichment",
+  "schema_version": 1
+}

@@ -2,14 +2,57 @@
 
 The Next.js dashboard proxies variable requests to a private Modal service. The service
 executes `scripts/microcosm_variable_core.py`, also used by the local command-line tool,
-and verifies the reviewed model tuple, both release manifests, and the H5 bytes before
-constructing a native PolicyEngine microsimulation. Weighted results use MicroSeries.
-The root evaluation environment and its recorded outputs remain separate.
+and verifies the installed .py version and the model versions it pins, both release
+manifests, the data certification and the H5 bytes before constructing a native
+PolicyEngine microsimulation. Weighted results use MicroSeries. The root evaluation
+environment and its recorded outputs remain separate.
 
 The runtime uses Python 3.12 and the hashed `../backend/requirements.lock`. Regenerate
 that lock with `uv pip compile backend/requirements.txt --python-version 3.12
 --generate-hashes --output-file backend/requirements.lock` from the repository root.
-Upgrade the country model, Core, SPM and `scripts/hosted_release.json` together.
+
+## Model and data identity
+
+.py (the PyPI package `policyengine`) is the model identity, and
+`backend/requirements.txt` declares only `policyengine[us]==VERSION`. **Upgrade by
+bumping .py; the dataset must be one that version of .py certifies.** Never pin
+`policyengine-us`, `policyengine-core` or `spm-calculator` directly; a test fails if a
+bare pin reappears. `scripts/hosted_release.json` records the certifying .py version
+in `certifying_package` and the reviewed data identity: repository, immutable commit
+`hf_revision`, release ID, H5 filename and SHA-256, data year, and the canonical
+digests of both release manifests.
+
+`scripts/hosted_release.py` enforces the identity in two places:
+
+- `validate_runtime` requires the installed .py to be the reviewed version, derives
+  the exact `policyengine-us`, `policyengine-core` and `spm-calculator` versions from
+  that .py's `us` extra, requires the `packages` block to equal them, and requires the
+  installed versions to equal them exactly. It runs before any manifest or H5 download.
+- `validate_manifests` checks both manifest digests and the release's own identity
+  fields, then requires the installed .py's bundle manifest
+  (`policyengine/data/bundle/manifest.json`) to certify this release: its release ID,
+  revision, dataset URI and SHA-256, manifest paths, model version, and the digest of
+  every release file it records, including the parent release and build manifests.
+
+The release's own built-with Core version and its build manifest's `runtime` block are
+not the identity: .py is. For the same reason the build manifest's exported-household
+count is checked by `verify_hosted_runtime.py --dataset-file` only when the
+.py-certified build records one.
+
+The reviewed release is `populace-us-2024-spm-20260915`, the US dataset .py 6.4.1
+certifies. It is a source-enrichment release of
+`populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`: the same tables
+and calibration plus `is_spm_independent_minor_role`, which `policyengine-us` 2.x
+requires to calculate SPM thresholds. Its parent manifests are the Build P manifests
+previously reviewed here.
+
+To upgrade:
+
+1. Bump `policyengine[us]` in `backend/requirements.txt` and regenerate the lock.
+2. Read the new .py's `data_releases.us` bundle entry, and set `hosted_release.json`'s
+   data identity and `packages` to what that .py certifies and pins.
+3. Refresh the manifest fixtures under `tests/fixtures/`, then qualify the deployment
+   with the checks below.
 
 ## Automated production deployment
 
@@ -80,14 +123,20 @@ serializes requests (`max_inputs=1`, one container). It scales to zero. Its work
 holds the normal HF download; there is no Vercel RAM-backed HDF5 workaround. Observe the
 actual deployed allocation and response resource measurements rather than assuming the
 requested allocation is sufficient.
-The identical local SPM reference peaked at approximately 12 GB; an 8 GiB hosted
-allocation did not complete the calculation. The required checks below must still pass.
+Under policyengine-us 1.764.6 the local SPM reference peaked at approximately 12 GB, and
+an 8 GiB hosted allocation did not complete the calculation. Under .py 6.4.1
+(policyengine-us 2.2.1, spm-calculator 1.0.0), a local national `spm_unit_spm_threshold`
+calculation, then `ca_income_tax`, then the national threshold again, peaked at about
+1 GB resident memory (macOS, 2026-10-16). Keep the 16 GiB allocation until a hosted
+measurement under the new tuple is recorded. The required checks below must still pass.
 The service loads only the reviewed 2024 input. It validates the native dataset year and
 wraps that `USSingleYearDataset` in a one-entry `USMultiYearDataset` before constructing
 the simulation. This compatibility step prevents the pinned country package from
-automatically allocating copies for later economic-assumption years. Remove the wrapper
-only after upgrading to a country-package version that supports an explicit extension
-end year, and qualify that upgrade with the same calculation checks.
+automatically allocating copies for later economic-assumption years: policyengine-us
+2.2.1's `Microsimulation` still extends a single-year dataset through every
+economic-assumption year and does not let the caller set the end year. Remove the
+wrapper only after upgrading to a country-package version that does, and qualify that
+upgrade with the same calculation checks.
 Only one native simulation stays resident: changing between national and state scopes
 evicts the preceding simulation before loading the next input tables. Same-scope requests
 can reuse it; mixed variable lists may rebuild when their scopes change.
@@ -118,7 +167,7 @@ explicitly. Without a remote URL, local calculations still use the shared Python
    selection and answers 409. A 200 metadata receipt therefore also records that this
    deployment is not carrying a stale override.
 2. On a fresh backend deployment, run a genuine `spm_unit_spm_threshold` lookup for 2024
-   on the pinned BuildP release through the exact Next preview. Require JSON 200, verified
+   on the pinned release through the exact Next preview. Require JSON 200, verified
    H5 SHA-256, exact model/source identity, `execution.simulation_cache_hits.national=false`
    and a non-null weighted result. Require comparison with a separately executed reference
    using the identical source, package tuple and immutable H5. An older Core version's

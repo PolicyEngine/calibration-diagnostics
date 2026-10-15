@@ -1,17 +1,20 @@
 """Check the hosted dependency assembly and imported APIs without a population.
 
-Run from the repository root with the hosted requirements installed separately
-from the frozen scientific checkpoint:
+The Modal image runs this while it is built. Run it from the repository root
+with the hosted requirements installed separately from the root evaluation
+environment:
     uv run --no-sync python frontend/scripts/verify_hosted_runtime.py
 """
 
 import argparse
 import inspect
 import json
+import math
 import os
 import sys
-from importlib import import_module, metadata
+from importlib import metadata
 from pathlib import Path
+from typing import Any
 
 from packaging.requirements import Requirement
 
@@ -19,15 +22,69 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.hosted_release import (
     load_verified_native_input,
+    recorded_household_count,
     reviewed_release,
     validate_manifests,
     validate_runtime,
 )
 from scripts.runtime_identity import runtime_identity
 
+# spm-calculator installs these on the country system; the deployment checks
+# calculate the first one.
+SPM_MEASUREMENT_VARIABLES = (
+    "spm_unit_spm_threshold",
+    "spm_unit_reference_spm_threshold",
+    "spm_unit_geographic_adjustment",
+)
+
+
+def verify_source_apis(data_year: int) -> dict[str, Any]:
+    """Bind the country, data and SPM APIs the hosted code uses; load no population."""
+    from huggingface_hub import hf_hub_download
+    from policyengine_us import Microsimulation
+    from policyengine_us.data import USMultiYearDataset, USSingleYearDataset
+    from policyengine_us.spm import DATASET_SOURCE_INPUTS, create_spm_provider
+    from policyengine_us.system import system
+
+    # Bind supported signatures, without invoking a simulation or a download.
+    inspect.signature(Microsimulation).bind(dataset="not-loaded.h5")
+    inspect.signature(USSingleYearDataset).bind(file_path="not-loaded.h5")
+    inspect.signature(USMultiYearDataset).bind(datasets=[])
+    inspect.signature(hf_hub_download).bind(
+        repo_id="policyengine/populace-us",
+        filename="populace_us_2024.h5",
+        revision="not-downloaded",
+        repo_type="dataset",
+    )
+    for variable_name in (*SPM_MEASUREMENT_VARIABLES, *sorted(DATASET_SOURCE_INPUTS)):
+        if system.get_variable(variable_name) is None:
+            raise RuntimeError(f"The country system does not define {variable_name}")
+    # Both the default county provider and an explicit national provider read
+    # spm-calculator's bundled, hash-verified forecast; neither downloads data.
+    create_spm_provider()
+    national_provider = create_spm_provider({"geography_kind": "national"})
+    reference_unit = national_provider.calculate_unit(
+        year=data_year, adults=2, children=2, tenure="renter"
+    )
+    reference_threshold = reference_unit["reference_threshold"]
+    if not isinstance(reference_threshold, float) or not math.isfinite(
+        reference_threshold
+    ):
+        raise RuntimeError("The SPM forecast returned no reference threshold")
+    if reference_threshold <= 0:
+        raise RuntimeError("The SPM forecast returned a non-positive threshold")
+    return {
+        "data_year": data_year,
+        "forecast_id": reference_unit["forecast_id"],
+        "forecast_sha256": national_provider.forecast.content_sha256,
+        "national_reference_threshold": reference_threshold,
+        "reference_unit": "two adults, two children, renter",
+        "dataset_source_inputs": sorted(DATASET_SOURCE_INPUTS),
+    }
+
 
 def main() -> None:
-    """Check installed requirements and the legacy APIs the hosted code uses."""
+    """Check installed requirements and the APIs the hosted code uses."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset-file", type=Path)
     parser.add_argument("--release-manifest", type=Path)
@@ -54,33 +111,12 @@ def main() -> None:
         if installed not in requirement.specifier:
             raise RuntimeError(f"{requirement} is required; found {installed}")
 
-    from huggingface_hub import hf_hub_download
-    from policyengine_us import Microsimulation
-    from policyengine_us.data import USSingleYearDataset
-    from spm_calculator.forecast import (
-        HISTORICAL_THRESHOLDS,
-        get_latest_published_year,
-    )
-    from spm_calculator.geoadj import get_cd_geoadj
-
-    # Bind supported signatures, without invoking a simulation or a download.
-    inspect.signature(Microsimulation).bind(dataset="not-loaded.h5")
-    inspect.signature(USSingleYearDataset).bind(file_path="not-loaded.h5")
-    inspect.signature(hf_hub_download).bind(
-        repo_id="policyengine/populace-us",
-        filename="populace_us_2024.h5",
-        revision="not-downloaded",
-        repo_type="dataset",
-    )
-    if get_latest_published_year() not in HISTORICAL_THRESHOLDS:
-        raise RuntimeError("The installed legacy SPM threshold table is incomplete")
-    inspect.signature(get_cd_geoadj).bind(6001, year=2023, tenure="renter")
-    for module in (
-        "spm_unit_reference_spm_threshold",
-        "spm_unit_geographic_adjustment",
-    ):
-        import_module(f"policyengine_us.variables.household.income.spm_unit.{module}")
-    receipt = {"runtime": runtime_identity(), "source_api_imports": "passed"}
+    spm_measurement = verify_source_apis(int(config["data_year"]))
+    receipt = {
+        "runtime": runtime_identity(),
+        "source_api_imports": "passed",
+        "spm_measurement": spm_measurement,
+    }
     if args.dataset_file:
         release = json.loads(args.release_manifest.read_text())
         build = json.loads(args.build_manifest.read_text())
@@ -88,7 +124,10 @@ def main() -> None:
         dataset = load_verified_native_input(args.dataset_file, config)
         arrays = dataset.load()
         household_rows = len(dataset.household)
-        if household_rows != build["dataset"]["default"]["n_exported_households"]:
+        # validate_manifests has already required the pinned .py's certification;
+        # only a .py-certified build may omit its exported household count.
+        expected_households = recorded_household_count(build)
+        if expected_households is not None and household_rows != expected_households:
             raise RuntimeError("Native input row count differs from the reviewed build")
         if (
             not dataset.person["person_household_id"]
@@ -103,6 +142,11 @@ def main() -> None:
             "data_format": dataset.data_format,
             "table_rows": dict(zip(dataset.table_names, map(len, dataset.tables))),
             "input_variable_count": len(arrays),
+            "household_count_check": (
+                "build manifest"
+                if expected_households is not None
+                else "not recorded by the .py-certified build manifest"
+            ),
             "person_household_links": "passed",
             "microsimulation_constructed": False,
             "policy_variables_calculated": False,
