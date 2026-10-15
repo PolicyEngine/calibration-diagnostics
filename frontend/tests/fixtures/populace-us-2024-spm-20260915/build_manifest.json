@@ -1,0 +1,40 @@
+{
+  "build_id": "populace-us-2024-spm-20260915",
+  "calibration": {
+    "diagnostics_schema_version": 5,
+    "diagnostics_sha256": "870449b44e86b13b25bcea1a57f0e7af37f4d4db18be815eea3acdf9fe6eb40e",
+    "mode": "inherited",
+    "parent_build_id": "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z"
+  },
+  "code": {
+    "git_commit": "743683b0e121378e93c9b426cd9c79d41d29595b",
+    "git_dirty": false,
+    "repository": "https://github.com/PolicyEngine/microcosm",
+    "runtime": {
+      "h5py": "3.16.0",
+      "hdf5": "2.0.0",
+      "microcosm-data": "0.1.0",
+      "numpy": "2.4.6",
+      "pandas": "3.0.3",
+      "python": "3.14.4",
+      "tables": "3.11.1"
+    },
+    "source_files_sha256": {
+      "packages/microcosm-build/src/microcosm/build/us_runtime/education_assistance_source.py": "e259e3fce64fdcab62953f79a1aa41719f81c64c7c5dc1a63f8b1e493ff5f83a",
+      "packages/microcosm-build/src/microcosm/build/us_runtime/spm_role_source.py": "a6cb7a9d9da95e584570b5d8d9a5fafed6334532e490cdd970805217872d6541",
+      "packages/microcosm-data/src/microcosm/data/contract.py": "0aac12b95586a6924ef8f03cedf4fe80a9a933892fcb4ab23dda0eb65db6159c",
+      "packages/microcosm-data/src/microcosm/data/h5_enrichment.py": "60d1f747bc21d17c892a16abd78f1cf33699a96f26425a2e79b4db9d037ab323",
+      "packages/microcosm-data/src/microcosm/data/source_enrichment.py": "14a63acb510fb43c79a917761b1ed3e7f4b11c08ebf586a8750afb461784f2cd",
+      "tools/build_us_spm_role_enrichment.py": "93f2ddaa4682d090125629c6e6b56f54d06509ecabfab7bece2c31e8be6c2493"
+    }
+  },
+  "dataset": {
+    "filename": "populace_us_2024.h5",
+    "sha256": "6496cc4393d4d3c6574f76eca231de5898c803b9067645591fd5c4d3e65aee84"
+  },
+  "release_type": "source_enrichment",
+  "staging": {
+    "enabled": false,
+    "reason": "local source-enrichment candidate; no calibration"
+  }
+}
