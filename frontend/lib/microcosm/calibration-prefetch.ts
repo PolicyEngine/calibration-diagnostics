@@ -1,8 +1,8 @@
 import {
   nextLevelExplorerStates,
   type ExplorerState,
-} from "./calibration-explorer";
-import type { CalibrationTreeResponse } from "./calibration-tree";
+} from "@policyengine/calibration-tree/calibration-explorer";
+import type { CalibrationTreeResponse } from "@policyengine/calibration-tree/calibration-tree";
 
 export type CalibrationTreeFetcher = (
   state: ExplorerState,

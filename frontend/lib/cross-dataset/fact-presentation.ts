@@ -4,9 +4,9 @@ import type {
   SourceSummary,
 } from "./artifact";
 import type { Country } from "@/components/layout/country-context";
-import { DEFAULT_COUNTRY, isCountry } from "@/lib/microcosm/countries";
+import { DEFAULT_COUNTRY, isCountry } from "@policyengine/calibration-tree/countries";
 import { sourceDisplayLabel } from "./presentation";
-import { sourceAuthorityLabel } from "../source-labels";
+import { sourceAuthorityLabel } from "@policyengine/calibration-tree/source-labels";
 
 export interface FactCatalogParams {
   country: Country;

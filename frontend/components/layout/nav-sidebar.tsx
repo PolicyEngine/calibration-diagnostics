@@ -13,7 +13,7 @@ import {
 import {
   countryRegistration,
   selectableCountries,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 export function NavSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const pathname = usePathname();

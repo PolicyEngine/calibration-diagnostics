@@ -13,24 +13,24 @@ import {
   loadRelease,
   microcosmCountryGeography,
   microcosmRepo,
-} from "@/lib/microcosm/latest-artifact";
-import type { CalibrationTreeSourceArtifact } from "@/lib/microcosm/calibration-tree-artifact";
+} from "./latest-artifact";
+import type { CalibrationTreeSourceArtifact } from "./calibration-tree-artifact";
 import {
   countryRegistration,
   resolveRegisteredStagingRepository,
   type RepositoryEnvironment,
   type ResolvedRepository,
-} from "@/lib/microcosm/countries";
+} from "./countries";
 import {
   type ReformValidation,
   buildReformValidation,
-} from "@/lib/microcosm/reforms";
+} from "./reforms";
 import {
   buildTargetChangeDataset,
   type TargetChangeDataset,
-} from "@/lib/microcosm/target-change";
-import { buildTargetChangeDatasetFromSummaryAndCalibration } from "@/lib/microcosm/calibration-build-comparison";
-import { loadCalibrationComparisonSource } from "@/lib/microcosm/calibration-comparison-blob";
+} from "./target-change";
+import { buildTargetChangeDatasetFromSummaryAndCalibration } from "./calibration-build-comparison";
+import { loadCalibrationComparisonSource } from "./calibration-comparison-blob";
 import {
   IncompatibleStagingDataError,
   isStructuredStagingDocument,
@@ -41,7 +41,7 @@ import {
   parseStagingRunIndex,
   validateStagingRunConsistency,
   type StagingSchemaVersion,
-} from "@/lib/microcosm/staging-contract";
+} from "./staging-contract";
 
 type JsonObject = Record<string, unknown>;
 

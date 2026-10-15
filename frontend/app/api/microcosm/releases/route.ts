@@ -5,7 +5,7 @@ import {
   loadReleases,
   parseCountry,
   scrub,
-} from "@/lib/microcosm/latest-artifact";
+} from "@policyengine/calibration-tree/latest-artifact";
 
 export const revalidate = 60;
 

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { hasCapability, selectableCountries } from "@/lib/microcosm/countries";
+import { hasCapability, selectableCountries } from "@policyengine/calibration-tree/countries";
 
 import {
   activeNavItem,

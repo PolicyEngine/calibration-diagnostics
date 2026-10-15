@@ -13,7 +13,7 @@ import {
   DEFAULT_COUNTRY,
   isCountry,
   type MicrocosmCountry,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 export type Country = MicrocosmCountry;
 

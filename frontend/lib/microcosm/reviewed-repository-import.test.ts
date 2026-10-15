@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { COUNTRY_REGISTRY } from "./countries";
+import { COUNTRY_REGISTRY } from "@policyengine/calibration-tree/countries";
 
 // A US-only data-selection conflict must fail US reads only. Asserting it while
 // building the repository table would throw during module import instead, taking

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { parseBuildSource } from "@/lib/microcosm/build-source";
 import { loadBuildRun } from "@/lib/microcosm/build-runs";
-import { parseCountry, scrub } from "@/lib/microcosm/latest-artifact";
+import { parseCountry, scrub } from "@policyengine/calibration-tree/latest-artifact";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

@@ -1,11 +1,11 @@
 import {
   CALIBRATION_TREE_SCHEMA_VERSION,
   type CalibrationTreeSourceArtifact,
-} from "../lib/microcosm/calibration-tree-artifact";
+} from "./calibration-tree-artifact";
 import {
   buildCalibrationTreeBundle,
   type CalibrationTreeBundleFile,
-} from "../lib/microcosm/calibration-tree-bundle";
+} from "./calibration-tree-bundle";
 import {
   auditCalibrationTreeBuild,
   listCalibrationTreeBlobs,
@@ -13,12 +13,12 @@ import {
   updateCalibrationTreeManifest,
   uploadCalibrationTreeBundle,
   type CalibrationTreeBuildAudit,
-} from "../lib/microcosm/calibration-tree-blob";
+} from "./calibration-tree-blob";
 import type { ListBlobResultBlob } from "@vercel/blob";
 import type {
   CalibrationTreeManifest,
   CalibrationTreeManifestEntry,
-} from "../lib/microcosm/calibration-tree-manifest";
+} from "./calibration-tree-manifest";
 import { createHash } from "node:crypto";
 import {
   CalibrationReleaseNotFoundError,
@@ -26,24 +26,24 @@ import {
   resolveHfReleaseDirectorySha,
   resolveHfRepositoryCommitPublishedAt,
   resolveHfRevisionSha,
-} from "../lib/microcosm/calibration-release-locator";
+} from "./calibration-release-locator";
 import {
   isCountry,
   selectableCountries,
   type MicrocosmCountry,
-} from "../lib/microcosm/countries";
+} from "./countries";
 import {
   buildCalibration,
   loadReleases,
   microcosmRepo,
   microcosmRevision,
-} from "../lib/microcosm/latest-artifact";
+} from "./latest-artifact";
 import {
   loadStagingRuns,
   resolveStagingCalibrationSource,
   resolveStagingRevisionSha,
   stagingRepository,
-} from "../lib/microcosm/staging-artifact";
+} from "./staging-artifact";
 
 type JsonObject = Record<string, unknown>;
 
