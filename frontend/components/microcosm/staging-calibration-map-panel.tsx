@@ -15,7 +15,10 @@ import {
 import {
   calibrationBuildManifestState,
   calibrationBuildsNewestFirst,
+  defaultComparisonBuildArtifactId,
+  stagingComparisonBaseline,
 } from "@/lib/microcosm/calibration-selection";
+import type { StagingComparisonRelease } from "@policyengine/calibration-tree/staging-artifact";
 import { targetChangeMapIdentity } from "@/lib/microcosm/target-change-visualization";
 
 type CalibrationMapView = "candidate" | "comparison";
@@ -61,14 +64,16 @@ function BuildSelect({
 
 function CalibrationMapViewSelect({
   value,
+  comparisonLabel,
   onChange,
 }: {
   value: CalibrationMapView;
+  comparisonLabel: string;
   onChange: (value: CalibrationMapView) => void;
 }) {
   const options: Array<{ value: CalibrationMapView; label: string }> = [
     { value: "candidate", label: "Candidate fit" },
-    { value: "comparison", label: "Change from current release" },
+    { value: "comparison", label: comparisonLabel },
   ];
 
   return (
@@ -103,6 +108,7 @@ function CalibrationMapViewSelect({
 export function StagingCalibrationMapPanel({
   runId,
   comparisonReleaseId,
+  comparisonRelease,
   comparisonRows,
   weightedTargetErrorChange,
   pageIntroHeight,
@@ -112,6 +118,7 @@ export function StagingCalibrationMapPanel({
 }: {
   runId: string;
   comparisonReleaseId?: string;
+  comparisonRelease?: StagingComparisonRelease;
   comparisonRows?: MicrocosmComparisonRow[];
   weightedTargetErrorChange: number | null;
   pageIntroHeight: number;
@@ -120,6 +127,7 @@ export function StagingCalibrationMapPanel({
   comparisonDetail?: string | null;
 }) {
   const [view, setView] = useState<CalibrationMapView>("candidate");
+  const comparisonBaseline = stagingComparisonBaseline(comparisonRelease);
   const {
     data: buildManifest,
     isLoading: buildManifestLoading,
@@ -146,16 +154,23 @@ export function StagingCalibrationMapPanel({
     setCurrentBuildArtifactId((current) =>
       builds.some((build) => build.buildArtifactId === current)
         ? current
-        : buildManifest?.latestReleaseBuildArtifactId ??
-          builds[0]?.buildArtifactId ??
-          "",
+        : defaultComparisonBuildArtifactId({
+            builds,
+            latestReleaseBuildArtifactId: buildManifest?.latestReleaseBuildArtifactId,
+            comparisonReleaseId,
+          }),
     );
     setCandidateBuildArtifactId((candidate) =>
       candidate && builds.some((build) => build.buildArtifactId === candidate)
         ? candidate
         : selectedRunBuild?.buildArtifactId ?? "",
     );
-  }, [buildManifest?.latestReleaseBuildArtifactId, builds, selectedRunBuild?.buildArtifactId]);
+  }, [
+    buildManifest?.latestReleaseBuildArtifactId,
+    builds,
+    comparisonReleaseId,
+    selectedRunBuild?.buildArtifactId,
+  ]);
 
   const immutableComparison = Boolean(
     currentBuildArtifactId && candidateBuildArtifactId,
@@ -163,7 +178,14 @@ export function StagingCalibrationMapPanel({
   return (
     <SectionCard
       title="Calibration map"
-      actions={<CalibrationMapViewSelect value={view} onChange={setView} />}
+      description={view === "comparison" ? comparisonBaseline.note ?? undefined : undefined}
+      actions={
+        <CalibrationMapViewSelect
+          value={view}
+          comparisonLabel={comparisonBaseline.tabLabel}
+          onChange={setView}
+        />
+      }
     >
       {view === "candidate" ? (
         <CalibrationExplorerMap
