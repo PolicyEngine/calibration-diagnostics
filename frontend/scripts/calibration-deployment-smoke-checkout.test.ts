@@ -4,6 +4,8 @@
 // job's own steps must install them before the script runs. This test copies
 // the checkout's files (without node_modules) and replays the deploy job's
 // install steps in order, checking at each smoke step that the script loads.
+// The job also holds Google Cloud credentials and can request GitHub OIDC
+// tokens, so its install must run no lifecycle scripts.
 import { afterEach, expect, test } from "bun:test";
 import {
   copyFileSync,
@@ -12,6 +14,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
@@ -23,6 +26,10 @@ const SMOKE_SCRIPT = "frontend/scripts/calibration-deployment-smoke.ts";
 // (here absent) arguments; it stops before any network request.
 const ARGUMENT_ERROR = "--url must name the mounted dashboard root.";
 const INSTALL_COMMAND = /(?<![\w-])bun\s+install\b/;
+// Planted only in the copy: install scripts that leave this file if they run.
+const LIFECYCLE_MARKER = "lifecycle-script-ran";
+const LIFECYCLE_SCRIPT_NAMES = ["preinstall", "install", "postinstall", "prepare"];
+const PACKAGES_WITH_PLANTED_SCRIPTS = ["frontend", "frontend/packages/calibration-tree"];
 
 interface WorkflowStep {
   name?: string;
@@ -53,6 +60,14 @@ function deployJob(): WorkflowJob {
     jobs: Record<string, WorkflowJob>;
   };
   return workflow.jobs.deploy;
+}
+
+function isInstallStep(step: WorkflowStep): step is WorkflowStep & { run: string } {
+  return step.run !== undefined && INSTALL_COMMAND.test(step.run);
+}
+
+function stepDirectory(job: WorkflowJob, step: WorkflowStep): string {
+  return step["working-directory"] ?? job.defaults?.run?.["working-directory"] ?? ".";
 }
 
 // The files a checkout of the next commit would contain: tracked files plus
@@ -139,10 +154,8 @@ test(
       if (step.run?.includes(`bun run ${SMOKE_SCRIPT}`)) {
         const firstLine = loadSmokeScript(checkoutCopy).output.split("\n")[0];
         smokeChecks.push({ step: step.name ?? step.run, output: firstLine });
-      } else if (step.run && INSTALL_COMMAND.test(step.run)) {
-        const workingDirectory =
-          step["working-directory"] ?? job.defaults?.run?.["working-directory"] ?? ".";
-        const install = runWorkflowCommand(step.run, join(checkoutCopy, workingDirectory));
+      } else if (isInstallStep(step)) {
+        const install = runWorkflowCommand(step.run, join(checkoutCopy, stepDirectory(job, step)));
         expect(install).toMatchObject({ exitCode: 0 });
       }
     }
@@ -151,6 +164,35 @@ test(
     expect(smokeChecks).toEqual(
       smokeChecks.map(({ step }) => ({ step, output: ARGUMENT_ERROR })),
     );
+  },
+  120_000,
+);
+
+test(
+  "the deploy job's dependency install runs no lifecycle scripts",
+  () => {
+    const job = deployJob();
+    const checkoutCopy = copyCheckout();
+    for (const packageDirectory of PACKAGES_WITH_PLANTED_SCRIPTS) {
+      const manifestFile = join(checkoutCopy, packageDirectory, "package.json");
+      const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
+      for (const scriptName of LIFECYCLE_SCRIPT_NAMES) {
+        manifest.scripts = { ...manifest.scripts, [scriptName]: `touch ${LIFECYCLE_MARKER}` };
+      }
+      writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
+    }
+
+    const installSteps = job.steps.filter(isInstallStep);
+    expect(installSteps.length).toBeGreaterThan(0);
+    for (const step of installSteps) {
+      const install = runWorkflowCommand(step.run, join(checkoutCopy, stepDirectory(job, step)));
+      expect(install).toMatchObject({ exitCode: 0 });
+    }
+
+    const packagesWhoseScriptsRan = PACKAGES_WITH_PLANTED_SCRIPTS.filter((packageDirectory) =>
+      existsSync(join(checkoutCopy, packageDirectory, LIFECYCLE_MARKER)),
+    );
+    expect(packagesWhoseScriptsRan).toEqual([]);
   },
   120_000,
 );
