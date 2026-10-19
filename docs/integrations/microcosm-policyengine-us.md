@@ -37,6 +37,14 @@ and expose entity-aligned arrays to the common harness aggregator. Direct
 microdata variables (for example `age` and `employment_income`) and calculated
 PolicyEngine variables (for example `eitc`) use the same aggregation interface.
 
+After constructing the simulation, the adapter applies .py's stored-input renames
+(`apply_legacy_input_renames_to_microsimulation` in
+`policyengine.tax_benefit_models.us.legacy_inputs`), as .py's
+`managed_microsimulation` and the hosted variable runtime do. The release stores
+WIC take-up as `would_claim_wic`; policyengine-us 2.2.1 renamed that input
+`takes_up_wic_if_eligible`, defaults it to true and skips the stored column, so
+without the mapping every WIC-eligible person would take WIC up.
+
 `frontend/scripts/microcosm_variable_core.py` proves the local
 loading path and documents the dataset's substantial disk and memory needs. The
 new adapter will move the reusable loading behavior behind a harness interface;

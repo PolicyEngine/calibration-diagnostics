@@ -182,10 +182,19 @@ def _default_table_loader(dataset_path: Path) -> Tables:
 
 def _default_simulation_factory(dataset_path: Path) -> Any:
     try:
+        from policyengine.tax_benefit_models.us.legacy_inputs import (
+            apply_legacy_input_renames_to_microsimulation,
+        )
         from policyengine_us import Microsimulation
     except ImportError as error:  # pragma: no cover - exercised by optional install
         raise RuntimeError("install the 'microcosm' extra to run PolicyEngine-US") from error
-    return Microsimulation(dataset=str(dataset_path))
+    simulation = Microsimulation(dataset=str(dataset_path))
+    # The release stores WIC take-up as `would_claim_wic`, which policyengine-us
+    # 2.2.1 renamed `takes_up_wic_if_eligible` (default True) and otherwise
+    # skips. Apply .py's stored-input renames, as its managed_microsimulation and
+    # the hosted variable runtime do.
+    apply_legacy_input_renames_to_microsimulation(simulation)
+    return simulation
 
 
 VARIABLE_ALIASES = {

@@ -83,6 +83,30 @@ def verify_source_apis(data_year: int) -> dict[str, Any]:
     }
 
 
+def verify_stored_input_renames() -> dict[str, Any]:
+    """Bind .py's stored-input rename step that every hosted simulation applies.
+
+    Reports the registered renames the pinned country model needs mapped, as
+    .py computes them; it loads no population.
+    """
+    from policyengine.tax_benefit_models.us.legacy_inputs import (
+        apply_legacy_input_renames_to_microsimulation,
+        pending_legacy_input_renames,
+    )
+    from policyengine_us.system import system
+
+    inspect.signature(apply_legacy_input_renames_to_microsimulation).bind(
+        "not-a-simulation"
+    )
+    return {
+        "source": (
+            f"{apply_legacy_input_renames_to_microsimulation.__module__}."
+            f"{apply_legacy_input_renames_to_microsimulation.__name__}"
+        ),
+        "pending_for_pinned_model": pending_legacy_input_renames(system.variables),
+    }
+
+
 def main() -> None:
     """Check installed requirements and the APIs the hosted code uses."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -116,6 +140,7 @@ def main() -> None:
         "runtime": runtime_identity(),
         "source_api_imports": "passed",
         "spm_measurement": spm_measurement,
+        "legacy_input_renames": verify_stored_input_renames(),
     }
     if args.dataset_file:
         release = json.loads(args.release_manifest.read_text())
