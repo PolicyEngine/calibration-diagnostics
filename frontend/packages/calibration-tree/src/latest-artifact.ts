@@ -56,6 +56,7 @@ import {
   resolveHfCommitPublishedAt,
 } from "./calibration-release-locator";
 import type { CalibrationTreeManifest } from "./calibration-tree-manifest";
+import { levelQualifiedGeographyLabels } from "./geography-labels";
 import { parseReleaseCutTag } from "./release-cut";
 
 // The registry is the registration point; these re-exports keep the server
@@ -2063,7 +2064,9 @@ export function buildCalibration(
   const presentation = releasePresentation(releaseManifest);
   const publisherLabels = releasePublisherLabels(releaseManifest);
   const dimensionDefinitions = diagnosticsDimensions(diag);
-  const enrichedRows = addEstimateScopeWarnings(
+  // Same-named areas at different geography levels (a UK constituency and
+  // local authority, say) keep separate labels in every view.
+  const enrichedRows = levelQualifiedGeographyLabels(addEstimateScopeWarnings(
     targets.map((row) =>
       enrichTargetRow(
         row,
@@ -2075,7 +2078,7 @@ export function buildCalibration(
         targetRepresentation,
       ),
     ),
-  );
+  ), artifactCountry.geography_label);
   const role = releaseRole(releaseManifest);
   const normalizedAttribution = normalizeTargetLossAttribution({
     diagnostics: diag,
