@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { ExplorerState } from "../../lib/microcosm/calibration-explorer";
+import type { ExplorerState } from "@policyengine/calibration-tree/calibration-explorer";
 import {
   EXPLORER_MAP_VERTICAL_PADDING,
   explorerBreadcrumbs,

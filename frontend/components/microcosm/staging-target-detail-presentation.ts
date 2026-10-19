@@ -6,7 +6,7 @@ import {
   type MicrocosmTargetErrorSummary,
 } from "@/components/microcosm/microcosm-target-detail";
 import type { MicrocosmTargetRow } from "@/lib/api/hooks/use-microcosm";
-import type { TargetChangeRow } from "@/lib/microcosm/target-change";
+import type { TargetChangeRow } from "@policyengine/calibration-tree/target-change";
 import { formatTargetChange } from "@/lib/microcosm/target-change-visualization";
 
 export interface StagingTargetDetailPresentation {

@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { MicrocosmOverviewView } from "@/components/microcosm/microcosm-overview-view";
 import { publishedReleaseSelection } from "@/lib/microcosm/calibration-selection";
-import { parseCountry } from "@/lib/microcosm/countries";
+import { parseCountry } from "@policyengine/calibration-tree/countries";
 
 interface MicrocosmOverviewPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;

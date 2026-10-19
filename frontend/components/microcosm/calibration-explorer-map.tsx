@@ -43,14 +43,14 @@ import {
   explorerReducer,
   type ExplorerBreakdown,
   type ExplorerState,
-} from "@/lib/microcosm/calibration-explorer";
+} from "@policyengine/calibration-tree/calibration-explorer";
 import { prefetchCalibrationDescendants } from "@/lib/microcosm/calibration-prefetch";
 import {
   type CalibrationTreeGroup,
   type CalibrationTreeNode,
   type CalibrationTreeResponse,
   type CalibrationTreeSizeMode,
-} from "@/lib/microcosm/calibration-tree";
+} from "@policyengine/calibration-tree/calibration-tree";
 import {
   condenseCalibrationTreemap,
   expandedGroupsForNode,

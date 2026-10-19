@@ -9,8 +9,8 @@ import {
   type MicrocosmTargetRow,
 } from "@/lib/api/hooks/use-microcosm";
 import { chronicleSourceEntryUrl } from "@/lib/microcosm/chronicle-entry-url";
-import { canonicalLabel } from "@/lib/microcosm/program-label";
-import { sourceLabel } from "@/lib/microcosm/source-label";
+import { canonicalLabel } from "@policyengine/calibration-tree/program-label";
+import { sourceLabel } from "@policyengine/calibration-tree/source-label";
 import { usStateName } from "@/lib/microcosm/us-state-names";
 
 interface DisplayDimension {

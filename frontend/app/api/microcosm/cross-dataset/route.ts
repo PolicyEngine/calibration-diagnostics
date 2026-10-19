@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { ArtifactError } from "@/lib/cross-dataset/artifact";
 import { crossDatasetApiResponse } from "@/lib/cross-dataset/query";
 import { configuredCrossDatasetReader } from "@/lib/cross-dataset/source";
-import { parseCountry } from "@/lib/microcosm/latest-artifact";
+import { parseCountry } from "@policyengine/calibration-tree/latest-artifact";
 
 export const revalidate = 300;
 export const runtime = "nodejs";

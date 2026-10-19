@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import type { TargetChangeRow } from "@/lib/microcosm/target-change";
+import type { TargetChangeRow } from "@policyengine/calibration-tree/target-change";
 import { stagingTargetDetailPresentation } from "./staging-target-detail-presentation";
 
 const TARGET_CHANGE: TargetChangeRow = {

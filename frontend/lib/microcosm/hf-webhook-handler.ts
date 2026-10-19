@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { postReleaseAlert } from "@/lib/slack";
 
-import type { MicrocosmCountry } from "./countries";
+import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 import type { HfWebhookConfig } from "./hf-webhook-config";
 
 interface UpdatedRef {

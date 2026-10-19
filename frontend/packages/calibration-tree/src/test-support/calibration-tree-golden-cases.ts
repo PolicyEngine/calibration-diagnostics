@@ -7,19 +7,23 @@
 // written bytes.
 //
 // fixtures/calibration-tree-golden.json is that record as produced by the
-// builder before it moved into its own package; the golden tests require the
-// builder to reproduce it exactly. Regenerate it only for an intended output
-// change, from frontend/:
+// builder before it moved into this package; the golden tests require the
+// builder to reproduce it exactly. The cases import the builder through the
+// package's public entry points. Regenerate the record only for an intended
+// output change, from the package directory:
 //
-//   bun run lib/microcosm/test-support/calibration-tree-golden-cases.ts
+//   bun run src/test-support/calibration-tree-golden-cases.ts
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
-import { loadCalibrationComparisonSource, loadCalibrationComparisonTargetDetail } from "../calibration-comparison-blob";
-import { buildCalibrationComparisonBundles } from "../calibration-comparison-bundle";
-import { createExplorerState, type ExplorerState } from "../calibration-explorer";
+import {
+  loadCalibrationComparisonSource,
+  loadCalibrationComparisonTargetDetail,
+} from "@policyengine/calibration-tree/calibration-comparison-blob";
+import { buildCalibrationComparisonBundles } from "@policyengine/calibration-tree/calibration-comparison-bundle";
+import { createExplorerState, type ExplorerState } from "@policyengine/calibration-tree/calibration-explorer";
 import {
   CALIBRATION_TREE_SCHEMA_VERSION,
   calibrationTreePartPath,
@@ -32,36 +36,39 @@ import {
   type CalibrationTreeTargetDetailsArtifact,
   type CalibrationTreeTargetSummaryArtifact,
   type CalibrationTreeTierArtifact,
-} from "../calibration-tree-artifact";
-import type { getCalibrationTreeBlob } from "../calibration-tree-blob";
+} from "@policyengine/calibration-tree/calibration-tree-artifact";
+import type { getCalibrationTreeBlob } from "@policyengine/calibration-tree/calibration-tree-blob";
 import {
   buildCalibrationTreeBundle,
   type CalibrationTreeBundle,
   type CalibrationTreeBundleFile,
-} from "../calibration-tree-bundle";
+} from "@policyengine/calibration-tree/calibration-tree-bundle";
 import {
   emptyCalibrationTreeManifest,
   serializeCalibrationTreeManifest,
   withCalibrationTreeManifestEntry,
   type CalibrationTreeManifestEntry,
-} from "../calibration-tree-manifest";
+} from "@policyengine/calibration-tree/calibration-tree-manifest";
 import {
   COUNTRY_REGISTRY,
   type CountryRegistration,
   type MicrocosmCountry,
-} from "../countries";
+} from "@policyengine/calibration-tree/countries";
 import {
   UK_LOCAL_CALIBRATION_DIR_ENV,
   buildCalibration,
   microcosmRepo,
   type Calibration,
-} from "../latest-artifact";
-import { resolveStagingCalibrationSource, stagingRepository } from "../staging-artifact";
+} from "@policyengine/calibration-tree/latest-artifact";
+import {
+  resolveStagingCalibrationSource,
+  stagingRepository,
+} from "@policyengine/calibration-tree/staging-artifact";
 import {
   TARGET_LOSS_BASIS_HASH_ALGORITHM,
   TARGET_LOSS_FORMULA,
   targetLossBasisHash,
-} from "../target-loss-attribution";
+} from "@policyengine/calibration-tree/target-loss-attribution";
 
 type JsonObject = Record<string, unknown>;
 
