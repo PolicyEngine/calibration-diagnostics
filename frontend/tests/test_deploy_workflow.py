@@ -19,6 +19,12 @@ FRONTEND_INSTALL_COMMAND = ["bun", "install", "--frozen-lockfile"]
 BUN_SCRIPT_COMMAND = re.compile(
     r"(?<![\w-])bun\s+(?:--\S+\s+)*(?:run|test|\S+\.[cm]?[jt]sx?)(?:\s|$)"
 )
+# The Bun command words between `bun` and the calibration smoke script's path.
+# Words after the path are the script's own arguments.
+CALIBRATION_SMOKE_INVOCATION = re.compile(
+    r"(?<![\w-])bun\s+(?P<bun_words>(?:\S+[ \t]+)*?)"
+    r"frontend/scripts/calibration-deployment-smoke\.ts(?=\s|$)"
+)
 
 
 def _workflow():
@@ -210,6 +216,38 @@ def test_deploy_dependency_install_skips_lifecycle_scripts():
     assert install_commands == [
         ["bun", "install", "--frozen-lockfile", "--ignore-scripts"]
     ]
+
+
+def test_every_calibration_check_turns_off_bun_auto_install():
+    # In a directory tree without node_modules, Bun installs a missing package
+    # from npm when a script imports it. A check must instead fail when the
+    # workspace install is missing. Bun reads --no-install only before the
+    # script path; after it, the flag is passed to the script.
+    steps = _workflow()["jobs"]["deploy"]["steps"]
+    bun_words_by_step = {}
+    for step in steps:
+        invocation = CALIBRATION_SMOKE_INVOCATION.search(step.get("run", ""))
+        if invocation:
+            bun_words_by_step[step["name"]] = invocation.group("bun_words").split()
+    assert sorted(bun_words_by_step) == [
+        "Verify promoted calibration releases and staging",
+        "Verify staged calibration releases and staging",
+    ]
+    assert {
+        name: "--no-install" in bun_words for name, bun_words in bun_words_by_step.items()
+    } == {name: True for name in bun_words_by_step}
+
+
+def test_calibration_smoke_invocation_reads_only_the_words_before_the_script():
+    for command, bun_words in (
+        ("bun run --no-install frontend/scripts/calibration-deployment-smoke.ts --url x", ["run", "--no-install"]),
+        ("bun --no-install run frontend/scripts/calibration-deployment-smoke.ts", ["--no-install", "run"]),
+        ("bun run frontend/scripts/calibration-deployment-smoke.ts --no-install", ["run"]),
+        ("bun run frontend/scripts/calibration-deployment-smoke.ts \\\n--url x || {\n  exit 1\n}", ["run"]),
+    ):
+        invocation = CALIBRATION_SMOKE_INVOCATION.search(command)
+        assert invocation, command
+        assert invocation.group("bun_words").split() == bun_words, command
 
 
 def test_timestamp_migration_can_run_through_the_publication_workflow():
