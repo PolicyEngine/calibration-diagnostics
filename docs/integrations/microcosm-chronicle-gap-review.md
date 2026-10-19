@@ -162,7 +162,7 @@ These remain deliberately unscored:
 - Microcosm release audited:
   `populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`.
 - PolicyEngine-US version audited: `1.764.6`. The harness now pins
-  `policyengine[us]==6.4.1` and its certified source-enrichment of this release,
+  `policyengine[us]==6.7.5` and its certified source-enrichment of this release,
   `populace-us-2024-spm-20260915`; this audit has not been re-run on that pair.
 - Reviewed Microcosm target inclusions and exclusions:
   `packages/microcosm-build/src/microcosm/build/us/target_parity_manifest.json`

@@ -91,7 +91,7 @@ def test_reviewed_package_versions_are_the_ones_pinned_py_installs(modules):
     config = release.reviewed_release()
     assert config["certifying_package"] == {
         "name": "policyengine",
-        "version": "6.4.1",
+        "version": "6.7.5",
         "extra": "us",
     }
     derived_versions = release.py_pinned_packages(config["certifying_package"])
@@ -100,18 +100,18 @@ def test_reviewed_package_versions_are_the_ones_pinned_py_installs(modules):
         "policyengine-core": "3.33.0",
         "spm-calculator": "1.0.0",
     }
-    assert config["packages"] == {"policyengine": "6.4.1", **derived_versions}
+    assert config["packages"] == {"policyengine": "6.7.5", **derived_versions}
 
 
 def test_tuple_not_pinned_by_py_is_refused(modules, monkeypatch):
     release, _ = modules
     config = release.reviewed_release()
-    # The release's own build names Core 3.32.5, which .py 6.4.1 does not pin.
+    # The release's own build names Core 3.32.5, which .py 6.7.5 does not pin.
     config["packages"]["policyengine-core"] = "3.32.5"
     monkeypatch.setattr(
         release, "runtime_identity", lambda: {"packages": dict(config["packages"])}
     )
-    with pytest.raises(release.VariableCalculationError, match="policyengine==6.4.1"):
+    with pytest.raises(release.VariableCalculationError, match="policyengine==6.7.5"):
         release.validate_runtime(config)
 
 
@@ -164,7 +164,7 @@ def test_dataset_not_certified_by_pinned_py_cannot_be_loaded(
     config, manifest, build = certificate
     national = manifest["artifacts"]["populace_us_2024"]
     if kind == "dataset_sha256":
-        # A self-consistent release whose bytes .py 6.4.1 never certified.
+        # A self-consistent release whose bytes .py 6.7.5 never certified.
         for document in (config, national, build["dataset"]):
             document["sha256"] = "f" * 64
     elif kind == "release":

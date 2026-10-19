@@ -309,7 +309,7 @@ def test_harness_and_hosted_runtime_share_the_py_certified_pair() -> None:
 
 def test_runner_reports_the_pinned_py_and_certified_release(tables) -> None:
     bundle = runner(tables).prepare(group("person", "person_weight", "__geography__"))
-    assert bundle.model_version == "policyengine[us]==6.4.1"
+    assert bundle.model_version == "policyengine[us]==6.7.5"
     assert bundle.dataset_version == "populace-us-2024-spm-20260915"
 
 

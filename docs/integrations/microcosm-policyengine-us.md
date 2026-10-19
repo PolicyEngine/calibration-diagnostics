@@ -17,12 +17,12 @@ This is a model/dataset pairing, not a raw-dataset adapter:
 - Dataset: Microcosm US, published at
   `policyengine/populace-us`, file `populace_us_2024.h5`, SHA-256
   `6496cc4393d4d3c6574f76eca231de5898c803b9067645591fd5c4d3e65aee84`.
-- Dataset build: the US release .py 6.4.1 certifies. It is a source-enrichment of
+- Dataset build: the US release .py 6.7.5 certifies. It is a source-enrichment of
   `populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z` (Microcosm
   commit `cae8640f9e65e274aea65c7916cb37b956978e32`): the same tables, weights and
   calibration diagnostics plus `is_spm_independent_minor_role`, added at Microcosm
   commit `743683b0e121378e93c9b426cd9c79d41d29595b`.
-- Model: `policyengine[us]==6.4.1`, the only declared model dependency. Its `us`
+- Model: `policyengine[us]==6.7.5`, the only declared model dependency. Its `us`
   extra pins `policyengine-us==2.2.1`, `policyengine-core==3.33.0` and
   `spm-calculator==1.0.0`. Upgrade by bumping .py, to a Microcosm release that
   version certifies; the hosted variable runtime uses the same pair.

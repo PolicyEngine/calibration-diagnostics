@@ -26,7 +26,7 @@ def test_microcosm_overview_pins_current_dataset_and_model() -> None:
     assert overview.source.dataset_version == (
         "populace-us-2024@populace-us-2024-spm-20260915"
     )
-    assert overview.source.model_version == "policyengine[us]==6.4.1"
+    assert overview.source.model_version == "policyengine[us]==6.7.5"
     assert overview.chronicle_snapshot_id == "chronicle-7917ea815df710fb20db076b"
     assert overview.alignment_policy == {
         "model_id": "cbo_growth_factor_aging",

@@ -9,7 +9,7 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-PINNED_PY_REQUIREMENT = "policyengine[us]==6.4.1"
+PINNED_PY_REQUIREMENT = "policyengine[us]==6.7.5"
 PY_DERIVED_PACKAGES = {"policyengine-us", "policyengine-core", "spm-calculator"}
 LOCK_PIN = re.compile(r"^([A-Za-z0-9_.\-]+)==([^\s\\;]+)")
 
@@ -38,7 +38,7 @@ def assert_only_pinned_py_declares_the_model(requirements: list[Requirement]) ->
     assert py_requirements == [PINNED_PY_REQUIREMENT]
 
 
-def test_hosted_requirements_pin_only_policyengine_py_6_4_1():
+def test_hosted_requirements_pin_only_policyengine_py_6_7_5():
     hosted_requirements = (REPOSITORY_ROOT / "backend/requirements.txt").read_text()
     assert_only_pinned_py_declares_the_model(
         declared_requirements(hosted_requirements.splitlines())
@@ -55,7 +55,7 @@ def test_hosted_lock_installs_the_reviewed_py_tuple():
     reviewed_packages = json.loads(
         (REPOSITORY_ROOT / "frontend/scripts/hosted_release.json").read_text()
     )["packages"]
-    assert reviewed_packages["policyengine"] == "6.4.1"
+    assert reviewed_packages["policyengine"] == "6.7.5"
     for package, version in reviewed_packages.items():
         assert locked_versions.get(package) == version, package
 
@@ -75,7 +75,7 @@ def root_project_requirements() -> dict[str, list[Requirement]]:
     }
 
 
-def test_root_project_pins_only_policyengine_py_6_4_1():
+def test_root_project_pins_only_policyengine_py_6_7_5():
     requirement_lists = root_project_requirements()
     for location, requirements in requirement_lists.items():
         names = {canonicalize_name(requirement.name) for requirement in requirements}

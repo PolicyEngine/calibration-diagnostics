@@ -10,7 +10,7 @@ dependencies = ["numpy>=1.26,<3", "pyarrow>=18,<24", "pyyaml>=6,<7"]
 # policyengine-core directly; .py's `us` extra supplies them.
 microcosm = [
   "pandas>=3,<4",
-  "policyengine[us]==6.4.1",
+  "policyengine[us]==6.7.5",
   "tables>=3.10,<4",
 ]
 taxcalc-cps = ["taxcalc==6.7.1"]

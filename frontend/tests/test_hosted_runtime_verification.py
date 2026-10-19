@@ -31,7 +31,7 @@ def test_image_build_verification_binds_current_spm_measurement_apis():
     assert completed.returncode == 0, completed.stderr[-4000:]
     receipt = json.loads(completed.stdout)
     assert receipt["source_api_imports"] == "passed"
-    assert receipt["runtime"]["packages"]["policyengine"] == "6.4.1"
+    assert receipt["runtime"]["packages"]["policyengine"] == "6.7.5"
     measurement = receipt["spm_measurement"]
     assert measurement["data_year"] == 2024
     assert len(measurement["forecast_sha256"]) == 64

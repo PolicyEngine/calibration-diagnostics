@@ -16,11 +16,11 @@
   },
   "certifying_package": {
     "name": "policyengine",
-    "version": "6.4.1",
+    "version": "6.7.5",
     "extra": "us"
   },
   "packages": {
-    "policyengine": "6.4.1",
+    "policyengine": "6.7.5",
     "policyengine-us": "2.2.1",
     "policyengine-core": "3.33.0",
     "spm-calculator": "1.0.0"

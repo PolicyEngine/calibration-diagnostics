@@ -21,7 +21,7 @@ class MicrocosmRelease:
     release_id: str
     dataset_filename: str
     dataset_sha256: str
-    # The model requirement, such as "policyengine[us]==6.4.1".
+    # The model requirement, such as "policyengine[us]==6.7.5".
     model_version: str
     repository: str = MICROCOSM_REPOSITORY
     calibration_diagnostics_filename: str | None = None
@@ -38,14 +38,14 @@ class MicrocosmRelease:
         )
 
 
-# The release .py 6.4.1 certifies, shared with the hosted variable runtime
+# The release .py 6.7.5 certifies, shared with the hosted variable runtime
 # (frontend/scripts/hosted_release.json). It is a source-enrichment of the Build P
 # release and keeps Build P's calibration diagnostics.
 MICROCOSM_RELEASE = MicrocosmRelease(
     release_id="populace-us-2024-spm-20260915",
     dataset_filename="populace_us_2024.h5",
     dataset_sha256="6496cc4393d4d3c6574f76eca231de5898c803b9067645591fd5c4d3e65aee84",
-    model_version="policyengine[us]==6.4.1",
+    model_version="policyengine[us]==6.7.5",
     calibration_diagnostics_filename=(
         "releases/populace-us-2024-spm-20260915/calibration_diagnostics.json"
     ),
