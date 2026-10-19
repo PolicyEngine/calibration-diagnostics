@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -12,7 +13,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-FRONTEND_INSTALL_COMMAND = "bun install --frozen-lockfile"
+FRONTEND_INSTALL_COMMAND = ["bun", "install", "--frozen-lockfile"]
 # `bun run <script or file>`, `bun test` and `bun <file>` load repository code, which
 # resolves packages through frontend/node_modules. `bunx` fetches its own package.
 BUN_SCRIPT_COMMAND = re.compile(
@@ -32,11 +33,16 @@ def _step_label(step):
 
 
 def _installs_locked_frontend_dependencies(step, job):
+    """A one-line `bun install --frozen-lockfile [--option ...]` run in frontend."""
     default_directory = job.get("defaults", {}).get("run", {}).get("working-directory")
     directory = step.get("working-directory", default_directory)
-    return (
-        step.get("run", "").strip() == FRONTEND_INSTALL_COMMAND
-        and directory == "frontend"
+    command = step.get("run", "").strip()
+    if "\n" in command or directory != "frontend":
+        return False
+    arguments = shlex.split(command)
+    extra_options = arguments[len(FRONTEND_INSTALL_COMMAND) :]
+    return arguments[: len(FRONTEND_INSTALL_COMMAND)] == FRONTEND_INSTALL_COMMAND and all(
+        option.startswith("--") for option in extra_options
     )
 
 
@@ -189,6 +195,21 @@ def test_deploy_installs_locked_frontend_dependencies_without_credentials_after_
     assert install_indexes[0] < names.index(
         "Verify staged calibration releases and staging"
     )
+
+
+def test_deploy_dependency_install_skips_lifecycle_scripts():
+    # The deploy job holds Google Cloud credentials and can request GitHub OIDC
+    # tokens, so neither the project's nor any dependency's install scripts may
+    # run there. The calibration checks need no install script.
+    job = _workflow()["jobs"]["deploy"]
+    install_commands = [
+        shlex.split(step["run"])
+        for step in job["steps"]
+        if _installs_locked_frontend_dependencies(step, job)
+    ]
+    assert install_commands == [
+        ["bun", "install", "--frozen-lockfile", "--ignore-scripts"]
+    ]
 
 
 def test_timestamp_migration_can_run_through_the_publication_workflow():
