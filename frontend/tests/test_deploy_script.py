@@ -7,6 +7,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github/scripts/deploy-dashboard.sh"
 CONFIGURATION = (
@@ -87,3 +89,69 @@ def test_frontend_receives_release_token_as_server_environment(tmp_path):
     assert arguments[arguments.index(token_argument) - 1] == "--env"
     assert not any("NEXT_PUBLIC_HF" in argument for argument in arguments)
     assert "test-HF_RELEASE_READ_TOKEN" not in result.stdout + result.stderr
+
+
+def _read_secret_check(tmp_path, gcloud_exit_code=0, **configuration):
+    """Run check-read-secret-exists with a gcloud that records its arguments."""
+    arguments_file = tmp_path / "gcloud-arguments.json"
+    stub = tmp_path / "gcloud"
+    stub.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
+        "from pathlib import Path\n"
+        "Path(os.environ['ARGUMENTS_FILE']).write_text(json.dumps(sys.argv[1:]))\n"
+        f"sys.exit({gcloud_exit_code})\n"
+    )
+    stub.chmod(0o755)
+    environment = {
+        "PATH": f"{tmp_path}:{os.environ['PATH']}",
+        "ARGUMENTS_FILE": str(arguments_file),
+        **configuration,
+    }
+    result = subprocess.run(
+        ["bash", str(SCRIPT), "check-read-secret-exists"],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    recorded_arguments = (
+        json.loads(arguments_file.read_text()) if arguments_file.exists() else None
+    )
+    return result, recorded_arguments
+
+
+def test_read_secret_check_reads_only_the_secret_metadata(tmp_path):
+    result, gcloud_arguments = _read_secret_check(
+        tmp_path, PROJECT_ID="test-project", READ_SECRET_NAME="test-read-secret"
+    )
+    assert result.returncode == 0
+    assert gcloud_arguments == [
+        "secrets",
+        "describe",
+        "test-read-secret",
+        "--project",
+        "test-project",
+        "--format=none",
+    ]
+
+
+def test_missing_read_secret_stops_deployment(tmp_path):
+    result, _ = _read_secret_check(
+        tmp_path,
+        gcloud_exit_code=1,
+        PROJECT_ID="test-project",
+        READ_SECRET_NAME="test-read-secret",
+    )
+    assert result.returncode != 0
+    assert "test-read-secret" in result.stderr
+
+
+@pytest.mark.parametrize("missing_name", ["PROJECT_ID", "READ_SECRET_NAME"])
+def test_read_secret_check_requires_its_configuration(tmp_path, missing_name):
+    configuration = {"PROJECT_ID": "test-project", "READ_SECRET_NAME": "test-secret"}
+    configuration.pop(missing_name)
+    result, gcloud_arguments = _read_secret_check(tmp_path, **configuration)
+    assert result.returncode != 0
+    assert missing_name in result.stderr
+    assert gcloud_arguments is None

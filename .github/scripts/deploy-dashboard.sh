@@ -18,6 +18,24 @@ require_configuration() {
   fi
 }
 
+check_read_secret_exists() {
+  # Only inspect the secret's metadata. Never access, compare, or print its value.
+  local missing=()
+  local name
+  for name in PROJECT_ID READ_SECRET_NAME; do
+    if [[ -z "${!name-}" ]]; then missing+=("$name"); fi
+  done
+  if (( ${#missing[@]} )); then
+    echo "Missing collector read secret configuration: ${missing[*]}" >&2
+    return 1
+  fi
+  if ! gcloud secrets describe "$READ_SECRET_NAME" \
+    --project "$PROJECT_ID" --format=none; then
+    echo "Cannot confirm the existence of the collector read secret: ${READ_SECRET_NAME}" >&2
+    return 1
+  fi
+}
+
 install_clients() {
   uv venv --python 3.12 .deploy-venv
   uv pip install --python .deploy-venv/bin/python modal==1.5.5
@@ -61,6 +79,7 @@ deploy_frontend() {
 
 case "${1:-}" in
   require-configuration) require_configuration ;;
+  check-read-secret-exists) check_read_secret_exists ;;
   install-clients) install_clients ;;
   define-backend) define_backend ;;
   resolve-backend) resolve_backend ;;
