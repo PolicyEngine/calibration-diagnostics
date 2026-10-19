@@ -137,6 +137,14 @@ jobs:
           --check full
           --vercel-bypass-secret "$VERCEL_AUTOMATION_BYPASS_SECRET"
 
+      # The calibration checks import @policyengine/calibration-tree, a workspace
+      # package that resolves only through frontend/node_modules. Install after
+      # the Vercel upload, which sends the repository root, so the uploaded
+      # working tree never contains node_modules.
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+
       - name: Verify staged calibration releases and staging
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

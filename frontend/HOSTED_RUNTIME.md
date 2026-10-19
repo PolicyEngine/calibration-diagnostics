@@ -227,7 +227,10 @@ supported staging inventory. It requires available calibration targets, a
 consistent selected release, and staging `available: true`; an HTTP 200 alone
 does not qualify staging. The same check runs against the public dashboard
 after promotion. Public US calculations alone do not qualify private release
-access.
+access. The script imports the `@policyengine/calibration-tree` workspace
+package, so the workflow runs `bun install --frozen-lockfile` in `frontend`
+before the first check. It installs after the Vercel upload, which sends the
+repository root, so the uploaded files never include `node_modules`.
 
 Calibration qualification retries network failures and HTTP 5xx twice, with short
 increasing backoff and a 60-second timeout per attempt. HTTP 4xx, malformed successful
