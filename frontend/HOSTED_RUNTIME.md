@@ -232,7 +232,9 @@ package, so the workflow runs `bun install --frozen-lockfile --ignore-scripts`
 in `frontend` before the first check. It installs after the Vercel upload,
 which sends the repository root, so the uploaded files never include
 `node_modules`. Lifecycle scripts are skipped because the job holds Google
-Cloud credentials and can request GitHub OIDC tokens.
+Cloud credentials and can request GitHub OIDC tokens. Both checks run
+`bun run --no-install`, so Bun never installs a missing package from npm by
+itself; without the workspace install, a check fails.
 
 Calibration qualification retries network failures and HTTP 5xx twice, with short
 increasing backoff and a 60-second timeout per attempt. HTTP 4xx, malformed successful
