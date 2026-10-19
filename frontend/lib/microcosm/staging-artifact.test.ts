@@ -1130,3 +1130,17 @@ test("the staged diagnostics file is the canonical name, or else the one stem fi
   expect(stagedBundleDiagnosticsFile({ "spine.h5": file })).toBeNull();
   expect(stagedBundleDiagnosticsFile(null)).toBeNull();
 });
+
+// Codex review of #223: a path-containing stem name was dropped before the
+// count, so it no longer made the receipt ambiguous.
+test("a receipt with one valid stem file and one stem name containing a path has no diagnostics file", () => {
+  const file = { bytes: 1, sha256: "0".repeat(64) };
+  expect(stagedBundleDiagnosticsFile({
+    [LOCAL_DIAGNOSTICS]: file,
+    "nested/dense.diagnostics.json": file,
+  })).toBeNull();
+  expect(stagedBundleDiagnosticsFile({
+    "../other.diagnostics.json": file,
+    [LOCAL_DIAGNOSTICS]: file,
+  })).toBeNull();
+});

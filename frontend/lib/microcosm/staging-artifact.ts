@@ -658,19 +658,21 @@ export interface ResolvedStagingCalibrationSource {
 
 // The bundle's per-target diagnostics file among the files its receipt
 // recorded: `calibration_diagnostics.json`, or else the one
-// `<dataset>.diagnostics.json`. A bundle recording none, or several stem
-// files, has no target view rather than a guessed one.
+// `<dataset>.diagnostics.json`. A bundle recording none, several stem
+// files, or a stem name that is not one path segment has no target view
+// rather than a guessed one. The count includes invalid names, so an
+// invalid name beside a valid one still makes the receipt ambiguous.
 export function stagedBundleDiagnosticsFile(files: JsonObject | null): string | null {
   if (!files) return null;
   if (Object.hasOwn(files, STAGED_BUNDLE_DIAGNOSTICS_FILE)) {
     return STAGED_BUNDLE_DIAGNOSTICS_FILE;
   }
-  const stemFiles = Object.keys(files).filter(
-    (name) =>
-      name.endsWith(STAGED_BUNDLE_STEM_DIAGNOSTICS_SUFFIX) &&
-      STAGED_BUNDLE_FILE_NAME.test(name),
+  const stemFiles = Object.keys(files).filter((name) =>
+    name.endsWith(STAGED_BUNDLE_STEM_DIAGNOSTICS_SUFFIX)
   );
-  return stemFiles.length === 1 ? stemFiles[0] : null;
+  return stemFiles.length === 1 && STAGED_BUNDLE_FILE_NAME.test(stemFiles[0])
+    ? stemFiles[0]
+    : null;
 }
 
 async function loadStagedBundleCalibrationSource(
