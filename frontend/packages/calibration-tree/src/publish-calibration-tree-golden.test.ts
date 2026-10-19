@@ -6,7 +6,11 @@ import {
   withCalibrationTreeManifestEntry,
   type CalibrationTreeManifestEntry,
 } from "@policyengine/calibration-tree/calibration-tree-manifest";
-import { COUNTRY_REGISTRY, countryPointerPath } from "@policyengine/calibration-tree/countries";
+import {
+  COUNTRY_REGISTRY,
+  countryPointerPath,
+  countryRegistration,
+} from "@policyengine/calibration-tree/countries";
 import {
   goldenReleaseInputs,
   withRegisteredRepositories,
@@ -25,6 +29,8 @@ import {
 // the recorded index byte for byte.
 const recorded = recordedGoldens as CalibrationTreeGoldenRecord;
 const MAIN_REVISION_SHA = "0123456789abcdef0123456789abcdef01234567";
+// The commit of the tag a per-release pointer file names (the UK's).
+const POINTER_TAG_SHA = "89abcdef0123456789abcdef0123456789abcdef";
 // Generous, so the suite also passes on a heavily loaded machine.
 const BUILD_TIMEOUT_MS = 300_000;
 const originalFetch = globalThis.fetch;
@@ -36,8 +42,11 @@ afterEach(() => {
 type ReleaseCaseName = keyof ReturnType<typeof goldenReleaseInputs>;
 
 // The dataset repository as the publisher reads it: one tagged release at
-// its commit, which the country's release pointer on the main branch also
-// names (`latest.json`, or the UK's `latest-national.json`).
+// its commit, which `latest.json` on the main branch also names. A country
+// registered with its own pointer file (the UK's `latest-national.json`)
+// must have it name a tag whose release manifest names it, so that file
+// names a tag of the recorded release at another commit. The tag is not
+// listed among the repository's refs, so reconciliation never publishes it.
 function huggingFaceReleaseRepository(release: GoldenReleaseInput): typeof fetch {
   const repo = COUNTRY_REGISTRY[release.country].repo;
   const api = `https://huggingface.co/api/datasets/${repo}`;
@@ -66,11 +75,35 @@ function huggingFaceReleaseRepository(release: GoldenReleaseInput): typeof fetch
     ],
     [`${api}/revision/main`, () => Response.json({ sha: MAIN_REVISION_SHA })],
     [`${api}/revision/${release.releaseId}`, () => Response.json({ sha: release.hfCommitSha })],
-    [
-      resolveUrl(MAIN_REVISION_SHA, countryPointerPath(release.country)),
-      () => Response.json({ release_id: release.releaseId }),
-    ],
   ]);
+  const pointerPath = countryPointerPath(release.country);
+  if (countryRegistration(release.country).pointer_path == null) {
+    responses.set(
+      resolveUrl(MAIN_REVISION_SHA, pointerPath),
+      () => Response.json({ release_id: release.releaseId }),
+    );
+  } else {
+    const pointerTag = `${release.releaseId}-20261019T083323Z-0a1b2c3d`;
+    responses.set(resolveUrl(MAIN_REVISION_SHA, pointerPath), () => Response.json({
+      schema_version: 1,
+      release_id: release.releaseId,
+      line: pointerPath.replace(/^latest-/, "").replace(/\.json$/, ""),
+      revision: pointerTag,
+    }));
+    responses.set(`${api}/revision/${pointerTag}`, () => Response.json({ sha: POINTER_TAG_SHA }));
+    responses.set(
+      `${api}/tree/${POINTER_TAG_SHA}/releases/${pointerTag}?recursive=false`,
+      () => new Response(null, { status: 404 }),
+    );
+    responses.set(
+      `${api}/tree/${POINTER_TAG_SHA}/${prefix}?recursive=false`,
+      () => Response.json([{ type: "file", path: `${prefix}/calibration_diagnostics.json` }]),
+    );
+    responses.set(
+      resolveUrl(POINTER_TAG_SHA, `${prefix}/release_manifest.json`),
+      () => Response.json({ build: { cut_tag: pointerTag } }),
+    );
+  }
   for (const [name, text] of publishedFiles) {
     responses.set(resolveUrl(release.hfCommitSha, `${prefix}/${name}`), () => new Response(text));
     responses.set(resolveUrl("main", `${prefix}/${name}`), () => new Response(text));
