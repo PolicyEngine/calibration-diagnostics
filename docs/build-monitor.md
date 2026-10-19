@@ -14,7 +14,8 @@ checks stop builds. The run selected on either tab carries over to the other.
   credential, and delivers events to the hosted collector. The dashboard
   server receives the collector address and its independent read credential
   from the deployment environment. Neither value belongs in documentation or
-  browser-visible configuration.
+  browser-visible configuration. The collector's source, tests and deployment
+  are in [PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector).
 
   A missing credential, a user outside the PolicyEngine Hugging Face
   organization, or an unavailable network does not stop a build. Events remain
