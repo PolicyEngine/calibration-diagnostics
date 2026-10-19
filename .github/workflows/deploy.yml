@@ -140,10 +140,11 @@ jobs:
       # The calibration checks import @policyengine/calibration-tree, a workspace
       # package that resolves only through frontend/node_modules. Install after
       # the Vercel upload, which sends the repository root, so the uploaded
-      # working tree never contains node_modules.
+      # working tree never contains node_modules. This job holds Google Cloud
+      # credentials and can request OIDC tokens, so no lifecycle script runs.
       - name: Install frontend dependencies
         working-directory: frontend
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Verify staged calibration releases and staging
         env:
