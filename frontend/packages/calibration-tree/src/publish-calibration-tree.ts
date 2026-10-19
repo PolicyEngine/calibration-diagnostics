@@ -1,12 +1,12 @@
 import {
   CALIBRATION_TREE_SCHEMA_VERSION,
   type CalibrationTreeSourceArtifact,
-} from "@policyengine/calibration-tree/calibration-tree-artifact";
+} from "./calibration-tree-artifact";
 import {
   buildCalibrationTreeBundle,
   type CalibrationTreeBundle,
   type CalibrationTreeBundleFile,
-} from "@policyengine/calibration-tree/calibration-tree-bundle";
+} from "./calibration-tree-bundle";
 import {
   auditCalibrationTreeBuild,
   listCalibrationTreeBlobs,
@@ -14,13 +14,13 @@ import {
   updateCalibrationTreeManifest,
   uploadCalibrationTreeBundle,
   type CalibrationTreeBuildAudit,
-} from "@policyengine/calibration-tree/calibration-tree-blob";
+} from "./calibration-tree-blob";
 import type { ListBlobResultBlob } from "@vercel/blob";
 import {
   releaseDirectoryOf,
   type CalibrationTreeManifest,
   type CalibrationTreeManifestEntry,
-} from "@policyengine/calibration-tree/calibration-tree-manifest";
+} from "./calibration-tree-manifest";
 import { createHash } from "node:crypto";
 import {
   CalibrationReleaseNotFoundError,
@@ -28,27 +28,27 @@ import {
   resolveHfReleaseDirectorySha,
   resolveHfRepositoryCommitPublishedAt,
   resolveHfRevisionSha,
-} from "@policyengine/calibration-tree/calibration-release-locator";
+} from "./calibration-release-locator";
 import {
   countryPointerPath,
   countryRegistration,
   isCountry,
   selectableCountries,
   type MicrocosmCountry,
-} from "@policyengine/calibration-tree/countries";
-import { parseReleaseCutTag } from "@policyengine/calibration-tree/release-cut";
+} from "./countries";
+import { parseReleaseCutTag } from "./release-cut";
 import {
   buildCalibration,
   loadReleases,
   microcosmRepo,
   microcosmRevision,
-} from "@policyengine/calibration-tree/latest-artifact";
+} from "./latest-artifact";
 import {
   loadStagingRuns,
   resolveStagingCalibrationSource,
   resolveStagingRevisionSha,
   stagingRepository,
-} from "@policyengine/calibration-tree/staging-artifact";
+} from "./staging-artifact";
 
 type JsonObject = Record<string, unknown>;
 
