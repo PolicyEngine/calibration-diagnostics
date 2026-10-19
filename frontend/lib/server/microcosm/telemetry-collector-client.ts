@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { BuildRunDocuments } from "@/lib/microcosm/build-monitor";
-import type { MicrocosmCountry } from "@/lib/microcosm/countries";
+import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 import { secretManager, validSecretVersion } from "@/lib/server/secret-manager";
 
 type JsonObject = Record<string, unknown>;
