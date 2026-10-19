@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/cache-policy";
 import { withBasePath } from "@/lib/base-path";
 import type { BuildRunSource } from "@/lib/microcosm/build-monitor";
+import type { StagingComparisonRelease } from "@policyengine/calibration-tree/staging-artifact";
 import type { BuildRunResponse, BuildRunsResponse } from "@/lib/microcosm/build-runs";
 import type { ExplorerState } from "@policyengine/calibration-tree/calibration-explorer";
 import type { CalibrationTreeResponse } from "@policyengine/calibration-tree/calibration-tree";
@@ -812,7 +813,12 @@ export function useMicrocosmStagingCompare(runId?: string, release = "latest") {
   return useQuery({
     queryKey: ["microcosm", "staging", "compare", country, runId, release],
     queryFn: () =>
-      apiGet<MicrocosmComparison & { available?: boolean; detail?: string }>(
+      apiGet<MicrocosmComparison & {
+        available?: boolean;
+        detail?: string;
+        // Present for a local-area candidate: which release it is compared with.
+        comparison_release?: StagingComparisonRelease;
+      }>(
         "/microcosm/staging/compare",
         { run: runId, release, country },
       ),
