@@ -348,7 +348,7 @@ def _run_us(
         release_target_alignments,
         source_id=microcosm_plan.source.source_id,
         dataset_version=MICROCOSM_RELEASE.release_id,
-        model_version=f"policyengine-us=={MICROCOSM_RELEASE.model_version}",
+        model_version=MICROCOSM_RELEASE.model_version,
         population_period=microcosm_plan.source.population_period,
         policy_period=microcosm_plan.source.policy_period,
     )

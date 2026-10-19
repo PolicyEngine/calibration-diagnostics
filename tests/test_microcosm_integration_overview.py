@@ -23,8 +23,10 @@ INTEGRATION = ROOT / "integrations" / "microcosm_policyengine_us"
 def test_microcosm_overview_pins_current_dataset_and_model() -> None:
     overview = load_integration_overview(INTEGRATION / "overview.yaml")
     assert overview.source.source_id == "populace_us_policyengine_us_2024"
-    assert overview.source.dataset_version.endswith("20260728T011454Z")
-    assert overview.source.model_version == "policyengine-us==1.764.6"
+    assert overview.source.dataset_version == (
+        "populace-us-2024@populace-us-2024-spm-20260915"
+    )
+    assert overview.source.model_version == "policyengine[us]==6.4.1"
     assert overview.chronicle_snapshot_id == "chronicle-7917ea815df710fb20db076b"
     assert overview.alignment_policy == {
         "model_id": "cbo_growth_factor_aging",
