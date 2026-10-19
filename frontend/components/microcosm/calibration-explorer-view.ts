@@ -1,14 +1,14 @@
 import type {
   ExplorerPath,
   ExplorerState,
-} from "@/lib/microcosm/calibration-explorer";
+} from "@policyengine/calibration-tree/calibration-explorer";
 import {
   type CalibrationTreeMetrics,
   type CalibrationTreeNode,
   type CalibrationTreeSizeMode,
-} from "@/lib/microcosm/calibration-tree";
-import { canonicalLabel, programLabel } from "@/lib/microcosm/program-label";
-import { sourceLabel } from "@/lib/microcosm/source-label";
+} from "@policyengine/calibration-tree/calibration-tree";
+import { canonicalLabel, programLabel } from "@policyengine/calibration-tree/program-label";
+import { sourceLabel } from "@policyengine/calibration-tree/source-label";
 
 export const EXPLORER_MAP_VERTICAL_PADDING = 10;
 

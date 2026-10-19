@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { readCalibrationTreeManifest } from "@/lib/microcosm/calibration-tree-blob";
+import { readCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-blob";
 import {
   loadPointerReleaseId,
   loadPublishedCutReleases,
@@ -8,7 +8,7 @@ import {
   mergeReleaseInventory,
   parseCountry,
   scrub,
-} from "@/lib/microcosm/latest-artifact";
+} from "@policyengine/calibration-tree/latest-artifact";
 
 export const revalidate = 60;
 

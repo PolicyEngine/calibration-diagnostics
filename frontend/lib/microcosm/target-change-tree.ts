@@ -1,9 +1,9 @@
-import type { ExplorerState } from "./calibration-explorer";
+import type { ExplorerState } from "@policyengine/calibration-tree/calibration-explorer";
 import {
   buildCalibrationTree,
   type CalibrationTreeResponse,
   type CalibrationTreeTarget,
-} from "./calibration-tree";
+} from "@policyengine/calibration-tree/calibration-tree";
 import {
   targetChangeForMode,
   type TargetChangeAttributionSide,
@@ -12,8 +12,8 @@ import {
   type TargetChangeMode,
   type TargetChangeRow,
   type TargetChangeSummary,
-} from "./target-change";
-import type { TargetMatchingSummary } from "./target-surface-matcher";
+} from "@policyengine/calibration-tree/target-change";
+import type { TargetMatchingSummary } from "@policyengine/calibration-tree/target-surface-matcher";
 
 export interface TargetChangeTreeResponse extends CalibrationTreeResponse {
   available: boolean;

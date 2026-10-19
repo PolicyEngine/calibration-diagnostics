@@ -1,18 +1,18 @@
 import { afterEach, expect, test } from "bun:test";
 
-import recordedGoldens from "../lib/microcosm/fixtures/calibration-tree-golden.json";
+import recordedGoldens from "../packages/calibration-tree/src/fixtures/calibration-tree-golden.json";
 import {
   emptyCalibrationTreeManifest,
   withCalibrationTreeManifestEntry,
   type CalibrationTreeManifestEntry,
-} from "../lib/microcosm/calibration-tree-manifest";
-import { COUNTRY_REGISTRY, countryPointerPath } from "../lib/microcosm/countries";
+} from "@policyengine/calibration-tree/calibration-tree-manifest";
+import { COUNTRY_REGISTRY, countryPointerPath } from "@policyengine/calibration-tree/countries";
 import {
   goldenReleaseInputs,
   withRegisteredRepositories,
   type CalibrationTreeGoldenRecord,
   type GoldenReleaseInput,
-} from "../lib/microcosm/test-support/calibration-tree-golden-cases";
+} from "../packages/calibration-tree/src/test-support/calibration-tree-golden-cases";
 import {
   reconcileReleaseBuilds,
   type CalibrationManifestStore,

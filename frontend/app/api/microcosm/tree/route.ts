@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 
 import { withBasePath } from "@/lib/base-path";
-import { getCalibrationTreeBlob } from "@/lib/microcosm/calibration-tree-blob";
+import { getCalibrationTreeBlob } from "@policyengine/calibration-tree/calibration-tree-blob";
 import { immutableCalibrationTreePartResponse } from "@/lib/microcosm/calibration-tree-http";
 import {
   isCalibrationTreePart,
   isSha256,
   type CalibrationTreePart,
-} from "@/lib/microcosm/calibration-tree-artifact";
-import { resolveCalibrationRelease } from "@/lib/microcosm/calibration-release-locator";
+} from "@policyengine/calibration-tree/calibration-tree-artifact";
+import { resolveCalibrationRelease } from "@policyengine/calibration-tree/calibration-release-locator";
 import {
   isCountry,
   selectableCountries,
   type MicrocosmCountry,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

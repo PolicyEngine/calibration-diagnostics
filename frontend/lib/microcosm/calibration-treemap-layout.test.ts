@@ -4,7 +4,7 @@ import type {
   CalibrationTreeGroup,
   CalibrationTreeMetrics,
   CalibrationTreeNode,
-} from "./calibration-tree";
+} from "@policyengine/calibration-tree/calibration-tree";
 import {
   condenseCalibrationTreemap,
   expandedGroupsForNode,

@@ -7,7 +7,7 @@ import {
 import {
   hfResolveUrl,
   microcosmRevision,
-} from "./latest-artifact";
+} from "@policyengine/calibration-tree/latest-artifact";
 
 test("dashboard discovery follows the repository branch while variable calculation stays pinned", () => {
   expect(microcosmRevision("us")).toBe("main");

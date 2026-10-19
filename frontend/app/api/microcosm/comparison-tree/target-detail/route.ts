@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { loadCalibrationComparisonTargetDetail } from "@/lib/microcosm/calibration-comparison-blob";
-import { isSha256 } from "@/lib/microcosm/calibration-tree-artifact";
+import { loadCalibrationComparisonTargetDetail } from "@policyengine/calibration-tree/calibration-comparison-blob";
+import { isSha256 } from "@policyengine/calibration-tree/calibration-tree-artifact";
 import {
   isCountry,
   selectableCountries,
   type MicrocosmCountry,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

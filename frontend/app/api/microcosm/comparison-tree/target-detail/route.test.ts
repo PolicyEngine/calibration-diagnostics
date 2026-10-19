@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import type { CalibrationTreeComparisonTargetDetailResponse } from "@/lib/microcosm/calibration-tree-artifact";
+import type { CalibrationTreeComparisonTargetDetailResponse } from "@policyengine/calibration-tree/calibration-tree-artifact";
 import {
   createCalibrationComparisonTargetDetailHandler,
   type CalibrationComparisonTargetDetailRouteDependencies,

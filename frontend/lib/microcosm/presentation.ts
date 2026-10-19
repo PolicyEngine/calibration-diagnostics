@@ -1,4 +1,4 @@
-import type { MicrocosmCountry } from "./countries";
+import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 
 export interface MicrocosmPresentationSlots {
   overview_intro?: string;

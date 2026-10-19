@@ -4,7 +4,7 @@ import {
   hasCapability,
   selectableCountries,
   type MicrocosmCountry,
-} from "../lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 type JsonObject = Record<string, unknown>;
 type Fetcher = (url: string | URL, init?: RequestInit) => Promise<Response>;

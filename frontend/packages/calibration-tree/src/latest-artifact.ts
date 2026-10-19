@@ -8,7 +8,7 @@ import { basename, join } from "node:path";
 
 import { createHash } from "node:crypto";
 
-import { sourceAuthorityLabel } from "@/lib/source-labels";
+import { sourceAuthorityLabel } from "./source-labels";
 
 import { normalizeChronicleMetadata } from "./chronicle-metadata";
 import {
