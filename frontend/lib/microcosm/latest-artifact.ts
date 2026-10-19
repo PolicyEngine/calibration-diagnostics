@@ -1302,9 +1302,27 @@ function policyengineVariablesFromMetadata(metadata: JsonObject): string[] {
   return variables.filter((variable, index) => variables.indexOf(variable) === index);
 }
 
+// Chronicle measure concept -> the model variable that the
+// integrations/microcosm_policyengine_us/mappings.yaml entry for that concept
+// evaluates (`source_expression`). Releases publish these targets without
+// `base_variables`, so without this table they carry no PolicyEngine
+// variable. Concepts whose source expression is not a model variable (for
+// example census_pep.resident_population, `__ones__`) and concepts without a
+// mapping (for example jct.individual_tax_expenditure_revenue_loss) stay
+// empty. A test in latest-artifact.test.ts keeps this table in sync
+// with the mappings file.
+export const MAPPED_MEASURE_CONCEPT_VARIABLES: Readonly<Record<string, readonly string[]>> = {
+  "census_stc.individual_income_tax_collections": ["state_income_tax"],
+  "irs_soi.individual_income_tax_returns": ["tax_unit_is_filer"],
+};
+
 function fallbackPolicyengineVariables(metadata: JsonObject): string[] {
   const targetRole = stringValue(metadata.target_role);
   const sourceMeasureId = stringValue(metadata.source_measure_id);
+  const measureConcept = stringValue(metadata.ledger_measure_concept);
+  if (measureConcept && Object.hasOwn(MAPPED_MEASURE_CONCEPT_VARIABLES, measureConcept)) {
+    return [...MAPPED_MEASURE_CONCEPT_VARIABLES[measureConcept]];
+  }
   if (
     targetRole === "aca_spending" ||
     targetRole === "aca_ptc_recipients" ||

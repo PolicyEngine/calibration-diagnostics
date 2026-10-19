@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -285,9 +286,31 @@ def test_locally_supplied_calibration_diagnostics_are_checksum_verified(
 def test_release_url_uses_the_immutable_hugging_face_revision() -> None:
     assert MICROCOSM_RELEASE.download_url == (
         "https://huggingface.co/datasets/policyengine/populace-us/resolve/"
-        "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
-        "populace_us_2024.h5"
+        "populace-us-2024-spm-20260915/populace_us_2024.h5"
     )
+
+
+def test_harness_and_hosted_runtime_share_the_py_certified_pair() -> None:
+    hosted_release = json.loads(
+        (Path(__file__).parents[1] / "frontend/scripts/hosted_release.json").read_text()
+    )
+    certifier = hosted_release["certifying_package"]
+    assert MICROCOSM_RELEASE.repository == hosted_release["repo"]
+    assert MICROCOSM_RELEASE.release_id == hosted_release["release_id"]
+    assert MICROCOSM_RELEASE.dataset_filename == hosted_release["filename"]
+    assert MICROCOSM_RELEASE.dataset_sha256 == hosted_release["sha256"]
+    assert MICROCOSM_RELEASE.model_version == (
+        f"{certifier['name']}[{certifier['extra']}]=={certifier['version']}"
+    )
+    assert MICROCOSM_RELEASE.calibration_diagnostics_filename == (
+        "releases/populace-us-2024-spm-20260915/calibration_diagnostics.json"
+    )
+
+
+def test_runner_reports_the_pinned_py_and_certified_release(tables) -> None:
+    bundle = runner(tables).prepare(group("person", "person_weight", "__geography__"))
+    assert bundle.model_version == "policyengine[us]==6.7.5"
+    assert bundle.dataset_version == "populace-us-2024-spm-20260915"
 
 
 def test_runner_builds_entity_specific_geographies(tables) -> None:

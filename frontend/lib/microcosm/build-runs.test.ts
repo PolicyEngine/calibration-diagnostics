@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 
 import {
   type BuildRunDocuments,
@@ -6,8 +6,14 @@ import {
 } from "@/lib/microcosm/build-monitor";
 import {
   type HostedRunLoaders,
+  loadBuildRuns,
   refreshHostedRun,
 } from "@/lib/microcosm/build-runs";
+import {
+  FAKE_COLLECTOR_URL,
+  fakeTelemetryCollector,
+} from "@/lib/microcosm/test-support/fake-telemetry-collector";
+import { secretManager } from "@/lib/server/secret-manager";
 
 const NOW = Date.parse("2026-10-05T12:00:00Z");
 
@@ -172,5 +178,52 @@ describe("refreshHostedRun", () => {
         }),
       ),
     ).rejects.toThrow("collector unavailable");
+  });
+});
+
+describe("loadBuildRuns from the collector", () => {
+  test("the build monitor reads only its 60 most recent collector runs", async () => {
+    // The zz fixture country has no staging repository, so the collector is
+    // the only hosted source and no Hugging Face request is made.
+    const collector = fakeTelemetryCollector({
+      countryCode: "ZZ",
+      runCount: 250,
+    });
+    const originalFetch = globalThis.fetch;
+    const originalEnvironment = {
+      MICROCOSM_TELEMETRY_COLLECTOR_URL:
+        process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL,
+      MICROCOSM_TELEMETRY_READ_SECRET_VERSION:
+        process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION,
+    };
+    const readSecret = spyOn(secretManager, "readVersion").mockResolvedValue(
+      "secret-read-token",
+    );
+    process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL = FAKE_COLLECTOR_URL;
+    process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION =
+      "projects/test-project/secrets/collector-read/versions/latest";
+    globalThis.fetch = collector.fetch;
+    try {
+      const response = await loadBuildRuns("staging", "zz");
+
+      const newestRunIds = collector.runs
+        .slice(0, 60)
+        .map((run) => run.run_id);
+      expect(response.available).toBe(true);
+      expect(response.problems).toEqual([]);
+      expect(collector.listRequests).toHaveLength(1);
+      expect(collector.listRequests[0].searchParams.get("limit")).toBe("60");
+      expect(collector.documentRequests.toSorted()).toEqual(
+        newestRunIds.toSorted(),
+      );
+      expect(response.runs.map((run) => run.run_id)).toEqual(newestRunIds);
+    } finally {
+      globalThis.fetch = originalFetch;
+      readSecret.mockRestore();
+      for (const [name, value] of Object.entries(originalEnvironment)) {
+        if (value == null) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
   });
 });

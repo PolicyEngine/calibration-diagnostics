@@ -21,6 +21,7 @@ class MicrocosmRelease:
     release_id: str
     dataset_filename: str
     dataset_sha256: str
+    # The model requirement, such as "policyengine[us]==6.7.5".
     model_version: str
     repository: str = MICROCOSM_REPOSITORY
     calibration_diagnostics_filename: str | None = None
@@ -37,15 +38,16 @@ class MicrocosmRelease:
         )
 
 
+# The release .py 6.7.5 certifies, shared with the hosted variable runtime
+# (frontend/scripts/hosted_release.json). It is a source-enrichment of the Build P
+# release and keeps Build P's calibration diagnostics.
 MICROCOSM_RELEASE = MicrocosmRelease(
-    release_id="populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z",
+    release_id="populace-us-2024-spm-20260915",
     dataset_filename="populace_us_2024.h5",
-    dataset_sha256="48b9d479fb4fd1c3537f9383ce4697d130b6f618658409d74f6233c43b994c7e",
-    model_version="1.764.6",
+    dataset_sha256="6496cc4393d4d3c6574f76eca231de5898c803b9067645591fd5c4d3e65aee84",
+    model_version="policyengine[us]==6.7.5",
     calibration_diagnostics_filename=(
-        "releases/"
-        "populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z/"
-        "calibration_diagnostics.json"
+        "releases/populace-us-2024-spm-20260915/calibration_diagnostics.json"
     ),
     calibration_diagnostics_sha256=(
         "870449b44e86b13b25bcea1a57f0e7af37f4d4db18be815eea3acdf9fe6eb40e"
@@ -180,10 +182,19 @@ def _default_table_loader(dataset_path: Path) -> Tables:
 
 def _default_simulation_factory(dataset_path: Path) -> Any:
     try:
+        from policyengine.tax_benefit_models.us.legacy_inputs import (
+            apply_legacy_input_renames_to_microsimulation,
+        )
         from policyengine_us import Microsimulation
     except ImportError as error:  # pragma: no cover - exercised by optional install
         raise RuntimeError("install the 'microcosm' extra to run PolicyEngine-US") from error
-    return Microsimulation(dataset=str(dataset_path))
+    simulation = Microsimulation(dataset=str(dataset_path))
+    # The release stores WIC take-up as `would_claim_wic`, which policyengine-us
+    # 2.2.1 renamed `takes_up_wic_if_eligible` (default True) and otherwise
+    # skips. Apply .py's stored-input renames, as its managed_microsimulation and
+    # the hosted variable runtime do.
+    apply_legacy_input_renames_to_microsimulation(simulation)
+    return simulation
 
 
 VARIABLE_ALIASES = {
@@ -709,6 +720,6 @@ class MicrocosmPolicyEngineRunner:
         return ArrayBundle(
             arrays=arrays,
             dataset_version=self.release.release_id,
-            model_version=f"policyengine-us=={self.release.model_version}",
+            model_version=self.release.model_version,
             domain_masks=masks,
         )

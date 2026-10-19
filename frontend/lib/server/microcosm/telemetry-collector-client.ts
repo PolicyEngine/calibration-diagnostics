@@ -119,8 +119,14 @@ function parseRunPage(value: JsonObject): CollectorRunPage {
   };
 }
 
+// The collector rejects a `GET /v1/runs` page larger than this.
+const COLLECTOR_MAX_PAGE_SIZE = 200;
+
+// The country's `limit` most recent runs, newest first. Each page asks only for
+// the runs still needed, so the dashboard never reads the full history.
 export async function loadCollectorRuns(
   country: MicrocosmCountry,
+  limit: number,
 ): Promise<CollectorRunSummary[]> {
   const runs: CollectorRunSummary[] = [];
   const visited = new Set<string>();
@@ -128,7 +134,7 @@ export async function loadCollectorRuns(
   do {
     const params = new URLSearchParams({
       country: collectorCountry(country),
-      limit: "200",
+      limit: String(Math.min(limit - runs.length, COLLECTOR_MAX_PAGE_SIZE)),
     });
     if (before) params.set("before", before);
     const page = parseRunPage(await collectorJson(`/v1/runs?${params}`));
@@ -140,8 +146,8 @@ export async function loadCollectorRuns(
       }
       visited.add(before);
     }
-  } while (before);
-  return runs;
+  } while (before && runs.length < limit);
+  return runs.slice(0, limit);
 }
 
 export async function loadCollectorRun(
