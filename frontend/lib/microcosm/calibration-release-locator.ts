@@ -1,5 +1,8 @@
 import { readCalibrationTreeManifest } from "./calibration-tree-blob";
-import { calibrationTreeManifestEntry } from "./calibration-tree-manifest";
+import {
+  calibrationTreeManifestEntry,
+  releaseDirectoryOf,
+} from "./calibration-tree-manifest";
 import type { CalibrationTreeManifest } from "./calibration-tree-manifest";
 import {
   countryRegistration,
@@ -9,6 +12,8 @@ import {
 export interface CalibrationReleaseLocation {
   buildArtifactId: string;
   releaseId: string;
+  /** The `releases/` folder holding the files: releaseId unless a cut tag. */
+  releaseDirectory: string;
   hfCommitSha: string;
   updatedAt: string | null;
 }
@@ -248,6 +253,7 @@ export function calibrationReleaseFromManifest(
   return {
     buildArtifactId: entry.buildArtifactId,
     releaseId: entry.releaseId,
+    releaseDirectory: releaseDirectoryOf(entry) ?? entry.releaseId,
     hfCommitSha: entry.hfCommitSha,
     // Null only on an entry written before the publication timestamp was
     // read from the pinned commit; the release loader then reads it from

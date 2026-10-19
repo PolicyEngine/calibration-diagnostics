@@ -16,6 +16,7 @@ import {
   type CalibrationTreeManifest,
   type CalibrationTreeManifestEntry,
 } from "../lib/microcosm/calibration-tree-manifest";
+import type { CalibrationTreeBundle } from "../lib/microcosm/calibration-tree-bundle";
 
 const originalFetch = globalThis.fetch;
 
@@ -196,6 +197,7 @@ test("latest publication uses its exact source commit when no release tag exists
   try {
     await expect(readUpstreamLatest("be", sourceSha)).resolves.toEqual({
       releaseId: "microcosm-be-current",
+      releaseDirectory: "microcosm-be-current",
       hfCommitSha: sourceSha,
       updatedAt: "2026-09-16T12:00:00Z",
     });
@@ -255,8 +257,10 @@ function placeholderEntry(hfRepo = UK_REPO): CalibrationTreeManifestEntry {
 function memoryStore(initial: CalibrationTreeManifest) {
   let manifest = initial;
   const writes: Array<{ entry: CalibrationTreeManifestEntry; makeLatest?: boolean }> = [];
+  const uploads: CalibrationTreeBundle[] = [];
   return {
     writes,
+    uploads,
     current: () => manifest,
     readManifest: async () => manifest,
     listBlobs: async () => new Map(),
@@ -265,6 +269,19 @@ function memoryStore(initial: CalibrationTreeManifest) {
       writes.push({ entry, makeLatest });
       manifest = withCalibrationTreeManifestEntry(manifest, "uk", entry, makeLatest);
       return manifest;
+    },
+    uploadBundle: async (bundle: CalibrationTreeBundle) => {
+      uploads.push(bundle);
+      const stored = (file: CalibrationTreeBundle["files"][number]) => ({
+        pathname: file.path,
+        sha256: file.sha256,
+        bytes: file.rawBytes,
+        created: true,
+      });
+      return {
+        files: bundle.files.map(stored),
+        index: stored(bundle.files.find((file) => file.part === "index")!),
+      };
     },
   };
 }
@@ -377,7 +394,7 @@ test("release reconciliation leaves a complete entry's metadata to the migration
     if (url.includes(`/api/datasets/${UK_REPO}/revision/${UK_RELEASE}`)) {
       return new Response(null, { status: 404 });
     }
-    if (url.endsWith("/latest.json")) return Response.json({ release_id: UK_RELEASE });
+    if (url.endsWith("/latest-national.json")) return Response.json({ release_id: UK_RELEASE });
     if (url.endsWith(`/releases/${UK_RELEASE}/release_manifest.json`)) return Response.json({});
     // No commit-log lookup belongs here; reconciliation does not date entries.
     throw new Error(`Unexpected URL ${url}`);
@@ -387,6 +404,252 @@ test("release reconciliation leaves a complete entry's metadata to the migration
     expect(report.outcomes.find((item) => item.sourceId === UK_RELEASE)?.status).toBe("complete");
     expect(store.current().countries.uk?.builds).toEqual([stale]);
     expect(store.writes.map((write) => write.makeLatest)).toEqual([true]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// A Microcosm line (microcosm#823): one constant folder, one immutable tag per
+// cut. All values are synthetic.
+const NATIONAL_LINE = "microcosm-uk-2024-25-national";
+const DENSE_LINE = "microcosm-uk-2024-25-dense";
+const NATIONAL_CUT = `${NATIONAL_LINE}-20261019T083323Z-0a1b2c3d`;
+const DENSE_CUT = `${DENSE_LINE}-20261019T000432Z-4e5f6a7b`;
+// A cut-shaped tag whose folder names another cut: never published.
+const STRAY_CUT = `${NATIONAL_LINE}-20261001T000000Z-99999999`;
+const JUNE_RELEASE = "populace-uk-2023-test-20260619T023711Z";
+const NATIONAL_SHA = "1".repeat(40);
+const DENSE_SHA = "2".repeat(40);
+const STRAY_SHA = "3".repeat(40);
+const JUNE_SHA = "4".repeat(40);
+const MAIN_SHA = "5".repeat(40);
+const COMMIT_DATES: Record<string, string> = {
+  [NATIONAL_SHA]: "2026-10-19T10:21:22.000Z",
+  [DENSE_SHA]: "2026-10-19T07:53:18.000Z",
+};
+
+const SCHEMA_8_DIAGNOSTICS = {
+  schema_version: 8,
+  targets: [{
+    name: "provider.target@2025",
+    target_name: "provider.target",
+    source: "Citation",
+    target: 100,
+    initial_estimate: 90,
+    final_estimate: 100,
+    hierarchy: {
+      provider: { id: "provider", label: "Provider label" },
+      category: { id: "provider.category", label: "Category label", provider_id: "provider" },
+      geography: { id: "K02000001", label: "United Kingdom", level: "country" },
+      dimensions: [],
+      target: { id: "provider.target", label: "Target label" },
+    },
+  }],
+};
+
+function juneEntry(): CalibrationTreeManifestEntry {
+  return {
+    ...placeholderEntry(),
+    buildArtifactId: "a".repeat(64),
+    sourceId: JUNE_RELEASE,
+    label: JUNE_RELEASE,
+    releaseId: JUNE_RELEASE,
+    hfCommitSha: JUNE_SHA,
+    createdAt: "2026-06-19T02:38:38.000Z",
+    updatedAt: "2026-06-19T02:38:38.000Z",
+  };
+}
+
+function lineRepositoryFetch(requested: string[]) {
+  const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
+  const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
+  const folderListing = (directory: string) => Response.json([
+    { type: "file", path: `releases/${directory}/calibration_diagnostics.json` },
+    { type: "file", path: `releases/${directory}/release_manifest.json` },
+  ]);
+  return (async (input: string | URL | Request) => {
+    const url = String(input);
+    requested.push(url);
+    if (url === `${api}/tree/main/releases?recursive=true`) {
+      return Response.json([
+        { type: "file", path: `releases/${NATIONAL_LINE}/calibration_diagnostics.json` },
+        { type: "file", path: `releases/${JUNE_RELEASE}/calibration_diagnostics.json` },
+      ]);
+    }
+    if (url === `${api}/refs`) {
+      return Response.json({
+        branches: [{ name: "main", targetCommit: MAIN_SHA }],
+        tags: [
+          { name: NATIONAL_CUT, targetCommit: NATIONAL_SHA },
+          { name: DENSE_CUT, targetCommit: DENSE_SHA },
+          { name: STRAY_CUT, targetCommit: STRAY_SHA },
+          { name: JUNE_RELEASE, targetCommit: JUNE_SHA },
+        ],
+      });
+    }
+    // No cut has a folder of its own; each keeps its files in its line's.
+    for (const [sha, tag] of [[NATIONAL_SHA, NATIONAL_CUT], [DENSE_SHA, DENSE_CUT], [STRAY_SHA, STRAY_CUT]]) {
+      if (url === `${api}/tree/${sha}/releases/${tag}?recursive=false`) {
+        return new Response(null, { status: 404 });
+      }
+    }
+    if (url === `${api}/tree/${NATIONAL_SHA}/releases/${NATIONAL_LINE}?recursive=false`) return folderListing(NATIONAL_LINE);
+    if (url === `${api}/tree/${STRAY_SHA}/releases/${NATIONAL_LINE}?recursive=false`) return folderListing(NATIONAL_LINE);
+    if (url === `${api}/tree/${DENSE_SHA}/releases/${DENSE_LINE}?recursive=false`) return folderListing(DENSE_LINE);
+    if (url === `${resolve}/${NATIONAL_SHA}/releases/${NATIONAL_LINE}/release_manifest.json`) {
+      return Response.json({ build: { cut_tag: NATIONAL_CUT }, default_datasets: { national: "x.h5" } });
+    }
+    if (url === `${resolve}/${STRAY_SHA}/releases/${NATIONAL_LINE}/release_manifest.json`) {
+      return Response.json({ build: { cut_tag: NATIONAL_CUT } });
+    }
+    if (url === `${resolve}/${DENSE_SHA}/releases/${DENSE_LINE}/release_manifest.json`) {
+      return Response.json({
+        build: { cut_tag: DENSE_CUT },
+        dataset_role: "non_default_local_area",
+        is_default: false,
+      });
+    }
+    if (
+      url === `${resolve}/${NATIONAL_SHA}/releases/${NATIONAL_LINE}/calibration_diagnostics.json` ||
+      url === `${resolve}/${DENSE_SHA}/releases/${DENSE_LINE}/calibration_diagnostics.json`
+    ) {
+      return Response.json(SCHEMA_8_DIAGNOSTICS);
+    }
+    if (/\/releases\/[^/]+\/(build_manifest|demographics)\.json$/.test(url)) {
+      return new Response(null, { status: 404 });
+    }
+    const commit = /\/commits\/([0-9a-f]{40})\?limit=1$/.exec(url)?.[1];
+    if (commit && COMMIT_DATES[commit]) {
+      return Response.json([{ id: commit, date: COMMIT_DATES[commit] }]);
+    }
+    if (url === `${api}/revision/main`) return Response.json({ sha: MAIN_SHA });
+    if (url === `${api}/revision/${NATIONAL_CUT}`) return Response.json({ sha: NATIONAL_SHA });
+    if (url === `${resolve}/${MAIN_SHA}/latest-national.json`) {
+      return Response.json({
+        schema_version: 1,
+        release_id: NATIONAL_LINE,
+        updated_at: "2026-10-19T10:21:51+00:00",
+        line: "national",
+        revision: NATIONAL_CUT,
+        paths: {},
+      });
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+}
+
+test("release reconciliation publishes each line cut from its folder and follows the line pointer", async () => {
+  // The folder's build from before cuts were recognised, and the June
+  // release, which is latest until the line pointer is read.
+  const legacy = placeholderEntry();
+  const june = juneEntry();
+  const store = memoryStore(
+    withCalibrationTreeManifestEntry(
+      withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", legacy),
+      "uk",
+      june,
+      true,
+    ),
+  );
+  const requested: string[] = [];
+  globalThis.fetch = lineRepositoryFetch(requested);
+  try {
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    const status = Object.fromEntries(
+      report.outcomes.map((outcome) => [outcome.sourceId, outcome.status]),
+    );
+    expect(status).toEqual({
+      [NATIONAL_CUT]: "published",
+      [DENSE_CUT]: "published",
+      [STRAY_CUT]: "ineligible",
+      [NATIONAL_LINE]: "complete",
+      [JUNE_RELEASE]: "complete",
+    });
+    expect(report.outcomes.find((outcome) => outcome.sourceId === STRAY_CUT)?.reason)
+      .toContain("does not name it as its cut");
+
+    const builds = store.current().countries.uk!.builds;
+    const national = builds.find((build) => build.releaseId === NATIONAL_CUT)!;
+    const dense = builds.find((build) => build.releaseId === DENSE_CUT)!;
+    expect(national).toMatchObject({
+      sourceId: NATIONAL_CUT,
+      releaseDirectory: NATIONAL_LINE,
+      hfCommitSha: NATIONAL_SHA,
+      createdAt: COMMIT_DATES[NATIONAL_SHA],
+      updatedAt: COMMIT_DATES[NATIONAL_SHA],
+    });
+    expect(dense).toMatchObject({
+      sourceId: DENSE_CUT,
+      releaseDirectory: DENSE_LINE,
+      hfCommitSha: DENSE_SHA,
+      createdAt: COMMIT_DATES[DENSE_SHA],
+    });
+    // The folder build and the June build are untouched; the line pointer's
+    // cut becomes the latest release.
+    expect(builds.find((build) => build.releaseId === NATIONAL_LINE)).toEqual(legacy);
+    expect(builds.find((build) => build.releaseId === JUNE_RELEASE)).toEqual(june);
+    expect(store.current().countries.uk!.latestReleaseBuildArtifactId)
+      .toBe(national.buildArtifactId);
+    expect(store.uploads.map((bundle) => bundle.index.build.releaseId).sort())
+      .toEqual([DENSE_CUT, NATIONAL_CUT]);
+
+    // Files are read from the line folder at each cut's own commit; the line
+    // folder on main is never dated, and the frozen latest.json is never read.
+    expect(requested).toContain(
+      `https://huggingface.co/datasets/${UK_REPO}/resolve/${DENSE_SHA}/releases/${DENSE_LINE}/calibration_diagnostics.json`,
+    );
+    expect(requested.some((url) => url.includes("expand=true"))).toBe(false);
+    expect(requested.some((url) => url.endsWith("/latest.json"))).toBe(false);
+
+    // A second run finds every build complete and does not probe the
+    // published cuts again.
+    requested.length = 0;
+    const again = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    expect(again.outcomes.filter((outcome) => outcome.status !== "ineligible")
+      .every((outcome) => outcome.status === "complete")).toBe(true);
+    expect(store.uploads).toHaveLength(2);
+    expect(requested.some((url) => url.includes(`/tree/${NATIONAL_SHA}/`))).toBe(false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("the UK latest release is the cut its line pointer names", async () => {
+  const requested: string[] = [];
+  globalThis.fetch = lineRepositoryFetch(requested);
+  try {
+    await expect(readUpstreamLatest("uk")).resolves.toEqual({
+      releaseId: NATIONAL_CUT,
+      releaseDirectory: NATIONAL_LINE,
+      hfCommitSha: NATIONAL_SHA,
+      updatedAt: "2026-10-19T10:21:51+00:00",
+    });
+    expect(requested.some((url) => url.endsWith("/latest.json"))).toBe(false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a line pointer must name an existing cut of its own release", async () => {
+  const pointer = (revision: string) => (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith("/revision/main")) return Response.json({ sha: MAIN_SHA });
+    if (url.endsWith(`/${MAIN_SHA}/latest-national.json`)) {
+      return Response.json({
+        schema_version: 1,
+        release_id: NATIONAL_LINE,
+        line: "national",
+        revision,
+      });
+    }
+    if (url.includes("/revision/")) return new Response(null, { status: 404 });
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+  try {
+    globalThis.fetch = pointer(DENSE_CUT);
+    await expect(readUpstreamLatest("uk")).rejects.toThrow("not a cut of");
+    globalThis.fetch = pointer(NATIONAL_CUT);
+    await expect(readUpstreamLatest("uk")).rejects.toThrow("was not found");
   } finally {
     globalThis.fetch = originalFetch;
   }

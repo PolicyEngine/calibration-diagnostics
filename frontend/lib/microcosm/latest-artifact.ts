@@ -55,6 +55,8 @@ import {
   resolveCalibrationRelease,
   resolveHfCommitPublishedAt,
 } from "./calibration-release-locator";
+import type { CalibrationTreeManifest } from "./calibration-tree-manifest";
+import { parseReleaseCutTag } from "./release-cut";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
@@ -1765,6 +1767,10 @@ export interface Calibration {
   description: string | null;
   diagnostics_status: DiagnosticsStatus;
   release_id: string;
+  // The `releases/` folder the files were read from, set only when it is not
+  // release_id: a Microcosm cut is released as its tag but stored under its
+  // line's folder (microcosm#823).
+  release_directory?: string;
   updated_at: string | null;
   schema_version: unknown;
   weight_entity: unknown;
@@ -2203,6 +2209,8 @@ export interface ReleaseEntry {
   dataset_role: string | null;
   is_default: boolean;
   is_local_area: boolean;
+  // A Microcosm cut's line folder; absent when the folder is release_id.
+  release_directory?: string;
 }
 
 // Trailing timestamp/date in a build id → a real timestamp for ordering. Ids
@@ -2388,6 +2396,78 @@ export async function loadReleases(
   return entries;
 }
 
+// A Microcosm cut (microcosm#823) is released as its tag and stored under its
+// line's folder, which the folder listing above names only as the mutable
+// copy on main; the dashboard manifest names every published cut. Roles are
+// read from the cut's own release_manifest.json at its pinned commit,
+// best-effort like the listing's.
+export async function loadPublishedCutReleases(
+  revalidate: number,
+  country: MicrocosmCountry,
+  manifest: CalibrationTreeManifest,
+): Promise<ReleaseEntry[]> {
+  if (await loadLocalCalibrationRelease(country)) return [];
+  const cuts = (manifest.countries[country]?.builds ?? []).filter(
+    (build) =>
+      build.kind === "release" &&
+      build.releaseId != null &&
+      build.releaseDirectory != null &&
+      build.releaseDirectory !== build.releaseId,
+  );
+  return Promise.all(cuts.map(async (build) => {
+    const releaseId = build.releaseId as string;
+    const directory = assertSafeReleaseId(
+      build.releaseDirectory as string,
+      "release directory",
+    );
+    const entry: ReleaseEntry = {
+      release_id: releaseId,
+      date: parseReleaseCutTag(releaseId)?.cutAt ?? releaseDate(releaseId),
+      files: [],
+      has_calibration: true,
+      dataset_role: null,
+      is_default: true,
+      is_local_area: false,
+      release_directory: directory,
+    };
+    try {
+      const releaseManifest = await hfJson(
+        hfResolveUrl(
+          `releases/${directory}/release_manifest.json`,
+          country,
+          build.hfCommitSha,
+        ),
+        revalidate,
+      );
+      Object.assign(entry, releaseRole(releaseManifest));
+    } catch {
+      // Best-effort: keep the default classification.
+    }
+    return entry;
+  }));
+}
+
+// The picker lists every published cut beside the folders on main. A line
+// folder is a mutable copy of whichever of its cuts was published last, so
+// it leaves the picker once its cuts are listed, unless the dashboard's
+// latest release still points at it. Without cuts the listing is returned
+// unchanged.
+export function mergeReleaseInventory(
+  folders: ReleaseEntry[],
+  cuts: ReleaseEntry[],
+  latestReleaseId: string | null,
+): ReleaseEntry[] {
+  if (!cuts.length) return folders;
+  const lineFolders = new Set(cuts.map((cut) => cut.release_directory));
+  return [
+    ...folders.filter(
+      (folder) =>
+        !lineFolders.has(folder.release_id) || folder.release_id === latestReleaseId,
+    ),
+    ...cuts,
+  ].sort((left, right) => releaseSortKey(right.date) - releaseSortKey(left.date));
+}
+
 export async function loadPointerReleaseId(
   revalidate: number,
   country: MicrocosmCountry = "us",
@@ -2462,8 +2542,9 @@ async function loadReleaseUncached(
     revalidate,
   );
   const id = location.releaseId;
+  const directory = assertSafeReleaseId(location.releaseDirectory, "release directory");
   const updatedAt = location.updatedAt;
-  const prefix = `releases/${id}`;
+  const prefix = `releases/${directory}`;
   const [diagnosticsArtifact, buildManifest, releaseManifest, demographics, publishedAt] = await Promise.all([
     hfHashedJson(
       hfResolveUrl(
@@ -2484,7 +2565,7 @@ async function loadReleaseUncached(
           () => null,
         ),
   ]);
-  return buildCalibration(
+  const calibration = buildCalibration(
     diagnosticsArtifact.payload,
     id,
     updatedAt ?? publishedAt,
@@ -2496,6 +2577,11 @@ async function loadReleaseUncached(
     diagnosticsArtifact.sha256,
     location.hfCommitSha,
   );
+  // A cut keeps its tag as the release id the picker, the latest pointer and
+  // this summary share, even if its diagnostics name the line instead.
+  return directory === id
+    ? calibration
+    : { ...calibration, release_id: id, release_directory: directory };
 }
 
 function targetDiagnosticsMetadata(rows: TargetRow[]): TargetDiagnosticsMetadata {
@@ -2710,15 +2796,20 @@ function investigationNextSteps(row: TargetRow): string[] {
 
 function targetInvestigationPacket(row: TargetRow, cal: Calibration) {
   const metadata = asObject(row.metadata);
+  const directory = cal.release_directory ?? cal.release_id;
   return {
     release_id: cal.release_id,
     target: targetResponseRow(row),
     source_artifact: {
       hf_repo: microcosmRepo(cal.country),
-      hf_revision: microcosmRevision(cal.country),
-      calibration_diagnostics_path: `releases/${cal.release_id}/calibration_diagnostics.json`,
-      build_manifest_path: `releases/${cal.release_id}/build_manifest.json`,
-      release_manifest_path: `releases/${cal.release_id}/release_manifest.json`,
+      // A cut's folder on main holds whichever cut was published last, so a
+      // cut is cited at the commit it was read from.
+      hf_revision: cal.release_directory && cal.hf_commit_sha
+        ? cal.hf_commit_sha
+        : microcosmRevision(cal.country),
+      calibration_diagnostics_path: `releases/${directory}/calibration_diagnostics.json`,
+      build_manifest_path: `releases/${directory}/build_manifest.json`,
+      release_manifest_path: `releases/${directory}/release_manifest.json`,
     },
     source_metadata: {
       source_measure_id: stringValue(metadata.source_measure_id),

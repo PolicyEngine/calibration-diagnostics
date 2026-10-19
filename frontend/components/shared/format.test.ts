@@ -51,3 +51,19 @@ test("short release ids use six characters from the varying identifier", () => {
   ).toBe("32fcf6");
   expect(shortReleaseId("rel-1")).toBe("rel");
 });
+
+test("Microcosm cut labels name their line and attempt", () => {
+  expect(
+    releaseLabel("microcosm-uk-2024-25-national-20261019T083323Z-0a1b2c3d", "20261019T083323Z"),
+  ).toBe("2026-10-19 08:33Z · 2024-25-national · 0a1b2c3d");
+  expect(
+    releaseLabel("microcosm-uk-2024-25-dense-20261019T000432Z-4e5f6a7b"),
+  ).toBe("2026-10-19 00:04Z · 2024-25-dense · 4e5f6a7b");
+  // Other release ids keep their labels.
+  expect(releaseLabel("populace-us-2024-f32c2e5-20260614", "20260614")).toBe(
+    "2026-06-14 · f32c2e5",
+  );
+  expect(
+    releaseLabel("populace-uk-2023-dd68c73-4aa4b14-20260619T023711Z", "20260619T023711Z"),
+  ).toBe("2026-06-19 02:37Z · populace");
+});

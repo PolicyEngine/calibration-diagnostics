@@ -5,6 +5,7 @@ import {
   COUNTRY_REGISTRY,
   DEFAULT_COUNTRY,
   countryCapabilities,
+  countryPointerPath,
   countryRegistration,
   hasCapability,
   isCountry,
@@ -171,4 +172,15 @@ test("capability gates read the registration", () => {
   expect(isCountryCapability("staging")).toBe(true);
   expect(isCountryCapability("dashboard_admin")).toBe(false);
   expect(isCountryCapability(7)).toBe(false);
+});
+
+test("only the UK resolves its current release through a line pointer", () => {
+  // microcosm#823: the UK default line is promoted through latest-national.json.
+  expect(countryPointerPath("uk")).toBe("latest-national.json");
+  expect(countryPointerPath("us")).toBe("latest.json");
+  expect(countryPointerPath("be")).toBe("latest.json");
+  for (const country of COUNTRIES) {
+    const pointer = countryRegistration(country).pointer_path;
+    if (pointer != null) expect(pointer).toMatch(/^latest-[a-z]+(-k[1-9][0-9]*)?\.json$/);
+  }
 });

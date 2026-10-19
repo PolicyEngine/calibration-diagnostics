@@ -5,6 +5,7 @@ import {
   isSha256,
   type CalibrationTreeBuildKind,
 } from "./calibration-tree-artifact";
+import { isReleaseDirectory } from "./release-cut";
 
 export const CALIBRATION_TREE_MANIFEST_SCHEMA_VERSION = 6 as const;
 export const CALIBRATION_TREE_MANIFEST_PATH = "calibration-trees/manifest.json";
@@ -15,6 +16,13 @@ export interface CalibrationTreeManifestEntry {
   sourceId: string;
   label: string;
   releaseId: string | null;
+  /**
+   * The `releases/<folder>/` holding the build's files, recorded only when it
+   * differs from releaseId: a Microcosm cut is released as its tag but read
+   * from its line's folder (microcosm#823). Absent means the folder is
+   * releaseId.
+   */
+  releaseDirectory?: string;
   stagingRunId: string | null;
   hfRepo: string;
   hfCommitSha: string;
@@ -98,6 +106,10 @@ function parseEntry(value: unknown, country: string): CalibrationTreeManifestEnt
     (entry.kind === "staging" && (!stagingRunId || releaseId))
   ) {
     throw new Error(`Calibration tree manifest entry ${country} has inconsistent aliases.`);
+  }
+  // The folder is interpolated into authenticated Hugging Face URLs.
+  if (entry.releaseDirectory != null && !isReleaseDirectory(entry.releaseDirectory)) {
+    throw new Error(`Calibration tree manifest entry ${country} has an invalid release directory.`);
   }
   if (entry.treeSchemaVersion !== CALIBRATION_TREE_SCHEMA_VERSION) {
     throw new Error(`Calibration tree manifest entry ${country} has an unsupported tree schema.`);
@@ -199,6 +211,13 @@ export function calibrationTreeCountryManifest(
   return entry;
 }
 
+/** The `releases/` folder a release build's files are read from. */
+export function releaseDirectoryOf(
+  entry: Pick<CalibrationTreeManifestEntry, "releaseId" | "releaseDirectory">,
+): string | null {
+  return entry.releaseDirectory ?? entry.releaseId;
+}
+
 export function calibrationTreeManifestEntry(
   manifest: CalibrationTreeManifest,
   country: MicrocosmCountry,
@@ -254,6 +273,7 @@ export function withCalibrationTreeManifestEntry(
       "kind",
       "sourceId",
       "releaseId",
+      "releaseDirectory",
       "stagingRunId",
       "hfRepo",
       "hfCommitSha",

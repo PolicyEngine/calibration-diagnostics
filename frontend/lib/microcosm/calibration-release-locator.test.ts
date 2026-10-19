@@ -36,9 +36,43 @@ test("latest release identity is read only from the dashboard manifest", () => {
   expect(calibrationReleaseFromManifest(manifest, "us")).toEqual({
     buildArtifactId: "a".repeat(64),
     releaseId: "microcosm-us-new-release",
+    releaseDirectory: "microcosm-us-new-release",
     hfCommitSha: "1234567890abcdef1234567890abcdef12345678",
     updatedAt: "2026-09-15T12:00:00.000Z",
   });
+});
+
+test("a release cut is located by its tag and read from its line folder", () => {
+  const cut = "microcosm-zz-2024-national-20261019T083323Z-0a1b2c3d";
+  const manifest = withCalibrationTreeManifestEntry(
+    emptyCalibrationTreeManifest(),
+    "uk",
+    {
+      buildArtifactId: "b".repeat(64),
+      kind: "release",
+      sourceId: cut,
+      label: cut,
+      releaseId: cut,
+      releaseDirectory: "microcosm-zz-2024-national",
+      stagingRunId: null,
+      hfRepo: "policyengine/populace-uk-private",
+      hfCommitSha: "2".repeat(40),
+      treeSchemaVersion: 6,
+      indexSha256: "c".repeat(64),
+      indexBytes: 20,
+      createdAt: "2026-10-19T10:21:22.000Z",
+      updatedAt: "2026-10-19T10:21:22.000Z",
+    },
+    true,
+  );
+  expect(calibrationReleaseFromManifest(manifest, "uk", cut)).toEqual({
+    buildArtifactId: "b".repeat(64),
+    releaseId: cut,
+    releaseDirectory: "microcosm-zz-2024-national",
+    hfCommitSha: "2".repeat(40),
+    updatedAt: "2026-10-19T10:21:22.000Z",
+  });
+  expect(calibrationReleaseFromManifest(manifest, "uk").releaseId).toBe(cut);
 });
 
 test("historical release tags resolve to exact Hugging Face commits", async () => {

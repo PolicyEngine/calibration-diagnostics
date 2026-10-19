@@ -4,6 +4,7 @@ import {
 } from "../lib/microcosm/calibration-tree-artifact";
 import {
   buildCalibrationTreeBundle,
+  type CalibrationTreeBundle,
   type CalibrationTreeBundleFile,
 } from "../lib/microcosm/calibration-tree-bundle";
 import {
@@ -15,9 +16,10 @@ import {
   type CalibrationTreeBuildAudit,
 } from "../lib/microcosm/calibration-tree-blob";
 import type { ListBlobResultBlob } from "@vercel/blob";
-import type {
-  CalibrationTreeManifest,
-  CalibrationTreeManifestEntry,
+import {
+  releaseDirectoryOf,
+  type CalibrationTreeManifest,
+  type CalibrationTreeManifestEntry,
 } from "../lib/microcosm/calibration-tree-manifest";
 import { createHash } from "node:crypto";
 import {
@@ -28,10 +30,12 @@ import {
   resolveHfRevisionSha,
 } from "../lib/microcosm/calibration-release-locator";
 import {
+  countryPointerPath,
   isCountry,
   selectableCountries,
   type MicrocosmCountry,
 } from "../lib/microcosm/countries";
+import { parseReleaseCutTag } from "../lib/microcosm/release-cut";
 import {
   buildCalibration,
   loadReleases,
@@ -64,6 +68,8 @@ export interface PublisherOptions {
 
 interface UpstreamLatest {
   releaseId: string;
+  /** The `releases/` folder holding its files: releaseId unless a cut tag. */
+  releaseDirectory: string;
   hfCommitSha: string;
   updatedAt: string | null;
 }
@@ -299,7 +305,7 @@ export async function readUpstreamLatest(
   const sourceSha = expectedSourceSha
     ? exactCommitSha(expectedSourceSha, "Source revision")
     : await resolveHfRevisionSha(country, microcosmRevision(country), 0);
-  const path = "latest.json";
+  const path = countryPointerPath(country);
   const response = await fetch(
     sourceUrl(country, sourceSha, path),
     {
@@ -309,9 +315,9 @@ export async function readUpstreamLatest(
     },
   );
   if (!response.ok) {
-    throw new Error(`Hugging Face returned ${response.status} for latest.json.`);
+    throw new Error(`Hugging Face returned ${response.status} for ${path}.`);
   }
-  const pointer = object(await response.json(), "latest.json");
+  const pointer = object(await response.json(), path);
   const id = releaseId(
     typeof pointer.release_id === "string" ? pointer.release_id : undefined,
   );
@@ -319,8 +325,31 @@ export async function readUpstreamLatest(
     typeof pointer.updated_at === "string" && Number.isFinite(Date.parse(pointer.updated_at))
       ? pointer.updated_at
       : null;
+  if (pointer.revision !== undefined) {
+    // A per-line pointer (microcosm#823) names the immutable cut tag the
+    // line's current release is read at; the release id is the line folder.
+    if (pointer.schema_version !== 1) {
+      throw new Error(`${path} has unsupported schema_version ${String(pointer.schema_version)}.`);
+    }
+    if (typeof pointer.line !== "string" || `latest-${pointer.line}.json` !== path) {
+      throw new Error(`${path} declares line ${String(pointer.line)}.`);
+    }
+    const revision = releaseId(
+      typeof pointer.revision === "string" ? pointer.revision : undefined,
+    );
+    if (parseReleaseCutTag(revision)?.releaseId !== id) {
+      throw new Error(`${path} names revision ${revision}, which is not a cut of ${id}.`);
+    }
+    return {
+      releaseId: revision,
+      releaseDirectory: id,
+      hfCommitSha: await resolveHfRevisionSha(country, revision, 0),
+      updatedAt,
+    };
+  }
   return {
     releaseId: id,
+    releaseDirectory: id,
     hfCommitSha: await resolveHfRevisionSha(country, id, 0).catch((error) => {
       if (error instanceof CalibrationReleaseNotFoundError) return sourceSha;
       throw error;
@@ -331,6 +360,8 @@ export async function readUpstreamLatest(
 
 interface ReleaseCandidate {
   releaseId: string;
+  /** The `releases/` folder holding its files: releaseId unless a cut tag. */
+  releaseDirectory: string;
   hfCommitSha: string;
 }
 
@@ -368,13 +399,14 @@ async function listReleaseTags(
   });
 }
 
-async function taggedReleaseHasDiagnostics(
+async function releaseFolderHasDiagnostics(
   country: MicrocosmCountry,
-  candidate: HfTagRef,
+  commit: string,
+  directory: string,
 ): Promise<boolean> {
   const response = await fetch(
     `https://huggingface.co/api/datasets/${microcosmRepo(country)}/tree/` +
-      `${candidate.targetCommit}/releases/${encodeURIComponent(candidate.name)}?recursive=false`,
+      `${commit}/releases/${encodeURIComponent(directory)}?recursive=false`,
     {
       headers: hfHeaders(),
       cache: "no-store",
@@ -384,19 +416,63 @@ async function taggedReleaseHasDiagnostics(
   if (response.status === 404) return false;
   if (!response.ok) {
     throw new Error(
-      `Hugging Face returned ${response.status} while inspecting release tag ${candidate.name}.`,
+      `Hugging Face returned ${response.status} while inspecting releases/${directory} at ${commit}.`,
     );
   }
   const entries = await response.json();
   return Array.isArray(entries) && entries.some((value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return false;
     return (value as JsonObject).path ===
-      `releases/${candidate.name}/calibration_diagnostics.json`;
+      `releases/${directory}/calibration_diagnostics.json`;
   });
+}
+
+type TaggedRelease =
+  | { releaseDirectory: string; reason?: never }
+  | { releaseDirectory?: never; reason: string };
+
+/**
+ * Where a tag's release files live. A tag named like its folder is a release
+ * (`releases/<tag>/`). A Microcosm cut tag (microcosm#823) keeps its files
+ * under its line's folder, `releases/<release id>/`, and counts only when
+ * that folder's release_manifest.json names the tag as its cut, so a stray
+ * tag can never publish another cut's files under its own name.
+ */
+async function resolveTaggedReleaseDirectory(
+  country: MicrocosmCountry,
+  tag: HfTagRef,
+): Promise<TaggedRelease> {
+  if (await releaseFolderHasDiagnostics(country, tag.targetCommit, tag.name)) {
+    return { releaseDirectory: tag.name };
+  }
+  const cut = parseReleaseCutTag(tag.name);
+  if (!cut) return { reason: "Release has no calibration diagnostics." };
+  if (!await releaseFolderHasDiagnostics(country, tag.targetCommit, cut.releaseId)) {
+    return {
+      reason: `Release cut has no calibration diagnostics under releases/${cut.releaseId}/.`,
+    };
+  }
+  const releaseManifest = await fetchJsonArtifact(
+    country,
+    tag.targetCommit,
+    `releases/${cut.releaseId}/release_manifest.json`,
+    false,
+  );
+  const build = releaseManifest?.json.build;
+  const cutTag = build && typeof build === "object" && !Array.isArray(build)
+    ? (build as JsonObject).cut_tag
+    : undefined;
+  if (cutTag !== tag.name) {
+    return {
+      reason: `releases/${cut.releaseId}/release_manifest.json at this tag does not name it as its cut.`,
+    };
+  }
+  return { releaseDirectory: cut.releaseId };
 }
 
 async function enumerateReleaseCandidates(
   country: MicrocosmCountry,
+  manifest: CalibrationTreeManifest,
 ): Promise<{
   candidates: ReleaseCandidate[];
   ineligible: ReconciliationOutcome[];
@@ -406,34 +482,89 @@ async function enumerateReleaseCandidates(
     listReleaseTags(country),
   ]);
   const tagsByName = new Map(tags.map((tag) => [tag.name, tag]));
+  const calibratedFolders = new Set(
+    releases
+      .filter((release) => release.has_calibration)
+      .map((release) => release.release_id),
+  );
   const candidates = new Map<string, ReleaseCandidate>();
   const ineligible: ReconciliationOutcome[] = [];
 
+  // Tags are resolved first: a verified cut tag makes its line's folder on
+  // main a mutable copy of whichever cut was published last.
+  const taggedReleases = new Map<string, TaggedRelease>();
+  for (const tag of tags) {
+    if (calibratedFolders.has(tag.name)) continue;
+    // A tag the manifest already pins at this commit keeps its folder; it is
+    // not probed again on every reconciliation.
+    const known = manifestBuildForSource(manifest, country, "release", tag.name);
+    taggedReleases.set(
+      tag.name,
+      known && known.hfCommitSha === tag.targetCommit
+        ? { releaseDirectory: releaseDirectoryOf(known) ?? tag.name }
+        : await resolveTaggedReleaseDirectory(country, tag),
+    );
+  }
+  const lineFolders = new Set(
+    [...taggedReleases].flatMap(([name, tagged]) =>
+      tagged.releaseDirectory && tagged.releaseDirectory !== name
+        ? [tagged.releaseDirectory]
+        : []
+    ),
+  );
+
   for (const release of releases) {
     if (!release.has_calibration) continue;
+    const existing = manifestBuildForSource(
+      manifest,
+      country,
+      "release",
+      release.release_id,
+    );
+    if (lineFolders.has(release.release_id)) {
+      // The cut tags publish the line. A build already published from the
+      // folder stays pinned at its own commit, so it audits and repairs as
+      // before instead of following the folder to a newer cut.
+      if (existing) {
+        candidates.set(release.release_id, {
+          releaseId: release.release_id,
+          releaseDirectory: releaseDirectoryOf(existing) ?? release.release_id,
+          hfCommitSha: existing.hfCommitSha,
+        });
+      } else {
+        ineligible.push({
+          sourceId: release.release_id,
+          status: "ineligible",
+          buildArtifactId: null,
+          reason: "A release line folder; its cut tags are published instead.",
+        });
+      }
+      continue;
+    }
     const tag = tagsByName.get(release.release_id);
     // The build pins the tag's commit, or the newest commit behind the
     // release directory when no tag exists. Its publication timestamp is
     // that commit's date, read by publishRelease when a bundle is built.
     candidates.set(release.release_id, {
       releaseId: release.release_id,
+      releaseDirectory: release.release_id,
       hfCommitSha: tag?.targetCommit ??
         await resolveHfReleaseDirectorySha(country, release.release_id, 0),
     });
   }
-  for (const tag of tags) {
-    if (candidates.has(tag.name)) continue;
-    if (await taggedReleaseHasDiagnostics(country, tag)) {
-      candidates.set(tag.name, {
-        releaseId: tag.name,
-        hfCommitSha: tag.targetCommit,
+  for (const [name, tagged] of taggedReleases) {
+    if (tagged.releaseDirectory) {
+      candidates.set(name, {
+        releaseId: name,
+        releaseDirectory: tagged.releaseDirectory,
+        hfCommitSha: tagsByName.get(name)!.targetCommit,
       });
     } else {
       ineligible.push({
-        sourceId: tag.name,
+        sourceId: name,
         status: "ineligible",
         buildArtifactId: null,
-        reason: "Release has no calibration diagnostics.",
+        reason: tagged.reason ?? null,
       });
     }
   }
@@ -453,6 +584,22 @@ async function enumerateReleaseCandidates(
     ),
     ineligible,
   };
+}
+
+/** The folder a tag publishes from, for the single-release modes. */
+async function releaseDirectoryForTag(
+  country: MicrocosmCountry,
+  id: string,
+  commit: string,
+): Promise<string> {
+  const tagged = await resolveTaggedReleaseDirectory(country, {
+    name: id,
+    targetCommit: commit,
+  });
+  if (!tagged.releaseDirectory) {
+    throw new Error(`Release ${id} cannot be published: ${tagged.reason}`);
+  }
+  return tagged.releaseDirectory;
 }
 
 export function manifestBuildForSource(
@@ -520,18 +667,40 @@ export async function resolvePublicationSourceSha(
   }
 }
 
-async function publishRelease(
-  country: MicrocosmCountry,
-  id: string,
-  expectedSha: string | undefined,
-  blobToken: string,
-  allowMissingReleaseTag = false,
-  useExpectedShaExactly = false,
-  buildArtifactId?: string,
-  dryRun = false,
-  expectedIndexSha256?: string,
-  indexCreatedAt?: string | null,
-) {
+interface PublishReleaseOptions {
+  country: MicrocosmCountry;
+  /** The build's release id: its folder name, or a Microcosm cut tag. */
+  id: string;
+  /** The `releases/` folder holding its files; defaults to id. */
+  releaseDirectory?: string;
+  expectedSha: string | undefined;
+  blobToken: string;
+  allowMissingReleaseTag?: boolean;
+  useExpectedShaExactly?: boolean;
+  buildArtifactId?: string;
+  dryRun?: boolean;
+  expectedIndexSha256?: string;
+  indexCreatedAt?: string | null;
+  uploadBundle?: CalibrationManifestStore["uploadBundle"];
+}
+
+async function publishRelease(options: PublishReleaseOptions) {
+  const {
+    country,
+    id,
+    expectedSha,
+    blobToken,
+    allowMissingReleaseTag = false,
+    useExpectedShaExactly = false,
+    buildArtifactId,
+    dryRun = false,
+    expectedIndexSha256,
+    indexCreatedAt,
+    uploadBundle = (bundle: CalibrationTreeBundle) =>
+      uploadCalibrationTreeBundle({ bundle, token: blobToken }),
+  } = options;
+  // The folder is interpolated into authenticated Hugging Face URLs.
+  const releaseDirectory = releaseId(options.releaseDirectory ?? id);
   const resolvedSha = useExpectedShaExactly && expectedSha
     ? exactCommitSha(expectedSha, "Exact source revision")
     : await resolvePublicationSourceSha(
@@ -552,7 +721,7 @@ async function publishRelease(
   const publishedAt = indexCreatedAt === undefined
     ? await resolveHfCommitPublishedAt(country, resolvedSha, 0)
     : indexCreatedAt;
-  const prefix = `releases/${id}`;
+  const prefix = `releases/${releaseDirectory}`;
   const [diagnostics, buildManifest, releaseManifest, demographics] =
     await Promise.all([
       fetchJsonArtifact(
@@ -633,8 +802,8 @@ async function publishRelease(
           };
         })(),
       }
-    : await uploadCalibrationTreeBundle({ bundle, token: blobToken });
-  return { bundle, stored, sizes };
+    : await uploadBundle(bundle);
+  return { bundle, stored, sizes, releaseDirectory };
 }
 
 async function promoteIfCurrent(
@@ -672,6 +841,10 @@ function releaseManifestEntry(
     sourceId: build.sourceId,
     label: build.label,
     releaseId: build.releaseId,
+    // Recorded only for a cut, so a folder-named entry stays as it was.
+    ...(published.releaseDirectory !== build.releaseId
+      ? { releaseDirectory: published.releaseDirectory }
+      : {}),
     stagingRunId: null,
     hfRepo: build.hfRepo,
     hfCommitSha: build.hfCommitSha,
@@ -695,6 +868,10 @@ export interface CalibrationManifestStore {
     entry: CalibrationTreeManifestEntry,
     makeLatest?: boolean,
   ): Promise<CalibrationTreeManifest>;
+  /** Uploads a built bundle; defaults to the Blob upload. */
+  uploadBundle?(
+    bundle: CalibrationTreeBundle,
+  ): ReturnType<typeof uploadCalibrationTreeBundle>;
 }
 
 function blobCalibrationManifestStore(
@@ -702,6 +879,7 @@ function blobCalibrationManifestStore(
   blobToken: string,
 ): CalibrationManifestStore {
   return {
+    uploadBundle: (bundle) => uploadCalibrationTreeBundle({ bundle, token: blobToken }),
     readManifest: async () =>
       (await readCalibrationTreeManifest({ token: blobToken, consistent: true })).manifest,
     listBlobs: () => listCalibrationTreeBlobs({ country, token: blobToken }),
@@ -955,8 +1133,8 @@ export async function reconcileReleaseBuilds(
   dryRun: boolean,
   store: CalibrationManifestStore = blobCalibrationManifestStore(country, blobToken),
 ): Promise<ReconciliationReport> {
-  const inventory = await enumerateReleaseCandidates(country);
   let manifest = await store.readManifest();
+  const inventory = await enumerateReleaseCandidates(country, manifest);
   let blobs = await store.listBlobs();
   const outcomes = [...inventory.ineligible];
 
@@ -971,6 +1149,12 @@ export async function reconcileReleaseBuilds(
       throw new Error(
         `Released dataset ${candidate.releaseId} changed from ${existing.hfCommitSha} ` +
           `to ${candidate.hfCommitSha}.`,
+      );
+    }
+    if (existing && releaseDirectoryOf(existing) !== candidate.releaseDirectory) {
+      throw new Error(
+        `Released dataset ${candidate.releaseId} moved from releases/${releaseDirectoryOf(existing)}/ ` +
+          `to releases/${candidate.releaseDirectory}/.`,
       );
     }
     const audit = existing ? await store.audit(existing, blobs) : null;
@@ -991,18 +1175,19 @@ export async function reconcileReleaseBuilds(
           audit.reasons.join("; "),
       );
     }
-    const published = await publishRelease(
+    const published = await publishRelease({
       country,
-      candidate.releaseId,
-      existing?.hfCommitSha ?? candidate.hfCommitSha,
+      id: candidate.releaseId,
+      releaseDirectory: candidate.releaseDirectory,
+      expectedSha: existing?.hfCommitSha ?? candidate.hfCommitSha,
       blobToken,
-      false,
-      true,
-      existing?.buildArtifactId,
+      useExpectedShaExactly: true,
+      buildArtifactId: existing?.buildArtifactId,
       dryRun,
-      existing?.indexSha256,
-      existing ? existing.createdAt : undefined,
-    );
+      expectedIndexSha256: existing?.indexSha256,
+      indexCreatedAt: existing ? existing.createdAt : undefined,
+      uploadBundle: store.uploadBundle,
+    });
     const entry = existing ?? releaseManifestEntry(published);
     if (!dryRun) {
       manifest = await store.updateManifest(entry);
@@ -1107,6 +1292,34 @@ export async function migrateReleaseTimestamps(
   return { country, mode: "migrate-release-timestamps", dryRun, outcomes };
 }
 
+interface ReleaseSelection {
+  releaseId: string;
+  releaseDirectory: string;
+  hfCommitSha: string | undefined;
+}
+
+// `--release <id>`: a Microcosm cut tag publishes from its line's folder at the
+// tag's commit; any other id publishes from its own folder, as before.
+async function requestedReleaseSelection(
+  country: MicrocosmCountry,
+  id: string,
+  hfCommitSha: string | undefined,
+): Promise<ReleaseSelection> {
+  const selection = { releaseId: id, releaseDirectory: id, hfCommitSha };
+  if (!parseReleaseCutTag(id)) return selection;
+  let commit: string;
+  try {
+    commit = await resolveHfRevisionSha(country, id, 0);
+  } catch (error) {
+    if (error instanceof CalibrationReleaseNotFoundError) return selection;
+    throw error;
+  }
+  return {
+    ...selection,
+    releaseDirectory: await releaseDirectoryForTag(country, id, commit),
+  };
+}
+
 export async function runPublisher(options: PublisherOptions): Promise<void> {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (!blobToken) throw new Error("BLOB_READ_WRITE_TOKEN is required.");
@@ -1148,20 +1361,21 @@ export async function runPublisher(options: PublisherOptions): Promise<void> {
     return;
   }
 
-  const selection = options.mode === "latest"
+  const selection: ReleaseSelection = options.mode === "latest"
     ? await readUpstreamLatest(options.country, options.hfCommitSha)
-    : {
-        releaseId: releaseId(options.releaseId),
-        hfCommitSha: options.hfCommitSha,
-        updatedAt: null,
-      };
-  const published = await publishRelease(
-    options.country,
-    selection.releaseId,
-    selection.hfCommitSha,
+    : await requestedReleaseSelection(
+        options.country,
+        releaseId(options.releaseId),
+        options.hfCommitSha,
+      );
+  const published = await publishRelease({
+    country: options.country,
+    id: selection.releaseId,
+    releaseDirectory: selection.releaseDirectory,
+    expectedSha: selection.hfCommitSha,
     blobToken,
-    options.mode === "latest",
-  );
+    allowMissingReleaseTag: options.mode === "latest",
+  });
   const entry = await registerReleaseBuild(options.country, published, blobToken);
   const promoted = await promoteIfCurrent(
     options.country,

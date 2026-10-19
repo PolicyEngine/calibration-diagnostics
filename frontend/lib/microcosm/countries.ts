@@ -38,6 +38,11 @@ export interface CountryRegistration {
   revision: string;
   repo_env?: string;
   revision_env?: string;
+  // The repository-root pointer naming the country's current release:
+  // `latest.json` unless the country promotes its default line through a
+  // per-line pointer (`latest-<line>.json`, microcosm#823) whose payload also
+  // names the immutable cut tag the release is read at.
+  pointer_path?: string;
   // Country display name ("United States").
   label: string;
   // Sidebar dataset line ("Microcosm US").
@@ -105,6 +110,10 @@ export const COUNTRY_REGISTRY = {
     geography_id: null,
     visibility: "private",
     capabilities: [...CALIBRATION_CAPABILITIES, "staging"],
+    // microcosm#823: the UK default line is the 2024-25 national dataset,
+    // promoted through its own pointer; `latest.json` stays on the June 2023
+    // release and is never moved.
+    pointer_path: "latest-national.json",
     staging: {
       repo: "policyengine/populace-uk-staging",
       revision: "main",
@@ -174,6 +183,13 @@ export function parseCountry(value: string | null | undefined): MicrocosmCountry
 
 export function countryRegistration(country: MicrocosmCountry): CountryRegistration {
   return COUNTRY_REGISTRY[country];
+}
+
+export const DEFAULT_POINTER_PATH = "latest.json";
+
+// The repository-root pointer a country's current release is resolved through.
+export function countryPointerPath(country: MicrocosmCountry): string {
+  return countryRegistration(country).pointer_path ?? DEFAULT_POINTER_PATH;
 }
 
 // Countries offered in selectors, in registry order; fixtures are excluded.

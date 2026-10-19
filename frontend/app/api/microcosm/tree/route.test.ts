@@ -13,6 +13,7 @@ function resolver() {
   return (async () => ({
     buildArtifactId: BUILD,
     releaseId: "microcosm-us-release",
+    releaseDirectory: "microcosm-us-release",
     hfCommitSha: COMMIT,
     updatedAt: "2026-09-15T12:00:00.000Z",
   })) as CalibrationTreeRouteDependencies["resolveRelease"];

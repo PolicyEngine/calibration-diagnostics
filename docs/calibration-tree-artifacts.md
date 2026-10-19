@@ -127,13 +127,37 @@ release repository update
   -> audit the existing Blob build for each release
   -> skip complete builds without downloading their diagnostics
   -> build and upload only missing builds or missing files
-  -> update latestReleaseBuildArtifactId from upstream latest.json
+  -> update latestReleaseBuildArtifactId from the country's upstream pointer
 ```
 
 A release directory or tag without calibration diagnostics is reported as
 ineligible and is not treated as an error. The next repository webhook repeats
 the inventory check, so it also finds a historical release missed by an older
 webhook. There is no scheduled reconciliation.
+
+#### Microcosm release lines
+
+Microcosm publishes a release line (microcosm#823) under a constant release id:
+its files stay in one folder, `releases/<release id>/`, and each cut is an
+immutable tag named `<release id>-<YYYYMMDDTHHMMSSZ>-<attempt>`. The folder on
+`main` is a mutable copy of whichever cut was published last; a line published
+for inspection only, such as the UK dense local-area line, has no copy on
+`main` at all.
+
+- A cut tag is a release build of its own. Its manifest entry has the tag as
+  `releaseId` (and source ID) and records the folder as `releaseDirectory`.
+  Readers fetch `releases/<releaseDirectory>/` at the entry's commit. Entries
+  without `releaseDirectory` read `releases/<releaseId>/` as before.
+- A tag counts as a cut only when `releases/<release id>/release_manifest.json`
+  at the tag names it as `build.cut_tag`. Any other cut-shaped tag is
+  ineligible.
+- A line folder on `main` is not published again once its cuts are. A build
+  already published from the folder stays pinned at its own commit.
+- A country registration may name a per-line pointer (`pointer_path`, for the
+  UK `latest-national.json`). Its `revision` names the current cut, which
+  becomes the country's latest release. Other countries keep `latest.json`.
+- The release picker adds every published cut beside the folders on `main` and
+  hides a line folder unless the dashboard's latest release still points at it.
 
 ### Finalized staging builds
 
