@@ -1,16 +1,31 @@
 name: Telemetry service
 
+# PolicyEngine/microcosm-collector releases and deploys the collector from its
+# own repo. This workflow no longer runs on push, so merging a change to
+# telemetry-service/ deploys nothing. It still validates pull requests that
+# change telemetry-service/, and it keeps one manual redeploy of main to
+# staging and then production, for rolling the deploy-source switch back.
+#
+# Dispatch it only while the repo variable COLLECTOR_DEPLOY_ENABLED is unset in
+# PolicyEngine/microcosm-collector and no microcosm-collector deployment is
+# running: both repos deploy the same Cloud Run services, and neither can see
+# the other's runs. The deployment jobs run only when the person dispatching
+# checks collector_deploy_disabled to confirm this; without it, the run fails.
+# Removing telemetry-service/ removes this workflow.
 on:
   pull_request:
     paths:
       - telemetry-service/**
       - .github/workflows/telemetry-service.yml
-  push:
-    branches: [main]
-    paths:
-      - telemetry-service/**
-      - .github/workflows/telemetry-service.yml
   workflow_dispatch:
+    inputs:
+      collector_deploy_disabled:
+        description: >-
+          COLLECTOR_DEPLOY_ENABLED is unset in PolicyEngine/microcosm-collector,
+          and no microcosm-collector deployment is running
+        type: boolean
+        required: true
+        default: false
 
 concurrency:
   group: telemetry-service-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
@@ -54,11 +69,21 @@ jobs:
       - run: uv run ruff format --check .
       - run: docker build --tag microcosm-telemetry:validation .
 
+  # A dispatch without the confirmation fails here, so that it cannot be
+  # mistaken for a redeploy whose deployment jobs were skipped.
+  require-collector-deploy-disabled:
+    name: Require the microcosm-collector deployment to be off
+    if: github.event_name == 'workflow_dispatch' && !inputs.collector_deploy_disabled
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse an unconfirmed redeploy
+        run: echo "::error::Nothing was deployed. Unset COLLECTOR_DEPLOY_ENABLED in PolicyEngine/microcosm-collector, wait for its running deployments to finish, then dispatch again with collector_deploy_disabled checked." && exit 1
+
   deploy-staging:
     name: Deploy image and migration in staging
     if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+      && inputs.collector_deploy_disabled
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -156,8 +181,8 @@ jobs:
   deploy-production:
     name: Deploy staging image to production
     if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+      && inputs.collector_deploy_disabled
     needs: deploy-staging
     runs-on: ubuntu-latest
     timeout-minutes: 45

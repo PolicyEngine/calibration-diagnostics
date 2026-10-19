@@ -73,9 +73,17 @@ Infrastructure was provisioned once with disposable scripts kept outside the
 source tree. The source tree intentionally contains no bootstrap script or
 mutable infrastructure template.
 
-`.github/workflows/telemetry-service.yml` runs only when this directory or the
-workflow itself changes. Pull requests run tests, Ruff, and a container build.
-After a change reaches `main`, the workflow authenticates to Google Cloud with
+PolicyEngine/microcosm-collector, where this history was extracted, now
+releases and deploys the collector. Merging a change to this directory deploys
+nothing: `.github/workflows/telemetry-service.yml` no longer runs on push.
+Pull requests that change this directory or the workflow still run tests,
+Ruff, and a container build. The workflow keeps one manual redeploy of `main`,
+for rolling the deploy-source switch back. Dispatch it only while the repo
+variable `COLLECTOR_DEPLOY_ENABLED` is unset in microcosm-collector and no
+microcosm-collector deployment is running, and check `collector_deploy_disabled`
+to confirm this; an unconfirmed dispatch fails without deploying.
+
+A redeploy authenticates to Google Cloud with
 GitHub OIDC and pushes one image identified by the commit SHA. It first applies
 the migration to the persistent staging PostgreSQL database, verifies both the
 Alembic revision and the complete SQLAlchemy metadata, and deploys the staging
