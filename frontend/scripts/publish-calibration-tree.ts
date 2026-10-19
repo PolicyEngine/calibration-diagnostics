@@ -298,9 +298,17 @@ export function parsePublisherOptions(argv: string[]): PublisherOptions {
   };
 }
 
+/**
+ * The country's current release, as its pointer file names it. A tag the
+ * pointer names must pass the same check as in reconciliation: its line
+ * folder's release_manifest.json names the tag as its cut. A tag that
+ * `manifest` already pins at the same commit was checked when it was
+ * published and is not probed again.
+ */
 export async function readUpstreamLatest(
   country: MicrocosmCountry,
   expectedSourceSha?: string,
+  manifest?: CalibrationTreeManifest,
 ): Promise<UpstreamLatest> {
   const sourceSha = expectedSourceSha
     ? exactCommitSha(expectedSourceSha, "Source revision")
@@ -340,10 +348,22 @@ export async function readUpstreamLatest(
     if (parseReleaseCutTag(revision)?.releaseId !== id) {
       throw new Error(`${path} names revision ${revision}, which is not a cut of ${id}.`);
     }
+    const commit = await resolveHfRevisionSha(country, revision, 0);
+    const pinned = manifest
+      ? manifestBuildForSource(manifest, country, "release", revision)
+      : null;
+    const directory = pinned && pinned.hfCommitSha === commit
+      ? releaseDirectoryOf(pinned) ?? revision
+      : await releaseDirectoryForTag(country, revision, commit);
+    if (directory !== id) {
+      throw new Error(
+        `${path} names revision ${revision}, whose files are under releases/${directory}/, not releases/${id}/.`,
+      );
+    }
     return {
       releaseId: revision,
       releaseDirectory: id,
-      hfCommitSha: await resolveHfRevisionSha(country, revision, 0),
+      hfCommitSha: commit,
       updatedAt,
     };
   }
@@ -1207,7 +1227,7 @@ export async function reconcileReleaseBuilds(
     });
   }
 
-  const latest = await readUpstreamLatest(country);
+  const latest = await readUpstreamLatest(country, undefined, manifest);
   const latestEntry = manifestBuildForSource(
     manifest,
     country,

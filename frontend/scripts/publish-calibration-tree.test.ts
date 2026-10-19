@@ -9,6 +9,7 @@ import {
   readUpstreamLatest,
   resolvePublicationSourceSha,
   manifestBuildForSource,
+  runPublisher,
 } from "./publish-calibration-tree";
 import {
   emptyCalibrationTreeManifest,
@@ -652,5 +653,46 @@ test("a line pointer must name an existing cut of its own release", async () => 
     await expect(readUpstreamLatest("uk")).rejects.toThrow("was not found");
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+// Codex review of #223: --latest published whatever tag the pointer named.
+// The pointer's tag must pass the check reconciliation applies: the release
+// manifest at that tag names the tag in build.cut_tag.
+test("the latest publication refuses a pointer tag whose release manifest names another build", async () => {
+  const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
+  const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
+  const requested: string[] = [];
+  const repository = lineRepositoryFetch(requested);
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url === `${resolve}/${MAIN_SHA}/latest-national.json`) {
+      requested.push(url);
+      return Response.json({
+        schema_version: 1,
+        release_id: NATIONAL_LINE,
+        line: "national",
+        revision: STRAY_CUT,
+      });
+    }
+    if (url === `${api}/revision/${STRAY_CUT}`) {
+      requested.push(url);
+      return Response.json({ sha: STRAY_SHA });
+    }
+    return repository(input);
+  }) as typeof fetch;
+  const priorBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  process.env.BLOB_READ_WRITE_TOKEN = "blob-token";
+  try {
+    await expect(readUpstreamLatest("uk")).rejects.toThrow("does not name it as its cut");
+    await expect(runPublisher({ country: "uk", mode: "latest" }))
+      .rejects.toThrow("does not name it as its cut");
+    // Refused before any calibration file was read or any Blob was written.
+    expect(requested.some((url) => url.endsWith("/calibration_diagnostics.json"))).toBe(false);
+    expect(requested.some((url) => !url.startsWith("https://huggingface.co/"))).toBe(false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (priorBlobToken == null) delete process.env.BLOB_READ_WRITE_TOKEN;
+    else process.env.BLOB_READ_WRITE_TOKEN = priorBlobToken;
   }
 });
