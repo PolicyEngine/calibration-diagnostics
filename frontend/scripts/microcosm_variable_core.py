@@ -287,6 +287,43 @@ def single_year_simulation_dataset(dataset_path: str, state: str | None = None) 
     return USMultiYearDataset(datasets=[single_year])
 
 
+def native_simulation(dataset_path: str, state: str | None = None) -> Any:
+    """Construct the native simulation and map stored inputs the engine renamed.
+
+    policyengine-us sets a stored column as an input only when it defines a
+    variable of that name. The reviewed H5 stores WIC take-up as
+    ``would_claim_wic``, which policyengine-us 2.2.1 renamed
+    ``takes_up_wic_if_eligible`` (default ``True``), so without the mapping every
+    WIC-eligible person takes WIC up. .py registers such renames and sets each
+    live input from its stored legacy column; a rename stops applying once the
+    data stores the live name or the engine defines the legacy name again.
+
+    .py's ``managed_microsimulation`` applies the mapping, but it accepts only a
+    dataset path (a local file needs ``allow_unmanaged=True`` and loses its
+    certified identity), builds every economic-assumption year, and cannot take
+    the in-memory state subset. This runtime therefore calls the step that
+    ``managed_microsimulation`` calls,
+    ``legacy_inputs.apply_legacy_input_renames_to_microsimulation``, on the
+    one-year simulation it builds. .py does not re-export that function from
+    ``policyengine.tax_benefit_models.us``; PolicyEngine/policyengine.py#667
+    proposes a supported API for loading a verified local file. The renames
+    applied, ``{legacy: live}``, are kept on the simulation as
+    ``applied_legacy_input_renames``.
+    """
+    from policyengine.tax_benefit_models.us.legacy_inputs import (
+        apply_legacy_input_renames_to_microsimulation,
+    )
+    from policyengine_us import Microsimulation
+
+    simulation = Microsimulation(
+        dataset=single_year_simulation_dataset(dataset_path, state)
+    )
+    simulation.applied_legacy_input_renames = (
+        apply_legacy_input_renames_to_microsimulation(simulation)
+    )
+    return simulation
+
+
 def calculate_variables(
     *,
     variables: list[str],
@@ -325,28 +362,32 @@ def calculate_variables(
 
         # Country initialization and H5 input loading happen only after the
         # installed package tuple, release certificate, and bytes are verified.
-        from policyengine_us import Microsimulation
         from policyengine_us.system import system
 
         simulation_cache_hits: dict[str, bool] = {}
         simulation_cache_evictions: list[str] = []
+        legacy_input_renames: dict[str, dict[str, str]] = {}
 
         def get_sim(state: str | None = None) -> Any:
             cache_key = (repo, revision, filename, state)
+            scope = state or "national"
             cached = _SIM_CACHE.get(cache_key)
-            simulation_cache_hits.setdefault(state or "national", cached is not None)
+            simulation_cache_hits.setdefault(scope, cached is not None)
             if cached is not None:
-                return cached[1]
-            simulation_cache_evictions.extend(
-                key[3] or "national" for key in _SIM_CACHE
+                sim = cached[1]
+            else:
+                simulation_cache_evictions.extend(
+                    key[3] or "national" for key in _SIM_CACHE
+                )
+                sim = _simulation_for(
+                    cache_key,
+                    dataset_path,
+                    lambda: native_simulation(dataset_path, state),
+                )
+            legacy_input_renames.setdefault(
+                scope, dict(sim.applied_legacy_input_renames)
             )
-            return _simulation_for(
-                cache_key,
-                dataset_path,
-                lambda: Microsimulation(
-                    dataset=single_year_simulation_dataset(dataset_path, state)
-                ),
-            )
+            return sim
 
         results = []
         for variable_name in unique_variables:
@@ -414,6 +455,8 @@ def calculate_variables(
             "id": str(uuid.uuid4()),
             "simulation_cache_hits": simulation_cache_hits,
             "simulation_cache_evictions": simulation_cache_evictions,
+            # Stored inputs mapped onto their renamed live inputs, per scope.
+            "legacy_input_renames": legacy_input_renames,
             "host_resources_after_calculation": host_resources(),
         },
         "elapsed_seconds": finite_float(time.time() - started),

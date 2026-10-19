@@ -3,9 +3,10 @@
 > Deprecated upstream identifiers: the current Microcosm HF release, files,
 > diagnostics metadata, and Chronicle fact keys still use `populace`/`ledger`.
 
-Status: **adapter implemented and verified against the pinned release**
+Status: **adapter implemented; the full evaluation was verified against the Build P
+release with policyengine-us 1.764.6 and has not yet been re-run on the pair below**
 
-Reviewed Microcosm release: `populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z`
+Reviewed Microcosm release: `populace-us-2024-spm-20260915`
 
 Chronicle snapshot: `chronicle-7917ea815df710fb20db076b`
 
@@ -15,11 +16,16 @@ This is a model/dataset pairing, not a raw-dataset adapter:
 
 - Dataset: Microcosm US, published at
   `policyengine/populace-us`, file `populace_us_2024.h5`, SHA-256
-  `48b9d479fb4fd1c3537f9383ce4697d130b6f618658409d74f6233c43b994c7e`.
-- Dataset build: Microcosm commit
-  `cae8640f9e65e274aea65c7916cb37b956978e32`.
-- Model: `policyengine-us==1.764.6` (with `policyengine-core==3.26.11` in the
-  release manifest).
+  `6496cc4393d4d3c6574f76eca231de5898c803b9067645591fd5c4d3e65aee84`.
+- Dataset build: the US release .py 6.7.5 certifies. It is a source-enrichment of
+  `populace-us-2024-buildp-sparse-rmloss100-cae8640-20260728T011454Z` (Microcosm
+  commit `cae8640f9e65e274aea65c7916cb37b956978e32`): the same tables, weights and
+  calibration diagnostics plus `is_spm_independent_minor_role`, added at Microcosm
+  commit `743683b0e121378e93c9b426cd9c79d41d29595b`.
+- Model: `policyengine[us]==6.7.5`, the only declared model dependency. Its `us`
+  extra pins `policyengine-us==2.2.1`, `policyengine-core==3.33.0` and
+  `spm-calculator==1.0.0`. Upgrade by bumping .py, to a Microcosm release that
+  version certifies; the hosted variable runtime uses the same pair.
 - Population period: calendar year 2024.
 - Policy calculation period: tax year 2024.
 - Weight entities: person, household, and tax unit.
@@ -30,6 +36,14 @@ cached `policyengine_us.Microsimulation`, calculate all required variables once,
 and expose entity-aligned arrays to the common harness aggregator. Direct
 microdata variables (for example `age` and `employment_income`) and calculated
 PolicyEngine variables (for example `eitc`) use the same aggregation interface.
+
+After constructing the simulation, the adapter applies .py's stored-input renames
+(`apply_legacy_input_renames_to_microsimulation` in
+`policyengine.tax_benefit_models.us.legacy_inputs`), as .py's
+`managed_microsimulation` and the hosted variable runtime do. The release stores
+WIC take-up as `would_claim_wic`; policyengine-us 2.2.1 renamed that input
+`takes_up_wic_if_eligible`, defaults it to true and skips the stored column, so
+without the mapping every WIC-eligible person would take WIC up.
 
 `frontend/scripts/microcosm_variable_core.py` proves the local
 loading path and documents the dataset's substantial disk and memory needs. The

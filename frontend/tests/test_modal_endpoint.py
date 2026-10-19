@@ -42,7 +42,12 @@ def test_metadata_is_configuration_not_calculation(endpoint, monkeypatch):
     )
     status, body = endpoint.handle_query("metadata=1")
     assert status == 200
-    assert body["data_configuration"]["packages"]["policyengine-us"] == "1.764.6"
+    assert body["data_configuration"]["packages"] == {
+        "policyengine": "6.7.5",
+        "policyengine-us": "2.2.1",
+        "policyengine-core": "3.33.0",
+        "spm-calculator": "1.0.0",
+    }
     assert "verified" not in body["data_configuration"]
     assert "data_identity" not in body
 
@@ -90,7 +95,7 @@ def test_calculation_uses_immutable_revision_and_preserves_response(
     assert body is result
     assert seen[0]["variables"] == ["snap", "spm_unit_spm_threshold"]
     assert seen[0]["period"] == "2024"
-    assert seen[0]["hf_revision"] == "f09f2f3b9fa8409642dc0c7fc9c8f7516ae0e3c5"
+    assert seen[0]["hf_revision"] == "8ab57ffc2ca41d8af631ff62ebbce95e966299f3"
 
 
 def test_typed_calculation_error_survives_transport(endpoint, monkeypatch):

@@ -1,17 +1,28 @@
-"""The reviewed immutable model/data contract for hosted variable calculations."""
+"""The reviewed immutable model/data contract for hosted variable calculations.
+
+.py (the PyPI package ``policyengine``) is the model identity. The runtime must
+install exactly the policyengine-us, policyengine-core and spm-calculator
+versions that the pinned .py's country extra pins, and it accepts only the data
+release that the same .py version's bundle manifest certifies.
+"""
 
 from __future__ import annotations
 
 import hashlib
 import json
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from packaging.specifiers import SpecifierSet
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 from scripts.runtime_identity import runtime_identity
 
 MANIFEST_DIGEST_ALGORITHM = "sha256-json-sort-keys-compact-ascii-escaped-utf8"
+RELEASE_SCHEMA_VERSION = 2
+MODEL_PACKAGE = "policyengine-us"
+PY_BUNDLE_MANIFEST = "policyengine/data/bundle/manifest.json"
 
 
 class VariableCalculationError(RuntimeError):
@@ -62,9 +73,95 @@ def validate_selection(
     return config
 
 
+def certifying_package(config: dict[str, Any]) -> dict[str, str]:
+    """Return the reviewed .py identity that pins the model and certifies data."""
+    certifier = config.get("certifying_package")
+    if config.get("schema_version") != RELEASE_SCHEMA_VERSION or not (
+        isinstance(certifier, dict) and set(certifier) == {"name", "version", "extra"}
+    ):
+        raise VariableCalculationError(
+            "The reviewed release does not name its certifying .py package.",
+            status_code=503,
+        )
+    return certifier
+
+
+def _installed_certifier(certifier: dict[str, str]) -> metadata.Distribution:
+    """Return the installed .py distribution, refusing any other version."""
+    required = f"{certifier['name']}=={certifier['version']}"
+    try:
+        distribution = metadata.distribution(certifier["name"])
+    except metadata.PackageNotFoundError as exc:
+        raise VariableCalculationError(
+            f"The reviewed release requires {required}; the runtime has None.",
+            status_code=503,
+        ) from exc
+    if distribution.version != certifier["version"]:
+        raise VariableCalculationError(
+            f"The reviewed release requires {required}; "
+            f"the runtime has {distribution.version!r}.",
+            status_code=503,
+        )
+    return distribution
+
+
+def py_pinned_packages(certifier: dict[str, str]) -> dict[str, str]:
+    """Derive the exact package versions the installed .py pins for its extra."""
+    distribution = _installed_certifier(certifier)
+    required = f"{certifier['name']}=={certifier['version']}"
+    pinned_versions = {}
+    for requirement_text in distribution.requires or []:
+        requirement = Requirement(requirement_text)
+        marker = requirement.marker
+        if (
+            marker is None
+            or marker.evaluate({"extra": ""})
+            or not marker.evaluate({"extra": certifier["extra"]})
+        ):
+            continue
+        specifiers = list(requirement.specifier)
+        if len(specifiers) != 1 or specifiers[0].operator != "==":
+            raise VariableCalculationError(
+                f"{required} does not pin {requirement.name} to one exact version.",
+                status_code=503,
+            )
+        pinned_versions[canonicalize_name(requirement.name)] = specifiers[0].version
+    if MODEL_PACKAGE not in pinned_versions:
+        raise VariableCalculationError(
+            f"{required} does not pin {MODEL_PACKAGE} in its "
+            f"{certifier['extra']!r} extra.",
+            status_code=503,
+        )
+    return pinned_versions
+
+
 def validate_runtime(config: dict[str, Any]) -> dict[str, Any]:
     """Check actual installed versions before fetching any population inputs."""
+    certifier = certifying_package(config)
+    required = f"{certifier['name']}=={certifier['version']}"
     runtime = runtime_identity()
+    installed_certifier = runtime["packages"].get(certifier["name"])
+    if installed_certifier != certifier["version"]:
+        raise VariableCalculationError(
+            f"The reviewed release requires {required}; "
+            f"the runtime has {installed_certifier!r}.",
+            status_code=503,
+        )
+    pinned_versions = py_pinned_packages(certifier)
+    reviewed_versions = {
+        package: version
+        for package, version in config["packages"].items()
+        if package != certifier["name"]
+    }
+    if (
+        config["packages"].get(certifier["name"]) != certifier["version"]
+        or reviewed_versions != pinned_versions
+    ):
+        raise VariableCalculationError(
+            f"The reviewed package versions {reviewed_versions} are not the ones "
+            f"{required} pins: {pinned_versions}.",
+            status_code=503,
+        )
     for package, expected in config["packages"].items():
         installed = runtime["packages"].get(package)
         if installed != expected:
@@ -89,7 +186,7 @@ def validate_manifests(
     manifest: dict[str, Any],
     build_manifest: dict[str, Any],
 ) -> None:
-    """Require reviewed manifest contents and matching model/data certification."""
+    """Require reviewed manifest contents and the pinned .py's data certification."""
     if config.get("manifest_digest_algorithm") != MANIFEST_DIGEST_ALGORITHM:
         raise VariableCalculationError("Unsupported manifest digest algorithm.")
     for key, document in (
@@ -116,23 +213,6 @@ def validate_manifests(
         }.items():
             if artifact[field] != expected:
                 raise ValueError(f"artifact {field} mismatch")
-        for package, field in (
-            ("policyengine-us", "model"),
-            ("policyengine-core", "core"),
-        ):
-            expected = config["packages"][package]
-            built = build[f"built_with_{field}_package"]
-            if built != {"name": package, "version": expected}:
-                raise ValueError(f"built {package} mismatch")
-            compatible = manifest[f"compatible_{field}_packages"]
-            if not any(
-                entry["name"] == package
-                and expected in SpecifierSet(entry["specifier"])
-                for entry in compatible
-            ):
-                raise ValueError(f"release does not certify {package}=={expected}")
-            if build_manifest["runtime"][package] != expected:
-                raise ValueError(f"build manifest {package} mismatch")
         if build_manifest["dataset"]["sha256"] != config["sha256"]:
             raise ValueError("build manifest dataset SHA-256 mismatch")
         if build_manifest["dataset"]["filename"] != config["filename"]:
@@ -141,6 +221,106 @@ def validate_manifests(
         raise VariableCalculationError(
             f"Incompatible reviewed release certificate: {exc}"
         ) from exc
+    # The release's own built-with Core and build-runtime fields are not the
+    # model identity: .py is. Its certification replaces those checks.
+    validate_py_certification(config, manifest)
+
+
+def py_bundle_manifest(certifier: dict[str, str]) -> dict[str, Any]:
+    """Read the bundle manifest shipped inside the installed .py distribution."""
+    distribution = _installed_certifier(certifier)
+    bundle_path = Path(str(distribution.locate_file(PY_BUNDLE_MANIFEST)))
+    try:
+        return json.loads(bundle_path.read_text())
+    except (OSError, ValueError) as exc:
+        raise VariableCalculationError(
+            f"{certifier['name']}=={certifier['version']} has no readable "
+            "bundle manifest.",
+            status_code=503,
+        ) from exc
+
+
+def validate_py_certification(config: dict[str, Any], manifest: dict[str, Any]) -> None:
+    """Accept only the data release that the pinned .py certifies for its extra."""
+    certifier = certifying_package(config)
+    bundle = py_bundle_manifest(certifier)
+    release_id = config["release_id"]
+    model_version = config["packages"][MODEL_PACKAGE]
+    try:
+        if bundle["policyengine_version"] != certifier["version"]:
+            raise ValueError("this release: the bundle belongs to another .py version")
+        certified = bundle["data_releases"][certifier["extra"]]
+        certification = certified["certification"]
+        artifact = certified["certified_data_artifact"]
+        data_package = certified["data_package"]
+        expected_dataset_uri = (
+            f"hf://{config['repo']}/{config['filename']}@{release_id}"
+        )
+        for label, certified_value, reviewed_value in (
+            ("the release", certified["build_id"], release_id),
+            ("the data build", certification["data_build_id"], release_id),
+            ("the dataset SHA-256", artifact["sha256"], config["sha256"]),
+            ("the dataset URI", artifact["uri"], expected_dataset_uri),
+            ("the data repository", data_package["repo_id"], config["repo"]),
+            (
+                "the release manifest",
+                data_package["release_manifest_path"],
+                config["release_manifest"]["path"],
+            ),
+            (
+                "the release revision",
+                data_package["release_manifest_revision"],
+                release_id,
+            ),
+            (
+                "the build manifest",
+                certified["datasets"]["build_manifest"]["path"],
+                config["build_manifest"]["path"],
+            ),
+            (
+                "the model version",
+                certification["certified_for_model_version"],
+                model_version,
+            ),
+            ("the model package", certified["model_package"]["version"], model_version),
+            (
+                "the built-with model",
+                {
+                    "name": MODEL_PACKAGE,
+                    "version": certification["built_with_model_version"],
+                },
+                manifest["build"]["built_with_model_package"],
+            ),
+        ):
+            if certified_value != reviewed_value:
+                raise ValueError(label)
+        for parent in ("parent_release_manifest", "parent_build_manifest"):
+            if certified["datasets"][parent]["revision"] != release_id:
+                raise ValueError(f"the {parent} revision")
+        # Every file .py records at this release revision, including the parent
+        # manifests, must be the file the reviewed release manifest lists.
+        for key, record in certified["datasets"].items():
+            if record.get("revision") != release_id:
+                continue
+            listed = manifest["artifacts"].get(key)
+            if not isinstance(listed, dict) or listed.get("sha256") != record["sha256"]:
+                raise ValueError(f"the {key} digest")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise VariableCalculationError(
+            "Incompatible reviewed release certificate: "
+            f"{certifier['name']}=={certifier['version']} does not certify {exc}."
+        ) from exc
+
+
+def recorded_household_count(build_manifest: dict[str, Any]) -> int | None:
+    """Return the build's exported household count when its manifest records one.
+
+    A .py-certified source-enrichment release, such as the reviewed
+    populace-us-2024-spm-20260915, does not record it; callers then rely on the
+    .py certification checked by ``validate_manifests``.
+    """
+    dataset = build_manifest.get("dataset") or {}
+    return (dataset.get("default") or {}).get("n_exported_households")
 
 
 def download_certification(config: dict[str, Any], downloader: Any) -> None:

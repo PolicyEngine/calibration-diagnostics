@@ -1,9 +1,9 @@
-# Match the reviewed Build P certificate and immutable data identity in
-# frontend/scripts/hosted_release.json. Upgrade all model/data pins together.
-policyengine-us==1.764.6
-policyengine-core==3.26.11
-# This country wheel imports legacy SPM APIs and has no upper dependency bound.
-spm-calculator==0.3.1
+# .py (the PyPI package `policyengine`) is the hosted runtime's model identity.
+# Upgrade by bumping .py; the dataset in frontend/scripts/hosted_release.json must
+# be one that version of .py certifies. Never pin policyengine-us,
+# policyengine-core or spm-calculator here: their versions come from .py's `us`
+# extra and are checked against frontend/scripts/hosted_release.json.
+policyengine[us]==6.7.5
 huggingface_hub>=0.25,<1.0
 numpy>=1.26,<3.0
 fastapi==0.141.1

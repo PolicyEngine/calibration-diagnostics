@@ -5,10 +5,12 @@ requires-python = ">=3.11,<3.14"
 dependencies = ["numpy>=1.26,<3", "pyarrow>=18,<24", "pyyaml>=6,<7"]
 
 [project.optional-dependencies]
+# .py (PyPI `policyengine`) is the model identity: bump it to upgrade, and pin
+# only a Microcosm release that version certifies. Never pin policyengine-us or
+# policyengine-core directly; .py's `us` extra supplies them.
 microcosm = [
-  "pandas>=2.2,<3",
-  "policyengine-core==3.26.11",
-  "policyengine-us==1.764.6",
+  "pandas>=3,<4",
+  "policyengine[us]==6.7.5",
   "tables>=3.10,<4",
 ]
 taxcalc-cps = ["taxcalc==6.7.1"]

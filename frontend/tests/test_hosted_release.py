@@ -1,4 +1,4 @@
-"""Protect the reviewed model/data pair before opening population inputs."""
+"""Protect the reviewed .py-certified model/data pair before opening inputs."""
 
 import copy
 import importlib
@@ -6,6 +6,10 @@ import json
 from pathlib import Path
 
 import pytest
+
+PUBLISHED_MANIFESTS = (
+    Path(__file__).resolve().parent / "fixtures" / "populace-us-2024-spm-20260915"
+)
 
 
 @pytest.fixture
@@ -17,59 +21,31 @@ def modules(monkeypatch):
     )
 
 
+def published_manifest(name: str) -> dict:
+    """Byte-identical copies of the release's manifests at the pinned commit."""
+    return json.loads((PUBLISHED_MANIFESTS / f"{name}.json").read_text())
+
+
 @pytest.fixture
 def certificate(modules):
     release, _ = modules
     config = release.reviewed_release()
-    packages = config["packages"]
-    manifest = {
-        "schema_version": 1,
-        "build": {
-            "build_id": config["release_id"],
-            "built_with_model_package": {
-                "name": "policyengine-us",
-                "version": packages["policyengine-us"],
-            },
-            "built_with_core_package": {
-                "name": "policyengine-core",
-                "version": packages["policyengine-core"],
-            },
-        },
-        "compatible_model_packages": [
-            {"name": "policyengine-us", "specifier": "==" + packages["policyengine-us"]}
-        ],
-        "compatible_core_packages": [
-            {
-                "name": "policyengine-core",
-                "specifier": "==" + packages["policyengine-core"],
-            }
-        ],
-        "default_datasets": {"national": "populace_us_2024"},
-        "artifacts": {
-            "populace_us_2024": {
-                "kind": "microdata",
-                "repo_id": config["repo"],
-                "path": config["filename"],
-                "revision": config["release_id"],
-                "sha256": config["sha256"],
-            }
-        },
-    }
-    build = {
-        "build_id": config["release_id"],
-        "runtime": packages,
-        "dataset": {"filename": config["filename"], "sha256": config["sha256"]},
-    }
+    return config, published_manifest("release_manifest"), published_manifest(
+        "build_manifest"
+    )
+
+
+def repin_manifest_digests(release, config, manifest, build) -> None:
+    """Even updating the content digests cannot bypass the .py certification."""
     config["release_manifest"]["json_sha256"] = release.json_sha256(manifest)
     config["build_manifest"]["json_sha256"] = release.json_sha256(build)
-    return config, manifest, build
 
 
 def test_default_is_reviewed_release_without_pointer_request(modules):
     release, _ = modules
     config = release.validate_selection(period="2024")
-    assert config["hf_revision"] == "f09f2f3b9fa8409642dc0c7fc9c8f7516ae0e3c5"
-    assert config["release_id"].startswith("populace-us-2024-buildp-")
+    assert config["hf_revision"] == "8ab57ffc2ca41d8af631ff62ebbce95e966299f3"
+    assert config["release_id"] == "populace-us-2024-spm-20260915"
 
 
 @pytest.mark.parametrize("requested", ["latest", "main", "future-canonical-release"])
@@ -110,6 +86,55 @@ def test_wrong_runtime_rejected_before_manifest_or_h5_fetch(modules, monkeypatch
         core.calculate_variables(variables=["snap"], period="2024")
 
 
+def test_reviewed_package_versions_are_the_ones_pinned_py_installs(modules):
+    release, _ = modules
+    config = release.reviewed_release()
+    assert config["certifying_package"] == {
+        "name": "policyengine",
+        "version": "6.7.5",
+        "extra": "us",
+    }
+    derived_versions = release.py_pinned_packages(config["certifying_package"])
+    assert derived_versions == {
+        "policyengine-us": "2.2.1",
+        "policyengine-core": "3.33.0",
+        "spm-calculator": "1.0.0",
+    }
+    assert config["packages"] == {"policyengine": "6.7.5", **derived_versions}
+
+
+def test_tuple_not_pinned_by_py_is_refused(modules, monkeypatch):
+    release, _ = modules
+    config = release.reviewed_release()
+    # The release's own build names Core 3.32.5, which .py 6.7.5 does not pin.
+    config["packages"]["policyengine-core"] = "3.32.5"
+    monkeypatch.setattr(
+        release, "runtime_identity", lambda: {"packages": dict(config["packages"])}
+    )
+    with pytest.raises(release.VariableCalculationError, match="policyengine==6.7.5"):
+        release.validate_runtime(config)
+
+
+def test_runtime_without_the_pinned_py_is_refused(modules, monkeypatch):
+    release, _ = modules
+    config = release.reviewed_release()
+    observed = {**config["packages"], "policyengine": "6.5.0"}
+    monkeypatch.setattr(release, "runtime_identity", lambda: {"packages": observed})
+    with pytest.raises(release.VariableCalculationError, match="6.5.0") as error:
+        release.validate_runtime(config)
+    assert error.value.status_code == 503
+
+
+def test_reviewed_digests_pin_the_published_manifests(modules, certificate):
+    release, _ = modules
+    config, manifest, build = certificate
+    assert release.json_sha256(manifest) == config["release_manifest"]["json_sha256"]
+    assert release.json_sha256(build) == config["build_manifest"]["json_sha256"]
+    assert config["release_manifest"]["path"] == (
+        "releases/populace-us-2024-spm-20260915/release_manifest.json"
+    )
+
+
 def test_matching_certificate_and_build_are_verified(modules, certificate):
     release, _ = modules
     config, manifest, build = certificate
@@ -118,20 +143,56 @@ def test_matching_certificate_and_build_are_verified(modules, certificate):
     assert release.json_sha256(reformatted) == release.json_sha256(manifest)
 
 
-@pytest.mark.parametrize("kind", ["model", "core", "sha256", "release"])
-def test_incompatible_future_certificate_cannot_be_loaded(modules, certificate, kind):
+def test_py_certified_release_needs_no_build_runtime_or_household_count(
+    modules, certificate
+):
     release, _ = modules
     config, manifest, build = certificate
-    if kind == "model":
-        manifest["compatible_model_packages"][0]["specifier"] = "==9.0.0"
-    elif kind == "core":
-        manifest["build"]["built_with_core_package"]["version"] = "9.0.0"
-    elif kind == "sha256":
-        manifest["artifacts"]["populace_us_2024"]["sha256"] = "f" * 64
+    # The source-enrichment build records neither, and names Core 3.32.5.
+    assert "runtime" not in build
+    assert "default" not in build["dataset"]
+    assert manifest["build"]["built_with_core_package"]["version"] == "3.32.5"
+    release.validate_manifests(config, manifest, build)
+    assert release.recorded_household_count(build) is None
+
+
+@pytest.mark.parametrize("kind", ["dataset_sha256", "release", "parent", "model"])
+def test_dataset_not_certified_by_pinned_py_cannot_be_loaded(
+    modules, certificate, kind
+):
+    release, _ = modules
+    config, manifest, build = certificate
+    national = manifest["artifacts"]["populace_us_2024"]
+    if kind == "dataset_sha256":
+        # A self-consistent release whose bytes .py 6.7.5 never certified.
+        for document in (config, national, build["dataset"]):
+            document["sha256"] = "f" * 64
+    elif kind == "release":
+        for document in (config, manifest["build"], build):
+            key = "release_id" if document is config else "build_id"
+            document[key] = "future-canonical-release"
+        national["revision"] = "future-canonical-release"
+    elif kind == "parent":
+        manifest["artifacts"]["parent_release_manifest"]["sha256"] = "0" * 64
     else:
-        manifest["build"]["build_id"] = "future-canonical-release"
-    # Even updating a content digest cannot bypass model/data field checks.
-    config["release_manifest"]["json_sha256"] = release.json_sha256(manifest)
+        manifest["build"]["built_with_model_package"]["version"] = "9.0.0"
+    repin_manifest_digests(release, config, manifest, build)
+    with pytest.raises(release.VariableCalculationError, match="does not certify"):
+        release.validate_manifests(config, manifest, build)
+
+
+@pytest.mark.parametrize("kind", ["bundle_version", "certified_sha256"])
+def test_release_certified_only_by_another_py_cannot_be_loaded(
+    modules, certificate, monkeypatch, kind
+):
+    release, _ = modules
+    config, manifest, build = certificate
+    bundle = copy.deepcopy(release.py_bundle_manifest(config["certifying_package"]))
+    if kind == "bundle_version":
+        bundle["policyengine_version"] = "6.5.0"
+    else:
+        bundle["data_releases"]["us"]["certified_data_artifact"]["sha256"] = "e" * 64
+    monkeypatch.setattr(release, "py_bundle_manifest", lambda certifier: bundle)
     with pytest.raises(release.VariableCalculationError):
         release.validate_manifests(config, manifest, build)
 
@@ -168,8 +229,8 @@ def test_future_certificate_is_refused_before_h5_download(
 ):
     release, core = modules
     config, manifest, build = certificate
-    manifest["compatible_model_packages"][0]["specifier"] = "==9.0.0"
-    config["release_manifest"]["json_sha256"] = release.json_sha256(manifest)
+    manifest["artifacts"]["parent_release_manifest"]["sha256"] = "0" * 64
+    repin_manifest_digests(release, config, manifest, build)
     monkeypatch.setattr(release, "reviewed_release", lambda: config)
     monkeypatch.setattr(core, "validate_runtime", lambda config: {})
     monkeypatch.setattr(
