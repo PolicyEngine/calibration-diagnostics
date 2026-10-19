@@ -370,8 +370,25 @@ test("the timestamp migration sets a legacy entry's updatedAt from its own commi
 
 test("release reconciliation leaves a complete entry's metadata to the migration", async () => {
   const stale = placeholderEntry();
+  // The UK pointer must name a tag, so the latest release is a published
+  // tag of the same folder, pinned at the stale entry's commit.
+  const currentTag = `${UK_RELEASE}-20261004T185722Z-0f0f0f0f`;
+  const current: CalibrationTreeManifestEntry = {
+    ...placeholderEntry(),
+    buildArtifactId: "c".repeat(64),
+    sourceId: currentTag,
+    label: currentTag,
+    releaseId: currentTag,
+    releaseDirectory: UK_RELEASE,
+    createdAt: UK_PUBLISHED_AT,
+    updatedAt: UK_PUBLISHED_AT,
+  };
   const store = memoryStore(
-    withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", stale, true),
+    withCalibrationTreeManifestEntry(
+      withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", stale, true),
+      "uk",
+      current,
+    ),
   );
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input);
@@ -381,7 +398,12 @@ test("release reconciliation leaves a complete entry's metadata to the migration
         { type: "file", path: `releases/${UK_RELEASE}/release_manifest.json` },
       ]);
     }
-    if (url.includes(`/api/datasets/${UK_REPO}/refs`)) return Response.json({ tags: [] });
+    if (url.includes(`/api/datasets/${UK_REPO}/refs`)) {
+      return Response.json({ tags: [{ name: currentTag, targetCommit: UK_SHA }] });
+    }
+    if (url.includes(`/api/datasets/${UK_REPO}/revision/${currentTag}`)) {
+      return Response.json({ sha: UK_SHA });
+    }
     if (url.includes(`/tree/main/releases/${UK_RELEASE}?recursive=false&expand=true`)) {
       return Response.json([
         {
@@ -395,7 +417,14 @@ test("release reconciliation leaves a complete entry's metadata to the migration
     if (url.includes(`/api/datasets/${UK_REPO}/revision/${UK_RELEASE}`)) {
       return new Response(null, { status: 404 });
     }
-    if (url.endsWith("/latest-national.json")) return Response.json({ release_id: UK_RELEASE });
+    if (url.endsWith("/latest-national.json")) {
+      return Response.json({
+        schema_version: 1,
+        release_id: UK_RELEASE,
+        line: "national",
+        revision: currentTag,
+      });
+    }
     if (url.endsWith(`/releases/${UK_RELEASE}/release_manifest.json`)) return Response.json({});
     // No commit-log lookup belongs here; reconciliation does not date entries.
     throw new Error(`Unexpected URL ${url}`);
@@ -403,8 +432,12 @@ test("release reconciliation leaves a complete entry's metadata to the migration
   try {
     const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     expect(report.outcomes.find((item) => item.sourceId === UK_RELEASE)?.status).toBe("complete");
-    expect(store.current().countries.uk?.builds).toEqual([stale]);
-    expect(store.writes.map((write) => write.makeLatest)).toEqual([true]);
+    expect(report.outcomes.find((item) => item.sourceId === currentTag)?.status).toBe("complete");
+    expect(store.current().countries.uk?.builds).toHaveLength(2);
+    expect(store.current().countries.uk?.builds).toContainEqual(stale);
+    expect(store.current().countries.uk?.builds).toContainEqual(current);
+    expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest]))
+      .toEqual([[currentTag, true]]);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -694,5 +727,49 @@ test("the latest publication refuses a pointer tag whose release manifest names 
     globalThis.fetch = originalFetch;
     if (priorBlobToken == null) delete process.env.BLOB_READ_WRITE_TOKEN;
     else process.env.BLOB_READ_WRITE_TOKEN = priorBlobToken;
+  }
+});
+
+// Codex review of #223: without `revision`, latest-national.json skipped
+// every check. The UK registration names that pointer file, so its rules
+// apply to whatever it contains.
+function nationalPointerFetch(pointer: Record<string, unknown>) {
+  return (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith("/revision/main")) return Response.json({ sha: MAIN_SHA });
+    if (url.endsWith(`/${MAIN_SHA}/latest-national.json`)) return Response.json(pointer);
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+}
+
+test("a national pointer without a revision still has its schema version and release name checked", async () => {
+  try {
+    globalThis.fetch = nationalPointerFetch({
+      schema_version: 99,
+      line: "dense",
+      release_id: NATIONAL_LINE,
+    });
+    await expect(readUpstreamLatest("uk")).rejects.toThrow("unsupported schema_version 99");
+    globalThis.fetch = nationalPointerFetch({
+      schema_version: 1,
+      line: "dense",
+      release_id: NATIONAL_LINE,
+    });
+    await expect(readUpstreamLatest("uk")).rejects.toThrow("declares line dense");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a national pointer that names no revision is refused", async () => {
+  globalThis.fetch = nationalPointerFetch({
+    schema_version: 1,
+    line: "national",
+    release_id: NATIONAL_LINE,
+  });
+  try {
+    await expect(readUpstreamLatest("uk")).rejects.toThrow("names no revision");
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });

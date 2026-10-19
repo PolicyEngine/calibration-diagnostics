@@ -31,6 +31,7 @@ import {
 } from "../lib/microcosm/calibration-release-locator";
 import {
   countryPointerPath,
+  countryRegistration,
   isCountry,
   selectableCountries,
   type MicrocosmCountry,
@@ -333,14 +334,20 @@ export async function readUpstreamLatest(
     typeof pointer.updated_at === "string" && Number.isFinite(Date.parse(pointer.updated_at))
       ? pointer.updated_at
       : null;
-  if (pointer.revision !== undefined) {
-    // A per-line pointer (microcosm#823) names the immutable cut tag the
-    // line's current release is read at; the release id is the line folder.
+  // A per-line pointer (microcosm#823) names the immutable cut tag the
+  // line's current release is read at; the release id is the line folder.
+  // A country registered with such a pointer file gets its checks whatever
+  // the file contains, so a pointer that drops `revision` is refused rather
+  // than read as a folder release.
+  if (countryRegistration(country).pointer_path != null || pointer.revision !== undefined) {
     if (pointer.schema_version !== 1) {
       throw new Error(`${path} has unsupported schema_version ${String(pointer.schema_version)}.`);
     }
     if (typeof pointer.line !== "string" || `latest-${pointer.line}.json` !== path) {
       throw new Error(`${path} declares line ${String(pointer.line)}.`);
+    }
+    if (pointer.revision === undefined) {
+      throw new Error(`${path} names no revision for ${id}.`);
     }
     const revision = releaseId(
       typeof pointer.revision === "string" ? pointer.revision : undefined,
