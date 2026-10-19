@@ -236,7 +236,7 @@ export interface GeographyCoverageBlock {
 }
 
 // Typed `release_manifest.country` merged over the country registration
-// (server: releaseCountry in lib/microcosm/latest-artifact.ts).
+// (server: releaseCountry in @policyengine/calibration-tree/latest-artifact).
 export interface MicrocosmArtifactCountry {
   code: Country;
   label: string;
