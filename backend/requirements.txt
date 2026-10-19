@@ -3,7 +3,7 @@
 # be one that version of .py certifies. Never pin policyengine-us,
 # policyengine-core or spm-calculator here: their versions come from .py's `us`
 # extra and are checked against frontend/scripts/hosted_release.json.
-policyengine[us]==6.4.1
+policyengine[us]==6.7.5
 huggingface_hub>=0.25,<1.0
 numpy>=1.26,<3.0
 fastapi==0.141.1

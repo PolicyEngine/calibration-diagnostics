@@ -960,9 +960,9 @@ pluggy==1.6.0 \
     --hash=sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3 \
     --hash=sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746
     # via pytest
-policyengine==6.4.1 \
-    --hash=sha256:550c3a9ae9c74d409d2fa81b7090850c2e5115b57f91ef1814f3c5fddaca36f2 \
-    --hash=sha256:cdc2549919cc5bebd767fc69ee192a01cb0874d7215a7489a0fa15275ec97e8a
+policyengine==6.7.5 \
+    --hash=sha256:872457de79f51dc57f33efb85274cb461d14aa42017e39aabf9d6611a673b30a \
+    --hash=sha256:acb921a6cd78c5bd5692827d3830fad9225a25f7e93e5742b92b2909624f76d3
     # via -r backend/requirements.txt
 policyengine-core==3.33.0 \
     --hash=sha256:2e32d02a8910ab683a2b7600987904b351d058fc2bd5910a8ea6641438bcd789 \

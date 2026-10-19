@@ -43,7 +43,7 @@ def test_metadata_is_configuration_not_calculation(endpoint, monkeypatch):
     status, body = endpoint.handle_query("metadata=1")
     assert status == 200
     assert body["data_configuration"]["packages"] == {
-        "policyengine": "6.4.1",
+        "policyengine": "6.7.5",
         "policyengine-us": "2.2.1",
         "policyengine-core": "3.33.0",
         "spm-calculator": "1.0.0",
