@@ -13,6 +13,7 @@ import {
   MICROCOSM_STAGING_HF_REPO,
   MICROCOSM_STAGING_HF_REVISION,
   resolveStagingCalibrationSource,
+  stagedBundleDiagnosticsFile,
   stagingRepository,
   stagingResolveUrl,
   stagingTargetChangeCacheTtlSeconds,
@@ -941,6 +942,7 @@ function stagedBundleFetch(
   receiptBody: string,
   bundleBody: string | null,
   requested: { url: string; authorization: string | null }[],
+  diagnosticsFile = "calibration_diagnostics.json",
 ): typeof fetch {
   return (async (input, init) => {
     const url = String(input);
@@ -952,7 +954,7 @@ function stagedBundleFetch(
     if (
       bundleBody != null &&
       url ===
-        `https://huggingface.co/datasets/${UK_RELEASE_REPO}/resolve/${STAGED_REVISION}/staged/${runId}/calibration_diagnostics.json`
+        `https://huggingface.co/datasets/${UK_RELEASE_REPO}/resolve/${STAGED_REVISION}/staged/${runId}/${diagnosticsFile}`
     ) {
       return new Response(bundleBody, { headers: { "Content-Type": "application/json" } });
     }
@@ -1071,4 +1073,60 @@ test("a staged bundle without calibration diagnostics has no target view", async
 
   expect(await loadStagingCalibration(STAGED_RUN_ID, 0, "uk")).toBeNull();
   expect(requested.some((r) => r.url.includes(UK_RELEASE_REPO))).toBe(false);
+});
+
+// Microcosm's UK local lane stages its outputs under the dataset's stem.
+const LOCAL_RUN_ID = "uk-local-candidate-f100-s42-20261019T000432Z-0c0c0c0c";
+const LOCAL_DIAGNOSTICS = "microcosm_uk_2024_25_local.diagnostics.json";
+
+test("reads a local candidate's diagnostics staged under the dataset's stem", async () => {
+  process.env.HF_TOKEN = "hf_test_release_token";
+  const diagnostics = serializedDiagnostics();
+  const { manifest, receiptBody } = stagedRun(
+    LOCAL_RUN_ID,
+    stagedDatasetReceipt(LOCAL_RUN_ID, diagnostics.sha256, {
+      files: {
+        [LOCAL_DIAGNOSTICS]: { bytes: 1, sha256: diagnostics.sha256 },
+        "microcosm_uk_2024_25_local.h5": { bytes: 1, sha256: "0".repeat(64) },
+        "uk.full.gates.calibrated.gate_report.json": { bytes: 1, sha256: "0".repeat(64) },
+      },
+    }),
+  );
+  const requested: { url: string; authorization: string | null }[] = [];
+  globalThis.fetch = stagedBundleFetch(
+    LOCAL_RUN_ID,
+    manifest,
+    receiptBody,
+    diagnostics.body,
+    requested,
+    LOCAL_DIAGNOSTICS,
+  );
+
+  const source = await resolveStagingCalibrationSource(LOCAL_RUN_ID, 0, "uk");
+
+  expect(source?.calibration.rows).toHaveLength(1);
+  expect(source?.sourceArtifacts.calibrationDiagnostics.path).toBe(
+    `staged/${LOCAL_RUN_ID}/${LOCAL_DIAGNOSTICS}`,
+  );
+  expect(requested.map((r) => r.url)).toContain(
+    `https://huggingface.co/datasets/${UK_RELEASE_REPO}/resolve/${STAGED_REVISION}/staged/${LOCAL_RUN_ID}/${LOCAL_DIAGNOSTICS}`,
+  );
+});
+
+test("the staged diagnostics file is the canonical name, or else the one stem file", () => {
+  const file = { bytes: 1, sha256: "0".repeat(64) };
+  expect(stagedBundleDiagnosticsFile({
+    "calibration_diagnostics.json": file,
+    [LOCAL_DIAGNOSTICS]: file,
+  })).toBe("calibration_diagnostics.json");
+  expect(stagedBundleDiagnosticsFile({ [LOCAL_DIAGNOSTICS]: file, "data.h5": file }))
+    .toBe(LOCAL_DIAGNOSTICS);
+  // Two stem files, a recorded name with a path, or none: no target view.
+  expect(stagedBundleDiagnosticsFile({
+    [LOCAL_DIAGNOSTICS]: file,
+    "microcosm_uk_2024_25_dense.diagnostics.json": file,
+  })).toBeNull();
+  expect(stagedBundleDiagnosticsFile({ "../other.diagnostics.json": file })).toBeNull();
+  expect(stagedBundleDiagnosticsFile({ "spine.h5": file })).toBeNull();
+  expect(stagedBundleDiagnosticsFile(null)).toBeNull();
 });

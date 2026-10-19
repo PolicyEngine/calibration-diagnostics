@@ -177,6 +177,11 @@ staging runs with no calibration diagnostics are reported as ineligible. A
 declared diagnostics file that is missing or has the wrong digest fails the
 workflow.
 
+A staged dataset's diagnostics are the `calibration_diagnostics.json` its
+receipt records or, failing that, the one `<dataset>.diagnostics.json` it
+records: Microcosm's UK local lane stages its outputs under the dataset's own
+stem. A receipt recording several stem files has no target view.
+
 US and UK staging use the same inventory, source-normalization, build,
 validation, and Blob publication functions. Country registration supplies the
 repository and credential name. UK staging reads use
