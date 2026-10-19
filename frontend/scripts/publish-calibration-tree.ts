@@ -793,7 +793,10 @@ async function publishRelease(options: PublishReleaseOptions) {
     lossAttributionAvailable:
       calibration.target_loss_attribution.status !== "unavailable",
     comparison: {
-      releaseId: calibration.release_id,
+      // A tag's diagnostics name its folder; like the release reader, keep
+      // the tag so two builds of one release compare as different builds.
+      // A folder release keeps the id its diagnostics carry, as before.
+      releaseId: releaseDirectory === id ? calibration.release_id : id,
       calibrationProvenance: calibration.calibration_provenance,
       status: calibration.target_loss_attribution.status,
       aggregate: calibration.target_loss_attribution.aggregate,

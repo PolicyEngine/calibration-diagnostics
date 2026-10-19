@@ -494,7 +494,10 @@ function juneEntry(): CalibrationTreeManifestEntry {
   };
 }
 
-function lineRepositoryFetch(requested: string[]) {
+function lineRepositoryFetch(
+  requested: string[],
+  diagnosticsFor: (directory: string) => Record<string, unknown> = () => SCHEMA_8_DIAGNOSTICS,
+) {
   const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
   const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
   const folderListing = (directory: string) => Response.json([
@@ -543,11 +546,11 @@ function lineRepositoryFetch(requested: string[]) {
         is_default: false,
       });
     }
-    if (
-      url === `${resolve}/${NATIONAL_SHA}/releases/${NATIONAL_LINE}/calibration_diagnostics.json` ||
-      url === `${resolve}/${DENSE_SHA}/releases/${DENSE_LINE}/calibration_diagnostics.json`
-    ) {
-      return Response.json(SCHEMA_8_DIAGNOSTICS);
+    if (url === `${resolve}/${NATIONAL_SHA}/releases/${NATIONAL_LINE}/calibration_diagnostics.json`) {
+      return Response.json(diagnosticsFor(NATIONAL_LINE));
+    }
+    if (url === `${resolve}/${DENSE_SHA}/releases/${DENSE_LINE}/calibration_diagnostics.json`) {
+      return Response.json(diagnosticsFor(DENSE_LINE));
     }
     if (/\/releases\/[^/]+\/(build_manifest|demographics)\.json$/.test(url)) {
       return new Response(null, { status: 404 });
@@ -769,6 +772,31 @@ test("a national pointer that names no revision is refused", async () => {
   });
   try {
     await expect(readUpstreamLatest("uk")).rejects.toThrow("names no revision");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// Codex review of #223: Microcosm's diagnostics name the folder, so a tag's
+// comparison metadata carried the folder name and two builds of one release
+// compared as the same release.
+test("a published tag's comparison metadata names the tag, as its build does", async () => {
+  const store = memoryStore(
+    withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", juneEntry(), true),
+  );
+  globalThis.fetch = lineRepositoryFetch([], (directory) => ({
+    ...SCHEMA_8_DIAGNOSTICS,
+    release_id: directory,
+  }));
+  try {
+    await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    const identities = store.uploads
+      .map((bundle) => [bundle.index.build.releaseId, bundle.index.targetComparison.releaseId])
+      .sort();
+    expect(identities).toEqual([
+      [DENSE_CUT, DENSE_CUT],
+      [NATIONAL_CUT, NATIONAL_CUT],
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
