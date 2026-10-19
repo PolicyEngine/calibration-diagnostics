@@ -60,6 +60,11 @@ export interface CountryRegistration {
     repo_env?: string;
     revision_env?: string;
     token_env?: string;
+    // Staging pipelines, by the `pipeline.id` their run manifests record,
+    // whose candidates are local-area builds. The Staging page compares those
+    // candidates with the newest published local-area release instead of the
+    // current (national) release.
+    local_area_pipelines?: readonly string[];
   };
   // Other jurisdiction codes a cross-dataset bundle may use for this country.
   jurisdiction_aliases?: readonly string[];
@@ -120,6 +125,9 @@ export const COUNTRY_REGISTRY = {
       repo_env: "POPULACE_UK_STAGING_HF_REPO",
       revision_env: "POPULACE_UK_STAGING_HF_REVISION",
       token_env: "POPULACE_UK_STAGING_HF_TOKEN",
+      // Microcosm's rowwise local-area candidates (published as the dense
+      // release). National attempts run the uk-frs-calibration pipeline.
+      local_area_pipelines: ["uk-local-candidate"],
     },
     jurisdiction_aliases: ["GB"],
   },
@@ -199,6 +207,12 @@ export function selectableCountries(): MicrocosmCountry[] {
 
 export function countryCapabilities(country: MicrocosmCountry): readonly CountryCapability[] {
   return COUNTRY_REGISTRY[country].capabilities;
+}
+
+// Staging pipeline ids whose candidates are local-area builds; empty for
+// countries that register none.
+export function stagingLocalAreaPipelines(country: MicrocosmCountry): readonly string[] {
+  return countryRegistration(country).staging?.local_area_pipelines ?? [];
 }
 
 export function hasCapability(country: MicrocosmCountry, capability: CountryCapability): boolean {

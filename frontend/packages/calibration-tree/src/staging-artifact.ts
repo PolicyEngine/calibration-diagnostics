@@ -10,14 +10,24 @@ import {
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
   loadCountryRepositoryHashedJson,
+  loadPointerReleaseId,
+  loadPublishedCutReleases,
   loadRelease,
+  loadReleases,
   microcosmCountryGeography,
   microcosmRepo,
+  type ReleaseEntry,
 } from "./latest-artifact";
+import { readCalibrationTreeManifest } from "./calibration-tree-blob";
+import type {
+  CalibrationTreeManifest,
+  CalibrationTreeManifestEntry,
+} from "./calibration-tree-manifest";
 import type { CalibrationTreeSourceArtifact } from "./calibration-tree-artifact";
 import {
   countryRegistration,
   resolveRegisteredStagingRepository,
+  stagingLocalAreaPipelines,
   type RepositoryEnvironment,
   type ResolvedRepository,
 } from "./countries";
@@ -1238,6 +1248,125 @@ export async function loadStagingTargetDiagnostics(
     };
   }
   return latestMicrocosmTargetDiagnosticsPage(requestUrl, cal);
+}
+
+// --- which release a staging candidate is compared with -----------------
+// A national candidate is compared with the country's current release, the
+// build the dashboard manifest marks latest (for the UK, the one
+// latest-national.json names). A local-area candidate calibrates local
+// geographies the national release does not, so it is compared with the
+// local-area release instead. That release has no pointer file and is never
+// promoted, so its most recently published build, as the dashboard manifest
+// records it, is used. A run is a local-area candidate when its run
+// manifest's pipeline id is one the country registers as local-area: no
+// staged receipt or manifest records a dataset role, and the dataset file
+// names change between builds.
+
+export type StagingComparisonBasis = "current_release" | "newest_local_area_release";
+
+export interface StagingComparisonRelease {
+  release_id: string;
+  basis: StagingComparisonBasis;
+  /** The run's pipeline builds local-area candidates. */
+  local_area_candidate: boolean;
+}
+
+export interface StagingComparisonReleaseDependencies {
+  runPipelineId(runId: string, country: MicrocosmCountry): Promise<string | null>;
+  currentReleaseId(country: MicrocosmCountry): Promise<string>;
+  newestLocalAreaReleaseId(country: MicrocosmCountry): Promise<string | null>;
+}
+
+/** The `pipeline.id` a staging run's manifest records, or null without one. */
+export async function stagingRunPipelineId(
+  runId: string,
+  revalidate: number,
+  country: MicrocosmCountry,
+): Promise<string | null> {
+  assertSafeReleaseId(runId, "run");
+  const manifest = await stagingJsonOrNull(`runs/${runId}/run_manifest.json`, revalidate, country);
+  const pipelineId = asObject(manifest?.pipeline).id;
+  return typeof pipelineId === "string" && pipelineId.trim() ? pipelineId.trim() : null;
+}
+
+function buildPublishedInstant(build: CalibrationTreeManifestEntry): number {
+  const instant = Date.parse(build.createdAt ?? build.updatedAt ?? "");
+  return Number.isFinite(instant) ? instant : Number.NEGATIVE_INFINITY;
+}
+
+/**
+ * The most recently published release build whose release is local-area, by
+ * the dataset roles `releases` carries (read from each release manifest, as
+ * the release picker reads them) and the publication time the dashboard
+ * manifest records.
+ */
+export function newestPublishedLocalAreaRelease(
+  manifest: CalibrationTreeManifest,
+  country: MicrocosmCountry,
+  releases: readonly ReleaseEntry[],
+): CalibrationTreeManifestEntry | null {
+  const localAreaReleases = new Set(
+    releases.filter((release) => release.is_local_area).map((release) => release.release_id),
+  );
+  const builds = (manifest.countries[country]?.builds ?? []).filter(
+    (build) =>
+      build.kind === "release" &&
+      build.releaseId != null &&
+      localAreaReleases.has(build.releaseId),
+  );
+  builds.sort(
+    (left, right) =>
+      buildPublishedInstant(right) - buildPublishedInstant(left) ||
+      left.buildArtifactId.localeCompare(right.buildArtifactId),
+  );
+  return builds[0] ?? null;
+}
+
+function defaultStagingComparisonReleaseDependencies(
+  revalidate: number,
+): StagingComparisonReleaseDependencies {
+  return {
+    runPipelineId: (runId, country) => stagingRunPipelineId(runId, revalidate, country),
+    currentReleaseId: async (country) =>
+      (await loadPointerReleaseId(revalidate, country)).release_id,
+    newestLocalAreaReleaseId: async (country) => {
+      const { manifest } = await readCalibrationTreeManifest();
+      const [folders, tagged] = await Promise.all([
+        loadReleases(revalidate, country),
+        loadPublishedCutReleases(revalidate, country, manifest),
+      ]);
+      return newestPublishedLocalAreaRelease(manifest, country, [...folders, ...tagged])
+        ?.releaseId ?? null;
+    },
+  };
+}
+
+export async function resolveStagingComparisonRelease(
+  runId: string,
+  country: MicrocosmCountry,
+  dependencies: StagingComparisonReleaseDependencies =
+    defaultStagingComparisonReleaseDependencies(300),
+): Promise<StagingComparisonRelease> {
+  const localAreaPipelines = stagingLocalAreaPipelines(country);
+  const pipelineId = localAreaPipelines.length
+    ? await dependencies.runPipelineId(runId, country)
+    : null;
+  const localAreaCandidate = pipelineId != null && localAreaPipelines.includes(pipelineId);
+  if (localAreaCandidate) {
+    const localAreaRelease = await dependencies.newestLocalAreaReleaseId(country);
+    if (localAreaRelease) {
+      return {
+        release_id: localAreaRelease,
+        basis: "newest_local_area_release",
+        local_area_candidate: true,
+      };
+    }
+  }
+  return {
+    release_id: await dependencies.currentReleaseId(country),
+    basis: "current_release",
+    local_area_candidate: localAreaCandidate,
+  };
 }
 
 export async function loadStagingComparison(
