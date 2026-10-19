@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -11,12 +12,31 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+FRONTEND_INSTALL_COMMAND = "bun install --frozen-lockfile"
+# `bun run <script or file>`, `bun test` and `bun <file>` load repository code, which
+# resolves packages through frontend/node_modules. `bunx` fetches its own package.
+BUN_SCRIPT_COMMAND = re.compile(
+    r"(?<![\w-])bun\s+(?:--\S+\s+)*(?:run|test|\S+\.[cm]?[jt]sx?)(?:\s|$)"
+)
 
 
 def _workflow():
     return yaml.load(
         (ROOT / ".github/workflows/deploy.yml").read_text(),
         Loader=yaml.BaseLoader,
+    )
+
+
+def _step_label(step):
+    return step.get("name") or step.get("uses") or step.get("run", "").strip()
+
+
+def _installs_locked_frontend_dependencies(step, job):
+    default_directory = job.get("defaults", {}).get("run", {}).get("working-directory")
+    directory = step.get("working-directory", default_directory)
+    return (
+        step.get("run", "").strip() == FRONTEND_INSTALL_COMMAND
+        and directory == "frontend"
     )
 
 
@@ -111,6 +131,63 @@ def test_deployment_supplies_private_release_secret_and_checks_views_before_prom
     assert (
         check["env"]["VERCEL_AUTOMATION_BYPASS_SECRET"]
         == "${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}"
+    )
+
+
+def test_every_bun_script_step_runs_after_its_job_installs_locked_frontend_dependencies():
+    # Bun resolves the frontend's workspace packages, such as
+    # @policyengine/calibration-tree, only through frontend/node_modules, so a
+    # job must install before it runs repository code with Bun.
+    uninstalled_steps = []
+    for workflow_file in sorted((ROOT / ".github/workflows").glob("*.yml")):
+        workflow = yaml.load(workflow_file.read_text(), Loader=yaml.BaseLoader)
+        for job_name, job in workflow["jobs"].items():
+            installed = False
+            for step in job.get("steps", []):
+                if _installs_locked_frontend_dependencies(step, job):
+                    installed = True
+                elif BUN_SCRIPT_COMMAND.search(step.get("run", "")) and not installed:
+                    uninstalled_steps.append(
+                        f"{workflow_file.name} / {job_name} / {_step_label(step)}"
+                    )
+    assert uninstalled_steps == []
+
+
+def test_bun_script_detection_covers_repository_scripts_but_not_package_runners():
+    for command in (
+        "bun run frontend/scripts/calibration-deployment-smoke.ts --url x",
+        "bun run lint",
+        "bun test",
+        "bun --no-install frontend/scripts/replay-build-run.ts",
+        'set -e\nbun run publish:calibration-tree -- "${args[@]}"',
+    ):
+        assert BUN_SCRIPT_COMMAND.search(command), command
+    for command in (
+        'bunx --bun "vercel@${VERCEL_CLI_VERSION}" promote "$URL"',
+        "bun install --frozen-lockfile",
+        "uv pip install modal==1.5.5",
+    ):
+        assert not BUN_SCRIPT_COMMAND.search(command), command
+
+
+def test_deploy_installs_locked_frontend_dependencies_without_credentials_after_the_vercel_upload():
+    job = _workflow()["jobs"]["deploy"]
+    steps = job["steps"]
+    install_indexes = [
+        index
+        for index, step in enumerate(steps)
+        if _installs_locked_frontend_dependencies(step, job)
+    ]
+    assert len(install_indexes) == 1
+    install = steps[install_indexes[0]]
+    assert "env" not in install
+    assert "${{" not in install["run"]
+    names = [step.get("name") for step in steps]
+    # `vercel deploy .` uploads the repository root; installing afterwards keeps
+    # frontend/node_modules out of the uploaded working tree.
+    assert names.index("Build unaliased Vercel production candidate") < install_indexes[0]
+    assert install_indexes[0] < names.index(
+        "Verify staged calibration releases and staging"
     )
 
 
