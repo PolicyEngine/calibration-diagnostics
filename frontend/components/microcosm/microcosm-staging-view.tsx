@@ -39,7 +39,7 @@ import {
   type MicrocosmStagingRunResponse,
   type MicrocosmStagingRunSummary,
 } from "@/lib/api/hooks/use-microcosm";
-import { countryRegistration, hasCapability } from "@/lib/microcosm/countries";
+import { countryRegistration, hasCapability } from "@policyengine/calibration-tree/countries";
 import {
   formatStagingCurrentStatus,
   formatStagingStatus,

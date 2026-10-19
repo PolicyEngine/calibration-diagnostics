@@ -1,6 +1,6 @@
 import { formatNumber } from "@policyengine/ui-kit";
 
-import { parseReleaseCutTag } from "@/lib/microcosm/release-cut";
+import { parseReleaseCutTag } from "@policyengine/calibration-tree/release-cut";
 
 // Tax/benefit acronyms shown uppercase rather than as words.
 const ACRONYMS = new Set([

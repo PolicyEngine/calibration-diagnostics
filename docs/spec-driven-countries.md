@@ -28,7 +28,7 @@ contract: they are served only by `/microcosm/datasets` from
 
 ## Code-owned metadata that remains
 
-`COUNTRY_REGISTRY` in `frontend/lib/microcosm/countries.ts` is the only required
+`COUNTRY_REGISTRY` in `frontend/packages/calibration-tree/src/countries.ts` is the only required
 registration point: country unions and parsers, selector lists, dataset and
 national-geography labels, public/private link behavior, and page gating read
 the registration or the artifact `country` block. Overview and target-browser
@@ -77,10 +77,10 @@ production tables.
 ### Country
 
 `release_manifest.country` is read by `releaseCountry` in
-`frontend/lib/microcosm/latest-artifact.ts` and served as `country` on the
+`frontend/packages/calibration-tree/src/latest-artifact.ts` and served as `country` on the
 overview summary and the target-diagnostics page (client type
 `MicrocosmArtifactCountry`). Registration lives in
-`frontend/lib/microcosm/countries.ts`; adding a country is one entry there.
+`frontend/packages/calibration-tree/src/countries.ts`; adding a country is one entry there.
 
 ```json
 {

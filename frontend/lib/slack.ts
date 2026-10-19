@@ -1,4 +1,4 @@
-import type { MicrocosmCountry } from "@/lib/microcosm/latest-artifact";
+import type { MicrocosmCountry } from "@policyengine/calibration-tree/latest-artifact";
 
 const DASHBOARD_URL = "https://microcosm.institute/calibration/dashboard/microcosm";
 

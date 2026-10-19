@@ -3,16 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && tsc --noEmit -p packages/calibration-tree",
     "publish:calibration-tree": "bun run scripts/publish-calibration-tree.ts",
     "test:dev-port": "node --test scripts/available-port.node-test.mjs",
     "replay:build-run": "bun run scripts/replay-build-run.ts"
   },
   "dependencies": {
+    "@policyengine/calibration-tree": "workspace:*",
     "@policyengine/ui-kit": "^0.9.0",
     "@tanstack/react-query": "^5.84.0",
     "@tanstack/react-query-devtools": "^5.83.0",

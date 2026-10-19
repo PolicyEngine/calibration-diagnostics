@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 
 import { NextResponse } from "next/server";
 
-import { microcosmRepo, scrub } from "@/lib/microcosm/latest-artifact";
+import { microcosmRepo, scrub } from "@policyengine/calibration-tree/latest-artifact";
 import {
   HOSTED_US_RELEASE,
   reviewedVariableRelease,

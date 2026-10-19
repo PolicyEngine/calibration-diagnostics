@@ -1,8 +1,8 @@
-import type { TargetMatchKind } from "./target-surface-matcher";
+import type { TargetMatchKind } from "@policyengine/calibration-tree/target-surface-matcher";
 import type {
   TargetRepresentation,
   TargetRowRepresentation,
-} from "./target-representation";
+} from "@policyengine/calibration-tree/target-representation";
 
 export function targetRepresentationLabel(
   representation: TargetRepresentation | TargetRowRepresentation,

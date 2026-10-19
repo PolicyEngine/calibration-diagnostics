@@ -2,7 +2,7 @@ import type { Country } from "@/components/layout/country-context";
 import {
   countryCapabilities,
   type CountryCapability,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 // A page is shown when the country (or the release artifact, which can narrow
 // a registration) serves its capability. Pages that run on country-specific

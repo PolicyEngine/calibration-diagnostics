@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { MicrocosmTargetsView } from "@/components/microcosm/microcosm-targets-view";
 import { publishedReleaseSelection } from "@/lib/microcosm/calibration-selection";
-import { parseCountry } from "@/lib/microcosm/countries";
+import { parseCountry } from "@policyengine/calibration-tree/countries";
 
 interface MicrocosmTargetsPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;

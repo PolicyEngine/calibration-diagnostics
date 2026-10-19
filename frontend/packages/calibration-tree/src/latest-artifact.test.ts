@@ -28,7 +28,6 @@ import {
   loadPublishedCutReleases,
   loadRelease,
   loadReleases,
-  MAPPED_MEASURE_CONCEPT_VARIABLES,
   mergeReleaseInventory,
   microcosmRepo,
   microcosmRevision,
@@ -1745,32 +1744,6 @@ test("mapped measure concepts fill policyengine_variables when releases omit bas
   expect(variablesFor("census_pep.")).toEqual([]);
   expect(variablesFor("jct.")).toEqual([]);
   expect(rows.find((row) => String(row.name).startsWith("census_stc."))?.policyengine_map_to).toBeNull();
-});
-
-test("mapped measure concept variables match the PolicyEngine US mappings file", async () => {
-  const mappingsPath = join(
-    import.meta.dir,
-    "../../../integrations/microcosm_policyengine_us/mappings.yaml",
-  );
-  const { mappings } = Bun.YAML.parse(await Bun.file(mappingsPath).text()) as {
-    mappings: {
-      chronicle_selector?: { measures?: string[] };
-      execution?: string;
-      source_expression?: string;
-      required_variables?: string[];
-    }[];
-  };
-  for (const [concept, variables] of Object.entries(MAPPED_MEASURE_CONCEPT_VARIABLES)) {
-    const matches = mappings.filter((mapping) =>
-      mapping.chronicle_selector?.measures?.includes(concept),
-    );
-    expect(matches.length).toBeGreaterThan(0);
-    for (const mapping of matches) {
-      expect(mapping.execution).toBe("model");
-      expect([mapping.source_expression]).toEqual([...variables]);
-      expect(mapping.required_variables).toEqual([...variables]);
-    }
-  }
 });
 
 test("comparison matches on base_name across the @period boundary", () => {

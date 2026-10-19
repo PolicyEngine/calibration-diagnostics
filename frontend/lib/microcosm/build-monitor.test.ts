@@ -27,7 +27,7 @@ import {
   parseStagingEvents,
   parseStagingManifest,
   parseStagingProgress,
-} from "./staging-contract";
+} from "@policyengine/calibration-tree/staging-contract";
 
 const T0 = Date.parse("2026-09-26T10:00:00Z");
 const min = (n: number) => n * 60_000;
@@ -1001,7 +1001,19 @@ describe("solver passes inside calibration", () => {
 });
 
 describe("version 3 outcomes", () => {
-  const FIXTURES = join(import.meta.dir, "fixtures", "staging-contract", "v3");
+  // The staging contract fixtures live beside the contract parser in the
+  // calibration tree package.
+  const FIXTURES = join(
+    import.meta.dir,
+    "..",
+    "..",
+    "packages",
+    "calibration-tree",
+    "src",
+    "fixtures",
+    "staging-contract",
+    "v3",
+  );
   const fixtureText = (path: string) => readFileSync(join(FIXTURES, path)).toString();
   const fixtureJson = (path: string) => JSON.parse(fixtureText(path)) as Record<string, unknown>;
 
