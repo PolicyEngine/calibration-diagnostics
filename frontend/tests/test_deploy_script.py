@@ -159,9 +159,17 @@ def test_missing_read_secret_stops_deployment(tmp_path):
 
 
 @pytest.mark.parametrize("missing_name", ["PROJECT_ID", "READ_SECRET_NAME"])
-def test_read_secret_check_requires_its_configuration(tmp_path, missing_name):
+@pytest.mark.parametrize("missing_value", [None, ""], ids=["unset", "empty"])
+def test_read_secret_check_requires_its_configuration(
+    tmp_path, missing_name, missing_value
+):
+    # GitHub Actions expands `${{ vars.NAME }}` to an empty string when the
+    # variable doesn't exist, so the deploy passes an empty value, not none.
     configuration = {"PROJECT_ID": "test-project", "READ_SECRET_NAME": "test-secret"}
-    configuration.pop(missing_name)
+    if missing_value is None:
+        configuration.pop(missing_name)
+    else:
+        configuration[missing_name] = missing_value
     result, gcloud_calls = _read_secret_check(tmp_path, **configuration)
     assert result.returncode != 0
     assert missing_name in result.stderr
