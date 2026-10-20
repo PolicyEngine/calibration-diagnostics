@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GITHUB_DIRECTORY = ROOT / ".github"
 # Built from parts, so that this file does not match its own search.
 REMOVED_DIRECTORY = "telemetry" + "-service"
+REMOVED_WORKFLOW = f".github/workflows/{REMOVED_DIRECTORY}.yml"
 REMOVED_PATH_REFERENCES = (f"{REMOVED_DIRECTORY}/", f"{REMOVED_DIRECTORY}.yml")
 COLLECTOR_DEPLOYMENT_MARKERS = (
     "vars.TELEMETRY_SERVICE",
@@ -39,8 +40,17 @@ def tracked_files() -> list[Path]:
 
 
 def test_the_collector_directory_and_its_workflow_are_removed() -> None:
-    assert not (ROOT / REMOVED_DIRECTORY).exists()
-    assert not (GITHUB_DIRECTORY / "workflows" / f"{REMOVED_DIRECTORY}.yml").exists()
+    # Ask git rather than the filesystem: switching an existing clone to this
+    # commit leaves ignored files such as .venv/ and __pycache__/ on disk.
+    listing = subprocess.run(
+        ["git", "ls-files", "--", REMOVED_DIRECTORY, REMOVED_WORKFLOW],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+    assert listing == ""
 
 
 def test_no_tracked_file_refers_to_the_removed_collector_directory() -> None:
