@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const cal = await loadRelease(release, revalidate, country);
     const calibration = latestMicrocosmCalibrationSummary(cal);
     const highlights = latestMicrocosmCalibrationHighlights(cal, 15);
-    const prefix = `releases/${cal.release_id}`;
+    const prefix = `releases/${cal.release_directory ?? cal.release_id}`;
     const sourceUrl = (path: string) =>
       hfResolveUrl(path, country, cal.hf_commit_sha ?? undefined);
     return NextResponse.json(

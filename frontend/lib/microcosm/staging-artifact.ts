@@ -629,6 +629,12 @@ export async function loadStagingRuns(
 // `calibration_diagnostics.json` is the same per-target artifact a release
 // carries, so an unreleased candidate can be inspected through the same views.
 const STAGED_BUNDLE_DIAGNOSTICS_FILE = "calibration_diagnostics.json";
+// Microcosm's UK local lane stages its outputs under the dataset's own stem,
+// so its per-target diagnostics arrive as `<dataset>.diagnostics.json`.
+const STAGED_BUNDLE_STEM_DIAGNOSTICS_SUFFIX = ".diagnostics.json";
+// A recorded file name is joined to the staged prefix in an authenticated
+// release-repository URL, so it must be one path segment.
+const STAGED_BUNDLE_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$/;
 const STAGED_BUNDLE_LANDED = new Set(["uploaded", "already_staged"]);
 const STAGED_BUNDLE_PREFIX = /^staged\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const GIT_COMMIT_SHA = /^[0-9a-f]{40}$/;
@@ -648,6 +654,25 @@ export interface ResolvedStagingCalibrationSource {
     stagingProgress: CalibrationTreeSourceArtifact | null;
     stagedDatasetReceipt: CalibrationTreeSourceArtifact | null;
   };
+}
+
+// The bundle's per-target diagnostics file among the files its receipt
+// recorded: `calibration_diagnostics.json`, or else the one
+// `<dataset>.diagnostics.json`. A bundle recording none, several stem
+// files, or a stem name that is not one path segment has no target view
+// rather than a guessed one. The count includes invalid names, so an
+// invalid name beside a valid one still makes the receipt ambiguous.
+export function stagedBundleDiagnosticsFile(files: JsonObject | null): string | null {
+  if (!files) return null;
+  if (Object.hasOwn(files, STAGED_BUNDLE_DIAGNOSTICS_FILE)) {
+    return STAGED_BUNDLE_DIAGNOSTICS_FILE;
+  }
+  const stemFiles = Object.keys(files).filter((name) =>
+    name.endsWith(STAGED_BUNDLE_STEM_DIAGNOSTICS_SUFFIX)
+  );
+  return stemFiles.length === 1 && STAGED_BUNDLE_FILE_NAME.test(stemFiles[0])
+    ? stemFiles[0]
+    : null;
 }
 
 async function loadStagedBundleCalibrationSource(
@@ -711,24 +736,26 @@ async function loadStagedBundleCalibrationSource(
     throw new IncompatibleStagingDataError("staged dataset revision is not a commit sha.");
   }
   const files = objectOrNull(delivery.files);
-  const declared = objectOrNull(files?.[STAGED_BUNDLE_DIAGNOSTICS_FILE]);
-  const expectedDigest = stringValue(declared?.sha256);
+  const diagnosticsFile = stagedBundleDiagnosticsFile(files);
   // A bundle without calibration diagnostics (a spine, say) has no target view.
+  if (!diagnosticsFile) return null;
+  const declared = objectOrNull(files?.[diagnosticsFile]);
+  const expectedDigest = stringValue(declared?.sha256);
   if (!expectedDigest || !SHA_256_HEX.test(expectedDigest)) return null;
   const diagnostics = await loadCountryRepositoryHashedJson(
-    `${prefix}/${STAGED_BUNDLE_DIAGNOSTICS_FILE}`,
+    `${prefix}/${diagnosticsFile}`,
     revalidate,
     country,
     revision,
   );
   if (!diagnostics) {
     throw new IncompatibleStagingDataError(
-      `staged bundle ${prefix} records ${STAGED_BUNDLE_DIAGNOSTICS_FILE} but the file is absent at revision ${revision}.`,
+      `staged bundle ${prefix} records ${diagnosticsFile} but the file is absent at revision ${revision}.`,
     );
   }
   if (diagnostics.sha256 !== expectedDigest) {
     throw new IncompatibleStagingDataError(
-      `staged bundle ${STAGED_BUNDLE_DIAGNOSTICS_FILE} does not match the digest the run recorded.`,
+      `staged bundle ${diagnosticsFile} does not match the digest the run recorded.`,
     );
   }
   const updatedAt = stringValue(progress?.updated_at) ??
@@ -753,7 +780,7 @@ async function loadStagedBundleCalibrationSource(
     stagingRevision,
     sourceArtifacts: {
       calibrationDiagnostics: {
-        path: `${prefix}/${STAGED_BUNDLE_DIAGNOSTICS_FILE}`,
+        path: `${prefix}/${diagnosticsFile}`,
         sha256: diagnostics.sha256,
         hfRepo: repository,
         hfCommitSha: revision,

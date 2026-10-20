@@ -17,7 +17,9 @@ before modifying code or external storage.
 ## Inspect the source and current publication
 
 1. Enumerate release directories plus immutable tags, or enumerate finalized
-   staging runs at an exact staging commit.
+   staging runs at an exact staging commit. A Microcosm cut tag reads its
+   line's folder and counts only when that folder's `release_manifest.json`
+   names the tag as `build.cut_tag`.
 2. Read `calibration-trees/manifest.json` and list the country's Blob prefix.
 3. For every existing source alias, decompress its `index.json.gz`; compare the
    manifest digest and raw size, parse its country and build ID, and confirm
@@ -56,8 +58,9 @@ would assign different immutable paths to the same release.
 2. Publish compressed non-index files first, then `index.json.gz`.
 3. Verify uploaded bytes through a consistent Blob read and decompression.
 4. Add every immutable source build to `manifest.json`; change
-   `latestReleaseBuildArtifactId` only when upstream `latest.json` still names
-   the same release and commit.
+   `latestReleaseBuildArtifactId` only when the country's upstream pointer
+   (`latest.json`, or the registration's `pointer_path`) still names the same
+   release and commit.
 5. For staging publication, include only `passed`, `published`, or `completed`
    runs from the exact webhook commit.
 6. Report the source ID, build artifact ID, commit, part count, and measured sizes without reporting

@@ -4,6 +4,7 @@ import {
   calibrationTreeManifestEntry,
   emptyCalibrationTreeManifest,
   parseCalibrationTreeManifest,
+  releaseDirectoryOf,
   serializeCalibrationTreeManifest,
   withCalibrationTreeManifestEntry,
   type CalibrationTreeManifestEntry,
@@ -106,4 +107,44 @@ test("re-adding a build replaces its metadata and keeps its content identity imm
   expect(() =>
     withCalibrationTreeManifestEntry(manifest, "us", { ...stamped, indexSha256: "f".repeat(64) }),
   ).toThrow("immutable");
+});
+
+test("release cuts sit beside their line folder's build and keep their folder", () => {
+  // The line folder's build (published before cuts were recognised) and one
+  // build per cut tag: distinct aliases, so the country stays valid.
+  const line = { ...entry, releaseId: "microcosm-zz-2024-national", sourceId: "microcosm-zz-2024-national", label: "microcosm-zz-2024-national" };
+  const cutTag = "microcosm-zz-2024-national-20261019T083323Z-0a1b2c3d";
+  const cut: CalibrationTreeManifestEntry = {
+    ...entry,
+    buildArtifactId: "e".repeat(64),
+    sourceId: cutTag,
+    label: cutTag,
+    releaseId: cutTag,
+    releaseDirectory: "microcosm-zz-2024-national",
+  };
+  const manifest = withCalibrationTreeManifestEntry(
+    withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", line),
+    "uk",
+    cut,
+    true,
+  );
+  const parsed = parseCalibrationTreeManifest(
+    JSON.parse(serializeCalibrationTreeManifest(manifest)),
+  );
+  expect(calibrationTreeManifestEntry(parsed, "uk", { releaseId: cutTag })).toEqual(cut);
+  expect(calibrationTreeManifestEntry(parsed, "uk", {})).toEqual(cut);
+  expect(releaseDirectoryOf(cut)).toBe("microcosm-zz-2024-national");
+  expect(releaseDirectoryOf(line)).toBe("microcosm-zz-2024-national");
+
+  expect(() => withCalibrationTreeManifestEntry(
+    manifest,
+    "uk",
+    { ...cut, releaseDirectory: "microcosm-zz-2024-dense" },
+  )).toThrow("immutable");
+  expect(() => parseCalibrationTreeManifest({
+    schemaVersion: 6,
+    countries: {
+      uk: { latestReleaseBuildArtifactId: null, builds: [{ ...cut, releaseDirectory: "../latest" }] },
+    },
+  })).toThrow("invalid release directory");
 });

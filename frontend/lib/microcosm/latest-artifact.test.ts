@@ -23,10 +23,13 @@ import {
   latestMicrocosmCalibrationHighlights,
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
+  latestMicrocosmTargetInvestigation,
   loadPointerReleaseId,
+  loadPublishedCutReleases,
   loadRelease,
   loadReleases,
   MAPPED_MEASURE_CONCEPT_VARIABLES,
+  mergeReleaseInventory,
   microcosmRepo,
   microcosmRevision,
   microcosmTargetTreemap,
@@ -39,7 +42,13 @@ import {
   UK_LOCAL_CALIBRATION_DIR_ENV,
   type ArtifactCountry,
   type Calibration,
+  type ReleaseEntry,
 } from "./latest-artifact";
+import {
+  emptyCalibrationTreeManifest,
+  withCalibrationTreeManifestEntry,
+  type CalibrationTreeManifestEntry,
+} from "./calibration-tree-manifest";
 import { buildCalibrationTree } from "./calibration-tree";
 
 test("keeps Microcosm deployment configuration on its published Populace env contract", () => {
@@ -3131,5 +3140,165 @@ test("schema 8 keeps the first spelling of an identifier two publishers label di
       'geography local_authority E06000001: "Hartlepool UA" · "Hartlepool"',
       'dimension value geography=e06000001: "Hartlepool UA" · "Hartlepool"',
     ],
+  });
+});
+
+// Microcosm release lines (microcosm#823): one folder per line, one tag per
+// cut. All values are synthetic.
+const LINE = "microcosm-uk-2024-25-national";
+const DENSE_LINE = "microcosm-uk-2024-25-dense";
+
+function folderRelease(id: string, date: string): ReleaseEntry {
+  return {
+    release_id: id,
+    date,
+    files: ["calibration_diagnostics.json"],
+    has_calibration: true,
+    dataset_role: null,
+    is_default: true,
+    is_local_area: false,
+  };
+}
+
+function cutRelease(tag: string, cutAt: string, directory: string): ReleaseEntry {
+  return { ...folderRelease(tag, cutAt), files: [], release_directory: directory };
+}
+
+test("the release picker lists every published cut in place of its line folder", () => {
+  const usFolders = [
+    folderRelease("populace-us-2024-b-20260915", "20260915"),
+    folderRelease("populace-us-2024-a-20260909", "20260909"),
+  ];
+  expect(mergeReleaseInventory(usFolders, [], usFolders[0].release_id)).toBe(usFolders);
+
+  const june = folderRelease("populace-uk-2023-test-20260619T023711Z", "20260619T023711Z");
+  const lineFolder = folderRelease(LINE, LINE);
+  const earlier = cutRelease(`${LINE}-20261002T230158Z-0a0a0a0a`, "20261002T230158Z", LINE);
+  const current = cutRelease(`${LINE}-20261019T083323Z-0b0b0b0b`, "20261019T083323Z", LINE);
+  const dense = {
+    ...cutRelease(`${DENSE_LINE}-20261019T000432Z-0c0c0c0c`, "20261019T000432Z", DENSE_LINE),
+    dataset_role: "non_default_local_area",
+    is_default: false,
+    is_local_area: true,
+  };
+  expect(
+    mergeReleaseInventory([june, lineFolder], [earlier, dense, current], current.release_id)
+      .map((release) => release.release_id),
+  ).toEqual([current.release_id, dense.release_id, earlier.release_id, june.release_id]);
+  // Until the dashboard's latest release moves to a cut, the folder build it
+  // points at stays selectable.
+  expect(
+    mergeReleaseInventory([june, lineFolder], [current], LINE)
+      .map((release) => release.release_id),
+  ).toContain(LINE);
+});
+
+test("published cuts take their role from their own release manifest at their commit", async () => {
+  const entry = (
+    tag: string,
+    directory: string | undefined,
+    sha: string,
+    id: string,
+  ): CalibrationTreeManifestEntry => ({
+    buildArtifactId: id.repeat(64),
+    kind: "release",
+    sourceId: tag,
+    label: tag,
+    releaseId: tag,
+    ...(directory ? { releaseDirectory: directory } : {}),
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-uk-private",
+    hfCommitSha: sha,
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: null,
+    updatedAt: null,
+  });
+  const nationalCut = `${LINE}-20261019T083323Z-0b0b0b0b`;
+  const denseCut = `${DENSE_LINE}-20261019T000432Z-0c0c0c0c`;
+  let manifest = emptyCalibrationTreeManifest();
+  for (const build of [
+    entry(LINE, undefined, "9".repeat(40), "a"),
+    entry(nationalCut, LINE, "1".repeat(40), "b"),
+    entry(denseCut, DENSE_LINE, "2".repeat(40), "c"),
+  ]) {
+    manifest = withCalibrationTreeManifestEntry(manifest, "uk", build);
+  }
+  const originalFetch = globalThis.fetch;
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.endsWith(`/resolve/${"2".repeat(40)}/releases/${DENSE_LINE}/release_manifest.json`)) {
+      return Response.json({ dataset_role: "non_default_local_area", is_default: false });
+    }
+    // An unreadable manifest keeps the default classification.
+    return new Response(null, { status: 503 });
+  }) as typeof fetch;
+  try {
+    const cuts = await loadPublishedCutReleases(0, "uk", manifest);
+    expect(cuts.map((cut) => [cut.release_id, cut.date, cut.release_directory, cut.is_local_area]))
+      .toEqual([
+        [nationalCut, "20261019T083323Z", LINE, false],
+        [denseCut, "20261019T000432Z", DENSE_LINE, true],
+      ]);
+    expect(requested).toContain(
+      `https://huggingface.co/datasets/${microcosmRepo("uk")}/resolve/${"1".repeat(40)}/releases/${LINE}/release_manifest.json`,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a cut's investigation packet cites its line folder at the cut's commit", () => {
+  const tag = `${LINE}-20261019T083323Z-0b0b0b0b`;
+  const sha = "1".repeat(40);
+  const cal: Calibration = {
+    ...buildCalibration(
+      {
+        schema_version: 8,
+        targets: [{
+          name: "provider.target@2025",
+          target_name: "provider.target",
+          source: "Citation",
+          target: 100,
+          initial_estimate: 90,
+          final_estimate: 100,
+          hierarchy: {
+            provider: { id: "provider", label: "Provider label" },
+            category: { id: "provider.category", label: "Category label", provider_id: "provider" },
+            geography: { id: "K02000001", label: "United Kingdom", level: "country" },
+            dimensions: [],
+            target: { id: "provider.target", label: "Target label" },
+          },
+        }],
+      },
+      tag,
+      null,
+      {},
+      {},
+      {},
+      "uk",
+      "huggingface_immutable",
+      null,
+      sha,
+    ),
+    release_directory: LINE,
+  };
+  const packet = latestMicrocosmTargetInvestigation(
+    `https://dashboard.example/api/microcosm/target-investigation?target=${encodeURIComponent(String(cal.rows[0].name))}`,
+    cal,
+  );
+  expect(packet).toMatchObject({
+    available: true,
+    release_id: tag,
+    source_artifact: {
+      hf_repo: microcosmRepo("uk"),
+      hf_revision: sha,
+      calibration_diagnostics_path: `releases/${LINE}/calibration_diagnostics.json`,
+      build_manifest_path: `releases/${LINE}/build_manifest.json`,
+      release_manifest_path: `releases/${LINE}/release_manifest.json`,
+    },
   });
 });

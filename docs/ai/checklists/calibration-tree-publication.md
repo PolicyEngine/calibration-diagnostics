@@ -4,6 +4,7 @@
 
 - [ ] Country and release/staging source kind are explicit.
 - [ ] Release tags resolve to exact commits, or staging inventory uses the exact webhook commit.
+- [ ] A Microcosm cut tag reads its line's folder, and that folder's release manifest names the tag as its cut.
 - [ ] Required private-repository access works without exposing `HF_TOKEN`.
 - [ ] Source files and digests come from the same commit.
 - [ ] The manifest contains at most one build for each release ID or staging run ID.

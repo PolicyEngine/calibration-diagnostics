@@ -343,6 +343,8 @@ export interface MicrocosmReleaseEntry {
   dataset_role?: string | null;
   is_default?: boolean;
   is_local_area?: boolean;
+  // A Microcosm cut's line folder; absent when the folder is release_id.
+  release_directory?: string;
 }
 
 export interface MicrocosmReleasesResponse {
@@ -361,6 +363,8 @@ export interface MicrocosmCalibrationBuild {
   sourceId: string;
   label: string;
   releaseId: string | null;
+  // A Microcosm cut's line folder; absent when the folder is releaseId.
+  releaseDirectory?: string;
   stagingRunId: string | null;
   hfRepo: string;
   hfCommitSha: string;

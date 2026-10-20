@@ -1,5 +1,7 @@
 import { formatNumber } from "@policyengine/ui-kit";
 
+import { parseReleaseCutTag } from "@/lib/microcosm/release-cut";
+
 // Tax/benefit acronyms shown uppercase rather than as words.
 const ACRONYMS = new Set([
   "salt", "agi", "eitc", "ctc", "actc", "qbi", "ira", "aca", "ptc", "snap",
@@ -38,8 +40,17 @@ export function shortReleaseId(releaseId: string, length = 6): string {
   return releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0].slice(0, length);
 }
 
-// A readable label for a release: "2026-06-14 · f32c2e5".
+// A readable label for a release: "2026-06-14 · f32c2e5". A Microcosm cut
+// (microcosm#823) names its line and attempt instead:
+// "2026-10-19 08:33Z · 2024-25-national · 6cba5d71".
 export function releaseLabel(releaseId: string, date?: string | null): string {
+  const cut = parseReleaseCutTag(releaseId);
+  if (cut) {
+    // Deprecated upstream identifier: Microcosm release IDs may still use the
+    // former Populace prefix.
+    const line = cut.releaseId.replace(/^(?:microcosm|populace)-[a-z]{2}-/, "");
+    return `${formatReleaseDate(date || cut.cutAt)} · ${line} · ${cut.attempt}`;
+  }
   // Deprecated upstream identifier: Microcosm release IDs still use the former
   // Populace prefix.
   const belgiumChronicleSha =

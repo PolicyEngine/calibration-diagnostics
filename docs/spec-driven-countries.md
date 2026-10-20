@@ -4,7 +4,11 @@
 
 The calibration dashboard resolves a country and release through its
 Vercel-backed build manifest, whose publisher pins the corresponding Hugging
-Face commit and reads `releases/<id>/calibration_diagnostics.json`.
+Face commit and reads `releases/<folder>/calibration_diagnostics.json`: the
+release's own folder, or its line's folder for a Microcosm cut tag (see
+[the release lines note](calibration-tree-artifacts.md#microcosm-release-lines)).
+The country's current release comes from `latest.json` unless the registration
+names a per-line pointer in `pointer_path` (the UK: `latest-national.json`).
 `build_manifest.json`,
 `release_manifest.json`, and `demographics.json` are optional enrichments. The
 diagnostics artifact owns fit values and target metadata; the build manifest owns
