@@ -131,7 +131,11 @@ export function parseReleasesRecord(document: unknown): ReleasesRecord {
   }
   for (const [release, entry] of Object.entries(releases)) {
     if (entry.current == null) continue;
-    const current = entry.builds[entry.current];
+    // Only the listed builds: `builds` is an ordinary object, so a name such
+    // as "constructor" would otherwise find an inherited property.
+    const current = Object.hasOwn(entry.builds, entry.current)
+      ? entry.builds[entry.current]
+      : undefined;
     if (!current) refuse(`Current build ${entry.current} of ${release} is not listed.`);
     if (current.withdrawn) refuse(`Current build ${entry.current} of ${release} is withdrawn.`);
   }
