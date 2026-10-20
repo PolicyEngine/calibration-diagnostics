@@ -11,6 +11,26 @@ import type {
 
 export type TargetChangeDirection = "increase" | "reduction";
 
+/** Help for each comparison mode, naming the release the candidate is compared with. */
+export function targetChangeModeHelp(
+  comparisonReleaseLabel: string,
+): Record<TargetChangeMode, string> {
+  return {
+    reported:
+      "Uses each release's actual target weights and complete target surface. Added targets " +
+      "contribute candidate error, while removed targets subtract their contribution in the " +
+      `${sentenceCaseToPhrase(comparisonReleaseLabel)}.`,
+    shared:
+      "Uses only targets present in both releases and applies the same pooled target weights to " +
+      "both. Each release still uses its own verified benchmark, scale, cap, and capped error.",
+  };
+}
+
+/** "Local-area release" as it reads mid-sentence: "local-area release". */
+export function sentenceCaseToPhrase(label: string): string {
+  return label.charAt(0).toLowerCase() + label.slice(1);
+}
+
 export function targetChangeMapIdentity(runId: string, releaseId: string): string {
   return `${runId}:${releaseId}`;
 }
