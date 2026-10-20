@@ -56,8 +56,8 @@ export interface CountryRegistration {
   // The repository-root pointer naming the country's current release:
   // `latest.json` unless the country promotes its default line through a
   // per-line pointer (`latest-<line>.json`, microcosm#823) whose payload also
-  // names the immutable cut tag the release is read at. Read only while the
-  // country publishes release folders.
+  // names the immutable tag the release is read at (`cut_tag`). Read only
+  // while the country publishes release folders.
   pointer_path?: string;
   // Country display name ("United States").
   label: string;

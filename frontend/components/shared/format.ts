@@ -44,8 +44,8 @@ export function shortReleaseId(releaseId: string, length = 6): string {
 // A readable label for a release: "2026-06-14 · f32c2e5". A build in its own
 // folder (`<release>/<build>`) names its release and its whole build, dated
 // by its publication: "2026-10-19 08:33Z · 2024-25-national · <build>". A
-// Microcosm cut (microcosm#823) names its line and attempt instead:
-// "2026-10-19 08:33Z · 2024-25-national · 6cba5d71".
+// tagged Microcosm build (microcosm#823) names its release and the attempt
+// suffix of its tag instead: "2026-10-19 08:33Z · 2024-25-national · 6cba5d71".
 export function releaseLabel(releaseId: string, date?: string | null): string {
   const buildFolder = parseBuildFolderId(releaseId);
   if (buildFolder) {

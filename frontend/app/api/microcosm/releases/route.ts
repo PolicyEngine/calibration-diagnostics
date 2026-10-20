@@ -43,7 +43,7 @@ export function createMicrocosmReleasesHandler(
   }
 
   // A country publishing release folders lists the folders on main beside
-  // its published cuts.
+  // its published tagged builds.
   async function folderInventory(
     country: ReturnType<typeof parseCountry>,
     latestReleaseId: Promise<string | null>,

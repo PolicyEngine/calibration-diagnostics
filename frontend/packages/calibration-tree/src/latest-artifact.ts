@@ -1793,10 +1793,10 @@ export interface Calibration {
   description: string | null;
   diagnostics_status: DiagnosticsStatus;
   release_id: string;
-  // The `releases/` folder the files were read from, set for a Microcosm cut
-  // (released as its tag but stored under its line's folder, microcosm#823)
-  // and for a build in its own folder (where it equals release_id); absent
-  // for a release folder.
+  // The `releases/` folder the files were read from, set for a tagged
+  // Microcosm build (released as its tag but stored under its release's
+  // folder, microcosm#823) and for a build in its own folder (where it equals
+  // release_id); absent for a release folder.
   release_directory?: string;
   updated_at: string | null;
   schema_version: unknown;

@@ -1320,7 +1320,7 @@ export function newestPublishedLocalAreaRelease(
  * The releases a local-area Staging candidate may be compared with, with
  * their roles. A country publishing build folders lists the builds
  * releases.json names and nothing else; one publishing release folders lists
- * the folders on main and its published cuts.
+ * the folders on main and its published tagged builds.
  */
 export async function stagingBaselineReleases(
   revalidate: number,

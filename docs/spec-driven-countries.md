@@ -8,7 +8,7 @@ Face commit and reads `releases/<folder>/calibration_diagnostics.json`: the
 release's own folder, or its line's folder for a Microcosm cut tag (see
 [the release lines note](calibration-tree-artifacts.md#microcosm-release-lines)).
 The country's current release comes from `latest.json` unless the registration
-names a per-line pointer in `pointer_path`. A registration with
+names another pointer file in `pointer_path`. A registration with
 `release_layout: "build_folders"` (the UK) reads neither: each build is in
 `releases/<release>/<build>/`, and `releases.json` alone names the builds and
 the current one (see

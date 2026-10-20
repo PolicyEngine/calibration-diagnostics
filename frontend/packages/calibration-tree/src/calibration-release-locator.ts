@@ -15,7 +15,8 @@ export interface CalibrationReleaseLocation {
   releaseId: string;
   /**
    * The `releases/` folder holding the files: releaseId, which for a build
-   * in its own folder is `<release>/<build>`, unless releaseId is a cut tag.
+   * in its own folder is `<release>/<build>`, unless releaseId is a tag read
+   * from its release's folder.
    */
   releaseDirectory: string;
   hfCommitSha: string;
