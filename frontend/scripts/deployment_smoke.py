@@ -26,13 +26,22 @@ REQUEST_TIMEOUT_SECONDS = 790
 # 60 s allow for container start. Counted from the first full-check request.
 BACKEND_FREE_DEADLINE_SECONDS = 860
 BACKEND_PROBE_PAUSE_SECONDS = 10
-# Failures that leave no complete HTTP response: RemoteDisconnected is a
-# ConnectionResetError. HTTPError, a URLError, is handled before these.
-_CONNECTION_FAILURES = (ConnectionResetError, URLError, TimeoutError)
+# Failures that leave no complete HTTP response: the connection was refused,
+# closed, reset or aborted (RemoteDisconnected is a ConnectionResetError), or
+# it timed out. urllib wraps such a failure while connecting or sending in a
+# URLError. A URLError for a DNS, TLS-certificate or URL problem is not one,
+# and HTTPError, a URLError that carries a response, is handled first.
+_CONNECTION_FAILURES = (ConnectionError, TimeoutError)
 
 
 class ConnectionFailedError(RuntimeError):
-    """The connection closed, reset, failed or timed out without a response."""
+    """The connection was refused, closed, reset or timed out without a response."""
+
+
+def _is_connection_failure(error: Exception | None) -> bool:
+    if isinstance(error, URLError):
+        return isinstance(error.reason, _CONNECTION_FAILURES)
+    return isinstance(error, _CONNECTION_FAILURES)
 
 
 def _record(value: Any, name: str) -> dict[str, Any]:
@@ -167,11 +176,16 @@ def _request_json(
         except HTTPError as exc:
             detail = exc.read(1_000).decode("utf-8", errors="replace")
             last_error = RuntimeError(f"Deployment returned HTTP {exc.code}: {detail}")
-        except (*_CONNECTION_FAILURES, ValueError, json.JSONDecodeError) as exc:
+        except (
+            URLError,
+            *_CONNECTION_FAILURES,
+            ValueError,
+            json.JSONDecodeError,
+        ) as exc:
             last_error = exc
         if attempt + 1 < attempts:
             time.sleep(5 * (attempt + 1))
-    if isinstance(last_error, _CONNECTION_FAILURES):
+    if _is_connection_failure(last_error):
         raise ConnectionFailedError(
             "Deployment check failed: the connection ended before a complete "
             f"response arrived ({type(last_error).__name__}: {last_error})."
