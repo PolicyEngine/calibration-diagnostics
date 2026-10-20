@@ -699,10 +699,12 @@ function version2RunManifest(
 }
 
 // A version 2 run that uploaded its diagnostics with its telemetry.
-function ukVersion2StagingFiles(): Map<string, string> {
-  const runId = UK_STAGING_RUN_ID;
+function ukVersion2StagingFiles(
+  runId: string = UK_STAGING_RUN_ID,
+  updatedAt = "2026-10-02T23:15:56+00:00",
+): Map<string, string> {
   const diagnosticsText = JSON.stringify(ukHierarchyDiagnostics(ukStagingTargets()));
-  const manifest = version2RunManifest(runId, "2026-10-02T23:15:56+00:00", [{
+  const manifest = version2RunManifest(runId, updatedAt, [{
     logical_name: "calibration_diagnostics",
     artifact_kind: "aggregate_diagnostics",
     contract_relative_path: "artifacts/calibration_diagnostics.json",
@@ -715,6 +717,29 @@ function ukVersion2StagingFiles(): Map<string, string> {
     [url("run_manifest.json"), JSON.stringify(manifest)],
     [url("artifacts/calibration_diagnostics.json"), diagnosticsText],
   ]);
+}
+
+// The UK staging repository at the recorded revision as the publisher's
+// staging inventory reads it: its runs tree listing and, for each run, the
+// recorded UK version 2 run's manifest and diagnostics under that run's id.
+export function ukStagingRepositoryFiles(
+  runs: ReadonlyArray<{ runId: string; updatedAt: string }>,
+): { revisionSha: string; files: Map<string, string> } {
+  const files = new Map<string, string>();
+  const listing: JsonObject[] = [];
+  for (const { runId, updatedAt } of runs) {
+    for (const [url, body] of ukVersion2StagingFiles(runId, updatedAt)) files.set(url, body);
+    listing.push(
+      { type: "file", path: `runs/${runId}/run_manifest.json` },
+      { type: "file", path: `runs/${runId}/artifacts/calibration_diagnostics.json` },
+    );
+  }
+  const repository = stagingRepository("uk")!.repo;
+  files.set(
+    `https://huggingface.co/api/datasets/${repository}/tree/${UK_STAGING_REVISION}/runs?recursive=true`,
+    JSON.stringify(listing),
+  );
+  return { revisionSha: UK_STAGING_REVISION, files };
 }
 
 // A version 2 run whose diagnostics travel in its staged dataset bundle in
