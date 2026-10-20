@@ -16,9 +16,10 @@ The package imports only its own modules, Node built-ins and `@vercel/blob`,
 and its boundary test enforces that.
 
 `src/fixtures/calibration-tree-golden.json` records the exact bytes the builder
-writes for representative US and UK release and staging inputs, the
-comparisons between them, and the manifest. The golden tests require every
-change to reproduce it. Regenerate it only for an intended output change, as
+writes for representative inputs: US, UK and Belgium releases, US and UK
+staging runs, a US and a UK release-to-staging comparison, and the manifest
+holding every recorded build. The golden tests require every change to
+reproduce it. Regenerate it only for an intended output change, as
 `src/test-support/calibration-tree-golden-cases.ts` describes.
 
 ## Required Blob folder schema
