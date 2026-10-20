@@ -12,9 +12,9 @@ import {
   type MicrocosmCalibrationBuild,
   type MicrocosmComparisonRow,
 } from "@/lib/api/hooks/use-microcosm";
+import { calibrationBuildsNewestFirst } from "@policyengine/calibration-tree/calibration-tree-manifest";
 import {
   calibrationBuildManifestState,
-  calibrationBuildsNewestFirst,
   comparisonMapBuilds,
   stagingComparisonBaseline,
   type ComparisonMapBuildPicks,
