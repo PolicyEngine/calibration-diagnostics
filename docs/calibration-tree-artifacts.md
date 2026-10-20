@@ -221,7 +221,11 @@ country the dashboard reads `releases.json` and nothing else: no tags, no
   fails without moving the latest release.
 - Entries published from tags or release folders stay in the manifest and
   stay readable by their ids; reconciliation no longer repairs them, and the
-  picker no longer lists them.
+  picker no longer lists them. The one exception is the dashboard's latest
+  release: until reconciliation makes the record's current build the latest
+  release, the latest release is still such an entry, and the picker keeps
+  it listed as the default dataset. The deployment's pre-promotion check
+  requires the latest release to be listed.
 - The release picker lists every build `releases.json` names, dated by
   `published_at`, with its release's role (the default release is the
   default dataset) and its `withdrawn` flag. A build is selectable for
@@ -229,6 +233,10 @@ country the dashboard reads `releases.json` and nothing else: no tags, no
   build is not decided.
 - The Staging page compares a local-area candidate with the newest published
   build of a release whose role is local-area.
+- Every release id the dashboard accepts may be a build folder,
+  `<release>/<build>`, including the Staging target-change view's; the
+  "View on Hugging Face" link opens the folder at the build's pinned commit,
+  since a build folder has no tag.
 - The timestamp migration leaves build-folder entries alone.
 
 ### Finalized staging builds
