@@ -8,6 +8,8 @@ import http.server
 import importlib
 import io
 import json
+import socket
+import ssl
 import sys
 import threading
 from dataclasses import dataclass
@@ -476,3 +478,79 @@ def test_request_does_not_report_an_http_error_as_a_connection_failure(monkeypat
         )
     # An HTTP response arrived, so this must not be a retried connection failure.
     assert type(raised.value) is RuntimeError
+
+
+def _certificate_verification_failure():
+    return URLError(
+        ssl.SSLCertVerificationError(
+            1, "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed"
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "setup_failure",
+    [
+        _certificate_verification_failure(),
+        URLError(socket.gaierror(8, "nodename nor servname provided, or not known")),
+        URLError("no host given"),
+    ],
+    ids=["tls-certificate", "dns-lookup", "no-host"],
+)
+def test_request_does_not_report_a_tls_dns_or_url_error_as_a_connection_failure(
+    monkeypatch, setup_failure
+):
+    deployment = _module(monkeypatch)
+
+    def fail_before_connecting(request, timeout):
+        raise setup_failure
+
+    monkeypatch.setattr(deployment, "urlopen", fail_before_connecting)
+
+    with pytest.raises(RuntimeError) as raised:
+        deployment._request_json(
+            "https://example.test/api", [("metadata", "1")], {}, attempts=1
+        )
+    # No connection was made, so no calculation is running to wait for.
+    assert type(raised.value) is RuntimeError
+
+
+def test_request_reports_an_aborted_connection_as_a_connection_failure(monkeypatch):
+    deployment = _module(monkeypatch)
+
+    def abort_before_any_response(request, timeout):
+        raise ConnectionAbortedError(53, "Software caused connection abort")
+
+    monkeypatch.setattr(deployment, "urlopen", abort_before_any_response)
+
+    with pytest.raises(deployment.ConnectionFailedError):
+        deployment._request_json(
+            "https://example.test/api", [("metadata", "1")], {}, attempts=1
+        )
+
+
+@dataclass(frozen=True)
+class UnreachableBackend:
+    url: str = (
+        "https://staged.example.test/calibration/dashboard/api/microcosm_variable"
+    )
+
+
+def test_full_check_fails_at_once_when_the_first_request_fails_tls_verification(
+    monkeypatch,
+):
+    deployment = _module(monkeypatch)
+    # Real pauses, and a short wait limit, keep a regression from looping.
+    monkeypatch.setattr(deployment, "BACKEND_FREE_DEADLINE_SECONDS", 0.2)
+    request_kinds = []
+
+    def fail_tls_verification(request, timeout):
+        query = parse_qs(urlsplit(request.full_url).query)
+        request_kinds.append("metadata" if query.get("metadata") == ["1"] else "full")
+        raise _certificate_verification_failure()
+
+    monkeypatch.setattr(deployment, "urlopen", fail_tls_verification)
+
+    with pytest.raises(RuntimeError, match="CERTIFICATE_VERIFY_FAILED"):
+        _run_check(monkeypatch, deployment, UnreachableBackend())
+    assert request_kinds == ["full"]
