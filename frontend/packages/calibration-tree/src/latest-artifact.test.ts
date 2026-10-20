@@ -3417,6 +3417,77 @@ test("the release picker reads releases.json and nothing else from the dataset r
   expect(requested).toEqual([hfResolveUrl("releases.json", "uk")]);
 });
 
+test("the dashboard's latest release stays listed until reconciliation moves it to releases.json's current build", async () => {
+  // Microcosm's migration has written releases.json, but the dashboard
+  // manifest's latest release is still the tagged build published before
+  // the switch. The deployment's pre-promotion check requires the latest
+  // release to be listed and calibrated.
+  const taggedBuild = `${LINE}-20261019T083323Z-6cba5d71`;
+  const taggedEntry: CalibrationTreeManifestEntry = {
+    buildArtifactId: "9".repeat(64),
+    kind: "release",
+    sourceId: taggedBuild,
+    label: taggedBuild,
+    releaseId: taggedBuild,
+    releaseDirectory: LINE,
+    stagingRunId: null,
+    hfRepo: microcosmRepo("uk"),
+    hfCommitSha: "9".repeat(40),
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: "2026-10-19T10:21:22.000Z",
+    updatedAt: "2026-10-19T10:21:22.000Z",
+  };
+  const recordedCurrent = `${LINE}/${NATIONAL_CURRENT}`;
+  const beforeReconciliation = withCalibrationTreeManifestEntry(
+    publishedBuildManifest([recordedCurrent]),
+    "uk",
+    taggedEntry,
+    true,
+  );
+  const releases = await withRecordedReleases(RECORDED_RELEASES, () =>
+    loadRecordedReleases(0, "uk", beforeReconciliation),
+  );
+  expect(releases.map((release) => release.release_id)).toEqual([
+    taggedBuild,
+    recordedCurrent,
+    `${DENSE_LINE}/${DENSE_BUILD}`,
+    `${LINE}/${NATIONAL_OLDER}`,
+  ]);
+  expect(releases[0]).toEqual({
+    release_id: taggedBuild,
+    date: "20261019T102122Z",
+    files: [],
+    has_calibration: true,
+    dataset_role: null,
+    is_default: true,
+    is_local_area: false,
+    release_directory: LINE,
+  });
+
+  // Once the latest release is a build releases.json lists, only the
+  // recorded builds are listed.
+  const recordedCurrentEntry = beforeReconciliation.countries.uk?.builds.find(
+    (build) => build.releaseId === recordedCurrent,
+  );
+  if (!recordedCurrentEntry) throw new Error("The recorded build is missing from the fixture.");
+  const afterReconciliation = withCalibrationTreeManifestEntry(
+    beforeReconciliation,
+    "uk",
+    recordedCurrentEntry,
+    true,
+  );
+  const reconciled = await withRecordedReleases(RECORDED_RELEASES, () =>
+    loadRecordedReleases(0, "uk", afterReconciliation),
+  );
+  expect(reconciled.map((release) => release.release_id)).toEqual([
+    recordedCurrent,
+    `${DENSE_LINE}/${DENSE_BUILD}`,
+    `${LINE}/${NATIONAL_OLDER}`,
+  ]);
+});
+
 test("the release picker refuses a releases.json the release writer would refuse", async () => {
   const withdrawnCurrent = structuredClone(RECORDED_RELEASES);
   withdrawnCurrent.releases[LINE].builds[NATIONAL_CURRENT].withdrawn = true;
