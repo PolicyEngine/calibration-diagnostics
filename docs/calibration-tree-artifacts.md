@@ -260,6 +260,16 @@ Hierarchy levels, groups, and nodes store sorted target ordinals.
 comparison fit, and calibration status. Target-summary shards store the compact
 metric inputs used to recalculate visible aggregates after filtering.
 
+Geography values are the labels `buildCalibration` produces, so a label that
+more than one geography level uses in a build carries its level, such as
+"Ashfield (constituency)" and "Ashfield (local authority)" (see
+[Geography labels shared by several levels](calibration-map-hierarchy.md#geography-labels-shared-by-several-levels)).
+A tree keeps the labels it was published with. Its build ID derives from its
+inputs, not from the builder's code, so a tree published before that rule keeps
+one merged label for both areas, and a repair of it is refused because the
+rebuilt index differs from the recorded digest. For a staging build, the refusal
+is reported as that run's `failed` outcome.
+
 The browser unions selected values within one category, intersects categories,
 filters hierarchy memberships, and recalculates visible metrics from compact
 per-target inputs. Target detail shards are not required for navigation,
