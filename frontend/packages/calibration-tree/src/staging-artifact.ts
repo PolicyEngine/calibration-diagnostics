@@ -20,9 +20,10 @@ import {
   type ReleaseEntry,
 } from "./latest-artifact";
 import { readCalibrationTreeManifest } from "./calibration-tree-blob";
-import type {
-  CalibrationTreeManifest,
-  CalibrationTreeManifestEntry,
+import {
+  calibrationBuildsNewestFirst,
+  type CalibrationTreeManifest,
+  type CalibrationTreeManifestEntry,
 } from "./calibration-tree-manifest";
 import type { CalibrationTreeSourceArtifact } from "./calibration-tree-artifact";
 import {
@@ -1292,11 +1293,6 @@ export async function stagingRunPipelineId(
   return typeof pipelineId === "string" && pipelineId.trim() ? pipelineId.trim() : null;
 }
 
-function buildPublishedInstant(build: CalibrationTreeManifestEntry): number {
-  const instant = Date.parse(build.createdAt ?? build.updatedAt ?? "");
-  return Number.isFinite(instant) ? instant : Number.NEGATIVE_INFINITY;
-}
-
 /**
  * The most recently published release build whose release is local-area, by
  * the dataset roles `releases` carries (read from each release manifest, as
@@ -1317,12 +1313,7 @@ export function newestPublishedLocalAreaRelease(
       build.releaseId != null &&
       localAreaReleases.has(build.releaseId),
   );
-  builds.sort(
-    (left, right) =>
-      buildPublishedInstant(right) - buildPublishedInstant(left) ||
-      left.buildArtifactId.localeCompare(right.buildArtifactId),
-  );
-  return builds[0] ?? null;
+  return calibrationBuildsNewestFirst(builds)[0] ?? null;
 }
 
 /**
@@ -1389,6 +1380,9 @@ export async function resolveStagingComparisonRelease(
     local_area_candidate: localAreaCandidate,
   };
 }
+
+/** A staging run compared with a release, as `/microcosm/staging/compare` returns it. */
+export type StagingComparison = Awaited<ReturnType<typeof loadStagingComparison>>;
 
 export async function loadStagingComparison(
   runId: string,

@@ -16,33 +16,6 @@ export function publishedReleaseSelection(
   return isStagingSelection(selection) ? "" : (selection ?? "");
 }
 
-interface TimestampedCalibrationBuild {
-  buildArtifactId: string;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-function buildInstant(build: TimestampedCalibrationBuild): number {
-  const value = build.createdAt ?? build.updatedAt;
-  const time = value == null ? Number.NaN : Date.parse(value);
-  // An undated build sorts last rather than wherever NaN lands.
-  return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
-}
-
-/** Order build records by their actual RFC 3339 instant, not timestamp text. */
-export function calibrationBuildsNewestFirst<
-  T extends TimestampedCalibrationBuild,
->(builds: readonly T[]): T[] {
-  return [...builds].sort((left, right) => {
-    const leftTime = buildInstant(left);
-    const rightTime = buildInstant(right);
-    return (
-      rightTime - leftTime ||
-      left.buildArtifactId.localeCompare(right.buildArtifactId)
-    );
-  });
-}
-
 export type CalibrationBuildManifestState =
   | "loading"
   | "error"
@@ -66,29 +39,63 @@ interface ComparableCalibrationBuild {
   releaseId: string | null;
 }
 
-/**
- * The published build the Staging comparison map starts from: the build of
- * the release the candidate is compared with when it is published, otherwise
- * the manifest's latest release, otherwise the newest build.
- */
-export function defaultComparisonBuildArtifactId(options: {
+/** The builds the user picked in the comparison map; null until they pick. */
+export interface ComparisonMapBuildPicks {
+  from: string | null;
+  /** The empty string is the "To" selector's live-candidate option. */
+  to: string | null;
+}
+
+export interface ComparisonMapBuildSources {
+  /** Published builds, newest first. */
   builds: readonly ComparableCalibrationBuild[];
   latestReleaseBuildArtifactId: string | null | undefined;
+  /** The release `/microcosm/staging/compare` names; undefined until it responds. */
   comparisonReleaseId: string | undefined;
-}): string {
-  const comparisonBuild = options.comparisonReleaseId
-    ? options.builds.find(
-        (build) => build.kind === "release" && build.releaseId === options.comparisonReleaseId,
+  /** The selected staging run's published build, when it has one. */
+  candidateBuildArtifactId: string | undefined;
+}
+
+/**
+ * The builds the Staging comparison map's "From" and "To" selectors show.
+ * They are worked out on every render from the user's picks, never stored
+ * as defaults, because the build manifest usually responds before
+ * `/microcosm/staging/compare`: "From" starts at the manifest's latest
+ * release and moves to the build of the release the candidate is compared
+ * with once the comparison names it. A pick that is not a published build is
+ * ignored. Without picks:
+ *
+ * - "From" is the published build of the comparison's release, otherwise the
+ *   manifest's latest release, otherwise the newest build;
+ * - "To" is the selected run's published build, otherwise the live candidate.
+ */
+export function comparisonMapBuilds(
+  picks: ComparisonMapBuildPicks,
+  sources: ComparisonMapBuildSources,
+): { from: string; to: string } {
+  const isPublished = (buildArtifactId: string | null): buildArtifactId is string =>
+    buildArtifactId != null &&
+    sources.builds.some((build) => build.buildArtifactId === buildArtifactId);
+  const comparisonBuild = sources.comparisonReleaseId
+    ? sources.builds.find(
+        (build) => build.kind === "release" && build.releaseId === sources.comparisonReleaseId,
       )
     : undefined;
-  return comparisonBuild?.buildArtifactId ??
-    options.latestReleaseBuildArtifactId ??
-    options.builds[0]?.buildArtifactId ??
+  const defaultFrom = comparisonBuild?.buildArtifactId ??
+    sources.latestReleaseBuildArtifactId ??
+    sources.builds[0]?.buildArtifactId ??
     "";
+  return {
+    from: isPublished(picks.from) ? picks.from : defaultFrom,
+    to: picks.to === "" || isPublished(picks.to)
+      ? picks.to
+      : sources.candidateBuildArtifactId ?? "",
+  };
 }
 
 export interface StagingComparisonBaseline {
-  columnLabel: string;
+  /** Names the compared release: the table column and the map's labels. */
+  releaseLabel: string;
   tabLabel: string;
   note: string | null;
 }
@@ -99,7 +106,7 @@ export function stagingComparisonBaseline(
 ): StagingComparisonBaseline {
   if (comparisonRelease?.basis === "newest_local_area_release") {
     return {
-      columnLabel: "Local-area release",
+      releaseLabel: "Local-area release",
       tabLabel: "Change from local-area release",
       note:
         `This local-area candidate is compared with ${comparisonRelease.release_id}, the most recently ` +
@@ -108,7 +115,7 @@ export function stagingComparisonBaseline(
     };
   }
   return {
-    columnLabel: "Current release",
+    releaseLabel: "Current release",
     tabLabel: "Change from current release",
     note: comparisonRelease?.local_area_candidate
       ? "No local-area release has been published, so this local-area candidate is " +

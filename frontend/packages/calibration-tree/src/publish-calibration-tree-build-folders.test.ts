@@ -431,7 +431,7 @@ test("a single-build publication refuses a build releases.json does not list, be
   await withBlobToken(async () => {
     await expect(runPublisher(
       { country: "uk", mode: "release", releaseId: folder(NATIONAL, "uk-frs-calibration-attempt-unlisted") },
-      "build_folders",
+      { releaseLayout: "build_folders" },
     )).rejects.toThrow("does not list build");
   });
   expect(requested.some((url) => url.includes("/tree/"))).toBe(false);
@@ -444,11 +444,11 @@ test("a single-build publication names a build folder only where the country pub
   await withBlobToken(async () => {
     await expect(runPublisher(
       { country: "uk", mode: "release", releaseId: folder(NATIONAL, NATIONAL_CURRENT) },
-      "release_folders",
+      { releaseLayout: "release_folders" },
     )).rejects.toThrow("publishes release folders");
     await expect(runPublisher(
       { country: "uk", mode: "release", releaseId: TAGGED_BUILD },
-      "build_folders",
+      { releaseLayout: "build_folders" },
     )).rejects.toThrow("publishes build folders");
   });
   expect(requested).toEqual([]);

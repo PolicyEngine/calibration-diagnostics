@@ -8,6 +8,7 @@ import {
 import {
   loadStagingComparison,
   resolveStagingComparisonRelease,
+  type StagingComparison,
   type StagingComparisonRelease,
 } from "@policyengine/calibration-tree/staging-artifact";
 
@@ -26,7 +27,7 @@ export interface StagingCompareRouteDependencies {
     releaseId: string,
     revalidate: number,
     country: MicrocosmCountry,
-  ): Promise<object>;
+  ): Promise<StagingComparison>;
 }
 
 export function createStagingCompareHandler(

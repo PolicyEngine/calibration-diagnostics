@@ -103,7 +103,8 @@ export class CalibrationTreeArtifactSizeError extends Error {}
 
 export interface ReconciliationOutcome {
   sourceId: string;
-  status: "complete" | "published" | "repaired" | "ineligible";
+  // `failed`: staging only; `reason` gives the error.
+  status: "complete" | "published" | "repaired" | "ineligible" | "failed";
   buildArtifactId: string | null;
   reason: string | null;
 }
@@ -1161,7 +1162,7 @@ async function publishStagingSource(options: {
   source: ResolvedStagingSource;
   repository: { repo: string };
   revisionSha: string;
-  blobToken: string;
+  uploadBundle: NonNullable<CalibrationManifestStore["uploadBundle"]>;
   existing: CalibrationTreeManifestEntry | null;
   existingIndex: Awaited<ReturnType<typeof auditCalibrationTreeBuild>>["index"];
   dryRun: boolean;
@@ -1172,7 +1173,7 @@ async function publishStagingSource(options: {
     source,
     repository,
     revisionSha,
-    blobToken,
+    uploadBundle,
     existing,
     existingIndex,
     dryRun,
@@ -1230,7 +1231,7 @@ async function publishStagingSource(options: {
           created: false,
         },
       }
-    : await uploadCalibrationTreeBundle({ bundle, token: blobToken });
+    : await uploadBundle(bundle);
   const entry: CalibrationTreeManifestEntry = existing ?? {
     buildArtifactId: bundle.index.buildArtifactId,
     kind: "staging",
@@ -1249,11 +1250,12 @@ async function publishStagingSource(options: {
   return { bundle, stored, entry };
 }
 
-async function reconcileStagingBuilds(
+export async function reconcileStagingBuilds(
   country: MicrocosmCountry,
   expectedSha: string | undefined,
   blobToken: string,
   dryRun: boolean,
+  store: CalibrationManifestStore = blobCalibrationManifestStore(country, blobToken),
 ): Promise<ReconciliationReport> {
   const repository = stagingRepository(country);
   if (!repository) {
@@ -1276,11 +1278,10 @@ async function reconcileStagingBuilds(
   const finalized = runs.runs.filter((run) =>
     FINAL_STAGING_STATUSES.has(run.status ?? ""),
   );
-  let { manifest } = await readCalibrationTreeManifest({
-    token: blobToken,
-    consistent: true,
-  });
-  let blobs = await listCalibrationTreeBlobs({ country, token: blobToken });
+  const uploadBundle = store.uploadBundle ??
+    ((bundle: CalibrationTreeBundle) => uploadCalibrationTreeBundle({ bundle, token: blobToken }));
+  let manifest = await store.readManifest();
+  let blobs = await store.listBlobs();
   const outcomes: ReconciliationOutcome[] = [];
 
   for (const run of finalized) {
@@ -1290,85 +1291,84 @@ async function reconcileStagingBuilds(
       "staging",
       run.run_id,
     );
-    const audit = existing
-      ? await auditCalibrationTreeBuild({
-          country,
-          entry: existing,
-          blobs,
-          token: blobToken,
-        })
-      : null;
-    if (existing && audit?.complete) {
-      outcomes.push({
-        sourceId: run.run_id,
-        status: "complete",
-        buildArtifactId: existing.buildArtifactId,
-        reason: null,
-      });
-      continue;
-    }
-    if (audit && !audit.repairable) {
-      throw new Error(
-        `Staging build ${run.run_id} is corrupt and cannot be repaired automatically: ` +
-          audit.reasons.join("; "),
+    // A run whose build cannot be published or repaired is reported with
+    // the reason, and the runs after it are still reconciled: stopping here
+    // would leave every later run unpublished on every later invocation.
+    // `runPublisher` exits with an error once the report is printed.
+    let buildArtifactId = existing?.buildArtifactId ?? null;
+    try {
+      const audit = existing ? await store.audit(existing, blobs) : null;
+      if (existing && audit?.complete) {
+        outcomes.push({
+          sourceId: run.run_id,
+          status: "complete",
+          buildArtifactId: existing.buildArtifactId,
+          reason: null,
+        });
+        continue;
+      }
+      if (audit && !audit.repairable) {
+        throw new Error(
+          `Staging build ${run.run_id} is corrupt and cannot be repaired automatically: ` +
+            audit.reasons.join("; "),
+        );
+      }
+      const source = await resolveStagingCalibrationSource(
+        run.run_id,
+        0,
+        country,
+        existing?.hfCommitSha ?? revisionSha,
       );
-    }
-    const source = await resolveStagingCalibrationSource(
-      run.run_id,
-      0,
-      country,
-      existing?.hfCommitSha ?? revisionSha,
-    );
-    if (!source) {
-      if (existing) {
-        throw new Error(
-          `Incomplete staging build ${run.run_id} no longer has calibration diagnostics.`,
-        );
+      if (!source) {
+        if (existing) {
+          throw new Error(
+            `Incomplete staging build ${run.run_id} no longer has calibration diagnostics.`,
+          );
+        }
+        outcomes.push({
+          sourceId: run.run_id,
+          status: "ineligible",
+          buildArtifactId: null,
+          reason: "Finalized staging run has no calibration diagnostics.",
+        });
+        continue;
+      }
+      const published = await publishStagingSource({
+        country,
+        runId: run.run_id,
+        source,
+        repository,
+        revisionSha: existing?.hfCommitSha ?? revisionSha,
+        uploadBundle,
+        existing,
+        existingIndex: audit?.index ?? null,
+        dryRun,
+      });
+      buildArtifactId = published.entry.buildArtifactId;
+      if (!dryRun) {
+        manifest = await store.updateManifest(published.entry);
+        blobs = await store.listBlobs();
+        const verified = await store.audit(published.entry, blobs);
+        if (!verified.complete) {
+          throw new Error(
+            `Staging build ${run.run_id} remains incomplete: ${verified.reasons.join("; ")}`,
+          );
+        }
       }
       outcomes.push({
         sourceId: run.run_id,
-        status: "ineligible",
-        buildArtifactId: null,
-        reason: "Finalized staging run has no calibration diagnostics.",
+        status: existing ? "repaired" : "published",
+        buildArtifactId: published.entry.buildArtifactId,
+        reason: dryRun ? "Dry run; no Blob writes performed." : null,
       });
-      continue;
+    } catch (error) {
+      outcomes.push({
+        sourceId: run.run_id,
+        status: "failed",
+        buildArtifactId,
+        reason: error instanceof Error ? error.message : String(error),
+      });
     }
-    const published = await publishStagingSource({
-      country,
-      runId: run.run_id,
-      source,
-      repository,
-      revisionSha: existing?.hfCommitSha ?? revisionSha,
-      blobToken,
-      existing,
-      existingIndex: audit?.index ?? null,
-      dryRun,
-    });
-    if (!dryRun) {
-      manifest = await updateCalibrationTreeManifest({
-        country,
-        entry: published.entry,
-        token: blobToken,
-      });
-      blobs = await listCalibrationTreeBlobs({ country, token: blobToken });
-      const verified = await auditCalibrationTreeBuild({
-        country,
-        entry: published.entry,
-        blobs,
-        token: blobToken,
-      });
-      if (!verified.complete) {
-        throw new Error(
-          `Staging build ${run.run_id} remains incomplete: ${verified.reasons.join("; ")}`,
-        );
-      }
-    }
-    outcomes.push({
-      sourceId: run.run_id,
-      status: existing ? "repaired" : "published",
-      buildArtifactId: published.entry.buildArtifactId,
-      reason: dryRun ? "Dry run; no Blob writes performed." : null,
-    });
   }
   return { country, sourceKind: "staging", dryRun, outcomes };
 }
@@ -1590,6 +1590,24 @@ async function requestedReleaseSelection(
   };
 }
 
+/** The error a report's failed outcomes end the publisher with, if any. */
+export function reconciliationFailureMessage(report: ReconciliationReport): string | null {
+  const failed = report.outcomes.filter((outcome) => outcome.status === "failed");
+  if (failed.length === 0) return null;
+  return (
+    `${failed.length} of ${report.outcomes.length} ${report.sourceKind} sources failed to ` +
+    `reconcile: ${failed.map((outcome) => outcome.sourceId).join(", ")}. ` +
+    "The printed report gives each reason."
+  );
+}
+
+export interface PublisherDependencies {
+  /** The manifest and Blob store the reconciliation and migration modes use. */
+  store?: CalibrationManifestStore;
+  /** How the country publishes releases; defaults to its registration. */
+  releaseLayout?: ReleaseLayout;
+}
+
 // `--latest` and `--release <release>/<build>` under build folders: the build
 // releases.json at `revisionSha` (or the head of the configured revision)
 // lists, pinned to the commit that wrote its folder.
@@ -1619,16 +1637,19 @@ async function requestedRecordedBuild(
 
 export async function runPublisher(
   options: PublisherOptions,
-  layout: ReleaseLayout = countryReleaseLayout(options.country),
+  dependencies: PublisherDependencies = {},
 ): Promise<void> {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (!blobToken) throw new Error("BLOB_READ_WRITE_TOKEN is required.");
+  const store = dependencies.store ?? blobCalibrationManifestStore(options.country, blobToken);
+  const layout = dependencies.releaseLayout ?? countryReleaseLayout(options.country);
 
   if (options.mode === "migrate-release-timestamps") {
     const report = await migrateReleaseTimestamps(
       options.country,
       blobToken,
       options.dryRun === true,
+      store,
     );
     console.log(JSON.stringify(report));
     return;
@@ -1643,8 +1664,11 @@ export async function runPublisher(
       options.hfCommitSha,
       blobToken,
       options.dryRun === true,
+      store,
     );
     console.log(JSON.stringify(report));
+    const failure = reconciliationFailureMessage(report);
+    if (failure) throw new Error(failure);
     return;
   }
 
@@ -1656,10 +1680,12 @@ export async function runPublisher(
       options.country,
       blobToken,
       options.dryRun === true,
-      undefined,
+      store,
       layout,
     );
     console.log(JSON.stringify(report));
+    const failure = reconciliationFailureMessage(report);
+    if (failure) throw new Error(failure);
     return;
   }
 
