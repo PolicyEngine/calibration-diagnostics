@@ -72,7 +72,12 @@ order:
 4. Verify the unaliased frontend metadata, then execute a real 2024 national threshold
    calculation followed by a California income-tax calculation. Promotion requires the
    reviewed package and data identities, verified H5 bytes, numeric results, and the
-   expected national-to-state cache transition.
+   expected national-to-state cache transition. If the connection closes, resets or
+   times out before a response arrives, the check waits until the backend answers a
+   metadata request (at most 860 seconds after the first request), then sends the
+   calculation once more; the retried response must meet the same requirements. An HTTP
+   error or a response that fails them is never retried, so a slow calculation still
+   fails: the proxy answers HTTP 504 after waiting 780 seconds.
 5. Promote the Vercel deployment and execute a California calculation through both
    `calibration-diagnostics.vercel.app` and the mounted `microcosm.institute` route.
 

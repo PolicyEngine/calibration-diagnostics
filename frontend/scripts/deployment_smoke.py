@@ -16,6 +16,23 @@ from urllib.request import Request, urlopen
 RELEASE_PATH = Path(__file__).with_name("hosted_release.json")
 NATIONAL_VARIABLE = "spm_unit_spm_threshold"
 STATE_VARIABLE = "ca_income_tax"
+# Socket timeout for one request. The Vercel route allows 800 s and its proxy
+# answers 504 after waiting 780 s for Modal, so a slow backend produces an HTTP
+# error with a body before this timeout.
+REQUEST_TIMEOUT_SECONDS = 790
+# The backend runs one request at a time and finishes a calculation whose
+# client has gone, so a retried full check waits until the backend answers a
+# metadata request. backend/modal_app.py stops a call after 800 s; the other
+# 60 s allow for container start. Counted from the first full-check request.
+BACKEND_FREE_DEADLINE_SECONDS = 860
+BACKEND_PROBE_PAUSE_SECONDS = 10
+# Failures that leave no complete HTTP response: RemoteDisconnected is a
+# ConnectionResetError. HTTPError, a URLError, is handled before these.
+_CONNECTION_FAILURES = (ConnectionResetError, URLError, TimeoutError)
+
+
+class ConnectionFailedError(RuntimeError):
+    """The connection closed, reset, failed or timed out without a response."""
 
 
 def _record(value: Any, name: str) -> dict[str, Any]:
@@ -130,6 +147,7 @@ def _request_json(
     headers: dict[str, str],
     *,
     attempts: int,
+    timeout: float = REQUEST_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     target = f"{url}?{urlencode(query)}"
     last_error: Exception | None = None
@@ -139,7 +157,7 @@ def _request_json(
                 target,
                 headers={"Cache-Control": "no-cache", **headers},
             )
-            with urlopen(request, timeout=790) as response:
+            with urlopen(request, timeout=timeout) as response:
                 if response.status != 200:
                     raise ValueError(f"Deployment returned HTTP {response.status}.")
                 content_type = response.headers.get("Content-Type", "")
@@ -149,10 +167,15 @@ def _request_json(
         except HTTPError as exc:
             detail = exc.read(1_000).decode("utf-8", errors="replace")
             last_error = RuntimeError(f"Deployment returned HTTP {exc.code}: {detail}")
-        except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        except (*_CONNECTION_FAILURES, ValueError, json.JSONDecodeError) as exc:
             last_error = exc
         if attempt + 1 < attempts:
             time.sleep(5 * (attempt + 1))
+    if isinstance(last_error, _CONNECTION_FAILURES):
+        raise ConnectionFailedError(
+            "Deployment check failed: the connection ended before a complete "
+            f"response arrived ({type(last_error).__name__}: {last_error})."
+        ) from last_error
     raise RuntimeError(f"Deployment check failed: {last_error}") from last_error
 
 
@@ -175,6 +198,84 @@ def _request_and_validate(
         if attempt + 1 < attempts:
             time.sleep(5 * (attempt + 1))
     raise RuntimeError(f"Deployment validation failed: {last_error}") from last_error
+
+
+def _validate_body(
+    body: dict[str, Any], validate: Callable[[dict[str, Any]], None]
+) -> None:
+    try:
+        validate(body)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"Deployment validation failed: {exc}") from exc
+
+
+def _wait_until_backend_is_free(
+    url: str,
+    headers: dict[str, str],
+    validate_metadata_body: Callable[[dict[str, Any]], None],
+    deadline: float,
+) -> None:
+    """Return once the backend answers a valid metadata request.
+
+    The backend serves one request at a time, so this answer arrives only after
+    the calculation whose connection was lost has finished. Only another lost
+    connection is retried; any HTTP error or invalid metadata fails at once.
+    """
+    last_probe_failure: Exception | None = None
+    while (remaining := deadline - time.monotonic()) > 0:
+        try:
+            body = _request_json(
+                url,
+                [("metadata", "1")],
+                headers,
+                attempts=1,
+                timeout=min(REQUEST_TIMEOUT_SECONDS, remaining),
+            )
+        except ConnectionFailedError as probe_failure:
+            last_probe_failure = probe_failure
+            print(f"Backend metadata request: {probe_failure}", flush=True)
+            pause = min(BACKEND_PROBE_PAUSE_SECONDS, deadline - time.monotonic())
+            time.sleep(max(0.0, pause))
+            continue
+        _validate_body(body, validate_metadata_body)
+        return
+    raise RuntimeError(
+        "The backend was still busy or unreachable "
+        f"{BACKEND_FREE_DEADLINE_SECONDS} s after the full check was sent, so it "
+        f"was not retried. Last metadata request: {last_probe_failure}"
+    )
+
+
+def _run_full_check(
+    url: str,
+    query: list[tuple[str, str]],
+    headers: dict[str, str],
+    validate_calculation_body: Callable[[dict[str, Any]], None],
+    validate_metadata_body: Callable[[dict[str, Any]], None],
+) -> None:
+    """Run the national and state calculation, retrying once after a lost connection.
+
+    Each response, first or retried, must pass the same validation on its own.
+    A response that fails validation and an HTTP error are never retried.
+    """
+    deadline = time.monotonic() + BACKEND_FREE_DEADLINE_SECONDS
+    try:
+        body = _request_json(url, query, headers, attempts=1)
+    except ConnectionFailedError as first_failure:
+        print(
+            f"::warning::{first_failure} Waiting for the backend to finish that "
+            "calculation, then sending the full check once more.",
+            flush=True,
+        )
+        _wait_until_backend_is_free(url, headers, validate_metadata_body, deadline)
+        print("The backend is free; sending the full check once more.", flush=True)
+        try:
+            body = _request_json(url, query, headers, attempts=1)
+        except RuntimeError as retry_failure:
+            raise RuntimeError(
+                f"The retried full check failed: {retry_failure}"
+            ) from retry_failure
+    _validate_body(body, validate_calculation_body)
 
 
 def main() -> int:
@@ -217,18 +318,27 @@ def main() -> int:
                 ("release", expected["release_id"]),
             ]
         )
-        _request_and_validate(
-            args.url,
-            query,
-            headers,
-            lambda body: validate_calculation(
+
+        def validate_calculation_body(body: dict[str, Any]) -> None:
+            validate_calculation(
                 body,
                 args.source_commit,
                 variables,
                 require_scope_switch=args.check == "full",
-            ),
-            attempts=1 if args.check == "full" else 6,
-        )
+            )
+
+        if args.check == "full":
+            _run_full_check(
+                args.url,
+                query,
+                headers,
+                validate_calculation_body,
+                lambda body: validate_metadata(body, args.source_commit),
+            )
+        else:
+            _request_and_validate(
+                args.url, query, headers, validate_calculation_body, attempts=6
+            )
     print(f"Validated {args.check} response from {args.url}")
     return 0
 
