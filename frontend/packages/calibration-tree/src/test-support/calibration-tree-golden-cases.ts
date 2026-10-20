@@ -1,10 +1,10 @@
-// Golden calibration tree cases: representative builder inputs (US and UK,
-// releases and staging runs, and comparisons between them) assembled from the
-// fixtures the module tests already use, and a record of everything the
-// builder writes for them. The record reduces each written part to its path,
-// raw JSON digest and size, gzip size and deflate-stream digest, and adds the
-// build ids, the manifest bytes, and what the readers return from the
-// written bytes.
+// Golden calibration tree cases: representative builder inputs (US, UK and
+// Belgium releases, US and UK staging runs, and US and UK comparisons between
+// a release and a staging run) assembled from the fixtures the module tests
+// already use, and a record of everything the builder writes for them. The
+// record reduces each written part to its path, raw JSON digest and size,
+// gzip size and deflate-stream digest, and adds the build ids, the manifest
+// bytes, and what the readers return from the written bytes.
 //
 // fixtures/calibration-tree-golden.json is that record as produced by the
 // builder before it moved into this package; the golden tests require the
@@ -453,26 +453,53 @@ function repositoryEnvironmentNames(): string[] {
   return [...names];
 }
 
+// Scopes that overlap, such as the two sides of a comparison that
+// `goldenComparisonRecord` builds under `Promise.all`, share one cleared
+// environment: the first scope to start saves and clears the variables, and
+// the last one to finish restores them. Scopes may also nest.
+let registeredRepositoryScopeCount = 0;
+let environmentOutsideRegisteredRepositories = new Map<string, string | undefined>();
+
 export async function withRegisteredRepositories<Result>(
   operation: () => Promise<Result>,
 ): Promise<Result> {
-  const saved = new Map(repositoryEnvironmentNames().map((name) => [name, process.env[name]]));
-  for (const name of saved.keys()) delete process.env[name];
+  if (registeredRepositoryScopeCount === 0) {
+    environmentOutsideRegisteredRepositories = new Map(
+      repositoryEnvironmentNames().map((name) => [name, process.env[name]]),
+    );
+    for (const name of environmentOutsideRegisteredRepositories.keys()) delete process.env[name];
+  }
+  registeredRepositoryScopeCount += 1;
   try {
     return await operation();
   } finally {
-    for (const [name, value] of saved) {
-      if (value == null) delete process.env[name];
-      else process.env[name] = value;
+    registeredRepositoryScopeCount -= 1;
+    if (registeredRepositoryScopeCount === 0) {
+      for (const [name, value] of environmentOutsideRegisteredRepositories) {
+        if (value == null) delete process.env[name];
+        else process.env[name] = value;
+      }
     }
   }
 }
 
-async function withHuggingFaceFiles<Result>(
+// Each scope replaces `globalThis.fetch` with a reader of its own files, so
+// scopes that overlap run one after another: a scope starts only after every
+// earlier scope has finished and put back the fetch it replaced. A scope must
+// not start another inside itself, because the inner one would wait forever.
+let huggingFaceFileScopesBefore: Promise<void> = Promise.resolve();
+
+export async function withHuggingFaceFiles<Result>(
   files: Map<string, string>,
   operation: () => Promise<Result>,
 ): Promise<Result> {
-  const originalFetch = globalThis.fetch;
+  const earlierScopesFinished = huggingFaceFileScopesBefore;
+  let finishThisScope = () => {};
+  huggingFaceFileScopesBefore = new Promise<void>((resolve) => {
+    finishThisScope = resolve;
+  });
+  await earlierScopesFinished;
+  const fetchOutsideScope = globalThis.fetch;
   globalThis.fetch = (async (input: string | URL | Request) => {
     const body = files.get(String(input));
     return body == null
@@ -482,7 +509,8 @@ async function withHuggingFaceFiles<Result>(
   try {
     return await operation();
   } finally {
-    globalThis.fetch = originalFetch;
+    globalThis.fetch = fetchOutsideScope;
+    finishThisScope();
   }
 }
 
