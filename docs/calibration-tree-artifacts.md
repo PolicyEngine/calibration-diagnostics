@@ -191,9 +191,11 @@ staging repository main-branch update
 ```
 
 Active or failed staging runs remain on the live 30-second API path. Historical
-staging runs with no calibration diagnostics are reported as ineligible. A
-declared diagnostics file that is missing or has the wrong digest fails the
-workflow.
+staging runs with no calibration diagnostics are reported as ineligible. A run
+whose build cannot be published or repaired, for example because a declared
+diagnostics file is missing or has the wrong digest, is reported as `failed`
+with the error. The remaining runs are still reconciled, and the workflow then
+fails.
 
 A staged dataset's diagnostics are the `calibration_diagnostics.json` its
 receipt records or, failing that, the one `<dataset>.diagnostics.json` it
@@ -257,6 +259,16 @@ Hierarchy levels, groups, and nodes store sorted target ordinals.
 `filter-index.json.gz` stores postings for geography level, geography, fit band,
 comparison fit, and calibration status. Target-summary shards store the compact
 metric inputs used to recalculate visible aggregates after filtering.
+
+Geography values are the labels `buildCalibration` produces, so a label that
+more than one geography level uses in a build carries its level, such as
+"Ashfield (constituency)" and "Ashfield (local authority)" (see
+[Geography labels shared by several levels](calibration-map-hierarchy.md#geography-labels-shared-by-several-levels)).
+A tree keeps the labels it was published with. Its build ID derives from its
+inputs, not from the builder's code, so a tree published before that rule keeps
+one merged label for both areas, and a repair of it is refused because the
+rebuilt index differs from the recorded digest. For a staging build, the refusal
+is reported as that run's `failed` outcome.
 
 The browser unions selected values within one category, intersects categories,
 filters hierarchy memberships, and recalculates visible metrics from compact
@@ -389,11 +401,19 @@ Remove `--dry-run` to publish. For staging, an automated invocation also passes
 repository state. The GitHub workflow exposes the same `dry_run` option for an
 authenticated verification using Actions secrets.
 
-Each outcome is `complete`, `published`, `repaired`, or `ineligible`.
+Each outcome is `complete`, `published`, `repaired`, or `ineligible`, and
+staging outcomes can also be `failed`.
 `complete` means no bundle construction or source-diagnostics download occurred.
 `repaired` means the publisher deterministically rebuilt an existing identity
 and restored only missing files. Any reconstructed index must match the digest
 already recorded in the manifest.
+
+Release reconciliation stops at the first release it cannot publish or repair.
+Staging reconciliation records that run as `failed`, with the error as its
+`reason`, and continues with the remaining runs; after printing the report the
+command exits with an error naming every failed run. A refused staging repair
+therefore no longer leaves the runs after it unpublished on every later
+invocation.
 
 `CALIBRATION_TREE_MAX_RAW_BYTES` defaults to 100,000,000 bytes per file, in
 addition to the fixed summary- and detail-shard limits.

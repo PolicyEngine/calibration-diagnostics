@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 
 import recordedGoldens from "./fixtures/calibration-tree-golden.json";
 import {
@@ -13,13 +13,17 @@ import {
 } from "@policyengine/calibration-tree/countries";
 import {
   goldenReleaseInputs,
+  ukStagingRepositoryFiles,
   withRegisteredRepositories,
   type CalibrationTreeGoldenRecord,
   type GoldenReleaseInput,
 } from "./test-support/calibration-tree-golden-cases";
 import {
   reconcileReleaseBuilds,
+  reconcileStagingBuilds,
+  runPublisher,
   type CalibrationManifestStore,
+  type ReconciliationReport,
 } from "@policyengine/calibration-tree/publish-calibration-tree";
 
 // A repair rebuilds a published release whose index went missing and refuses
@@ -208,3 +212,124 @@ test("a repair refuses a rebuilt index that differs from the recorded digest", a
     reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry))
   )).rejects.toThrow("Rebuilt calibration index differs from immutable manifest entry");
 });
+
+// Two finalized UK staging runs. The newer one, which reconciliation reaches
+// first, already has a manifest entry whose index has gone missing, and the
+// digest it records is not what the builder now writes for that run: a
+// staging tree published before a builder change, such as the September UK
+// local-area trees before same-named areas at different geography levels
+// got separate labels.
+const REFUSED_STAGING_RUN = {
+  runId: "uk-calibration-refused-20261004T000000Z",
+  updatedAt: "2026-10-04T00:00:00+00:00",
+};
+const UNPUBLISHED_STAGING_RUN = {
+  runId: "uk-calibration-unpublished-20261003T000000Z",
+  updatedAt: "2026-10-03T00:00:00+00:00",
+};
+const REFUSED_BUILD_ID = "a".repeat(64);
+
+function stagingRepositoryWithRefusedRepair(): {
+  revisionSha: string;
+  store: CalibrationManifestStore;
+} {
+  const { revisionSha, files } = ukStagingRepositoryFiles([
+    REFUSED_STAGING_RUN,
+    UNPUBLISHED_STAGING_RUN,
+  ]);
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const body = files.get(String(input));
+    return body == null ? new Response(null, { status: 404 }) : new Response(body);
+  }) as typeof fetch;
+  const staleEntry: CalibrationTreeManifestEntry = {
+    buildArtifactId: REFUSED_BUILD_ID,
+    kind: "staging",
+    sourceId: REFUSED_STAGING_RUN.runId,
+    label: `${REFUSED_STAGING_RUN.runId}-candidate`,
+    releaseId: null,
+    stagingRunId: REFUSED_STAGING_RUN.runId,
+    hfRepo: COUNTRY_REGISTRY.uk.staging.repo,
+    hfCommitSha: revisionSha,
+    treeSchemaVersion: 6,
+    indexSha256: "0".repeat(64),
+    indexBytes: 10,
+    createdAt: "2026-10-04T00:00:00.000Z",
+    updatedAt: "2026-10-04T00:00:00.000Z",
+  };
+  const store: CalibrationManifestStore = {
+    readManifest: async () => withCalibrationTreeManifestEntry(
+      emptyCalibrationTreeManifest(),
+      "uk",
+      staleEntry,
+    ),
+    listBlobs: async () => new Map(),
+    audit: async () => ({
+      complete: false,
+      repairable: true,
+      reasons: ["index is missing"],
+      index: null,
+    }),
+    updateManifest: async () => {
+      throw new Error("A dry run must not write the manifest.");
+    },
+  };
+  return { revisionSha, store };
+}
+
+test(
+  "a refused staging repair is recorded as that run's failure, and the runs after it are still published",
+  async () => {
+    const { revisionSha, store } = stagingRepositoryWithRefusedRepair();
+
+    const report = await withRegisteredRepositories(() =>
+      reconcileStagingBuilds("uk", revisionSha, "unused-blob-token", true, store)
+    );
+
+    expect(report.outcomes).toEqual([
+      {
+        sourceId: REFUSED_STAGING_RUN.runId,
+        status: "failed",
+        buildArtifactId: REFUSED_BUILD_ID,
+        reason: `Rebuilt staging index differs from immutable manifest entry ${REFUSED_BUILD_ID}.`,
+      },
+      {
+        sourceId: UNPUBLISHED_STAGING_RUN.runId,
+        status: "published",
+        buildArtifactId: expect.stringMatching(/^[0-9a-f]{64}$/),
+        reason: "Dry run; no Blob writes performed.",
+      },
+    ]);
+  },
+  BUILD_TIMEOUT_MS,
+);
+
+test(
+  "the publisher prints every staging outcome, then exits with an error naming the failed run",
+  async () => {
+    const { revisionSha, store } = stagingRepositoryWithRefusedRepair();
+    const originalBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    process.env.BLOB_READ_WRITE_TOKEN = "unused-blob-token";
+    const printed = spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await expect(withRegisteredRepositories(() =>
+        runPublisher(
+          { country: "uk", mode: "reconcile-staging", hfCommitSha: revisionSha, dryRun: true },
+          { store },
+        )
+      )).rejects.toThrow(
+        `1 of 2 staging sources failed to reconcile: ${REFUSED_STAGING_RUN.runId}.`,
+      );
+      expect(printed).toHaveBeenCalledTimes(1);
+      const report = JSON.parse(String(printed.mock.calls[0][0])) as ReconciliationReport;
+      expect(report.outcomes.map((outcome) => [outcome.sourceId, outcome.status])).toEqual([
+        [REFUSED_STAGING_RUN.runId, "failed"],
+        [UNPUBLISHED_STAGING_RUN.runId, "published"],
+      ]);
+    } finally {
+      printed.mockRestore();
+      if (originalBlobToken == null) delete process.env.BLOB_READ_WRITE_TOKEN;
+      else process.env.BLOB_READ_WRITE_TOKEN = originalBlobToken;
+    }
+  },
+  BUILD_TIMEOUT_MS,
+);
