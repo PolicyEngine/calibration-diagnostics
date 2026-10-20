@@ -135,6 +135,25 @@ test("a record whose current build is unlisted or withdrawn is refused", () => {
   expect(() => parseReleasesRecord(withdrawn)).toThrow("is withdrawn");
 });
 
+test("a current build named like a built-in object property is refused unless it is listed", () => {
+  // The writer's check_record looks the name up among the listed builds only.
+  for (const builtInName of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+    const document = documentedExample();
+    nationalRelease(document).current = builtInName;
+    expect(() => parseReleasesRecord(document), builtInName).toThrow(ReleasesRecordError);
+    expect(() => parseReleasesRecord(document), builtInName).toThrow("is not listed");
+  }
+
+  const listed = documentedExample();
+  const release = nationalRelease(listed);
+  release.builds = {
+    ...(release.builds as Record<string, unknown>),
+    constructor: { published_at: "2026-10-20T00:00:00+00:00", withdrawn: false },
+  };
+  release.current = "constructor";
+  expect(parseReleasesRecord(listed).releases[NATIONAL].current).toBe("constructor");
+});
+
 test("a record whose default release is not listed is refused", () => {
   const document = documentedExample();
   document.default = DENSE;
