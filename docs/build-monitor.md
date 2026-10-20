@@ -60,7 +60,7 @@ value for production and preview:
 
 | Setting | Value | Where production and preview get it |
 |---|---|---|
-| `MICROCOSM_TELEMETRY_COLLECTOR_URL` | The matching environment's collector address. It must use HTTPS, except on `localhost`. | Production: the GitHub `Production` environment variable of the same name, which `.github/workflows/deploy.yml` passes to `vercel deploy --env`. Preview: the Vercel project's settings. |
+| `MICROCOSM_TELEMETRY_COLLECTOR_URL` | The matching environment's collector address. It must use HTTPS, except on `localhost` or `127.0.0.1`. | Production: the GitHub `Production` environment variable of the same name, which `.github/workflows/deploy.yml` passes to `vercel deploy --env`. Preview: the Vercel project's settings. |
 | `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` | The full Secret Manager version resource of that collector's read credential: `projects/<project>/secrets/<secret>/versions/<number or latest>`. | The Vercel project's settings. |
 | `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER` | The full Google Workload Identity provider resource that trusts this Vercel project: `projects/<project number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>`. Read only on Vercel. | The Vercel project's settings. |
 
