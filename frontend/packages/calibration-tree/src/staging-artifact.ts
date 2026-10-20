@@ -1360,6 +1360,9 @@ export async function resolveStagingComparisonRelease(
   };
 }
 
+/** A staging run compared with a release, as `/microcosm/staging/compare` returns it. */
+export type StagingComparison = Awaited<ReturnType<typeof loadStagingComparison>>;
+
 export async function loadStagingComparison(
   runId: string,
   releaseId: string,
