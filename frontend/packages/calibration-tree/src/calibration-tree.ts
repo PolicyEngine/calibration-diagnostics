@@ -500,6 +500,19 @@ function earliestValueLabel(entries: HierarchyEntry[]): string {
   return hierarchyDimension(earliest)!.value;
 }
 
+function entriesByValueId(
+  entries: HierarchyEntry[],
+): Map<string, HierarchyEntry[]> {
+  const byValue = new Map<string, HierarchyEntry[]>();
+  for (const entry of entries) {
+    const valueId = hierarchyDimensionValueId(hierarchyDimension(entry)!);
+    const valueEntries = byValue.get(valueId);
+    if (valueEntries) valueEntries.push(entry);
+    else byValue.set(valueId, [entry]);
+  }
+  return byValue;
+}
+
 function mergeHierarchyPartitions(
   partitions: HierarchyDimensionPartition[],
 ): HierarchyDimensionPartition[] {
@@ -887,18 +900,16 @@ function hierarchyDimensionTree(
         visibleRows.has(entry.row),
       );
       if (!visibleEntries.length) return [];
-      const byValue = new Map<string, HierarchyEntry[]>();
-      for (const entry of visibleEntries) {
-        const valueId = hierarchyDimensionValueId(hierarchyDimension(entry)!);
-        const valueEntries = byValue.get(valueId);
-        if (valueEntries) valueEntries.push(entry);
-        else byValue.set(valueId, [entry]);
-      }
+      // A value is labelled from all of its rows, not only the visible ones,
+      // so filters do not change its label: its selected path and the
+      // published tree, which is compiled without filters, use all its rows.
+      const allEntriesByValue = entriesByValueId(dimensionEntries);
+      const byValue = entriesByValueId(visibleEntries);
       const nodes = sortNodes(
         [...byValue.entries()].map(([valueId, valueEntries]) =>
           node(
             valueId,
-            earliestValueLabel(valueEntries),
+            earliestValueLabel(allEntriesByValue.get(valueId)!),
             "dimension_value",
             {
               kind: "dimension_value",
