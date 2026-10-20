@@ -430,7 +430,7 @@ test("release reconciliation leaves a complete entry's metadata to the migration
     throw new Error(`Unexpected URL ${url}`);
   }) as typeof fetch;
   try {
-    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
     expect(report.outcomes.find((item) => item.sourceId === UK_RELEASE)?.status).toBe("complete");
     expect(report.outcomes.find((item) => item.sourceId === currentTag)?.status).toBe("complete");
     expect(store.current().countries.uk?.builds).toHaveLength(2);
@@ -444,7 +444,9 @@ test("release reconciliation leaves a complete entry's metadata to the migration
 });
 
 // A Microcosm line (microcosm#823): one constant folder, one immutable tag per
-// cut. All values are synthetic.
+// cut. All values are synthetic. The UK registration now publishes build
+// folders, so these tests name the release-folder layout they cover; its
+// readers stay until Microcosm deletes the pointer files (P5).
 const NATIONAL_LINE = "microcosm-uk-2024-25-national";
 const DENSE_LINE = "microcosm-uk-2024-25-dense";
 const NATIONAL_CUT = `${NATIONAL_LINE}-20261019T083323Z-0a1b2c3d`;
@@ -591,7 +593,7 @@ test("release reconciliation publishes each line cut from its folder and follows
   const requested: string[] = [];
   globalThis.fetch = lineRepositoryFetch(requested);
   try {
-    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
     const status = Object.fromEntries(
       report.outcomes.map((outcome) => [outcome.sourceId, outcome.status]),
     );
@@ -641,7 +643,7 @@ test("release reconciliation publishes each line cut from its folder and follows
     // A second run finds every build complete and does not probe the
     // published cuts again.
     requested.length = 0;
-    const again = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    const again = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
     expect(again.outcomes.filter((outcome) => outcome.status !== "ineligible")
       .every((outcome) => outcome.status === "complete")).toBe(true);
     expect(store.uploads).toHaveLength(2);
@@ -721,7 +723,7 @@ test("the latest publication refuses a pointer tag whose release manifest names 
   process.env.BLOB_READ_WRITE_TOKEN = "blob-token";
   try {
     await expect(readUpstreamLatest("uk")).rejects.toThrow("does not name it as its cut");
-    await expect(runPublisher({ country: "uk", mode: "latest" }))
+    await expect(runPublisher({ country: "uk", mode: "latest" }, { releaseLayout: "release_folders" }))
       .rejects.toThrow("does not name it as its cut");
     // Refused before any calibration file was read or any Blob was written.
     expect(requested.some((url) => url.endsWith("/calibration_diagnostics.json"))).toBe(false);
@@ -789,7 +791,7 @@ test("a published tag's comparison metadata names the tag, as its build does", a
     release_id: directory,
   }));
   try {
-    await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
     const identities = store.uploads
       .map((bundle) => [bundle.index.build.releaseId, bundle.index.targetComparison.releaseId])
       .sort();

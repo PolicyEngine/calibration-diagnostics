@@ -141,11 +141,13 @@ release repository update
   -> POST <basePath>/api/hf-webhook
   -> one GitHub workflow_dispatch per webhook delivery
   -> enumerate the union of release directories and immutable repository tags
+     (for a country publishing build folders: the builds releases.json lists)
   -> resolve every eligible release to an exact Hugging Face commit
   -> audit the existing Blob build for each release
   -> skip complete builds without downloading their diagnostics
   -> build and upload only missing builds or missing files
   -> update latestReleaseBuildArtifactId from the country's upstream pointer
+     (for a country publishing build folders: releases.json's current build)
 ```
 
 A release directory or tag without calibration diagnostics is reported as
@@ -176,6 +178,58 @@ for inspection only, such as the UK dense local-area line, has no copy on
   becomes the country's latest release. Other countries keep `latest.json`.
 - The release picker adds every published cut beside the folders on `main` and
   hides a line folder unless the dashboard's latest release still points at it.
+
+The UK no longer reads its repository this way (next section). These readers
+stay for the countries that publish release folders, and for the UK until
+Microcosm deletes its pointer files (P5): removing the UK's `release_layout`
+returns it to them until then.
+
+#### Build folders and `releases.json`
+
+A country registration with `release_layout: "build_folders"` (the UK, once
+Microcosm's migration P1 has run) publishes every build in its own folder,
+never changed after publishing, and one record at the repository root names
+every build and each release's current build:
+
+```text
+releases.json
+releases/<release>/<build>/release_manifest.json
+releases/<release>/<build>/calibration_diagnostics.json
+releases/<release>/<build>/...
+```
+
+`releases.json` follows microcosm-emitter's
+`microcosm_emitter_interface.releases` (microcosm-emitter#24), whose release
+writer is the only program that changes it. `release-record.ts` reads it with
+the same rules: exact keys, `schema_version` 1, safe release and build names,
+each `current` listed and not withdrawn, and `default` listed. For such a
+country the dashboard reads `releases.json` and nothing else: no tags, no
+`latest*.json` pointer files and no listing of `releases/`.
+
+- A build's release id is its folder, `<release>/<build>`. Its manifest entry
+  records no separate `releaseDirectory`, and readers fetch
+  `releases/<release>/<build>/` at the entry's commit.
+- Reconciliation reads `releases.json` at the head of `main` and publishes
+  every listed build whose folder holds `calibration_diagnostics.json` and
+  whose `release_manifest.json` names the same `release` and `build` in its
+  top-level fields. The build is pinned to the newest commit behind its
+  folder's files (the commit that wrote the folder) and dated by its
+  `published_at`, so a build the migration copied keeps its original date.
+  A build the manifest already holds is not looked up again.
+- The latest release is the current build of the record's default release.
+  While the record names none, reconciliation publishes the listed builds and
+  fails without moving the latest release.
+- Entries published from tags or release folders stay in the manifest and
+  stay readable by their ids; reconciliation no longer repairs them, and the
+  picker no longer lists them.
+- The release picker lists every build `releases.json` names, dated by
+  `published_at`, with its release's role (the default release is the
+  default dataset) and its `withdrawn` flag. A build is selectable for
+  comparison once its tree is published. How the picker shows a withdrawn
+  build is not decided.
+- The Staging page compares a local-area candidate with the newest published
+  build of a release whose role is local-area.
+- The timestamp migration leaves build-folder entries alone.
 
 ### Finalized staging builds
 

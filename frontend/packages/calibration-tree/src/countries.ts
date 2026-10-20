@@ -131,9 +131,16 @@ export const COUNTRY_REGISTRY = {
     geography_id: null,
     visibility: "private",
     capabilities: [...CALIBRATION_CAPABILITIES, "staging"],
+    // Microcosm's migration (P1) moves the UK repository to one folder per
+    // build, with releases.json as the only record of what is current; the
+    // dashboard's UK readers then read nothing else. Must not be deployed
+    // before that migration has run.
+    release_layout: "build_folders",
     // microcosm#823: the UK default line is the 2024-25 national dataset,
     // promoted through its own pointer; `latest.json` stays on the June 2023
-    // release and is never moved.
+    // release and is never moved. Unread while release_layout is
+    // build_folders. Kept until Microcosm deletes the pointer files (P5), so
+    // removing release_layout returns the UK to the release-folder readers.
     pointer_path: "latest-national.json",
     staging: {
       repo: "policyengine/populace-uk-staging",

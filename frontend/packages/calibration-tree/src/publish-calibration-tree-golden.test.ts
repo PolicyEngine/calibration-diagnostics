@@ -26,6 +26,9 @@ import {
   type ReconciliationReport,
 } from "@policyengine/calibration-tree/publish-calibration-tree";
 
+// The recorded releases are release folders, so every repair here names that
+// layout, including the UK's, whose registration now publishes build folders.
+//
 // A repair rebuilds a published release whose index went missing and refuses
 // any rebuilt index whose digest differs from the manifest entry. Seeding the
 // entry with the recorded build id and index digest therefore proves, through
@@ -189,7 +192,7 @@ for (const [name, description] of Object.entries(RELEASE_DESCRIPTIONS) as Array<
       globalThis.fetch = huggingFaceReleaseRepository(release);
 
       const report = await withRegisteredRepositories(() =>
-        reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry))
+        reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry), "release_folders")
       );
 
       expect(report.outcomes).toEqual([{
@@ -209,7 +212,7 @@ test("a repair refuses a rebuilt index that differs from the recorded digest", a
   globalThis.fetch = huggingFaceReleaseRepository(release);
 
   await expect(withRegisteredRepositories(() =>
-    reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry))
+    reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry), "release_folders")
   )).rejects.toThrow("Rebuilt calibration index differs from immutable manifest entry");
 });
 
