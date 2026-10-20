@@ -354,8 +354,51 @@ export function orderedBreakdownDimensions(
     .map(({ key, label }) => ({ key, label }));
 }
 
-function geographyId(row: CalibrationTreeTarget): string {
+function rowGeographyLabel(row: CalibrationTreeTarget): string {
   return String(row.geography ?? "").trim() || DEFAULT_GEOGRAPHY;
+}
+
+// A row names its geography by level and `geography_id`, and spells the
+// geography's label in `geography`. Rows from different publishers can spell
+// one geography differently (a state's full name on one target, its postal
+// code on another), and the reader (validateHierarchyTargets) reports the
+// spellings without rewriting the rows. So that the tree lists a geography
+// once, every row of a geography ID takes the first spelling of that ID in
+// row order, which is the spelling the reader keeps; when the rows spell it
+// one way, it is that spelling, so trees built from rows without variants
+// do not change.
+//
+// The label is read from every row the tree is built from, before filters,
+// because it is also the geography's selection value: a geography must have
+// the same label in both breakdowns, at every level and under any filter, as
+// in a published tree, which is compiled without filters. Distinct geography
+// IDs that share a label still form one node, as before.
+//
+// Rows without a geography ID (comparison rows carry none) keep their own
+// spelling. The geography filter and its options also use each row's own
+// spelling, as the published filter index does.
+type GeographyLabeller = (row: CalibrationTreeTarget) => string;
+
+function geographyKey(row: CalibrationTreeTarget): string | null {
+  const geographyIdentifier =
+    typeof row.geography_id === "string" ? row.geography_id.trim() : "";
+  if (!geographyIdentifier) return null;
+  return `${String(row.level ?? "").trim()}\0${geographyIdentifier}`;
+}
+
+function geographyLabeller(rows: CalibrationTreeTarget[]): GeographyLabeller {
+  const firstSpellings = new Map<string, string>();
+  for (const row of rows) {
+    const key = geographyKey(row);
+    if (key != null && !firstSpellings.has(key)) {
+      firstSpellings.set(key, rowGeographyLabel(row));
+    }
+  }
+  return (row) => {
+    const key = geographyKey(row);
+    return (key == null ? undefined : firstSpellings.get(key)) ??
+      rowGeographyLabel(row);
+  };
 }
 
 function targetLabel(row: CalibrationTreeTarget): string {
@@ -673,6 +716,7 @@ function programGroups(rows: CalibrationTreeTarget[]): CalibrationTreeGroup[] {
 function pathLabels(
   rows: CalibrationTreeTarget[],
   path: ExplorerState["path"],
+  geographyLabel: GeographyLabeller,
 ): CalibrationTreeResponse["pathLabels"] {
   const labels: CalibrationTreeResponse["pathLabels"] = {};
   if (path.geography) {
@@ -682,10 +726,10 @@ function pathLabels(
           .filter(
             (row) =>
               row.target_representation === "hierarchy" &&
-              geographyId(row) === path.geography,
+              Boolean(row.geography?.trim()) &&
+              geographyLabel(row) === path.geography,
           )
-          .map((row) => row.geography?.trim())
-          .filter((label): label is string => Boolean(label)),
+          .map(geographyLabel),
       ),
     ];
     if (geographyLabels.length === 1) labels.geography = geographyLabels[0];
@@ -714,8 +758,11 @@ function pathLabels(
   return labels;
 }
 
-function geographyNodes(rows: CalibrationTreeTarget[]): CalibrationTreeNode[] {
-  const byGeography = groupRows(rows, geographyId);
+function geographyNodes(
+  rows: CalibrationTreeTarget[],
+  geographyLabel: GeographyLabeller,
+): CalibrationTreeNode[] {
+  const byGeography = groupRows(rows, geographyLabel);
   return sortNodes(
     [...byGeography.entries()].map(([geography, geographyRows]) =>
       node(
@@ -886,12 +933,13 @@ export function buildCalibrationTree(
 ): CalibrationTreeResponse {
   const chartRows = normalizeCalibrationTreeTargets(allRows);
   const { path } = state;
-  const selectedPathLabels = pathLabels(chartRows, path);
+  const geographyLabel = geographyLabeller(chartRows);
+  const selectedPathLabels = pathLabels(chartRows, path, geographyLabel);
   const options = filterOptions(chartRows);
   const filteredRows = applyExplorerFilters(chartRows, state.filters);
 
   if (state.breakdown === "geography" && !path.geography) {
-    const nodes = geographyNodes(filteredRows);
+    const nodes = geographyNodes(filteredRows, geographyLabel);
     return {
       releaseId,
       calibrationProvenance,
@@ -913,7 +961,7 @@ export function buildCalibrationTree(
 
   if (state.breakdown === "geography" && (!path.source || !path.program)) {
     const geographyRows = chartRows.filter(
-      (row) => geographyId(row) === path.geography,
+      (row) => geographyLabel(row) === path.geography,
     );
     const filteredGeographyRows = applyExplorerFilters(
       geographyRows,
@@ -955,7 +1003,7 @@ export function buildCalibrationTree(
   );
   const filteredProgramRows = applyExplorerFilters(programRows, state.filters);
   if (!path.geography) {
-    const nodes = geographyNodes(filteredProgramRows);
+    const nodes = geographyNodes(filteredProgramRows, geographyLabel);
     return {
       releaseId,
       calibrationProvenance,
@@ -976,7 +1024,7 @@ export function buildCalibrationTree(
   }
 
   const geographyRows = path.geography
-    ? programRows.filter((row) => geographyId(row) === path.geography)
+    ? programRows.filter((row) => geographyLabel(row) === path.geography)
     : programRows;
   if (
     geographyRows.length > 0 &&
