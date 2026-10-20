@@ -78,10 +78,12 @@ releases and deploys the collector. Merging a change to this directory deploys
 nothing: `.github/workflows/telemetry-service.yml` no longer runs on push.
 Pull requests that change this directory or the workflow still run tests,
 Ruff, and a container build. The workflow keeps one manual redeploy of `main`,
-for rolling the deploy-source switch back. Dispatch it only while the repo
-variable `COLLECTOR_DEPLOY_ENABLED` is unset in microcosm-collector and no
-microcosm-collector deployment is running, and check `collector_deploy_disabled`
-to confirm this; an unconfirmed dispatch fails without deploying.
+for rolling the deploy-source switch back. Dispatch it from `main`, only while
+the repo variable `COLLECTOR_DEPLOY_ENABLED` is unset in microcosm-collector,
+and check `collector_deploy_disabled` to confirm this. A dispatch from another
+branch, without the confirmation, or while a microcosm-collector Push run is
+queued or in progress (`scripts/require-collector-push-runs-finished.sh` lists
+them) fails without deploying.
 
 A redeploy authenticates to Google Cloud with
 GitHub OIDC and pushes one image identified by the commit SHA. It first applies
