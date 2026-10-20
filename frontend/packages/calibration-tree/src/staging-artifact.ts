@@ -12,6 +12,7 @@ import {
   loadCountryRepositoryHashedJson,
   loadPointerReleaseId,
   loadPublishedCutReleases,
+  loadRecordedReleases,
   loadRelease,
   loadReleases,
   microcosmCountryGeography,
@@ -26,8 +27,10 @@ import type {
 import type { CalibrationTreeSourceArtifact } from "./calibration-tree-artifact";
 import {
   countryRegistration,
+  countryReleaseLayout,
   resolveRegisteredStagingRepository,
   stagingLocalAreaPipelines,
+  type ReleaseLayout,
   type RepositoryEnvironment,
   type ResolvedRepository,
 } from "./countries";
@@ -1322,6 +1325,28 @@ export function newestPublishedLocalAreaRelease(
   return builds[0] ?? null;
 }
 
+/**
+ * The releases a local-area Staging candidate may be compared with, with
+ * their roles. A country publishing build folders lists the builds
+ * releases.json names and nothing else; one publishing release folders lists
+ * the folders on main and its published cuts.
+ */
+export async function stagingBaselineReleases(
+  revalidate: number,
+  country: MicrocosmCountry,
+  manifest: CalibrationTreeManifest,
+  layout: ReleaseLayout = countryReleaseLayout(country),
+): Promise<ReleaseEntry[]> {
+  if (layout === "build_folders") {
+    return loadRecordedReleases(revalidate, country, manifest);
+  }
+  const [folders, tagged] = await Promise.all([
+    loadReleases(revalidate, country),
+    loadPublishedCutReleases(revalidate, country, manifest),
+  ]);
+  return [...folders, ...tagged];
+}
+
 function defaultStagingComparisonReleaseDependencies(
   revalidate: number,
 ): StagingComparisonReleaseDependencies {
@@ -1331,12 +1356,8 @@ function defaultStagingComparisonReleaseDependencies(
       (await loadPointerReleaseId(revalidate, country)).release_id,
     newestLocalAreaReleaseId: async (country) => {
       const { manifest } = await readCalibrationTreeManifest();
-      const [folders, tagged] = await Promise.all([
-        loadReleases(revalidate, country),
-        loadPublishedCutReleases(revalidate, country, manifest),
-      ]);
-      return newestPublishedLocalAreaRelease(manifest, country, [...folders, ...tagged])
-        ?.releaseId ?? null;
+      const releases = await stagingBaselineReleases(revalidate, country, manifest);
+      return newestPublishedLocalAreaRelease(manifest, country, releases)?.releaseId ?? null;
     },
   };
 }

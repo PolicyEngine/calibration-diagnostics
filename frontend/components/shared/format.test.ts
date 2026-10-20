@@ -67,3 +67,13 @@ test("Microcosm cut labels name their line and attempt", () => {
     releaseLabel("populace-uk-2023-dd68c73-4aa4b14-20260619T023711Z", "20260619T023711Z"),
   ).toBe("2026-06-19 02:37Z · populace");
 });
+
+test("build-folder labels name the release and the build", () => {
+  const build = "microcosm-uk-2024-25-national/uk-frs-calibration-attempt-20261019T083323Z-6cba5d71";
+  expect(releaseLabel(build, "20261019T083323Z")).toBe(
+    "2026-10-19 08:33Z · 2024-25-national · uk-frs-calibration-attempt-20261019T083323Z-6cba5d71",
+  );
+  expect(releaseLabel(build)).toBe(
+    "2024-25-national · uk-frs-calibration-attempt-20261019T083323Z-6cba5d71",
+  );
+});

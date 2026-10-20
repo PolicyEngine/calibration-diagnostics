@@ -12,6 +12,7 @@ import beReleaseManifestFixture from "./fixtures/be-release/release_manifest.jso
 import {
   buildCalibration,
   buildComparison,
+  calibrationAsReleased,
   calibrationLossKind,
   diagnosticsDimensions,
   MICROCOSM_HF_REPO_ENV,
@@ -26,6 +27,7 @@ import {
   latestMicrocosmTargetInvestigation,
   loadPointerReleaseId,
   loadPublishedCutReleases,
+  loadRecordedReleases,
   loadRelease,
   loadReleases,
   mergeReleaseInventory,
@@ -3272,6 +3274,214 @@ test("a cut's investigation packet cites its line folder at the cut's commit", (
       calibration_diagnostics_path: `releases/${LINE}/calibration_diagnostics.json`,
       build_manifest_path: `releases/${LINE}/build_manifest.json`,
       release_manifest_path: `releases/${LINE}/release_manifest.json`,
+    },
+  });
+});
+
+// Build folders (microcosm-emitter#24): every build in
+// releases/<release>/<build>/, and releases.json as the only record of
+// which builds exist and which is current. All values are synthetic.
+const NATIONAL_OLDER = "uk-frs-calibration-attempt-20261014T214443Z-d12ff9b3";
+const NATIONAL_CURRENT = "uk-frs-calibration-attempt-20261019T083323Z-6cba5d71";
+const DENSE_BUILD = "uk-local-candidate-f100-s42-20261019T000432Z-ee5c2dbe";
+const RECORDED_RELEASES = {
+  schema_version: 1,
+  default: LINE,
+  releases: {
+    [LINE]: {
+      role: "national_default",
+      current: NATIONAL_CURRENT,
+      builds: {
+        [NATIONAL_OLDER]: { published_at: "2026-10-14T21:44:43+00:00", withdrawn: true },
+        [NATIONAL_CURRENT]: { published_at: "2026-10-19T08:33:23+00:00", withdrawn: false },
+      },
+    },
+    [DENSE_LINE]: {
+      role: "non_default_local_area",
+      current: null,
+      builds: {
+        [DENSE_BUILD]: { published_at: "2026-10-19T07:53:18+00:00", withdrawn: false },
+      },
+    },
+  },
+};
+
+function publishedBuildManifest(releaseIds: string[]) {
+  return releaseIds.reduce(
+    (manifest, releaseId, index) => withCalibrationTreeManifestEntry(manifest, "uk", {
+      buildArtifactId: String(index + 1).repeat(64),
+      kind: "release",
+      sourceId: releaseId,
+      label: releaseId,
+      releaseId,
+      stagingRunId: null,
+      hfRepo: microcosmRepo("uk"),
+      hfCommitSha: String(index + 1).repeat(40),
+      treeSchemaVersion: 6,
+      indexSha256: "e".repeat(64),
+      indexBytes: 10,
+      createdAt: null,
+      updatedAt: null,
+    }),
+    emptyCalibrationTreeManifest(),
+  );
+}
+
+async function withRecordedReleases<T>(
+  record: unknown,
+  run: (requested: string[]) => Promise<T>,
+): Promise<T> {
+  const originalFetch = globalThis.fetch;
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    requested.push(url);
+    if (url === hfResolveUrl("releases.json", "uk")) return Response.json(record);
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+  try {
+    return await run(requested);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+test("the release picker lists every build releases.json lists, named by its folder, with its release's role and publication time", async () => {
+  const manifest = publishedBuildManifest([
+    `${LINE}/${NATIONAL_OLDER}`,
+    `${LINE}/${NATIONAL_CURRENT}`,
+    `${DENSE_LINE}/${DENSE_BUILD}`,
+  ]);
+  const releases = await withRecordedReleases(RECORDED_RELEASES, () =>
+    loadRecordedReleases(0, "uk", manifest),
+  );
+  expect(releases).toEqual([
+    {
+      release_id: `${LINE}/${NATIONAL_CURRENT}`,
+      date: "20261019T083323Z",
+      files: [],
+      has_calibration: true,
+      dataset_role: "national_default",
+      is_default: true,
+      is_local_area: false,
+      release: LINE,
+      build: NATIONAL_CURRENT,
+      withdrawn: false,
+    },
+    {
+      release_id: `${DENSE_LINE}/${DENSE_BUILD}`,
+      date: "20261019T075318Z",
+      files: [],
+      has_calibration: true,
+      dataset_role: "non_default_local_area",
+      is_default: false,
+      is_local_area: true,
+      release: DENSE_LINE,
+      build: DENSE_BUILD,
+      withdrawn: false,
+    },
+    {
+      release_id: `${LINE}/${NATIONAL_OLDER}`,
+      date: "20261014T214443Z",
+      files: [],
+      has_calibration: true,
+      dataset_role: "national_default",
+      is_default: true,
+      is_local_area: false,
+      release: LINE,
+      build: NATIONAL_OLDER,
+      // Carried as releases.json records it; how the picker shows a
+      // withdrawn build is not decided here.
+      withdrawn: true,
+    },
+  ]);
+});
+
+test("a listed build counts as calibrated only once its calibration tree is in the dashboard manifest", async () => {
+  const releases = await withRecordedReleases(RECORDED_RELEASES, () =>
+    loadRecordedReleases(0, "uk", publishedBuildManifest([`${LINE}/${NATIONAL_CURRENT}`])),
+  );
+  expect(Object.fromEntries(releases.map((release) => [release.release_id, release.has_calibration])))
+    .toEqual({
+      [`${LINE}/${NATIONAL_CURRENT}`]: true,
+      [`${DENSE_LINE}/${DENSE_BUILD}`]: false,
+      [`${LINE}/${NATIONAL_OLDER}`]: false,
+    });
+});
+
+test("the release picker reads releases.json and nothing else from the dataset repository", async () => {
+  const requested = await withRecordedReleases(RECORDED_RELEASES, async (requested) => {
+    await loadRecordedReleases(0, "uk", emptyCalibrationTreeManifest());
+    return requested;
+  });
+  expect(requested).toEqual([hfResolveUrl("releases.json", "uk")]);
+});
+
+test("the release picker refuses a releases.json the release writer would refuse", async () => {
+  const withdrawnCurrent = structuredClone(RECORDED_RELEASES);
+  withdrawnCurrent.releases[LINE].builds[NATIONAL_CURRENT].withdrawn = true;
+  await withRecordedReleases(withdrawnCurrent, async () => {
+    await expect(loadRecordedReleases(0, "uk", emptyCalibrationTreeManifest()))
+      .rejects.toThrow("is withdrawn");
+  });
+});
+
+function nationalDiagnostics(releaseId: string) {
+  return {
+    schema_version: 8,
+    release_id: releaseId,
+    targets: [{
+      name: "provider.target@2025",
+      target_name: "provider.target",
+      source: "Citation",
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 100,
+      hierarchy: {
+        provider: { id: "provider", label: "Provider label" },
+        category: { id: "provider.category", label: "Category label", provider_id: "provider" },
+        geography: { id: "K02000001", label: "United Kingdom", level: "country" },
+        dimensions: [],
+        target: { id: "provider.target", label: "Target label" },
+      },
+    }],
+  };
+}
+
+test("a build keeps its folder as its release id when its diagnostics name only its release", () => {
+  const id = `${LINE}/${NATIONAL_CURRENT}`;
+  const calibration = calibrationAsReleased(
+    buildCalibration(nationalDiagnostics(LINE), id, null, {}, {}, {}, "uk"),
+    id,
+    id,
+  );
+  expect(calibration.release_id).toBe(id);
+  expect(calibration.release_directory).toBe(id);
+
+  // A release folder keeps the id its diagnostics carry, as before.
+  const folder = buildCalibration(nationalDiagnostics("x"), "x", null, {}, {}, {}, "uk");
+  expect(calibrationAsReleased(folder, "x", "x")).toBe(folder);
+});
+
+test("a build's investigation packet cites its own folder at its pinned commit", () => {
+  const id = `${LINE}/${NATIONAL_CURRENT}`;
+  const sha = "2".repeat(40);
+  const cal = calibrationAsReleased(
+    buildCalibration(nationalDiagnostics(LINE), id, null, {}, {}, {}, "uk", "huggingface_immutable", null, sha),
+    id,
+    id,
+  );
+  const packet = latestMicrocosmTargetInvestigation(
+    `https://dashboard.example/api/microcosm/target-investigation?target=${encodeURIComponent(String(cal.rows[0].name))}`,
+    cal,
+  );
+  expect(packet).toMatchObject({
+    available: true,
+    release_id: id,
+    source_artifact: {
+      hf_revision: sha,
+      calibration_diagnostics_path: `releases/${id}/calibration_diagnostics.json`,
+      release_manifest_path: `releases/${id}/release_manifest.json`,
     },
   });
 });

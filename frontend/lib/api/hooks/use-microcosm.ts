@@ -346,6 +346,11 @@ export interface MicrocosmReleaseEntry {
   is_local_area?: boolean;
   // A Microcosm cut's line folder; absent when the folder is release_id.
   release_directory?: string;
+  // A build in its own folder (release_id is `<release>/<build>`): its
+  // release and build, and whether releases.json marks it withdrawn.
+  release?: string;
+  build?: string;
+  withdrawn?: boolean;
 }
 
 export interface MicrocosmReleasesResponse {

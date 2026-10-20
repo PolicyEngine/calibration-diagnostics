@@ -8,12 +8,15 @@ import {
   countryRegistration,
   type MicrocosmCountry,
 } from "./countries";
-import { parseBuildFolderId } from "./release-record";
+import { isBuildFolderId, parseBuildFolderId } from "./release-record";
 
 export interface CalibrationReleaseLocation {
   buildArtifactId: string;
   releaseId: string;
-  /** The `releases/` folder holding the files: releaseId unless a cut tag. */
+  /**
+   * The `releases/` folder holding the files: releaseId, which for a build
+   * in its own folder is `<release>/<build>`, unless releaseId is a cut tag.
+   */
   releaseDirectory: string;
   hfCommitSha: string;
   updatedAt: string | null;
@@ -290,14 +293,22 @@ export async function resolveHfCommitPublishedAt(
   return resolveHfRepositoryCommitPublishedAt(repository(country), sha, revalidate);
 }
 
+/**
+ * A requested release: "latest" (also for an empty request), a release id
+ * (a release folder or a tag), or a build folder, `<release>/<build>`.
+ */
+export function requestedReleaseId(requestedRelease: string): string {
+  if (!requestedRelease || requestedRelease === "latest") return "latest";
+  if (isBuildFolderId(requestedRelease)) return requestedRelease;
+  return safeReleaseId(requestedRelease);
+}
+
 export async function resolveCalibrationRelease(
   country: MicrocosmCountry,
   requestedRelease: string,
   _revalidate = 3600,
 ): Promise<CalibrationReleaseLocation> {
-  const releaseId = requestedRelease && requestedRelease !== "latest"
-    ? safeReleaseId(requestedRelease)
-    : "latest";
+  const releaseId = requestedReleaseId(requestedRelease);
   const { manifest } = await readCalibrationTreeManifest();
   return calibrationReleaseFromManifest(manifest, country, releaseId);
 }

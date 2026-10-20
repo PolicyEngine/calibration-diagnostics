@@ -11,6 +11,7 @@ import type { ReleaseEntry } from "./latest-artifact";
 import {
   newestPublishedLocalAreaRelease,
   resolveStagingComparisonRelease,
+  stagingBaselineReleases,
   stagingRunPipelineId,
   stagingResolveUrl,
   type StagingComparisonReleaseDependencies,
@@ -213,6 +214,70 @@ test("a staging run's pipeline id is read from its run manifest", async () => {
   try {
     await expect(stagingRunPipelineId(LOCAL_CANDIDATE_RUN, 0, "uk")).resolves.toBe("uk-local-candidate");
     await expect(stagingRunPipelineId("missing-run", 0, "uk")).resolves.toBeNull();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// A country publishing build folders (microcosm-emitter#24): the local-area
+// release is the one releases.json gives a local-area role, and its builds
+// are named by their folders. All values are synthetic.
+const DENSE_OLDER_BUILD = `${DENSE_FOLDER}/uk-local-candidate-f100-s42-20261005T101500Z-0d0d0d0d`;
+const DENSE_NEWER_BUILD = `${DENSE_FOLDER}/uk-local-candidate-f100-s42-20261019T000432Z-ee5c2dbe`;
+const NATIONAL_BUILD = `${NATIONAL_FOLDER}/uk-frs-calibration-attempt-20261019T083323Z-6cba5d71`;
+
+function recordedReleases() {
+  const build = (publishedAt: string) => ({ published_at: publishedAt, withdrawn: false });
+  return {
+    schema_version: 1,
+    default: NATIONAL_FOLDER,
+    releases: {
+      [NATIONAL_FOLDER]: {
+        role: "national_default",
+        current: NATIONAL_BUILD.split("/")[1],
+        builds: { [NATIONAL_BUILD.split("/")[1]]: build("2026-10-19T08:33:23+00:00") },
+      },
+      [DENSE_FOLDER]: {
+        role: "non_default_local_area",
+        current: null,
+        builds: {
+          [DENSE_OLDER_BUILD.split("/")[1]]: build("2026-10-05T10:15:00+00:00"),
+          [DENSE_NEWER_BUILD.split("/")[1]]: build("2026-10-19T00:04:32+00:00"),
+        },
+      },
+    },
+  };
+}
+
+function buildFolderManifest(): CalibrationTreeManifest {
+  return [
+    releaseBuild(NATIONAL_BUILD, "2026-10-19T08:33:23.000Z", "6"),
+    releaseBuild(DENSE_OLDER_BUILD, "2026-10-05T10:15:00.000Z", "7"),
+    releaseBuild(DENSE_NEWER_BUILD, "2026-10-19T00:04:32.000Z", "8"),
+    // A tagged build published before the build folders, newer than both.
+    releaseBuild(`${DENSE_FOLDER}-20261020T000000Z-ffffffff`, "2026-10-20T00:00:00.000Z", "9", DENSE_FOLDER),
+  ].reduce(
+    (manifest, entry) => withCalibrationTreeManifestEntry(manifest, "uk", entry),
+    emptyCalibrationTreeManifest(),
+  );
+}
+
+test("for a country publishing build folders, a local-area candidate's baseline is the newest published build of a local-area release releases.json lists", async () => {
+  const originalFetch = globalThis.fetch;
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.endsWith("/resolve/main/releases.json")) return Response.json(recordedReleases());
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+  try {
+    const manifest = buildFolderManifest();
+    const releases = await stagingBaselineReleases(0, "uk", manifest, "build_folders");
+    expect(newestPublishedLocalAreaRelease(manifest, "uk", releases)?.releaseId)
+      .toBe(DENSE_NEWER_BUILD);
+    // Nothing but releases.json: no release-folder listing and no tags.
+    expect(requested).toHaveLength(1);
   } finally {
     globalThis.fetch = originalFetch;
   }
