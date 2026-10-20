@@ -836,6 +836,42 @@ describe("schema 8 labels that rows spell more than one way", () => {
     ]);
   });
 
+  test("keeps a value ID's first spelling when a filter hides the row that carries it", () => {
+    // A published tree is compiled without filters and keeps its node labels
+    // when a filter is applied, so a live tree must label a value from all
+    // of its rows, not only the visible ones, and its selected path must
+    // agree.
+    const poorlyFitTableRow = { ...tableRow, abs_relative_error: 0.5 };
+    const rows = [poorlyFitTableRow, filingSeasonRow, otherBandRow];
+    const wellFitOnly = { ...EMPTY_FILTERS, fitBands: ["0_5" as const] };
+
+    const level = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: eitcPath,
+      filters: wellFitOnly,
+    });
+    const selected = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: {
+        ...eitcPath,
+        dimensions: [
+          { key: INCOME_KEY, label: "Adjusted gross income", value: "under_1" },
+        ],
+      },
+      filters: wellFitOnly,
+    });
+
+    expect(
+      level.groups
+        .find((group) => group.id === INCOME_KEY)
+        ?.nodes.map((treeNode) => [treeNode.id, treeNode.label, treeNode.metrics.nTargets]),
+    ).toEqual([
+      ["1k_to_2k", "$1,000 under $2,000", 1],
+      ["under_1", "No adjusted gross income", 1],
+    ]);
+    expect(selected.pathLabels.dimensions).toEqual(["No adjusted gross income"]);
+  });
+
   test("labels a dimension that rows spell two ways with its first spelling in row order", () => {
     const plainRow = eitcRow("irs_soi.ty2023.table_2_5.eitc_total.under_1", [
       incomeBand("under_1", "No adjusted gross income"),
