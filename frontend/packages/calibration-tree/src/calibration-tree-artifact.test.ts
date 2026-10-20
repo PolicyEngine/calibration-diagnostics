@@ -68,7 +68,7 @@ const rows: CalibrationTreeTarget[] = [
       }],
 }));
 
-function bundle(): CalibrationTreeBundle {
+function bundle(bundleRows = rows): CalibrationTreeBundle {
   return buildCalibrationTreeBundle({
     country: "us",
     releaseId: RELEASE,
@@ -83,7 +83,7 @@ function bundle(): CalibrationTreeBundle {
       releaseManifest: null,
       demographics: null,
     },
-    rows,
+    rows: bundleRows,
     lossAttributionAvailable: true,
   });
 }
@@ -150,6 +150,73 @@ test("posting-list filters union within categories and intersect across them", (
   expect(calibrationTreeResponseFromBundle(loaded(), state)).toEqual(
     buildCalibrationTree(rows, state, RELEASE, true),
   );
+});
+
+// Release populace-us-2024-buildo-acs-local-766b7c7-20261017T030317Z names
+// state 0400000US23 "Maine" on its SNAP and Medicaid targets and "ME" on its
+// later state population target.
+test("published and live trees list a geography ID that rows spell two ways as one node", () => {
+  function maineTarget(
+    name: string,
+    source: string,
+    geography: string,
+    error: number,
+  ): CalibrationTreeTarget {
+    return {
+      comparison_id: name,
+      name,
+      target_label: name,
+      target_representation: "hierarchy",
+      source,
+      source_label: source,
+      variable: `${source}.total`,
+      variable_label: source,
+      geography,
+      geography_id: "0400000US23",
+      level: "state",
+      abs_relative_error: error,
+      final_loss_contribution: error / 10,
+      target_loss_weight_share: 0.25,
+      calibration_status: "included",
+      target_dimensions: [],
+    };
+  }
+  const maineRows = [
+    maineTarget("usda_snap.fy2024.state_benefits.nero.me.total_benefits@2024", "usda_snap", "Maine", 0.02),
+    maineTarget(
+      "cms_medicaid.month2024_12.state_enrollment.me.total_medicaid_enrollment@2024",
+      "cms_medicaid",
+      "Maine",
+      0.03,
+    ),
+    maineTarget("pop_state_23@2024", "census_population", "ME", 0.5),
+  ];
+  const compiled = loaded(bundle(maineRows));
+  const unfiltered: ExplorerState = { ...createExplorerState(), breakdown: "geography" };
+  const poorlyFitOnly: ExplorerState = {
+    ...unfiltered,
+    filters: { ...unfiltered.filters, fitBands: ["40_plus"] },
+  };
+
+  const geographyNodes = (state: ExplorerState) => {
+    const published = calibrationTreeResponseFromBundle(compiled, state);
+    expect(published).toEqual(buildCalibrationTree(maineRows, state, RELEASE, true));
+    return published!.groups
+      .flatMap((group) => group.nodes)
+      .map((treeNode) => [treeNode.label, treeNode.metrics.nTargets]);
+  };
+  expect(geographyNodes(unfiltered)).toEqual([["Maine", 3]]);
+  expect(geographyNodes(poorlyFitOnly)).toEqual([["Maine", 1]]);
+
+  const maine = selectExplorerNode(unfiltered, { kind: "geography", value: "Maine" });
+  for (const programState of [maine, { ...maine, filters: poorlyFitOnly.filters }]) {
+    const programs = calibrationTreeResponseFromBundle(compiled, programState);
+    expect(programs).toEqual(buildCalibrationTree(maineRows, programState, RELEASE, true));
+    expect(programs!.pathLabels.geography).toBe("Maine");
+  }
+  expect(
+    calibrationTreeResponseFromBundle(compiled, maine)!.groups.map((group) => group.id),
+  ).toEqual(["census_population", "cms_medicaid", "usda_snap"]);
 });
 
 test("the index renders without later parts and deeper navigation waits for its tier", () => {

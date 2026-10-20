@@ -854,3 +854,171 @@ describe("calibration tree metrics and filters", () => {
     expect(tree.filterOptions.geographies).toContain("United States");
   });
 });
+
+// Release populace-us-2024-buildo-acs-local-766b7c7-20261017T030317Z names
+// state 0400000US23 "Maine" on its SNAP and Medicaid targets and "ME" on its
+// state population target, which comes later in the file. The reader keeps
+// "Maine" and reports "ME" (validateHierarchyTargets) without rewriting the
+// rows, so the builder receives both spellings for one geography ID and must
+// still list one geography.
+describe("geographies that rows spell more than one way", () => {
+  function maineRow(
+    name: string,
+    overrides: Partial<CalibrationTreeTarget>,
+  ): CalibrationTreeTarget {
+    return target(name, {
+      level: "state",
+      geography: "Maine",
+      geography_id: "0400000US23",
+      target_label: name,
+      target_representation: "hierarchy",
+      ...overrides,
+    });
+  }
+
+  const POPULATION = {
+    source: "census_population",
+    source_label: "Census population",
+    variable: "census_population.resident_population",
+    variable_label: "Resident population",
+  };
+
+  const snapRow = maineRow(
+    "usda_snap.fy2024.state_benefits.nero.me.total_benefits@2024",
+    {
+      source: "usda_snap",
+      source_label: "USDA · SNAP",
+      variable: "usda_snap.usda_snap",
+      variable_label: "SNAP",
+    },
+  );
+  const medicaidRow = maineRow(
+    "cms_medicaid.month2024_12.state_enrollment.me.total_medicaid_enrollment@2024",
+    {
+      source: "cms_medicaid",
+      source_label: "CMS · Medicaid / CHIP",
+      variable: "cms_medicaid.cms_medicaid",
+      variable_label: "Medicaid and CHIP",
+    },
+  );
+  const statePopulationRow = maineRow("pop_state_23@2024", {
+    ...POPULATION,
+    geography: "ME",
+    target_label: "ME resident population",
+  });
+  const districtPopulationRow = maineRow("pop_cd_2301@2024", {
+    ...POPULATION,
+    level: "congressional_district",
+    geography: "ME congressional district 1",
+    geography_id: "5001900US2301",
+    target_label: "ME congressional district 1 resident population",
+  });
+  const releaseRows = [
+    snapRow,
+    medicaidRow,
+    statePopulationRow,
+    districtPopulationRow,
+  ];
+  const populationPath = {
+    source: POPULATION.source,
+    program: POPULATION.variable,
+    dimensions: [],
+  };
+
+  function nodeSummaries(tree: ReturnType<typeof buildCalibrationTree>) {
+    return tree.groups
+      .flatMap((group) => group.nodes)
+      .map((treeNode) => [treeNode.id, treeNode.label, treeNode.metrics.nTargets]);
+  }
+
+  test("lists a geography ID that rows spell two ways as one node with its first spelling in row order", () => {
+    const tree = buildCalibrationTree(
+      releaseRows,
+      state({ dimensions: [] }, "geography"),
+    );
+
+    expect(nodeSummaries(tree)).toEqual([
+      ["Maine", "Maine", 3],
+      ["ME congressional district 1", "ME congressional district 1", 1],
+    ]);
+    expect(tree.groups[0].nodes[0].selection).toEqual({
+      kind: "geography",
+      value: "Maine",
+    });
+
+    const populationFirst = buildCalibrationTree(
+      [statePopulationRow, snapRow, medicaidRow, districtPopulationRow],
+      state({ dimensions: [] }, "geography"),
+    );
+    expect(nodeSummaries(populationFirst)).toEqual([
+      ["ME", "ME", 3],
+      ["ME congressional district 1", "ME congressional district 1", 1],
+    ]);
+  });
+
+  test("labels the geography the same way under a program whose rows spell it only the other way", () => {
+    // A geography's label is also its selection value, so it must be the
+    // same in every view that lists the geography.
+    const tree = buildCalibrationTree(releaseRows, state(populationPath));
+
+    expect(nodeSummaries(tree)).toEqual([
+      ["Maine", "Maine", 1],
+      ["ME congressional district 1", "ME congressional district 1", 1],
+    ]);
+  });
+
+  test("selects every row of the geography ID whichever breakdown reaches it", () => {
+    const programs = buildCalibrationTree(
+      releaseRows,
+      state({ geography: "Maine", dimensions: [] }, "geography"),
+    );
+    expect(
+      programs.groups.map((group) => [group.id, group.nodes.map((treeNode) => treeNode.id)]),
+    ).toEqual([
+      ["census_population", ["census_population.resident_population"]],
+      ["cms_medicaid", ["cms_medicaid.cms_medicaid"]],
+      ["usda_snap", ["usda_snap.usda_snap"]],
+    ]);
+
+    const targets = buildCalibrationTree(
+      releaseRows,
+      state({ ...populationPath, geography: "Maine" }, "geography"),
+    );
+    expect(targets.pathLabels.geography).toBe("Maine");
+    expect(nodeSummaries(targets)).toEqual([
+      ["pop_state_23@2024", "ME resident population", 1],
+    ]);
+  });
+
+  test("keeps a geography's label when filters hide the rows that carry it", () => {
+    // A published tree is compiled without filters and keeps its node labels
+    // when a filter is applied, so a live tree must label a geography from
+    // all of its rows, not only the visible ones.
+    const rows = releaseRows.map((row) =>
+      row === statePopulationRow ? { ...row, abs_relative_error: 0.5 } : row,
+    );
+    const poorlyFitOnly = { ...EMPTY_FILTERS, fitBands: ["40_plus" as const] };
+    const geographyRoot = buildCalibrationTree(rows, {
+      breakdown: "geography",
+      path: { dimensions: [] },
+      filters: poorlyFitOnly,
+    });
+    expect(nodeSummaries(geographyRoot)).toEqual([["Maine", "Maine", 1]]);
+
+    const populationGeographies = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: populationPath,
+      filters: poorlyFitOnly,
+    });
+    expect(nodeSummaries(populationGeographies)).toEqual([["Maine", "Maine", 1]]);
+
+    // The geography filter matches each row's own spelling, as the published
+    // filter index does, and the node keeps the geography's label.
+    const spelledME = buildCalibrationTree(releaseRows, {
+      breakdown: "geography",
+      path: { dimensions: [] },
+      filters: { ...EMPTY_FILTERS, geographies: ["ME"] },
+    });
+    expect(nodeSummaries(spelledME)).toEqual([["Maine", "Maine", 1]]);
+  });
+});
