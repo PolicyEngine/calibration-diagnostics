@@ -957,6 +957,80 @@ describe("schema 8 labels that rows spell more than one way", () => {
       ["targets", "Targets", 1],
     ]);
   });
+
+  // The reader keeps the first spelling in the whole file, which can belong
+  // to another program. In the same release, taxable pension income rows
+  // spell income band "all" both "All returns" and "All returns, total".
+  function pensionRow(
+    name: string,
+    dimensions: CalibrationTreeDimension[],
+  ): CalibrationTreeTarget {
+    return {
+      ...eitcRow(name, dimensions),
+      variable: "irs_soi.taxable_pension_income",
+      variable_label: "Taxable pension income",
+    };
+  }
+
+  const historicPensionRow = pensionRow(
+    "irs_soi.ty2022.historic_table_2.us.all.taxable_pension_income_amount",
+    [incomeBand("all", "All returns")],
+  );
+  const totalEitcRow = eitcRow("irs_soi.ty2023.table_1_4.all.eitc_amount", [
+    incomeBand("all", "All returns, total"),
+  ]);
+
+  test("labels a value ID that a node spells two ways with the spelling the reader keeps", () => {
+    const rows = [
+      historicPensionRow,
+      totalEitcRow,
+      eitcRow("irs_soi.ty2022.historic_table_2.us.all.eitc_amount", [
+        incomeBand("all", "All returns"),
+      ]),
+      tableRow,
+    ];
+
+    expect(incomeNodes(rows)).toEqual([
+      ["all", "All returns", 2],
+      ["under_1", "No adjusted gross income", 1],
+    ]);
+    const selected = buildCalibrationTree(
+      rows,
+      state({
+        ...eitcPath,
+        dimensions: [{ key: INCOME_KEY, label: "Adjusted gross income", value: "all" }],
+      }),
+    );
+    expect(selected.pathLabels.dimensions).toEqual(["All returns"]);
+  });
+
+  test("labels a dimension that a program spells two ways with the spelling the reader keeps", () => {
+    const rows = [
+      historicPensionRow,
+      eitcRow("irs_soi.ty2023.table_2_5.eitc_total.under_1", [
+        incomeBand("under_1", "No adjusted gross income", "AGI"),
+      ]),
+      otherBandRow,
+    ];
+
+    const tree = buildCalibrationTree(rows, state(eitcPath));
+
+    const readerDimension = { key: INCOME_KEY, label: "Adjusted gross income" };
+    expect(tree.dimensionOrder).toEqual([readerDimension]);
+    expect(tree.currentLevel).toEqual({ kind: "dimension", ...readerDimension });
+    expect(tree.groups.map((group) => [group.id, group.label])).toEqual([
+      [INCOME_KEY, "Adjusted gross income"],
+    ]);
+  });
+
+  test("keeps the spelling of a value ID that a node spells only one way", () => {
+    // Before label variants were accepted, such a node built with its own
+    // spelling. Changing it would change trees already published.
+    expect(incomeNodes([historicPensionRow, totalEitcRow, tableRow])).toEqual([
+      ["all", "All returns, total", 1],
+      ["under_1", "No adjusted gross income", 1],
+    ]);
+  });
 });
 
 describe("calibration tree metrics and filters", () => {
