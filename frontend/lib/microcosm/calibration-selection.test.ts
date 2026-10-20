@@ -200,7 +200,7 @@ test("without a published build of the comparison's release, From starts at the 
 
 test("the Staging page names the release a candidate is compared with", () => {
   const current = {
-    columnLabel: "Current release",
+    releaseLabel: "Current release",
     tabLabel: "Change from current release",
     note: null,
   };
@@ -215,7 +215,7 @@ test("the Staging page names the release a candidate is compared with", () => {
     basis: "newest_local_area_release",
     local_area_candidate: true,
   })).toEqual({
-    columnLabel: "Local-area release",
+    releaseLabel: "Local-area release",
     tabLabel: "Change from local-area release",
     note:
       `This local-area candidate is compared with ${DENSE_NEWEST}, the most recently ` +

@@ -47,6 +47,7 @@ import {
   targetChangeDirectionAreas,
   targetChangeGroupsForDirection,
   targetChangeDirectionValue,
+  targetChangeModeHelp,
   type TargetChangeDirection,
   type TargetChangeDirectionData,
 } from "@/lib/microcosm/target-change-visualization";
@@ -57,13 +58,6 @@ const DIRECTION_HEADER_HEIGHT = 34;
 const GROUP_GAP = 7;
 const GROUP_HEADER_HEIGHT = 22;
 const NODE_GAP = 3;
-
-const MODE_HELP: Record<TargetChangeMode, string> = {
-  reported:
-    "Uses each release's actual target weights and complete target surface. Added targets contribute candidate error, while removed targets subtract their current-release contribution.",
-  shared:
-    "Uses only targets present in both releases and applies the same pooled target weights to both. Each release still uses its own verified benchmark, scale, cap, and capped error.",
-};
 
 interface LaidGroup {
   group: CalibrationTreemapGroup;
@@ -248,13 +242,17 @@ export function StagingTargetChangeMap({
   currentBuildArtifactId,
   candidateBuildArtifactId,
   weightedTargetErrorChange,
+  comparisonReleaseLabel = "Current release",
 }: {
   runId?: string;
   releaseId?: string;
   currentBuildArtifactId?: string;
   candidateBuildArtifactId?: string;
   weightedTargetErrorChange: number | null;
+  /** Names the release the candidate is compared with, e.g. "Local-area release". */
+  comparisonReleaseLabel?: string;
 }) {
+  const modeHelp = targetChangeModeHelp(comparisonReleaseLabel);
   const [state, dispatch] = useReducer(explorerReducer, undefined, createExplorerState);
   const [mode, setMode] = useState<TargetChangeMode>("reported");
   const [expanded, setExpanded] = useState<{
@@ -339,6 +337,7 @@ export function StagingTargetChangeMap({
           data.selectedTarget,
           data.summary?.netChange ?? weightedTargetErrorChange,
           data.selectedTarget.candidateDetail as MicrocosmTargetRow | null,
+          comparisonReleaseLabel,
         )
     : null;
   const filtersActive = hasExplorerFilters(state);
@@ -355,12 +354,12 @@ export function StagingTargetChangeMap({
               {
                 value: "reported",
                 label: "Reported error change",
-                tooltip: MODE_HELP.reported,
+                tooltip: modeHelp.reported,
               },
               {
                 value: "shared",
                 label: "Shared-target comparison",
-                tooltip: MODE_HELP.shared,
+                tooltip: modeHelp.shared,
               },
             ]}
             onChange={(nextMode) => {
@@ -563,11 +562,7 @@ export function StagingTargetChangeMap({
         <MicrocosmTargetDetail
           row={selectedDetail as MicrocosmTargetRow}
           dimensions={selectedDetailDimensions}
-          eyebrow={
-            data.selectedTarget.candidateDetail
-              ? "Candidate calibration target"
-              : "Current release calibration target"
-          }
+          eyebrow={selectedDetailPresentation?.eyebrow}
           metrics={selectedDetailPresentation?.metrics}
           afterCalibrationSeries={selectedDetailPresentation?.afterCalibrationSeries}
           fitSummary={selectedDetailPresentation?.fitSummary}

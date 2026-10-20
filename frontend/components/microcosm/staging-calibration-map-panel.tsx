@@ -187,6 +187,7 @@ export function StagingCalibrationMapPanel({
             comparisonReleaseId
               ? {
                   releaseId: comparisonReleaseId,
+                  releaseLabel: comparisonBaseline.releaseLabel,
                   rows: comparisonRows ?? [],
                   weightedTargetErrorChange,
                 }
@@ -267,6 +268,7 @@ export function StagingCalibrationMapPanel({
               weightedTargetErrorChange={
                 immutableComparison ? null : weightedTargetErrorChange
               }
+              comparisonReleaseLabel={comparisonBaseline.releaseLabel}
             />
           ) : comparisonLoading ? (
             <LoadingBlock
