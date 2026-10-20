@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { CalibrationExplorerMap } from "@/components/microcosm/calibration-explorer-map";
 import { StagingTargetChangeMap } from "@/components/microcosm/staging-target-change-map";
@@ -15,8 +15,9 @@ import {
 import {
   calibrationBuildManifestState,
   calibrationBuildsNewestFirst,
-  defaultComparisonBuildArtifactId,
+  comparisonMapBuilds,
   stagingComparisonBaseline,
+  type ComparisonMapBuildPicks,
 } from "@/lib/microcosm/calibration-selection";
 import type { StagingComparisonRelease } from "@policyengine/calibration-tree/staging-artifact";
 import { targetChangeMapIdentity } from "@/lib/microcosm/target-change-visualization";
@@ -147,30 +148,21 @@ export function StagingCalibrationMapPanel({
   const selectedRunBuild = builds.find(
     (build) => build.stagingRunId === runId,
   );
-  const [currentBuildArtifactId, setCurrentBuildArtifactId] = useState("");
-  const [candidateBuildArtifactId, setCandidateBuildArtifactId] = useState("");
-
-  useEffect(() => {
-    setCurrentBuildArtifactId((current) =>
-      builds.some((build) => build.buildArtifactId === current)
-        ? current
-        : defaultComparisonBuildArtifactId({
-            builds,
-            latestReleaseBuildArtifactId: buildManifest?.latestReleaseBuildArtifactId,
-            comparisonReleaseId,
-          }),
-    );
-    setCandidateBuildArtifactId((candidate) =>
-      candidate && builds.some((build) => build.buildArtifactId === candidate)
-        ? candidate
-        : selectedRunBuild?.buildArtifactId ?? "",
-    );
-  }, [
-    buildManifest?.latestReleaseBuildArtifactId,
+  // Only the user's picks are state; the selectors' defaults follow the
+  // build manifest and the comparison as each responds.
+  const [buildPicks, setBuildPicks] = useState<ComparisonMapBuildPicks>({
+    from: null,
+    to: null,
+  });
+  const {
+    from: currentBuildArtifactId,
+    to: candidateBuildArtifactId,
+  } = comparisonMapBuilds(buildPicks, {
     builds,
+    latestReleaseBuildArtifactId: buildManifest?.latestReleaseBuildArtifactId,
     comparisonReleaseId,
-    selectedRunBuild?.buildArtifactId,
-  ]);
+    candidateBuildArtifactId: selectedRunBuild?.buildArtifactId,
+  });
 
   const immutableComparison = Boolean(
     currentBuildArtifactId && candidateBuildArtifactId,
@@ -240,14 +232,18 @@ export function StagingCalibrationMapPanel({
                 label="From"
                 value={currentBuildArtifactId}
                 builds={builds}
-                onChange={setCurrentBuildArtifactId}
+                onChange={(buildArtifactId) =>
+                  setBuildPicks((picks) => ({ ...picks, from: buildArtifactId }))
+                }
               />
               <BuildSelect
                 label="To"
                 value={candidateBuildArtifactId}
                 builds={builds}
                 liveLabel={`Selected live candidate: ${runId}`}
-                onChange={setCandidateBuildArtifactId}
+                onChange={(buildArtifactId) =>
+                  setBuildPicks((picks) => ({ ...picks, to: buildArtifactId }))
+                }
               />
             </div>
           ) : null}
