@@ -3,7 +3,6 @@ import { expect, test } from "bun:test";
 import { microcosmStagingTargetChangeSourceParameters } from "@/lib/api/hooks/use-microcosm";
 import {
   calibrationBuildManifestState,
-  calibrationBuildsNewestFirst,
   comparisonMapBuilds,
   isStagingSelection,
   publishedReleaseSelection,
@@ -24,46 +23,6 @@ test("published-release pages discard staging candidate selectors", () => {
     "populace-uk-2023-release",
   );
   expect(publishedReleaseSelection(undefined)).toBe("");
-});
-
-test("orders calibration builds by instant across RFC 3339 offsets", () => {
-  const builds = [
-    {
-      buildArtifactId: "offset-earlier",
-      createdAt: "2026-01-01T00:30:00+02:00",
-      updatedAt: "2026-01-01T00:30:00+02:00",
-    },
-    {
-      buildArtifactId: "utc-later",
-      createdAt: "2026-01-01T00:00:00Z",
-      updatedAt: "2026-01-01T00:00:00Z",
-    },
-    {
-      buildArtifactId: "same-instant-b",
-      createdAt: null,
-      updatedAt: "2025-12-31T19:00:00-05:00",
-    },
-    {
-      buildArtifactId: "same-instant-a",
-      createdAt: "2026-01-01T00:00:00+00:00",
-      updatedAt: "2026-01-01T00:00:00+00:00",
-    },
-  ];
-
-  expect(
-    calibrationBuildsNewestFirst(builds).map((build) => build.buildArtifactId),
-  ).toEqual([
-    "same-instant-a",
-    "same-instant-b",
-    "utc-later",
-    "offset-earlier",
-  ]);
-  expect(builds.map((build) => build.buildArtifactId)).toEqual([
-    "offset-earlier",
-    "utc-later",
-    "same-instant-b",
-    "same-instant-a",
-  ]);
 });
 
 test("distinguishes build-manifest loading, error, empty, and ready states", () => {
@@ -97,21 +56,6 @@ test("distinguishes build-manifest loading, error, empty, and ready states", () 
     hasError: true,
     buildCount: 2,
   })).toBe("ready");
-});
-
-test("an undated calibration build sorts after every dated one", () => {
-  const builds = [
-    { buildArtifactId: "undated-b", createdAt: null, updatedAt: null },
-    {
-      buildArtifactId: "dated",
-      createdAt: "2026-10-04T18:57:22Z",
-      updatedAt: "2026-10-04T18:57:22Z",
-    },
-    { buildArtifactId: "undated-a", createdAt: null, updatedAt: null },
-  ];
-  expect(
-    calibrationBuildsNewestFirst(builds).map((build) => build.buildArtifactId),
-  ).toEqual(["dated", "undated-a", "undated-b"]);
 });
 
 const DENSE_NEWEST = "microcosm-uk-2024-25-dense-20261019T000432Z-ee5c2dbe";

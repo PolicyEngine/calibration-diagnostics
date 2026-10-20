@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 
 import {
+  calibrationBuildsNewestFirst,
   calibrationTreeManifestEntry,
   emptyCalibrationTreeManifest,
   parseCalibrationTreeManifest,
@@ -147,4 +148,59 @@ test("release cuts sit beside their line folder's build and keep their folder", 
       uk: { latestReleaseBuildArtifactId: null, builds: [{ ...cut, releaseDirectory: "../latest" }] },
     },
   })).toThrow("invalid release directory");
+});
+
+test("orders calibration builds by instant across RFC 3339 offsets", () => {
+  const builds = [
+    {
+      buildArtifactId: "offset-earlier",
+      createdAt: "2026-01-01T00:30:00+02:00",
+      updatedAt: "2026-01-01T00:30:00+02:00",
+    },
+    {
+      buildArtifactId: "utc-later",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+    {
+      buildArtifactId: "same-instant-b",
+      createdAt: null,
+      updatedAt: "2025-12-31T19:00:00-05:00",
+    },
+    {
+      buildArtifactId: "same-instant-a",
+      createdAt: "2026-01-01T00:00:00+00:00",
+      updatedAt: "2026-01-01T00:00:00+00:00",
+    },
+  ];
+
+  expect(
+    calibrationBuildsNewestFirst(builds).map((build) => build.buildArtifactId),
+  ).toEqual([
+    "same-instant-a",
+    "same-instant-b",
+    "utc-later",
+    "offset-earlier",
+  ]);
+  expect(builds.map((build) => build.buildArtifactId)).toEqual([
+    "offset-earlier",
+    "utc-later",
+    "same-instant-b",
+    "same-instant-a",
+  ]);
+});
+
+test("an undated calibration build sorts after every dated one", () => {
+  const builds = [
+    { buildArtifactId: "undated-b", createdAt: null, updatedAt: null },
+    {
+      buildArtifactId: "dated",
+      createdAt: "2026-10-04T18:57:22Z",
+      updatedAt: "2026-10-04T18:57:22Z",
+    },
+    { buildArtifactId: "undated-a", createdAt: null, updatedAt: null },
+  ];
+  expect(
+    calibrationBuildsNewestFirst(builds).map((build) => build.buildArtifactId),
+  ).toEqual(["dated", "undated-a", "undated-b"]);
 });
