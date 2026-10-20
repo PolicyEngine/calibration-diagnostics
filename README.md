@@ -80,8 +80,39 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 | `GET /api/microcosm/staging/runs` | List staging build runs |
 | `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and its candidate diagnostics: an uploaded `calibration_diagnostics` telemetry artifact, or the `calibration_diagnostics.json` of the dataset bundle the run staged under `staged/<run_id>/` in the country's release repository (read at the commit the run recorded, digest-verified) |
 | `GET /api/microcosm/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
-| `GET /api/microcosm/staging/compare?run=<run_id>&release=latest` | Diff staging candidate against a published release |
+| `GET /api/microcosm/staging/compare?run=<run_id>&release=latest` | Diff a staging candidate against a published release: by default the current release, or the newest published local-area build for a local-area candidate (see below) |
 | `GET /api/microcosm/staging/target-change-tree?run=<run_id>&release=<resolved_id>&mode=reported\|shared&...` | One hierarchy level of weighted target-error changes for a staging candidate and an explicit current release |
+
+`/api/microcosm/staging/compare` resolves `release=latest`, its default, for
+each candidate:
+
+- **Local-area candidates.** A run is a local-area candidate when the
+  `pipeline.id` its `run_manifest.json` records is one of the country's
+  `staging.local_area_pipelines` in the country registry. The UK lists
+  `uk-local-candidate`; no other country lists any, so their run manifests are
+  not read for this. A local-area candidate is compared with the most recently
+  published local-area build: among release builds in the tree manifest whose
+  release manifest's `dataset_role` names a local area (such as
+  `non_default_local_area`), the one with the latest recorded `createdAt`, else
+  `updatedAt`. The local-area release has no pointer file and is never
+  promoted, so it has no current build.
+- **Every other candidate,** and a local-area candidate when the tree manifest
+  lists no local-area release build, is compared with the country's current
+  release. That includes a local-area release published on Hugging Face whose
+  calibration tree the dashboard has not built yet.
+
+Only a local-area candidate's response adds `comparison_release`, which names
+the release it was compared with:
+
+| Field | Meaning |
+|---|---|
+| `release_id` | The release compared with, the same as `a.release_id` |
+| `basis` | `newest_local_area_release`, or `current_release` when the tree manifest lists no local-area release build |
+| `local_area_candidate` | Always `true` when the field is present |
+
+An explicit `release=<id>` is compared as requested and adds no
+`comparison_release`. Responses for US, Belgian and UK national candidates are
+unchanged.
 
 The staging target-change route supports two comparison modes. `reported` uses
 each release's actual target weights and complete target surface, including
@@ -202,6 +233,15 @@ backward-compatible `POPULACE_STAGING_HF_REPO` and
 `POPULACE_UK_STAGING_HF_TOKEN`, and optionally override the dataset or revision
 with `POPULACE_UK_STAGING_HF_REPO` or `POPULACE_UK_STAGING_HF_REVISION`. Never
 use a `NEXT_PUBLIC_` variable for a private-repository credential.
+
+A staging registration may also list `local_area_pipelines`: the
+`pipeline.id` values, as run manifests record them, of pipelines whose
+candidates are local-area builds. The Staging page and
+`/api/microcosm/staging/compare` compare those candidates with the newest
+published local-area build instead of the current release, and the page names
+that release in its validation table and calibration map. The UK lists
+`uk-local-candidate`, Microcosm's local-area candidate pipeline; its national
+attempts run `uk-frs-calibration`. A country that lists none is unaffected.
 
 The staging contract fixtures under
 `frontend/packages/calibration-tree/src/fixtures/staging-contract/` are byte-identical copies

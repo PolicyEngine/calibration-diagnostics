@@ -45,6 +45,7 @@ import {
   formatStagingStatus,
 } from "@/lib/microcosm/staging-status";
 import { formatWeightedTargetError } from "@/lib/microcosm/target-change-visualization";
+import { stagingComparisonBaseline } from "@/lib/microcosm/calibration-selection";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
 
@@ -694,7 +695,7 @@ const VALIDATION_METHOD_HELP = {
   reformWithin10:
     "Measures the share of scored out-of-sample reforms whose estimated effect is within 10% of the external benchmark. Out-of-sample means that the reform includes values that are not used as calibration targets; higher is better.",
   targetCoverage:
-    "Counts the complete set of calibration targets available in each release, including targets that are not shared. The verdict reports how many targets the candidate adds and removes relative to the current release.",
+    "Counts the complete set of calibration targets available in each release, including targets that are not shared. The verdict reports how many targets the candidate adds and removes relative to the release it is compared with.",
 } as const;
 
 function sideStats(errors: number[]): SideStats {
@@ -845,6 +846,9 @@ function MicrocosmStagingRunsView({
     runData?.has_calibration ? selectedRun : undefined,
     "latest",
   );
+  // A local-area candidate is compared with the local-area release, not the
+  // current (national) release; the page names which.
+  const comparisonBaseline = stagingComparisonBaseline(compareData?.comparison_release);
   // Fit stats on the targets both sides share — the honest better-or-worse basis.
   const commonStats = useMemo(() => {
     const rows = compareData?.rows ?? [];
@@ -1029,7 +1033,7 @@ function MicrocosmStagingRunsView({
                   title="Candidate validation"
                 >
                   <LoadingBlock
-                    label="Comparing candidate vs current release (loads both calibration packages)…"
+                    label="Comparing the candidate with its comparison release (loads both calibration packages)…"
                     height="h-24"
                   />
                 </SectionCard>
@@ -1038,6 +1042,7 @@ function MicrocosmStagingRunsView({
               {hasCandidateValidation && (
                 <SectionCard
                   title="Candidate validation"
+                  description={comparisonBaseline.note ?? undefined}
                   padded={false}
                 >
                   <div className="overflow-x-auto px-5">
@@ -1045,7 +1050,7 @@ function MicrocosmStagingRunsView({
                     <thead className="col-span-full grid grid-cols-subgrid">
                       <tr className="col-span-full grid grid-cols-subgrid border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
                         <th className="whitespace-nowrap py-2 font-semibold">Validation point</th>
-                        <th className="whitespace-nowrap py-2 text-right font-semibold">Current release</th>
+                        <th className="whitespace-nowrap py-2 text-right font-semibold">{comparisonBaseline.releaseLabel}</th>
                         <th className="whitespace-nowrap py-2 text-right font-semibold">Candidate</th>
                         <th className="whitespace-nowrap py-2 text-right font-semibold">Verdict</th>
                         <th className="whitespace-nowrap py-2 text-center font-semibold">About</th>
@@ -1183,6 +1188,7 @@ function MicrocosmStagingRunsView({
                     comparisonReleaseId={
                       compareData?.summary ? compareData.a.release_id : undefined
                     }
+                    comparisonRelease={compareData?.comparison_release}
                     comparisonRows={compareData?.rows}
                     weightedTargetErrorChange={weightedTargetErrorChange}
                     pageIntroHeight={pageIntroHeight}
