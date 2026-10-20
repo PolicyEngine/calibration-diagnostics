@@ -7,8 +7,9 @@ import {
   type CalibrationTreeManifestEntry,
 } from "./calibration-tree-manifest";
 import { stagingLocalAreaPipelines } from "./countries";
-import type { ReleaseEntry } from "./latest-artifact";
+import { InvalidReleaseIdError, type ReleaseEntry } from "./latest-artifact";
 import {
+  loadStagingTargetChangeDataset,
   newestPublishedLocalAreaRelease,
   resolveStagingComparisonRelease,
   stagingBaselineReleases,
@@ -278,6 +279,38 @@ test("for a country publishing build folders, a local-area candidate's baseline 
       .toBe(DENSE_NEWER_BUILD);
     // Nothing but releases.json: no release-folder listing and no tags.
     expect(requested).toHaveLength(1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a staging candidate's target changes can be compared with a build in its own folder", async () => {
+  const originalFetch = globalThis.fetch;
+  const requested: string[] = [];
+  const progressUrl = stagingResolveUrl(`runs/${LOCAL_CANDIDATE_RUN}/progress.json`, "uk");
+  // Every repository read fails, so loading stops at its first read.
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requested.push(String(input));
+    return new Response(null, { status: 503 });
+  }) as typeof fetch;
+  try {
+    const failure = await loadStagingTargetChangeDataset(
+      LOCAL_CANDIDATE_RUN,
+      DENSE_NEWER_BUILD,
+      "uk",
+    ).then(() => null, (error: unknown) => error);
+    // The build is accepted as the release to compare with: loading starts
+    // with the candidate's progress file and stops at the stubbed failure.
+    expect(failure).not.toBeInstanceOf(InvalidReleaseIdError);
+    expect(String(failure)).toContain("Staging fetch failed 503");
+    expect(requested).toEqual([progressUrl]);
+
+    // A path below a build folder is still refused before any read.
+    requested.length = 0;
+    await expect(
+      loadStagingTargetChangeDataset(LOCAL_CANDIDATE_RUN, `${DENSE_NEWER_BUILD}/extra`, "uk"),
+    ).rejects.toBeInstanceOf(InvalidReleaseIdError);
+    expect(requested).toEqual([]);
   } finally {
     globalThis.fetch = originalFetch;
   }
