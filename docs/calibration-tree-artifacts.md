@@ -270,6 +270,13 @@ one merged label for both areas, and a repair of it is refused because the
 rebuilt index differs from the recorded digest. For a staging build, the refusal
 is reported as that run's `failed` outcome.
 
+Geography nodes group rows by geography ID, and a geography that rows spell
+more than one way is listed once (see
+[Geographies spelled more than one way](calibration-map-hierarchy.md#geographies-spelled-more-than-one-way)).
+Geography postings still use each row's own spelling, so the Geography filter
+lists every spelling and matches the rows that carry it. A tree that listed one
+geography ID under two spellings would likewise be refused on repair.
+
 The browser unions selected values within one category, intersects categories,
 filters hierarchy memberships, and recalculates visible metrics from compact
 per-target inputs. Target detail shards are not required for navigation,

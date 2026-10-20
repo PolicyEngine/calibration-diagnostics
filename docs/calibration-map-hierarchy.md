@@ -135,6 +135,35 @@ comparisons pair the same targets as before.
 Published calibration trees keep the labels they were built with; see
 [Filtering indices](calibration-tree-artifacts.md#filtering-indices).
 
+## Geographies spelled more than one way
+
+Rows name a geography by its level and `geography_id`, and each row carries its
+own spelling of the geography's label. Rows from different publishers can spell
+one geography differently. Release
+`populace-us-2024-buildo-acs-local-766b7c7-20261017T030317Z`, for example,
+spells state `0400000US23` "Maine" on its SNAP, Medicaid and IRS SOI targets
+and "ME" on its state population target. The schema 8 reader reports such
+spellings as label variants and does not rewrite the rows.
+
+The calibration tree groups geography by geography ID:
+
+- Every row of one level and geography ID takes the first spelling of that ID
+  in row order, which is the spelling the reader keeps. A geography that its
+  rows spell one way keeps that spelling, so trees built from rows without
+  variants are unchanged.
+- The label is read from every row the tree is built from, before filters. It
+  is also the geography's selection value, so it is the same in the program
+  and geography breakdowns, under any filter, and in published trees.
+- Geographies with different IDs that share a label still form one node.
+- Rows without a geography ID, such as the rows of a comparison tree, keep
+  their own spelling.
+- The Geography filter and its options still list and match each row's own
+  spelling, because the published filter index stores one posting per
+  spelling.
+
+The rule is `geographyLabeller` in `calibration-tree.ts` of
+`@policyengine/calibration-tree`.
+
 ## Required verification
 
 For a producer change, verify these representations in order:
