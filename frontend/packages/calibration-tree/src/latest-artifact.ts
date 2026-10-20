@@ -2526,7 +2526,8 @@ function compactUtcTimestamp(value: string): string {
  * the only file read from the dataset repository. A build is calibrated
  * (selectable for comparison) once the dashboard manifest holds its tree.
  * Withdrawn builds are listed with their flag: how the picker shows them is
- * not decided here.
+ * not decided here. The dashboard's latest release is listed too while
+ * releases.json does not name it (see dashboardLatestRelease).
  */
 export async function loadRecordedReleases(
   revalidate: number,
@@ -2542,18 +2543,57 @@ export async function loadRecordedReleases(
       build.kind === "release" && build.releaseId ? [build.releaseId] : []
     ),
   );
-  return recordedBuilds(record)
-    .map((recorded): ReleaseEntry => ({
-      release_id: recorded.id,
-      date: compactUtcTimestamp(recorded.publishedAt),
-      files: [],
-      has_calibration: published.has(recorded.id),
-      ...releaseRole({ dataset_role: recorded.role, is_default: recorded.inDefaultRelease }),
-      release: recorded.release,
-      build: recorded.build,
-      withdrawn: recorded.withdrawn,
-    }))
-    .sort((left, right) => releaseSortKey(right.date) - releaseSortKey(left.date));
+  const recorded = recordedBuilds(record).map((build): ReleaseEntry => ({
+    release_id: build.id,
+    date: compactUtcTimestamp(build.publishedAt),
+    files: [],
+    has_calibration: published.has(build.id),
+    ...releaseRole({ dataset_role: build.role, is_default: build.inDefaultRelease }),
+    release: build.release,
+    build: build.build,
+    withdrawn: build.withdrawn,
+  }));
+  const recordedIds = new Set(recorded.map((entry) => entry.release_id));
+  const latest = dashboardLatestRelease(manifest, country);
+  return [
+    ...recorded,
+    ...(latest && !recordedIds.has(latest.release_id) ? [latest] : []),
+  ].sort((left, right) => releaseSortKey(right.date) - releaseSortKey(left.date));
+}
+
+/**
+ * The release the dashboard manifest marks latest, as a picker entry. Under
+ * build folders it is releases.json's current build once reconciliation has
+ * run; until then it is the entry published before the switch (a tagged
+ * build or a release folder), which releases.json does not name. Keeping it
+ * listed keeps the page's selected release selectable, which the
+ * deployment's pre-promotion check requires. Read from the dashboard
+ * manifest only; it is classified as the default dataset, as the latest
+ * release is.
+ */
+function dashboardLatestRelease(
+  manifest: CalibrationTreeManifest,
+  country: MicrocosmCountry,
+): ReleaseEntry | null {
+  const countryManifest = manifest.countries[country];
+  const latest = countryManifest?.builds.find(
+    (build) =>
+      build.buildArtifactId === countryManifest.latestReleaseBuildArtifactId &&
+      build.kind === "release",
+  );
+  if (!latest?.releaseId) return null;
+  return {
+    release_id: latest.releaseId,
+    date: latest.createdAt ? compactUtcTimestamp(latest.createdAt) : releaseDate(latest.releaseId),
+    files: [],
+    has_calibration: true,
+    dataset_role: null,
+    is_default: true,
+    is_local_area: false,
+    ...(latest.releaseDirectory && latest.releaseDirectory !== latest.releaseId
+      ? { release_directory: latest.releaseDirectory }
+      : {}),
+  };
 }
 
 export async function loadPointerReleaseId(
