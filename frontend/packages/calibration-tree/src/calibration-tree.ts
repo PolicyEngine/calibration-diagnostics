@@ -366,7 +366,10 @@ function rowGeographyLabel(row: CalibrationTreeTarget): string {
 // once, every row of a geography ID takes the first spelling of that ID in
 // row order, which is the spelling the reader keeps; when the rows spell it
 // one way, it is that spelling, so trees built from rows without variants
-// do not change.
+// do not change. Rows reach the builder after buildCalibration has added the
+// level to a label that another geography level also uses
+// (levelQualifiedGeographyLabels), so the kept spelling can carry its level,
+// such as "Wrexham (local authority)" where the reader reports "Wrexham".
 //
 // The label is read from every row the tree is built from, before filters,
 // because it is also the geography's selection value: a geography must have

@@ -151,6 +151,12 @@ The calibration tree groups geography by geography ID:
   in row order, which is the spelling the reader keeps. A geography that its
   rows spell one way keeps that spelling, so trees built from rows without
   variants are unchanged.
+- That spelling carries its level when rows at another geography level use it
+  too (see [Geography labels shared by several levels](#geography-labels-shared-by-several-levels)).
+  In a UK local-area candidate, for example, local authority `W06000006` is
+  spelled "Wrexham" and then "Wrexham / Wrecsam", and a constituency is also
+  "Wrexham", so the tree lists the local authority as "Wrexham (local
+  authority)" while the reader reports "Wrexham" as the kept spelling.
 - The label is read from every row the tree is built from, before filters. It
   is also the geography's selection value, so it is the same in the program
   and geography breakdowns, under any filter, and in published trees.
@@ -159,7 +165,9 @@ The calibration tree groups geography by geography ID:
   their own spelling.
 - The Geography filter and its options still list and match each row's own
   spelling, because the published filter index stores one posting per
-  spelling.
+  spelling. So "Maine" and "ME" are separate options: "ME" shows the "Maine"
+  node with only the population target, and "Maine" shows the "Maine" node
+  without it.
 
 The rule is `geographyLabeller` in `calibration-tree.ts` of
 `@policyengine/calibration-tree`.
