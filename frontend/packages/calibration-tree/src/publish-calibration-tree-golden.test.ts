@@ -1,6 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 
 import recordedGoldens from "./fixtures/calibration-tree-golden.json";
+import type { CalibrationTreeBundle } from "@policyengine/calibration-tree/calibration-tree-bundle";
 import {
   emptyCalibrationTreeManifest,
   withCalibrationTreeManifestEntry,
@@ -235,6 +236,7 @@ const REFUSED_BUILD_ID = "a".repeat(64);
 function stagingRepositoryWithRefusedRepair(): {
   revisionSha: string;
   store: CalibrationManifestStore;
+  staleEntry: CalibrationTreeManifestEntry;
 } {
   const { revisionSha, files } = ukStagingRepositoryFiles([
     REFUSED_STAGING_RUN,
@@ -276,7 +278,7 @@ function stagingRepositoryWithRefusedRepair(): {
       throw new Error("A dry run must not write the manifest.");
     },
   };
-  return { revisionSha, store };
+  return { revisionSha, store, staleEntry };
 }
 
 test(
@@ -333,6 +335,111 @@ test(
       if (originalBlobToken == null) delete process.env.BLOB_READ_WRITE_TOKEN;
       else process.env.BLOB_READ_WRITE_TOKEN = originalBlobToken;
     }
+  },
+  BUILD_TIMEOUT_MS,
+);
+
+// A store for a reconciliation that writes (not a dry run). It records each
+// upload, manifest write, listing and audit in the order the publisher makes
+// them. Its manifest starts with the refused run's entry and takes each write
+// through the same entry checks as the Blob manifest. A build audits as
+// complete once it has been both uploaded and written to the manifest.
+function recordingStagingStore(staleEntry: CalibrationTreeManifestEntry) {
+  const operations: string[] = [];
+  const uploadedBuildIds = new Set<string>();
+  const writtenEntries: CalibrationTreeManifestEntry[] = [];
+  let storedManifest = withCalibrationTreeManifestEntry(
+    emptyCalibrationTreeManifest(),
+    "uk",
+    staleEntry,
+  );
+  const store: CalibrationManifestStore = {
+    readManifest: async () => storedManifest,
+    listBlobs: async () => {
+      operations.push("list files");
+      return new Map();
+    },
+    audit: async (entry) => {
+      operations.push(`audit ${entry.stagingRunId}`);
+      const stored = uploadedBuildIds.has(entry.buildArtifactId) &&
+        writtenEntries.some((written) => written.buildArtifactId === entry.buildArtifactId);
+      return stored
+        ? { complete: true, repairable: true, reasons: [], index: null }
+        : { complete: false, repairable: true, reasons: ["index is missing"], index: null };
+    },
+    updateManifest: async (entry) => {
+      operations.push(`write manifest entry for ${entry.stagingRunId}`);
+      storedManifest = withCalibrationTreeManifestEntry(storedManifest, "uk", entry);
+      writtenEntries.push(entry);
+      return storedManifest;
+    },
+    uploadBundle: async (bundle: CalibrationTreeBundle) => {
+      operations.push(`upload ${bundle.index.build.sourceId}`);
+      uploadedBuildIds.add(bundle.index.buildArtifactId);
+      const storedFiles = bundle.files.map((file) => ({
+        pathname: file.path,
+        sha256: file.sha256,
+        bytes: file.rawBytes,
+        created: true,
+      }));
+      const indexPosition = bundle.files.findIndex((file) => file.part === "index");
+      return { files: storedFiles, index: storedFiles[indexPosition] };
+    },
+  };
+  return {
+    store,
+    operations,
+    writtenEntries,
+    storedManifest: () => storedManifest,
+  };
+}
+
+test(
+  "a reconciliation that writes publishes the run after a refused one and writes nothing for the refused run",
+  async () => {
+    const { revisionSha, staleEntry } = stagingRepositoryWithRefusedRepair();
+    const recording = recordingStagingStore(staleEntry);
+
+    const report = await withRegisteredRepositories(() =>
+      reconcileStagingBuilds("uk", revisionSha, "unused-blob-token", false, recording.store)
+    );
+
+    const publishedOutcome = report.outcomes[1];
+    expect(report.outcomes).toEqual([
+      {
+        sourceId: REFUSED_STAGING_RUN.runId,
+        status: "failed",
+        buildArtifactId: REFUSED_BUILD_ID,
+        reason: `Rebuilt staging index differs from immutable manifest entry ${REFUSED_BUILD_ID}.`,
+      },
+      {
+        sourceId: UNPUBLISHED_STAGING_RUN.runId,
+        status: "published",
+        buildArtifactId: expect.stringMatching(/^[0-9a-f]{64}$/),
+        reason: null,
+      },
+    ]);
+    // The refused run is audited and then left alone; the next run is
+    // uploaded, registered, listed again and audited, in that order.
+    expect(recording.operations).toEqual([
+      "list files",
+      `audit ${REFUSED_STAGING_RUN.runId}`,
+      `upload ${UNPUBLISHED_STAGING_RUN.runId}`,
+      `write manifest entry for ${UNPUBLISHED_STAGING_RUN.runId}`,
+      "list files",
+      `audit ${UNPUBLISHED_STAGING_RUN.runId}`,
+    ]);
+    expect(recording.writtenEntries.map((entry) => [entry.kind, entry.stagingRunId])).toEqual([
+      ["staging", UNPUBLISHED_STAGING_RUN.runId],
+    ]);
+    // The manifest keeps the refused run's entry exactly as it was and gains
+    // one entry, for the published run.
+    const storedBuilds = recording.storedManifest().countries.uk?.builds ?? [];
+    expect(storedBuilds).toHaveLength(2);
+    expect(storedBuilds.find((entry) => entry.buildArtifactId === REFUSED_BUILD_ID))
+      .toEqual(staleEntry);
+    expect(storedBuilds.find((entry) => entry.stagingRunId === UNPUBLISHED_STAGING_RUN.runId)
+      ?.buildArtifactId ?? null).toBe(publishedOutcome.buildArtifactId);
   },
   BUILD_TIMEOUT_MS,
 );

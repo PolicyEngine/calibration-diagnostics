@@ -166,15 +166,25 @@ test("the Staging page names the release a candidate is compared with", () => {
       "published build of the local-area release. That release is never promoted, " +
       "so it has no current build.",
   });
-  expect(stagingComparisonBaseline({
+});
+
+test("the fallback note says the dashboard has no local-area build, not that none was published", () => {
+  // The fallback is chosen from the dashboard's build manifest alone. A
+  // local-area release published on Hugging Face whose calibration tree the
+  // dashboard has not built yet (tree publishing paused, or its role
+  // unreadable) also lands here, so the note must not say that no local-area
+  // release has been published.
+  const fallback = stagingComparisonBaseline({
     release_id: NATIONAL_CURRENT,
     basis: "current_release",
     local_area_candidate: true,
-  })).toEqual({
-    ...current,
+  });
+  expect(fallback).toEqual({
+    releaseLabel: "Current release",
+    tabLabel: "Change from current release",
     note:
-      "No local-area release has been published, so this local-area candidate is " +
-      `compared with the current release, ${NATIONAL_CURRENT}, which calibrates a ` +
-      "different set of targets.",
+      "The dashboard has no published calibration build of a local-area release, so " +
+      `this local-area candidate is compared with the current release, ${NATIONAL_CURRENT}, ` +
+      "which calibrates a different set of targets.",
   });
 });

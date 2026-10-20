@@ -114,13 +114,16 @@ export function stagingComparisonBaseline(
         "so it has no current build.",
     };
   }
+  // The fallback is decided from the dashboard's build manifest alone: a
+  // local-area release published on Hugging Face whose calibration tree the
+  // dashboard has not built yet also lands here.
   return {
     releaseLabel: "Current release",
     tabLabel: "Change from current release",
     note: comparisonRelease?.local_area_candidate
-      ? "No local-area release has been published, so this local-area candidate is " +
-        `compared with the current release, ${comparisonRelease.release_id}, which calibrates a ` +
-        "different set of targets."
+      ? "The dashboard has no published calibration build of a local-area release, so " +
+        `this local-area candidate is compared with the current release, ${comparisonRelease.release_id}, ` +
+        "which calibrates a different set of targets."
       : null,
   };
 }

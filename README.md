@@ -96,8 +96,10 @@ each candidate:
   `non_default_local_area`), the one with the latest recorded `createdAt`, else
   `updatedAt`. The local-area release has no pointer file and is never
   promoted, so it has no current build.
-- **Every other candidate,** and a local-area candidate when no local-area build
-  has been published, is compared with the country's current release.
+- **Every other candidate,** and a local-area candidate when the tree manifest
+  lists no local-area release build, is compared with the country's current
+  release. That includes a local-area release published on Hugging Face whose
+  calibration tree the dashboard has not built yet.
 
 Only a local-area candidate's response adds `comparison_release`, which names
 the release it was compared with:
@@ -105,7 +107,7 @@ the release it was compared with:
 | Field | Meaning |
 |---|---|
 | `release_id` | The release compared with, the same as `a.release_id` |
-| `basis` | `newest_local_area_release`, or `current_release` when no local-area build has been published |
+| `basis` | `newest_local_area_release`, or `current_release` when the tree manifest lists no local-area release build |
 | `local_area_candidate` | Always `true` when the field is present |
 
 An explicit `release=<id>` is compared as requested and adds no
