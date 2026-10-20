@@ -16,33 +16,6 @@ export function publishedReleaseSelection(
   return isStagingSelection(selection) ? "" : (selection ?? "");
 }
 
-interface TimestampedCalibrationBuild {
-  buildArtifactId: string;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-function buildInstant(build: TimestampedCalibrationBuild): number {
-  const value = build.createdAt ?? build.updatedAt;
-  const time = value == null ? Number.NaN : Date.parse(value);
-  // An undated build sorts last rather than wherever NaN lands.
-  return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
-}
-
-/** Order build records by their actual RFC 3339 instant, not timestamp text. */
-export function calibrationBuildsNewestFirst<
-  T extends TimestampedCalibrationBuild,
->(builds: readonly T[]): T[] {
-  return [...builds].sort((left, right) => {
-    const leftTime = buildInstant(left);
-    const rightTime = buildInstant(right);
-    return (
-      rightTime - leftTime ||
-      left.buildArtifactId.localeCompare(right.buildArtifactId)
-    );
-  });
-}
-
 export type CalibrationBuildManifestState =
   | "loading"
   | "error"

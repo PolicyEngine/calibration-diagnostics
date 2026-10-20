@@ -307,3 +307,31 @@ export function withCalibrationTreeManifestEntry(
     },
   };
 }
+
+interface TimestampedCalibrationBuild {
+  buildArtifactId: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+// When a build was published: createdAt, else updatedAt. An undated build
+// sorts last rather than wherever NaN lands.
+function buildPublishedInstant(build: TimestampedCalibrationBuild): number {
+  const value = build.createdAt ?? build.updatedAt;
+  const time = value == null ? Number.NaN : Date.parse(value);
+  return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
+}
+
+/**
+ * Build records newest first, by their actual RFC 3339 instant rather than
+ * timestamp text; builds published at the same instant are ordered by build
+ * ID.
+ */
+export function calibrationBuildsNewestFirst<
+  T extends TimestampedCalibrationBuild,
+>(builds: readonly T[]): T[] {
+  return [...builds].sort((left, right) =>
+    buildPublishedInstant(right) - buildPublishedInstant(left) ||
+    left.buildArtifactId.localeCompare(right.buildArtifactId)
+  );
+}
