@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import { readCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-blob";
 import {
   loadPointerReleaseId,
   loadPublishedCutReleases,
   loadReleases,
   mergeReleaseInventory,
-  parseCountry,
   scrub,
 } from "@policyengine/calibration-tree/latest-artifact";
 
@@ -28,7 +28,8 @@ export function createMicrocosmReleasesHandler(
   },
 ) {
   return async function GET(request: Request) {
-    const country = parseCountry(new URL(request.url).searchParams.get("country"));
+    const country = requestedCountry(new URL(request.url).searchParams);
+    if (country instanceof Response) return country;
     try {
       const [folders, pointer, cuts] = await Promise.all([
         dependencies.loadReleases(revalidate, country),

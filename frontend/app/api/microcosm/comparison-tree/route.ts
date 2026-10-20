@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requiredCountry } from "@/lib/api/request-country";
 import { withBasePath } from "@/lib/base-path";
 import { ensureCalibrationComparison } from "@policyengine/calibration-tree/calibration-comparison-blob";
 import {
@@ -13,11 +14,6 @@ import {
   isSha256,
   type CalibrationTreePart,
 } from "@policyengine/calibration-tree/calibration-tree-artifact";
-import {
-  isCountry,
-  selectableCountries,
-  type MicrocosmCountry,
-} from "@policyengine/calibration-tree/countries";
 import type { TargetChangeMode } from "@policyengine/calibration-tree/target-change";
 
 export const runtime = "nodejs";
@@ -29,11 +25,6 @@ const IMMUTABLE_CACHE_HEADERS = {
   "Vercel-CDN-Cache-Control": "public, max-age=31536000",
   "X-Content-Type-Options": "nosniff",
 };
-
-function countryParameter(url: URL): MicrocosmCountry | null {
-  const value = url.searchParams.get("country");
-  return isCountry(value) && selectableCountries().includes(value) ? value : null;
-}
 
 function partParameter(url: URL): CalibrationTreePart | null {
   const value = url.searchParams.get("part");
@@ -58,12 +49,13 @@ export function createCalibrationComparisonTreeHandler(
 ) {
   return async function GET(request: Request) {
     const url = new URL(request.url);
-    const country = countryParameter(url);
+    const country = requiredCountry(url.searchParams);
+    if (country instanceof Response) return country;
     const part = partParameter(url);
     const mode = modeParameter(url);
-    if (!country || !part || !mode) {
+    if (!part || !mode) {
       return NextResponse.json(
-        { detail: "A valid country, comparison mode, and tree part are required." },
+        { detail: "A valid comparison mode and tree part are required." },
         { status: 400 },
       );
     }
