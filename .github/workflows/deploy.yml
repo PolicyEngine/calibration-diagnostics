@@ -137,11 +137,22 @@ jobs:
           --check full
           --vercel-bypass-secret "$VERCEL_AUTOMATION_BYPASS_SECRET"
 
+      # The calibration checks import @policyengine/calibration-tree, a workspace
+      # package that resolves only through frontend/node_modules. Install after
+      # the Vercel upload, which sends the repository root, so the uploaded
+      # working tree never contains node_modules. This job holds Google Cloud
+      # credentials and can request OIDC tokens, so no lifecycle script runs.
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # --no-install (before the script path) stops Bun from installing a
+      # missing package from npm, so a check fails if the install above is gone.
       - name: Verify staged calibration releases and staging
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: >-
-          bun run frontend/scripts/calibration-deployment-smoke.ts
+          bun run --no-install frontend/scripts/calibration-deployment-smoke.ts
           --url "${{ steps.frontend.outputs.url }}/calibration/dashboard"
           --vercel-bypass-secret "$VERCEL_AUTOMATION_BYPASS_SECRET"
 
@@ -171,7 +182,7 @@ jobs:
 
       - name: Verify promoted calibration releases and staging
         run: |
-          bun run frontend/scripts/calibration-deployment-smoke.ts \
+          bun run --no-install frontend/scripts/calibration-deployment-smoke.ts \
           --url "https://calibration-diagnostics.vercel.app/calibration/dashboard" || {
             qualification_status=$?
             echo "::error::Post-promotion calibration qualification failed. Production aliases already point at this candidate. Follow frontend/HOSTED_RUNTIME.md#promotion-and-rollback and run vercel rollback PREVIOUS_DEPLOYMENT." >&2

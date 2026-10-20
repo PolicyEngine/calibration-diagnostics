@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { emptyCalibrationTreeManifest, withCalibrationTreeManifestEntry } from "@/lib/microcosm/calibration-tree-manifest";
+import { emptyCalibrationTreeManifest, withCalibrationTreeManifestEntry } from "@policyengine/calibration-tree/calibration-tree-manifest";
 import { createCalibrationTreeManifestHandler } from "./route";
 
 test("manifest API returns one country's current immutable release identity", async () => {

@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { useCountry } from "@/components/layout/country-context";
 import { activeNavItem, navGroupsForCountry } from "@/components/layout/nav-items";
-import { countryRegistration } from "@/lib/microcosm/countries";
+import { countryRegistration } from "@policyengine/calibration-tree/countries";
 
 import { NavSidebar } from "./nav-sidebar";
 

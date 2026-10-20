@@ -4,7 +4,7 @@ import { gzipSync } from "node:zlib";
 import {
   calibrationComparisonBuildArtifactId,
   calibrationComparisonPairArtifactId,
-} from "@/lib/microcosm/calibration-comparison-bundle";
+} from "@policyengine/calibration-tree/calibration-comparison-bundle";
 import {
   createCalibrationComparisonTreeHandler,
   type CalibrationComparisonTreeRouteDependencies,

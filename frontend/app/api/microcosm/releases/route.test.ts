@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { emptyCalibrationTreeManifest } from "@/lib/microcosm/calibration-tree-manifest";
-import type { ReleaseEntry } from "@/lib/microcosm/latest-artifact";
+import { emptyCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-manifest";
+import type { ReleaseEntry } from "@policyengine/calibration-tree/latest-artifact";
 import { createMicrocosmReleasesHandler } from "./route";
 
 // Synthetic Microcosm line (microcosm#823): a folder on main and its cuts.

@@ -5,7 +5,7 @@ import {
   type CalibrationStatus,
   type ComparisonFit,
   type FitBand,
-} from "./calibration-explorer";
+} from "@policyengine/calibration-tree/calibration-explorer";
 
 const CALIBRATION_STATUSES = new Set<CalibrationStatus>([
   "included",

@@ -23,7 +23,7 @@ import {
 import {
   hasCapability,
   type MicrocosmCountry,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 import {
   discoverLocalRuns,
   loadLocalRunDocuments,
@@ -33,7 +33,7 @@ import {
 import {
   loadStagingRuns,
   loadStagingRunTelemetry,
-} from "@/lib/microcosm/staging-artifact";
+} from "@policyengine/calibration-tree/staging-artifact";
 import {
   collectorConfigured,
   loadCollectorRun,

@@ -9,7 +9,7 @@ import {
   microcosmCountryGeography,
   microcosmRepo,
   microcosmRevision,
-} from "./latest-artifact";
+} from "@policyengine/calibration-tree/latest-artifact";
 import { IncompatibleProductionReleaseError } from "./production-release";
 
 // Collecting page data imports every route, so one country's refused selection

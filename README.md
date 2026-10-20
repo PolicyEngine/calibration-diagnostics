@@ -204,7 +204,7 @@ with `POPULACE_UK_STAGING_HF_REPO` or `POPULACE_UK_STAGING_HF_REVISION`. Never
 use a `NEXT_PUBLIC_` variable for a private-repository credential.
 
 The staging contract fixtures under
-`frontend/lib/microcosm/fixtures/staging-contract/` are byte-identical copies
+`frontend/packages/calibration-tree/src/fixtures/staging-contract/` are byte-identical copies
 of Microcosm's canonical producer fixtures. The consumer tests pin each
 version's `SHA256SUMS` digest and verify every listed file. A contract change
 must update the canonical Microcosm fixture, its digest manifest, this copy,

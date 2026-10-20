@@ -1,7 +1,7 @@
 import { expect, spyOn, test } from "bun:test";
 
 import { verifyCalibrationDeployment } from "./calibration-deployment-smoke";
-import { hasCapability, selectableCountries } from "../lib/microcosm/countries";
+import { hasCapability, selectableCountries } from "@policyengine/calibration-tree/countries";
 
 type Fetcher = (url: string | URL, init?: RequestInit) => Promise<Response>;
 const noSleep = async (_milliseconds: number) => {};

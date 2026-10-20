@@ -1,4 +1,4 @@
-import { sourceAuthorityLabel } from "@/lib/source-labels";
+import { sourceAuthorityLabel } from "./source-labels";
 
 export function sourceLabel(source: string): string {
   return sourceAuthorityLabel(source);

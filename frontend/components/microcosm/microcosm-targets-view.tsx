@@ -17,7 +17,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
-import { sourceLabel } from "@/lib/microcosm/source-label";
+import { sourceLabel } from "@policyengine/calibration-tree/source-label";
 import {
   releaseSelectOptions,
   useMicrocosmReleases,

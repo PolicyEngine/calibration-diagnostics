@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createExplorerState, type ExplorerState } from "./calibration-explorer";
+import { createExplorerState, type ExplorerState } from "@policyengine/calibration-tree/calibration-explorer";
 import {
   prefetchCalibrationDescendants,
   type CalibrationTreeFetcher,
@@ -8,7 +8,7 @@ import {
 import type {
   CalibrationTreeNode,
   CalibrationTreeResponse,
-} from "./calibration-tree";
+} from "@policyengine/calibration-tree/calibration-tree";
 
 const EMPTY_METRICS = {
   nTargets: 0,

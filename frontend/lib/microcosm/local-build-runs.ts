@@ -8,7 +8,7 @@ import {
   parseStagingManifest,
   parseStagingProgress,
   validateStagingRunConsistency,
-} from "@/lib/microcosm/staging-contract";
+} from "@policyengine/calibration-tree/staging-contract";
 
 // Local build runs: the `runs/<run_id>/` telemetry folders a Microcosm build
 // writes on the machine it runs on (the US release writes them under

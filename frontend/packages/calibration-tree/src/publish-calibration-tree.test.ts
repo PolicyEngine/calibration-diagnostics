@@ -16,8 +16,8 @@ import {
   withCalibrationTreeManifestEntry,
   type CalibrationTreeManifest,
   type CalibrationTreeManifestEntry,
-} from "../lib/microcosm/calibration-tree-manifest";
-import type { CalibrationTreeBundle } from "../lib/microcosm/calibration-tree-bundle";
+} from "./calibration-tree-manifest";
+import type { CalibrationTreeBundle } from "./calibration-tree-bundle";
 
 const originalFetch = globalThis.fetch;
 

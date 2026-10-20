@@ -4,6 +4,24 @@ The calibration explorer reads precomputed schema-6 JSON from private Vercel
 Blob storage. The browser does not download calibration diagnostics or rebuild
 the hierarchy. Schemas 1 through 5 are unsupported.
 
+## Code
+
+The builder, the schema-6 types, parsers and serializers, the Blob I/O, the
+release and staging readers the builder reads from, and the publisher
+(`src/publish-calibration-tree.ts`, run by `bun run publish:calibration-tree`)
+live in the `@policyengine/calibration-tree` workspace package at
+`frontend/packages/calibration-tree/`. The dashboard imports it through its
+subpath exports, such as `@policyengine/calibration-tree/calibration-tree-bundle`.
+The package imports only its own modules, Node built-ins and `@vercel/blob`,
+and its boundary test enforces that.
+
+`src/fixtures/calibration-tree-golden.json` records the exact bytes the builder
+writes for representative inputs: US, UK and Belgium releases, US and UK
+staging runs, a US and a UK release-to-staging comparison, and the manifest
+holding every recorded build. The golden tests require every change to
+reproduce it. Regenerate it only for an intended output change, as
+`src/test-support/calibration-tree-golden-cases.ts` describes.
+
 ## Required Blob folder schema
 
 ```text
@@ -384,13 +402,17 @@ fails publication and therefore fails the GitHub Actions job.
 
 ## Verification
 
-Run from `frontend/`:
+Run from `frontend/`; `bun test` includes the package's tests and
+`bun run lint` also typechecks the package:
 
 ```sh
 bun test
 bun run lint
 bun run build
 ```
+
+To check the package on its own, run `bun test` and `bun run typecheck` from
+`frontend/packages/calibration-tree/`.
 
 Then verify that:
 
