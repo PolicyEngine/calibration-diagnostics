@@ -91,21 +91,34 @@ def test_frontend_receives_release_token_as_server_environment(tmp_path):
     assert "test-HF_RELEASE_READ_TOKEN" not in result.stdout + result.stderr
 
 
+READ_SECRET_METADATA_CALL = [
+    "secrets",
+    "describe",
+    "test-read-secret",
+    "--project",
+    "test-project",
+    "--format=none",
+]
+
+
 def _read_secret_check(tmp_path, gcloud_exit_code=0, **configuration):
-    """Run check-read-secret-exists with a gcloud that records its arguments."""
-    arguments_file = tmp_path / "gcloud-arguments.json"
+    """Run check-read-secret-exists with a gcloud that records every call.
+
+    Returns the script's result and the arguments of each gcloud call, in order.
+    """
+    calls_file = tmp_path / "gcloud-calls.jsonl"
     stub = tmp_path / "gcloud"
     stub.write_text(
         "#!/usr/bin/env python3\n"
         "import json, os, sys\n"
-        "from pathlib import Path\n"
-        "Path(os.environ['ARGUMENTS_FILE']).write_text(json.dumps(sys.argv[1:]))\n"
+        "with open(os.environ['GCLOUD_CALLS_FILE'], 'a') as calls:\n"
+        "    calls.write(json.dumps(sys.argv[1:]) + '\\n')\n"
         f"sys.exit({gcloud_exit_code})\n"
     )
     stub.chmod(0o755)
     environment = {
         "PATH": f"{tmp_path}:{os.environ['PATH']}",
-        "ARGUMENTS_FILE": str(arguments_file),
+        "GCLOUD_CALLS_FILE": str(calls_file),
         **configuration,
     }
     result = subprocess.run(
@@ -115,29 +128,26 @@ def _read_secret_check(tmp_path, gcloud_exit_code=0, **configuration):
         text=True,
         check=False,
     )
-    recorded_arguments = (
-        json.loads(arguments_file.read_text()) if arguments_file.exists() else None
+    gcloud_calls = (
+        [json.loads(call) for call in calls_file.read_text().splitlines()]
+        if calls_file.exists()
+        else []
     )
-    return result, recorded_arguments
+    return result, gcloud_calls
 
 
 def test_read_secret_check_reads_only_the_secret_metadata(tmp_path):
-    result, gcloud_arguments = _read_secret_check(
+    result, gcloud_calls = _read_secret_check(
         tmp_path, PROJECT_ID="test-project", READ_SECRET_NAME="test-read-secret"
     )
     assert result.returncode == 0
-    assert gcloud_arguments == [
-        "secrets",
-        "describe",
-        "test-read-secret",
-        "--project",
-        "test-project",
-        "--format=none",
-    ]
+    # Every call is recorded, so any other call, such as one that reads the
+    # secret's value with `gcloud secrets versions access`, fails this test.
+    assert gcloud_calls == [READ_SECRET_METADATA_CALL]
 
 
 def test_missing_read_secret_stops_deployment(tmp_path):
-    result, _ = _read_secret_check(
+    result, gcloud_calls = _read_secret_check(
         tmp_path,
         gcloud_exit_code=1,
         PROJECT_ID="test-project",
@@ -145,13 +155,14 @@ def test_missing_read_secret_stops_deployment(tmp_path):
     )
     assert result.returncode != 0
     assert "test-read-secret" in result.stderr
+    assert gcloud_calls == [READ_SECRET_METADATA_CALL]
 
 
 @pytest.mark.parametrize("missing_name", ["PROJECT_ID", "READ_SECRET_NAME"])
 def test_read_secret_check_requires_its_configuration(tmp_path, missing_name):
     configuration = {"PROJECT_ID": "test-project", "READ_SECRET_NAME": "test-secret"}
     configuration.pop(missing_name)
-    result, gcloud_arguments = _read_secret_check(tmp_path, **configuration)
+    result, gcloud_calls = _read_secret_check(tmp_path, **configuration)
     assert result.returncode != 0
     assert missing_name in result.stderr
-    assert gcloud_arguments is None
+    assert gcloud_calls == []
