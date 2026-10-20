@@ -135,6 +135,13 @@ export function assertSafeReleaseId(id: string, label = "release"): string {
   return id;
 }
 
+// A release id, or a build in its own folder (`<release>/<build>`), which is
+// how a country publishing build folders names each build. Each segment
+// passes the same allowlist, and nothing longer is accepted.
+export function assertSafeReleaseOrBuildFolderId(id: string, label = "release"): string {
+  return isBuildFolderId(id) ? id : assertSafeReleaseId(id, label);
+}
+
 // Route catch → HTTP: a bad id is the caller's fault (400); anything else is
 // an upstream/HF failure (502). Keeps status semantics consistent across routes.
 export function classifyApiError(error: unknown): { status: number; body: { detail: string } } {

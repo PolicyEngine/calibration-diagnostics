@@ -5,6 +5,7 @@ import {
   type MicrocosmCountry,
   asObject,
   assertSafeReleaseId,
+  assertSafeReleaseOrBuildFolderId,
   buildCalibration,
   buildComparison,
   latestMicrocosmCalibrationSummary,
@@ -985,7 +986,7 @@ export async function loadStagingTargetChangeDataset(
 ): Promise<TargetChangeDataset | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
-  assertSafeReleaseId(releaseId, "release");
+  assertSafeReleaseOrBuildFolderId(releaseId, "release");
   const progress = await stagingJsonOrNull(
     `runs/${runId}/progress.json`,
     TARGET_CHANGE_MUTABLE_CACHE_SECONDS,
