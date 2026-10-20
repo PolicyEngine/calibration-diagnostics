@@ -55,14 +55,14 @@ secret version (`frontend/lib/server/secret-manager.ts`), keeps the value in
 memory for up to one minute, and after a failed fetch tries again on the next
 request. It never reaches the browser and never passes through GitHub Actions.
 
-The Vercel project sets these server-only, non-secret settings, separately for
-production and preview:
+The server reads three server-only, non-secret settings, each with a separate
+value for production and preview:
 
-| Setting | Value |
-|---|---|
-| `MICROCOSM_TELEMETRY_COLLECTOR_URL` | The matching environment's collector address. It must use HTTPS, except on `localhost`. |
-| `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` | The full Secret Manager version resource of that collector's read credential: `projects/<project>/secrets/<secret>/versions/<number or latest>`. |
-| `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER` | The full Google Workload Identity provider resource that trusts this Vercel project: `projects/<project number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>`. Read only on Vercel. |
+| Setting | Value | Where production and preview get it |
+|---|---|---|
+| `MICROCOSM_TELEMETRY_COLLECTOR_URL` | The matching environment's collector address. It must use HTTPS, except on `localhost`. | Production: the GitHub `Production` environment variable of the same name, which `.github/workflows/deploy.yml` passes to `vercel deploy --env`. Preview: the Vercel project's settings. |
+| `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` | The full Secret Manager version resource of that collector's read credential: `projects/<project>/secrets/<secret>/versions/<number or latest>`. | The Vercel project's settings. |
+| `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER` | The full Google Workload Identity provider resource that trusts this Vercel project: `projects/<project number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>`. Read only on Vercel. | The Vercel project's settings. |
 
 Without the first two, the dashboard doesn't query the collector and shows only
 the historical Hugging Face runs. If a collector request fails, the tab still
