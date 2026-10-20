@@ -57,7 +57,10 @@ target label when its selected fact can describe the resulting target exactly.
 Microcosm supplies an explicitly declared, reviewed target label when a target
 combines facts, transforms their value, or assigns a different target period.
 Missing or conflicting Chronicle-owned labels stop target compilation. The
-dashboard does not construct labels for schema 8.
+dashboard shows these labels as published, with one exception: a geography
+label that more than one geography level uses in the same build is qualified by
+its level, as described in
+[Geography labels shared by several levels](#geography-labels-shared-by-several-levels).
 
 ## Dashboard parsing
 
@@ -97,6 +100,40 @@ target row for details, comparisons, and diagnostics. Navigation uses
 Schema 2–7 behavior remains isolated in its historical reader and tree adapter.
 Humanization and country-specific parsing in those adapters must not be added
 to the schema 8 path.
+
+## Geography labels shared by several levels
+
+The map's geography breakdown, its Geography filter, `/microcosm/targets` and
+the Staging comparison maps group and select targets by geography label. In one
+build, geographies at different levels can share a label. UK local-area builds
+calibrate parliamentary constituencies and local authorities side by side, and
+many of them have the same name, such as Ashfield, Colchester and Midlothian.
+Without a distinguishing label, the two areas would be shown and selected as
+one geography.
+
+`buildCalibration` therefore applies this rule to the target rows of each
+diagnostics file it reads, whatever the diagnostics schema:
+
+- A label that rows at more than one geography level use gets its level in
+  parentheses, with underscores and hyphens in the level shown as spaces:
+  "Ashfield (constituency)" and "Ashfield (local authority)".
+- A label that rows at only one level use is left exactly as published.
+- The country's national geography label is never qualified. It is the release
+  manifest's `country.geography_label`, or else the registration's
+  `geography`, such as "United Kingdom". A target whose geography cannot be
+  resolved falls back to that label at the national level, and it still means
+  the whole country.
+- A row with no level keeps its label.
+- Labels and levels are compared after surrounding whitespace is removed.
+
+The rule is `levelQualifiedGeographyLabels` in
+`@policyengine/calibration-tree/geography-labels`. Every view reads its rows
+from `buildCalibration`, so they all show the same labels. Matching targets
+between two builds uses target names and identities, not geography labels, so
+comparisons pair the same targets as before.
+
+Published calibration trees keep the labels they were built with; see
+[Filtering indices](calibration-tree-artifacts.md#filtering-indices).
 
 ## Required verification
 
