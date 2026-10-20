@@ -8,6 +8,7 @@ import {
   countryRegistration,
   type MicrocosmCountry,
 } from "./countries";
+import { parseBuildFolderId } from "./release-record";
 
 export interface CalibrationReleaseLocation {
   buildArtifactId: string;
@@ -121,7 +122,67 @@ export async function resolveHfReleaseDirectorySha(
     );
   }
 
-  const entries = await response.json() as Array<{
+  return newestCommitOfCalibratedFolder(
+    await response.json(),
+    prefix,
+    `release ${release}`,
+    country,
+  );
+}
+
+/**
+ * The commit that wrote a build folder, `releases/<release>/<build>/`, as
+ * the folder is at `revision` (an exact commit, so the folder and the
+ * `releases.json` read beside it come from one snapshot). A build folder is
+ * never changed after publishing, so the newest commit behind its files is
+ * the one that wrote it, and every file is read there.
+ */
+export async function resolveHfBuildFolderSha(
+  country: MicrocosmCountry,
+  folderId: string,
+  revision: string,
+  revalidate = 0,
+): Promise<string> {
+  const folder = parseBuildFolderId(folderId);
+  if (!folder) throw new Error("Invalid build folder.");
+  const safeRevision = safeReleaseId(revision, "Hugging Face revision");
+  const repo = repository(country);
+  const response = await fetch(
+    `https://huggingface.co/api/datasets/${repo}/tree/${encodeURIComponent(safeRevision)}` +
+      `/releases/${encodeURIComponent(folder.release)}/${encodeURIComponent(folder.build)}` +
+      "?recursive=false&expand=true",
+    {
+      headers: hfHeaders(),
+      ...(revalidate <= 0
+        ? { cache: "no-store" as const }
+        : { next: { revalidate } }),
+    },
+  );
+  if (response.status === 404) {
+    throw new CalibrationReleaseNotFoundError(
+      `Hugging Face build folder releases/${folderId}/ was not found for ${country}.`,
+    );
+  }
+  if (!response.ok) {
+    throw new Error(`Hugging Face build folder lookup failed with ${response.status}.`);
+  }
+  return newestCommitOfCalibratedFolder(
+    await response.json(),
+    `releases/${folderId}/`,
+    `build folder releases/${folderId}/`,
+    country,
+  );
+}
+
+// The newest commit behind a folder listing's files (an expanded Hugging
+// Face tree response), refusing a folder without calibration diagnostics.
+function newestCommitOfCalibratedFolder(
+  listing: unknown,
+  prefix: string,
+  subject: string,
+  country: MicrocosmCountry,
+): string {
+  const entries = listing as Array<{
     path?: unknown;
     type?: unknown;
     lastCommit?: { id?: unknown; date?: unknown };
@@ -139,7 +200,7 @@ export async function resolveHfReleaseDirectorySha(
     (entry) => entry.path === `${prefix}calibration_diagnostics.json`,
   )) {
     throw new CalibrationReleaseNotFoundError(
-      `Hugging Face release ${release} has no calibration diagnostics for ${country}.`,
+      `Hugging Face ${subject} has no calibration diagnostics for ${country}.`,
     );
   }
 
@@ -152,7 +213,7 @@ export async function resolveHfReleaseDirectorySha(
       : Number.NaN;
     if (!/^[0-9a-f]{40,64}$/.test(id) || !Number.isFinite(date)) {
       throw new Error(
-        `Hugging Face returned invalid commit metadata for release ${release}.`,
+        `Hugging Face returned invalid commit metadata for ${subject}.`,
       );
     }
     return { id, date };
@@ -160,7 +221,7 @@ export async function resolveHfReleaseDirectorySha(
   commits.sort((left, right) => right.date - left.date);
   if (!commits[0]) {
     throw new CalibrationReleaseNotFoundError(
-      `Hugging Face release ${release} has no source files for ${country}.`,
+      `Hugging Face ${subject} has no source files for ${country}.`,
     );
   }
   return commits[0].id;

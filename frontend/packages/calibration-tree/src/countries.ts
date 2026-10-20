@@ -31,6 +31,19 @@ export interface ResolvedRepository {
   revision: string;
 }
 
+// How a country's dataset repository publishes its releases.
+// - `release_folders` (the default): one folder per release,
+//   `releases/<release id>/`, rewritten by each publication. Hugging Face
+//   tags name builds, and a root pointer file (`latest.json`, or
+//   `pointer_path`) names the current release.
+// - `build_folders`: one folder per build, `releases/<release>/<build>/`,
+//   never changed after publishing, and the root `releases.json` is the only
+//   record of each release's builds and current build (microcosm-emitter#24).
+//   The dashboard's readers then read nothing else: no tags, no pointer
+//   files and no listing of `releases/`.
+export const RELEASE_LAYOUTS = ["release_folders", "build_folders"] as const;
+export type ReleaseLayout = (typeof RELEASE_LAYOUTS)[number];
+
 export interface CountryRegistration {
   // Default HF dataset repository and revision (the server may override both
   // through the deployment variables named in repo_env / revision_env).
@@ -38,10 +51,13 @@ export interface CountryRegistration {
   revision: string;
   repo_env?: string;
   revision_env?: string;
+  // Omitted for `release_folders`.
+  release_layout?: ReleaseLayout;
   // The repository-root pointer naming the country's current release:
   // `latest.json` unless the country promotes its default line through a
   // per-line pointer (`latest-<line>.json`, microcosm#823) whose payload also
-  // names the immutable cut tag the release is read at.
+  // names the immutable cut tag the release is read at. Read only while the
+  // country publishes release folders.
   pointer_path?: string;
   // Country display name ("United States").
   label: string;
@@ -191,6 +207,10 @@ export function parseCountry(value: string | null | undefined): MicrocosmCountry
 
 export function countryRegistration(country: MicrocosmCountry): CountryRegistration {
   return COUNTRY_REGISTRY[country];
+}
+
+export function countryReleaseLayout(country: MicrocosmCountry): ReleaseLayout {
+  return countryRegistration(country).release_layout ?? "release_folders";
 }
 
 export const DEFAULT_POINTER_PATH = "latest.json";
