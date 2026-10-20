@@ -370,8 +370,20 @@ Failure meanings and recovery:
 - `502` from the application means GitHub rejected or did not receive the
   workflow dispatch; check `GITHUB_ACTIONS_DISPATCH_TOKEN` and its Actions
   permission.
-- A failed GitHub workflow means publication started but did not complete.
-  Rerun that workflow after correcting the reported error.
+- A failed release workflow means publication started but did not complete.
+  Release reconciliation stops at its first error, so the releases after a
+  failing one were not reconciled. Rerun that workflow after correcting the
+  reported error.
+- A failed staging workflow either stopped before reconciling any run (for
+  example, the staging repository was unavailable or listed incompatible
+  runs), or printed a report in which at least one run is `failed`. In the
+  second case every run with another outcome was reconciled, and the error
+  names the failed runs. Every later staging workflow for that country retries
+  them and fails again until their errors are corrected. Rerunning does not
+  correct a refused repair of a published tree ("Rebuilt staging index differs
+  from immutable manifest entry"): the same rebuild differs from the recorded
+  digest again, so that run keeps failing until the tree's missing files are
+  restored.
 - Hugging Face retries non-2xx deliveries and can suspend a repeatedly failing
   webhook. Correct the failure, re-enable the webhook, and replay the delivery;
   see the [Hugging Face delivery and retry documentation](https://huggingface.co/docs/hub/webhooks#delivery-and-retries).
