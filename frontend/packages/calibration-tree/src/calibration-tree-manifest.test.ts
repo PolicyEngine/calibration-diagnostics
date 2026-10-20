@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test";
 
+import { CountryNotConfiguredError } from "./countries";
 import {
   calibrationBuildsNewestFirst,
+  calibrationTreeCountryManifest,
   calibrationTreeManifestEntry,
   emptyCalibrationTreeManifest,
   parseCalibrationTreeManifest,
@@ -50,6 +52,42 @@ test("manifest updates one country without replacing other country entries", () 
   expect(serializeCalibrationTreeManifest(manifest)).toBe(
     serializeCalibrationTreeManifest(parseCalibrationTreeManifest(manifest)),
   );
+});
+
+function notConfiguredReason(read: () => unknown): string | null {
+  try {
+    read();
+  } catch (error) {
+    return error instanceof CountryNotConfiguredError ? error.reason : `other: ${String(error)}`;
+  }
+  return null;
+}
+
+test("a country without a published release is not configured, not another country's build", () => {
+  // Belgium has no entry; the UK has a build that is not its latest release.
+  const manifest = withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", {
+    ...entry,
+    hfRepo: "policyengine/populace-uk-private",
+  });
+  expect(notConfiguredReason(() => calibrationTreeCountryManifest(manifest, "be"))).toBe(
+    "no_published_release",
+  );
+  expect(
+    notConfiguredReason(() => calibrationTreeManifestEntry(manifest, "be", { releaseId: "latest" })),
+  ).toBe("no_published_release");
+  expect(
+    notConfiguredReason(() => calibrationTreeManifestEntry(manifest, "uk", { releaseId: "latest" })),
+  ).toBe("no_published_release");
+  expect(notConfiguredReason(() => calibrationTreeManifestEntry(manifest, "uk", {}))).toBe(
+    "no_published_release",
+  );
+  // An exact release id still resolves, and an unknown one is a plain miss.
+  expect(
+    calibrationTreeManifestEntry(manifest, "uk", { releaseId: entry.releaseId! }).buildArtifactId,
+  ).toBe(entry.buildArtifactId);
+  expect(
+    notConfiguredReason(() => calibrationTreeManifestEntry(manifest, "uk", { releaseId: "missing" })),
+  ).toBe("other: Error: No matching calibration build exists for uk.");
 });
 
 test("manifest validation rejects mutable or malformed content identities", () => {

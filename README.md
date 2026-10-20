@@ -63,7 +63,11 @@ The Next.js route handlers are the API layer. Mutable staging data reads from
 Hugging Face; immutable calibration trees and comparisons read through private
 Vercel Blob storage.
 
-Published-release endpoints accept `country=us|uk|be` (default `us`).
+Published-release endpoints accept `country=us|uk|be` (default `us` when the
+parameter is absent). Any other value, including another spelling such as `US`,
+returns HTTP 404 with `{"error": "country_not_configured", "requested_country",
+"reason", "detail"}`; it is never answered with another country's release. See
+[the request contract](docs/spec-driven-countries.md#requests-for-a-country).
 
 | Endpoint | Purpose |
 |---|---|
