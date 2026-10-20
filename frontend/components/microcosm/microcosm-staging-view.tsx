@@ -1050,7 +1050,7 @@ function MicrocosmStagingRunsView({
                     <thead className="col-span-full grid grid-cols-subgrid">
                       <tr className="col-span-full grid grid-cols-subgrid border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
                         <th className="whitespace-nowrap py-2 font-semibold">Validation point</th>
-                        <th className="whitespace-nowrap py-2 text-right font-semibold">{comparisonBaseline.columnLabel}</th>
+                        <th className="whitespace-nowrap py-2 text-right font-semibold">{comparisonBaseline.releaseLabel}</th>
                         <th className="whitespace-nowrap py-2 text-right font-semibold">Candidate</th>
                         <th className="whitespace-nowrap py-2 text-right font-semibold">Verdict</th>
                         <th className="whitespace-nowrap py-2 text-center font-semibold">About</th>

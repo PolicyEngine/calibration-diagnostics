@@ -406,6 +406,8 @@ interface CalibrationExplorerMapProps {
   stagingRunId?: string;
   stagingComparison?: {
     releaseId: string;
+    /** Names that release, e.g. "Local-area release"; defaults to "Current release". */
+    releaseLabel?: string;
     rows: MicrocosmComparisonRow[];
     weightedTargetErrorChange: number | null;
   };
@@ -506,6 +508,7 @@ function CalibrationExplorerMapForSource({
           selectedTargetChange,
           stagingComparison.weightedTargetErrorChange,
           selectedTarget,
+          stagingComparison.releaseLabel,
         )
       : null;
 

@@ -121,7 +121,8 @@ export function comparisonMapBuilds(
 }
 
 export interface StagingComparisonBaseline {
-  columnLabel: string;
+  /** Names the compared release: the table column and the map's labels. */
+  releaseLabel: string;
   tabLabel: string;
   note: string | null;
 }
@@ -132,7 +133,7 @@ export function stagingComparisonBaseline(
 ): StagingComparisonBaseline {
   if (comparisonRelease?.basis === "newest_local_area_release") {
     return {
-      columnLabel: "Local-area release",
+      releaseLabel: "Local-area release",
       tabLabel: "Change from local-area release",
       note:
         `This local-area candidate is compared with ${comparisonRelease.release_id}, the most recently ` +
@@ -141,7 +142,7 @@ export function stagingComparisonBaseline(
     };
   }
   return {
-    columnLabel: "Current release",
+    releaseLabel: "Current release",
     tabLabel: "Change from current release",
     note: comparisonRelease?.local_area_candidate
       ? "No local-area release has been published, so this local-area candidate is " +

@@ -12,6 +12,7 @@ import {
   targetChangeDirectionValue,
   targetChangeGroupsForDirection,
   targetChangeMapIdentity,
+  targetChangeModeHelp,
 } from "./target-change-visualization";
 
 function changeMetrics(
@@ -152,4 +153,21 @@ describe("target change visualization data", () => {
       change: 0.02,
     }));
   });
+});
+
+test("the comparison mode help names the release the candidate is compared with", () => {
+  expect(targetChangeModeHelp("Current release").reported).toBe(
+    "Uses each release's actual target weights and complete target surface. Added targets " +
+      "contribute candidate error, while removed targets subtract their contribution in the " +
+      "current release.",
+  );
+  expect(targetChangeModeHelp("Local-area release").reported).toBe(
+    "Uses each release's actual target weights and complete target surface. Added targets " +
+      "contribute candidate error, while removed targets subtract their contribution in the " +
+      "local-area release.",
+  );
+  expect(targetChangeModeHelp("Local-area release").shared).toBe(
+    "Uses only targets present in both releases and applies the same pooled target weights to " +
+      "both. Each release still uses its own verified benchmark, scale, cap, and capped error.",
+  );
 });
