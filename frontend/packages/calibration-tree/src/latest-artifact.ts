@@ -16,6 +16,7 @@ import {
   type HierarchyLabelVariant,
   validateHierarchyTargets,
 } from "./hierarchy-target-reader";
+import { expandHierarchyCatalogs } from "./hierarchy-catalog-reader";
 import { historicalWeightSummaryForDiagnostics } from "./historical-weight-summary";
 import {
   chroniclePublisherFromMetadata,
@@ -2029,7 +2030,7 @@ export function releaseCountry(
 }
 
 export function buildCalibration(
-  diag: JsonObject,
+  diagnostics: JsonObject,
   releaseId: string,
   updatedAt: string | null = null,
   buildManifest: JsonObject = {},
@@ -2040,6 +2041,9 @@ export function buildCalibration(
   diagnosticsSha256: string | null = null,
   hfCommitSha: string | null = null,
 ): Calibration {
+  // A schema 9 file's rows carry catalog references; every reader below
+  // sees them as schema 8 rows. Other versions pass through unchanged.
+  const diag = expandHierarchyCatalogs(diagnostics);
   const targetRepresentation = targetRepresentationForDiagnosticsArtifact(
     diag.schema_version,
     { releaseId, sha256: diagnosticsSha256 },

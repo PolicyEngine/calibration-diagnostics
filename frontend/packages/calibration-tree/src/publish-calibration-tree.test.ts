@@ -19,6 +19,7 @@ import {
   type CalibrationTreeManifestEntry,
 } from "./calibration-tree-manifest";
 import type { CalibrationTreeBundle } from "./calibration-tree-bundle";
+import { schema9Diagnostics } from "./test-support/schema-9-diagnostics";
 
 const originalFetch = globalThis.fetch;
 
@@ -892,6 +893,38 @@ test("a dry run records a failed release, writes nothing and still reports the r
     });
     expect(store.uploads).toHaveLength(0);
     expect(store.writes).toHaveLength(0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("release reconciliation publishes a schema 9 release with the tree of its schema 8 equivalent", async () => {
+  const schema8Store = lineStoreWithJuneLatest();
+  const schema9Store = lineStoreWithJuneLatest();
+  try {
+    globalThis.fetch = lineRepositoryFetch([]);
+    await reconcileReleaseBuilds("uk", "blob-token", false, schema8Store);
+    globalThis.fetch = lineRepositoryFetch([], () => schema9Diagnostics(SCHEMA_8_DIAGNOSTICS));
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, schema9Store);
+
+    expect(report.outcomes.filter((outcome) => outcome.status === "published")
+      .map((outcome) => outcome.sourceId).sort()).toEqual([DENSE_CUT, NATIONAL_CUT].sort());
+    // The source digest, and so the build ID, comes from the file's bytes.
+    // With both replaced, every uploaded file is the same as for schema 8,
+    // except that the index records each part's SHA-256 and compressed size,
+    // which cover the build ID inside the part; those two fields are left out.
+    const withoutIdentity = (bundle: CalibrationTreeBundle) =>
+      bundle.files.map((file) => {
+        const text = file.serialized
+          .replaceAll(bundle.index.buildArtifactId, "<build>")
+          .replaceAll(bundle.index.build.sourceArtifacts.calibrationDiagnostics?.sha256 ?? "", "<digest>");
+        if (file.part !== "index") return text;
+        return JSON.stringify(JSON.parse(text), (key, value) =>
+          key === "sha256" || key === "gzipBytes" ? undefined : value
+        );
+      });
+    expect(schema9Store.uploads.map(withoutIdentity))
+      .toEqual(schema8Store.uploads.map(withoutIdentity));
   } finally {
     globalThis.fetch = originalFetch;
   }
