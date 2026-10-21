@@ -28,7 +28,11 @@ import {
   type CompileCalibrationTreeInput,
   type CompiledCalibrationLevel,
 } from "./calibration-tree-artifact";
-import { fitBandForTarget, type CalibrationTreeTarget } from "./calibration-tree";
+import {
+  fitBandForTarget,
+  geographyLabeller,
+  type CalibrationTreeTarget,
+} from "./calibration-tree";
 
 export interface CalibrationTreeBundleFile {
   part: CalibrationTreePart;
@@ -213,18 +217,29 @@ function expectedFacet(
   return null;
 }
 
-function facetPostings(
-  summaryTargets: CalibrationTreeTargetSummaryArtifact["targets"],
-  key: Exclude<FilterPostingKey, "geographies">,
+// The target ordinals of each facet value, with rows in target order.
+function rowPostings(
+  rows: CalibrationTreeTarget[],
+  facetValue: (row: CalibrationTreeTarget) => string | null,
 ): Map<string | null, number[]> {
   const postings = new Map<string | null, number[]>();
-  summaryTargets.forEach((target, targetOrdinal) => {
-    const value = expectedFacet(target.comparison.row, key);
+  rows.forEach((row, targetOrdinal) => {
+    const value = facetValue(row);
     const targetOrdinals = postings.get(value) ?? [];
     targetOrdinals.push(targetOrdinal);
     postings.set(value, targetOrdinals);
   });
   return postings;
+}
+
+function samePostings(
+  actual: Map<string | null, number[]>,
+  expected: Map<string | null, number[]>,
+): boolean {
+  return actual.size === expected.size &&
+    [...expected].every(([value, targetOrdinals]) =>
+      sameIndices(actual.get(value) ?? [], targetOrdinals),
+    );
 }
 
 // The Geography filter offers and selects the labels of the tree's geography
@@ -235,6 +250,9 @@ function facetPostings(
 // calibration-tree.ts). Trees published before nodes were grouped by
 // geography ID grouped both their nodes and their postings by each row's own
 // spelling, so they meet this condition too.
+//
+// The node and the posting come from the same labeller, so they are also
+// checked against the target rows (geographyPostingsFollowRows).
 function geographyNodePostings(
   bundle: CalibrationTreeBundle,
 ): Map<string | null, number[]> {
@@ -251,6 +269,32 @@ function geographyNodePostings(
     postings.set(treeNode.selection.value, treeNode.targetOrdinals);
   }
   return postings;
+}
+
+// Each geography posting must hold the targets of one label worked out from
+// the target rows. A tree built with nodes grouped by geography ID has one
+// posting per label that geographyLabeller gives its target detail rows,
+// which carry the geography IDs; a comparison tree has no detail rows, and
+// its compact rows carry no geography ID, so each row keeps its own
+// spelling. A tree published before nodes were grouped by geography ID has
+// one posting per row's own spelling. Where every geography ID is spelled
+// one way, both rules give the same postings.
+function geographyPostingsFollowRows(
+  actual: Map<string | null, number[]>,
+  summaryRows: CalibrationTreeTarget[],
+  detailRows: CalibrationTreeTarget[],
+): boolean {
+  const labelledRows = detailRows.length ? detailRows : summaryRows;
+  return (
+    samePostings(actual, rowPostings(labelledRows, geographyLabeller(labelledRows))) ||
+    samePostings(
+      actual,
+      rowPostings(
+        summaryRows,
+        (row) => String(row.geography ?? "").trim() || "United States",
+      ),
+    )
+  );
 }
 
 function validatePostingCoverage(
@@ -275,6 +319,7 @@ function validatePostingCoverage(
   const summaryTargets = targetSummaries.flatMap(
     (artifact) => (artifact as CalibrationTreeTargetSummaryArtifact).targets,
   );
+  const summaryRows = summaryTargets.map((target) => target.comparison.row);
   if (
     filterIndex.targetCount !== bundle.index.targetCount ||
     summaryTargets.length !== bundle.index.targetCount ||
@@ -309,7 +354,7 @@ function validatePostingCoverage(
     );
     const expected = key === "geographies"
       ? geographyNodePostings(bundle)
-      : facetPostings(summaryTargets, key);
+      : rowPostings(summaryRows, (row) => expectedFacet(row, key));
     if (actual.size !== expected.size) {
       throw new Error(`Calibration tree ${key} postings do not cover every facet value.`);
     }
@@ -317,6 +362,12 @@ function validatePostingCoverage(
       if (!sameIndices(actual.get(value) ?? [], targetOrdinals)) {
         throw new Error(`Calibration tree ${key} posting ${String(value)} is incorrect.`);
       }
+    }
+    if (
+      key === "geographies" &&
+      !geographyPostingsFollowRows(actual, summaryRows, detailRows)
+    ) {
+      throw new Error("Calibration tree geographies postings do not follow the target rows.");
     }
   }
 }
