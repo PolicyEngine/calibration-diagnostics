@@ -1,4 +1,8 @@
-import { isCountry, type MicrocosmCountry } from "./countries";
+import {
+  CountryNotConfiguredError,
+  isCountry,
+  type MicrocosmCountry,
+} from "./countries";
 import {
   CALIBRATION_TREE_SCHEMA_VERSION,
   isHfCommitSha,
@@ -207,7 +211,9 @@ export function calibrationTreeCountryManifest(
   country: MicrocosmCountry,
 ): CalibrationTreeCountryManifest {
   const entry = manifest.countries[country];
-  if (!entry) throw new Error(`No published calibration builds exist for ${country}.`);
+  // A registered country the publisher has not written yet: an honest
+  // not-configured state, never another country's builds.
+  if (!entry) throw new CountryNotConfiguredError(country, "no_published_release");
   return entry;
 }
 
@@ -224,11 +230,17 @@ export function calibrationTreeManifestEntry(
   selector: { buildArtifactId?: string; releaseId?: string; stagingRunId?: string },
 ): CalibrationTreeManifestEntry {
   const countryManifest = calibrationTreeCountryManifest(manifest, country);
-  const buildArtifactId = selector.buildArtifactId ?? (
+  const wantsLatest = !selector.buildArtifactId && (
     selector.releaseId === "latest" ||
       (!selector.releaseId && !selector.stagingRunId)
-      ? countryManifest.latestReleaseBuildArtifactId
-      : undefined
+  );
+  // Builds (staging runs, say) without a published release: the country has
+  // no current release to serve yet.
+  if (wantsLatest && !countryManifest.latestReleaseBuildArtifactId) {
+    throw new CountryNotConfiguredError(country, "no_published_release");
+  }
+  const buildArtifactId = selector.buildArtifactId ?? (
+    wantsLatest ? countryManifest.latestReleaseBuildArtifactId ?? undefined : undefined
   );
   const result = countryManifest.builds.find((entry) =>
     buildArtifactId

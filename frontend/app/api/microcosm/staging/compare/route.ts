@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import { hasCapability, type MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 import {
-  parseCountry,
   scrub,
 } from "@policyengine/calibration-tree/latest-artifact";
 import {
@@ -39,7 +39,8 @@ export function createStagingCompareHandler(
 ) {
   return async function GET(request: Request) {
     const url = new URL(request.url);
-    const country = parseCountry(url.searchParams.get("country"));
+    const country = requestedCountry(url.searchParams);
+    if (country instanceof Response) return country;
     const runId = url.searchParams.get("run")?.trim();
     let release = url.searchParams.get("release")?.trim() || "latest";
     if (!runId && hasCapability(country, "staging")) {

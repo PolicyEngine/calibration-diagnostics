@@ -13,6 +13,7 @@ import {
   buildCalibration,
   buildComparison,
   calibrationLossKind,
+  classifyApiError,
   diagnosticsDimensions,
   MICROCOSM_HF_REPO_ENV,
   MICROCOSM_BE_HF_REPO_ENV,
@@ -32,7 +33,9 @@ import {
   microcosmRepo,
   microcosmRevision,
   microcosmTargetTreemap,
-  parseCountry,
+  CountryNotConfiguredError,
+  countryParam,
+  isCountry,
   parseHashedJsonArtifact,
   releaseCountry,
   releasePresentation,
@@ -76,18 +79,42 @@ test("hashes calibration diagnostics before parsing JSON", () => {
   );
 });
 
-test("coerces supported country parameters and defaults unknown values to US", () => {
-  expect(parseCountry("be")).toBe("be");
-  expect(parseCountry("uk")).toBe("uk");
-  expect(parseCountry("us")).toBe("us");
-  expect(parseCountry("BE")).toBe("us");
-  expect(parseCountry("fr")).toBe("us");
-  expect(parseCountry(null)).toBe("us");
+test("a country parameter names its own country or is not configured, never US by fallback", () => {
+  expect(countryParam("be")).toEqual({ configured: true, country: "be", explicit: true });
+  expect(countryParam("uk")).toEqual({ configured: true, country: "uk", explicit: true });
+  expect(countryParam("us")).toEqual({ configured: true, country: "us", explicit: true });
+  expect(countryParam("BE")).toEqual({ configured: false, requested: "BE" });
+  expect(countryParam("fr")).toEqual({ configured: false, requested: "fr" });
+  expect(countryParam("nz")).toEqual({ configured: false, requested: "nz" });
+  expect(countryParam(null)).toEqual({ configured: true, country: "us", explicit: false });
 });
 
-test("accepts the conformance fixture country only as a registered code", () => {
-  expect(parseCountry("zz")).toBe("zz");
-  expect(parseCountry("ZZ")).toBe("us");
+test("the conformance fixture is a registered code that requests cannot select", () => {
+  expect(isCountry("zz")).toBe(true);
+  expect(countryParam("zz")).toEqual({ configured: false, requested: "zz" });
+  expect(countryParam("ZZ")).toEqual({ configured: false, requested: "ZZ" });
+});
+
+test("a country without a configured release is a 404 not-configured response", () => {
+  expect(classifyApiError(new CountryNotConfiguredError("nz"))).toEqual({
+    status: 404,
+    body: {
+      error: "country_not_configured",
+      requested_country: "nz",
+      reason: "unknown_country",
+      detail: 'No Microcosm calibration release is configured for country "nz".',
+    },
+  });
+  expect(classifyApiError(new CountryNotConfiguredError("be", "no_published_release"))).toEqual({
+    status: 404,
+    body: {
+      error: "country_not_configured",
+      requested_country: "be",
+      reason: "no_published_release",
+      detail: "No Microcosm calibration release has been published for Belgium yet.",
+    },
+  });
+  expect(classifyApiError(new Error("HF fetch failed 500")).status).toBe(502);
 });
 
 test("uses the private Belgium repository and country revision", () => {

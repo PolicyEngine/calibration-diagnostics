@@ -27,12 +27,14 @@ import {
 import {
   COUNTRY_REGISTRY,
   DEFAULT_COUNTRY,
+  CountryNotConfiguredError,
+  countryParam,
   countryRegistration,
   isCountry,
   isCountryCapability,
-  parseCountry,
   resolveRegisteredRepository,
   type CountryCapability,
+  type CountryNotConfiguredBody,
   type MicrocosmCountry,
   type RepositoryVisibility,
 } from "./countries";
@@ -61,7 +63,7 @@ import { parseReleaseCutTag } from "./release-cut";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
-export { isCountry, parseCountry, type MicrocosmCountry };
+export { CountryNotConfiguredError, countryParam, isCountry, type MicrocosmCountry };
 
 type JsonObject = Record<string, unknown>;
 type TargetRow = JsonObject;
@@ -128,11 +130,18 @@ export function assertSafeReleaseId(id: string, label = "release"): string {
   return id;
 }
 
-// Route catch → HTTP: a bad id is the caller's fault (400); anything else is
-// an upstream/HF failure (502). Keeps status semantics consistent across routes.
-export function classifyApiError(error: unknown): { status: number; body: { detail: string } } {
+// Route catch → HTTP: a bad id is the caller's fault (400); a country without
+// a configured release is an explicit not-configured state (404); anything
+// else is an upstream/HF failure (502). Keeps status semantics consistent
+// across routes.
+export function classifyApiError(
+  error: unknown,
+): { status: number; body: { detail: string } | CountryNotConfiguredBody } {
   if (error instanceof InvalidReleaseIdError) {
     return { status: 400, body: { detail: error.message } };
+  }
+  if (error instanceof CountryNotConfiguredError) {
+    return { status: 404, body: error.body() };
   }
   return {
     status: 502,

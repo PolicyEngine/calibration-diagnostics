@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import { hasCapability } from "@policyengine/calibration-tree/countries";
-import { parseCountry, scrub } from "@policyengine/calibration-tree/latest-artifact";
+import { scrub } from "@policyengine/calibration-tree/latest-artifact";
 import { loadStagingTargetDiagnostics } from "@policyengine/calibration-tree/staging-artifact";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,8 @@ export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
-  const country = parseCountry(params.get("country"));
+  const country = requestedCountry(params);
+  if (country instanceof Response) return country;
   const runId = params.get("id")?.trim();
   if (!runId && hasCapability(country, "staging")) {
     return NextResponse.json({ detail: "Provide a staging run id via ?id=." }, { status: 400 });

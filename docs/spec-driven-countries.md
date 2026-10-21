@@ -118,6 +118,46 @@ through 7 while published releases migrate. The top-level schema version selects
 one reader for the complete file, never by country or individual row shape. See
 [Calibration map hierarchy](calibration-map-hierarchy.md).
 
+### Requests for a country
+
+Every API route and page that takes `?country=` resolves it with
+`countryParam` in `frontend/packages/calibration-tree/src/countries.ts`:
+
+- absent (or empty): the registry default, `us`;
+- a selectable registration key, exactly: that country;
+- anything else (an unregistered code such as `nz`, another spelling such as
+  `US`, or a conformance fixture such as `zz`): not configured.
+
+A not-configured code never resolves to another country. API routes answer
+it before validating other parameters or reading any artifact
+(`frontend/lib/api/request-country.ts`) with HTTP 404 and:
+
+```json
+{
+  "error": "country_not_configured",
+  "requested_country": "nz",
+  "reason": "unknown_country",
+  "detail": "No Microcosm calibration release is configured for country \"nz\"."
+}
+```
+
+A registered country that the dashboard manifest names no current release for
+gets the same response with `reason: "no_published_release"`. That is a newly
+registered country before its first publication. Routes addressed by build
+artifact (`tree`, `tree-manifest`, `comparison-tree`) also require the
+parameter, and a request without it is a 400.
+
+Pages follow the URL's country. A not-configured code renders an empty state
+naming the requested code in place of the page, and the selector shows no
+dataset. The deployment smoke check asserts that an unregistered code is
+refused this way.
+
+Registering a country before its first release fails the deployment smoke
+check, which requires every selectable `calibration` country to serve a
+release, until `publish-calibration-tree.yml` has written that country's
+manifest entry. Merge the registration, dispatch the publisher for the
+country from `main`, then re-run the deployment.
+
 ### Presentation
 
 `release_manifest.presentation` fills only the two existing overview and

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import { calibrationTreeRequestState } from "@/lib/microcosm/calibration-tree-request";
 import {
   classifyApiError,
-  parseCountry,
   scrub,
 } from "@policyengine/calibration-tree/latest-artifact";
 import { isSha256 } from "@policyengine/calibration-tree/calibration-tree-artifact";
@@ -32,6 +32,8 @@ export function createStagingTargetChangeTreeHandler(
 ) {
   return async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
+    const country = requestedCountry(params);
+    if (country instanceof Response) return country;
     const runId = params.get("run")?.trim();
     const releaseId = params.get("release")?.trim();
     const currentBuildArtifactId = params.get("build")?.trim();
@@ -65,7 +67,6 @@ export function createStagingTargetChangeTreeHandler(
       );
     }
     const mode = requestedMode as TargetChangeMode;
-    const country = parseCountry(params.get("country"));
     try {
       const dataset = currentBuildArtifactId
         ? await dependencies.loadBuildDataset(
