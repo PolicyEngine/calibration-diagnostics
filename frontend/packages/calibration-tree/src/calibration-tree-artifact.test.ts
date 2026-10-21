@@ -446,6 +446,42 @@ test("bundle validation still accepts a tree published with a node per spelling"
   expect(() => validateCalibrationTreeBundle(published)).not.toThrow();
 });
 
+test("a compile reads each row's geography ID once, however many levels the tree has", () => {
+  // A compile builds every level of the tree from the same rows, so it labels
+  // each row's geography once instead of once per level: the largest
+  // published trees have more than 12,000 levels.
+  const geographyIdReads = MAINE_RELEASE_ROWS.map(() => 0);
+  const countedRows = MAINE_RELEASE_ROWS.map(
+    ({ geography_id: geographyId, ...row }, rowIndex) =>
+      Object.defineProperty({ ...row }, "geography_id", {
+        enumerable: true,
+        get() {
+          geographyIdReads[rowIndex] += 1;
+          return geographyId;
+        },
+      }) as CalibrationTreeTarget,
+  );
+
+  const draft = compileCalibrationTreeBundleDraft({
+    country: "us",
+    releaseId: RELEASE,
+    hfRepo: "policyengine/populace-us",
+    hfCommitSha: COMMIT,
+    buildArtifactId: SOURCE_HASH,
+    sourceArtifacts: {
+      calibrationDiagnostics: null,
+      buildManifest: null,
+      releaseManifest: null,
+      demographics: null,
+    },
+    rows: countedRows,
+    lossAttributionAvailable: true,
+  });
+
+  expect(Object.keys(draft.levels).length).toBeGreaterThan(50);
+  expect(geographyIdReads).toEqual(MAINE_RELEASE_ROWS.map(() => 1));
+});
+
 test("the index renders without later parts and deeper navigation waits for its tier", () => {
   const built = bundle();
   const root = calibrationTreeResponseFromBundle(
