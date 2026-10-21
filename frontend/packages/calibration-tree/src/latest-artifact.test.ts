@@ -403,7 +403,8 @@ test("top-level schema version selects one reader and rejects unsupported versio
       "invalid-schema-8",
     ),
   ).toThrow("hierarchy must be an object");
-  for (const schemaVersion of [undefined, 0, 9]) {
+  // Schema 9 is read (schema-9-diagnostics.test.ts); 10 is not.
+  for (const schemaVersion of [undefined, 0, 10]) {
     expect(() =>
       buildCalibration(
         { schema_version: schemaVersion, targets: [] },
