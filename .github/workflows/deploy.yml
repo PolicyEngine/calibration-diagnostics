@@ -1,13 +1,14 @@
 name: Deploy production
 
+# Only CI runs whose head branch is main create a run of this workflow. The
+# filter matches the branch name alone, so a pull request from a fork whose
+# branch is named main still passes it; the deploy job's condition rejects that
+# run because its event is pull_request. See #260.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-
-concurrency:
-  group: calibration-diagnostics-production
-  cancel-in-progress: false
+    branches: [main]
 
 permissions:
   contents: read
@@ -25,6 +26,14 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main'
+    # One deploy runs and at most one waits; a newer deploy replaces the waiting
+    # one, which is safe because the newer main commit contains the older one.
+    # The group belongs to this job, not the workflow: a workflow-level group
+    # admits a run when GitHub creates it, before this condition skips it, so a
+    # run that deploys nothing could replace a waiting deploy of main.
+    concurrency:
+      group: calibration-diagnostics-production
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: Production
