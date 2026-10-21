@@ -270,6 +270,31 @@ one merged label for both areas, and a repair of it is refused because the
 rebuilt index differs from the recorded digest. For a staging build, the refusal
 is reported as that run's `failed` outcome.
 
+Geography nodes group rows by geography ID, and a geography that rows spell
+more than one way is listed once (see
+[Geographies spelled more than one way](calibration-map-hierarchy.md#geographies-spelled-more-than-one-way)).
+Geography postings and the index's geography filter options use the node
+labels: one posting per geography node, holding every target of that node, so
+the Geography filter offers one option per geography and selects all of its
+targets. Bundle validation compares each geography posting with the geography
+root node of the same label. It cannot recompute them from the target
+summaries alone, whose compact rows carry each row's own spelling and no
+geography ID. Because the nodes and the postings come from the same labels,
+validation also checks the postings against the target rows: they must be the
+postings that `geographyLabeller` gives the target detail rows, which carry
+the geography IDs, or the postings by each row's own spelling, as trees built
+before geographies were grouped by ID have them. A comparison tree has no
+detail rows and its compact rows carry no geography ID, so both rules give
+each row's own spelling there. For rows that spell every geography one way,
+labels, postings and files are unchanged.
+
+A tree published before geographies were grouped by ID has one node and one
+posting per spelling. Its nodes and postings agree with each other and with
+each row's own spelling, so it still validates, and reconciliation finds it
+complete and leaves its files as they are. Rebuilding
+one whose rows spell a geography ID two ways would give a different index and
+filter index, so a repair of it is refused, like the trees above.
+
 The browser unions selected values within one category, intersects categories,
 filters hierarchy memberships, and recalculates visible metrics from compact
 per-target inputs. Target detail shards are not required for navigation,

@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import {
   calibrationTreeTargetDetailsFromDraft,
@@ -14,7 +15,9 @@ import {
   parseCalibrationTreeIndex,
   parseCalibrationTreePart,
   serializeCalibrationTreePart,
+  type CalibrationTreeArtifactPart,
   type CalibrationTreeFilterIndexArtifact,
+  type CalibrationTreePosting,
   type CalibrationTreeTargetDetailsArtifact,
   type CalibrationTreeTargetSummaryArtifact,
   type CalibrationTreeTierArtifact,
@@ -33,6 +36,7 @@ import {
   buildCalibrationTree,
   type CalibrationTreeTarget,
 } from "./calibration-tree";
+import maineRelease from "./fixtures/us-766b7c7-maine-targets.json";
 
 const COMMIT = "1234567890abcdef1234567890abcdef12345678";
 const SOURCE_HASH = "a".repeat(64);
@@ -68,7 +72,7 @@ const rows: CalibrationTreeTarget[] = [
       }],
 }));
 
-function bundle(): CalibrationTreeBundle {
+function bundle(bundleRows = rows): CalibrationTreeBundle {
   return buildCalibrationTreeBundle({
     country: "us",
     releaseId: RELEASE,
@@ -83,7 +87,7 @@ function bundle(): CalibrationTreeBundle {
       releaseManifest: null,
       demographics: null,
     },
-    rows,
+    rows: bundleRows,
     lossAttributionAvailable: true,
   });
 }
@@ -150,6 +154,368 @@ test("posting-list filters union within categories and intersect across them", (
   expect(calibrationTreeResponseFromBundle(loaded(), state)).toEqual(
     buildCalibrationTree(rows, state, RELEASE, true),
   );
+});
+
+// Release populace-us-2024-buildo-acs-local-766b7c7-20261017T030317Z names
+// state 0400000US23 "Maine" on its SNAP and Medicaid targets and "ME" on its
+// later state population target.
+test("published and live trees list a geography ID that rows spell two ways as one node", () => {
+  function maineTarget(
+    name: string,
+    source: string,
+    geography: string,
+    error: number,
+  ): CalibrationTreeTarget {
+    return {
+      comparison_id: name,
+      name,
+      target_label: name,
+      target_representation: "hierarchy",
+      source,
+      source_label: source,
+      variable: `${source}.total`,
+      variable_label: source,
+      geography,
+      geography_id: "0400000US23",
+      level: "state",
+      abs_relative_error: error,
+      final_loss_contribution: error / 10,
+      target_loss_weight_share: 0.25,
+      calibration_status: "included",
+      target_dimensions: [],
+    };
+  }
+  const maineRows = [
+    maineTarget("usda_snap.fy2024.state_benefits.nero.me.total_benefits@2024", "usda_snap", "Maine", 0.02),
+    maineTarget(
+      "cms_medicaid.month2024_12.state_enrollment.me.total_medicaid_enrollment@2024",
+      "cms_medicaid",
+      "Maine",
+      0.03,
+    ),
+    maineTarget("pop_state_23@2024", "census_population", "ME", 0.5),
+  ];
+  const compiled = loaded(bundle(maineRows));
+  const unfiltered: ExplorerState = { ...createExplorerState(), breakdown: "geography" };
+  const poorlyFitOnly: ExplorerState = {
+    ...unfiltered,
+    filters: { ...unfiltered.filters, fitBands: ["40_plus"] },
+  };
+
+  const geographyNodes = (state: ExplorerState) => {
+    const published = calibrationTreeResponseFromBundle(compiled, state);
+    expect(published).toEqual(buildCalibrationTree(maineRows, state, RELEASE, true));
+    return published!.groups
+      .flatMap((group) => group.nodes)
+      .map((treeNode) => [treeNode.label, treeNode.metrics.nTargets]);
+  };
+  expect(geographyNodes(unfiltered)).toEqual([["Maine", 3]]);
+  expect(geographyNodes(poorlyFitOnly)).toEqual([["Maine", 1]]);
+
+  const maine = selectExplorerNode(unfiltered, { kind: "geography", value: "Maine" });
+  for (const programState of [maine, { ...maine, filters: poorlyFitOnly.filters }]) {
+    const programs = calibrationTreeResponseFromBundle(compiled, programState);
+    expect(programs).toEqual(buildCalibrationTree(maineRows, programState, RELEASE, true));
+    expect(programs!.pathLabels.geography).toBe("Maine");
+  }
+  expect(
+    calibrationTreeResponseFromBundle(compiled, maine)!.groups.map((group) => group.id),
+  ).toEqual(["census_population", "cms_medicaid", "usda_snap"]);
+});
+
+// Every row of state 0400000US23 and of Maine's two congressional districts in
+// release populace-us-2024-buildo-acs-local-766b7c7-20261017T030317Z, in
+// release order (the fixture records how it was made). 84 of the state's 85
+// targets spell it "Maine"; its state population target spells it "ME".
+const MAINE_RELEASE_ROWS = maineRelease.rows as unknown as CalibrationTreeTarget[];
+
+// Replaces one part of a built bundle and rewrites the digest and sizes that
+// its descriptor and the index record, as a builder that wrote the part would.
+function withReplacedPart(
+  built: CalibrationTreeBundle,
+  artifact: CalibrationTreeArtifactPart,
+): CalibrationTreeBundle {
+  const content = (part: CalibrationTreeArtifactPart) => {
+    const serialized = serializeCalibrationTreePart(part);
+    const compressed = gzipSync(serialized, { level: 9 });
+    return {
+      serialized,
+      compressed,
+      sha256: createHash("sha256").update(serialized, "utf8").digest("hex"),
+      rawBytes: Buffer.byteLength(serialized, "utf8"),
+      gzipBytes: compressed.byteLength,
+    };
+  };
+  const replaced = structuredClone(built);
+  const partContent = content(artifact);
+  Object.assign(
+    replaced.files.find((file) => file.part === artifact.part)!,
+    { artifact, ...partContent },
+  );
+  const { parts } = replaced.index;
+  Object.assign(
+    [
+      parts.filterIndex,
+      ...parts.targetSummaries,
+      ...parts.targetDetails,
+      ...parts.tiers,
+    ].find((descriptor) => descriptor.part === artifact.part)!,
+    {
+      sha256: partContent.sha256,
+      rawBytes: partContent.rawBytes,
+      gzipBytes: partContent.gzipBytes,
+    },
+  );
+  Object.assign(
+    replaced.files.find((file) => file.part === "index")!,
+    { artifact: replaced.index, ...content(replaced.index) },
+  );
+  return replaced;
+}
+
+function withGeographyPostings(
+  built: CalibrationTreeBundle,
+  geographies: CalibrationTreePosting[],
+): CalibrationTreeBundle {
+  const filterIndex = built.files.find((file) => file.part === "filter-index")!
+    .artifact as CalibrationTreeFilterIndexArtifact;
+  return withReplacedPart(built, {
+    ...filterIndex,
+    postings: { ...filterIndex.postings, geographies },
+  });
+}
+
+test("published and live Geography filters offer one option per geography and select all of its targets", () => {
+  const built = bundle(MAINE_RELEASE_ROWS);
+  const compiled = loaded(built);
+  const geographyRoot: ExplorerState = {
+    ...createExplorerState(),
+    breakdown: "geography",
+  };
+  const filteredBy = (
+    treeState: ExplorerState,
+    geographies: string[],
+  ): ExplorerState => ({
+    ...treeState,
+    filters: { ...treeState.filters, geographies },
+  });
+
+  const geographies = [
+    "Maine",
+    "ME congressional district 1",
+    "ME congressional district 2",
+  ];
+  expect(built.index.filterOptions.geographies).toEqual(geographies);
+  expect(
+    buildCalibrationTree(MAINE_RELEASE_ROWS, geographyRoot, RELEASE, true)
+      .filterOptions.geographies,
+  ).toEqual(geographies);
+  expect(
+    compiled.filterIndex.postings.geographies.map((posting) => [
+      posting.value,
+      posting.targetOrdinals.length,
+    ]),
+  ).toEqual([
+    ["Maine", 85],
+    ["ME congressional district 1", 1],
+    ["ME congressional district 2", 1],
+  ]);
+
+  const maine = selectExplorerNode(geographyRoot, {
+    kind: "geography",
+    value: "Maine",
+  });
+  const population = selectExplorerNode(createExplorerState(), {
+    kind: "program",
+    source: "census_population",
+    value: "census_population.resident_population",
+  });
+  for (const treeState of [geographyRoot, maine, population]) {
+    const filtered = filteredBy(treeState, ["Maine"]);
+    expect(calibrationTreeResponseFromBundle(compiled, filtered)).toEqual(
+      buildCalibrationTree(MAINE_RELEASE_ROWS, filtered, RELEASE, true),
+    );
+  }
+  expect(
+    calibrationTreeResponseFromBundle(compiled, filteredBy(geographyRoot, ["Maine"]))!
+      .groups.flatMap((group) => group.nodes)
+      .map((treeNode) => [treeNode.label, treeNode.metrics.nTargets]),
+  ).toEqual([["Maine", 85]]);
+
+  // The program breakdown lists the same programs and counts; the published
+  // reader keeps the compiled node order under a filter.
+  const programs = filteredBy(createExplorerState(), ["Maine"]);
+  const programCounts = (response: ReturnType<typeof buildCalibrationTree>) =>
+    response.groups
+      .map((group) => [group.id, group.metrics.nTargets] as const)
+      .sort(([left], [right]) => left.localeCompare(right));
+  const publishedPrograms = calibrationTreeResponseFromBundle(compiled, programs)!;
+  const livePrograms = buildCalibrationTree(MAINE_RELEASE_ROWS, programs, RELEASE, true);
+  expect(programCounts(publishedPrograms)).toEqual(programCounts(livePrograms));
+  expect(publishedPrograms.filteredMetrics.nTargets).toBe(85);
+  expect(livePrograms.filteredMetrics.nTargets).toBe(85);
+
+  // A spelling that is not an option selects no target in either tree.
+  const spelledME = filteredBy(geographyRoot, ["ME"]);
+  for (const response of [
+    calibrationTreeResponseFromBundle(compiled, spelledME)!,
+    buildCalibrationTree(MAINE_RELEASE_ROWS, spelledME, RELEASE, true),
+  ]) {
+    expect(response.groups.flatMap((group) => group.nodes)).toEqual([]);
+    expect(response.filteredMetrics.nTargets).toBe(0);
+  }
+});
+
+test("bundle validation requires one geography posting per geography node", () => {
+  const built = bundle(MAINE_RELEASE_ROWS);
+  const geographyRoot = built.index.levels[built.index.roots.geography];
+  const nodePostings = geographyRoot.groups
+    .flatMap((group) => group.nodes)
+    .map((treeNode) => ({
+      value: treeNode.selection.value,
+      targetOrdinals: treeNode.targetOrdinals,
+    }))
+    .sort((left, right) => left.value.localeCompare(right.value));
+  expect(nodePostings.map((posting) => [posting.value, posting.targetOrdinals.length]))
+    .toEqual([
+      ["Maine", 85],
+      ["ME congressional district 1", 1],
+      ["ME congressional district 2", 1],
+    ]);
+  expect(() =>
+    validateCalibrationTreeBundle(withGeographyPostings(built, nodePostings)),
+  ).not.toThrow();
+
+  // Postings by each row's own spelling split the Maine node: the option
+  // "Maine" would select 84 of its 85 targets.
+  const spellingPostings = new Map<string, number[]>();
+  MAINE_RELEASE_ROWS.forEach((row, targetOrdinal) => {
+    const spelling = String(row.geography);
+    spellingPostings.set(spelling, [
+      ...(spellingPostings.get(spelling) ?? []),
+      targetOrdinal,
+    ]);
+  });
+  expect(() =>
+    validateCalibrationTreeBundle(
+      withGeographyPostings(
+        built,
+        [...spellingPostings]
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([value, targetOrdinals]) => ({ value, targetOrdinals })),
+      ),
+    ),
+  ).toThrow(/geographies posting/);
+});
+
+test("bundle validation still accepts a tree published with a node per spelling", () => {
+  // Earlier builders ignored geography IDs: they grouped geography nodes and
+  // postings by each row's own spelling, and stored the rows, IDs included,
+  // as target details. Five published UK staging trees spell a geography ID
+  // two ways and were built that way. Building from the rows without their
+  // IDs gives the same nodes and postings; the IDs are then put back into
+  // the target details, as those trees store them.
+  const rowsWithoutIds = MAINE_RELEASE_ROWS.map(
+    ({ geography_id: _geographyId, ...row }) => row,
+  );
+  let published = bundle(rowsWithoutIds);
+  expect(
+    loaded(published).filterIndex.postings.geographies.map((posting) => [
+      posting.value,
+      posting.targetOrdinals.length,
+    ]),
+  ).toEqual([
+    ["Maine", 84],
+    ["ME", 1],
+    ["ME congressional district 1", 1],
+    ["ME congressional district 2", 1],
+  ]);
+  for (const file of published.files) {
+    if (!file.part.startsWith("target-details-")) continue;
+    const details = file.artifact as CalibrationTreeTargetDetailsArtifact;
+    published = withReplacedPart(published, {
+      ...details,
+      targets: details.targets.map((row, offset) => ({
+        ...row,
+        geography_id:
+          MAINE_RELEASE_ROWS[details.startTargetOrdinal + offset].geography_id,
+      })),
+    });
+  }
+
+  expect(() => validateCalibrationTreeBundle(published)).not.toThrow();
+});
+
+test("bundle validation refuses geography nodes and postings that agree with each other but not with the target rows", () => {
+  const built = bundle(MAINE_RELEASE_ROWS);
+  // Renames one geography in the geography root's node and in its posting
+  // alike, as a builder that labelled a geography wrongly would write both.
+  const withGeographyRenamed = (from: string, to: string) => {
+    const renamed = structuredClone(built);
+    const geographyRoot = renamed.index.levels[renamed.index.roots.geography];
+    const treeNode = geographyRoot.groups
+      .flatMap((group) => group.nodes)
+      .find((candidate) => candidate.selection.value === from)!;
+    treeNode.label = to;
+    treeNode.selection = { kind: "geography", value: to };
+    return withGeographyPostings(
+      renamed,
+      loaded(built).filterIndex.postings.geographies
+        .map((posting) => posting.value === from ? { ...posting, value: to } : posting)
+        .sort((left, right) => left.value.localeCompare(right.value)),
+    );
+  };
+
+  expect(() =>
+    validateCalibrationTreeBundle(withGeographyRenamed("Maine", "Maine")),
+  ).not.toThrow();
+  // A label that no row spells.
+  expect(() =>
+    validateCalibrationTreeBundle(
+      withGeographyRenamed("ME congressional district 1", "Kennebec"),
+    ),
+  ).toThrow(/geographies postings do not follow the target rows/);
+  // The state's other spelling for all 85 targets: the rows spell it "Maine"
+  // first, and only the population target spells it "ME".
+  expect(() =>
+    validateCalibrationTreeBundle(withGeographyRenamed("Maine", "ME")),
+  ).toThrow(/geographies postings do not follow the target rows/);
+});
+
+test("a compile reads each row's geography ID once, however many levels the tree has", () => {
+  // A compile builds every level of the tree from the same rows, so it labels
+  // each row's geography once instead of once per level: the largest
+  // published trees have more than 12,000 levels.
+  const geographyIdReads = MAINE_RELEASE_ROWS.map(() => 0);
+  const countedRows = MAINE_RELEASE_ROWS.map(
+    ({ geography_id: geographyId, ...row }, rowIndex) =>
+      Object.defineProperty({ ...row }, "geography_id", {
+        enumerable: true,
+        get() {
+          geographyIdReads[rowIndex] += 1;
+          return geographyId;
+        },
+      }) as CalibrationTreeTarget,
+  );
+
+  const draft = compileCalibrationTreeBundleDraft({
+    country: "us",
+    releaseId: RELEASE,
+    hfRepo: "policyengine/populace-us",
+    hfCommitSha: COMMIT,
+    buildArtifactId: SOURCE_HASH,
+    sourceArtifacts: {
+      calibrationDiagnostics: null,
+      buildManifest: null,
+      releaseManifest: null,
+      demographics: null,
+    },
+    rows: countedRows,
+    lossAttributionAvailable: true,
+  });
+
+  expect(Object.keys(draft.levels).length).toBeGreaterThan(50);
+  expect(geographyIdReads).toEqual(MAINE_RELEASE_ROWS.map(() => 1));
 });
 
 test("the index renders without later parts and deeper navigation waits for its tier", () => {
