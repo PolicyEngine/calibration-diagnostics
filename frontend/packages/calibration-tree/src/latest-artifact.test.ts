@@ -3305,6 +3305,71 @@ test("a release published only as a tag is listed from the dashboard manifest", 
   }
 });
 
+// The dashboard manifest keeps the build published from a release series'
+// shared folder before its per-attempt tags existed. If the folder's copy on
+// main has no calibration diagnostics, the manifest reader returns that build,
+// and it must still leave the picker once the series' tags are listed.
+test("a release series' shared folder build leaves the picker even when its copy on main lacks diagnostics", async () => {
+  const currentTag = `${LINE}-20261019T083323Z-0b0b0b0b`;
+  const manifestEntry = (
+    releaseId: string,
+    releaseDirectory: string | undefined,
+    commit: string,
+    artifactDigit: string,
+  ): CalibrationTreeManifestEntry => ({
+    buildArtifactId: artifactDigit.repeat(64),
+    kind: "release",
+    sourceId: releaseId,
+    label: releaseId,
+    releaseId,
+    ...(releaseDirectory ? { releaseDirectory } : {}),
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-uk-private",
+    hfCommitSha: commit,
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: null,
+    updatedAt: null,
+  });
+  let manifest = emptyCalibrationTreeManifest();
+  for (const build of [
+    manifestEntry(LINE, undefined, "9".repeat(40), "a"),
+    manifestEntry(currentTag, LINE, "1".repeat(40), "b"),
+  ]) {
+    manifest = withCalibrationTreeManifestEntry(manifest, "uk", build);
+  }
+  const sharedFolderWithoutDiagnostics = {
+    ...folderRelease(LINE, LINE),
+    files: ["release_manifest.json"],
+    has_calibration: false,
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (_input: string | URL | Request) =>
+    new Response(null, { status: 503 })) as typeof fetch;
+  try {
+    const tagged = await loadPublishedCutReleases(
+      0,
+      "uk",
+      manifest,
+      [sharedFolderWithoutDiagnostics],
+    );
+    expect(
+      mergeReleaseInventory([sharedFolderWithoutDiagnostics], tagged, currentTag)
+        .map((release) => release.release_id),
+    ).toEqual([currentTag]);
+    // While the dashboard's latest release is the shared folder build, it is
+    // listed once, as that published build.
+    const whileLatest = mergeReleaseInventory([sharedFolderWithoutDiagnostics], tagged, LINE);
+    expect(whileLatest.map((release) => [release.release_id, release.has_calibration])).toEqual([
+      [currentTag, true],
+      [LINE, true],
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("a cut's investigation packet cites its line folder at the cut's commit", () => {
   const tag = `${LINE}-20261019T083323Z-0b0b0b0b`;
   const sha = "1".repeat(40);
