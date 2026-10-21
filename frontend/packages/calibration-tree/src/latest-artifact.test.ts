@@ -3237,7 +3237,7 @@ test("published cuts take their role from their own release manifest at their co
     return new Response(null, { status: 503 });
   }) as typeof fetch;
   try {
-    const cuts = await loadPublishedCutReleases(0, "uk", manifest);
+    const cuts = await loadPublishedCutReleases(0, "uk", manifest, [folderRelease(LINE, LINE)]);
     expect(cuts.map((cut) => [cut.release_id, cut.date, cut.release_directory, cut.is_local_area]))
       .toEqual([
         [nationalCut, "20261019T083323Z", LINE, false],
@@ -3246,6 +3246,152 @@ test("published cuts take their role from their own release manifest at their co
     expect(requested).toContain(
       `https://huggingface.co/datasets/${microcosmRepo("uk")}/resolve/${"1".repeat(40)}/releases/${LINE}/release_manifest.json`,
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// Microcosm can publish a release as a tag alone (`--no-latest --tag-only`):
+// `releases/<release id>/` exists at the tag's commit and never on main, so
+// the folder listing cannot name it. A folder on main without calibration
+// diagnostics does not name a published release either: the publisher reads
+// that release from its tag. Release ids and commits are synthetic.
+test("a release published only as a tag is listed from the dashboard manifest", async () => {
+  const folderReleaseId = "populace-us-2024-folder-20260915";
+  const uncalibratedFolderReleaseId = "populace-us-2024-uncalibrated-folder-20261001";
+  const tagOnlyReleaseId = "populace-us-2024-tag-only-local-20261017T030317Z";
+  const tagOnlyCommit = "3".repeat(40);
+  const manifestEntry = (
+    releaseId: string,
+    commit: string,
+    artifactDigit: string,
+  ): CalibrationTreeManifestEntry => ({
+    buildArtifactId: artifactDigit.repeat(64),
+    kind: "release",
+    sourceId: releaseId,
+    label: releaseId,
+    releaseId,
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-us",
+    hfCommitSha: commit,
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: null,
+    updatedAt: null,
+  });
+  let manifest = emptyCalibrationTreeManifest();
+  for (const build of [
+    manifestEntry(folderReleaseId, "4".repeat(40), "a"),
+    manifestEntry(tagOnlyReleaseId, tagOnlyCommit, "b"),
+    manifestEntry(uncalibratedFolderReleaseId, "5".repeat(40), "c"),
+  ]) {
+    manifest = withCalibrationTreeManifestEntry(manifest, "us", build);
+  }
+  const folders = [
+    folderRelease(folderReleaseId, "20260915"),
+    {
+      ...folderRelease(uncalibratedFolderReleaseId, "20261001"),
+      files: ["release_manifest.json"],
+      has_calibration: false,
+    },
+  ];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith(`/resolve/${tagOnlyCommit}/releases/${tagOnlyReleaseId}/release_manifest.json`)) {
+      return Response.json({ dataset_role: "non_default_local_area", is_default: false });
+    }
+    return new Response(null, { status: 503 });
+  }) as typeof fetch;
+  try {
+    const tagged = await loadPublishedCutReleases(0, "us", manifest, folders);
+    expect(
+      tagged
+        .map((release) => [
+          release.release_id,
+          release.date,
+          release.release_directory,
+          release.has_calibration,
+          release.is_local_area,
+        ])
+        .sort(),
+    ).toEqual([
+      [tagOnlyReleaseId, "20261017T030317Z", undefined, true, true],
+      [uncalibratedFolderReleaseId, "20261001", undefined, true, false],
+    ]);
+    // Each release is listed once, newest first.
+    const inventory = mergeReleaseInventory(folders, tagged, folderReleaseId);
+    expect(inventory.map((release) => [release.release_id, release.has_calibration])).toEqual([
+      [tagOnlyReleaseId, true],
+      [uncalibratedFolderReleaseId, true],
+      [folderReleaseId, true],
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// The dashboard manifest keeps the build published from a release series'
+// shared folder before its per-attempt tags existed. If the folder's copy on
+// main has no calibration diagnostics, the manifest reader returns that build,
+// and it must still leave the picker once the series' tags are listed.
+test("a release series' shared folder build leaves the picker even when its copy on main lacks diagnostics", async () => {
+  const currentTag = `${LINE}-20261019T083323Z-0b0b0b0b`;
+  const manifestEntry = (
+    releaseId: string,
+    releaseDirectory: string | undefined,
+    commit: string,
+    artifactDigit: string,
+  ): CalibrationTreeManifestEntry => ({
+    buildArtifactId: artifactDigit.repeat(64),
+    kind: "release",
+    sourceId: releaseId,
+    label: releaseId,
+    releaseId,
+    ...(releaseDirectory ? { releaseDirectory } : {}),
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-uk-private",
+    hfCommitSha: commit,
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: null,
+    updatedAt: null,
+  });
+  let manifest = emptyCalibrationTreeManifest();
+  for (const build of [
+    manifestEntry(LINE, undefined, "9".repeat(40), "a"),
+    manifestEntry(currentTag, LINE, "1".repeat(40), "b"),
+  ]) {
+    manifest = withCalibrationTreeManifestEntry(manifest, "uk", build);
+  }
+  const sharedFolderWithoutDiagnostics = {
+    ...folderRelease(LINE, LINE),
+    files: ["release_manifest.json"],
+    has_calibration: false,
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (_input: string | URL | Request) =>
+    new Response(null, { status: 503 })) as typeof fetch;
+  try {
+    const tagged = await loadPublishedCutReleases(
+      0,
+      "uk",
+      manifest,
+      [sharedFolderWithoutDiagnostics],
+    );
+    expect(
+      mergeReleaseInventory([sharedFolderWithoutDiagnostics], tagged, currentTag)
+        .map((release) => release.release_id),
+    ).toEqual([currentTag]);
+    // While the dashboard's latest release is the shared folder build, it is
+    // listed once, as that published build.
+    const whileLatest = mergeReleaseInventory([sharedFolderWithoutDiagnostics], tagged, LINE);
+    expect(whileLatest.map((release) => [release.release_id, release.has_calibration])).toEqual([
+      [currentTag, true],
+      [LINE, true],
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }

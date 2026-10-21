@@ -77,3 +77,35 @@ test("without the dashboard manifest the inventory keeps the folder listing", as
     FOLDERS.map((entry) => entry.release_id),
   );
 });
+
+test("the manifest reader receives the folder listing, so releases published only as a tag are listed", async () => {
+  const folderRelease = release("populace-us-2024-folder-20260915", "20260915");
+  const tagOnlyRelease = release(
+    "populace-us-2024-tag-only-20261017T030317Z",
+    "20261017T030317Z",
+  );
+  const foldersSeenByManifestReader: unknown[] = [];
+  const response = await createMicrocosmReleasesHandler({
+    loadReleases: async () => [folderRelease],
+    loadPointerReleaseId: async () => ({
+      release_id: folderRelease.release_id,
+      updated_at: "2026-09-15T00:00:00.000Z",
+    }),
+    readManifest: async () => ({
+      manifest: emptyCalibrationTreeManifest(),
+      etag: '"manifest"',
+    }),
+    loadPublishedCutReleases: async (_revalidate, _country, _manifest, folders) => {
+      foldersSeenByManifestReader.push(folders);
+      return [tagOnlyRelease];
+    },
+  })(new Request("https://dashboard.example/api/microcosm/releases?country=us"));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(foldersSeenByManifestReader).toEqual([[folderRelease]]);
+  expect(body.default_release_id).toBe(folderRelease.release_id);
+  expect(body.releases.map((entry: ReleaseEntry) => entry.release_id)).toEqual([
+    tagOnlyRelease.release_id,
+    folderRelease.release_id,
+  ]);
+});

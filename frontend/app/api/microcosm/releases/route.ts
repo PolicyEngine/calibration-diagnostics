@@ -31,17 +31,21 @@ export function createMicrocosmReleasesHandler(
     const country = requestedCountry(new URL(request.url).searchParams);
     if (country instanceof Response) return country;
     try {
-      const [folders, pointer, cuts] = await Promise.all([
+      const [folders, pointer, manifest] = await Promise.all([
         dependencies.loadReleases(revalidate, country),
         dependencies.loadPointerReleaseId(revalidate, country).catch(() => ({ release_id: "", updated_at: null })),
-        // Published cuts are named only by the dashboard manifest; without it
-        // the picker keeps the folder listing.
         dependencies.readManifest()
-          .then(({ manifest }) =>
-            dependencies.loadPublishedCutReleases(revalidate, country, manifest),
-          )
-          .catch(() => []),
+          .then(({ manifest }) => manifest)
+          .catch(() => null),
       ]);
+      // Per-attempt tags and releases published only as a tag are named only
+      // by the dashboard manifest; without it the picker keeps the folder
+      // listing.
+      const cuts = manifest
+        ? await dependencies
+          .loadPublishedCutReleases(revalidate, country, manifest, folders)
+          .catch(() => [])
+        : [];
       const releases = mergeReleaseInventory(folders, cuts, pointer.release_id || null);
       return NextResponse.json(
         scrub({
