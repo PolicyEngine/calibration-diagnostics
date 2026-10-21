@@ -273,9 +273,20 @@ is reported as that run's `failed` outcome.
 Geography nodes group rows by geography ID, and a geography that rows spell
 more than one way is listed once (see
 [Geographies spelled more than one way](calibration-map-hierarchy.md#geographies-spelled-more-than-one-way)).
-Geography postings still use each row's own spelling, so the Geography filter
-lists every spelling and matches the rows that carry it. A tree that listed one
-geography ID under two spellings would likewise be refused on repair.
+Geography postings and the index's geography filter options use the node
+labels: one posting per geography node, holding every target of that node, so
+the Geography filter offers one option per geography and selects all of its
+targets. Bundle validation compares each geography posting with the geography
+root node of the same label. It cannot recompute them from the target
+summaries, whose compact rows carry each row's own spelling and no geography
+ID. For rows that spell every geography one way, labels, postings and files
+are unchanged.
+
+A tree published before geographies were grouped by ID has one node and one
+posting per spelling. Its nodes and postings agree, so it still validates, and
+reconciliation finds it complete and leaves its files as they are. Rebuilding
+one whose rows spell a geography ID two ways would give a different index and
+filter index, so a repair of it is refused, like the trees above.
 
 The browser unions selected values within one category, intersects categories,
 filters hierarchy memberships, and recalculates visible metrics from compact

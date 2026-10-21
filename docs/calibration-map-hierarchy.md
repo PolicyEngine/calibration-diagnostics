@@ -160,17 +160,28 @@ The calibration tree groups geography by geography ID:
 - The label is read from every row the tree is built from, before filters. It
   is also the geography's selection value, so it is the same in the program
   and geography breakdowns, under any filter, and in published trees.
-- Geographies with different IDs that share a label still form one node.
+- Geographies with different IDs that share a label still form one node. A
+  label that two geography levels share carries its level, so those
+  geographies stay separate nodes.
 - Rows without a geography ID, such as the rows of a comparison tree, keep
   their own spelling.
-- The Geography filter and its options still list and match each row's own
-  spelling, because the published filter index stores one posting per
-  spelling. So "Maine" and "ME" are separate options: "ME" shows the "Maine"
-  node with only the population target, and "Maine" shows the "Maine" node
-  without it.
+- The Geography filter uses the same labels. It offers one option per
+  geography node, and an option selects every row of that node, whichever way
+  the row spells the geography: "Maine" selects all 85 of the state's targets,
+  including the population target, and "ME" is not an option. The published
+  filter index stores one geography posting per node label, so live and
+  published trees offer the same options and select the same targets, and
+  the filter separates and merges geographies exactly as the nodes do.
+- The calibration map keeps its filter selection in page state, not in the
+  page URL or browser storage, so no saved link names a spelling. A request
+  that names a spelling that is not an option, such as `geography=ME` in a
+  hand-written API URL, selects no target in a live or a published tree, as
+  any unknown value does.
 
 The rule is `geographyLabeller` in `calibration-tree.ts` of
-`@policyengine/calibration-tree`.
+`@policyengine/calibration-tree`. Published trees built before geographies
+were grouped by ID keep one node and one option per spelling; see
+[Filtering indices](calibration-tree-artifacts.md#filtering-indices).
 
 ## Required verification
 

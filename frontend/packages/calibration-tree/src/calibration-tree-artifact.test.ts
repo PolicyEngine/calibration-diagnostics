@@ -408,6 +408,44 @@ test("bundle validation requires one geography posting per geography node", () =
   ).toThrow(/geographies posting/);
 });
 
+test("bundle validation still accepts a tree published with a node per spelling", () => {
+  // Earlier builders ignored geography IDs: they grouped geography nodes and
+  // postings by each row's own spelling, and stored the rows, IDs included,
+  // as target details. Five published UK staging trees spell a geography ID
+  // two ways and were built that way. Building from the rows without their
+  // IDs gives the same nodes and postings; the IDs are then put back into
+  // the target details, as those trees store them.
+  const rowsWithoutIds = MAINE_RELEASE_ROWS.map(
+    ({ geography_id: _geographyId, ...row }) => row,
+  );
+  let published = bundle(rowsWithoutIds);
+  expect(
+    loaded(published).filterIndex.postings.geographies.map((posting) => [
+      posting.value,
+      posting.targetOrdinals.length,
+    ]),
+  ).toEqual([
+    ["Maine", 84],
+    ["ME", 1],
+    ["ME congressional district 1", 1],
+    ["ME congressional district 2", 1],
+  ]);
+  for (const file of published.files) {
+    if (!file.part.startsWith("target-details-")) continue;
+    const details = file.artifact as CalibrationTreeTargetDetailsArtifact;
+    published = withReplacedPart(published, {
+      ...details,
+      targets: details.targets.map((row, offset) => ({
+        ...row,
+        geography_id:
+          MAINE_RELEASE_ROWS[details.startTargetOrdinal + offset].geography_id,
+      })),
+    });
+  }
+
+  expect(() => validateCalibrationTreeBundle(published)).not.toThrow();
+});
+
 test("the index renders without later parts and deeper navigation waits for its tier", () => {
   const built = bundle();
   const root = calibrationTreeResponseFromBundle(

@@ -2,6 +2,7 @@ import {
   buildCalibrationTree,
   calibrationTreeMetricsFromInputs,
   fitBandForTarget,
+  geographyLabeller,
   normalizeCalibrationTreeTargets,
   type CalibrationTreeGroup,
   type CalibrationTreeMetricInput,
@@ -9,6 +10,7 @@ import {
   type CalibrationTreeNode,
   type CalibrationTreeResponse,
   type CalibrationTreeTarget,
+  type GeographyLabeller,
 } from "./calibration-tree";
 import {
   createExplorerState,
@@ -363,7 +365,6 @@ export interface CompileCalibrationTreeInput {
   comparisonResult?: CalibrationTreeComparisonResultMetadata;
 }
 
-const DEFAULT_GEOGRAPHY = "United States";
 const DEFAULT_GEOGRAPHY_LEVEL = "national";
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const HF_COMMIT_RE = /^[0-9a-f]{40,64}$/;
@@ -480,6 +481,7 @@ function comparisonReadyTarget(
 function compiledTarget(
   row: CalibrationTreeTarget,
   index: number,
+  geographyLabel: GeographyLabeller,
 ): CalibrationTreeBundleDraft["targets"][number] {
   const error = finiteNumber(row.abs_relative_error);
   const hasDetailSource =
@@ -498,7 +500,10 @@ function compiledTarget(
     facets: {
       geographyLevel:
         String(row.level ?? "").trim() || DEFAULT_GEOGRAPHY_LEVEL,
-      geography: String(row.geography ?? "").trim() || DEFAULT_GEOGRAPHY,
+      // The geography's tree label, which the Geography filter offers and
+      // selects, so a geography that rows spell more than one way has one
+      // posting (see geographyLabeller).
+      geography: geographyLabel(row),
       fitBand: fitBandForTarget(row),
       comparisonFit:
         row.comparison_fit === "improved" ||
@@ -615,7 +620,10 @@ export function compileCalibrationTreeBundleDraft(
     input.lossAttributionAvailable ??
     (rows.length > 0 &&
       rows.every((row) => nonnegativeNumber(row.final_loss_contribution) != null));
-  const targets = rows.map(compiledTarget);
+  const geographyLabel = geographyLabeller(rows);
+  const targets = rows.map((row, index) =>
+    compiledTarget(row, index, geographyLabel),
+  );
   const targetOrdinals = new Map(rows.map((row, ordinal) => [row, ordinal]));
   const levels: Record<string, CompiledCalibrationLevel> = {};
   const stateLevels = new Map<string, string>();
