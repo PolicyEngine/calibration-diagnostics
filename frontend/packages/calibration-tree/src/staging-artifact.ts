@@ -1321,11 +1321,11 @@ function defaultStagingComparisonReleaseDependencies(
     currentReleaseId: async (country) =>
       (await loadPointerReleaseId(revalidate, country)).release_id,
     newestLocalAreaReleaseId: async (country) => {
-      const { manifest } = await readCalibrationTreeManifest();
-      const [folders, tagged] = await Promise.all([
+      const [{ manifest }, folders] = await Promise.all([
+        readCalibrationTreeManifest(),
         loadReleases(revalidate, country),
-        loadPublishedCutReleases(revalidate, country, manifest),
       ]);
+      const tagged = await loadPublishedCutReleases(revalidate, country, manifest, folders);
       return newestPublishedLocalAreaRelease(manifest, country, [...folders, ...tagged])
         ?.releaseId ?? null;
     },

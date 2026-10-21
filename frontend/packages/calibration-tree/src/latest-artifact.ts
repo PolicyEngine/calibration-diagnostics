@@ -55,7 +55,10 @@ import {
   resolveCalibrationRelease,
   resolveHfCommitPublishedAt,
 } from "./calibration-release-locator";
-import type { CalibrationTreeManifest } from "./calibration-tree-manifest";
+import {
+  releaseDirectoryOf,
+  type CalibrationTreeManifest,
+} from "./calibration-tree-manifest";
 import { levelQualifiedGeographyLabels } from "./geography-labels";
 import { parseReleaseCutTag } from "./release-cut";
 
@@ -2417,28 +2420,37 @@ export async function loadReleases(
   return entries;
 }
 
-// A Microcosm cut (microcosm#823) is released as its tag and stored under its
-// line's folder, which the folder listing above names only as the mutable
-// copy on main; the dashboard manifest names every published cut. Roles are
-// read from the cut's own release_manifest.json at its pinned commit,
-// best-effort like the listing's.
+// Published releases the folder listing above cannot name, read from the
+// dashboard manifest:
+// - a Microcosm cut (microcosm#823), released as its tag and stored under its
+//   line's folder, which the folder listing names only as the mutable copy on
+//   main;
+// - a release published only as a tag (`--no-latest --tag-only`), whose
+//   `releases/<release id>/` exists at the tag's commit and never on main.
+// A release whose calibrated folder is on main is listed from that folder, as
+// the publisher reads it. Roles are read from the release's own
+// release_manifest.json at its pinned commit, best-effort like the listing's.
 export async function loadPublishedCutReleases(
   revalidate: number,
   country: MicrocosmCountry,
   manifest: CalibrationTreeManifest,
+  folders: readonly ReleaseEntry[],
 ): Promise<ReleaseEntry[]> {
   if (await loadLocalCalibrationRelease(country)) return [];
-  const cuts = (manifest.countries[country]?.builds ?? []).filter(
+  const calibratedFolders = new Set(
+    folders.filter((folder) => folder.has_calibration).map((folder) => folder.release_id),
+  );
+  const unlisted = (manifest.countries[country]?.builds ?? []).filter(
     (build) =>
       build.kind === "release" &&
       build.releaseId != null &&
-      build.releaseDirectory != null &&
-      build.releaseDirectory !== build.releaseId,
+      (releaseDirectoryOf(build) !== build.releaseId ||
+        !calibratedFolders.has(build.releaseId)),
   );
-  return Promise.all(cuts.map(async (build) => {
+  return Promise.all(unlisted.map(async (build) => {
     const releaseId = build.releaseId as string;
     const directory = assertSafeReleaseId(
-      build.releaseDirectory as string,
+      releaseDirectoryOf(build) as string,
       "release directory",
     );
     const entry: ReleaseEntry = {
@@ -2449,7 +2461,7 @@ export async function loadPublishedCutReleases(
       dataset_role: null,
       is_default: true,
       is_local_area: false,
-      release_directory: directory,
+      ...(directory !== releaseId ? { release_directory: directory } : {}),
     };
     try {
       const releaseManifest = await hfJson(
@@ -2468,11 +2480,13 @@ export async function loadPublishedCutReleases(
   }));
 }
 
-// The picker lists every published cut beside the folders on main. A line
-// folder is a mutable copy of whichever of its cuts was published last, so
-// it leaves the picker once its cuts are listed, unless the dashboard's
-// latest release still points at it. Without cuts the listing is returned
-// unchanged.
+// The picker lists every published cut and every release published only as a
+// tag beside the folders on main. A line folder is a mutable copy of
+// whichever of its cuts was published last, so it leaves the picker once its
+// cuts are listed, unless the dashboard's latest release still points at it.
+// A folder on main without calibration diagnostics gives way to the
+// published build of the same release. Without such releases the listing is
+// returned unchanged.
 export function mergeReleaseInventory(
   folders: ReleaseEntry[],
   cuts: ReleaseEntry[],
@@ -2480,10 +2494,12 @@ export function mergeReleaseInventory(
 ): ReleaseEntry[] {
   if (!cuts.length) return folders;
   const lineFolders = new Set(cuts.map((cut) => cut.release_directory));
+  const publishedReleaseIds = new Set(cuts.map((cut) => cut.release_id));
   return [
     ...folders.filter(
       (folder) =>
-        !lineFolders.has(folder.release_id) || folder.release_id === latestReleaseId,
+        (!lineFolders.has(folder.release_id) || folder.release_id === latestReleaseId) &&
+        !publishedReleaseIds.has(folder.release_id),
     ),
     ...cuts,
   ].sort((left, right) => releaseSortKey(right.date) - releaseSortKey(left.date));

@@ -3210,7 +3210,7 @@ test("published cuts take their role from their own release manifest at their co
     return new Response(null, { status: 503 });
   }) as typeof fetch;
   try {
-    const cuts = await loadPublishedCutReleases(0, "uk", manifest);
+    const cuts = await loadPublishedCutReleases(0, "uk", manifest, [folderRelease(LINE, LINE)]);
     expect(cuts.map((cut) => [cut.release_id, cut.date, cut.release_directory, cut.is_local_area]))
       .toEqual([
         [nationalCut, "20261019T083323Z", LINE, false],
