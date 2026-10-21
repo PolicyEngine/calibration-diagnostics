@@ -404,28 +404,34 @@ export interface GeographyLabeller {
 }
 
 function geographyKey(row: CalibrationTreeTarget): string | null {
-  const geographyIdentifier =
-    typeof row.geography_id === "string" ? row.geography_id.trim() : "";
-  if (!geographyIdentifier) return null;
-  return `${String(row.level ?? "").trim()}\0${geographyIdentifier}`;
+  const geographyIdentifier = row.geography_id;
+  const trimmedIdentifier =
+    typeof geographyIdentifier === "string" ? geographyIdentifier.trim() : "";
+  if (!trimmedIdentifier) return null;
+  return `${String(row.level ?? "").trim()}\0${trimmedIdentifier}`;
 }
 
+// Labels every row in one pass. A compile builds one labeller and every level
+// of the tree from the same rows (buildCalibrationTree's
+// allRowsGeographyLabel), so the label of each of those rows is stored and
+// looked up by the row instead of being worked out again at every level.
 export function geographyLabeller(rows: CalibrationTreeTarget[]): GeographyLabeller {
   const firstSpellings = new Map<string, string>();
-  // Collected in the same pass, so the filter options need not label every
-  // row again (buildCalibrationTree runs once per level of a published tree).
+  const rowLabels = new Map<CalibrationTreeTarget, string>();
   const labels = new Set<string>();
   for (const row of rows) {
     const key = geographyKey(row);
-    if (key == null) {
-      labels.add(rowGeographyLabel(row));
-    } else if (!firstSpellings.has(key)) {
-      const label = rowGeographyLabel(row);
-      firstSpellings.set(key, label);
+    let label = key == null ? undefined : firstSpellings.get(key);
+    if (label === undefined) {
+      label = rowGeographyLabel(row);
+      if (key != null) firstSpellings.set(key, label);
       labels.add(label);
     }
+    rowLabels.set(row, label);
   }
   const labelOf = (row: CalibrationTreeTarget) => {
+    const rowLabel = rowLabels.get(row);
+    if (rowLabel !== undefined) return rowLabel;
     const key = geographyKey(row);
     return (key == null ? undefined : firstSpellings.get(key)) ??
       rowGeographyLabel(row);
@@ -961,6 +967,14 @@ function hierarchyDimensionTree(
   };
 }
 
+/**
+ * Builds one level of the calibration tree from all of its rows.
+ *
+ * `allRowsGeographyLabel` is `geographyLabeller(allRows)`, for a caller that
+ * builds many levels from the same rows (compileCalibrationTreeBundleDraft):
+ * it is then built once rather than at every level. Without it, the labeller
+ * of `allRows` is built here.
+ */
 export function buildCalibrationTree(
   allRows: CalibrationTreeTarget[],
   state: ExplorerState,
@@ -968,10 +982,11 @@ export function buildCalibrationTree(
   lossAttributionAvailable =
     allRows.length > 0 && allRows.every((row) => finiteLossContribution(row) != null),
   calibrationProvenance?: CalibrationProvenance,
+  allRowsGeographyLabel?: GeographyLabeller,
 ): CalibrationTreeResponse {
   const chartRows = normalizeCalibrationTreeTargets(allRows);
   const { path } = state;
-  const geographyLabel = geographyLabeller(chartRows);
+  const geographyLabel = allRowsGeographyLabel ?? geographyLabeller(chartRows);
   const selectedPathLabels = pathLabels(chartRows, path, geographyLabel);
   const options = filterOptions(chartRows, geographyLabel);
   const filteredRows = applyExplorerFilters(

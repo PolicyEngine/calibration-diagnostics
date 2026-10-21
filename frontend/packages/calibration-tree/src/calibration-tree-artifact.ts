@@ -620,6 +620,7 @@ export function compileCalibrationTreeBundleDraft(
     input.lossAttributionAvailable ??
     (rows.length > 0 &&
       rows.every((row) => nonnegativeNumber(row.final_loss_contribution) != null));
+  // One labeller for the geography postings and for every level of the tree.
   const geographyLabel = geographyLabeller(rows);
   const targets = rows.map((row, index) =>
     compiledTarget(row, index, geographyLabel),
@@ -644,6 +645,8 @@ export function compileCalibrationTreeBundleDraft(
       state,
       input.releaseId,
       lossAttributionAvailable,
+      undefined,
+      geographyLabel,
     );
     filterOptions ??= response.filterOptions;
 
