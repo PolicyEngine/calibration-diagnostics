@@ -218,6 +218,29 @@ describe("schema 9 calibration diagnostics", () => {
     );
   });
 
+  test("a row that also carries schema 8 labels is refused", () => {
+    // Microcosm's schema 9 model and JSON Schema forbid undeclared fields, so
+    // an inline label beside a catalog reference can only disagree with the
+    // catalog; the reader must not silently prefer one of them.
+    expect(refusal((document) => {
+      rowHierarchy(document, 0).geography = {
+        id: "K02000001",
+        label: "UK",
+        level: "country",
+      };
+    })).toBe(
+      "Schema 9 target obr.income_tax.K02000001@2025 hierarchy has field geography, " +
+        "which schema 9 does not define.",
+    );
+    expect(refusal((document) => {
+      const dimensions = rowHierarchy(document, 0).dimensions as JsonObject[];
+      dimensions[0].value_label = "Income tax receipts";
+    })).toBe(
+      "Schema 9 target obr.income_tax.K02000001@2025 hierarchy.dimensions[0] has field " +
+        "value_label, which schema 9 does not define.",
+    );
+  });
+
   test("a row whose hierarchy target is another target is refused", () => {
     expect(refusal((document) => {
       (rowHierarchy(document, 0).target as JsonObject).id = "obr.national_insurance.K02000001";
