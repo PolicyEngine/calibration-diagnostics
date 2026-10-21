@@ -255,23 +255,49 @@ function placeholderEntry(hfRepo = UK_REPO): CalibrationTreeManifestEntry {
   };
 }
 
-function memoryStore(initial: CalibrationTreeManifest) {
+/**
+ * A manifest and Blob store in memory. It records each upload, listing, audit
+ * and manifest write in the order the publisher makes them. Every audit
+ * reports a complete build, except for the release IDs in
+ * `incompleteAfterUpload`, whose uploaded build audits as missing a file.
+ */
+function memoryStore(
+  initial: CalibrationTreeManifest,
+  options: { incompleteAfterUpload?: ReadonlySet<string> } = {},
+) {
   let manifest = initial;
   const writes: Array<{ entry: CalibrationTreeManifestEntry; makeLatest?: boolean }> = [];
   const uploads: CalibrationTreeBundle[] = [];
+  const operations: string[] = [];
   return {
     writes,
     uploads,
+    operations,
     current: () => manifest,
     readManifest: async () => manifest,
-    listBlobs: async () => new Map(),
-    audit: async () => ({ complete: true, repairable: true, reasons: [], index: null }),
+    listBlobs: async () => {
+      operations.push("list files");
+      return new Map();
+    },
+    audit: async (entry: CalibrationTreeManifestEntry) => {
+      operations.push(`audit ${entry.releaseId}`);
+      return entry.releaseId && options.incompleteAfterUpload?.has(entry.releaseId)
+        ? {
+            complete: false,
+            repairable: true,
+            reasons: [`missing calibration-trees/uk/${entry.buildArtifactId}/tier-1.json.gz`],
+            index: null,
+          }
+        : { complete: true, repairable: true, reasons: [], index: null };
+    },
     updateManifest: async (entry: CalibrationTreeManifestEntry, makeLatest?: boolean) => {
+      operations.push(`write ${entry.releaseId}${makeLatest ? " as latest" : ""}`);
       writes.push({ entry, makeLatest });
       manifest = withCalibrationTreeManifestEntry(manifest, "uk", entry, makeLatest);
       return manifest;
     },
     uploadBundle: async (bundle: CalibrationTreeBundle) => {
+      operations.push(`upload ${bundle.index.build.releaseId}`);
       uploads.push(bundle);
       const stored = (file: CalibrationTreeBundle["files"][number]) => ({
         pathname: file.path,
@@ -646,6 +672,223 @@ test("release reconciliation publishes each line cut from its folder and follows
       .every((outcome) => outcome.status === "complete")).toBe(true);
     expect(store.uploads).toHaveLength(2);
     expect(requested.some((url) => url.includes(`/tree/${NATIONAL_SHA}/`))).toBe(false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// A file the schema 8 reader refuses: its second row puts the first row's
+// category under another provider. A release built from it cannot be
+// published.
+const REFUSED_SCHEMA_8_DIAGNOSTICS = {
+  schema_version: 8,
+  targets: [
+    SCHEMA_8_DIAGNOSTICS.targets[0],
+    {
+      ...SCHEMA_8_DIAGNOSTICS.targets[0],
+      name: "other.target@2025",
+      target_name: "other.target",
+      hierarchy: {
+        ...SCHEMA_8_DIAGNOSTICS.targets[0].hierarchy,
+        provider: { id: "other", label: "Other provider" },
+        category: { id: "provider.category", label: "Category label", provider_id: "other" },
+        target: { id: "other.target", label: "Other target label" },
+      },
+    },
+  ],
+};
+const REFUSED_SCHEMA_8_ERROR =
+  "Schema 8 category provider.category references inconsistent providers: provider and other.";
+
+function lineStoreWithJuneLatest(
+  options: { incompleteAfterUpload?: ReadonlySet<string> } = {},
+) {
+  return memoryStore(
+    withCalibrationTreeManifestEntry(
+      withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", placeholderEntry()),
+      "uk",
+      juneEntry(),
+      true,
+    ),
+    options,
+  );
+}
+
+test("release reconciliation records a release it cannot build as failed and still publishes the releases after it", async () => {
+  // The dense cut sorts first, so on its own it used to stop reconciliation
+  // before the national cut and the latest-release selection.
+  const store = lineStoreWithJuneLatest();
+  globalThis.fetch = lineRepositoryFetch([], (directory) =>
+    directory === DENSE_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS
+  );
+  try {
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    const status = Object.fromEntries(
+      report.outcomes.map((outcome) => [outcome.sourceId, outcome.status]),
+    );
+    expect(status).toEqual({
+      [DENSE_CUT]: "failed",
+      [NATIONAL_CUT]: "published",
+      [STRAY_CUT]: "ineligible",
+      [NATIONAL_LINE]: "complete",
+      [JUNE_RELEASE]: "complete",
+    });
+    expect(report.outcomes.find((outcome) => outcome.sourceId === DENSE_CUT)).toEqual({
+      sourceId: DENSE_CUT,
+      status: "failed",
+      buildArtifactId: null,
+      reason: REFUSED_SCHEMA_8_ERROR,
+    });
+    expect(report.latestReleaseFailure).toBeUndefined();
+
+    // Nothing is uploaded or written for the failed cut. The national cut is
+    // published and becomes the latest release, as its line pointer says.
+    expect(store.uploads.map((bundle) => bundle.index.build.releaseId)).toEqual([NATIONAL_CUT]);
+    expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+      .toEqual([[NATIONAL_CUT, false], [NATIONAL_CUT, true]]);
+    const builds = store.current().countries.uk!.builds;
+    expect(builds.map((build) => build.releaseId).sort())
+      .toEqual([JUNE_RELEASE, NATIONAL_LINE, NATIONAL_CUT].sort());
+    expect(store.current().countries.uk!.latestReleaseBuildArtifactId)
+      .toBe(builds.find((build) => build.releaseId === NATIONAL_CUT)!.buildArtifactId);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a release whose uploaded build fails its audit gets no manifest entry, and the releases after it are still published", async () => {
+  const store = lineStoreWithJuneLatest({ incompleteAfterUpload: new Set([DENSE_CUT]) });
+  globalThis.fetch = lineRepositoryFetch([]);
+  try {
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    const dense = report.outcomes.find((outcome) => outcome.sourceId === DENSE_CUT);
+    expect(dense?.status).toBe("failed");
+    expect(dense?.buildArtifactId).toBeNull();
+    expect(dense?.reason).toMatch(
+      new RegExp(`^Release build ${DENSE_CUT} remains incomplete: missing calibration-trees/uk/[0-9a-f]{64}/tier-1\\.json\\.gz$`),
+    );
+    expect(report.outcomes.find((outcome) => outcome.sourceId === NATIONAL_CUT)?.status)
+      .toBe("published");
+
+    // Each uploaded build is audited before the manifest names it, so the
+    // dense cut's files are never registered.
+    expect(store.operations).toEqual([
+      "list files",
+      `upload ${DENSE_CUT}`,
+      "list files",
+      `audit ${DENSE_CUT}`,
+      `audit ${NATIONAL_LINE}`,
+      `upload ${NATIONAL_CUT}`,
+      "list files",
+      `audit ${NATIONAL_CUT}`,
+      `write ${NATIONAL_CUT}`,
+      `audit ${JUNE_RELEASE}`,
+      `write ${NATIONAL_CUT} as latest`,
+    ]);
+    expect(store.current().countries.uk!.builds.some((build) => build.releaseId === DENSE_CUT))
+      .toBe(false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("when the release the line pointer names fails, the latest-release selection is left as it was", async () => {
+  const store = lineStoreWithJuneLatest();
+  globalThis.fetch = lineRepositoryFetch([], (directory) =>
+    directory === NATIONAL_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS
+  );
+  try {
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    expect(report.outcomes.find((outcome) => outcome.sourceId === NATIONAL_CUT)).toEqual({
+      sourceId: NATIONAL_CUT,
+      status: "failed",
+      buildArtifactId: null,
+      reason: REFUSED_SCHEMA_8_ERROR,
+    });
+    expect(report.outcomes.find((outcome) => outcome.sourceId === DENSE_CUT)?.status)
+      .toBe("published");
+    expect(report.latestReleaseFailure).toBe(
+      `Latest release ${NATIONAL_CUT} failed to reconcile, so the latest-release selection was not changed.`,
+    );
+
+    // Only the dense cut is written; the June release stays the latest.
+    expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+      .toEqual([[DENSE_CUT, false]]);
+    expect(store.current().countries.uk!.latestReleaseBuildArtifactId)
+      .toBe(juneEntry().buildArtifactId);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("the publisher prints every release outcome, then exits with an error naming each failed release", async () => {
+  // Two failures: the dense cut's file is refused, and the June release's
+  // stored build pins a commit its tag no longer points at.
+  const movedJune = { ...juneEntry(), hfCommitSha: "6".repeat(40) };
+  const store = memoryStore(
+    withCalibrationTreeManifestEntry(
+      withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", placeholderEntry()),
+      "uk",
+      movedJune,
+      true,
+    ),
+  );
+  globalThis.fetch = lineRepositoryFetch([], (directory) =>
+    directory === DENSE_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS
+  );
+  const originalBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  process.env.BLOB_READ_WRITE_TOKEN = "unused-blob-token";
+  const printed: string[] = [];
+  const originalLog = console.log;
+  console.log = (message?: unknown) => {
+    printed.push(String(message));
+  };
+  try {
+    await expect(
+      runPublisher({ country: "uk", mode: "reconcile-releases" }, { store }),
+    ).rejects.toThrow(
+      `2 of 5 releases failed to reconcile: ${DENSE_CUT}, ${JUNE_RELEASE}. ` +
+        "The printed report gives each reason.",
+    );
+    expect(printed).toHaveLength(1);
+    const report = JSON.parse(printed[0]) as { outcomes: Array<{ sourceId: string; status: string; reason: string | null }> };
+    expect(report.outcomes.map((outcome) => [outcome.sourceId, outcome.status])).toEqual([
+      [STRAY_CUT, "ineligible"],
+      [DENSE_CUT, "failed"],
+      [NATIONAL_LINE, "complete"],
+      [NATIONAL_CUT, "published"],
+      [JUNE_RELEASE, "failed"],
+    ]);
+    expect(report.outcomes.find((outcome) => outcome.sourceId === JUNE_RELEASE)?.reason).toBe(
+      `Released dataset ${JUNE_RELEASE} changed from ${"6".repeat(40)} to ${JUNE_SHA}.`,
+    );
+    // The national cut still becomes the latest release.
+    expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+      .toEqual([[NATIONAL_CUT, false], [NATIONAL_CUT, true]]);
+  } finally {
+    console.log = originalLog;
+    globalThis.fetch = originalFetch;
+    if (originalBlobToken == null) delete process.env.BLOB_READ_WRITE_TOKEN;
+    else process.env.BLOB_READ_WRITE_TOKEN = originalBlobToken;
+  }
+});
+
+test("a dry run records a failed release, writes nothing and still reports the releases after it", async () => {
+  const store = lineStoreWithJuneLatest();
+  globalThis.fetch = lineRepositoryFetch([], (directory) =>
+    directory === DENSE_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS
+  );
+  try {
+    const report = await reconcileReleaseBuilds("uk", "blob-token", true, store);
+    expect(report.dryRun).toBe(true);
+    expect(report.outcomes.find((outcome) => outcome.sourceId === DENSE_CUT)?.status)
+      .toBe("failed");
+    expect(report.outcomes.find((outcome) => outcome.sourceId === NATIONAL_CUT)).toMatchObject({
+      status: "published",
+      reason: "Dry run; no Blob writes performed.",
+    });
+    expect(store.uploads).toHaveLength(0);
+    expect(store.writes).toHaveLength(0);
   } finally {
     globalThis.fetch = originalFetch;
   }
