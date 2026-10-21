@@ -234,7 +234,9 @@ inference.
 
 The top-level diagnostics schema selects exactly one target reader. Schemas 2–6
 use the legacy reader, schema 7 uses the structured reader described above, and
-schema 8 uses the normalized hierarchy reader. Missing versions, version 1, and
+schemas 8 and 9 use the normalized hierarchy reader (schema 9 after its
+hierarchy catalogs are expanded into schema 8 rows; see
+[Calibration map hierarchy](calibration-map-hierarchy.md#schema-9-catalogs)). Missing versions, version 1, and
 unsupported future versions are rejected explicitly. A row that does not match
 its file's declared representation is rejected; the dashboard does not choose a
 different reader from that row's shape.

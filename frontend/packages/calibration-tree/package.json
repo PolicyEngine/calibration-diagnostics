@@ -18,6 +18,7 @@
     "./chronicle-metadata": "./src/chronicle-metadata.ts",
     "./countries": "./src/countries.ts",
     "./geography-labels": "./src/geography-labels.ts",
+    "./hierarchy-catalog-reader": "./src/hierarchy-catalog-reader.ts",
     "./hierarchy-target-reader": "./src/hierarchy-target-reader.ts",
     "./historical-weight-summary": "./src/historical-weight-summary.ts",
     "./latest-artifact": "./src/latest-artifact.ts",
