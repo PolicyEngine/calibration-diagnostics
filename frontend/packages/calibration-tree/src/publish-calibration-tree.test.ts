@@ -6,6 +6,7 @@ import {
   parsePublisherOptions,
   migrateReleaseTimestamps,
   reconcileReleaseBuilds,
+  reconciliationFailureMessage,
   readUpstreamLatest,
   resolvePublicationSourceSha,
   manifestBuildForSource,
@@ -891,6 +892,30 @@ test("a dry run records a failed release, writes nothing and still reports the r
     });
     expect(store.uploads).toHaveLength(0);
     expect(store.writes).toHaveLength(0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a dry run reports the same latest-release failure as a run that writes when the release the pointer file names fails", async () => {
+  const refuseNationalDiagnostics = (directory: string) =>
+    directory === NATIONAL_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS;
+  const expectedFailure =
+    `Latest release ${NATIONAL_CUT} failed to reconcile, so the latest-release selection was not changed.`;
+  try {
+    globalThis.fetch = lineRepositoryFetch([], refuseNationalDiagnostics);
+    const writingReport = await reconcileReleaseBuilds("uk", "blob-token", false, lineStoreWithJuneLatest());
+    expect(writingReport.latestReleaseFailure).toBe(expectedFailure);
+
+    const dryRunStore = lineStoreWithJuneLatest();
+    globalThis.fetch = lineRepositoryFetch([], refuseNationalDiagnostics);
+    const dryRunReport = await reconcileReleaseBuilds("uk", "blob-token", true, dryRunStore);
+    expect(dryRunReport.outcomes.find((outcome) => outcome.sourceId === NATIONAL_CUT)?.status)
+      .toBe("failed");
+    expect(dryRunReport.latestReleaseFailure).toBe(expectedFailure);
+    expect(reconciliationFailureMessage(dryRunReport)).toBe(reconciliationFailureMessage(writingReport));
+    expect(dryRunStore.uploads).toHaveLength(0);
+    expect(dryRunStore.writes).toHaveLength(0);
   } finally {
     globalThis.fetch = originalFetch;
   }
