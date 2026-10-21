@@ -102,8 +102,9 @@ export interface ReconciliationReport {
   outcomes: ReconciliationOutcome[];
   /**
    * Release reconciliation only: why the latest-release selection could not
-   * be read or updated. Absent when it was updated, and in a dry run that
-   * read the upstream pointer.
+   * be read or updated. Absent when it was updated. In a dry run, present
+   * only when the upstream pointer cannot be read or names a release that
+   * failed in this run.
    */
   latestReleaseFailure?: string;
 }
@@ -1288,9 +1289,10 @@ export async function reconcileReleaseBuilds(
 /**
  * Point the country's latest-release selection at the release its upstream
  * pointer names, once that release is completely published. Returns why the
- * selection could not be read or updated, or null. A dry run only reads the
- * pointer. A release that failed in this reconciliation is never selected,
- * so the selection keeps naming the build it named before.
+ * selection could not be read or updated, or null. A release that failed in
+ * this reconciliation is never selected, so the selection keeps naming the
+ * build it named before. A dry run reads the pointer and reports a release
+ * that failed, but neither checks nor changes the selection otherwise.
  */
 async function selectLatestRelease(
   country: MicrocosmCountry,
@@ -1301,10 +1303,14 @@ async function selectLatestRelease(
 ): Promise<string | null> {
   try {
     const latest = await readUpstreamLatest(country, undefined, manifest);
-    if (dryRun) return null;
+    // Checked before the dry-run return, so a dry run reports a failed
+    // latest release exactly as a run that writes does.
     if (failedReleaseIds.has(latest.releaseId)) {
       return `Latest release ${latest.releaseId} failed to reconcile, so the latest-release selection was not changed.`;
     }
+    // A dry run writes no manifest entries, so it cannot check whether the
+    // release is completely published.
+    if (dryRun) return null;
     const latestEntry = manifestBuildForSource(
       manifest,
       country,
