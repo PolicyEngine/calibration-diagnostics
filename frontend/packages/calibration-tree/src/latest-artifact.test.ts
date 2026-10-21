@@ -3224,6 +3224,87 @@ test("published cuts take their role from their own release manifest at their co
   }
 });
 
+// Microcosm can publish a release as a tag alone (`--no-latest --tag-only`):
+// `releases/<release id>/` exists at the tag's commit and never on main, so
+// the folder listing cannot name it. A folder on main without calibration
+// diagnostics does not name a published release either: the publisher reads
+// that release from its tag. Release ids and commits are synthetic.
+test("a release published only as a tag is listed from the dashboard manifest", async () => {
+  const folderReleaseId = "populace-us-2024-folder-20260915";
+  const uncalibratedFolderReleaseId = "populace-us-2024-uncalibrated-folder-20261001";
+  const tagOnlyReleaseId = "populace-us-2024-tag-only-local-20261017T030317Z";
+  const tagOnlyCommit = "3".repeat(40);
+  const manifestEntry = (
+    releaseId: string,
+    commit: string,
+    artifactDigit: string,
+  ): CalibrationTreeManifestEntry => ({
+    buildArtifactId: artifactDigit.repeat(64),
+    kind: "release",
+    sourceId: releaseId,
+    label: releaseId,
+    releaseId,
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-us",
+    hfCommitSha: commit,
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: null,
+    updatedAt: null,
+  });
+  let manifest = emptyCalibrationTreeManifest();
+  for (const build of [
+    manifestEntry(folderReleaseId, "4".repeat(40), "a"),
+    manifestEntry(tagOnlyReleaseId, tagOnlyCommit, "b"),
+    manifestEntry(uncalibratedFolderReleaseId, "5".repeat(40), "c"),
+  ]) {
+    manifest = withCalibrationTreeManifestEntry(manifest, "us", build);
+  }
+  const folders = [
+    folderRelease(folderReleaseId, "20260915"),
+    {
+      ...folderRelease(uncalibratedFolderReleaseId, "20261001"),
+      files: ["release_manifest.json"],
+      has_calibration: false,
+    },
+  ];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith(`/resolve/${tagOnlyCommit}/releases/${tagOnlyReleaseId}/release_manifest.json`)) {
+      return Response.json({ dataset_role: "non_default_local_area", is_default: false });
+    }
+    return new Response(null, { status: 503 });
+  }) as typeof fetch;
+  try {
+    const tagged = await loadPublishedCutReleases(0, "us", manifest, folders);
+    expect(
+      tagged
+        .map((release) => [
+          release.release_id,
+          release.date,
+          release.release_directory,
+          release.has_calibration,
+          release.is_local_area,
+        ])
+        .sort(),
+    ).toEqual([
+      [tagOnlyReleaseId, "20261017T030317Z", undefined, true, true],
+      [uncalibratedFolderReleaseId, "20261001", undefined, true, false],
+    ]);
+    // Each release is listed once, newest first.
+    const inventory = mergeReleaseInventory(folders, tagged, folderReleaseId);
+    expect(inventory.map((release) => [release.release_id, release.has_calibration])).toEqual([
+      [tagOnlyReleaseId, true],
+      [uncalibratedFolderReleaseId, true],
+      [folderReleaseId, true],
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("a cut's investigation packet cites its line folder at the cut's commit", () => {
   const tag = `${LINE}-20261019T083323Z-0b0b0b0b`;
   const sha = "1".repeat(40);
