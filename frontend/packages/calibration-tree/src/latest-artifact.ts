@@ -2422,9 +2422,9 @@ export async function loadReleases(
 
 // Published releases the folder listing above cannot name, read from the
 // dashboard manifest:
-// - a Microcosm cut (microcosm#823), released as its tag and stored under its
-//   line's folder, which the folder listing names only as the mutable copy on
-//   main;
+// - a per-attempt tag of a Microcosm release series (microcosm#823), whose
+//   files are in the series' shared folder, which the folder listing names
+//   only as the mutable copy on main;
 // - a release published only as a tag (`--no-latest --tag-only`), whose
 //   `releases/<release id>/` exists at the tag's commit and never on main.
 // A release whose calibrated folder is on main is listed from that folder, as
@@ -2480,10 +2480,11 @@ export async function loadPublishedCutReleases(
   }));
 }
 
-// The picker lists every published cut and every release published only as a
-// tag beside the folders on main. A line folder is a mutable copy of
-// whichever of its cuts was published last, so it leaves the picker once its
-// cuts are listed, unless the dashboard's latest release still points at it.
+// The picker lists every published per-attempt tag and every release
+// published only as a tag beside the folders on main. A release series'
+// shared folder is a mutable copy of whichever of its tags was published
+// last, so it leaves the picker once its tags are listed, unless the
+// dashboard's latest release still points at it.
 // A folder on main without calibration diagnostics gives way to the
 // published build of the same release. Without such releases the listing is
 // returned unchanged.

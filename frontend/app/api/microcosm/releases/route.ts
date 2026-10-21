@@ -37,8 +37,9 @@ export function createMicrocosmReleasesHandler(
           .then(({ manifest }) => manifest)
           .catch(() => null),
       ]);
-      // Published cuts and releases published only as a tag are named only by
-      // the dashboard manifest; without it the picker keeps the folder listing.
+      // Per-attempt tags and releases published only as a tag are named only
+      // by the dashboard manifest; without it the picker keeps the folder
+      // listing.
       const cuts = manifest
         ? await dependencies
           .loadPublishedCutReleases(revalidate, country, manifest, folders)
