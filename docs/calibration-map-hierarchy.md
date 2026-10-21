@@ -160,7 +160,10 @@ catalog entry, when:
 - a row refers to a category, geography or dimension the catalogs do not list,
   or to a value its own dimension does not list (including a value listed only
   under another dimension);
-- a row lists one dimension twice, or is still in the schema 8 layout; or
+- a row lists one dimension twice, or is still in the schema 8 layout;
+- a row's `hierarchy`, or one of its `dimensions` references, has a field
+  schema 9 does not define (such as an inline schema 8 `geography` or
+  `value_label`); or
 - a row's `hierarchy.target.id` differs from its `target_name`.
 
 IDs are compared after trimming whitespace, as the schema 8 reader trims them.

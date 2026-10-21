@@ -21,8 +21,9 @@
 // The provider is the category's. A file that is structurally inconsistent
 // (missing catalogs, an ID listed twice, a reference to an entry the catalogs
 // do not list, a value looked up under a dimension that does not list it) is
-// refused. IDs are compared after trimming whitespace, as the schema 8 reader
-// trims them.
+// refused, as is a row hierarchy field schema 9 does not define (such as an
+// inline schema 8 label). IDs are compared after trimming whitespace, as the
+// schema 8 reader trims them.
 
 type JsonObject = Record<string, unknown>;
 
@@ -157,6 +158,26 @@ function readCatalogs(document: JsonObject): HierarchyCatalogs {
   return { providers, categories, geographies, dimensions };
 }
 
+const ROW_HIERARCHY_FIELDS = new Set(["category_id", "geography_id", "dimensions", "target"]);
+const DIMENSION_REFERENCE_FIELDS = new Set(["id", "value_id"]);
+
+/**
+ * Refuse a field schema 9 does not define, as Microcosm's model and JSON
+ * Schema do: an inline schema 8 label beside a catalog reference could only
+ * disagree with the catalog.
+ */
+function refuseUndefinedFields(
+  value: JsonObject,
+  allowed: Set<string>,
+  location: string,
+): void {
+  for (const field of Object.keys(value)) {
+    if (!allowed.has(field)) {
+      throw new Error(`${location} has field ${field}, which schema 9 does not define.`);
+    }
+  }
+}
+
 function rowName(row: JsonObject, index: number): string {
   for (const candidate of [row.name, row.target_name]) {
     if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
@@ -217,6 +238,11 @@ function expandRowHierarchy(
           "which that dimension does not list.",
       );
     }
+    refuseUndefinedFields(
+      dimensionReference,
+      DIMENSION_REFERENCE_FIELDS,
+      `Schema 9 target ${name} hierarchy.dimensions[${rank}]`,
+    );
     return {
       id: dimension.id,
       label: dimension.label,
@@ -235,6 +261,10 @@ function expandRowHierarchy(
         `target_name ${rowTargetId}.`,
     );
   }
+
+  // Checked after the required fields, so a schema 8 row reports its missing
+  // category_id first.
+  refuseUndefinedFields(reference, ROW_HIERARCHY_FIELDS, `Schema 9 target ${name} hierarchy`);
 
   // The schema 8 hierarchy, with the producer's key order.
   return {
