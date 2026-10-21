@@ -405,7 +405,8 @@ Failure meanings and recovery:
   permission.
 - A failed release workflow either stopped before reconciling any release (for
   example, the manifest, the release listing or the repository's tags could
-  not be read), or printed a report in which at least one release is `failed`
+  not be read, or one tag's folder or one folder's commit could not be
+  resolved), or printed a report in which at least one release is `failed`
   or `latestReleaseFailure` says why the latest-release selection was not
   updated. In the second case every release with another outcome was
   reconciled, and the error names the failed releases. Every later release
@@ -464,8 +465,14 @@ repair as `failed`, with the error as its `reason`, and continue with the
 remaining sources; after printing the report the command exits with an error
 naming every failed source. One release or run that cannot be published
 therefore no longer leaves the sources after it unpublished on every later
-invocation. Errors before the per-source loop (reading the manifest, listing
-releases, tags or staging runs) still stop reconciliation before any source.
+invocation. Errors before the per-source loop still stop reconciliation before
+any source and print no report: reading the manifest, listing releases, tags or
+staging runs, the first Blob listing, and, for releases, the Hugging Face
+lookups that build the release list (the folder probe and
+`release_manifest.json` of each tag the manifest does not already pin at its
+commit, and the commit of each folder release without a tag).
+An error in one of those lookups therefore stops every release, as one failed
+release did before.
 
 For a release, the steps that write run in this order: upload the bundle's
 files (the index last), list the stored files and audit the build against its
