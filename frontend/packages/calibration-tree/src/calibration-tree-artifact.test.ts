@@ -446,6 +446,42 @@ test("bundle validation still accepts a tree published with a node per spelling"
   expect(() => validateCalibrationTreeBundle(published)).not.toThrow();
 });
 
+test("bundle validation refuses geography nodes and postings that agree with each other but not with the target rows", () => {
+  const built = bundle(MAINE_RELEASE_ROWS);
+  // Renames one geography in the geography root's node and in its posting
+  // alike, as a builder that labelled a geography wrongly would write both.
+  const withGeographyRenamed = (from: string, to: string) => {
+    const renamed = structuredClone(built);
+    const geographyRoot = renamed.index.levels[renamed.index.roots.geography];
+    const treeNode = geographyRoot.groups
+      .flatMap((group) => group.nodes)
+      .find((candidate) => candidate.selection.value === from)!;
+    treeNode.label = to;
+    treeNode.selection = { kind: "geography", value: to };
+    return withGeographyPostings(
+      renamed,
+      loaded(built).filterIndex.postings.geographies
+        .map((posting) => posting.value === from ? { ...posting, value: to } : posting)
+        .sort((left, right) => left.value.localeCompare(right.value)),
+    );
+  };
+
+  expect(() =>
+    validateCalibrationTreeBundle(withGeographyRenamed("Maine", "Maine")),
+  ).not.toThrow();
+  // A label that no row spells.
+  expect(() =>
+    validateCalibrationTreeBundle(
+      withGeographyRenamed("ME congressional district 1", "Kennebec"),
+    ),
+  ).toThrow(/geographies postings do not follow the target rows/);
+  // The state's other spelling for all 85 targets: the rows spell it "Maine"
+  // first, and only the population target spells it "ME".
+  expect(() =>
+    validateCalibrationTreeBundle(withGeographyRenamed("Maine", "ME")),
+  ).toThrow(/geographies postings do not follow the target rows/);
+});
+
 test("a compile reads each row's geography ID once, however many levels the tree has", () => {
   // A compile builds every level of the tree from the same rows, so it labels
   // each row's geography once instead of once per level: the largest
