@@ -2484,7 +2484,9 @@ export async function loadPublishedCutReleases(
 // published only as a tag beside the folders on main. A release series'
 // shared folder is a mutable copy of whichever of its tags was published
 // last, so it leaves the picker once its tags are listed, unless the
-// dashboard's latest release still points at it.
+// dashboard's latest release still points at it. That holds for the shared
+// folder's own published build too, which the manifest reader returns when
+// the folder's copy on main has no calibration diagnostics.
 // A folder on main without calibration diagnostics gives way to the
 // published build of the same release. Without such releases the listing is
 // returned unchanged.
@@ -2496,13 +2498,14 @@ export function mergeReleaseInventory(
   if (!cuts.length) return folders;
   const lineFolders = new Set(cuts.map((cut) => cut.release_directory));
   const publishedReleaseIds = new Set(cuts.map((cut) => cut.release_id));
+  const outsideSharedFolders = (release: ReleaseEntry) =>
+    !lineFolders.has(release.release_id) || release.release_id === latestReleaseId;
   return [
     ...folders.filter(
       (folder) =>
-        (!lineFolders.has(folder.release_id) || folder.release_id === latestReleaseId) &&
-        !publishedReleaseIds.has(folder.release_id),
+        outsideSharedFolders(folder) && !publishedReleaseIds.has(folder.release_id),
     ),
-    ...cuts,
+    ...cuts.filter(outsideSharedFolders),
   ].sort((left, right) => releaseSortKey(right.date) - releaseSortKey(left.date));
 }
 
