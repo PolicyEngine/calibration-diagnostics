@@ -36,6 +36,11 @@ if modal.is_local():
     source_commit, source_tree_sha256 = deployment_identity()
     image = (
         modal.Image.debian_slim(python_version="3.12")
+        # Modal's prebuilt Debian base keeps the ca-certificates package it was
+        # built with. Install the current one so clients that read the
+        # operating-system CA store, such as hf-xet, stop trusting roots Debian
+        # has since removed. Modal caches this step; force a rebuild to refresh it.
+        .apt_install("ca-certificates")
         .pip_install_from_requirements(str(ROOT / "backend/requirements.lock"))
         .add_local_dir(
             str(ROOT / "frontend/scripts"),
