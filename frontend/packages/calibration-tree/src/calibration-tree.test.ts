@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { ExplorerState } from "./calibration-explorer";
+import maineRelease from "./fixtures/us-766b7c7-maine-targets.json";
 import type { CalibrationProvenance } from "./target-loss-attribution";
 import {
   applyExplorerFilters,
@@ -1012,13 +1013,133 @@ describe("geographies that rows spell more than one way", () => {
     });
     expect(nodeSummaries(populationGeographies)).toEqual([["Maine", "Maine", 1]]);
 
-    // The geography filter matches each row's own spelling, as the published
-    // filter index does, and the node keeps the geography's label.
-    const spelledME = buildCalibrationTree(releaseRows, {
-      breakdown: "geography",
-      path: { dimensions: [] },
-      filters: { ...EMPTY_FILTERS, geographies: ["ME"] },
+    // The Geography filter selects the geography's label, so it keeps the row
+    // that spells the geography "ME".
+    const poorlyFitInMaine = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: populationPath,
+      filters: { ...poorlyFitOnly, geographies: ["Maine"] },
     });
-    expect(nodeSummaries(spelledME)).toEqual([["Maine", "Maine", 1]]);
+    expect(nodeSummaries(poorlyFitInMaine)).toEqual([["Maine", "Maine", 1]]);
+  });
+});
+
+// Every row of state 0400000US23 and of Maine's two congressional districts in
+// release populace-us-2024-buildo-acs-local-766b7c7-20261017T030317Z, in
+// release order, as buildCalibration returns them (the fixture records how it
+// was made). 84 of the state's 85 targets spell it "Maine"; its state
+// population target, the last of them, spells it "ME".
+describe("the Geography filter on a geography that rows spell more than one way", () => {
+  const maineRows = maineRelease.rows as unknown as CalibrationTreeTarget[];
+  const geographyRoot = state({ dimensions: [] }, "geography");
+  const filteredBy = (
+    treeState: ExplorerState,
+    geographies: string[],
+  ): ExplorerState => ({
+    ...treeState,
+    filters: { ...EMPTY_FILTERS, geographies },
+  });
+
+  function nodeSummaries(tree: ReturnType<typeof buildCalibrationTree>) {
+    return tree.groups
+      .flatMap((group) => group.nodes)
+      .map((treeNode) => [treeNode.label, treeNode.metrics.nTargets]);
+  }
+
+  test("offers one option per geography, labelled as the geography's node", () => {
+    const tree = buildCalibrationTree(maineRows, geographyRoot);
+
+    expect(nodeSummaries(tree)).toEqual([
+      ["Maine", 85],
+      ["ME congressional district 1", 1],
+      ["ME congressional district 2", 1],
+    ]);
+    expect(tree.filterOptions.geographies).toEqual([
+      "Maine",
+      "ME congressional district 1",
+      "ME congressional district 2",
+    ]);
+  });
+
+  test("selecting Maine selects all 85 of its targets, whatever their spelling", () => {
+    const geographies = buildCalibrationTree(
+      maineRows,
+      filteredBy(geographyRoot, ["Maine"]),
+    );
+    expect(nodeSummaries(geographies)).toEqual([["Maine", 85]]);
+    expect(geographies.filteredMetrics.nTargets).toBe(85);
+
+    const programs = buildCalibrationTree(
+      maineRows,
+      filteredBy(state({ dimensions: [] }), ["Maine"]),
+    );
+    expect(programs.filteredMetrics.nTargets).toBe(85);
+    expect(
+      programs.groups.map((group) => [group.id, group.metrics.nTargets]),
+    ).toEqual([
+      ["irs_soi", 81],
+      ["usda_snap", 2],
+      ["census_population", 1],
+      ["cms_medicaid", 1],
+    ]);
+
+    // The filter keeps every program of the Maine node, as the unfiltered
+    // node lists them.
+    const maine = state({ geography: "Maine", dimensions: [] }, "geography");
+    expect(buildCalibrationTree(maineRows, filteredBy(maine, ["Maine"])))
+      .toEqual(buildCalibrationTree(maineRows, maine));
+
+    const populationGeographies = buildCalibrationTree(
+      maineRows,
+      filteredBy(
+        state({
+          source: "census_population",
+          program: "census_population.resident_population",
+          dimensions: [],
+        }),
+        ["Maine"],
+      ),
+    );
+    expect(nodeSummaries(populationGeographies)).toEqual([["Maine", 1]]);
+  });
+
+  test("a spelling that is not an option, such as ME, selects no target", () => {
+    const tree = buildCalibrationTree(
+      maineRows,
+      filteredBy(geographyRoot, ["ME"]),
+    );
+
+    expect(nodeSummaries(tree)).toEqual([]);
+    expect(tree.filteredMetrics.nTargets).toBe(0);
+  });
+
+  test("an option selects only its own geography when another geography's rows use the same spelling", () => {
+    // County A is spelled "Kent" and then "Kent County"; county B is spelled
+    // "Kent County". The tree lists A as "Kent" and B as "Kent County", so
+    // the option "Kent County" must not select A's second row.
+    const county = (name: string, geographyId: string, geography: string) =>
+      target(name, {
+        source: "census",
+        variable: "population",
+        level: "county",
+        geography_id: geographyId,
+        geography,
+      });
+    const rows = [
+      county("population/a/1", "A", "Kent"),
+      county("population/a/2", "A", "Kent County"),
+      county("population/b/1", "B", "Kent County"),
+    ];
+
+    expect(nodeSummaries(buildCalibrationTree(rows, geographyRoot))).toEqual([
+      ["Kent", 2],
+      ["Kent County", 1],
+    ]);
+    expect(
+      nodeSummaries(buildCalibrationTree(rows, filteredBy(geographyRoot, ["Kent County"]))),
+    ).toEqual([["Kent County", 1]]);
+    expect(
+      nodeSummaries(buildCalibrationTree(rows, filteredBy(geographyRoot, ["Kent"]))),
+    ).toEqual([["Kent", 2]]);
   });
 });
