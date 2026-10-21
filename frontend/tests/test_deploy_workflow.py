@@ -52,15 +52,61 @@ def _installs_locked_frontend_dependencies(step, job):
     )
 
 
+PRODUCTION_CONCURRENCY_GROUP = "calibration-diagnostics-production"
+SUCCESSFUL_MAIN_PUSH_CLAUSES = {
+    "github.event.workflow_run.conclusion == 'success'",
+    "github.event.workflow_run.event == 'push'",
+    "github.event.workflow_run.head_branch == 'main'",
+}
+
+
+def _concurrency_group(job):
+    concurrency = job.get("concurrency", {})
+    return concurrency if isinstance(concurrency, str) else concurrency.get("group")
+
+
 def test_deployment_waits_for_successful_main_ci():
+    # Without the branch filter, every CI run, pull-request runs included,
+    # creates a run of this workflow (see #260).
     workflow = _workflow()
     assert workflow["on"] == {
-        "workflow_run": {"workflows": ["CI"], "types": ["completed"]}
+        "workflow_run": {
+            "workflows": ["CI"],
+            "types": ["completed"],
+            "branches": ["main"],
+        }
     }
     condition = workflow["jobs"]["deploy"]["if"]
     assert "conclusion == 'success'" in condition
     assert "event == 'push'" in condition
     assert "head_branch == 'main'" in condition
+
+
+def test_production_concurrency_group_belongs_to_the_deploy_job_not_the_workflow():
+    # A workflow-level group admits a run as soon as GitHub creates it, before
+    # its job's `if:` skips it, and replaces any older pending run in the
+    # group. On 2026-10-21, a pull-request CI run's deploy run, which would
+    # have skipped, cancelled the pending deploy of #248 that way.
+    workflow = _workflow()
+    assert "concurrency" not in workflow
+    assert workflow["jobs"]["deploy"]["concurrency"] == {
+        "group": PRODUCTION_CONCURRENCY_GROUP,
+        "cancel-in-progress": "false",
+    }
+
+
+def test_every_job_in_the_production_group_requires_a_successful_main_push():
+    # The branch filter matches the triggering run's head branch name, and a
+    # pull request from a fork whose branch is named main passes it. The job
+    # condition, which requires a push run, is what rejects such a run, so each
+    # job holding the production group keeps exactly these clauses, all required.
+    jobs = _workflow()["jobs"]
+    clauses_by_job = {
+        job_name: {clause.strip() for clause in job.get("if", "").split("&&")}
+        for job_name, job in jobs.items()
+        if _concurrency_group(job) == PRODUCTION_CONCURRENCY_GROUP
+    }
+    assert clauses_by_job == {"deploy": SUCCESSFUL_MAIN_PUSH_CLAUSES}
 
 
 def test_deployment_uses_exact_project_and_backend_first_order():
