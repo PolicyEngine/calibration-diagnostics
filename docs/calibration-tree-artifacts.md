@@ -485,7 +485,10 @@ After the releases, release reconciliation points `latestReleaseBuildArtifactId`
 at the release the upstream pointer names. It leaves the selection unchanged,
 and records why in the report's `latestReleaseFailure`, when that release
 failed in the same run, is not completely published, or the pointer cannot be
-read; the command then exits with an error. A dry run only reads the pointer.
+read; the command then exits with an error. A dry run reads the pointer and
+reports the same `latestReleaseFailure` when the pointer cannot be read or names
+a release that failed in the same run; it does not check whether the named
+release is completely published, because it writes no manifest entries.
 
 `CALIBRATION_TREE_MAX_RAW_BYTES` defaults to 100,000,000 bytes per file, in
 addition to the fixed summary- and detail-shard limits.
