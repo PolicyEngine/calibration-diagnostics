@@ -715,8 +715,9 @@ function lineStoreWithJuneLatest(
 }
 
 test("release reconciliation records a release it cannot build as failed and still publishes the releases after it", async () => {
-  // The dense cut sorts first, so on its own it used to stop reconciliation
-  // before the national cut and the latest-release selection.
+  // The dense tagged build (DENSE_CUT) sorts first, so on its own it used to
+  // stop reconciliation before the national tagged build and the
+  // latest-release selection.
   const store = lineStoreWithJuneLatest();
   globalThis.fetch = lineRepositoryFetch([], (directory) =>
     directory === DENSE_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS
@@ -741,8 +742,9 @@ test("release reconciliation records a release it cannot build as failed and sti
     });
     expect(report.latestReleaseFailure).toBeUndefined();
 
-    // Nothing is uploaded or written for the failed cut. The national cut is
-    // published and becomes the latest release, as its line pointer says.
+    // Nothing is uploaded or written for the failed tagged build. The national
+    // tagged build is published and becomes the latest release, as
+    // latest-national.json names it.
     expect(store.uploads.map((bundle) => bundle.index.build.releaseId)).toEqual([NATIONAL_CUT]);
     expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
       .toEqual([[NATIONAL_CUT, false], [NATIONAL_CUT, true]]);
@@ -771,7 +773,7 @@ test("a release whose uploaded build fails its audit gets no manifest entry, and
       .toBe("published");
 
     // Each uploaded build is audited before the manifest names it, so the
-    // dense cut's files are never registered.
+    // dense tagged build's files are never registered.
     expect(store.operations).toEqual([
       "list files",
       `upload ${DENSE_CUT}`,
@@ -792,7 +794,7 @@ test("a release whose uploaded build fails its audit gets no manifest entry, and
   }
 });
 
-test("when the release the line pointer names fails, the latest-release selection is left as it was", async () => {
+test("when the release the pointer file names fails, the latest-release selection is left as it was", async () => {
   const store = lineStoreWithJuneLatest();
   globalThis.fetch = lineRepositoryFetch([], (directory) =>
     directory === NATIONAL_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS
@@ -811,7 +813,7 @@ test("when the release the line pointer names fails, the latest-release selectio
       `Latest release ${NATIONAL_CUT} failed to reconcile, so the latest-release selection was not changed.`,
     );
 
-    // Only the dense cut is written; the June release stays the latest.
+    // Only the dense tagged build is written; the June release stays the latest.
     expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
       .toEqual([[DENSE_CUT, false]]);
     expect(store.current().countries.uk!.latestReleaseBuildArtifactId)
@@ -822,7 +824,7 @@ test("when the release the line pointer names fails, the latest-release selectio
 });
 
 test("the publisher prints every release outcome, then exits with an error naming each failed release", async () => {
-  // Two failures: the dense cut's file is refused, and the June release's
+  // Two failures: the dense tagged build's file is refused, and the June release's
   // stored build pins a commit its tag no longer points at.
   const movedJune = { ...juneEntry(), hfCommitSha: "6".repeat(40) };
   const store = memoryStore(
@@ -862,7 +864,7 @@ test("the publisher prints every release outcome, then exits with an error namin
     expect(report.outcomes.find((outcome) => outcome.sourceId === JUNE_RELEASE)?.reason).toBe(
       `Released dataset ${JUNE_RELEASE} changed from ${"6".repeat(40)} to ${JUNE_SHA}.`,
     );
-    // The national cut still becomes the latest release.
+    // The national tagged build still becomes the latest release.
     expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
       .toEqual([[NATIONAL_CUT, false], [NATIONAL_CUT, true]]);
   } finally {
