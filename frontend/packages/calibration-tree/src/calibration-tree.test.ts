@@ -8,6 +8,7 @@ import {
   buildCalibrationTree,
   effectiveNodeMetric,
   fitBandForTarget,
+  type CalibrationTreeDimension,
   type CalibrationTreeTarget,
 } from "./calibration-tree";
 
@@ -730,6 +731,305 @@ describe("schema 8 ordered hierarchy", () => {
     );
 
     expect(tree.calibrationProvenance).toEqual(inheritedProvenance);
+  });
+});
+
+// The reader keeps the first spelling of a label that rows spell more than
+// one way and reports the others (validateHierarchyTargets), so the builder
+// receives every row with its own spelling and must not refuse them. The
+// fixtures copy release populace-us-2024-0fb05b6-4b57d15a287c-20260930T150401Z,
+// whose national EITC rows label income band under_1 two ways.
+describe("schema 8 labels that rows spell more than one way", () => {
+  const INCOME_KEY = "us:statutes/26/62#adjusted_gross_income";
+  const CHILDREN_KEY = "irs_soi.qualifying_children";
+  const eitcPath = {
+    source: "irs_soi",
+    program: "irs_soi.eitc",
+    geography: "United States",
+    dimensions: [],
+  };
+
+  function eitcRow(
+    name: string,
+    dimensions: CalibrationTreeDimension[],
+  ): CalibrationTreeTarget {
+    return target(name, {
+      source: "irs_soi",
+      source_label: "IRS Statistics of Income",
+      variable: "irs_soi.eitc",
+      variable_label: "EITC",
+      geography: "United States",
+      level: "country",
+      target_label: name,
+      target_representation: "hierarchy",
+      target_dimensions: dimensions,
+    });
+  }
+
+  function incomeBand(
+    valueId: string,
+    valueLabel: string,
+    dimensionLabel = "Adjusted gross income",
+  ): CalibrationTreeDimension {
+    return {
+      key: INCOME_KEY,
+      label: dimensionLabel,
+      value: valueLabel,
+      value_id: valueId,
+    };
+  }
+
+  const oneChild: CalibrationTreeDimension = {
+    key: CHILDREN_KEY,
+    label: "Qualifying children",
+    value: "One qualifying child",
+    value_id: "one",
+  };
+
+  // The two rows that label value ID under_1 differently. The builder skips a
+  // dimension with a single value ID as a level, so the third row, in
+  // another income band, makes the income band a level it groups.
+  const tableRow = eitcRow("irs_soi.ty2023.table_2_5.eitc_total.under_1", [
+    incomeBand("under_1", "No adjusted gross income"),
+  ]);
+  const filingSeasonRow = eitcRow(
+    "irs_soi.ty2024.filing_season_week47.eitc_by_agi.under_1.returns",
+    [incomeBand("under_1", "No adjusted gross income and deficit")],
+  );
+  const otherBandRow = eitcRow("irs_soi.ty2023.table_2_5.eitc_total.1k_to_2k", [
+    incomeBand("1k_to_2k", "$1,000 under $2,000"),
+  ]);
+
+  function incomeNodes(rows: CalibrationTreeTarget[]) {
+    const tree = buildCalibrationTree(rows, state(eitcPath));
+    return tree.groups
+      .find((group) => group.id === INCOME_KEY)
+      ?.nodes.map((treeNode) => [treeNode.id, treeNode.label, treeNode.metrics.nTargets]);
+  }
+
+  test("labels a value ID that rows spell two ways with its first spelling in row order", () => {
+    expect(incomeNodes([tableRow, filingSeasonRow, otherBandRow])).toEqual([
+      ["under_1", "No adjusted gross income", 2],
+      ["1k_to_2k", "$1,000 under $2,000", 1],
+    ]);
+    expect(incomeNodes([filingSeasonRow, tableRow, otherBandRow])).toEqual([
+      ["under_1", "No adjusted gross income and deficit", 2],
+      ["1k_to_2k", "$1,000 under $2,000", 1],
+    ]);
+  });
+
+  test("names a selected value ID that rows spell two ways with its first spelling", () => {
+    const tree = buildCalibrationTree(
+      [tableRow, filingSeasonRow, otherBandRow],
+      state({
+        ...eitcPath,
+        dimensions: [
+          { key: INCOME_KEY, label: "Adjusted gross income", value: "under_1" },
+        ],
+      }),
+    );
+
+    expect(tree.pathLabels.dimensions).toEqual(["No adjusted gross income"]);
+    expect(tree.groups.flatMap((group) => group.nodes).map((treeNode) => treeNode.id)).toEqual([
+      "irs_soi.ty2023.table_2_5.eitc_total.under_1",
+      "irs_soi.ty2024.filing_season_week47.eitc_by_agi.under_1.returns",
+    ]);
+  });
+
+  test("keeps a value ID's first spelling when a filter hides the row that carries it", () => {
+    // A published tree is compiled without filters and keeps its node labels
+    // when a filter is applied, so a live tree must label a value from all
+    // of its rows, not only the visible ones, and its selected path must
+    // agree.
+    const poorlyFitTableRow = { ...tableRow, abs_relative_error: 0.5 };
+    const rows = [poorlyFitTableRow, filingSeasonRow, otherBandRow];
+    const wellFitOnly = { ...EMPTY_FILTERS, fitBands: ["0_5" as const] };
+
+    const level = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: eitcPath,
+      filters: wellFitOnly,
+    });
+    const selected = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: {
+        ...eitcPath,
+        dimensions: [
+          { key: INCOME_KEY, label: "Adjusted gross income", value: "under_1" },
+        ],
+      },
+      filters: wellFitOnly,
+    });
+
+    expect(
+      level.groups
+        .find((group) => group.id === INCOME_KEY)
+        ?.nodes.map((treeNode) => [treeNode.id, treeNode.label, treeNode.metrics.nTargets]),
+    ).toEqual([
+      ["1k_to_2k", "$1,000 under $2,000", 1],
+      ["under_1", "No adjusted gross income", 1],
+    ]);
+    expect(selected.pathLabels.dimensions).toEqual(["No adjusted gross income"]);
+  });
+
+  test("labels a dimension that rows spell two ways with its first spelling in row order", () => {
+    const plainRow = eitcRow("irs_soi.ty2023.table_2_5.eitc_total.under_1", [
+      incomeBand("under_1", "No adjusted gross income"),
+    ]);
+    const abbreviatedRow = eitcRow("irs_soi.ty2023.table_2_5.eitc_total.1k_to_2k", [
+      incomeBand("1k_to_2k", "$1,000 under $2,000", "Adjusted gross income (AGI)"),
+    ]);
+
+    const tree = buildCalibrationTree([plainRow, abbreviatedRow], state(eitcPath));
+
+    const plainDimension = { key: INCOME_KEY, label: "Adjusted gross income" };
+    expect(tree.dimensionOrder).toEqual([plainDimension]);
+    expect(tree.currentLevel).toEqual({ kind: "dimension", ...plainDimension });
+    expect(tree.groups.map((group) => [group.id, group.label])).toEqual([
+      [INCOME_KEY, "Adjusted gross income"],
+    ]);
+    expect(tree.groups[0].nodes.map((treeNode) => treeNode.selection)).toEqual([
+      { kind: "dimension_value", ...plainDimension, value: "1k_to_2k" },
+      { kind: "dimension_value", ...plainDimension, value: "under_1" },
+    ]);
+    expect(
+      buildCalibrationTree([abbreviatedRow, plainRow], state(eitcPath)).groups.map(
+        (group) => group.label,
+      ),
+    ).toEqual(["Adjusted gross income (AGI)"]);
+  });
+
+  test("lists a dimension that rows in separate branches spell two ways with its first spelling", () => {
+    // Neither row's income band becomes a level, so only the dimension order
+    // of the whole scope sees both spellings.
+    const directRow = eitcRow("irs_soi.direct.under_1", [
+      incomeBand("under_1", "No adjusted gross income"),
+    ]);
+    const childrenRow = eitcRow("irs_soi.children.under_1", [
+      oneChild,
+      incomeBand("under_1", "No adjusted gross income", "Adjusted gross income (AGI)"),
+    ]);
+
+    const tree = buildCalibrationTree([directRow, childrenRow], state(eitcPath));
+
+    expect(tree.dimensionOrder).toEqual([
+      { key: INCOME_KEY, label: "Adjusted gross income" },
+      { key: CHILDREN_KEY, label: "Qualifying children" },
+    ]);
+    expect(tree.groups.flatMap((group) => group.nodes).map((treeNode) => treeNode.id)).toEqual([
+      "irs_soi.children.under_1",
+      "irs_soi.direct.under_1",
+    ]);
+  });
+
+  test("gives a dimension reached through two parent branches its first spelling in row order", () => {
+    // The children branch is grouped first because its first row comes
+    // first, but the earliest row that carries the income band is a direct
+    // row, so the merged income level takes the direct rows' spelling.
+    const rows = [
+      eitcRow("irs_soi.children.total", [
+        oneChild,
+        { key: "irs_soi.filing_status", label: "Filing status", value: "All", value_id: "all" },
+      ]),
+      eitcRow("irs_soi.direct.under_1", [incomeBand("under_1", "No adjusted gross income")]),
+      eitcRow("irs_soi.direct.1k_to_2k", [incomeBand("1k_to_2k", "$1,000 under $2,000")]),
+      eitcRow("irs_soi.children.under_1", [
+        oneChild,
+        incomeBand("under_1", "No adjusted gross income", "Adjusted gross income (AGI)"),
+      ]),
+      eitcRow("irs_soi.children.1k_to_2k", [
+        oneChild,
+        incomeBand("1k_to_2k", "$1,000 under $2,000", "Adjusted gross income (AGI)"),
+      ]),
+    ];
+
+    const tree = buildCalibrationTree(rows, state(eitcPath));
+
+    expect(tree.dimensionOrder).toEqual([
+      { key: CHILDREN_KEY, label: "Qualifying children" },
+      { key: "irs_soi.filing_status", label: "Filing status" },
+      { key: INCOME_KEY, label: "Adjusted gross income" },
+    ]);
+    expect(
+      tree.groups.map((group) => [group.id, group.label, group.metrics.nTargets]),
+    ).toEqual([
+      [INCOME_KEY, "Adjusted gross income", 4],
+      ["targets", "Targets", 1],
+    ]);
+  });
+
+  // The reader keeps the first spelling in the whole file, which can belong
+  // to another program. In the same release, taxable pension income rows
+  // spell income band "all" both "All returns" and "All returns, total".
+  function pensionRow(
+    name: string,
+    dimensions: CalibrationTreeDimension[],
+  ): CalibrationTreeTarget {
+    return {
+      ...eitcRow(name, dimensions),
+      variable: "irs_soi.taxable_pension_income",
+      variable_label: "Taxable pension income",
+    };
+  }
+
+  const historicPensionRow = pensionRow(
+    "irs_soi.ty2022.historic_table_2.us.all.taxable_pension_income_amount",
+    [incomeBand("all", "All returns")],
+  );
+  const totalEitcRow = eitcRow("irs_soi.ty2023.table_1_4.all.eitc_amount", [
+    incomeBand("all", "All returns, total"),
+  ]);
+
+  test("labels a value ID that a node spells two ways with the spelling the reader keeps", () => {
+    const rows = [
+      historicPensionRow,
+      totalEitcRow,
+      eitcRow("irs_soi.ty2022.historic_table_2.us.all.eitc_amount", [
+        incomeBand("all", "All returns"),
+      ]),
+      tableRow,
+    ];
+
+    expect(incomeNodes(rows)).toEqual([
+      ["all", "All returns", 2],
+      ["under_1", "No adjusted gross income", 1],
+    ]);
+    const selected = buildCalibrationTree(
+      rows,
+      state({
+        ...eitcPath,
+        dimensions: [{ key: INCOME_KEY, label: "Adjusted gross income", value: "all" }],
+      }),
+    );
+    expect(selected.pathLabels.dimensions).toEqual(["All returns"]);
+  });
+
+  test("labels a dimension that a program spells two ways with the spelling the reader keeps", () => {
+    const rows = [
+      historicPensionRow,
+      eitcRow("irs_soi.ty2023.table_2_5.eitc_total.under_1", [
+        incomeBand("under_1", "No adjusted gross income", "AGI"),
+      ]),
+      otherBandRow,
+    ];
+
+    const tree = buildCalibrationTree(rows, state(eitcPath));
+
+    const readerDimension = { key: INCOME_KEY, label: "Adjusted gross income" };
+    expect(tree.dimensionOrder).toEqual([readerDimension]);
+    expect(tree.currentLevel).toEqual({ kind: "dimension", ...readerDimension });
+    expect(tree.groups.map((group) => [group.id, group.label])).toEqual([
+      [INCOME_KEY, "Adjusted gross income"],
+    ]);
+  });
+
+  test("keeps the spelling of a value ID that a node spells only one way", () => {
+    // Before label variants were accepted, such a node built with its own
+    // spelling. Changing it would change trees already published.
+    expect(incomeNodes([historicPensionRow, totalEitcRow, tableRow])).toEqual([
+      ["all", "All returns, total", 1],
+      ["under_1", "No adjusted gross income", 1],
+    ]);
   });
 });
 

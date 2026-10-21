@@ -479,6 +479,72 @@ function hierarchyDimensionValueId(
   ).trim();
 }
 
+// The reader (validateHierarchyTargets) keeps the first spelling, in row
+// order across the whole file, of a label that rows spell more than one way,
+// and reports the others without rewriting the rows, so each row reaches the
+// builder with its own spelling. The builder labels a dimension key from the
+// rows of the program and geography being built (hierarchyDimensionOrder),
+// and a dimension value from the rows of its node (hierarchyValueLabel):
+// - when those rows spell it one way, it keeps that spelling, even if the
+//   reader keeps another one. Trees built before label variants were
+//   accepted did so, and they must rebuild unchanged.
+// - otherwise, where the builder used to refuse, it uses the spelling the
+//   reader keeps (readerKeptLabels).
+interface ReaderKeptLabels {
+  dimensions: ReadonlyMap<string, string>;
+  values: ReadonlyMap<string, string>;
+}
+
+function hierarchyValueKey(key: string, valueId: string): string {
+  return `${key}\0${valueId}`;
+}
+
+function readerKeptLabels(rows: CalibrationTreeTarget[]): ReaderKeptLabels {
+  const dimensions = new Map<string, string>();
+  const values = new Map<string, string>();
+  for (const row of rows) {
+    if (row.target_representation !== "hierarchy") continue;
+    for (const dimension of row.target_dimensions ?? []) {
+      if (!dimensions.has(dimension.key)) {
+        dimensions.set(dimension.key, dimension.label);
+      }
+      const valueKey = hierarchyValueKey(
+        dimension.key,
+        hierarchyDimensionValueId(dimension),
+      );
+      if (!values.has(valueKey)) values.set(valueKey, dimension.value);
+    }
+  }
+  return { dimensions, values };
+}
+
+function hierarchyValueLabel(
+  entries: HierarchyEntry[],
+  keptLabels: () => ReaderKeptLabels,
+): string {
+  const dimension = hierarchyDimension(entries[0])!;
+  const spellings = new Set(
+    entries.map((entry) => hierarchyDimension(entry)!.value),
+  );
+  if (spellings.size === 1) return dimension.value;
+  return keptLabels().values.get(
+    hierarchyValueKey(dimension.key, hierarchyDimensionValueId(dimension)),
+  ) ?? dimension.value;
+}
+
+function entriesByValueId(
+  entries: HierarchyEntry[],
+): Map<string, HierarchyEntry[]> {
+  const byValue = new Map<string, HierarchyEntry[]>();
+  for (const entry of entries) {
+    const valueId = hierarchyDimensionValueId(hierarchyDimension(entry)!);
+    const valueEntries = byValue.get(valueId);
+    if (valueEntries) valueEntries.push(entry);
+    else byValue.set(valueId, [entry]);
+  }
+  return byValue;
+}
+
 function mergeHierarchyPartitions(
   partitions: HierarchyDimensionPartition[],
 ): HierarchyDimensionPartition[] {
@@ -486,11 +552,6 @@ function mergeHierarchyPartitions(
   for (const partition of partitions) {
     const existing = merged.get(partition.dimension.key);
     if (existing) {
-      if (existing.dimension.label !== partition.dimension.label) {
-        throw new Error(
-          `Schema 8 dimension ${partition.dimension.key} has inconsistent labels.`,
-        );
-      }
       existing.entries.push(...partition.entries);
     } else {
       merged.set(partition.dimension.key, {
@@ -502,7 +563,10 @@ function mergeHierarchyPartitions(
   return [...merged.values()];
 }
 
-function hierarchyPartitions(entries: HierarchyEntry[]): {
+function hierarchyPartitions(
+  entries: HierarchyEntry[],
+  dimensionLabels: ReadonlyMap<string, string>,
+): {
   dimensions: HierarchyDimensionPartition[];
   targets: HierarchyEntry[];
 } {
@@ -516,15 +580,13 @@ function hierarchyPartitions(entries: HierarchyEntry[]): {
     }
     const existing = grouped.get(dimension.key);
     if (existing) {
-      if (existing.dimension.label !== dimension.label) {
-        throw new Error(
-          `Schema 8 dimension ${dimension.key} has inconsistent labels.`,
-        );
-      }
       existing.entries.push(entry);
     } else {
       grouped.set(dimension.key, {
-        dimension: { key: dimension.key, label: dimension.label },
+        dimension: {
+          key: dimension.key,
+          label: dimensionLabels.get(dimension.key) ?? dimension.label,
+        },
         entries: [entry],
       });
     }
@@ -543,6 +605,7 @@ function hierarchyPartitions(entries: HierarchyEntry[]): {
     }
     const nested = hierarchyPartitions(
       partition.entries.map((entry) => ({ ...entry, cursor: entry.cursor + 1 })),
+      dimensionLabels,
     );
     visible.push(...nested.dimensions);
     targets.push(...nested.targets);
@@ -555,21 +618,26 @@ function hierarchyPartitions(entries: HierarchyEntry[]): {
 
 function hierarchyDimensionOrder(
   rows: CalibrationTreeTarget[],
+  keptLabels: () => ReaderKeptLabels,
 ): BreakdownDimension[] {
   const order = new Map<string, BreakdownDimension>();
+  const spelledMoreThanOneWay = new Set<string>();
   for (const row of rows) {
     for (const dimension of row.target_dimensions ?? []) {
       const existing = order.get(dimension.key);
-      if (existing && existing.label !== dimension.label) {
-        throw new Error(
-          `Schema 8 dimension ${dimension.key} has inconsistent labels.`,
-        );
+      if (!existing) {
+        order.set(dimension.key, {
+          key: dimension.key,
+          label: dimension.label,
+        });
+      } else if (existing.label !== dimension.label) {
+        spelledMoreThanOneWay.add(dimension.key);
       }
-      order.set(dimension.key, existing ?? {
-        key: dimension.key,
-        label: dimension.label,
-      });
     }
+  }
+  for (const key of spelledMoreThanOneWay) {
+    const dimension = order.get(key)!;
+    dimension.label = keptLabels().dimensions.get(key) ?? dimension.label;
   }
   return [...order.values()];
 }
@@ -816,6 +884,7 @@ function geographyNodes(
 }
 
 function hierarchyDimensionTree(
+  allRows: CalibrationTreeTarget[],
   geographyRows: CalibrationTreeTarget[],
   state: ExplorerState,
   releaseId: string | undefined,
@@ -825,10 +894,21 @@ function hierarchyDimensionTree(
   options: CalibrationTreeResponse["filterOptions"],
   geographyLabel: GeographyLabeller,
 ): CalibrationTreeResponse {
-  let entries = geographyRows.map((row) => ({ row, cursor: 0 }));
+  // Only rows that spell a label more than one way need the reader's
+  // spellings, so they are read from all rows only then.
+  let labelsKeptByReader: ReaderKeptLabels | undefined;
+  const keptLabels = () => (labelsKeptByReader ??= readerKeptLabels(allRows));
+  const dimensionOrder = hierarchyDimensionOrder(geographyRows, keptLabels);
+  const dimensionLabels = new Map(
+    dimensionOrder.map(({ key, label }) => [key, label]),
+  );
+  let entries: HierarchyEntry[] = geographyRows.map((row) => ({
+    row,
+    cursor: 0,
+  }));
   const selectedValueLabels: string[] = [];
   for (const selection of state.path.dimensions) {
-    const partition = hierarchyPartitions(entries).dimensions.find(
+    const partition = hierarchyPartitions(entries, dimensionLabels).dimensions.find(
       ({ dimension }) => dimension.key === selection.key,
     );
     if (!partition) {
@@ -842,15 +922,11 @@ function hierarchyDimensionTree(
         hierarchyDimensionValueId(dimension) === selection.value
       );
     });
-    const valueLabels = new Set(
-      matching.map((entry) => hierarchyDimension(entry)!.value),
+    selectedValueLabels.push(
+      matching.length
+        ? hierarchyValueLabel(matching, keptLabels)
+        : selection.value,
     );
-    if (valueLabels.size > 1) {
-      throw new Error(
-        `Schema 8 dimension value ${selection.key}/${selection.value} has inconsistent labels.`,
-      );
-    }
-    selectedValueLabels.push([...valueLabels][0] ?? selection.value);
     entries = matching.map((entry) => ({
       ...entry,
       cursor: entry.cursor + 1,
@@ -864,34 +940,23 @@ function hierarchyDimensionTree(
     geographyLabel,
   );
   const visibleRows = new Set(filteredScopedRows);
-  const partition = hierarchyPartitions(entries);
+  const partition = hierarchyPartitions(entries, dimensionLabels);
   const groups: CalibrationTreeGroup[] = partition.dimensions.flatMap(
     ({ dimension, entries: dimensionEntries }) => {
       const visibleEntries = dimensionEntries.filter((entry) =>
         visibleRows.has(entry.row),
       );
       if (!visibleEntries.length) return [];
-      const byValue = new Map<
-        string,
-        { label: string; rows: CalibrationTreeTarget[] }
-      >();
-      for (const entry of visibleEntries) {
-        const value = hierarchyDimension(entry)!;
-        const valueId = hierarchyDimensionValueId(value);
-        const existing = byValue.get(valueId);
-        if (existing && existing.label !== value.value) {
-          throw new Error(
-            `Schema 8 dimension value ${dimension.key}/${valueId} has inconsistent labels.`,
-          );
-        }
-        if (existing) existing.rows.push(entry.row);
-        else byValue.set(valueId, { label: value.value, rows: [entry.row] });
-      }
+      // A value is labelled from all of its rows, not only the visible ones,
+      // so filters do not change its label: its selected path and the
+      // published tree, which is compiled without filters, use all its rows.
+      const allEntriesByValue = entriesByValueId(dimensionEntries);
+      const byValue = entriesByValueId(visibleEntries);
       const nodes = sortNodes(
-        [...byValue.entries()].map(([valueId, value]) =>
+        [...byValue.entries()].map(([valueId, valueEntries]) =>
           node(
             valueId,
-            value.label,
+            hierarchyValueLabel(allEntriesByValue.get(valueId)!, keptLabels),
             "dimension_value",
             {
               kind: "dimension_value",
@@ -899,7 +964,7 @@ function hierarchyDimensionTree(
               label: dimension.label,
               value: valueId,
             },
-            value.rows,
+            valueEntries.map((entry) => entry.row),
             undefined,
             true,
           ),
@@ -961,7 +1026,7 @@ function hierarchyDimensionTree(
     },
     currentLevel,
     groups,
-    dimensionOrder: hierarchyDimensionOrder(geographyRows),
+    dimensionOrder,
     filterOptions: options,
     filteredMetrics: calibrationTreeMetrics(filteredScopedRows),
   };
@@ -1093,6 +1158,7 @@ export function buildCalibrationTree(
     geographyRows.every((row) => row.target_representation === "hierarchy")
   ) {
     return hierarchyDimensionTree(
+      chartRows,
       geographyRows,
       state,
       releaseId,
