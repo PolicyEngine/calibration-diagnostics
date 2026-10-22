@@ -25,8 +25,8 @@ import { createStagingRunsHandler } from "./route";
 
 type RunList = {
   available: boolean;
-  source_repo: string | null;
-  revision: string | null;
+  source_repo: string;
+  revision: string;
   truncated: boolean;
   runs: StagingRunSummary[];
   incompatible_runs: never[];

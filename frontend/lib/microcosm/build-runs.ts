@@ -35,6 +35,7 @@ import {
   loadStagingRunTelemetry,
 } from "@policyengine/calibration-tree/staging-artifact";
 import {
+  type CollectorRunSummary,
   collectorConfigured,
   loadCollectorRun,
   loadCollectorRuns,
@@ -226,37 +227,110 @@ async function loadHuggingFaceStaging(
   return { available: true, detail: null, documents, problems };
 }
 
+// One collector run's documents. A finished run's documents are reused until
+// the collector reports a newer update for it.
+async function loadCollectorDocuments(
+  summary: CollectorRunSummary,
+  country: MicrocosmCountry,
+): Promise<BuildRunDocuments> {
+  const key = `collector:${country}:${summary.run_id}`;
+  const cached = stagingRunCache.get(key);
+  if (
+    cached?.final &&
+    FINAL_STATUSES.has(summary.status) &&
+    cached.collector_version === summary.updated_at
+  ) {
+    return cached.documents;
+  }
+  const loaded = await loadCollectorRun(summary.run_id, country);
+  stagingRunCache.set(key, {
+    documents: loaded,
+    final: isFinal(loaded),
+    collector_version: summary.updated_at,
+  });
+  return loaded;
+}
+
 async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
   const summaries = await loadCollectorRuns(country, STAGING_RUN_LIMIT);
   const documents: BuildRunDocuments[] = [];
   const problems: BuildRunProblem[] = [];
   await Promise.all(
     summaries.map(async (summary) => {
-      const key = `collector:${country}:${summary.run_id}`;
-      const cached = stagingRunCache.get(key);
-      const summaryFinal = FINAL_STATUSES.has(summary.status);
-      if (
-        cached?.final &&
-        summaryFinal &&
-        cached.collector_version === summary.updated_at
-      ) {
-        documents.push(cached.documents);
-        return;
-      }
       try {
-        const loaded = await loadCollectorRun(summary.run_id, country);
-        stagingRunCache.set(key, {
-          documents: loaded,
-          final: isFinal(loaded),
-          collector_version: summary.updated_at,
-        });
-        documents.push(loaded);
+        documents.push(await loadCollectorDocuments(summary, country));
       } catch (error) {
         problems.push({ run_id: summary.run_id, detail: message(error) });
       }
     }),
   );
   return { available: true, detail: null, documents, problems };
+}
+
+export interface CollectorTimelines {
+  // The build monitor's timeline of each requested run the collector has a
+  // record of, by run id.
+  timelines: Map<string, BuildTimeline>;
+  // Why some or all requested runs could not use the collector's record;
+  // null when the collector answered for every run it knows.
+  note: string | null;
+}
+
+const HUGGING_FACE_FALLBACK =
+  "run states come from the Hugging Face staging repository";
+
+// The collector's state for runs the Candidate tab lists from Hugging Face.
+// It reads the same records the Build progress tab does (the country's 60
+// most recent collector runs) and derives each state with the same
+// `buildTimeline`, so the two tabs agree on every run the collector knows.
+export async function loadCollectorTimelines(
+  country: MicrocosmCountry,
+  runIds: readonly string[],
+  nowMs: number = Date.now(),
+): Promise<CollectorTimelines> {
+  const timelines = new Map<string, BuildTimeline>();
+  if (!runIds.length) return { timelines, note: null };
+  let summaries: CollectorRunSummary[];
+  try {
+    // An invalid collector setting throws here; it must not hide the
+    // Hugging Face runs.
+    if (!collectorConfigured()) {
+      return {
+        timelines,
+        note: `The telemetry collector is not configured on this server, so ${HUGGING_FACE_FALLBACK}.`,
+      };
+    }
+    summaries = await loadCollectorRuns(country, STAGING_RUN_LIMIT);
+  } catch (error) {
+    return {
+      timelines,
+      note: `The telemetry collector could not be read (${message(error)}), so ${HUGGING_FACE_FALLBACK}.`,
+    };
+  }
+  const requested = new Set(runIds);
+  const problems: BuildRunProblem[] = [];
+  await Promise.all(
+    summaries
+      .filter((summary) => requested.has(summary.run_id))
+      .map(async (summary) => {
+        try {
+          const documents = await loadCollectorDocuments(summary, country);
+          timelines.set(summary.run_id, buildTimeline(documents, nowMs));
+        } catch (error) {
+          problems.push({ run_id: summary.run_id, detail: message(error) });
+        }
+      }),
+  );
+  if (!problems.length) return { timelines, note: null };
+  const unreadable = problems
+    .map((problem) => `${problem.run_id} (${problem.detail})`)
+    .join(", ");
+  return {
+    timelines,
+    note: `The telemetry collector's record could not be read for ${unreadable}, so ${
+      problems.length === 1 ? "that run's state comes" : "those runs' states come"
+    } from the Hugging Face staging repository.`,
+  };
 }
 
 async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {

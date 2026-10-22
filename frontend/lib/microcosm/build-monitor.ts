@@ -281,7 +281,10 @@ function pipelineIdentity(
   };
 }
 
-function runState(
+// A run's state from its recorded status and when it last reported. The
+// Staging page's Candidate tab uses the same rule for runs the collector does
+// not know.
+export function runState(
   rawStatus: string | null,
   updatedMs: number | null,
   nowMs: number,
