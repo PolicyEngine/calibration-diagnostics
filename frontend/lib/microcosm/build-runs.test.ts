@@ -7,6 +7,7 @@ import {
 import {
   type HostedRunLoaders,
   loadBuildRuns,
+  loadCollectorTimelines,
   refreshHostedRun,
 } from "@/lib/microcosm/build-runs";
 import {
@@ -225,5 +226,132 @@ describe("loadBuildRuns from the collector", () => {
         else process.env[name] = value;
       }
     }
+  });
+});
+
+const READ_SECRET_VERSION =
+  "projects/test-project/secrets/collector-read/versions/latest";
+
+// Runs `body` with the collector configured to answer through `collectorFetch`,
+// or with the collector not configured when it is null.
+async function withCollector<T>(
+  collectorFetch: typeof fetch | null,
+  body: () => Promise<T>,
+): Promise<T> {
+  const originalFetch = globalThis.fetch;
+  const originalEnvironment = {
+    MICROCOSM_TELEMETRY_COLLECTOR_URL:
+      process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL,
+    MICROCOSM_TELEMETRY_READ_SECRET_VERSION:
+      process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION,
+  };
+  const readSecret = spyOn(secretManager, "readVersion").mockResolvedValue(
+    "secret-read-token",
+  );
+  if (collectorFetch) {
+    process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL = FAKE_COLLECTOR_URL;
+    process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION = READ_SECRET_VERSION;
+    globalThis.fetch = collectorFetch;
+  } else {
+    delete process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL;
+    delete process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION;
+    globalThis.fetch = (async () => {
+      throw new Error("An unconfigured collector must not be requested.");
+    }) as unknown as typeof fetch;
+  }
+  try {
+    return await body();
+  } finally {
+    globalThis.fetch = originalFetch;
+    readSecret.mockRestore();
+    for (const [name, value] of Object.entries(originalEnvironment)) {
+      if (value == null) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
+describe("loadCollectorTimelines for the Candidate tab", () => {
+  test("reads the collector's records only for the requested runs it knows", async () => {
+    // The am fixture country has a staging repository, like a country whose
+    // Candidate tab lists Hugging Face runs.
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 80 });
+    const newest = collector.runs[0].run_id;
+    const finished = collector.runs[5].run_id;
+    const olderThanTheListedRuns = collector.runs[70].run_id;
+
+    const loaded = await withCollector(collector.fetch, () =>
+      loadCollectorTimelines(
+        "am",
+        [newest, finished, olderThanTheListedRuns, "hugging-face-only-run"],
+        NOW,
+      ),
+    );
+
+    expect(loaded.note).toBeNull();
+    expect(collector.listRequests).toHaveLength(1);
+    expect(collector.listRequests[0].searchParams.get("country")).toBe("AM");
+    expect(collector.listRequests[0].searchParams.get("limit")).toBe("60");
+    expect(collector.documentRequests.toSorted()).toEqual(
+      [newest, finished].toSorted(),
+    );
+    expect([...loaded.timelines.keys()].toSorted()).toEqual(
+      [newest, finished].toSorted(),
+    );
+    expect(loaded.timelines.get(newest)?.state).toBe("running");
+    expect(loaded.timelines.get(finished)?.state).toBe("passed");
+  });
+
+  test("asks the collector nothing when no run is requested", async () => {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 3 });
+
+    const loaded = await withCollector(collector.fetch, () =>
+      loadCollectorTimelines("am", [], NOW),
+    );
+
+    expect(loaded).toEqual({ timelines: new Map(), note: null });
+    expect(collector.listRequests).toHaveLength(0);
+  });
+
+  test("an unconfigured collector leaves every run on Hugging Face, with a note", async () => {
+    const loaded = await withCollector(null, () =>
+      loadCollectorTimelines("am", ["run-0001"], NOW),
+    );
+
+    expect(loaded.timelines.size).toBe(0);
+    expect(loaded.note).toContain("not configured");
+  });
+
+  test("a failed collector request leaves every run on Hugging Face, with a note", async () => {
+    const unavailable = (async () =>
+      Response.json({ detail: "Unavailable." }, { status: 503 })) as unknown as typeof fetch;
+
+    const loaded = await withCollector(unavailable, () =>
+      loadCollectorTimelines("am", ["run-0001"], NOW),
+    );
+
+    expect(loaded.timelines.size).toBe(0);
+    expect(loaded.note).toContain("could not be read");
+    expect(loaded.note).toContain("503");
+  });
+
+  test("a run whose collector record fails keeps its Hugging Face state, with a note", async () => {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 4 });
+    const unreadable = collector.runs[1].run_id;
+    const readable = collector.runs[2].run_id;
+    const failingOneRecord = (async (input: RequestInfo | URL) => {
+      if (String(input).endsWith(`/v1/runs/${unreadable}`)) {
+        return Response.json({ detail: "Internal error." }, { status: 500 });
+      }
+      return collector.fetch(input);
+    }) as typeof fetch;
+
+    const loaded = await withCollector(failingOneRecord, () =>
+      loadCollectorTimelines("am", [unreadable, readable], NOW),
+    );
+
+    expect([...loaded.timelines.keys()]).toEqual([readable]);
+    expect(loaded.note).toContain(unreadable);
+    expect(loaded.note).toContain("500");
   });
 });

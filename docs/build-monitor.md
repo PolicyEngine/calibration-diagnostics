@@ -29,7 +29,7 @@ checks stop builds. The run selected on either tab carries over to the other.
 - **Historical Hugging Face telemetry.** During migration, the hosted view also
   reads version 1, 2 and 3 run documents from each country's Hugging Face
   staging repository. A collector record replaces a historical record with the
-  same run id.
+  same run id. The Candidate tab applies the same rule to the runs it lists.
 - **Local run folders.** The dashboard can still inspect legacy or diagnostic
   run folders on the same machine. Point it at the directory that holds them:
 
