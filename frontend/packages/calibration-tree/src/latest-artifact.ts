@@ -2460,6 +2460,9 @@ export async function loadReleases(
 // A release whose calibrated folder is on main is listed from that folder, as
 // the publisher reads it. Roles are read from the release's own
 // release_manifest.json at its pinned commit, best-effort like the listing's.
+// A build in its own folder (`<release>/<build>`) is listed only from
+// releases.json (loadRecordedReleases); a country that returns to release
+// folders keeps such entries readable by id, but not listed here.
 export async function loadPublishedCutReleases(
   revalidate: number,
   country: MicrocosmCountry,
@@ -2474,6 +2477,7 @@ export async function loadPublishedCutReleases(
     (build) =>
       build.kind === "release" &&
       build.releaseId != null &&
+      !isBuildFolderId(build.releaseId) &&
       (releaseDirectoryOf(build) !== build.releaseId ||
         !calibratedFolders.has(build.releaseId)),
   );
