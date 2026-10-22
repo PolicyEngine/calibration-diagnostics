@@ -96,7 +96,19 @@ def test_production_concurrency_group_belongs_to_the_deploy_job_not_the_workflow
 
 
 def _requires_every_clause(condition, required_clauses):
-    return {clause.strip() for clause in condition.split("&&")} == required_clauses
+    """Whether `condition` is a conjunction that includes every required clause.
+
+    The `${{ }}` wrapper, whitespace, clause order, grouping parentheses and
+    extra `&&`-joined clauses are accepted. Any `||` or `!` (other than `!=`)
+    is rejected, because either could let the job run without the clauses.
+    """
+    expression = " ".join(condition.split())
+    if expression.startswith("${{") and expression.endswith("}}"):
+        expression = expression[3:-2].strip()
+    if "||" in expression or re.search(r"!(?!=)", expression):
+        return False
+    clauses = {clause.strip(" ()") for clause in expression.split("&&")}
+    return required_clauses <= clauses
 
 
 def test_every_job_in_the_production_group_requires_a_successful_main_push():
