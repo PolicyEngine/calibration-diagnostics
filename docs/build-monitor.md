@@ -12,9 +12,12 @@ checks stop builds. The run selected on either tab carries over to the other.
   socket; that service samples the build process tree, stores unsent events in
   a bounded SQLite retry queue, authenticates with the ambient Hugging Face
   credential, and delivers events to the hosted collector. The dashboard
-  server receives the collector address and its independent read credential
-  from the deployment environment. Neither value belongs in documentation or
-  browser-visible configuration.
+  server reads the collector address from its deployment settings, and
+  fetches its independent read credential from Google Secret Manager itself
+  (see [Reading the collector](#reading-the-collector)). Neither value belongs
+  in documentation or browser-visible configuration. The collector's source,
+  tests and deployment are in
+  [PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector).
 
   A missing credential, a user outside the PolicyEngine Hugging Face
   organization, or an unavailable network does not stop a build. Events remain
@@ -41,6 +44,55 @@ checks stop builds. The run selected on either tab carries over to the other.
   with `:`) for folders that hold `progress.json` and `events.ndjson`, skipping
   checkpoint trees and hidden folders. Local runs are off unless the variable
   is set, so a hosted deployment never reads its own filesystem.
+
+## Reading the collector
+
+The dashboard server sends the collector's read credential in the
+`X-Telemetry-Read-Token` header of each query
+(`frontend/lib/server/microcosm/telemetry-collector-client.ts`). The credential
+is not a deployment setting. The server fetches it from a Google Secret Manager
+secret version (`frontend/lib/server/secret-manager.ts`), keeps the value in
+memory for up to one minute, and after a failed fetch tries again on the next
+request. It never reaches the browser and never passes through GitHub Actions.
+
+The server reads three server-only, non-secret settings, each with a separate
+value for production and preview:
+
+| Setting | Value | Where production and preview get it |
+|---|---|---|
+| `MICROCOSM_TELEMETRY_COLLECTOR_URL` | The matching environment's collector address. It must use HTTPS, except on `localhost` or `127.0.0.1`. | Production: the GitHub `Production` environment variable of the same name, which `.github/workflows/deploy.yml` passes to `vercel deploy --env`. Preview: the Vercel project's settings. |
+| `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` | The full Secret Manager version resource of that collector's read credential: `projects/<project>/secrets/<secret>/versions/<number or latest>`. | The Vercel project's settings. |
+| `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER` | The full Google Workload Identity provider resource that trusts this Vercel project: `projects/<project number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>`. Read only on Vercel. | The Vercel project's settings. |
+
+Without the first two, the dashboard doesn't query the collector and shows only
+the historical Hugging Face runs. If a collector request fails, the tab still
+shows the Hugging Face runs, and lists `collector` with the error under "Runs
+that could not be read".
+
+**On Vercel** (`VERCEL=1`), the server exchanges the deployment's Vercel OIDC
+token for a Google access token through that provider, then reads the secret
+version with it. This needs, once per environment and outside this repo:
+
+- a provider that trusts the Vercel project's OIDC issuer and audience;
+- access for the production identity to only the production read secret, and
+  for the preview identity to only the staging read secret. Grant the access
+  permission (`secretmanager.versions.access`) on each secret, not on the
+  project.
+
+**Local development** uses Google Application Default Credentials (for example,
+after `gcloud auth application-default login`), with the same
+`MICROCOSM_TELEMETRY_COLLECTOR_URL` and
+`MICROCOSM_TELEMETRY_READ_SECRET_VERSION`. Your Google account needs access to
+the chosen secret. No copied collector token or service-account key is needed,
+and `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER` is not read.
+
+**The production dashboard deploy** (`.github/workflows/deploy.yml`) checks only
+that the read secret exists. `deploy-dashboard.sh check-read-secret-exists`
+runs `gcloud secrets describe` for `TELEMETRY_READ_SECRET_NAME` in
+`TELEMETRY_GCP_PROJECT_ID`, both variables of the GitHub `Production`
+environment. That reads metadata, never the value, so it needs only
+`secretmanager.secrets.get` on that secret. It doesn't show that the credential
+works or that the Vercel identities can read it.
 
 ## Testing without a build
 
