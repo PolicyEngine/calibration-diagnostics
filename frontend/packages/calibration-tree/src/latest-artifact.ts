@@ -67,7 +67,7 @@ import {
   RELEASES_RECORD_PATH,
   isBuildFolderId,
   isReleaseDirectory,
-  parseReleasesRecord,
+  parseReleasesRecordBytes,
   recordedBuilds,
 } from "./release-record";
 
@@ -2568,9 +2568,10 @@ export async function loadRecordedReleases(
   manifest: CalibrationTreeManifest,
 ): Promise<ReleaseEntry[]> {
   if (await loadLocalCalibrationRelease(country)) return loadReleases(revalidate, country);
-  const record = parseReleasesRecord(
-    await hfJson(hfResolveUrl(RELEASES_RECORD_PATH, country), revalidate),
-  );
+  const url = hfResolveUrl(RELEASES_RECORD_PATH, country);
+  const response = await hfFetch(url, revalidate);
+  if (!response.ok) throw new Error(`HF fetch failed ${response.status}: ${url}`);
+  const record = parseReleasesRecordBytes(new Uint8Array(await response.arrayBuffer()));
   const published = new Set(
     (manifest.countries[country]?.builds ?? []).flatMap((build) =>
       build.kind === "release" && build.releaseId ? [build.releaseId] : []

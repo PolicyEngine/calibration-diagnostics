@@ -10,11 +10,17 @@
 // `microcosm_emitter_interface.releases` (microcosm-emitter#24), whose release
 // writer is the only program that changes the file. This module reads the
 // record with the same rules, so a record the writer would refuse is refused
-// here too. Isomorphic: the release picker and the tree publisher share it.
+// here too, with one exception: JSON.parse reads `1.0` as the number 1, so a
+// `schema_version` of `1.0` passes here although the writer, which requires
+// an integer, refuses it. The writer itself always writes `1`. Isomorphic:
+// the release picker and the tree publisher share it.
 
 export const RELEASES_RECORD_PATH = "releases.json";
 export const RELEASES_RECORD_SCHEMA_VERSION = 1;
 export const RELEASE_MANIFEST_NAME = "release_manifest.json";
+// The interface's MAX_RECORD_BYTES: the largest releases.json the writer's
+// parser accepts, and the size its checks keep every record within.
+export const MAX_RELEASES_RECORD_BYTES = 4 * 1024 * 1024;
 
 // The interface's SAFE_IDENTIFIER and ROLE_IDENTIFIER.
 const SAFE_IDENTIFIER_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -140,6 +146,24 @@ export function parseReleasesRecord(document: unknown): ReleasesRecord {
     if (current.withdrawn) refuse(`Current build ${entry.current} of ${release} is withdrawn.`);
   }
   return record;
+}
+
+/**
+ * Read `releases.json` from its bytes as the writer's `ReleasesRecord.parse`
+ * does: refuse a record larger than MAX_RELEASES_RECORD_BYTES or one that is
+ * not a readable JSON document, then check it with parseReleasesRecord.
+ */
+export function parseReleasesRecordBytes(bytes: Uint8Array): ReleasesRecord {
+  if (bytes.byteLength > MAX_RELEASES_RECORD_BYTES) {
+    refuse(`${RELEASES_RECORD_PATH} is larger than ${MAX_RELEASES_RECORD_BYTES} bytes.`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    refuse(`${RELEASES_RECORD_PATH} is not a readable JSON document.`);
+  }
+  return parseReleasesRecord(parsed);
 }
 
 /** A build's folder under `releases/`, which identifies it: `<release>/<build>`. */

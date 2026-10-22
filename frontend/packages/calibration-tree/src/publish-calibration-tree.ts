@@ -46,7 +46,7 @@ import {
   currentDefaultBuild,
   isBuildFolderId,
   isReleaseDirectory,
-  parseReleasesRecord,
+  parseReleasesRecordBytes,
   recordedBuilds,
   releaseManifestNamesBuild,
   type RecordedBuild,
@@ -669,7 +669,7 @@ async function readReleasesRecord(
   if (!response.ok) {
     throw new Error(`Hugging Face returned ${response.status} for ${RELEASES_RECORD_PATH}.`);
   }
-  return parseReleasesRecord(await response.json());
+  return parseReleasesRecordBytes(new Uint8Array(await response.arrayBuffer()));
 }
 
 // The record's `published_at`, as the dashboard manifest's RFC 3339 form.

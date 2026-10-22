@@ -201,8 +201,10 @@ releases/<release>/<build>/...
 `releases.json` follows microcosm-emitter's
 `microcosm_emitter_interface.releases` (microcosm-emitter#24), whose release
 writer is the only program that changes it. `release-record.ts` reads it with
-the same rules: exact keys, `schema_version` 1, safe release and build names,
-each `current` listed and not withdrawn, and `default` listed. For such a
+the same rules: at most 4 MiB, exact keys, `schema_version` 1, safe release
+and build names, each `current` listed and not withdrawn, and `default`
+listed. (JavaScript reads a `schema_version` of `1.0` as 1, which the writer
+refuses; the writer itself writes `1`.) For such a
 country the dashboard reads `releases.json` and nothing else: no tags, no
 `latest*.json` pointer files and no listing of `releases/`.
 
