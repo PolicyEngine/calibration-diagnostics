@@ -369,6 +369,24 @@ test("reconciliation refuses a releases.json the release writer would refuse, be
   expect(store.writes).toHaveLength(0);
 });
 
+// The writer's ReleasesRecord.parse refuses a record over MAX_RECORD_BYTES
+// (4 MiB), the size check_change keeps every record within.
+test("reconciliation refuses a releases.json larger than the release writer accepts, before publishing anything", async () => {
+  // Trailing whitespace keeps the record otherwise valid.
+  const oversized = JSON.stringify(releasesRecord()) + " ".repeat(4 * 1024 * 1024);
+  const repository = buildFolderRepository([]);
+  const store = memoryStore(emptyCalibrationTreeManifest());
+  globalThis.fetch = (async (input: string | URL | Request) =>
+    String(input) === `${RESOLVE}/${MAIN_SHA}/releases.json`
+      ? new Response(oversized)
+      : repository(input)) as typeof fetch;
+
+  await expect(reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders"))
+    .rejects.toThrow("releases.json is larger than 4194304 bytes.");
+  expect(store.uploads).toHaveLength(0);
+  expect(store.writes).toHaveLength(0);
+});
+
 test("without a current build of the default release, reconciliation publishes the listed builds and fails without moving the latest release", async () => {
   const record = releasesRecord();
   (record.releases as Record<string, Record<string, unknown>>)[NATIONAL].current = null;

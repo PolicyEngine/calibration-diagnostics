@@ -3712,6 +3712,24 @@ test("the dashboard's latest release stays listed until reconciliation moves it 
   ]);
 });
 
+// The writer's ReleasesRecord.parse refuses a record over MAX_RECORD_BYTES
+// (4 MiB), the size check_change keeps every record within.
+test("the release picker refuses a releases.json larger than the release writer accepts", async () => {
+  // Trailing whitespace keeps the record otherwise valid.
+  const oversized = JSON.stringify(RECORDED_RELEASES) + " ".repeat(4 * 1024 * 1024);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    if (String(input) === hfResolveUrl("releases.json", "uk")) return new Response(oversized);
+    throw new Error(`Unexpected URL ${String(input)}`);
+  }) as typeof fetch;
+  try {
+    await expect(loadRecordedReleases(0, "uk", emptyCalibrationTreeManifest()))
+      .rejects.toThrow("releases.json is larger than 4194304 bytes.");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("the release picker refuses a releases.json the release writer would refuse", async () => {
   const withdrawnCurrent = structuredClone(RECORDED_RELEASES);
   withdrawnCurrent.releases[LINE].builds[NATIONAL_CURRENT].withdrawn = true;
