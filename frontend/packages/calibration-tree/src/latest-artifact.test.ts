@@ -3253,6 +3253,57 @@ test("published cuts take their role from their own release manifest at their co
   }
 });
 
+// Removing a country's `release_layout: "build_folders"` returns it to the
+// release-folder readers, but the dashboard manifest keeps the entries the
+// build-folder readers published, named `<release>/<build>`. Those readers
+// list only tags and folders, so such an entry must not stop them. Ids and
+// commits are synthetic.
+test("a build-folder entry in the manifest does not stop the tagged builds being listed", async () => {
+  const nationalTag = `${LINE}-20261019T083323Z-0b0b0b0b`;
+  const buildFolder = `${LINE}/uk-frs-calibration-attempt-20261020T091500Z-1d1d1d1d`;
+  const manifestEntry = (
+    releaseId: string,
+    releaseDirectory: string | undefined,
+    commit: string,
+    artifactDigit: string,
+  ): CalibrationTreeManifestEntry => ({
+    buildArtifactId: artifactDigit.repeat(64),
+    kind: "release",
+    sourceId: releaseId,
+    label: releaseId,
+    releaseId,
+    ...(releaseDirectory ? { releaseDirectory } : {}),
+    stagingRunId: null,
+    hfRepo: "policyengine/populace-uk-private",
+    hfCommitSha: commit,
+    treeSchemaVersion: 6,
+    indexSha256: "e".repeat(64),
+    indexBytes: 10,
+    createdAt: "2026-10-20T09:15:00.000Z",
+    updatedAt: null,
+  });
+  let manifest = emptyCalibrationTreeManifest();
+  for (const build of [
+    manifestEntry(nationalTag, LINE, "1".repeat(40), "a"),
+    // A build in its own folder records no separate releaseDirectory.
+    manifestEntry(buildFolder, undefined, "6".repeat(40), "b"),
+  ]) {
+    manifest = withCalibrationTreeManifestEntry(manifest, "uk", build);
+  }
+  const originalFetch = globalThis.fetch;
+  // No release manifest is readable: each entry keeps its default role.
+  globalThis.fetch = (async (_input: string | URL | Request) =>
+    new Response(null, { status: 503 })) as typeof fetch;
+  try {
+    const tagged = await loadPublishedCutReleases(0, "uk", manifest, [folderRelease(LINE, LINE)]);
+    expect(tagged.map((release) => [release.release_id, release.release_directory])).toEqual([
+      [nationalTag, LINE],
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 // Microcosm can publish a release as a tag alone (`--no-latest --tag-only`):
 // `releases/<release id>/` exists at the tag's commit and never on main, so
 // the folder listing cannot name it. A folder on main without calibration
