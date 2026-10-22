@@ -2,6 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 
 import {
   calibrationReleaseFromManifest,
+  requestedReleaseId,
+  resolveHfBuildFolderSha,
   resolveHfCommitPublishedAt,
   resolveHfRepositoryCommitPublishedAt,
   resolveHfReleaseDirectorySha,
@@ -73,6 +75,63 @@ test("a release cut is located by its tag and read from its line folder", () => 
     updatedAt: "2026-10-19T10:21:22.000Z",
   });
   expect(calibrationReleaseFromManifest(manifest, "uk").releaseId).toBe(cut);
+});
+
+test("a build in its own folder is located and read by that folder", () => {
+  const build = "microcosm-zz-2024-national/zz-calibration-attempt-20261019T083323Z-0a1b2c3d";
+  const manifest = withCalibrationTreeManifestEntry(
+    emptyCalibrationTreeManifest(),
+    "uk",
+    {
+      buildArtifactId: "b".repeat(64),
+      kind: "release",
+      sourceId: build,
+      label: build,
+      releaseId: build,
+      stagingRunId: null,
+      hfRepo: "policyengine/populace-uk-private",
+      hfCommitSha: "2".repeat(40),
+      treeSchemaVersion: 6,
+      indexSha256: "c".repeat(64),
+      indexBytes: 20,
+      createdAt: "2026-10-19T08:33:23.000Z",
+      updatedAt: "2026-10-19T08:33:23.000Z",
+    },
+    true,
+  );
+  expect(calibrationReleaseFromManifest(manifest, "uk", build)).toMatchObject({
+    releaseId: build,
+    releaseDirectory: build,
+    hfCommitSha: "2".repeat(40),
+  });
+});
+
+test("a requested release may name a build folder, never a path that leaves releases/", () => {
+  expect(requestedReleaseId("")).toBe("latest");
+  expect(requestedReleaseId("latest")).toBe("latest");
+  expect(requestedReleaseId("microcosm-uk-2024-25-national")).toBe("microcosm-uk-2024-25-national");
+  expect(requestedReleaseId("microcosm-uk-2024-25-national/uk-frs-calibration-attempt-x"))
+    .toBe("microcosm-uk-2024-25-national/uk-frs-calibration-attempt-x");
+  for (const value of ["../latest", "a/..", "a/b/c", "a//b", "/a", "a b"]) {
+    expect(() => requestedReleaseId(value), value).toThrow("Invalid release id.");
+  }
+});
+
+test("a build folder's commit is the newest commit behind its files, read at the given revision", async () => {
+  const revision = "5".repeat(40);
+  const requested: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requested.push(String(input));
+    return Response.json([
+      { type: "file", path: "releases/r/b/calibration_diagnostics.json", lastCommit: { id: "1".repeat(40), date: "2026-10-19T08:00:00Z" } },
+      { type: "file", path: "releases/r/b/microcosm_uk_2024_25.h5", lastCommit: { id: "2".repeat(40), date: "2026-10-19T09:00:00Z" } },
+    ]);
+  }) as typeof fetch;
+  await expect(resolveHfBuildFolderSha("uk", "r/b", revision)).resolves.toBe("2".repeat(40));
+  expect(requested).toEqual([
+    `https://huggingface.co/api/datasets/policyengine/populace-uk-private/tree/${revision}/releases/r/b?recursive=false&expand=true`,
+  ]);
+  await expect(resolveHfBuildFolderSha("uk", "r", revision)).rejects.toThrow("Invalid build folder.");
 });
 
 test("historical release tags resolve to exact Hugging Face commits", async () => {

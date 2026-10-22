@@ -26,6 +26,7 @@
     "./publish-calibration-tree": "./src/publish-calibration-tree.ts",
     "./reforms": "./src/reforms.ts",
     "./release-cut": "./src/release-cut.ts",
+    "./release-record": "./src/release-record.ts",
     "./source-label": "./src/source-label.ts",
     "./source-labels": "./src/source-labels.ts",
     "./staging-artifact": "./src/staging-artifact.ts",

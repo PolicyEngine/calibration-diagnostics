@@ -63,6 +63,13 @@ import {
 } from "./calibration-tree-manifest";
 import { levelQualifiedGeographyLabels } from "./geography-labels";
 import { parseReleaseCutTag } from "./release-cut";
+import {
+  RELEASES_RECORD_PATH,
+  isBuildFolderId,
+  isReleaseDirectory,
+  parseReleasesRecordBytes,
+  recordedBuilds,
+} from "./release-record";
 
 // The registry is the registration point; these re-exports keep the server
 // modules and routes that import country helpers from here working.
@@ -131,6 +138,13 @@ export function assertSafeReleaseId(id: string, label = "release"): string {
     throw new InvalidReleaseIdError(`Invalid ${label} id`);
   }
   return id;
+}
+
+// A release id, or a build in its own folder (`<release>/<build>`), which is
+// how a country publishing build folders names each build. Each segment
+// passes the same allowlist, and nothing longer is accepted.
+export function assertSafeReleaseOrBuildFolderId(id: string, label = "release"): string {
+  return isBuildFolderId(id) ? id : assertSafeReleaseId(id, label);
 }
 
 // Route catch → HTTP: a bad id is the caller's fault (400); a country without
@@ -1798,9 +1812,10 @@ export interface Calibration {
   description: string | null;
   diagnostics_status: DiagnosticsStatus;
   release_id: string;
-  // The `releases/` folder the files were read from, set only when it is not
-  // release_id: a Microcosm cut is released as its tag but stored under its
-  // line's folder (microcosm#823).
+  // The `releases/` folder the files were read from, set for a tagged
+  // Microcosm build (released as its tag but stored under its release's
+  // folder, microcosm#823) and for a build in its own folder (where it equals
+  // release_id); absent for a release folder.
   release_directory?: string;
   updated_at: string | null;
   schema_version: unknown;
@@ -2244,6 +2259,12 @@ export interface ReleaseEntry {
   is_local_area: boolean;
   // A Microcosm cut's line folder; absent when the folder is release_id.
   release_directory?: string;
+  // A build in its own folder (release_id is `<release>/<build>`): its
+  // release and build as releases.json names them, and whether releases.json
+  // marks it withdrawn. Absent for release folders and tags.
+  release?: string;
+  build?: string;
+  withdrawn?: boolean;
 }
 
 // Trailing timestamp/date in a build id → a real timestamp for ordering. Ids
@@ -2439,6 +2460,9 @@ export async function loadReleases(
 // A release whose calibrated folder is on main is listed from that folder, as
 // the publisher reads it. Roles are read from the release's own
 // release_manifest.json at its pinned commit, best-effort like the listing's.
+// A build in its own folder (`<release>/<build>`) is listed only from
+// releases.json (loadRecordedReleases); a country that returns to release
+// folders keeps such entries readable by id, but not listed here.
 export async function loadPublishedCutReleases(
   revalidate: number,
   country: MicrocosmCountry,
@@ -2453,6 +2477,7 @@ export async function loadPublishedCutReleases(
     (build) =>
       build.kind === "release" &&
       build.releaseId != null &&
+      !isBuildFolderId(build.releaseId) &&
       (releaseDirectoryOf(build) !== build.releaseId ||
         !calibratedFolders.has(build.releaseId)),
   );
@@ -2516,6 +2541,93 @@ export function mergeReleaseInventory(
     ),
     ...cuts.filter(outsideSharedFolders),
   ].sort((left, right) => releaseSortKey(right.date) - releaseSortKey(left.date));
+}
+
+// The picker's compact UTC form, YYYYMMDDTHHMMSSZ, of a recorded date-time;
+// a value that is not one is kept as written.
+function compactUtcTimestamp(value: string): string {
+  const instant = Date.parse(value);
+  if (!Number.isFinite(instant)) return value;
+  return new Date(instant).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+/**
+ * The release inventory of a country that publishes build folders: every
+ * build releases.json lists, named by its folder (`<release>/<build>`),
+ * dated by the record's `published_at` and classified by its release's role
+ * (the record's default release is the default dataset). releases.json is
+ * the only file read from the dataset repository. A build is calibrated
+ * (selectable for comparison) once the dashboard manifest holds its tree.
+ * Withdrawn builds are listed with their flag: how the picker shows them is
+ * not decided here. The dashboard's latest release is listed too while
+ * releases.json does not name it (see dashboardLatestRelease).
+ */
+export async function loadRecordedReleases(
+  revalidate: number,
+  country: MicrocosmCountry,
+  manifest: CalibrationTreeManifest,
+): Promise<ReleaseEntry[]> {
+  if (await loadLocalCalibrationRelease(country)) return loadReleases(revalidate, country);
+  const url = hfResolveUrl(RELEASES_RECORD_PATH, country);
+  const response = await hfFetch(url, revalidate);
+  if (!response.ok) throw new Error(`HF fetch failed ${response.status}: ${url}`);
+  const record = parseReleasesRecordBytes(new Uint8Array(await response.arrayBuffer()));
+  const published = new Set(
+    (manifest.countries[country]?.builds ?? []).flatMap((build) =>
+      build.kind === "release" && build.releaseId ? [build.releaseId] : []
+    ),
+  );
+  const recorded = recordedBuilds(record).map((build): ReleaseEntry => ({
+    release_id: build.id,
+    date: compactUtcTimestamp(build.publishedAt),
+    files: [],
+    has_calibration: published.has(build.id),
+    ...releaseRole({ dataset_role: build.role, is_default: build.inDefaultRelease }),
+    release: build.release,
+    build: build.build,
+    withdrawn: build.withdrawn,
+  }));
+  const recordedIds = new Set(recorded.map((entry) => entry.release_id));
+  const latest = dashboardLatestRelease(manifest, country);
+  return [
+    ...recorded,
+    ...(latest && !recordedIds.has(latest.release_id) ? [latest] : []),
+  ].sort((left, right) => releaseSortKey(right.date) - releaseSortKey(left.date));
+}
+
+/**
+ * The release the dashboard manifest marks latest, as a picker entry. Under
+ * build folders it is releases.json's current build once reconciliation has
+ * run; until then it is the entry published before the switch (a tagged
+ * build or a release folder), which releases.json does not name. Keeping it
+ * listed keeps the page's selected release selectable, which the
+ * deployment's pre-promotion check requires. Read from the dashboard
+ * manifest only; it is classified as the default dataset, as the latest
+ * release is.
+ */
+function dashboardLatestRelease(
+  manifest: CalibrationTreeManifest,
+  country: MicrocosmCountry,
+): ReleaseEntry | null {
+  const countryManifest = manifest.countries[country];
+  const latest = countryManifest?.builds.find(
+    (build) =>
+      build.buildArtifactId === countryManifest.latestReleaseBuildArtifactId &&
+      build.kind === "release",
+  );
+  if (!latest?.releaseId) return null;
+  return {
+    release_id: latest.releaseId,
+    date: latest.createdAt ? compactUtcTimestamp(latest.createdAt) : releaseDate(latest.releaseId),
+    files: [],
+    has_calibration: true,
+    dataset_role: null,
+    is_default: true,
+    is_local_area: false,
+    ...(latest.releaseDirectory && latest.releaseDirectory !== latest.releaseId
+      ? { release_directory: latest.releaseDirectory }
+      : {}),
+  };
 }
 
 export async function loadPointerReleaseId(
@@ -2592,7 +2704,12 @@ async function loadReleaseUncached(
     revalidate,
   );
   const id = location.releaseId;
-  const directory = assertSafeReleaseId(location.releaseDirectory, "release directory");
+  // A release folder or a build folder (`<release>/<build>`); interpolated
+  // into authenticated Hugging Face URLs.
+  const directory = location.releaseDirectory;
+  if (!isReleaseDirectory(directory) || directory === "latest") {
+    throw new InvalidReleaseIdError("Invalid release directory id");
+  }
   const updatedAt = location.updatedAt;
   const prefix = `releases/${directory}`;
   const [diagnosticsArtifact, buildManifest, releaseManifest, demographics, publishedAt] = await Promise.all([
@@ -2627,11 +2744,25 @@ async function loadReleaseUncached(
     diagnosticsArtifact.sha256,
     location.hfCommitSha,
   );
-  // A cut keeps its tag as the release id the picker, the latest pointer and
-  // this summary share, even if its diagnostics name the line instead.
-  return directory === id
+  return calibrationAsReleased(calibration, id, directory);
+}
+
+/**
+ * A release build as the picker and the dashboard manifest name it. A tag
+ * keeps its tag, and a build folder keeps `<release>/<build>`, as the release
+ * id the picker, the latest release and this summary share, even when its
+ * diagnostics name its folder or its release instead; both record the folder
+ * they were read from, so their sources are cited at the pinned commit. A
+ * release folder keeps the id its diagnostics carry, as before.
+ */
+export function calibrationAsReleased(
+  calibration: Calibration,
+  releaseId: string,
+  releaseDirectory: string,
+): Calibration {
+  return releaseDirectory === releaseId && !isBuildFolderId(releaseId)
     ? calibration
-    : { ...calibration, release_id: id, release_directory: directory };
+    : { ...calibration, release_id: releaseId, release_directory: releaseDirectory };
 }
 
 function targetDiagnosticsMetadata(rows: TargetRow[]): TargetDiagnosticsMetadata {

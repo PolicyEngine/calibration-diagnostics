@@ -29,6 +29,10 @@ const FOLDERS = [
 
 function handler(options: { manifestFails?: boolean } = {}) {
   return createMicrocosmReleasesHandler({
+    releaseLayout: () => "release_folders",
+    loadRecordedReleases: async () => {
+      throw new Error("releases.json is not read for release folders");
+    },
     loadReleases: async () => FOLDERS,
     loadPointerReleaseId: async () => ({
       release_id: CUT,
@@ -78,6 +82,79 @@ test("without the dashboard manifest the inventory keeps the folder listing", as
   );
 });
 
+// A country publishing build folders (microcosm-emitter#24): releases.json
+// lists every build, named by its folder.
+const CURRENT_BUILD = `${LINE}/uk-frs-calibration-attempt-20261019T083323Z-6cba5d71`;
+const UNPUBLISHED_BUILD = `${LINE}/uk-frs-calibration-attempt-20261020T000000Z-11111111`;
+const DENSE_BUILD = "microcosm-uk-2024-25-dense/uk-local-candidate-f100-s42-20261019T000432Z-ee5c2dbe";
+
+function buildFolderHandler(options: { manifestFails?: boolean } = {}) {
+  const calls: string[] = [];
+  const refuse = (name: string) => async () => {
+    calls.push(name);
+    throw new Error(`${name} is not read for build folders`);
+  };
+  return {
+    calls,
+    handle: createMicrocosmReleasesHandler({
+      releaseLayout: () => "build_folders",
+      loadRecordedReleases: async () => {
+        calls.push("loadRecordedReleases");
+        return [
+          release(CURRENT_BUILD, "20261019T083323Z"),
+          release(DENSE_BUILD, "20261019T000432Z", {
+            dataset_role: "non_default_local_area",
+            is_default: false,
+            is_local_area: true,
+          }),
+          release(UNPUBLISHED_BUILD, "20261020T000000Z", { has_calibration: false }),
+        ];
+      },
+      loadReleases: refuse("loadReleases"),
+      loadPublishedCutReleases: refuse("loadPublishedCutReleases"),
+      loadPointerReleaseId: async () => ({
+        release_id: CURRENT_BUILD,
+        updated_at: "2026-10-19T08:33:23.000Z",
+      }),
+      readManifest: async () => {
+        if (options.manifestFails) throw new Error("Blob unavailable");
+        return { manifest: emptyCalibrationTreeManifest(), etag: '"manifest"' };
+      },
+    }),
+  };
+}
+
+test("for a country publishing build folders, the inventory is the builds releases.json lists", async () => {
+  const { calls, handle } = buildFolderHandler();
+  const response = await handle(
+    new Request("https://dashboard.example/api/microcosm/releases?country=uk"),
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.default_release_id).toBe(CURRENT_BUILD);
+  expect(body.latest_release_id).toBe(CURRENT_BUILD);
+  expect(body.all_releases.map((entry: ReleaseEntry) => entry.release_id)).toEqual([
+    CURRENT_BUILD,
+    DENSE_BUILD,
+    UNPUBLISHED_BUILD,
+  ]);
+  // Only builds with a published calibration tree can be compared.
+  expect(body.releases.map((entry: ReleaseEntry) => entry.release_id)).toEqual([
+    CURRENT_BUILD,
+    DENSE_BUILD,
+  ]);
+  // No release-folder listing, tags or pointer files.
+  expect(calls).toEqual(["loadRecordedReleases"]);
+});
+
+test("for a country publishing build folders, the inventory fails without the dashboard manifest", async () => {
+  const { handle } = buildFolderHandler({ manifestFails: true });
+  const response = await handle(
+    new Request("https://dashboard.example/api/microcosm/releases?country=uk"),
+  );
+  expect(response.status).toBe(502);
+});
+
 test("the manifest reader receives the folder listing, so releases published only as a tag are listed", async () => {
   const folderRelease = release("populace-us-2024-folder-20260915", "20260915");
   const tagOnlyRelease = release(
@@ -86,6 +163,10 @@ test("the manifest reader receives the folder listing, so releases published onl
   );
   const foldersSeenByManifestReader: unknown[] = [];
   const response = await createMicrocosmReleasesHandler({
+    releaseLayout: () => "release_folders",
+    loadRecordedReleases: async () => {
+      throw new Error("releases.json is not read for release folders");
+    },
     loadReleases: async () => [folderRelease],
     loadPointerReleaseId: async () => ({
       release_id: folderRelease.release_id,

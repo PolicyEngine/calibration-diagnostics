@@ -1,6 +1,7 @@
 import { formatNumber } from "@policyengine/ui-kit";
 
 import { parseReleaseCutTag } from "@policyengine/calibration-tree/release-cut";
+import { parseBuildFolderId } from "@policyengine/calibration-tree/release-record";
 
 // Tax/benefit acronyms shown uppercase rather than as words.
 const ACRONYMS = new Set([
@@ -40,10 +41,20 @@ export function shortReleaseId(releaseId: string, length = 6): string {
   return releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0].slice(0, length);
 }
 
-// A readable label for a release: "2026-06-14 · f32c2e5". A Microcosm cut
-// (microcosm#823) names its line and attempt instead:
-// "2026-10-19 08:33Z · 2024-25-national · 6cba5d71".
+// A readable label for a release: "2026-06-14 · f32c2e5". A build in its own
+// folder (`<release>/<build>`) names its release and its whole build, dated
+// by its publication: "2026-10-19 08:33Z · 2024-25-national · <build>". A
+// tagged Microcosm build (microcosm#823) names its release and the attempt
+// suffix of its tag instead: "2026-10-19 08:33Z · 2024-25-national · 6cba5d71".
 export function releaseLabel(releaseId: string, date?: string | null): string {
+  const buildFolder = parseBuildFolderId(releaseId);
+  if (buildFolder) {
+    // Deprecated upstream identifier: Microcosm release IDs may still use the
+    // former Populace prefix.
+    const release = buildFolder.release.replace(/^(?:microcosm|populace)-[a-z]{2}-/, "");
+    const formatted = formatReleaseDate(date);
+    return [formatted, release, buildFolder.build].filter(Boolean).join(" · ");
+  }
   const cut = parseReleaseCutTag(releaseId);
   if (cut) {
     // Deprecated upstream identifier: Microcosm release IDs may still use the

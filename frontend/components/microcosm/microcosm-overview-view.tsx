@@ -123,7 +123,7 @@ export function MicrocosmReleaseHeader({
       )
     : null;
   const publicationUrl = data
-    ? microcosmPublicationUrl(data.source_repo, data.release_id)
+    ? microcosmPublicationUrl(data.source_repo, data.release_id, data.revision)
     : null;
   const overviewIntro = data
     ? microcosmOverviewIntro(country, calibration?.presentation)

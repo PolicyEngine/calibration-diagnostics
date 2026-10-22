@@ -4,11 +4,13 @@ import fc from "fast-check";
 import {
   COUNTRY_CAPABILITIES,
   COUNTRY_REGISTRY,
+  RELEASE_LAYOUTS,
   CountryNotConfiguredError,
   DEFAULT_COUNTRY,
   countryCapabilities,
   countryParam,
   countryPointerPath,
+  countryReleaseLayout,
   countryRegistration,
   hasCapability,
   isCountry,
@@ -262,5 +264,20 @@ test("only the UK resolves its current release through a line pointer", () => {
   for (const country of COUNTRIES) {
     const pointer = countryRegistration(country).pointer_path;
     if (pointer != null) expect(pointer).toMatch(/^latest-[a-z]+(-k[1-9][0-9]*)?\.json$/);
+  }
+});
+
+test("only the UK publishes build folders, so only its readers read releases.json", () => {
+  // Microcosm's migration (P1) moves the UK repository to one folder per
+  // build and releases.json. The UK keeps its pointer_path so that removing
+  // release_layout returns it to the release-folder readers until Microcosm
+  // deletes the pointer files (P5).
+  expect(countryReleaseLayout("uk")).toBe("build_folders");
+  for (const country of COUNTRIES.filter((code) => code !== "uk")) {
+    expect(countryReleaseLayout(country), country).toBe("release_folders");
+  }
+  for (const country of COUNTRIES) {
+    const layout = countryRegistration(country).release_layout;
+    if (layout != null) expect(RELEASE_LAYOUTS).toContain(layout);
   }
 });

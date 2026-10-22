@@ -5,6 +5,7 @@ import {
   type MicrocosmCountry,
   asObject,
   assertSafeReleaseId,
+  assertSafeReleaseOrBuildFolderId,
   buildCalibration,
   buildComparison,
   latestMicrocosmCalibrationSummary,
@@ -12,6 +13,7 @@ import {
   loadCountryRepositoryHashedJson,
   loadPointerReleaseId,
   loadPublishedCutReleases,
+  loadRecordedReleases,
   loadRelease,
   loadReleases,
   microcosmCountryGeography,
@@ -27,8 +29,10 @@ import {
 import type { CalibrationTreeSourceArtifact } from "./calibration-tree-artifact";
 import {
   countryRegistration,
+  countryReleaseLayout,
   resolveRegisteredStagingRepository,
   stagingLocalAreaPipelines,
+  type ReleaseLayout,
   type RepositoryEnvironment,
   type ResolvedRepository,
 } from "./countries";
@@ -982,7 +986,7 @@ export async function loadStagingTargetChangeDataset(
 ): Promise<TargetChangeDataset | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
-  assertSafeReleaseId(releaseId, "release");
+  assertSafeReleaseOrBuildFolderId(releaseId, "release");
   const progress = await stagingJsonOrNull(
     `runs/${runId}/progress.json`,
     TARGET_CHANGE_MUTABLE_CACHE_SECONDS,
@@ -1313,6 +1317,27 @@ export function newestPublishedLocalAreaRelease(
   return calibrationBuildsNewestFirst(builds)[0] ?? null;
 }
 
+/**
+ * The releases a local-area Staging candidate may be compared with, with
+ * their roles. A country publishing build folders lists the builds
+ * releases.json names and nothing else; one publishing release folders lists
+ * the folders on main and its published tagged builds.
+ */
+export async function stagingBaselineReleases(
+  revalidate: number,
+  country: MicrocosmCountry,
+  manifest: CalibrationTreeManifest,
+  layout: ReleaseLayout = countryReleaseLayout(country),
+): Promise<ReleaseEntry[]> {
+  if (layout === "build_folders") {
+    return loadRecordedReleases(revalidate, country, manifest);
+  }
+  // The published tagged builds are the ones the folder listing cannot name.
+  const folders = await loadReleases(revalidate, country);
+  const tagged = await loadPublishedCutReleases(revalidate, country, manifest, folders);
+  return [...folders, ...tagged];
+}
+
 function defaultStagingComparisonReleaseDependencies(
   revalidate: number,
 ): StagingComparisonReleaseDependencies {
@@ -1321,13 +1346,9 @@ function defaultStagingComparisonReleaseDependencies(
     currentReleaseId: async (country) =>
       (await loadPointerReleaseId(revalidate, country)).release_id,
     newestLocalAreaReleaseId: async (country) => {
-      const [{ manifest }, folders] = await Promise.all([
-        readCalibrationTreeManifest(),
-        loadReleases(revalidate, country),
-      ]);
-      const tagged = await loadPublishedCutReleases(revalidate, country, manifest, folders);
-      return newestPublishedLocalAreaRelease(manifest, country, [...folders, ...tagged])
-        ?.releaseId ?? null;
+      const { manifest } = await readCalibrationTreeManifest();
+      const releases = await stagingBaselineReleases(revalidate, country, manifest);
+      return newestPublishedLocalAreaRelease(manifest, country, releases)?.releaseId ?? null;
     },
   };
 }
