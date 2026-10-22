@@ -88,7 +88,8 @@ export class CalibrationTreeArtifactSizeError extends Error {}
 
 export interface ReconciliationOutcome {
   sourceId: string;
-  // `failed`: staging only; `reason` gives the error.
+  // `failed`: the source could not be published or repaired; `reason` gives
+  // the error. Nothing was written for it.
   status: "complete" | "published" | "repaired" | "ineligible" | "failed";
   buildArtifactId: string | null;
   reason: string | null;
@@ -99,6 +100,13 @@ export interface ReconciliationReport {
   sourceKind: "releases" | "staging";
   dryRun: boolean;
   outcomes: ReconciliationOutcome[];
+  /**
+   * Release reconciliation only: why the latest-release selection could not
+   * be read or updated. Absent when it was updated. In a dry run, present
+   * only when the upstream pointer cannot be read or names a release that
+   * failed in this run.
+   */
+  latestReleaseFailure?: string;
 }
 
 function sha256Text(value: string): string {
@@ -1175,84 +1183,148 @@ export async function reconcileReleaseBuilds(
       "release",
       candidate.releaseId,
     );
-    if (existing && existing.hfCommitSha !== candidate.hfCommitSha) {
-      throw new Error(
-        `Released dataset ${candidate.releaseId} changed from ${existing.hfCommitSha} ` +
-          `to ${candidate.hfCommitSha}.`,
-      );
-    }
-    if (existing && releaseDirectoryOf(existing) !== candidate.releaseDirectory) {
-      throw new Error(
-        `Released dataset ${candidate.releaseId} moved from releases/${releaseDirectoryOf(existing)}/ ` +
-          `to releases/${candidate.releaseDirectory}/.`,
-      );
-    }
-    const audit = existing ? await store.audit(existing, blobs) : null;
-    if (existing && audit?.complete) {
-      // Reconciliation validates and restores stored parts only; a stored
-      // entry's metadata is the timestamp migration's business.
-      outcomes.push({
-        sourceId: candidate.releaseId,
-        status: "complete",
-        buildArtifactId: existing.buildArtifactId,
-        reason: null,
-      });
-      continue;
-    }
-    if (audit && !audit.repairable) {
-      throw new Error(
-        `Release build ${candidate.releaseId} is corrupt and cannot be repaired automatically: ` +
-          audit.reasons.join("; "),
-      );
-    }
-    const published = await publishRelease({
-      country,
-      id: candidate.releaseId,
-      releaseDirectory: candidate.releaseDirectory,
-      expectedSha: existing?.hfCommitSha ?? candidate.hfCommitSha,
-      blobToken,
-      useExpectedShaExactly: true,
-      buildArtifactId: existing?.buildArtifactId,
-      dryRun,
-      expectedIndexSha256: existing?.indexSha256,
-      indexCreatedAt: existing ? existing.createdAt : undefined,
-      uploadBundle: store.uploadBundle,
-    });
-    const entry = existing ?? releaseManifestEntry(published);
-    if (!dryRun) {
-      manifest = await store.updateManifest(entry);
-      blobs = await store.listBlobs();
-      const verified = await store.audit(entry, blobs);
-      if (!verified.complete) {
+    // A release whose build cannot be published or repaired is reported with
+    // the reason, and the releases after it are still reconciled: stopping
+    // here would leave every later release, and the latest-release
+    // selection, unreconciled on every later invocation. `runPublisher`
+    // exits with an error once the report is printed. The manifest write is
+    // a release's last step, after its files are uploaded and audited, so a
+    // release that fails gets no manifest entry (unless that write's own
+    // read-back check fails after the write was stored). A failed release is
+    // never selected as the latest release.
+    try {
+      if (existing && existing.hfCommitSha !== candidate.hfCommitSha) {
         throw new Error(
-          `Release build ${candidate.releaseId} remains incomplete: ${verified.reasons.join("; ")}`,
+          `Released dataset ${candidate.releaseId} changed from ${existing.hfCommitSha} ` +
+            `to ${candidate.hfCommitSha}.`,
         );
       }
+      if (existing && releaseDirectoryOf(existing) !== candidate.releaseDirectory) {
+        throw new Error(
+          `Released dataset ${candidate.releaseId} moved from releases/${releaseDirectoryOf(existing)}/ ` +
+            `to releases/${candidate.releaseDirectory}/.`,
+        );
+      }
+      const audit = existing ? await store.audit(existing, blobs) : null;
+      if (existing && audit?.complete) {
+        // Reconciliation validates and restores stored parts only; a stored
+        // entry's metadata is the timestamp migration's business.
+        outcomes.push({
+          sourceId: candidate.releaseId,
+          status: "complete",
+          buildArtifactId: existing.buildArtifactId,
+          reason: null,
+        });
+        continue;
+      }
+      if (audit && !audit.repairable) {
+        throw new Error(
+          `Release build ${candidate.releaseId} is corrupt and cannot be repaired automatically: ` +
+            audit.reasons.join("; "),
+        );
+      }
+      const published = await publishRelease({
+        country,
+        id: candidate.releaseId,
+        releaseDirectory: candidate.releaseDirectory,
+        expectedSha: existing?.hfCommitSha ?? candidate.hfCommitSha,
+        blobToken,
+        useExpectedShaExactly: true,
+        buildArtifactId: existing?.buildArtifactId,
+        dryRun,
+        expectedIndexSha256: existing?.indexSha256,
+        indexCreatedAt: existing ? existing.createdAt : undefined,
+        uploadBundle: store.uploadBundle,
+      });
+      const entry = existing ?? releaseManifestEntry(published);
+      if (!dryRun) {
+        // The uploaded files are audited before the manifest names them, so
+        // an incomplete upload never becomes a manifest entry. The audit
+        // reads the build's own index and the Blob listing, not the
+        // manifest.
+        blobs = await store.listBlobs();
+        const verified = await store.audit(entry, blobs);
+        if (!verified.complete) {
+          throw new Error(
+            `Release build ${candidate.releaseId} remains incomplete: ${verified.reasons.join("; ")}`,
+          );
+        }
+        manifest = await store.updateManifest(entry);
+      }
+      outcomes.push({
+        sourceId: candidate.releaseId,
+        status: existing ? "repaired" : "published",
+        buildArtifactId: entry.buildArtifactId,
+        reason: dryRun ? "Dry run; no Blob writes performed." : null,
+      });
+    } catch (error) {
+      outcomes.push({
+        sourceId: candidate.releaseId,
+        status: "failed",
+        buildArtifactId: existing?.buildArtifactId ?? null,
+        reason: error instanceof Error ? error.message : String(error),
+      });
     }
-    outcomes.push({
-      sourceId: candidate.releaseId,
-      status: existing ? "repaired" : "published",
-      buildArtifactId: entry.buildArtifactId,
-      reason: dryRun ? "Dry run; no Blob writes performed." : null,
-    });
   }
 
-  const latest = await readUpstreamLatest(country, undefined, manifest);
-  const latestEntry = manifestBuildForSource(
-    manifest,
-    country,
-    "release",
-    latest.releaseId,
+  const failedReleaseIds = new Set(
+    outcomes.filter((outcome) => outcome.status === "failed").map((outcome) => outcome.sourceId),
   );
-  if (!dryRun) {
+  const latestReleaseFailure = await selectLatestRelease(
+    country,
+    manifest,
+    failedReleaseIds,
+    dryRun,
+    store,
+  );
+  return {
+    country,
+    sourceKind: "releases",
+    dryRun,
+    outcomes,
+    ...(latestReleaseFailure == null ? {} : { latestReleaseFailure }),
+  };
+}
+
+/**
+ * Point the country's latest-release selection at the release its upstream
+ * pointer names, once that release is completely published. Returns why the
+ * selection could not be read or updated, or null. A release that failed in
+ * this reconciliation is never selected, so the selection keeps naming the
+ * build it named before. A dry run reads the pointer and reports a release
+ * that failed, but neither checks nor changes the selection otherwise.
+ */
+async function selectLatestRelease(
+  country: MicrocosmCountry,
+  manifest: CalibrationTreeManifest,
+  failedReleaseIds: ReadonlySet<string>,
+  dryRun: boolean,
+  store: CalibrationManifestStore,
+): Promise<string | null> {
+  try {
+    const latest = await readUpstreamLatest(country, undefined, manifest);
+    // Checked before the dry-run return, so a dry run reports a failed
+    // latest release exactly as a run that writes does.
+    if (failedReleaseIds.has(latest.releaseId)) {
+      return `Latest release ${latest.releaseId} failed to reconcile, so the latest-release selection was not changed.`;
+    }
+    // A dry run writes no manifest entries, so it cannot check whether the
+    // release is completely published.
+    if (dryRun) return null;
+    const latestEntry = manifestBuildForSource(
+      manifest,
+      country,
+      "release",
+      latest.releaseId,
+    );
     if (!latestEntry || latestEntry.hfCommitSha !== latest.hfCommitSha) {
-      throw new Error(
-        `Latest release ${latest.releaseId}@${latest.hfCommitSha} is not completely published.`,
-      );
+      return `Latest release ${latest.releaseId}@${latest.hfCommitSha} is not completely published.`;
     }
     await store.updateManifest(latestEntry, true);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
   }
-  return { country, sourceKind: "releases", dryRun, outcomes };
 }
 
 interface TimestampMigrationOutcome {
@@ -1350,15 +1422,25 @@ async function requestedReleaseSelection(
   };
 }
 
-/** The error a report's failed outcomes end the publisher with, if any. */
+/**
+ * The error a report's failed outcomes, or a latest-release selection that
+ * could not be updated, end the publisher with, if any.
+ */
 export function reconciliationFailureMessage(report: ReconciliationReport): string | null {
   const failed = report.outcomes.filter((outcome) => outcome.status === "failed");
-  if (failed.length === 0) return null;
-  return (
-    `${failed.length} of ${report.outcomes.length} ${report.sourceKind} sources failed to ` +
-    `reconcile: ${failed.map((outcome) => outcome.sourceId).join(", ")}. ` +
-    "The printed report gives each reason."
-  );
+  const messages: string[] = [];
+  if (failed.length > 0) {
+    const sources = report.sourceKind === "releases" ? "releases" : "staging sources";
+    messages.push(
+      `${failed.length} of ${report.outcomes.length} ${sources} failed to ` +
+        `reconcile: ${failed.map((outcome) => outcome.sourceId).join(", ")}.`,
+    );
+  }
+  if (report.latestReleaseFailure) {
+    messages.push(`The latest release was not selected: ${report.latestReleaseFailure}`);
+  }
+  if (messages.length === 0) return null;
+  return [...messages, "The printed report gives each reason."].join(" ");
 }
 
 export interface PublisherDependencies {
