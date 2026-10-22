@@ -20,6 +20,7 @@ import {
   useCountry,
   type Country,
 } from "@/components/layout/country-context";
+import { CountryNotConfiguredState } from "@/components/microcosm/country-not-configured";
 import { EmptyState } from "@/components/shared/empty-state";
 import { fmt, fmtCompact, fmtDecimal } from "@/components/shared/format";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -28,6 +29,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
+import { countryNotConfiguredError } from "@/lib/api/client";
 import {
   releaseSelectOptions,
   useMicrocosm,
@@ -218,6 +220,15 @@ export function MicrocosmOverviewView({
         {releaseHeader}
         <LoadingBlock label="Loading microcosm release…" />
       </div>
+    );
+  }
+  const notConfigured = countryNotConfiguredError(error);
+  if (notConfigured) {
+    return (
+      <CountryNotConfiguredState
+        requested={notConfigured.requested_country}
+        reason={notConfigured.reason}
+      />
     );
   }
   if (error || !data) {

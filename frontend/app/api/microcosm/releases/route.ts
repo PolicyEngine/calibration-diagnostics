@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import { readCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-blob";
-import { countryReleaseLayout } from "@policyengine/calibration-tree/countries";
+import {
+  countryReleaseLayout,
+  type MicrocosmCountry,
+} from "@policyengine/calibration-tree/countries";
 import {
   loadPointerReleaseId,
   loadPublishedCutReleases,
   loadRecordedReleases,
   loadReleases,
   mergeReleaseInventory,
-  parseCountry,
   scrub,
   type ReleaseEntry,
 } from "@policyengine/calibration-tree/latest-artifact";
@@ -37,7 +40,7 @@ export function createMicrocosmReleasesHandler(
   // A country publishing build folders lists the builds releases.json names
   // and nothing else; which of them are calibrated comes from the dashboard
   // manifest, so the listing needs it.
-  async function recordedInventory(country: ReturnType<typeof parseCountry>) {
+  async function recordedInventory(country: MicrocosmCountry) {
     const { manifest } = await dependencies.readManifest();
     return dependencies.loadRecordedReleases(revalidate, country, manifest);
   }
@@ -45,25 +48,30 @@ export function createMicrocosmReleasesHandler(
   // A country publishing release folders lists the folders on main beside
   // its published tagged builds.
   async function folderInventory(
-    country: ReturnType<typeof parseCountry>,
+    country: MicrocosmCountry,
     latestReleaseId: Promise<string | null>,
   ): Promise<ReleaseEntry[]> {
-    const [folders, cuts, latest] = await Promise.all([
+    const [folders, manifest, latest] = await Promise.all([
       dependencies.loadReleases(revalidate, country),
-      // Published cuts are named only by the dashboard manifest; without it
-      // the picker keeps the folder listing.
       dependencies.readManifest()
-        .then(({ manifest }) =>
-          dependencies.loadPublishedCutReleases(revalidate, country, manifest),
-        )
-        .catch(() => []),
+        .then(({ manifest }) => manifest)
+        .catch(() => null),
       latestReleaseId,
     ]);
+    // Per-attempt tags and releases published only as a tag are named only
+    // by the dashboard manifest; without it the picker keeps the folder
+    // listing.
+    const cuts = manifest
+      ? await dependencies
+        .loadPublishedCutReleases(revalidate, country, manifest, folders)
+        .catch(() => [])
+      : [];
     return mergeReleaseInventory(folders, cuts, latest);
   }
 
   return async function GET(request: Request) {
-    const country = parseCountry(new URL(request.url).searchParams.get("country"));
+    const country = requestedCountry(new URL(request.url).searchParams);
+    if (country instanceof Response) return country;
     try {
       // The dashboard's latest release, from its manifest.
       const pointerRead = dependencies.loadPointerReleaseId(revalidate, country)

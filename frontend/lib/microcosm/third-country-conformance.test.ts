@@ -16,7 +16,8 @@ import {
   microcosmRepo,
   microcosmRevision,
   microcosmTargetTreemap,
-  parseCountry,
+  countryParam,
+  isCountry,
 } from "@policyengine/calibration-tree/latest-artifact";
 
 const COUNTRY = "zz" as const;
@@ -43,7 +44,9 @@ const calibration = buildCalibration(
 
 describe("synthetic third-country conformance", () => {
   test("one country registration supplies repository, national geography, and country block behavior", () => {
-    expect(parseCountry(COUNTRY)).toBe(COUNTRY);
+    expect(isCountry(COUNTRY)).toBe(true);
+    // Builders accept the fixture; a dashboard request for it is not configured.
+    expect(countryParam(COUNTRY)).toEqual({ configured: false, requested: COUNTRY });
     expect(microcosmRepo(COUNTRY)).toBe("policyengine/microcosm-zz-fixture");
     expect(microcosmRevision(COUNTRY)).toBe("main");
     expect(hfResolveUrl("latest.json", COUNTRY)).toBe(

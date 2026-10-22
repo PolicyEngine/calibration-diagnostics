@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import { parseBuildSource } from "@/lib/microcosm/build-source";
 import { loadBuildRun } from "@/lib/microcosm/build-runs";
-import { parseCountry, scrub } from "@policyengine/calibration-tree/latest-artifact";
+import { scrub } from "@policyengine/calibration-tree/latest-artifact";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,7 +12,8 @@ export const maxDuration = 120;
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
-  const country = parseCountry(params.get("country"));
+  const country = requestedCountry(params);
+  if (country instanceof Response) return country;
   const source = parseBuildSource(params.get("source"));
   const runId = params.get("id")?.trim();
   if (!runId) {

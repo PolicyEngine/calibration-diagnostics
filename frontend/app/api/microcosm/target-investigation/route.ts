@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import {
   classifyApiError,
   latestMicrocosmTargetInvestigation,
   loadRelease,
-  parseCountry,
   scrub,
 } from "@policyengine/calibration-tree/latest-artifact";
 
@@ -14,7 +14,8 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const release = searchParams.get("release") || "latest";
-    const country = parseCountry(searchParams.get("country"));
+    const country = requestedCountry(searchParams);
+    if (country instanceof Response) return country;
     const cal = await loadRelease(release, revalidate, country);
     return NextResponse.json(
       scrub(latestMicrocosmTargetInvestigation(request.url, cal)),

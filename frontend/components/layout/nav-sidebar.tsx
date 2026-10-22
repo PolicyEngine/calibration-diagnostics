@@ -17,7 +17,7 @@ import {
 
 export function NavSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const pathname = usePathname();
-  const { country, setCountry } = useCountry();
+  const { country, unconfiguredCountry, setCountry } = useCountry();
   const dataset = countryRegistration(country);
   const groups = navGroupsForCountry(country);
   return (
@@ -34,7 +34,7 @@ export function NavSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
           className="mt-1.5 inline-flex rounded-lg bg-muted p-0.5"
         >
           {selectableCountries().map((value) => {
-            const active = country === value;
+            const active = unconfiguredCountry == null && country === value;
             return (
               <button
                 key={value}
@@ -54,9 +54,9 @@ export function NavSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
           })}
         </div>
         <div className="mt-1.5 text-sm font-semibold text-foreground">
-          {dataset.dataset_label}
+          {unconfiguredCountry != null ? "No dataset selected" : dataset.dataset_label}
         </div>
-        {dataset.visibility === "public" ? (
+        {unconfiguredCountry == null && dataset.visibility === "public" ? (
           <div className="font-mono text-xs text-muted-foreground">{dataset.repo}</div>
         ) : null}
       </div>

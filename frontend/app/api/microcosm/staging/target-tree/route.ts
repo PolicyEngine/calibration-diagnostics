@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import { buildCalibrationTree, type CalibrationTreeTarget } from "@policyengine/calibration-tree/calibration-tree";
 import { calibrationTreeRequestState } from "@/lib/microcosm/calibration-tree-request";
-import { classifyApiError, parseCountry, scrub } from "@policyengine/calibration-tree/latest-artifact";
+import { classifyApiError, scrub } from "@policyengine/calibration-tree/latest-artifact";
 import { loadStagingCalibration } from "@policyengine/calibration-tree/staging-artifact";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +13,12 @@ export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
+  const country = requestedCountry(params);
+  if (country instanceof Response) return country;
   const runId = params.get("run")?.trim();
   if (!runId) {
     return NextResponse.json({ detail: "Provide a staging run id via ?run=." }, { status: 400 });
   }
-  const country = parseCountry(params.get("country"));
   try {
     const calibration = await loadStagingCalibration(runId, revalidate, country);
     if (!calibration) {

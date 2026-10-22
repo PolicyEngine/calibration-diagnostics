@@ -208,16 +208,95 @@ export function isCountry(value: string | null | undefined): value is MicrocosmC
   return value != null && Object.hasOwn(COUNTRY_REGISTRY, value);
 }
 
-export function parseCountry(value: string | null | undefined): MicrocosmCountry {
-  return isCountry(value) ? value : DEFAULT_COUNTRY;
-}
-
 export function countryRegistration(country: MicrocosmCountry): CountryRegistration {
   return COUNTRY_REGISTRY[country];
 }
 
 export function countryReleaseLayout(country: MicrocosmCountry): ReleaseLayout {
   return countryRegistration(country).release_layout ?? "release_folders";
+}
+
+// A registered country the dashboard offers: every registration except the
+// conformance fixtures.
+export function isSelectableCountry(
+  value: string | null | undefined,
+): value is MicrocosmCountry {
+  return isCountry(value) && !countryRegistration(value).fixture;
+}
+
+// What a request's `country` parameter names. Absent (null or "") selects the
+// registry default. A present value must equal a selectable registration key
+// exactly; anything else (an unregistered code such as "nz", another spelling
+// such as "US", or a conformance fixture) is not configured. It never resolves
+// to a different country, so one country's release is never served under
+// another country's code.
+export type CountryParam =
+  | { configured: true; country: MicrocosmCountry; explicit: boolean }
+  | { configured: false; requested: string };
+
+export function countryParam(value: string | null | undefined): CountryParam {
+  if (value == null || value === "") {
+    return { configured: true, country: DEFAULT_COUNTRY, explicit: false };
+  }
+  return isSelectableCountry(value)
+    ? { configured: true, country: value, explicit: true }
+    : { configured: false, requested: value };
+}
+
+// "unknown_country": the dashboard has no such country. "no_published_release":
+// the country is registered but the dashboard manifest names no release for it
+// yet (a newly registered country before its first publication).
+export type CountryNotConfiguredReason = "unknown_country" | "no_published_release";
+
+export const COUNTRY_NOT_CONFIGURED = "country_not_configured";
+
+export interface CountryNotConfiguredBody {
+  error: typeof COUNTRY_NOT_CONFIGURED;
+  requested_country: string;
+  reason: CountryNotConfiguredReason;
+  detail: string;
+}
+
+export class CountryNotConfiguredError extends Error {
+  readonly requested: string;
+  readonly reason: CountryNotConfiguredReason;
+
+  constructor(requested: string, reason?: CountryNotConfiguredReason) {
+    const resolvedReason =
+      reason ?? (isSelectableCountry(requested) ? "no_published_release" : "unknown_country");
+    super(countryNotConfiguredDetail(requested, resolvedReason));
+    this.name = "CountryNotConfiguredError";
+    this.requested = requested;
+    this.reason = resolvedReason;
+  }
+
+  body(): CountryNotConfiguredBody {
+    return {
+      error: COUNTRY_NOT_CONFIGURED,
+      requested_country: this.requested,
+      reason: this.reason,
+      detail: this.message,
+    };
+  }
+}
+
+function countryNotConfiguredDetail(
+  requested: string,
+  reason: CountryNotConfiguredReason,
+): string {
+  if (reason === "no_published_release" && isCountry(requested)) {
+    return `No Microcosm calibration release has been published for ${countryRegistration(requested).label} yet.`;
+  }
+  return `No Microcosm calibration release is configured for country "${requested}".`;
+}
+
+export function isCountryNotConfiguredBody(value: unknown): value is CountryNotConfiguredBody {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    (value as { error?: unknown }).error === COUNTRY_NOT_CONFIGURED &&
+    typeof (value as { requested_country?: unknown }).requested_country === "string"
+  );
 }
 
 export const DEFAULT_POINTER_PATH = "latest.json";
@@ -229,7 +308,7 @@ export function countryPointerPath(country: MicrocosmCountry): string {
 
 // Countries offered in selectors, in registry order; fixtures are excluded.
 export function selectableCountries(): MicrocosmCountry[] {
-  return COUNTRY_CODES.filter((country) => !countryRegistration(country).fixture);
+  return COUNTRY_CODES.filter(isSelectableCountry);
 }
 
 export function countryCapabilities(country: MicrocosmCountry): readonly CountryCapability[] {

@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import type { ExplorerState } from "./calibration-explorer";
+import maineRelease from "./fixtures/us-766b7c7-maine-targets.json";
 import type { CalibrationProvenance } from "./target-loss-attribution";
 import {
   applyExplorerFilters,
   buildCalibrationTree,
   effectiveNodeMetric,
   fitBandForTarget,
+  type CalibrationTreeDimension,
   type CalibrationTreeTarget,
 } from "./calibration-tree";
 
@@ -732,6 +734,305 @@ describe("schema 8 ordered hierarchy", () => {
   });
 });
 
+// The reader keeps the first spelling of a label that rows spell more than
+// one way and reports the others (validateHierarchyTargets), so the builder
+// receives every row with its own spelling and must not refuse them. The
+// fixtures copy release populace-us-2024-0fb05b6-4b57d15a287c-20260930T150401Z,
+// whose national EITC rows label income band under_1 two ways.
+describe("schema 8 labels that rows spell more than one way", () => {
+  const INCOME_KEY = "us:statutes/26/62#adjusted_gross_income";
+  const CHILDREN_KEY = "irs_soi.qualifying_children";
+  const eitcPath = {
+    source: "irs_soi",
+    program: "irs_soi.eitc",
+    geography: "United States",
+    dimensions: [],
+  };
+
+  function eitcRow(
+    name: string,
+    dimensions: CalibrationTreeDimension[],
+  ): CalibrationTreeTarget {
+    return target(name, {
+      source: "irs_soi",
+      source_label: "IRS Statistics of Income",
+      variable: "irs_soi.eitc",
+      variable_label: "EITC",
+      geography: "United States",
+      level: "country",
+      target_label: name,
+      target_representation: "hierarchy",
+      target_dimensions: dimensions,
+    });
+  }
+
+  function incomeBand(
+    valueId: string,
+    valueLabel: string,
+    dimensionLabel = "Adjusted gross income",
+  ): CalibrationTreeDimension {
+    return {
+      key: INCOME_KEY,
+      label: dimensionLabel,
+      value: valueLabel,
+      value_id: valueId,
+    };
+  }
+
+  const oneChild: CalibrationTreeDimension = {
+    key: CHILDREN_KEY,
+    label: "Qualifying children",
+    value: "One qualifying child",
+    value_id: "one",
+  };
+
+  // The two rows that label value ID under_1 differently. The builder skips a
+  // dimension with a single value ID as a level, so the third row, in
+  // another income band, makes the income band a level it groups.
+  const tableRow = eitcRow("irs_soi.ty2023.table_2_5.eitc_total.under_1", [
+    incomeBand("under_1", "No adjusted gross income"),
+  ]);
+  const filingSeasonRow = eitcRow(
+    "irs_soi.ty2024.filing_season_week47.eitc_by_agi.under_1.returns",
+    [incomeBand("under_1", "No adjusted gross income and deficit")],
+  );
+  const otherBandRow = eitcRow("irs_soi.ty2023.table_2_5.eitc_total.1k_to_2k", [
+    incomeBand("1k_to_2k", "$1,000 under $2,000"),
+  ]);
+
+  function incomeNodes(rows: CalibrationTreeTarget[]) {
+    const tree = buildCalibrationTree(rows, state(eitcPath));
+    return tree.groups
+      .find((group) => group.id === INCOME_KEY)
+      ?.nodes.map((treeNode) => [treeNode.id, treeNode.label, treeNode.metrics.nTargets]);
+  }
+
+  test("labels a value ID that rows spell two ways with its first spelling in row order", () => {
+    expect(incomeNodes([tableRow, filingSeasonRow, otherBandRow])).toEqual([
+      ["under_1", "No adjusted gross income", 2],
+      ["1k_to_2k", "$1,000 under $2,000", 1],
+    ]);
+    expect(incomeNodes([filingSeasonRow, tableRow, otherBandRow])).toEqual([
+      ["under_1", "No adjusted gross income and deficit", 2],
+      ["1k_to_2k", "$1,000 under $2,000", 1],
+    ]);
+  });
+
+  test("names a selected value ID that rows spell two ways with its first spelling", () => {
+    const tree = buildCalibrationTree(
+      [tableRow, filingSeasonRow, otherBandRow],
+      state({
+        ...eitcPath,
+        dimensions: [
+          { key: INCOME_KEY, label: "Adjusted gross income", value: "under_1" },
+        ],
+      }),
+    );
+
+    expect(tree.pathLabels.dimensions).toEqual(["No adjusted gross income"]);
+    expect(tree.groups.flatMap((group) => group.nodes).map((treeNode) => treeNode.id)).toEqual([
+      "irs_soi.ty2023.table_2_5.eitc_total.under_1",
+      "irs_soi.ty2024.filing_season_week47.eitc_by_agi.under_1.returns",
+    ]);
+  });
+
+  test("keeps a value ID's first spelling when a filter hides the row that carries it", () => {
+    // A published tree is compiled without filters and keeps its node labels
+    // when a filter is applied, so a live tree must label a value from all
+    // of its rows, not only the visible ones, and its selected path must
+    // agree.
+    const poorlyFitTableRow = { ...tableRow, abs_relative_error: 0.5 };
+    const rows = [poorlyFitTableRow, filingSeasonRow, otherBandRow];
+    const wellFitOnly = { ...EMPTY_FILTERS, fitBands: ["0_5" as const] };
+
+    const level = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: eitcPath,
+      filters: wellFitOnly,
+    });
+    const selected = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: {
+        ...eitcPath,
+        dimensions: [
+          { key: INCOME_KEY, label: "Adjusted gross income", value: "under_1" },
+        ],
+      },
+      filters: wellFitOnly,
+    });
+
+    expect(
+      level.groups
+        .find((group) => group.id === INCOME_KEY)
+        ?.nodes.map((treeNode) => [treeNode.id, treeNode.label, treeNode.metrics.nTargets]),
+    ).toEqual([
+      ["1k_to_2k", "$1,000 under $2,000", 1],
+      ["under_1", "No adjusted gross income", 1],
+    ]);
+    expect(selected.pathLabels.dimensions).toEqual(["No adjusted gross income"]);
+  });
+
+  test("labels a dimension that rows spell two ways with its first spelling in row order", () => {
+    const plainRow = eitcRow("irs_soi.ty2023.table_2_5.eitc_total.under_1", [
+      incomeBand("under_1", "No adjusted gross income"),
+    ]);
+    const abbreviatedRow = eitcRow("irs_soi.ty2023.table_2_5.eitc_total.1k_to_2k", [
+      incomeBand("1k_to_2k", "$1,000 under $2,000", "Adjusted gross income (AGI)"),
+    ]);
+
+    const tree = buildCalibrationTree([plainRow, abbreviatedRow], state(eitcPath));
+
+    const plainDimension = { key: INCOME_KEY, label: "Adjusted gross income" };
+    expect(tree.dimensionOrder).toEqual([plainDimension]);
+    expect(tree.currentLevel).toEqual({ kind: "dimension", ...plainDimension });
+    expect(tree.groups.map((group) => [group.id, group.label])).toEqual([
+      [INCOME_KEY, "Adjusted gross income"],
+    ]);
+    expect(tree.groups[0].nodes.map((treeNode) => treeNode.selection)).toEqual([
+      { kind: "dimension_value", ...plainDimension, value: "1k_to_2k" },
+      { kind: "dimension_value", ...plainDimension, value: "under_1" },
+    ]);
+    expect(
+      buildCalibrationTree([abbreviatedRow, plainRow], state(eitcPath)).groups.map(
+        (group) => group.label,
+      ),
+    ).toEqual(["Adjusted gross income (AGI)"]);
+  });
+
+  test("lists a dimension that rows in separate branches spell two ways with its first spelling", () => {
+    // Neither row's income band becomes a level, so only the dimension order
+    // of the whole scope sees both spellings.
+    const directRow = eitcRow("irs_soi.direct.under_1", [
+      incomeBand("under_1", "No adjusted gross income"),
+    ]);
+    const childrenRow = eitcRow("irs_soi.children.under_1", [
+      oneChild,
+      incomeBand("under_1", "No adjusted gross income", "Adjusted gross income (AGI)"),
+    ]);
+
+    const tree = buildCalibrationTree([directRow, childrenRow], state(eitcPath));
+
+    expect(tree.dimensionOrder).toEqual([
+      { key: INCOME_KEY, label: "Adjusted gross income" },
+      { key: CHILDREN_KEY, label: "Qualifying children" },
+    ]);
+    expect(tree.groups.flatMap((group) => group.nodes).map((treeNode) => treeNode.id)).toEqual([
+      "irs_soi.children.under_1",
+      "irs_soi.direct.under_1",
+    ]);
+  });
+
+  test("gives a dimension reached through two parent branches its first spelling in row order", () => {
+    // The children branch is grouped first because its first row comes
+    // first, but the earliest row that carries the income band is a direct
+    // row, so the merged income level takes the direct rows' spelling.
+    const rows = [
+      eitcRow("irs_soi.children.total", [
+        oneChild,
+        { key: "irs_soi.filing_status", label: "Filing status", value: "All", value_id: "all" },
+      ]),
+      eitcRow("irs_soi.direct.under_1", [incomeBand("under_1", "No adjusted gross income")]),
+      eitcRow("irs_soi.direct.1k_to_2k", [incomeBand("1k_to_2k", "$1,000 under $2,000")]),
+      eitcRow("irs_soi.children.under_1", [
+        oneChild,
+        incomeBand("under_1", "No adjusted gross income", "Adjusted gross income (AGI)"),
+      ]),
+      eitcRow("irs_soi.children.1k_to_2k", [
+        oneChild,
+        incomeBand("1k_to_2k", "$1,000 under $2,000", "Adjusted gross income (AGI)"),
+      ]),
+    ];
+
+    const tree = buildCalibrationTree(rows, state(eitcPath));
+
+    expect(tree.dimensionOrder).toEqual([
+      { key: CHILDREN_KEY, label: "Qualifying children" },
+      { key: "irs_soi.filing_status", label: "Filing status" },
+      { key: INCOME_KEY, label: "Adjusted gross income" },
+    ]);
+    expect(
+      tree.groups.map((group) => [group.id, group.label, group.metrics.nTargets]),
+    ).toEqual([
+      [INCOME_KEY, "Adjusted gross income", 4],
+      ["targets", "Targets", 1],
+    ]);
+  });
+
+  // The reader keeps the first spelling in the whole file, which can belong
+  // to another program. In the same release, taxable pension income rows
+  // spell income band "all" both "All returns" and "All returns, total".
+  function pensionRow(
+    name: string,
+    dimensions: CalibrationTreeDimension[],
+  ): CalibrationTreeTarget {
+    return {
+      ...eitcRow(name, dimensions),
+      variable: "irs_soi.taxable_pension_income",
+      variable_label: "Taxable pension income",
+    };
+  }
+
+  const historicPensionRow = pensionRow(
+    "irs_soi.ty2022.historic_table_2.us.all.taxable_pension_income_amount",
+    [incomeBand("all", "All returns")],
+  );
+  const totalEitcRow = eitcRow("irs_soi.ty2023.table_1_4.all.eitc_amount", [
+    incomeBand("all", "All returns, total"),
+  ]);
+
+  test("labels a value ID that a node spells two ways with the spelling the reader keeps", () => {
+    const rows = [
+      historicPensionRow,
+      totalEitcRow,
+      eitcRow("irs_soi.ty2022.historic_table_2.us.all.eitc_amount", [
+        incomeBand("all", "All returns"),
+      ]),
+      tableRow,
+    ];
+
+    expect(incomeNodes(rows)).toEqual([
+      ["all", "All returns", 2],
+      ["under_1", "No adjusted gross income", 1],
+    ]);
+    const selected = buildCalibrationTree(
+      rows,
+      state({
+        ...eitcPath,
+        dimensions: [{ key: INCOME_KEY, label: "Adjusted gross income", value: "all" }],
+      }),
+    );
+    expect(selected.pathLabels.dimensions).toEqual(["All returns"]);
+  });
+
+  test("labels a dimension that a program spells two ways with the spelling the reader keeps", () => {
+    const rows = [
+      historicPensionRow,
+      eitcRow("irs_soi.ty2023.table_2_5.eitc_total.under_1", [
+        incomeBand("under_1", "No adjusted gross income", "AGI"),
+      ]),
+      otherBandRow,
+    ];
+
+    const tree = buildCalibrationTree(rows, state(eitcPath));
+
+    const readerDimension = { key: INCOME_KEY, label: "Adjusted gross income" };
+    expect(tree.dimensionOrder).toEqual([readerDimension]);
+    expect(tree.currentLevel).toEqual({ kind: "dimension", ...readerDimension });
+    expect(tree.groups.map((group) => [group.id, group.label])).toEqual([
+      [INCOME_KEY, "Adjusted gross income"],
+    ]);
+  });
+
+  test("keeps the spelling of a value ID that a node spells only one way", () => {
+    // Before label variants were accepted, such a node built with its own
+    // spelling. Changing it would change trees already published.
+    expect(incomeNodes([historicPensionRow, totalEitcRow, tableRow])).toEqual([
+      ["all", "All returns, total", 1],
+      ["under_1", "No adjusted gross income", 1],
+    ]);
+  });
+});
+
 describe("calibration tree metrics and filters", () => {
   test("classifies targets without generated model data as skipped", () => {
     const missingModelData = target("missing-model-data", {
@@ -852,5 +1153,293 @@ describe("calibration tree metrics and filters", () => {
     expect(tree.filterOptions.geographies).not.toContain("__missing__");
     expect(tree.filterOptions.geographyLevels).toContain("national");
     expect(tree.filterOptions.geographies).toContain("United States");
+  });
+});
+
+// Release populace-us-2024-buildo-acs-local-766b7c7-20261017T030317Z names
+// state 0400000US23 "Maine" on its SNAP and Medicaid targets and "ME" on its
+// state population target, which comes later in the file. The reader keeps
+// "Maine" and reports "ME" (validateHierarchyTargets) without rewriting the
+// rows, so the builder receives both spellings for one geography ID and must
+// still list one geography.
+describe("geographies that rows spell more than one way", () => {
+  function maineRow(
+    name: string,
+    overrides: Partial<CalibrationTreeTarget>,
+  ): CalibrationTreeTarget {
+    return target(name, {
+      level: "state",
+      geography: "Maine",
+      geography_id: "0400000US23",
+      target_label: name,
+      target_representation: "hierarchy",
+      ...overrides,
+    });
+  }
+
+  const POPULATION = {
+    source: "census_population",
+    source_label: "Census population",
+    variable: "census_population.resident_population",
+    variable_label: "Resident population",
+  };
+
+  const snapRow = maineRow(
+    "usda_snap.fy2024.state_benefits.nero.me.total_benefits@2024",
+    {
+      source: "usda_snap",
+      source_label: "USDA · SNAP",
+      variable: "usda_snap.usda_snap",
+      variable_label: "SNAP",
+    },
+  );
+  const medicaidRow = maineRow(
+    "cms_medicaid.month2024_12.state_enrollment.me.total_medicaid_enrollment@2024",
+    {
+      source: "cms_medicaid",
+      source_label: "CMS · Medicaid / CHIP",
+      variable: "cms_medicaid.cms_medicaid",
+      variable_label: "Medicaid and CHIP",
+    },
+  );
+  const statePopulationRow = maineRow("pop_state_23@2024", {
+    ...POPULATION,
+    geography: "ME",
+    target_label: "ME resident population",
+  });
+  const districtPopulationRow = maineRow("pop_cd_2301@2024", {
+    ...POPULATION,
+    level: "congressional_district",
+    geography: "ME congressional district 1",
+    geography_id: "5001900US2301",
+    target_label: "ME congressional district 1 resident population",
+  });
+  const releaseRows = [
+    snapRow,
+    medicaidRow,
+    statePopulationRow,
+    districtPopulationRow,
+  ];
+  const populationPath = {
+    source: POPULATION.source,
+    program: POPULATION.variable,
+    dimensions: [],
+  };
+
+  function nodeSummaries(tree: ReturnType<typeof buildCalibrationTree>) {
+    return tree.groups
+      .flatMap((group) => group.nodes)
+      .map((treeNode) => [treeNode.id, treeNode.label, treeNode.metrics.nTargets]);
+  }
+
+  test("lists a geography ID that rows spell two ways as one node with its first spelling in row order", () => {
+    const tree = buildCalibrationTree(
+      releaseRows,
+      state({ dimensions: [] }, "geography"),
+    );
+
+    expect(nodeSummaries(tree)).toEqual([
+      ["Maine", "Maine", 3],
+      ["ME congressional district 1", "ME congressional district 1", 1],
+    ]);
+    expect(tree.groups[0].nodes[0].selection).toEqual({
+      kind: "geography",
+      value: "Maine",
+    });
+
+    const populationFirst = buildCalibrationTree(
+      [statePopulationRow, snapRow, medicaidRow, districtPopulationRow],
+      state({ dimensions: [] }, "geography"),
+    );
+    expect(nodeSummaries(populationFirst)).toEqual([
+      ["ME", "ME", 3],
+      ["ME congressional district 1", "ME congressional district 1", 1],
+    ]);
+  });
+
+  test("labels the geography the same way under a program whose rows spell it only the other way", () => {
+    // A geography's label is also its selection value, so it must be the
+    // same in every view that lists the geography.
+    const tree = buildCalibrationTree(releaseRows, state(populationPath));
+
+    expect(nodeSummaries(tree)).toEqual([
+      ["Maine", "Maine", 1],
+      ["ME congressional district 1", "ME congressional district 1", 1],
+    ]);
+  });
+
+  test("selects every row of the geography ID whichever breakdown reaches it", () => {
+    const programs = buildCalibrationTree(
+      releaseRows,
+      state({ geography: "Maine", dimensions: [] }, "geography"),
+    );
+    expect(
+      programs.groups.map((group) => [group.id, group.nodes.map((treeNode) => treeNode.id)]),
+    ).toEqual([
+      ["census_population", ["census_population.resident_population"]],
+      ["cms_medicaid", ["cms_medicaid.cms_medicaid"]],
+      ["usda_snap", ["usda_snap.usda_snap"]],
+    ]);
+
+    const targets = buildCalibrationTree(
+      releaseRows,
+      state({ ...populationPath, geography: "Maine" }, "geography"),
+    );
+    expect(targets.pathLabels.geography).toBe("Maine");
+    expect(nodeSummaries(targets)).toEqual([
+      ["pop_state_23@2024", "ME resident population", 1],
+    ]);
+  });
+
+  test("keeps a geography's label when filters hide the rows that carry it", () => {
+    // A published tree is compiled without filters and keeps its node labels
+    // when a filter is applied, so a live tree must label a geography from
+    // all of its rows, not only the visible ones.
+    const rows = releaseRows.map((row) =>
+      row === statePopulationRow ? { ...row, abs_relative_error: 0.5 } : row,
+    );
+    const poorlyFitOnly = { ...EMPTY_FILTERS, fitBands: ["40_plus" as const] };
+    const geographyRoot = buildCalibrationTree(rows, {
+      breakdown: "geography",
+      path: { dimensions: [] },
+      filters: poorlyFitOnly,
+    });
+    expect(nodeSummaries(geographyRoot)).toEqual([["Maine", "Maine", 1]]);
+
+    const populationGeographies = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: populationPath,
+      filters: poorlyFitOnly,
+    });
+    expect(nodeSummaries(populationGeographies)).toEqual([["Maine", "Maine", 1]]);
+
+    // The Geography filter selects the geography's label, so it keeps the row
+    // that spells the geography "ME".
+    const poorlyFitInMaine = buildCalibrationTree(rows, {
+      breakdown: "program",
+      path: populationPath,
+      filters: { ...poorlyFitOnly, geographies: ["Maine"] },
+    });
+    expect(nodeSummaries(poorlyFitInMaine)).toEqual([["Maine", "Maine", 1]]);
+  });
+});
+
+// Every row of state 0400000US23 and of Maine's two congressional districts in
+// release populace-us-2024-buildo-acs-local-766b7c7-20261017T030317Z, in
+// release order, as buildCalibration returns them (the fixture records how it
+// was made). 84 of the state's 85 targets spell it "Maine"; its state
+// population target, the last of them, spells it "ME".
+describe("the Geography filter on a geography that rows spell more than one way", () => {
+  const maineRows = maineRelease.rows as unknown as CalibrationTreeTarget[];
+  const geographyRoot = state({ dimensions: [] }, "geography");
+  const filteredBy = (
+    treeState: ExplorerState,
+    geographies: string[],
+  ): ExplorerState => ({
+    ...treeState,
+    filters: { ...EMPTY_FILTERS, geographies },
+  });
+
+  function nodeSummaries(tree: ReturnType<typeof buildCalibrationTree>) {
+    return tree.groups
+      .flatMap((group) => group.nodes)
+      .map((treeNode) => [treeNode.label, treeNode.metrics.nTargets]);
+  }
+
+  test("offers one option per geography, labelled as the geography's node", () => {
+    const tree = buildCalibrationTree(maineRows, geographyRoot);
+
+    expect(nodeSummaries(tree)).toEqual([
+      ["Maine", 85],
+      ["ME congressional district 1", 1],
+      ["ME congressional district 2", 1],
+    ]);
+    expect(tree.filterOptions.geographies).toEqual([
+      "Maine",
+      "ME congressional district 1",
+      "ME congressional district 2",
+    ]);
+  });
+
+  test("selecting Maine selects all 85 of its targets, whatever their spelling", () => {
+    const geographies = buildCalibrationTree(
+      maineRows,
+      filteredBy(geographyRoot, ["Maine"]),
+    );
+    expect(nodeSummaries(geographies)).toEqual([["Maine", 85]]);
+    expect(geographies.filteredMetrics.nTargets).toBe(85);
+
+    const programs = buildCalibrationTree(
+      maineRows,
+      filteredBy(state({ dimensions: [] }), ["Maine"]),
+    );
+    expect(programs.filteredMetrics.nTargets).toBe(85);
+    expect(
+      programs.groups.map((group) => [group.id, group.metrics.nTargets]),
+    ).toEqual([
+      ["irs_soi", 81],
+      ["usda_snap", 2],
+      ["census_population", 1],
+      ["cms_medicaid", 1],
+    ]);
+
+    // The filter keeps every program of the Maine node, as the unfiltered
+    // node lists them.
+    const maine = state({ geography: "Maine", dimensions: [] }, "geography");
+    expect(buildCalibrationTree(maineRows, filteredBy(maine, ["Maine"])))
+      .toEqual(buildCalibrationTree(maineRows, maine));
+
+    const populationGeographies = buildCalibrationTree(
+      maineRows,
+      filteredBy(
+        state({
+          source: "census_population",
+          program: "census_population.resident_population",
+          dimensions: [],
+        }),
+        ["Maine"],
+      ),
+    );
+    expect(nodeSummaries(populationGeographies)).toEqual([["Maine", 1]]);
+  });
+
+  test("a spelling that is not an option, such as ME, selects no target", () => {
+    const tree = buildCalibrationTree(
+      maineRows,
+      filteredBy(geographyRoot, ["ME"]),
+    );
+
+    expect(nodeSummaries(tree)).toEqual([]);
+    expect(tree.filteredMetrics.nTargets).toBe(0);
+  });
+
+  test("an option selects only its own geography when another geography's rows use the same spelling", () => {
+    // County A is spelled "Kent" and then "Kent County"; county B is spelled
+    // "Kent County". The tree lists A as "Kent" and B as "Kent County", so
+    // the option "Kent County" must not select A's second row.
+    const county = (name: string, geographyId: string, geography: string) =>
+      target(name, {
+        source: "census",
+        variable: "population",
+        level: "county",
+        geography_id: geographyId,
+        geography,
+      });
+    const rows = [
+      county("population/a/1", "A", "Kent"),
+      county("population/a/2", "A", "Kent County"),
+      county("population/b/1", "B", "Kent County"),
+    ];
+
+    expect(nodeSummaries(buildCalibrationTree(rows, geographyRoot))).toEqual([
+      ["Kent", 2],
+      ["Kent County", 1],
+    ]);
+    expect(
+      nodeSummaries(buildCalibrationTree(rows, filteredBy(geographyRoot, ["Kent County"]))),
+    ).toEqual([["Kent County", 1]]);
+    expect(
+      nodeSummaries(buildCalibrationTree(rows, filteredBy(geographyRoot, ["Kent"]))),
+    ).toEqual([["Kent", 2]]);
   });
 });

@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import { loadStagingRuns } from "@policyengine/calibration-tree/staging-artifact";
-import { parseCountry, scrub } from "@policyengine/calibration-tree/latest-artifact";
+import { scrub } from "@policyengine/calibration-tree/latest-artifact";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: Request) {
-  const country = parseCountry(new URL(request.url).searchParams.get("country"));
+  const country = requestedCountry(new URL(request.url).searchParams);
+  if (country instanceof Response) return country;
   try {
     return NextResponse.json(scrub(await loadStagingRuns(revalidate, country)), {
       headers: { "Cache-Control": "no-store" },

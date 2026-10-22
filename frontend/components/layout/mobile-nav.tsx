@@ -14,7 +14,7 @@ import { NavSidebar } from "./nav-sidebar";
 // same NavSidebar over the page, beside the dataset and page the reader is on.
 export function MobileNav() {
   const pathname = usePathname();
-  const { country } = useCountry();
+  const { country, unconfiguredCountry } = useCountry();
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   // Keyed by pathname so the menu closes on any route change (a link, or
@@ -53,9 +53,15 @@ export function MobileNav() {
         Menu
       </button>
       <div className="min-w-0 truncate font-mono text-[13px] text-muted-foreground">
-        <span className="font-medium text-foreground">{country.toUpperCase()}</span>
-        <span aria-hidden="true"> · </span>
-        {current?.label ?? countryRegistration(country).dataset_label}
+        {unconfiguredCountry != null ? (
+          "No dataset selected"
+        ) : (
+          <>
+            <span className="font-medium text-foreground">{country.toUpperCase()}</span>
+            <span aria-hidden="true"> · </span>
+            {current?.label ?? countryRegistration(country).dataset_label}
+          </>
+        )}
       </div>
       {open ? (
         <div

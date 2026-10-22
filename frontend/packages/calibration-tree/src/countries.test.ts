@@ -1,18 +1,22 @@
 import { expect, test } from "bun:test";
+import fc from "fast-check";
 
 import {
   COUNTRY_CAPABILITIES,
   COUNTRY_REGISTRY,
   RELEASE_LAYOUTS,
+  CountryNotConfiguredError,
   DEFAULT_COUNTRY,
   countryCapabilities,
+  countryParam,
   countryPointerPath,
   countryReleaseLayout,
   countryRegistration,
   hasCapability,
   isCountry,
   isCountryCapability,
-  parseCountry,
+  isCountryNotConfiguredBody,
+  isSelectableCountry,
   resolveRegisteredRepository,
   resolveRegisteredStagingRepository,
   selectableCountries,
@@ -135,26 +139,102 @@ test("repository resolution applies explicit deployment overrides", () => {
   expect(resolveRegisteredStagingRepository("be", {})).toBeNull();
 });
 
-test("fixture registrations are valid countries without being selectable", () => {
+test("fixture registrations are valid countries that requests cannot select", () => {
   expect(isCountry("zz")).toBe(true);
   expect(isCountry("am")).toBe(true);
-  expect(parseCountry("zz")).toBe("zz");
-  expect(parseCountry("am")).toBe("am");
+  expect(isSelectableCountry("zz")).toBe(false);
+  expect(isSelectableCountry("am")).toBe(false);
+  expect(countryParam("zz")).toEqual({ configured: false, requested: "zz" });
+  expect(countryParam("am")).toEqual({ configured: false, requested: "am" });
 });
 
-test("country parsing is exact and defaults to the registry default", () => {
+test("a country parameter is exact; only its absence selects the registry default", () => {
   expect(DEFAULT_COUNTRY).toBe("us");
-  expect(parseCountry("be")).toBe("be");
-  expect(parseCountry("uk")).toBe("uk");
-  expect(parseCountry("us")).toBe("us");
-  expect(parseCountry("BE")).toBe(DEFAULT_COUNTRY);
-  expect(parseCountry("fr")).toBe(DEFAULT_COUNTRY);
-  expect(parseCountry("")).toBe(DEFAULT_COUNTRY);
-  expect(parseCountry(null)).toBe(DEFAULT_COUNTRY);
-  expect(parseCountry(undefined)).toBe(DEFAULT_COUNTRY);
+  expect(countryParam("be")).toEqual({ configured: true, country: "be", explicit: true });
+  expect(countryParam("uk")).toEqual({ configured: true, country: "uk", explicit: true });
+  expect(countryParam("us")).toEqual({ configured: true, country: "us", explicit: true });
+  expect(countryParam("")).toEqual({ configured: true, country: DEFAULT_COUNTRY, explicit: false });
+  expect(countryParam(null)).toEqual({ configured: true, country: DEFAULT_COUNTRY, explicit: false });
+  expect(countryParam(undefined)).toEqual({
+    configured: true,
+    country: DEFAULT_COUNTRY,
+    explicit: false,
+  });
+  // The production report (2026-10-20): ?country=nz served the US release.
+  expect(countryParam("nz")).toEqual({ configured: false, requested: "nz" });
+  expect(countryParam("BE")).toEqual({ configured: false, requested: "BE" });
+  expect(countryParam("fr")).toEqual({ configured: false, requested: "fr" });
+  expect(countryParam(" us")).toEqual({ configured: false, requested: " us" });
+  expect(countryParam("constructor")).toEqual({ configured: false, requested: "constructor" });
+  expect(countryParam("__proto__")).toEqual({ configured: false, requested: "__proto__" });
   expect(isCountry("constructor")).toBe(false);
   expect(isCountry("__proto__")).toBe(false);
   expect(isCountry(null)).toBe(false);
+});
+
+// Invariant: a present country parameter resolves to itself or to nothing.
+// It never resolves to a different country (the default included).
+function assertNeverAnotherCountry(value: string): void {
+  const param = countryParam(value);
+  if (value === "") {
+    expect(param).toEqual({ configured: true, country: DEFAULT_COUNTRY, explicit: false });
+  } else if (param.configured) {
+    expect<string>(param.country).toBe(value);
+    expect(param.explicit).toBe(true);
+    expect(isSelectableCountry(value)).toBe(true);
+  } else {
+    expect(param.requested).toBe(value);
+    expect(isSelectableCountry(value)).toBe(false);
+  }
+}
+
+test("every two-letter code resolves to itself or is not configured", () => {
+  const letters = "abcdefghijklmnopqrstuvwxyz";
+  let configured = 0;
+  for (const first of letters) {
+    for (const second of letters) {
+      for (const code of [`${first}${second}`, `${first}${second}`.toUpperCase()]) {
+        assertNeverAnotherCountry(code);
+        if (countryParam(code).configured) configured += 1;
+      }
+    }
+  }
+  expect(configured).toBe(selectableCountries().length);
+});
+
+test("property: any string resolves to itself or is not configured", () => {
+  fc.assert(
+    fc.property(
+      fc.oneof(
+        fc.string(),
+        fc.string({ unit: "grapheme", maxLength: 8 }),
+        fc.stringMatching(/^[A-Za-z]{2,3}$/),
+        fc.constantFrom(...COUNTRIES, ...COUNTRIES.map((code) => code.toUpperCase())),
+      ),
+      (value) => assertNeverAnotherCountry(value),
+    ),
+    { numRuns: 2_000 },
+  );
+});
+
+test("a not-configured error names the requested code and why it has no release", () => {
+  const unknown = new CountryNotConfiguredError("nz");
+  expect(unknown.body()).toEqual({
+    error: "country_not_configured",
+    requested_country: "nz",
+    reason: "unknown_country",
+    detail: 'No Microcosm calibration release is configured for country "nz".',
+  });
+  expect(isCountryNotConfiguredBody(unknown.body())).toBe(true);
+  // A registered country without a manifest entry: a newly registered country
+  // before its first publication.
+  expect(new CountryNotConfiguredError("be").body()).toMatchObject({
+    requested_country: "be",
+    reason: "no_published_release",
+  });
+  expect(new CountryNotConfiguredError("zz").reason).toBe("unknown_country");
+  expect(isCountryNotConfiguredBody({ detail: "HF fetch failed 502" })).toBe(false);
+  expect(isCountryNotConfiguredBody(null)).toBe(false);
 });
 
 test("capability gates read the registration", () => {

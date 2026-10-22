@@ -1332,10 +1332,9 @@ export async function stagingBaselineReleases(
   if (layout === "build_folders") {
     return loadRecordedReleases(revalidate, country, manifest);
   }
-  const [folders, tagged] = await Promise.all([
-    loadReleases(revalidate, country),
-    loadPublishedCutReleases(revalidate, country, manifest),
-  ]);
+  // The published tagged builds are the ones the folder listing cannot name.
+  const folders = await loadReleases(revalidate, country);
+  const tagged = await loadPublishedCutReleases(revalidate, country, manifest, folders);
   return [...folders, ...tagged];
 }
 

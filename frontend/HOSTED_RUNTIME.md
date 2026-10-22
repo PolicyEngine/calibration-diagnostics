@@ -62,8 +62,13 @@ To upgrade:
 ## Automated production deployment
 
 `.github/workflows/deploy.yml` runs after the `CI` workflow succeeds for a push to
-`main`. It checks out the exact commit tested by CI and performs these operations in
-order:
+`main`. Its trigger accepts only CI runs whose head branch is `main`, and its deploy
+job runs only when that CI run was a successful push. The deploy job, not the
+workflow, holds the `calibration-diagnostics-production` concurrency group: one deploy
+runs, at most one waits, and a newer `main` deploy replaces a waiting one. A run whose
+job is skipped, such as one for a pull request from a fork whose branch is named
+`main`, must not replace a waiting deploy (#260). The deploy job checks out the exact
+commit tested by CI and performs these operations in order:
 
 1. Deploy a commit-specific Modal application in the `main` Modal environment.
 2. Resolve the deployed `web_app` URL and verify its authenticated metadata.
@@ -72,7 +77,13 @@ order:
 4. Verify the unaliased frontend metadata, then execute a real 2024 national threshold
    calculation followed by a California income-tax calculation. Promotion requires the
    reviewed package and data identities, verified H5 bytes, numeric results, and the
-   expected national-to-state cache transition.
+   expected national-to-state cache transition. If the connection is refused, closes,
+   resets or times out before a complete response arrives, the check waits until the
+   backend answers a metadata request (at most 860 seconds after the first request),
+   then sends the calculation once more; the retried response must meet the same
+   requirements. A DNS or TLS-certificate failure, an HTTP error, or a response that
+   fails them is never retried, so a slow calculation still fails: the proxy answers
+   HTTP 504 after waiting 780 seconds.
 5. Promote the Vercel deployment and execute a California calculation through both
    `calibration-diagnostics.vercel.app` and the mounted `microcosm.institute` route.
 

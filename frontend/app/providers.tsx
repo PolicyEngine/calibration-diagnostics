@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { CountryProvider } from "@/components/layout/country-context";
 import { PUBLISHED_RELEASE_STALE_TIME_MS } from "@/lib/api/cache-policy";
+import { countryNotConfiguredError } from "@/lib/api/client";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -15,7 +16,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queries: {
             staleTime: PUBLISHED_RELEASE_STALE_TIME_MS,
             refetchOnWindowFocus: false,
-            retry: 2,
+            // A country without a configured release stays that way on a
+            // retry; any other failure is retried twice.
+            retry: (failureCount, error) =>
+              countryNotConfiguredError(error) == null && failureCount < 2,
           },
         },
       }),

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
+import {
+  countryNotConfiguredResponse,
+  requiredCountry,
+} from "@/lib/api/request-country";
 import { readCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-blob";
 import { calibrationTreeCountryManifest } from "@policyengine/calibration-tree/calibration-tree-manifest";
-import {
-  isCountry,
-  selectableCountries,
-} from "@policyengine/calibration-tree/countries";
+import { CountryNotConfiguredError } from "@policyengine/calibration-tree/countries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,16 +26,8 @@ export function createCalibrationTreeManifestHandler(
   },
 ) {
   return async function GET(request: Request) {
-    const countryValue = new URL(request.url).searchParams.get("country");
-    if (
-      !isCountry(countryValue) ||
-      !selectableCountries().includes(countryValue)
-    ) {
-      return NextResponse.json(
-        { detail: "Unknown calibration country." },
-        { status: 400 },
-      );
-    }
+    const countryValue = requiredCountry(new URL(request.url).searchParams);
+    if (countryValue instanceof Response) return countryValue;
     try {
       const { manifest } = await dependencies.readManifest();
       const countryManifest = calibrationTreeCountryManifest(
@@ -50,6 +43,9 @@ export function createCalibrationTreeManifestHandler(
         { headers: MANIFEST_CACHE_HEADERS },
       );
     } catch (error) {
+      if (error instanceof CountryNotConfiguredError) {
+        return countryNotConfiguredResponse(error);
+      }
       console.error("Calibration tree manifest read failed:", error);
       return NextResponse.json(
         { detail: "No published calibration tree is available." },
