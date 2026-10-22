@@ -1008,7 +1008,9 @@ function MicrocosmStagingRunsView({
   const internalsCopyNote = candidateState?.hugging_face_differs
     ? `These sections read the run's Hugging Face copy (${huggingFaceCopyLabel(candidateState, progress)}); the status above comes from the telemetry collector.`
     : null;
-  const collectorNote = runData?.collector_note ?? runsData?.collector_note ?? null;
+  // The selected run's own note: the collector may have answered for it even
+  // when the run list's request failed, or the other way round.
+  const collectorNote = runData?.collector_note ?? null;
   const candidateReleaseId = runData?.candidate_release_id ?? selectedRun;
   const buildManifest = (runData?.build_manifest ?? null) as Record<string, unknown> | null;
   const artifacts = ((runData?.run_manifest as Record<string, unknown> | null)?.artifacts ??
