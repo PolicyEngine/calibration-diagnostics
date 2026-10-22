@@ -95,18 +95,79 @@ def test_production_concurrency_group_belongs_to_the_deploy_job_not_the_workflow
     }
 
 
+def _requires_every_clause(condition, required_clauses):
+    return {clause.strip() for clause in condition.split("&&")} == required_clauses
+
+
 def test_every_job_in_the_production_group_requires_a_successful_main_push():
     # The branch filter matches the triggering run's head branch name, and a
     # pull request from a fork whose branch is named main passes it. The job
     # condition, which requires a push run, is what rejects such a run, so each
-    # job holding the production group keeps exactly these clauses, all required.
+    # job holding the production group requires all of these clauses.
     jobs = _workflow()["jobs"]
-    clauses_by_job = {
-        job_name: {clause.strip() for clause in job.get("if", "").split("&&")}
+    jobs_in_production_group = [
+        job_name
         for job_name, job in jobs.items()
         if _concurrency_group(job) == PRODUCTION_CONCURRENCY_GROUP
-    }
-    assert clauses_by_job == {"deploy": SUCCESSFUL_MAIN_PUSH_CLAUSES}
+    ]
+    assert jobs_in_production_group
+    for job_name in jobs_in_production_group:
+        condition = jobs[job_name].get("if", "")
+        assert _requires_every_clause(condition, SUCCESSFUL_MAIN_PUSH_CLAUSES), job_name
+
+
+SUCCESSFUL_CONCLUSION, PUSH_EVENT, MAIN_HEAD_BRANCH = sorted(SUCCESSFUL_MAIN_PUSH_CLAUSES)
+
+
+@pytest.mark.parametrize(
+    ("condition", "requires_every_clause"),
+    [
+        pytest.param(
+            f"{SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH}",
+            True,
+            id="current wording",
+        ),
+        pytest.param(
+            f"${{{{ {SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH} }}}}",
+            True,
+            id="expression wrapper",
+        ),
+        pytest.param(
+            f"({MAIN_HEAD_BRANCH} &&\n  {PUSH_EVENT}) && {SUCCESSFUL_CONCLUSION}",
+            True,
+            id="reordered and grouped",
+        ),
+        pytest.param(
+            f"{SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH}"
+            " && github.repository == 'PolicyEngine/calibration-diagnostics'",
+            True,
+            id="extra required clause",
+        ),
+        pytest.param(
+            f"{SUCCESSFUL_CONCLUSION} && {MAIN_HEAD_BRANCH}",
+            False,
+            id="missing push clause",
+        ),
+        pytest.param(
+            f"{SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH}"
+            " || github.event.workflow_run.event == 'pull_request'",
+            False,
+            id="alternative after or",
+        ),
+        pytest.param(
+            f"!({SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH})",
+            False,
+            id="negated",
+        ),
+    ],
+)
+def test_clause_check_accepts_rewordings_and_rejects_weaker_conditions(
+    condition, requires_every_clause
+):
+    assert (
+        _requires_every_clause(condition, SUCCESSFUL_MAIN_PUSH_CLAUSES)
+        is requires_every_clause
+    )
 
 
 def test_deployment_uses_exact_project_and_backend_first_order():
