@@ -43,7 +43,13 @@ dashboard API layer.
   dataset on this page), candidate-vs-current-release
   fit, and a hierarchical map of weighted target-error increases and
   reductions. Countries without a staging repository show an explicit
-  unavailable state.
+  unavailable state. A run's status, stage and times come from the hosted
+  telemetry collector when it has a record of the run, because a build's
+  Hugging Face copy can stop updating partway through; the page then names the
+  source and says what the Hugging Face copy last recorded. On both tabs, a
+  collector record that stopped before the run ended gives way to a Hugging
+  Face copy that recorded the end later. Runs only the
+  collector knows have no candidate files and appear on Build progress only.
 - **Build progress** (the second tab of Staging candidates,
   `/microcosm/staging?view=progress`) — follow a build run while it runs,
   from the staging repository or from the `runs/<run_id>/` telemetry folders a
@@ -81,8 +87,8 @@ returns HTTP 404 with `{"error": "country_not_configured", "requested_country",
 | `GET /api/microcosm/compare?a=<id>&b=<id>` | Version-over-version diff |
 | `GET /api/microcosm/builds?country=<code>&source=local\|staging` | Every build run from one source as a stage timeline |
 | `GET /api/microcosm/builds/run?id=<run_id>&country=<code>&source=local\|staging` | One run's timeline and completion forecast, with stage-time and gate-failure statistics for its pipeline |
-| `GET /api/microcosm/staging/runs` | List staging build runs |
-| `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress and its candidate diagnostics: an uploaded `calibration_diagnostics` telemetry artifact, or the `calibration_diagnostics.json` of the dataset bundle the run staged under `staged/<run_id>/` in the country's release repository (read at the commit the run recorded, digest-verified) |
+| `GET /api/microcosm/staging/runs` | List staging build runs, each with the collector's state when it has a record of the run (`state_source`, Hugging Face values in `hugging_face_*`, and `collector_note` when the collector is unavailable) |
+| `GET /api/microcosm/staging/run?id=<run_id>` | One staging run's progress, its state as in the run list (`state`), and its candidate diagnostics: an uploaded `calibration_diagnostics` telemetry artifact, or the `calibration_diagnostics.json` of the dataset bundle the run staged under `staged/<run_id>/` in the country's release repository (read at the commit the run recorded, digest-verified) |
 | `GET /api/microcosm/staging/target-diagnostics?id=<run_id>&...` | Faceted diagnostics for a staging candidate once diagnostics exist |
 | `GET /api/microcosm/staging/compare?run=<run_id>&release=latest` | Diff a staging candidate against a published release: by default the current release, or the newest published local-area build for a local-area candidate (see below) |
 | `GET /api/microcosm/staging/target-change-tree?run=<run_id>&release=<resolved_id>&mode=reported\|shared&...` | One hierarchy level of weighted target-error changes for a staging candidate and an explicit current release |

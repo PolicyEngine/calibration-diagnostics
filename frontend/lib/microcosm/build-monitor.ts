@@ -281,7 +281,10 @@ function pipelineIdentity(
   };
 }
 
-function runState(
+// A run's state from its recorded status and when it last reported. The
+// Staging page's Candidate tab uses the same rule for runs the collector does
+// not know.
+export function runState(
   rawStatus: string | null,
   updatedMs: number | null,
   nowMs: number,
@@ -294,6 +297,33 @@ function runState(
   if (rawStatus === "blocked") return "blocked";
   if (updatedMs != null && nowMs - updatedMs > stallMs) return "stalled";
   return "running";
+}
+
+const FINAL_RUN_STATES: ReadonlySet<BuildRunState> = new Set(["passed", "blocked", "failed"]);
+
+export interface RecordedRunState {
+  state: BuildRunState | null;
+  // The record's latest update.
+  updated_ms: number | null;
+}
+
+// Whether a run's collector record must give way to its Hugging Face copy:
+// the record stopped before the run ended (it says running, or stalled once
+// its heartbeats stopped), and the copy recorded the end (passed, blocked or
+// failed) after the record's latest update. Otherwise the collector's record
+// stands, final or newer. Both Staging tabs choose between the two sources
+// with this rule.
+export function collectorMissedTheEnd(
+  collector: RecordedRunState,
+  huggingFace: RecordedRunState,
+): boolean {
+  return (
+    (collector.state == null || !FINAL_RUN_STATES.has(collector.state)) &&
+    huggingFace.state != null &&
+    FINAL_RUN_STATES.has(huggingFace.state) &&
+    huggingFace.updated_ms != null &&
+    (collector.updated_ms == null || huggingFace.updated_ms > collector.updated_ms)
+  );
 }
 
 function resourceSnapshot(value: unknown, at: number | null): ResourceSnapshot | null {

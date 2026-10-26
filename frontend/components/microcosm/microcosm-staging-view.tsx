@@ -39,10 +39,13 @@ import {
   type MicrocosmStagingRunResponse,
   type MicrocosmStagingRunSummary,
 } from "@/lib/api/hooks/use-microcosm";
+import type { CandidateRunState } from "@/lib/microcosm/staging-run-state";
 import { countryRegistration, hasCapability } from "@policyengine/calibration-tree/countries";
 import {
+  formatCandidateCurrentStatus,
   formatStagingCurrentStatus,
   formatStagingStatus,
+  formatStateSource,
 } from "@/lib/microcosm/staging-status";
 import { formatWeightedTargetError } from "@/lib/microcosm/target-change-visualization";
 import { stagingComparisonBaseline } from "@/lib/microcosm/calibration-selection";
@@ -137,17 +140,9 @@ function runLabel(run: MicrocosmStagingRunSummary): string {
   )}`;
 }
 
-// Display a running or queued run as stalled after six hours without an update.
-const STALL_MS = 6 * 60 * 60 * 1000;
-
-function effectiveStatus(
-  status: string | null | undefined,
-  updatedAt: string | null | undefined,
-): string | null {
-  if (status !== "running" && status !== "queued") return status ?? null;
-  const t = updatedAt ? new Date(updatedAt).valueOf() : NaN;
-  if (Number.isFinite(t) && Date.now() - t > STALL_MS) return "stalled";
-  return status ?? null;
+// Where the run picker's states come from; each option's tooltip names it.
+function stateSourceTitle(run: MicrocosmStagingRunSummary): string {
+  return `State from the ${formatStateSource(run.state_source).toLowerCase()}`;
 }
 
 const STATUS_INDICATOR_CLASS: Record<StatusTone, string> = {
@@ -172,10 +167,7 @@ function RunSelect({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const selectedRun = runs.find((run) => run.run_id === selected);
-  const selectedStatus = effectiveStatus(
-    selectedRun?.status,
-    selectedRun?.updated_at,
-  );
+  const selectedStatus = selectedRun?.status ?? null;
   const selectedTone = statusTone(selectedStatus);
   const disabled = !runs.length;
 
@@ -221,7 +213,10 @@ function RunSelect({
           {selectedRun ? runLabel(selectedRun) : placeholder}
         </span>
         {selectedRun ? (
-          <span className="shrink-0 text-xs text-muted-foreground">
+          <span
+            className="shrink-0 text-xs text-muted-foreground"
+            title={stateSourceTitle(selectedRun)}
+          >
             {formatStagingStatus(selectedStatus)}
           </span>
         ) : null}
@@ -249,7 +244,7 @@ function RunSelect({
           <ul role="listbox" aria-label="Run" className="max-h-80 overflow-y-auto p-1 text-sm">
             {runs.map((run) => {
               const active = run.run_id === selected;
-              const shownStatus = effectiveStatus(run.status, run.updated_at);
+              const shownStatus = run.status;
               const tone = statusTone(shownStatus);
               return (
                 <li key={run.run_id} role="presentation">
@@ -270,7 +265,10 @@ function RunSelect({
                       className={`h-2 w-2 shrink-0 rounded-full ${STATUS_INDICATOR_CLASS[tone]}`}
                     />
                     <span className="min-w-0 flex-1 truncate font-medium">{runLabel(run)}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                    <span
+                      className="shrink-0 text-xs text-muted-foreground"
+                      title={stateSourceTitle(run)}
+                    >
                       {formatStagingStatus(shownStatus)}
                     </span>
                   </button>
@@ -278,6 +276,10 @@ function RunSelect({
               );
             })}
           </ul>
+          <p className="border-t border-border px-3 py-2 text-[11px] leading-snug text-muted-foreground">
+            States come from the telemetry collector when it has a record of the run, otherwise
+            from the Hugging Face staging repository.
+          </p>
         </div>
       ) : null}
     </div>
@@ -291,6 +293,111 @@ function agoLabel(value: string | null | undefined): string {
   if (mins < 60) return `${mins}m ago`;
   if (mins < 60 * 48) return `${Math.round(mins / 60)}h ago`;
   return `${Math.round(mins / 60 / 24)}d ago`;
+}
+
+function timeWithAgo(value: string | null | undefined): string {
+  const ago = agoLabel(value);
+  return `${timeLabel(value)}${ago ? ` · ${ago}` : ""}`;
+}
+
+// What the run's Hugging Face copy last recorded: "Running, Calibration,
+// epoch 273 of 1500 · updated Oct 20, 06:09 · 2d ago".
+function huggingFaceCopyLabel(
+  state: CandidateRunState,
+  progress: Record<string, unknown>,
+): string {
+  const recorded = [formatStagingStatus(state.hugging_face_status)];
+  if (state.hugging_face_stage) {
+    recorded.push(formatStagingCurrentStatus({ ...progress, stage: state.hugging_face_stage }));
+  }
+  return `${recorded.join(", ")} · updated ${timeWithAgo(state.hugging_face_updated_at)}`;
+}
+
+function OverviewRow({
+  label,
+  value,
+  wrap = false,
+}: {
+  label: string;
+  value: string;
+  // Long text, such as a failure message, wraps to three lines instead of one.
+  wrap?: boolean;
+}) {
+  return (
+    <>
+      <div
+        className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
+      >
+        {label}
+      </div>
+      <div
+        className={`min-w-0 pr-5 text-xs ${wrap ? "line-clamp-3 break-words" : "truncate"} ${overviewMetricValueClassName}`}
+        title={value}
+      >
+        {value}
+      </div>
+    </>
+  );
+}
+
+// The selected candidate's identity and state. The state is the telemetry
+// collector's when it has a record of the run, else the Hugging Face copy's;
+// when the copy has fallen behind the collector, the card also says what the
+// copy still records.
+export function CandidateOverview({
+  candidateReleaseId,
+  state,
+  progress,
+  calibration,
+  collectorNote,
+}: {
+  candidateReleaseId: string;
+  state: CandidateRunState | null;
+  progress: Record<string, unknown>;
+  calibration: MicrocosmStagingRunResponse["calibration"];
+  collectorNote: string | null;
+}) {
+  const currentStatus = state
+    ? formatCandidateCurrentStatus(state)
+    : formatStagingCurrentStatus(progress);
+  const huggingFaceCopy = state?.hugging_face_differs
+    ? huggingFaceCopyLabel(state, progress)
+    : null;
+  return (
+    <SectionCard title="Candidate overview" className="w-full" padded={false}>
+      <div className="grid grid-cols-[min-content_minmax(0,1fr)] items-baseline gap-y-3 py-3.5">
+        <OverviewRow label="Candidate" value={candidateReleaseId} />
+        <OverviewRow label="Status" value={formatStagingStatus(state?.status ?? null)} />
+        {state && <OverviewRow label="Status from" value={formatStateSource(state.state_source)} />}
+        <OverviewRow label="Last update" value={timeWithAgo(state?.updated_at)} />
+        {state?.heartbeat_at && (
+          <OverviewRow label="Last heartbeat" value={timeWithAgo(state.heartbeat_at)} />
+        )}
+        <OverviewRow label="Current status" value={currentStatus} />
+        {state?.failure?.message && (
+          <OverviewRow label="Failure" value={state.failure.message} wrap />
+        )}
+        {huggingFaceCopy && <OverviewRow label="Hugging Face copy" value={huggingFaceCopy} />}
+        {calibration && (
+          <>
+            <div
+              className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
+            >
+              Dataset
+            </div>
+            <div className={`min-w-0 text-xs ${overviewMetricValueClassName}`}>
+              <CalibrationOriginPill origin={calibrationOrigin(calibration)} />
+            </div>
+          </>
+        )}
+      </div>
+      {collectorNote && (
+        <p className="border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
+          {collectorNote}
+        </p>
+      )}
+    </SectionCard>
+  );
 }
 
 // Human rendering for the small details dicts events carry (n_targets,
@@ -354,6 +461,7 @@ function RunInternalsPanel({
   lossValues,
   status,
   stage,
+  huggingFaceCopyNote,
   buildManifest,
   artifacts,
   open,
@@ -364,6 +472,9 @@ function RunInternalsPanel({
   lossValues: number[];
   status: string | null;
   stage: string | null;
+  // Set when the run's state comes from the collector and its Hugging Face
+  // copy, which every section here reads, has fallen behind.
+  huggingFaceCopyNote: string | null;
   buildManifest: Record<string, unknown> | null;
   artifacts: Record<string, { path?: string; staging_path?: string }>;
   open: boolean;
@@ -383,6 +494,11 @@ function RunInternalsPanel({
             Optimizer progress, stage timeline with logged numbers, build manifest (versions,
             hashes, validation results), and uploaded artifacts.
           </div>
+          {huggingFaceCopyNote ? (
+            <div className="mt-1 max-w-2xl text-xs leading-snug tone-warn">
+              {huggingFaceCopyNote}
+            </div>
+          ) : null}
         </div>
         <span className="shrink-0 text-xs text-muted-foreground transition-transform group-open:rotate-180">
           ▾
@@ -519,9 +635,9 @@ function RunInternalsPanel({
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                           {index === all.length - 1 && event.stage !== "complete" && !failed && !blocked
-                            ? status === "stalled"
-                              ? "⚠ last event"
-                              : "…"
+                            ? status === "running" || status == null
+                              ? "…"
+                              : "⚠ last event"
                             : durationLabel(duration)}
                         </td>
                         <td className="px-3 py-1.5">
@@ -883,13 +999,18 @@ function MicrocosmStagingRunsView({
     [calibrationEvents],
   );
   const progress = runData?.progress ?? {};
-  const rawStatus = typeof progress.status === "string" ? progress.status : null;
-  const stage = typeof progress.stage === "string" ? progress.stage : null;
-  const updatedAt = typeof progress.updated_at === "string" ? progress.updated_at : null;
-  const status = effectiveStatus(rawStatus, updatedAt);
-  const statusLabel = formatStagingStatus(status);
-  const lastUpdate = `${timeLabel(updatedAt)}${agoLabel(updatedAt) ? ` · ${agoLabel(updatedAt)}` : ""}`;
-  const currentStatus = formatStagingCurrentStatus(progress);
+  // The collector's state when it has a record of the run, else the Hugging
+  // Face copy's, derived on the server with the Build progress tab's rule.
+  const candidateState = runData?.state ?? null;
+  const status = candidateState?.status ?? null;
+  const stage = candidateState?.stage ?? null;
+  // Run internals read the Hugging Face copy; say so when it has fallen behind.
+  const internalsCopyNote = candidateState?.hugging_face_differs
+    ? `These sections read the run's Hugging Face copy (${huggingFaceCopyLabel(candidateState, progress)}); the status above comes from the telemetry collector.`
+    : null;
+  // The selected run's own note: the collector may have answered for it even
+  // when the run list's request failed, or the other way round.
+  const collectorNote = runData?.collector_note ?? null;
   const candidateReleaseId = runData?.candidate_release_id ?? selectedRun;
   const buildManifest = (runData?.build_manifest ?? null) as Record<string, unknown> | null;
   const artifacts = ((runData?.run_manifest as Record<string, unknown> | null)?.artifacts ??
@@ -963,70 +1084,13 @@ function MicrocosmStagingRunsView({
                 <CalibrationExplorerDataPrefetch stagingRunId={selectedRun} />
               )}
               <div className="flex min-w-0 flex-col gap-5">
-              <SectionCard
-                title="Candidate overview"
-                className="w-full"
-                padded={false}
-              >
-                <div className="grid grid-cols-[min-content_minmax(0,1fr)] items-baseline gap-y-3 py-3.5">
-                  <div
-                    className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
-                  >
-                    Candidate
-                  </div>
-                  <div
-                    className={`min-w-0 truncate text-xs ${overviewMetricValueClassName}`}
-                    title={candidateReleaseId}
-                  >
-                    {candidateReleaseId}
-                  </div>
-                  <div
-                    className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
-                  >
-                    Status
-                  </div>
-                  <div
-                    className={`min-w-0 truncate text-xs ${overviewMetricValueClassName}`}
-                    title={statusLabel}
-                  >
-                    {statusLabel}
-                  </div>
-                  <div
-                    className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
-                  >
-                    Last update
-                  </div>
-                  <div
-                    className={`min-w-0 truncate text-xs ${overviewMetricValueClassName}`}
-                    title={lastUpdate}
-                  >
-                    {lastUpdate}
-                  </div>
-                  <div
-                    className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
-                  >
-                    Current status
-                  </div>
-                  <div
-                    className={`min-w-0 truncate text-xs ${overviewMetricValueClassName}`}
-                    title={currentStatus}
-                  >
-                    {currentStatus}
-                  </div>
-                  {runData.calibration && (
-                    <>
-                      <div
-                        className={`whitespace-nowrap px-5 text-primary ${overviewMetricLabelTypographyClassName}`}
-                      >
-                        Dataset
-                      </div>
-                      <div className={`min-w-0 text-xs ${overviewMetricValueClassName}`}>
-                        <CalibrationOriginPill origin={calibrationOrigin(runData.calibration)} />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </SectionCard>
+              <CandidateOverview
+                candidateReleaseId={candidateReleaseId}
+                state={candidateState}
+                progress={progress}
+                calibration={runData.calibration ?? null}
+                collectorNote={collectorNote}
+              />
 
               {candidateValidationPending && (
                 <SectionCard
@@ -1172,6 +1236,7 @@ function MicrocosmStagingRunsView({
                   lossValues={lossValues}
                   status={status}
                   stage={stage}
+                  huggingFaceCopyNote={internalsCopyNote}
                   buildManifest={buildManifest}
                   artifacts={artifacts}
                   open={runInternalsOpen}
@@ -1204,6 +1269,7 @@ function MicrocosmStagingRunsView({
                   lossValues={lossValues}
                   status={status}
                   stage={stage}
+                  huggingFaceCopyNote={internalsCopyNote}
                   buildManifest={buildManifest}
                   artifacts={artifacts}
                   open={runInternalsOpen}
