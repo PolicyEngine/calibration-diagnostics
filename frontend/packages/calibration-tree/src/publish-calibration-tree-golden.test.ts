@@ -204,15 +204,22 @@ for (const [name, description] of Object.entries(RELEASE_DESCRIPTIONS) as Array<
   );
 }
 
-test("a repair refuses a rebuilt index that differs from the recorded digest", async () => {
+test("a repair refuses a rebuilt index that differs from the recorded digest and records it as that release's failure", async () => {
   const release = goldenReleaseInputs()["uk-release"];
   const entry = { ...recordedReleaseEntry(release, "uk-release"), indexSha256: "0".repeat(64) };
   globalThis.fetch = huggingFaceReleaseRepository(release);
 
-  await expect(withRegisteredRepositories(() =>
+  const report = await withRegisteredRepositories(() =>
     reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry))
-  )).rejects.toThrow("Rebuilt calibration index differs from immutable manifest entry");
-});
+  );
+
+  expect(report.outcomes).toEqual([{
+    sourceId: release.releaseId,
+    status: "failed",
+    buildArtifactId: entry.buildArtifactId,
+    reason: `Rebuilt calibration index differs from immutable manifest entry ${entry.buildArtifactId}.`,
+  }]);
+}, BUILD_TIMEOUT_MS);
 
 // Two finalized UK staging runs. The newer one, which reconciliation reaches
 // first, already has a manifest entry whose index has gone missing, and the

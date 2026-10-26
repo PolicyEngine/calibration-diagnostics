@@ -153,6 +153,17 @@ ineligible and is not treated as an error. The next repository webhook repeats
 the inventory check, so it also finds a historical release missed by an older
 webhook. There is no scheduled reconciliation.
 
+A release whose build cannot be published or repaired, for example because the
+schema 8 reader refuses its diagnostics, its tag moved to another commit, or a
+repair's rebuilt index differs from the recorded digest, is reported as
+`failed` with the error. The remaining releases are still reconciled and the
+latest-release selection is still updated, unless the release the upstream
+pointer names is the one that failed; the workflow then fails. A failed release
+gets no new manifest entry (an entry it already had is left unchanged), unless
+the manifest write was stored and only its read-back check failed ("Calibration
+tree manifest verification failed."). The latest-release selection is never
+moved to a failed release.
+
 #### Microcosm release lines
 
 Microcosm publishes a release line (microcosm#823) under a constant release id:
@@ -395,10 +406,17 @@ Failure meanings and recovery:
 - `502` from the application means GitHub rejected or did not receive the
   workflow dispatch; check `GITHUB_ACTIONS_DISPATCH_TOKEN` and its Actions
   permission.
-- A failed release workflow means publication started but did not complete.
-  Release reconciliation stops at its first error, so the releases after a
-  failing one were not reconciled. Rerun that workflow after correcting the
-  reported error.
+- A failed release workflow either stopped before reconciling any release (for
+  example, the manifest, the release listing or the repository's tags could
+  not be read, or one tag's folder or one folder's commit could not be
+  resolved), or printed a report in which at least one release is `failed`
+  or `latestReleaseFailure` says why the latest-release selection was not
+  updated. In the second case every release with another outcome was
+  reconciled, and the error names the failed releases. Every later release
+  workflow for that country retries them and fails again until their errors
+  are corrected. Rerunning does not correct a refused repair of a published
+  tree ("Rebuilt calibration index differs from immutable manifest entry") or
+  a release whose tag moved ("Released dataset … changed from … to …").
 - A failed staging workflow either stopped before reconciling any run (for
   example, the staging repository was unavailable or listed incompatible
   runs), or printed a report in which at least one run is `failed`. In the
@@ -438,19 +456,50 @@ Remove `--dry-run` to publish. For staging, an automated invocation also passes
 repository state. The GitHub workflow exposes the same `dry_run` option for an
 authenticated verification using Actions secrets.
 
-Each outcome is `complete`, `published`, `repaired`, or `ineligible`, and
-staging outcomes can also be `failed`.
+Each outcome is `complete`, `published`, `repaired`, `ineligible`, or
+`failed`.
 `complete` means no bundle construction or source-diagnostics download occurred.
 `repaired` means the publisher deterministically rebuilt an existing identity
 and restored only missing files. Any reconstructed index must match the digest
 already recorded in the manifest.
 
-Release reconciliation stops at the first release it cannot publish or repair.
-Staging reconciliation records that run as `failed`, with the error as its
-`reason`, and continues with the remaining runs; after printing the report the
-command exits with an error naming every failed run. A refused staging repair
-therefore no longer leaves the runs after it unpublished on every later
-invocation.
+Release and staging reconciliation both record a source they cannot publish or
+repair as `failed`, with the error as its `reason`, and continue with the
+remaining sources; after printing the report the command exits with an error
+naming every failed source. One release or run that cannot be published
+therefore no longer leaves the sources after it unpublished on every later
+invocation. Errors before the per-source loop still stop reconciliation before
+any source and print no report: reading the manifest, listing releases, tags or
+staging runs, the first Blob listing, and, for releases, the Hugging Face
+lookups that build the release list (the folder probe and
+`release_manifest.json` of each tag the manifest does not already pin at its
+commit, and the commit of each folder release without a tag).
+An error in one of those lookups therefore stops every release, as one failed
+release did before.
+
+For a release, the steps that write run in this order: upload the bundle's
+files (the index last), list the stored files and audit the build against its
+own index, then add the manifest entry. An error at any step before the
+manifest write leaves a new release without a manifest entry, and leaves a
+release that already had an entry with that entry unchanged. Files a new
+release uploaded before the error stay under the build's ID, which is a digest
+of the country, the release ID and the source files' digests; no manifest entry
+refers to them, and the next reconciliation rebuilds the same ID and checks
+each existing file byte for byte before reusing it. Each manifest write reads
+the stored manifest, adds one entry, and writes it back on the condition that
+the stored manifest has not changed since that read (after a conflict it reads
+once more and writes without the condition). A failed release makes no
+manifest write, so the writes for the releases after it are the same as
+without it.
+
+After the releases, release reconciliation points `latestReleaseBuildArtifactId`
+at the release the upstream pointer names. It leaves the selection unchanged,
+and records why in the report's `latestReleaseFailure`, when that release
+failed in the same run, is not completely published, or the pointer cannot be
+read; the command then exits with an error. A dry run reads the pointer and
+reports the same `latestReleaseFailure` when the pointer cannot be read or names
+a release that failed in the same run; it does not check whether the named
+release is completely published, because it writes no manifest entries.
 
 `CALIBRATION_TREE_MAX_RAW_BYTES` defaults to 100,000,000 bytes per file, in
 addition to the fixed summary- and detail-shard limits.
