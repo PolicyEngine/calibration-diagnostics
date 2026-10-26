@@ -159,8 +159,10 @@ repair's rebuilt index differs from the recorded digest, is reported as
 `failed` with the error. The remaining releases are still reconciled and the
 latest-release selection is still updated, unless the release the upstream
 pointer names is the one that failed; the workflow then fails. A failed release
-gets no new manifest entry (an entry it already had is left unchanged), and the
-latest-release selection is never moved to it.
+gets no new manifest entry (an entry it already had is left unchanged), unless
+the manifest write was stored and only its read-back check failed ("Calibration
+tree manifest verification failed."). The latest-release selection is never
+moved to a failed release.
 
 #### Microcosm release lines
 

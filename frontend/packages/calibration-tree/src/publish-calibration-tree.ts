@@ -89,8 +89,9 @@ export class CalibrationTreeArtifactSizeError extends Error {}
 export interface ReconciliationOutcome {
   sourceId: string;
   // `failed`: the source could not be published or repaired; `reason` gives
-  // the error. A failed release gets no new manifest entry (an entry it
-  // already had is left as it was), though files uploaded before the error
+  // the error. A failed release gets no new manifest entry unless the
+  // manifest write was stored and only its read-back check failed; an entry
+  // it already had is left as it was, and files uploaded before the error
   // stay under its build ID. A failed staging run can already have its
   // entry, because staging writes the entry before it audits the upload.
   status: "complete" | "published" | "repaired" | "ineligible" | "failed";
