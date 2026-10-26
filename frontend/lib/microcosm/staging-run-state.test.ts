@@ -131,6 +131,91 @@ describe("a run the collector has a record of", () => {
   });
 });
 
+describe("a collector record older than the Hugging Face copy", () => {
+  test("a record that never saw the run end does not override a later final Hugging Face state", () => {
+    // The collector last heard from the run at 17:16:47 and then nothing more,
+    // so by 20:10 its record says stalled; the Hugging Face copy recorded the
+    // run passing at 20:05.
+    const laterNowMs = Date.parse("2026-10-22T20:10:00Z");
+    const collectorTimeline = buildTimeline(usRunningCollectorDocuments(), laterNowMs);
+    const finishedOnHuggingFace = {
+      ...usSummary(US_RUNNING_RUN_ID),
+      status: "passed",
+      stage: "complete",
+      updated_at: "2026-10-22T20:05:00+00:00",
+    };
+
+    const overlaid = overlayRunSummary(finishedOnHuggingFace, collectorTimeline, laterNowMs);
+
+    expect(collectorTimeline.state).toBe("stalled");
+    expect(overlaid).toMatchObject({
+      state_source: "hugging_face",
+      status: "passed",
+      stage: "complete",
+      updated_at: "2026-10-22T20:05:00+00:00",
+      ended_at: null,
+      failure: null,
+      hugging_face_status: "passed",
+      hugging_face_differs: false,
+    });
+  });
+
+  test("a final collector state is kept when the Hugging Face copy recorded the end later", () => {
+    // Both sources saw the run end; the collector's refusal, inferred from its
+    // acceptance check events, stays even though the copy was written after it.
+    const collectorTimeline = buildTimeline(
+      ukBlockedCollectorDocuments(),
+      INVESTIGATION_NOW_MS,
+    );
+    const completedLaterOnHuggingFace = {
+      ...ukSummary(UK_BLOCKED_RUN_ID),
+      status: "completed",
+      stage: "complete",
+      updated_at: "2026-10-18T23:46:30+00:00",
+    };
+
+    const overlaid = overlayRunSummary(
+      completedLaterOnHuggingFace,
+      collectorTimeline,
+      INVESTIGATION_NOW_MS,
+    );
+
+    expect(overlaid).toMatchObject({
+      state_source: "collector",
+      status: "blocked",
+      hugging_face_status: "completed",
+      hugging_face_differs: true,
+    });
+  });
+
+  test("a Hugging Face final state older than the collector's record does not override it", () => {
+    // The copy recorded a failure before the collector's last heartbeat: the
+    // collector's later record wins, as it does for every other run it knows.
+    const collectorTimeline = buildTimeline(
+      usRunningCollectorDocuments(),
+      INVESTIGATION_NOW_MS,
+    );
+    const failedEarlierOnHuggingFace = {
+      ...usSummary(US_RUNNING_RUN_ID),
+      status: "failed",
+      stage: "failed",
+      updated_at: "2026-10-22T17:00:00+00:00",
+    };
+
+    const overlaid = overlayRunSummary(
+      failedEarlierOnHuggingFace,
+      collectorTimeline,
+      INVESTIGATION_NOW_MS,
+    );
+
+    expect(overlaid).toMatchObject({
+      state_source: "collector",
+      status: "running",
+      stage: "reform_validation",
+    });
+  });
+});
+
 describe("a run the collector has no record of", () => {
   test("keeps its Hugging Face state, with the shared 6-hour rule for silent runs", () => {
     const abandoned = overlayRunSummary(
