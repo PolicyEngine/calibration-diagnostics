@@ -42,9 +42,11 @@ checks stop builds. The run selected on either tab carries over to the other.
   Every Staging route reads the collector's run list (the country's 60 most
   recent runs) through one cache on each server instance. An answer is
   reused for 15 seconds, and a failed request is tried again on the next
-  call. The Candidate tab waits at most 5 seconds for the list; after that it
-  shows the Hugging Face states with a note, and the late answer serves the
-  next poll. Each run's own record is read on every request, as before.
+  call. The Candidate tab waits at most 5 seconds for the list. After that it
+  uses the list's latest earlier answer if that answered less than 60 seconds
+  ago (two of its 30-second polls), and otherwise shows the Hugging Face
+  states with a note; the late answer serves the next poll. Each run's own
+  record is read on every request, as before.
 - **Local run folders.** The dashboard can still inspect legacy or diagnostic
   run folders on the same machine. Point it at the directory that holds them:
 

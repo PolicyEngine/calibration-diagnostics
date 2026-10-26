@@ -604,4 +604,37 @@ describe("one collector run list for every Staging route", () => {
     expect(nextPoll.note).toBeNull();
     expect(nextPoll.timelines.get(runningRunId)?.state).toBe("running");
   });
+
+  test("an answer a minute old no longer stands in for a slow list", async () => {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+    let listRequestCount = 0;
+    const unansweredListRequests: Array<() => void> = [];
+    // The first list request answers at once; later ones are slow.
+    const slowAfterFirst = (async (input: RequestInfo | URL) => {
+      if (new URL(String(input)).pathname === "/v1/runs" && listRequestCount++ > 0) {
+        await new Promise<void>((resolve) => unansweredListRequests.push(resolve));
+      }
+      return collector.fetch(input);
+    }) as typeof fetch;
+
+    jest.useFakeTimers();
+    let latePoll: Awaited<ReturnType<typeof loadCollectorTimelines>>;
+    try {
+      latePoll = await withCollector(slowAfterFirst, async () => {
+        await loadCollectorTimelines("am", [runningRunId], NOW);
+        jest.advanceTimersByTime(60_000);
+        const latePending = loadCollectorTimelines("am", [runningRunId], NOW);
+        jest.advanceTimersByTime(5_000);
+        const late = await latePending;
+        for (const answer of unansweredListRequests.splice(0)) answer();
+        return late;
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(latePoll.timelines.size).toBe(0);
+    expect(latePoll.note).toContain("did not answer within 5 seconds");
+  });
 });

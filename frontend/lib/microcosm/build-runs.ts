@@ -55,10 +55,15 @@ const STAGING_RUN_LIMIT = 60;
 // seconds, as does the Build progress list, so a poll makes at most one list
 // request per country. Each run's own record is read as before.
 const COLLECTOR_LIST_TTL_MS = 15_000;
-// How long the Candidate tab waits for the collector's run list before it
-// shows the Hugging Face states. The request carries on, and its answer
-// serves the next poll.
+// How long the Candidate tab waits for the collector's run list. Past it, the
+// tab uses the list's latest earlier answer, or shows the Hugging Face states
+// when there is none. The request carries on, and its answer serves the next
+// poll.
 const COLLECTOR_LIST_WAIT_MS = 5_000;
+// How old that earlier answer may be: two of the Candidate tab's 30-second
+// polls. A list that answers after the wait is more than 15 seconds old at the
+// next poll, and that poll's own request may be as slow.
+const EARLIER_COLLECTOR_LIST_MAX_AGE_MS = 60_000;
 
 export interface BuildRunProblem {
   run_id: string;
@@ -115,6 +120,12 @@ const collectorLists = new Map<
   MicrocosmCountry,
   { runs: Promise<CollectorRunSummary[]>; answeredAt: number | null }
 >();
+// The latest list that answered for each country, kept while a newer request
+// is in flight.
+const answeredCollectorLists = new Map<
+  MicrocosmCountry,
+  { runs: CollectorRunSummary[]; answeredAt: number }
+>();
 
 export const collectorRunLists = {
   recent(country: MicrocosmCountry): Promise<CollectorRunSummary[]> {
@@ -132,8 +143,12 @@ export const collectorRunLists = {
     };
     collectorLists.set(country, entry);
     entry.runs.then(
-      () => {
+      (runs) => {
         entry.answeredAt = Date.now();
+        // Not after `clear()` replaced or removed the request.
+        if (collectorLists.get(country) === entry) {
+          answeredCollectorLists.set(country, { runs, answeredAt: entry.answeredAt });
+        }
       },
       () => {
         if (collectorLists.get(country) === entry) collectorLists.delete(country);
@@ -141,8 +156,19 @@ export const collectorRunLists = {
     );
     return entry.runs;
   },
+  // The latest list that answered less than `maxAgeMs` ago, or null.
+  answeredWithin(
+    country: MicrocosmCountry,
+    maxAgeMs: number,
+  ): CollectorRunSummary[] | null {
+    const answered = answeredCollectorLists.get(country);
+    return answered && Date.now() - answered.answeredAt < maxAgeMs
+      ? answered.runs
+      : null;
+  },
   clear(): void {
     collectorLists.clear();
+    answeredCollectorLists.clear();
   },
 };
 
@@ -373,13 +399,23 @@ export async function loadCollectorTimelines(
       };
     }
     const listed = await settledWithin(collectorRunLists.recent(country), waitMs);
-    if (listed === WAIT_OVER) {
-      return {
-        timelines,
-        note: `The telemetry collector did not answer within ${waitMs / 1000} seconds, so ${HUGGING_FACE_FALLBACK}.`,
-      };
+    if (listed !== WAIT_OVER) {
+      summaries = listed;
+    } else {
+      // The request carries on, and its answer serves a later poll. Until it
+      // answers, an earlier answer that is recent enough stands in.
+      const earlier = collectorRunLists.answeredWithin(
+        country,
+        EARLIER_COLLECTOR_LIST_MAX_AGE_MS,
+      );
+      if (!earlier) {
+        return {
+          timelines,
+          note: `The telemetry collector did not answer within ${waitMs / 1000} seconds, so ${HUGGING_FACE_FALLBACK}.`,
+        };
+      }
+      summaries = earlier;
     }
-    summaries = listed;
   } catch (error) {
     return {
       timelines,
