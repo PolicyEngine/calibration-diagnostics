@@ -4,7 +4,9 @@
 // uploads off), while the telemetry collector keeps receiving events. So when
 // the collector has a record of a run, its state replaces the Hugging Face
 // one, derived exactly as the Build progress tab derives it; the Hugging Face
-// values stay alongside for comparison.
+// values stay alongside for comparison. The one exception: a collector record
+// that stopped before the run ended never hides an end the Hugging Face copy
+// recorded after the record's latest update.
 import {
   type BuildRunState,
   type BuildTimeline,
@@ -36,6 +38,9 @@ export interface CandidateRunFailure {
 }
 
 export interface CandidateRunState {
+  // "collector" when the collector has a record of the run, unless that
+  // record stopped before the run ended and the Hugging Face copy recorded the
+  // end later.
   state_source: RunStateSource;
   // Null only when the Hugging Face copy records no status.
   status: BuildRunState | null;
@@ -82,6 +87,26 @@ function huggingFaceState(
     : runState(huggingFace.status, timeMs(huggingFace.updated_at), nowMs);
 }
 
+const FINAL_STATES: ReadonlySet<BuildRunState> = new Set(["passed", "blocked", "failed"]);
+
+// The collector's record stopped before the run ended (it says running, or
+// stalled once its heartbeats stopped), and the Hugging Face copy recorded the
+// run's end after the record's latest update: the collector missed the run's
+// last events, so its record must not hide the end.
+function collectorMissedTheEnd(
+  collector: BuildTimeline,
+  huggingFaceStatus: BuildRunState | null,
+  huggingFaceUpdatedMs: number | null,
+): boolean {
+  return (
+    !FINAL_STATES.has(collector.state) &&
+    huggingFaceStatus != null &&
+    FINAL_STATES.has(huggingFaceStatus) &&
+    huggingFaceUpdatedMs != null &&
+    (collector.updated_ms == null || huggingFaceUpdatedMs > collector.updated_ms)
+  );
+}
+
 function lastCalibrationEpoch(timeline: BuildTimeline): CalibrationEpoch | null {
   const last = timeline.calibration.at(-1);
   return last ? { epoch: last.epoch, epochs: last.epochs } : null;
@@ -98,7 +123,11 @@ export function candidateRunState(
     hugging_face_updated_at: huggingFace.updated_at,
   };
   const huggingFaceStatus = huggingFaceState(huggingFace, nowMs);
-  if (!collector) {
+  const huggingFaceUpdatedMs = timeMs(huggingFace.updated_at);
+  if (
+    !collector ||
+    collectorMissedTheEnd(collector, huggingFaceStatus, huggingFaceUpdatedMs)
+  ) {
     return {
       state_source: "hugging_face",
       status: huggingFaceStatus,
@@ -113,7 +142,6 @@ export function candidateRunState(
       hugging_face_differs: false,
     };
   }
-  const huggingFaceUpdatedMs = timeMs(huggingFace.updated_at);
   const huggingFaceLagMs =
     collector.updated_ms != null && huggingFaceUpdatedMs != null
       ? collector.updated_ms - huggingFaceUpdatedMs
