@@ -17,15 +17,21 @@ The dashboard server also reads:
 - the hosted Microcosm telemetry collector, for build progress
   ([Reading the telemetry collector](#reading-the-telemetry-collector));
 - private Vercel Blob storage, for the published calibration tree and comparison
-  artifacts (`BLOB_READ_WRITE_TOKEN`; see
-  [calibration tree artifacts](../docs/calibration-tree-artifacts.md)).
+  artifacts (see [calibration tree artifacts](../docs/calibration-tree-artifacts.md)).
+  The dashboard's Blob reads pass no credential, so `@vercel/blob` uses the
+  deployment's Vercel OIDC token with `BLOB_STORE_ID` when both are present, and
+  `BLOB_READ_WRITE_TOKEN` otherwise. The comparison route
+  (`frontend/app/api/microcosm/comparison-tree/route.ts`) writes a missing comparison
+  artifact with `BLOB_READ_WRITE_TOKEN`.
 
 The Modal runtime uses Python 3.12 and the hashed `backend/requirements.lock`.
 Regenerate that lock from the repository root with `uv pip compile
 backend/requirements.txt --python-version 3.12 --generate-hashes --output-file
 backend/requirements.lock`. The Modal image also installs Debian's current
-`ca-certificates` package, and the Next.js server removes two compromised certificate
-authorities from Node's default list when it starts (`frontend/instrumentation.ts`).
+`ca-certificates` package. When the Next.js server starts, it removes two root
+certificates from Node's default list (`frontend/instrumentation.ts`): the compromised
+eMudhra root "emSign ECC Root CA - G3", and Sectigo's "AAA Certificate Services",
+which cross-signed the affected intermediates.
 
 ## Model and data identity
 
@@ -160,8 +166,9 @@ performs these steps in order:
 The workflow names each backend after its commit so an older frontend continues to
 reference its matching backend during rollback. Retain these applications for the
 rollback window, and remove them separately once no deployable frontend references
-them. Nothing removes them automatically: the `main` Modal environment held 31
-`calibration-diagnostics-*` applications on 2026-10-26.
+them. Nothing removes them automatically: on 2026-10-26 the `main` Modal environment
+held 30 deployed `calibration-diagnostics-<commit>` applications, plus an older one
+named `calibration-diagnostics`.
 
 The workflow is fixed to Vercel project `calibration-diagnostics`
 (`prj_pL7dIJJ3M4hGcKr5pttWaOACVFtu`) in the PolicyEngine team
@@ -177,8 +184,8 @@ Vercel look for a nonexistent `frontend/frontend` directory.
 
 ### Deployment settings
 
-The workflow reads these settings. Every name was present when listed on 2026-10-26;
-no value was read.
+The workflow reads these settings. Every stored secret and variable named here was
+present when listed on 2026-10-26; no value was read.
 
 | Setting | Provider | Where it is read |
 | --- | --- | --- |
@@ -190,6 +197,8 @@ no value was read.
 | `MICROCOSM_TELEMETRY_COLLECTOR_URL` | `Production` environment variable | `vercel deploy --env`, for the candidate's collector client. |
 | `TELEMETRY_GCP_WIF_PROVIDER`, `TELEMETRY_GCP_DEPLOY_SERVICE_ACCOUNT` | `Production` environment secrets | `google-github-actions/auth`, used only by the read-secret existence check. The service account is the collector's deploy service account. |
 | `TELEMETRY_GCP_PROJECT_ID`, `TELEMETRY_READ_SECRET_NAME` | `Production` environment variables | The read-secret existence check, as `PROJECT_ID` and `READ_SECRET_NAME`. |
+| `CALIBRATION_MODAL_APP_NAME` | Output of the backend-name step: `calibration-diagnostics-<first 12 characters of the commit>` | The Modal deploy step, where `backend/modal_app.py` names the application and records the name in the image, and the URL-resolution step. |
+| `MODAL_ENVIRONMENT`, `VERCEL_CLI_VERSION`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | Fixed values in the workflow's top-level `env:` | The Modal deploy and URL-resolution steps (`main`), every Vercel CLI call (`58.8.0`), and the Vercel CLI's choice of team and project. |
 | `MICROCOSM_CALCULATION_URL` | Output of the URL-resolution step | `vercel deploy --env`, for the candidate's variable route. |
 | `MICROCOSM_BACKEND_SOURCE_COMMIT` | The commit CI tested | `vercel deploy --env`. The variable route compares the backend's packaged commit with `VERCEL_GIT_COMMIT_SHA` when Vercel sets it, and with this value otherwise, and answers 409 when they differ. |
 
@@ -197,13 +206,15 @@ The candidate also uses settings stored in the Vercel project's Production
 environment, which the workflow neither supplies nor changes:
 `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` and
 `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER` (the collector),
-`POPULACE_UK_STAGING_HF_TOKEN` (UK staging), `BLOB_READ_WRITE_TOKEN` (Blob storage),
-`HF_WEBHOOK_SECRET` and `GITHUB_ACTIONS_DISPATCH_TOKEN` (the Hugging Face webhook),
+`POPULACE_UK_STAGING_HF_TOKEN` (UK staging), `BLOB_STORE_ID` and
+`BLOB_READ_WRITE_TOKEN` (Blob storage), `HF_WEBHOOK_SECRET` and
+`GITHUB_ACTIONS_DISPATCH_TOKEN` (the Hugging Face webhook),
 `SLACK_WEBHOOK_POPULACE_US` and `SLACK_WEBHOOK_POPULACE_UK`, and
 `CROSS_DATASET_ARTIFACT_BASE_URL` and `CROSS_DATASET_ARTIFACT_BASE_URL_BE`. Each name
-was listed on 2026-10-26. The project also stores its own Production `HF_TOKEN`; which
-of that value and the `--env` value a deployment uses was not verified. Vercel provides
-`VERCEL=1` and the deployment's OIDC token itself.
+was listed on 2026-10-26. The project also stores its own Production `HF_TOKEN` and
+`MICROCOSM_TELEMETRY_COLLECTOR_URL`, both of which the workflow also passes with
+`--env`; which of the two values a deployment uses was not verified for either. Vercel
+provides `VERCEL=1` and the deployment's OIDC token itself.
 
 ## Reading the telemetry collector
 
@@ -216,9 +227,10 @@ collector, from server code (`frontend/lib/server/microcosm/telemetry-collector-
 with three server-only settings:
 
 - `MICROCOSM_TELEMETRY_COLLECTOR_URL`: the collector address. It must use HTTPS, except
-  on `localhost` or `127.0.0.1`. Production deployments get it from the GitHub
-  `Production` environment variable through `vercel deploy --env`; previews get it from
-  the Vercel project's Preview settings.
+  on `localhost` or `127.0.0.1`. The workflow passes production deployments the GitHub
+  `Production` environment variable through `vercel deploy --env`, and the Vercel
+  project also stores a Production value; which one a deployment uses was not
+  verified. Previews get it from the Vercel project's Preview settings.
 - `MICROCOSM_TELEMETRY_READ_SECRET_VERSION`: the full Google Secret Manager version
   resource that holds the collector's read credential,
   `projects/<project>/secrets/<secret>/versions/<number or latest>`. It is a Vercel
@@ -237,10 +249,10 @@ provider, reads the secret version from the Secret Manager API, and keeps the va
 memory for up to one minute. Locally it uses Google Application Default Credentials and
 does not read the provider setting. The server sends the credential only to the
 collector, as the `X-Telemetry-Read-Token` header; it never reaches the browser and
-never passes through GitHub Actions. Without the address and the secret version, the
-build monitor shows only the Hugging Face staging history. If a collector request fails,
-the build monitor still shows the Hugging Face runs and reports `collector` among the
-runs that could not be read.
+never passes through GitHub Actions. Unless both the address and the secret version
+are set, the build monitor shows only the Hugging Face staging history. If a collector
+request fails, the build monitor still shows the Hugging Face runs and reports
+`collector` among the runs that could not be read.
 
 The Vercel project has OIDC turned on with the team issuer (read 2026-10-26). The
 Google side, the provider's trust in that issuer and audience and each identity's
@@ -277,11 +289,11 @@ for the US). None of these overrides was set in the Vercel project on 2026-10-26
 Vercel's Git integration builds a preview of every pull request. A preview reads its
 settings from the Vercel project's Preview environment, which on 2026-10-26 held
 `MICROCOSM_CALCULATION_URL`, `MICROCOSM_MODAL_KEY`, `MICROCOSM_MODAL_SECRET`, `HF_TOKEN`,
-`POPULACE_UK_STAGING_HF_TOKEN`, `BLOB_READ_WRITE_TOKEN`, the three collector settings
-and `VERCEL_SUPPORT_LARGE_FUNCTIONS`. A Git preview's `VERCEL_GIT_COMMIT_SHA` is its own
-commit, so its variable lookups succeed only when the configured backend was deployed
-from that same commit; otherwise the proxy answers 409. The other dashboard pages do
-not use the backend.
+`POPULACE_UK_STAGING_HF_TOKEN`, `BLOB_STORE_ID`, `BLOB_READ_WRITE_TOKEN`, the three
+collector settings and `VERCEL_SUPPORT_LARGE_FUNCTIONS`. A Git preview's
+`VERCEL_GIT_COMMIT_SHA` is its own commit, so its variable lookups succeed only when the
+configured backend was deployed from that same commit; otherwise the proxy answers 409.
+The other dashboard pages do not use the backend.
 
 To qualify a change to the hosted runtime on a preview, install the runtime lock into a
 separate environment, run the hosted Python tests and `verify_hosted_runtime.py`, then
@@ -384,11 +396,13 @@ environment. The Modal function has no Modal secret attached and its image sets 
 so both are unset and the backend uses the reviewed values; its 503 refusal guards
 against a later change that sets them. The variable proxy on Vercel uses the checked-in
 identity and never forwards either setting to the backend. On Vercel, `POPULACE_HF_REPO`
-changes only which repository the dashboard's US release discovery reads, and that
-discovery follows the repository's `main` branch through the dashboard manifest. Neither
-setting was present in the Vercel project's Production or Preview environment on
-2026-10-26. If either appears, record and remove only that entry, retaining its prior
-setting for rollback. Do not print or change unrelated environment entries.
+changes which repository the dashboard's US release discovery reads, and which
+repository's Hugging Face webhook events start a US calibration tree publication
+(`frontend/lib/microcosm/hf-webhook-config.ts`). Release discovery follows the
+repository's `main` branch through the dashboard manifest. Neither setting was present
+in the Vercel project's Production or Preview environment on 2026-10-26. If either
+appears, record and remove only that entry, retaining its prior setting for rollback.
+Do not print or change unrelated environment entries.
 
 The production workflow deploys the matching private backend, stages the exact frontend
 with production server-only URL and credentials, verifies metadata, a genuine
