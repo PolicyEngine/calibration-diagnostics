@@ -2,14 +2,21 @@ import { describe, expect, spyOn, test } from "bun:test";
 
 import {
   type BuildRunDocuments,
+  type RunDelivery,
   buildTimeline,
 } from "@/lib/microcosm/build-monitor";
 import {
   type HostedRunLoaders,
   loadBuildRuns,
   loadCollectorTimelines,
+  mergeHostedDocuments,
   refreshHostedRun,
 } from "@/lib/microcosm/build-runs";
+import {
+  UK_STAGED_RUN_ID,
+  ukStagedCollectorDocuments,
+  ukStagedHuggingFaceDocuments,
+} from "@/lib/microcosm/test-support/collector-run-fixtures";
 import {
   FAKE_COLLECTOR_URL,
   fakeTelemetryCollector,
@@ -381,5 +388,70 @@ describe("loadCollectorTimelines for the Candidate tab", () => {
     expect([...loaded.timelines.keys()]).toEqual([readable]);
     expect(loaded.note).toContain(unreadable);
     expect(loaded.note).toContain("500");
+  });
+});
+
+describe("uploads to Hugging Face for runs the collector records", () => {
+  // The collector never learns whether a run's files reached Hugging Face, so
+  // the monitor reads the uploads from the run's Hugging Face copy.
+  const STAGED_NOW_MS = Date.parse("2026-10-22T17:11:00Z");
+  const UPLOADED: RunDelivery = {
+    uploads: "uploaded",
+    repository: "policyengine/populace-uk-staging",
+    reason: null,
+    attempts: 39,
+    successes: 39,
+  };
+
+  function listedRun(huggingFace: BuildRunDocuments[]) {
+    return mergeHostedDocuments([ukStagedCollectorDocuments()], huggingFace, STAGED_NOW_MS)
+      .map((documents) => buildTimeline(documents, STAGED_NOW_MS))
+      .find((timeline) => timeline.run_id === UK_STAGED_RUN_ID)!;
+  }
+
+  test("the list shows the uploads the Hugging Face copy records", () => {
+    const run = listedRun([ukStagedHuggingFaceDocuments()]);
+
+    // The collector's record still sets the state and the end.
+    expect(run.state).toBe("passed");
+    expect(run.ended_ms).toBe(Date.parse("2026-10-21T20:36:30Z"));
+    expect(run.delivery).toEqual(UPLOADED);
+  });
+
+  test("uploads stay unknown when the run has no Hugging Face copy", () => {
+    const run = listedRun([]);
+
+    expect(run.delivery?.uploads).toBe("unknown");
+  });
+
+  test("uploads stay unknown when the Hugging Face copy records none", () => {
+    const copy = ukStagedHuggingFaceDocuments();
+    const { delivery: _progressDelivery, ...progress } = copy.progress!;
+    const run = listedRun([{ ...copy, progress, run_manifest: null }]);
+
+    expect(run.delivery?.uploads).toBe("unknown");
+  });
+
+  test("refreshing the selected run from the collector keeps the listed uploads", async () => {
+    const listed = listedRun([ukStagedHuggingFaceDocuments()]);
+    let historyCalls = 0;
+
+    const run = await refreshHostedRun(
+      listed,
+      "uk",
+      UK_STAGED_RUN_ID,
+      STAGED_NOW_MS,
+      loaders({
+        loadCollector: async () => ukStagedCollectorDocuments(),
+        loadHistory: async () => {
+          historyCalls += 1;
+          return ukStagedHuggingFaceDocuments();
+        },
+      }),
+    );
+
+    expect(run?.state).toBe("passed");
+    expect(run?.delivery).toEqual(UPLOADED);
+    expect(historyCalls).toBe(0);
   });
 });
