@@ -561,4 +561,47 @@ describe("one collector run list for every Staging route", () => {
     expect(nextPoll.timelines.get(runningRunId)?.state).toBe("running");
     expect(collector.listRequests).toHaveLength(1);
   });
+
+  test("a late answer serves the next 30-second poll while the collector stays slow", async () => {
+    // The Candidate tab polls every 30 seconds. A list that answers 6 seconds
+    // after each request is more than 15 seconds old at the next poll, whose
+    // own request is again slower than the 5-second wait.
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+    const unansweredListRequests: Array<() => void> = [];
+    const slowList = (async (input: RequestInfo | URL) => {
+      if (new URL(String(input)).pathname === "/v1/runs") {
+        await new Promise<void>((resolve) => unansweredListRequests.push(resolve));
+      }
+      return collector.fetch(input);
+    }) as typeof fetch;
+
+    jest.useFakeTimers();
+    let firstPoll: Awaited<ReturnType<typeof loadCollectorTimelines>>;
+    let nextPoll: Awaited<ReturnType<typeof loadCollectorTimelines>>;
+    try {
+      [firstPoll, nextPoll] = await withCollector(slowList, async () => {
+        const firstPending = loadCollectorTimelines("am", [runningRunId], NOW);
+        jest.advanceTimersByTime(5_000);
+        const first = await firstPending;
+        // The first request answers 6 seconds after it was made.
+        jest.advanceTimersByTime(1_000);
+        unansweredListRequests.shift()?.();
+        await collectorRunLists.recent("am");
+        // The next poll, 30 seconds after the first.
+        jest.advanceTimersByTime(24_000);
+        const nextPending = loadCollectorTimelines("am", [runningRunId], NOW);
+        jest.advanceTimersByTime(5_000);
+        const next = await nextPending;
+        for (const answer of unansweredListRequests.splice(0)) answer();
+        return [first, next];
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(firstPoll.note).toContain("did not answer within 5 seconds");
+    expect(nextPoll.note).toBeNull();
+    expect(nextPoll.timelines.get(runningRunId)?.state).toBe("running");
+  });
 });
