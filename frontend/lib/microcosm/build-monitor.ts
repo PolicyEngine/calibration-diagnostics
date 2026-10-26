@@ -260,6 +260,16 @@ export function formatStageName(stage: string): string {
   return text ? text[0].toUpperCase() + text.slice(1) : stage;
 }
 
+// Run kinds that are not comparable with full runs of the same pipeline, with
+// the label suffix for each. A smoke run builds a synthetic fixture; a dry run
+// (`--dry-run`) checks its configuration, pins its inputs and stops. The run
+// kind is part of their pipeline key, so they have their own group, history
+// and forecasts.
+const SEPARATE_RUN_KINDS: ReadonlyMap<string, string> = new Map([
+  ["smoke", "smoke"],
+  ["dry_run", "dry run"],
+]);
+
 function pipelineIdentity(
   documents: BuildRunDocuments,
   schemaVersion: 1 | 2 | 3,
@@ -269,13 +279,11 @@ function pipelineIdentity(
   const pipelineId = str(pipeline?.id);
   const country = str(identity?.country_code) ?? documents.country.toUpperCase();
   if (schemaVersion >= 2 && pipelineId) {
-    // A smoke run on a synthetic fixture is not comparable with a full run of
-    // the same pipeline, so the run kind is part of the key.
     const kind = str(identity?.run_kind);
-    const smoke = kind === "smoke";
+    const kindLabel = kind == null ? undefined : SEPARATE_RUN_KINDS.get(kind);
     return {
-      key: `${country}:${pipelineId}${smoke ? ":smoke" : ""}`,
-      label: `${formatStageName(pipelineId)}${smoke ? " (smoke)" : ""}`,
+      key: `${country}:${pipelineId}${kindLabel ? `:${kind}` : ""}`,
+      label: `${formatStageName(pipelineId)}${kindLabel ? ` (${kindLabel})` : ""}`,
     };
   }
   return {
