@@ -13,7 +13,8 @@ import { scrub } from "@policyengine/calibration-tree/latest-artifact";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
-// The collector lookup can add two 30-second request timeouts.
+// The collector lookup waits at most 5 seconds for the shared run list, but a
+// run's own record can still take its 30-second request timeout.
 export const maxDuration = 120;
 
 export interface StagingRunsRouteDependencies {

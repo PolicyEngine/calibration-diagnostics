@@ -1,4 +1,4 @@
-import { describe, expect, jest, spyOn, test } from "bun:test";
+import { beforeEach, describe, expect, jest, spyOn, test } from "bun:test";
 
 import {
   type BuildRunDocuments,
@@ -7,6 +7,7 @@ import {
 } from "@/lib/microcosm/build-monitor";
 import {
   type HostedRunLoaders,
+  collectorRunLists,
   loadBuildRuns,
   loadCollectorTimelines,
   mergeHostedDocuments,
@@ -24,6 +25,10 @@ import {
 import { secretManager } from "@/lib/server/secret-manager";
 
 const NOW = Date.parse("2026-10-05T12:00:00Z");
+
+// Each test's fake collector answers for itself, not from an earlier test's
+// cached run list.
+beforeEach(() => collectorRunLists.clear());
 
 function documents(
   runId: string,

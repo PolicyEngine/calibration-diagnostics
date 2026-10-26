@@ -50,6 +50,15 @@ import {
 
 const STAGING_LIST_TTL_MS = 30_000;
 const STAGING_RUN_LIMIT = 60;
+// How long one answer to the collector's run list serves every Staging route
+// on a server instance. The Candidate tab's two routes poll together every 30
+// seconds, as does the Build progress list, so a poll makes at most one list
+// request per country. Each run's own record is read as before.
+const COLLECTOR_LIST_TTL_MS = 15_000;
+// How long the Candidate tab waits for the collector's run list before it
+// shows the Hugging Face states. The request carries on, and its answer
+// serves the next poll.
+const COLLECTOR_LIST_WAIT_MS = 5_000;
 
 export interface BuildRunProblem {
   run_id: string;
@@ -97,6 +106,64 @@ const stagingListCache = new Map<
   string,
   { expiresAt: number; promise: Promise<LoadedRuns> }
 >();
+
+// The country's 60 most recent collector runs, shared by every caller: a list
+// that answered is reused for `COLLECTOR_LIST_TTL_MS` after it answered, a
+// request in flight is shared, and a failed request is dropped so the next
+// caller asks again.
+const collectorLists = new Map<
+  MicrocosmCountry,
+  { runs: Promise<CollectorRunSummary[]>; answeredAt: number | null }
+>();
+
+export const collectorRunLists = {
+  recent(country: MicrocosmCountry): Promise<CollectorRunSummary[]> {
+    const cached = collectorLists.get(country);
+    if (
+      cached &&
+      (cached.answeredAt == null ||
+        Date.now() - cached.answeredAt < COLLECTOR_LIST_TTL_MS)
+    ) {
+      return cached.runs;
+    }
+    const entry = {
+      runs: loadCollectorRuns(country, STAGING_RUN_LIMIT),
+      answeredAt: null as number | null,
+    };
+    collectorLists.set(country, entry);
+    entry.runs.then(
+      () => {
+        entry.answeredAt = Date.now();
+      },
+      () => {
+        if (collectorLists.get(country) === entry) collectorLists.delete(country);
+      },
+    );
+    return entry.runs;
+  },
+  clear(): void {
+    collectorLists.clear();
+  },
+};
+
+const WAIT_OVER = Symbol("wait over");
+
+// `promise`'s value, or `WAIT_OVER` when it has not settled within `waitMs`.
+// A rejection within the wait is thrown.
+async function settledWithin<T>(
+  promise: Promise<T>,
+  waitMs: number,
+): Promise<T | typeof WAIT_OVER> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const waitOver = new Promise<typeof WAIT_OVER>((resolve) => {
+    timer = setTimeout(() => resolve(WAIT_OVER), waitMs);
+  });
+  try {
+    return await Promise.race([promise, waitOver]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 interface LoadedRuns {
   available: boolean;
@@ -255,7 +322,7 @@ async function loadCollectorDocuments(
 }
 
 async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
-  const summaries = await loadCollectorRuns(country, STAGING_RUN_LIMIT);
+  const summaries = await collectorRunLists.recent(country);
   const documents: BuildRunDocuments[] = [];
   const problems: BuildRunProblem[] = [];
   await Promise.all(
@@ -284,12 +351,14 @@ const HUGGING_FACE_FALLBACK =
 
 // The collector's state for runs the Candidate tab lists from Hugging Face.
 // It reads the same records the Build progress tab does (the country's 60
-// most recent collector runs) and derives each state with the same
-// `buildTimeline`, so the two tabs agree on every run the collector knows.
+// most recent collector runs, from the shared list) and derives each state
+// with the same `buildTimeline`, so the two tabs agree on every run the
+// collector knows. It waits at most `waitMs` for the list.
 export async function loadCollectorTimelines(
   country: MicrocosmCountry,
   runIds: readonly string[],
   nowMs: number = Date.now(),
+  waitMs: number = COLLECTOR_LIST_WAIT_MS,
 ): Promise<CollectorTimelines> {
   const timelines = new Map<string, BuildTimeline>();
   if (!runIds.length) return { timelines, note: null };
@@ -303,7 +372,14 @@ export async function loadCollectorTimelines(
         note: `The telemetry collector is not configured on this server, so ${HUGGING_FACE_FALLBACK}.`,
       };
     }
-    summaries = await loadCollectorRuns(country, STAGING_RUN_LIMIT);
+    const listed = await settledWithin(collectorRunLists.recent(country), waitMs);
+    if (listed === WAIT_OVER) {
+      return {
+        timelines,
+        note: `The telemetry collector did not answer within ${waitMs / 1000} seconds, so ${HUGGING_FACE_FALLBACK}.`,
+      };
+    }
+    summaries = listed;
   } catch (error) {
     return {
       timelines,
