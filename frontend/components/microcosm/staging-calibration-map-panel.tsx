@@ -163,6 +163,13 @@ export function StagingCalibrationMapPanel({
     comparisonReleaseId,
     candidateBuildArtifactId: selectedRunBuild?.buildArtifactId,
   });
+  // The comparison view names a From build the user picked by its date and
+  // run ID. The candidate-fit view still compares with the release the
+  // comparison names, so it keeps that release's name.
+  const fromBaseline = stagingComparisonBaseline(
+    comparisonRelease,
+    builds.find((build) => build.buildArtifactId === buildPicks.from),
+  );
 
   const immutableComparison = Boolean(
     currentBuildArtifactId && candidateBuildArtifactId,
@@ -170,11 +177,11 @@ export function StagingCalibrationMapPanel({
   return (
     <SectionCard
       title="Calibration map"
-      description={view === "comparison" ? comparisonBaseline.note ?? undefined : undefined}
+      description={view === "comparison" ? fromBaseline.note ?? undefined : undefined}
       actions={
         <CalibrationMapViewSelect
           value={view}
-          comparisonLabel={comparisonBaseline.tabLabel}
+          comparisonLabel={fromBaseline.tabLabel}
           onChange={setView}
         />
       }
@@ -268,7 +275,7 @@ export function StagingCalibrationMapPanel({
               weightedTargetErrorChange={
                 immutableComparison ? null : weightedTargetErrorChange
               }
-              comparisonReleaseLabel={comparisonBaseline.releaseLabel}
+              comparisonReleaseLabel={fromBaseline.releaseLabel}
             />
           ) : comparisonLoading ? (
             <LoadingBlock

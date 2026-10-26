@@ -1,3 +1,4 @@
+import { formatShortDateTime } from "@/components/shared/format";
 import type { StagingComparisonRelease } from "@policyengine/calibration-tree/staging-artifact";
 
 // Older dashboard links used `staging:<run_id>` on published-release pages.
@@ -94,16 +95,60 @@ export function comparisonMapBuilds(
 }
 
 export interface StagingComparisonBaseline {
-  /** Names the compared release: the table column and the map's labels. */
+  /** Names the side compared with: the table column and the map's labels. */
   releaseLabel: string;
   tabLabel: string;
   note: string | null;
 }
 
-/** How the Staging page names the release a candidate is compared with. */
+/** A published build the comparison map's "From" selector offers. */
+export interface ComparisonFromBuild {
+  kind: "release" | "staging";
+  releaseId: string | null;
+  stagingRunId: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/**
+ * A From build the user picked, named by its date and run ID: "Build Oct 17,
+ * 01:02 PM · uk-frs-calibration-attempt-…". A release build has no staging
+ * run, so its release ID stands in. The date is when the build was published
+ * (createdAt, else updatedAt), in the format the Staging page dates its runs
+ * with, and is left out when the publisher could not date the build.
+ */
+function pickedFromBuildBaseline(build: ComparisonFromBuild): StagingComparisonBaseline {
+  const buildId = build.kind === "staging" ? build.stagingRunId : build.releaseId;
+  const publishedAt = build.createdAt ?? build.updatedAt;
+  const name = [publishedAt ? formatShortDateTime(publishedAt) : null, buildId]
+    .filter((part) => part)
+    .join(" · ");
+  return {
+    releaseLabel: `Build ${name}`,
+    tabLabel: `Change from build ${name}`,
+    note: null,
+  };
+}
+
+/**
+ * How the Staging page names the side a candidate is compared with. That is
+ * the release `/microcosm/staging/compare` names, unless the user picked
+ * another build in the comparison map's "From" selector: that build is named
+ * by its date and run ID instead, and the note explaining the server's choice
+ * of release is dropped. Picking the compared release's own build keeps the
+ * release's name.
+ */
 export function stagingComparisonBaseline(
   comparisonRelease: StagingComparisonRelease | undefined,
+  pickedFromBuild?: ComparisonFromBuild | null,
 ): StagingComparisonBaseline {
+  if (
+    pickedFromBuild &&
+    !(pickedFromBuild.kind === "release" &&
+      pickedFromBuild.releaseId === comparisonRelease?.release_id)
+  ) {
+    return pickedFromBuildBaseline(pickedFromBuild);
+  }
   if (comparisonRelease?.basis === "newest_local_area_release") {
     return {
       releaseLabel: "Local-area release",
