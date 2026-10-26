@@ -164,6 +164,34 @@ describe("refreshHostedRun", () => {
     expect(historyCalls).toBe(0);
   });
 
+  test("keeps the list's later Hugging Face end over a collector record that stopped before it", async () => {
+    // The list holds the Hugging Face copy, which recorded the run completing
+    // at 11:00; the collector's record stops at 10:30, still running.
+    const running = documents("run-1", "running");
+    const stoppedEarly: BuildRunDocuments = {
+      ...running,
+      progress: { ...running.progress, updated_at: "2026-10-05T10:30:00Z" },
+      events: running.events.map((event) => ({
+        ...event,
+        timestamp: "2026-10-05T10:30:00Z",
+        time: "2026-10-05T10:30:00Z",
+      })),
+    };
+    const current = buildTimeline(documents("run-1", "completed"), NOW);
+
+    const run = await refreshHostedRun(
+      current,
+      "us",
+      "run-1",
+      NOW,
+      loaders({ loadCollector: async () => stoppedEarly }),
+    );
+
+    expect(buildTimeline(stoppedEarly, NOW).state).toBe("running");
+    expect(run?.state).toBe("passed");
+    expect(run).toBe(current);
+  });
+
   test("surfaces collector failure when no staged history exists", async () => {
     await expect(
       refreshHostedRun(
