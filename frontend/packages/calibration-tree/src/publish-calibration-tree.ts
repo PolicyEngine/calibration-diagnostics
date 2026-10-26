@@ -89,7 +89,10 @@ export class CalibrationTreeArtifactSizeError extends Error {}
 export interface ReconciliationOutcome {
   sourceId: string;
   // `failed`: the source could not be published or repaired; `reason` gives
-  // the error. Nothing was written for it.
+  // the error. A failed release gets no new manifest entry (an entry it
+  // already had is left as it was), though files uploaded before the error
+  // stay under its build ID. A failed staging run can already have its
+  // entry, because staging writes the entry before it audits the upload.
   status: "complete" | "published" | "repaired" | "ineligible" | "failed";
   buildArtifactId: string | null;
   reason: string | null;
@@ -1189,9 +1192,10 @@ export async function reconcileReleaseBuilds(
     // selection, unreconciled on every later invocation. `runPublisher`
     // exits with an error once the report is printed. The manifest write is
     // a release's last step, after its files are uploaded and audited, so a
-    // release that fails gets no manifest entry (unless that write's own
-    // read-back check fails after the write was stored). A failed release is
-    // never selected as the latest release.
+    // release that fails gets no new manifest entry (unless that write's own
+    // read-back check fails after the write was stored); a release that
+    // already had an entry keeps it unchanged. The latest-release selection
+    // is never moved to a failed release.
     try {
       if (existing && existing.hfCommitSha !== candidate.hfCommitSha) {
         throw new Error(
