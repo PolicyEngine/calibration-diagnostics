@@ -32,6 +32,19 @@ checks stop builds. The run selected on either tab carries over to the other.
   same run id, except that a collector record that stopped before the run
   ended never hides an end the Hugging Face copy recorded after the record's
   latest update. The Candidate tab applies the same rule to the runs it lists.
+
+  Uploads to Hugging Face never pass through the collector, so its record
+  always says delivery mode `collector` with no counts. A collector record
+  that replaces a copy keeps the copy's upload record (files attempted and
+  uploaded, or a failed write check), and a run's uploads show as `unknown`
+  only when it has no copy that records them.
+
+  Every Staging route reads the collector's run list (the country's 60 most
+  recent runs) through one cache on each server instance. An answer is
+  reused for 15 seconds, and a failed request is tried again on the next
+  call. The Candidate tab waits at most 5 seconds for the list; after that it
+  shows the Hugging Face states with a note, and the late answer serves the
+  next poll. Each run's own record is read on every request, as before.
 - **Local run folders.** The dashboard can still inspect legacy or diagnostic
   run folders on the same machine. Point it at the directory that holds them:
 
@@ -84,6 +97,13 @@ checks stop builds. The run selected on either tab carries over to the other.
 The forecast compares the run with finished runs of the same pipeline from
 the same source (version 2 and 3 runs by pipeline id; version 1 US runs as one
 release pipeline), up to the 12 most recent.
+
+Smoke runs (run kind `smoke`) and dry runs (`dry_run`) form pipelines of
+their own, labelled "(smoke)" and "(dry run)", with their own history and
+forecasts. A dry run checks its configuration, pins its inputs and stops, so
+it would otherwise count as a passed run that ended after its first two
+stages. The UK spine build registers its own pipeline id, `uk-frs-spine`, so
+it is never compared with the calibration runs that read its output.
 
 Runs of one pipeline can still differ in what they do: UK local candidates kept
 the pipeline id `uk-local-candidate` 0.1.0 when cloning and surface resolution
