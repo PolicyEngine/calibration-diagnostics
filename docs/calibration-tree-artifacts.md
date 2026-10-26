@@ -159,7 +159,10 @@ repair's rebuilt index differs from the recorded digest, is reported as
 `failed` with the error. The remaining releases are still reconciled and the
 latest-release selection is still updated, unless the release the upstream
 pointer names is the one that failed; the workflow then fails. A failed release
-gets no manifest entry and is never selected as the latest release.
+gets no new manifest entry (an entry it already had is left unchanged), unless
+the manifest write was stored and only its read-back check failed ("Calibration
+tree manifest verification failed."). The latest-release selection is never
+moved to a failed release.
 
 #### Microcosm release lines
 
@@ -477,9 +480,10 @@ release did before.
 For a release, the steps that write run in this order: upload the bundle's
 files (the index last), list the stored files and audit the build against its
 own index, then add the manifest entry. An error at any step before the
-manifest write leaves the release without a manifest entry. Files uploaded
-before the error stay under the build's ID, which is a digest of the country,
-the release ID and the source files' digests; no manifest entry
+manifest write leaves a new release without a manifest entry, and leaves a
+release that already had an entry with that entry unchanged. Files a new
+release uploaded before the error stay under the build's ID, which is a digest
+of the country, the release ID and the source files' digests; no manifest entry
 refers to them, and the next reconciliation rebuilds the same ID and checks
 each existing file byte for byte before reusing it. Each manifest write reads
 the stored manifest, adds one entry, and writes it back on the condition that
