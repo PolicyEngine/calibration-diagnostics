@@ -16,7 +16,9 @@ The dashboard server also reads:
   ([Hugging Face reads](#hugging-face-reads));
 - the hosted Microcosm telemetry collector, for build progress
   ([Reading the telemetry collector](#reading-the-telemetry-collector));
-- Vercel Blob, for comparison artifacts (`BLOB_READ_WRITE_TOKEN`).
+- private Vercel Blob storage, for the published calibration tree and comparison
+  artifacts (`BLOB_READ_WRITE_TOKEN`; see
+  [calibration tree artifacts](../docs/calibration-tree-artifacts.md)).
 
 The Modal runtime uses Python 3.12 and the hashed `backend/requirements.lock`.
 Regenerate that lock from the repository root with `uv pip compile
@@ -195,7 +197,7 @@ The candidate also uses settings stored in the Vercel project's Production
 environment, which the workflow neither supplies nor changes:
 `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` and
 `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER` (the collector),
-`POPULACE_UK_STAGING_HF_TOKEN` (UK staging), `BLOB_READ_WRITE_TOKEN` (Vercel Blob),
+`POPULACE_UK_STAGING_HF_TOKEN` (UK staging), `BLOB_READ_WRITE_TOKEN` (Blob storage),
 `HF_WEBHOOK_SECRET` and `GITHUB_ACTIONS_DISPATCH_TOKEN` (the Hugging Face webhook),
 `SLACK_WEBHOOK_POPULACE_US` and `SLACK_WEBHOOK_POPULACE_UK`, and
 `CROSS_DATASET_ARTIFACT_BASE_URL` and `CROSS_DATASET_ARTIFACT_BASE_URL_BE`. Each name
