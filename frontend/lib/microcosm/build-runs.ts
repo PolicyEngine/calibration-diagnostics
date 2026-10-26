@@ -7,6 +7,7 @@ import {
   type PhaseTotals,
   type StageStat,
   buildTimeline,
+  collectorMissedTheEnd,
   compactTimeline,
   type StopStat,
   stopStatistics,
@@ -333,12 +334,43 @@ export async function loadCollectorTimelines(
   };
 }
 
+// The hosted documents the build monitor shows, one per run id. During the
+// migration period a collector record replaces the run's historical Hugging
+// Face copy, unless the record stopped before an end the copy recorded later
+// (`collectorMissedTheEnd`, the rule the Candidate tab uses too).
+export function mergeHostedDocuments(
+  collector: readonly BuildRunDocuments[],
+  huggingFace: readonly BuildRunDocuments[],
+  nowMs: number,
+): BuildRunDocuments[] {
+  const byId = new Map<string, BuildRunDocuments>();
+  for (const document of huggingFace) byId.set(document.run_id, document);
+  for (const document of collector) {
+    const copy = byId.get(document.run_id);
+    if (
+      copy &&
+      collectorMissedTheEnd(
+        buildTimeline(document, nowMs),
+        buildTimeline(copy, nowMs),
+      )
+    ) {
+      continue;
+    }
+    byId.set(document.run_id, document);
+  }
+  return [...byId.values()];
+}
+
 async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
   const hosted: LoadedRuns[] = [];
   const sourceProblems: BuildRunProblem[] = [];
+  let collectorRunDocuments: BuildRunDocuments[] = [];
+  let huggingFaceRunDocuments: BuildRunDocuments[] = [];
   if (collectorConfigured()) {
     try {
-      hosted.push(await loadCollector(country));
+      const loaded = await loadCollector(country);
+      hosted.push(loaded);
+      collectorRunDocuments = loaded.documents;
     } catch (error) {
       sourceProblems.push({
         run_id: "collector",
@@ -347,7 +379,9 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
     }
   }
   try {
-    hosted.push(await loadHuggingFaceStaging(country));
+    const loaded = await loadHuggingFaceStaging(country);
+    hosted.push(loaded);
+    huggingFaceRunDocuments = loaded.documents;
   } catch (error) {
     sourceProblems.push({
       run_id: "hugging-face-history",
@@ -355,13 +389,6 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
     });
   }
   const available = hosted.some((source) => source.available);
-  const byId = new Map<string, BuildRunDocuments>();
-  // Historical Hugging Face documents enter first; collector documents are
-  // newer and replace the same run id during the migration period.
-  for (const source of [...hosted].reverse()) {
-    for (const document of source.documents)
-      byId.set(document.run_id, document);
-  }
   return {
     available,
     detail: available
@@ -370,7 +397,11 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
           .map((source) => source.detail)
           .filter(Boolean)
           .join(" ") || "Hosted build telemetry is unavailable.",
-    documents: [...byId.values()],
+    documents: mergeHostedDocuments(
+      collectorRunDocuments,
+      huggingFaceRunDocuments,
+      Date.now(),
+    ),
     problems: [
       ...hosted.flatMap((source) => source.problems),
       ...sourceProblems,
@@ -413,10 +444,19 @@ export async function refreshHostedRun(
 ): Promise<BuildTimeline | null> {
   let collectorError: unknown = null;
   if (loaders.collectorConfigured()) {
+    let collectorRun: BuildTimeline | null = null;
     try {
-      return buildTimeline(await loaders.loadCollector(runId, country), nowMs);
+      collectorRun = buildTimeline(await loaders.loadCollector(runId, country), nowMs);
     } catch (error) {
       collectorError = error;
+    }
+    if (collectorRun) {
+      // The list kept the Hugging Face copy when the collector's record
+      // stopped before an end the copy recorded later; a fresh read of that
+      // record must not hide the end either.
+      return current && collectorMissedTheEnd(collectorRun, current)
+        ? current
+        : collectorRun;
     }
   }
   if (!loaders.hasStagingHistory(country)) {
@@ -460,7 +500,8 @@ export async function loadBuildRun(
   const all = timelines(loaded.documents, nowMs);
   let run = all.find((timeline) => timeline.run_id === runId) ?? null;
   // A running hosted run may be newer than the cached list. The live
-  // collector is authoritative when it responds; staged files are fallback.
+  // collector's record wins when it responds, unless it stopped before an end
+  // the Hugging Face copy recorded later; staged files are fallback.
   if (source === "staging")
     run = await refreshHostedRun(run, country, runId, nowMs);
   if (run == null) return null;

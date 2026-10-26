@@ -10,6 +10,7 @@
 import {
   type BuildRunState,
   type BuildTimeline,
+  collectorMissedTheEnd,
   runState,
 } from "@/lib/microcosm/build-monitor";
 import type { StagingRunSummary } from "@policyengine/calibration-tree/staging-artifact";
@@ -90,26 +91,6 @@ function huggingFaceState(
     : runState(huggingFace.status, timeMs(huggingFace.updated_at), nowMs);
 }
 
-const FINAL_STATES: ReadonlySet<BuildRunState> = new Set(["passed", "blocked", "failed"]);
-
-// The collector's record stopped before the run ended (it says running, or
-// stalled once its heartbeats stopped), and the Hugging Face copy recorded the
-// run's end after the record's latest update: the collector missed the run's
-// last events, so its record must not hide the end.
-function collectorMissedTheEnd(
-  collector: BuildTimeline,
-  huggingFaceStatus: BuildRunState | null,
-  huggingFaceUpdatedMs: number | null,
-): boolean {
-  return (
-    !FINAL_STATES.has(collector.state) &&
-    huggingFaceStatus != null &&
-    FINAL_STATES.has(huggingFaceStatus) &&
-    huggingFaceUpdatedMs != null &&
-    (collector.updated_ms == null || huggingFaceUpdatedMs > collector.updated_ms)
-  );
-}
-
 function lastCalibrationEpoch(timeline: BuildTimeline): CalibrationEpoch | null {
   const last = timeline.calibration.at(-1);
   return last ? { epoch: last.epoch, epochs: last.epochs } : null;
@@ -129,7 +110,10 @@ export function candidateRunState(
   const huggingFaceUpdatedMs = timeMs(huggingFace.updated_at);
   if (
     !collector ||
-    collectorMissedTheEnd(collector, huggingFaceStatus, huggingFaceUpdatedMs)
+    collectorMissedTheEnd(collector, {
+      state: huggingFaceStatus,
+      updated_ms: huggingFaceUpdatedMs,
+    })
   ) {
     return {
       state_source: "hugging_face",

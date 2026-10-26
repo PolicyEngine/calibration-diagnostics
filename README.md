@@ -46,9 +46,9 @@ dashboard API layer.
   unavailable state. A run's status, stage and times come from the hosted
   telemetry collector when it has a record of the run, because a build's
   Hugging Face copy can stop updating partway through; the page then names the
-  source and says what the Hugging Face copy last recorded. A collector record
-  that stopped before the run ended gives way to a Hugging Face copy that
-  recorded the end later. Runs only the
+  source and says what the Hugging Face copy last recorded. On both tabs, a
+  collector record that stopped before the run ended gives way to a Hugging
+  Face copy that recorded the end later. Runs only the
   collector knows have no candidate files and appear on Build progress only.
 - **Build progress** (the second tab of Staging candidates,
   `/microcosm/staging?view=progress`) — follow a build run while it runs,
