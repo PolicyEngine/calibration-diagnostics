@@ -20,6 +20,7 @@ import {
   fmtDecimal,
   fmtMoney,
   fmtSignedMoney,
+  formatShortDateTime,
   shortReleaseId,
 } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -106,18 +107,6 @@ function statusTone(status: string | null | undefined): StatusTone {
   return "neutral";
 }
 
-function timeLabel(value: string | null | undefined): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return value;
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function timestampFromId(value: string | null | undefined): string | null {
   const match = value?.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
   if (!match) return null;
@@ -135,7 +124,7 @@ function runStartTime(run: MicrocosmStagingRunSummary): string | null | undefine
 }
 
 function runLabel(run: MicrocosmStagingRunSummary): string {
-  return `${timeLabel(runStartTime(run))} · ${shortReleaseId(
+  return `${formatShortDateTime(runStartTime(run))} · ${shortReleaseId(
     run.candidate_release_id || run.run_id,
   )}`;
 }
@@ -297,7 +286,7 @@ function agoLabel(value: string | null | undefined): string {
 
 function timeWithAgo(value: string | null | undefined): string {
   const ago = agoLabel(value);
-  return `${timeLabel(value)}${ago ? ` · ${ago}` : ""}`;
+  return `${formatShortDateTime(value)}${ago ? ` · ${ago}` : ""}`;
 }
 
 // What the run's Hugging Face copy last recorded: "Running, Calibration,
@@ -631,7 +620,7 @@ function RunInternalsPanel({
                           {blocked && <StatusPill tone="warning">blocked</StatusPill>}
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
-                          {timeLabel(time)}
+                          {formatShortDateTime(time)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                           {index === all.length - 1 && event.stage !== "complete" && !failed && !blocked

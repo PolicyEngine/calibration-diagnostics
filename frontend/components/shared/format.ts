@@ -29,6 +29,21 @@ export function formatReleaseDate(date: string | null | undefined): string {
   return h ? `${y}-${mo}-${d} ${h}:${mi}Z` : `${y}-${mo}-${d}`;
 }
 
+// The Staging page's date and time, in the viewer's locale and time zone,
+// such as "Oct 19, 08:33 AM" in US English. An empty value shows "—" and an
+// unparseable one is shown as given.
+export function formatShortDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function releaseDateFromId(releaseId: string): string {
   return releaseId.match(/-(\d{8}(?:T\d{6}Z)?)$/)?.[1] ?? "";
 }
