@@ -545,10 +545,14 @@ describe("one collector run list for every Staging route", () => {
     try {
       [firstPoll, nextPoll] = await withCollector(slowList, async () => {
         const pending = loadCollectorTimelines("am", [runningRunId], NOW);
+        // The first poll's list request, which carries on after the wait.
+        const firstList = collectorRunLists.recent("am");
         jest.advanceTimersByTime(5_000);
         // The collector answers only after the wait is over.
         answerList();
-        return [await pending, await loadCollectorTimelines("am", [runningRunId], NOW)];
+        const first = await pending;
+        await firstList;
+        return [first, await loadCollectorTimelines("am", [runningRunId], NOW)];
       });
     } finally {
       jest.useRealTimers();
@@ -582,12 +586,14 @@ describe("one collector run list for every Staging route", () => {
     try {
       [firstPoll, nextPoll] = await withCollector(slowList, async () => {
         const firstPending = loadCollectorTimelines("am", [runningRunId], NOW);
+        // The first poll's list request, which carries on after the wait.
+        const firstList = collectorRunLists.recent("am");
         jest.advanceTimersByTime(5_000);
         const first = await firstPending;
         // The first request answers 6 seconds after it was made.
         jest.advanceTimersByTime(1_000);
         unansweredListRequests.shift()?.();
-        await collectorRunLists.recent("am");
+        await firstList;
         // The next poll, 30 seconds after the first.
         jest.advanceTimersByTime(24_000);
         const nextPending = loadCollectorTimelines("am", [runningRunId], NOW);
@@ -636,5 +642,75 @@ describe("one collector run list for every Staging route", () => {
 
     expect(latePoll.timelines.size).toBe(0);
     expect(latePoll.note).toContain("did not answer within 5 seconds");
+  });
+
+  test("a call made while the list request is in flight shares it", async () => {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+    let answerList!: () => void;
+    const listAnswer = new Promise<void>((resolve) => {
+      answerList = resolve;
+    });
+    const slowList = (async (input: RequestInfo | URL) => {
+      if (new URL(String(input)).pathname === "/v1/runs") await listAnswer;
+      return collector.fetch(input);
+    }) as typeof fetch;
+
+    jest.useFakeTimers();
+    let polls: Array<Awaited<ReturnType<typeof loadCollectorTimelines>>>;
+    try {
+      polls = await withCollector(slowList, async () => {
+        const firstPending = loadCollectorTimelines("am", [runningRunId], NOW);
+        // A second call 4 seconds later, before the first one's wait is over.
+        jest.advanceTimersByTime(4_000);
+        const secondPending = loadCollectorTimelines("am", [runningRunId], NOW);
+        answerList();
+        return Promise.all([firstPending, secondPending]);
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(polls.map((poll) => poll.note)).toEqual([null, null]);
+    expect(collector.listRequests).toHaveLength(1);
+  });
+
+  test("a list request left running after the wait is not shared by the next poll", async () => {
+    // Once every caller has stopped waiting, nothing keeps the request
+    // running: Vercel can suspend the instance with it in flight, and its
+    // overdue 30-second timeout fires when the next poll resumes the instance.
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+    let listRequestCount = 0;
+    let failFirstList!: (error: Error) => void;
+    const firstListTimesOut = (async (input: RequestInfo | URL) => {
+      if (new URL(String(input)).pathname === "/v1/runs" && listRequestCount++ === 0) {
+        await new Promise<never>((_resolve, reject) => {
+          failFirstList = reject;
+        });
+      }
+      return collector.fetch(input);
+    }) as typeof fetch;
+
+    jest.useFakeTimers();
+    let nextPoll: Awaited<ReturnType<typeof loadCollectorTimelines>>;
+    try {
+      nextPoll = await withCollector(firstListTimesOut, async () => {
+        const firstPending = loadCollectorTimelines("am", [runningRunId], NOW);
+        jest.advanceTimersByTime(5_000);
+        await firstPending;
+        // The next poll, 30 seconds after the first, finds the first request
+        // still in flight, and that request then fails with its timeout.
+        jest.advanceTimersByTime(25_000);
+        const nextPending = loadCollectorTimelines("am", [runningRunId], NOW);
+        failFirstList(new Error("The operation was aborted due to timeout"));
+        return nextPending;
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(nextPoll.note).toBeNull();
+    expect(nextPoll.timelines.get(runningRunId)?.state).toBe("running");
   });
 });
