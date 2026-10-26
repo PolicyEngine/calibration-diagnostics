@@ -1,4 +1,4 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { describe, expect, jest, spyOn, test } from "bun:test";
 
 import {
   type BuildRunDocuments,
@@ -453,5 +453,107 @@ describe("uploads to Hugging Face for runs the collector records", () => {
     expect(run?.state).toBe("passed");
     expect(run?.delivery).toEqual(UPLOADED);
     expect(historyCalls).toBe(0);
+  });
+});
+
+describe("one collector run list for every Staging route", () => {
+  test("the Build progress list and both Candidate routes share one list request", async () => {
+    // The be country has no staging repository, so Build progress reads only
+    // the collector.
+    const collector = fakeTelemetryCollector({ countryCode: "BE", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+
+    await withCollector(collector.fetch, async () => {
+      await loadBuildRuns("staging", "be");
+      // The Candidate tab's run list and its selected run.
+      await loadCollectorTimelines("be", [runningRunId], NOW);
+      await loadCollectorTimelines("be", [runningRunId], NOW);
+    });
+
+    expect(collector.listRequests).toHaveLength(1);
+    // A running run's own record is still read for every request.
+    expect(
+      collector.documentRequests.filter((runId) => runId === runningRunId),
+    ).toHaveLength(3);
+  });
+
+  test("the list is read again once it is 15 seconds old", async () => {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+    const listRequestsAt: number[] = [];
+
+    jest.useFakeTimers();
+    try {
+      await withCollector(collector.fetch, async () => {
+        await loadCollectorTimelines("am", [runningRunId], NOW);
+        listRequestsAt.push(collector.listRequests.length);
+        jest.advanceTimersByTime(14_000);
+        await loadCollectorTimelines("am", [runningRunId], NOW);
+        listRequestsAt.push(collector.listRequests.length);
+        jest.advanceTimersByTime(2_000);
+        await loadCollectorTimelines("am", [runningRunId], NOW);
+        listRequestsAt.push(collector.listRequests.length);
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(listRequestsAt).toEqual([1, 1, 2]);
+  });
+
+  test("a failed list request is not reused", async () => {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+    let listRequestCount = 0;
+    const failingOnce = (async (input: RequestInfo | URL) => {
+      if (new URL(String(input)).pathname === "/v1/runs" && listRequestCount++ === 0) {
+        return Response.json({ detail: "Unavailable." }, { status: 503 });
+      }
+      return collector.fetch(input);
+    }) as typeof fetch;
+
+    const [failed, answered] = await withCollector(failingOnce, async () => [
+      await loadCollectorTimelines("am", [runningRunId], NOW),
+      await loadCollectorTimelines("am", [runningRunId], NOW),
+    ]);
+
+    expect(failed.note).toContain("503");
+    expect(answered.note).toBeNull();
+    expect(answered.timelines.get(runningRunId)?.state).toBe("running");
+  });
+
+  test("the Candidate tab waits at most 5 seconds for the list, and a late answer serves the next poll", async () => {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+    let answerList!: () => void;
+    const listAnswer = new Promise<void>((resolve) => {
+      answerList = resolve;
+    });
+    const slowList = (async (input: RequestInfo | URL) => {
+      if (new URL(String(input)).pathname === "/v1/runs") await listAnswer;
+      return collector.fetch(input);
+    }) as typeof fetch;
+
+    jest.useFakeTimers();
+    let firstPoll: Awaited<ReturnType<typeof loadCollectorTimelines>>;
+    let nextPoll: Awaited<ReturnType<typeof loadCollectorTimelines>>;
+    try {
+      [firstPoll, nextPoll] = await withCollector(slowList, async () => {
+        const pending = loadCollectorTimelines("am", [runningRunId], NOW);
+        jest.advanceTimersByTime(5_000);
+        // The collector answers only after the wait is over.
+        answerList();
+        return [await pending, await loadCollectorTimelines("am", [runningRunId], NOW)];
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(firstPoll.timelines.size).toBe(0);
+    expect(firstPoll.note).toContain("did not answer within 5 seconds");
+    expect(firstPoll.note).toContain("Hugging Face");
+    expect(nextPoll.note).toBeNull();
+    expect(nextPoll.timelines.get(runningRunId)?.state).toBe("running");
+    expect(collector.listRequests).toHaveLength(1);
   });
 });
