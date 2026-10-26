@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 
+import { stagingTargetDetailPresentation } from "@/components/microcosm/staging-target-detail-presentation";
+import { formatShortDateTime } from "@/components/shared/format";
 import { microcosmStagingTargetChangeSourceParameters } from "@/lib/api/hooks/use-microcosm";
 import {
   calibrationBuildManifestState,
@@ -9,6 +11,7 @@ import {
   stagingComparisonBaseline,
   type ComparisonMapBuildSources,
 } from "./calibration-selection";
+import { targetChangeModeHelp } from "./target-change-visualization";
 
 test("recognizes obsolete staging selectors without treating releases as staging", () => {
   expect(isStagingSelection("staging:uk-candidate")).toBe(true);
@@ -187,4 +190,111 @@ test("the fallback note says the dashboard has no local-area build, not that non
       `this local-area candidate is compared with the current release, ${NATIONAL_CURRENT}, ` +
       "which calibrates a different set of targets.",
   });
+});
+
+// Published builds the comparison map's "From" selector offers, as the build
+// manifest lists them.
+const NATIONAL_BUILD_PUBLISHED_AT = "2026-10-19T08:41:07Z";
+const NATIONAL_RELEASE_BUILD = {
+  buildArtifactId: "national-build",
+  kind: "release" as const,
+  releaseId: NATIONAL_CURRENT,
+  stagingRunId: null,
+  createdAt: NATIONAL_BUILD_PUBLISHED_AT,
+  updatedAt: NATIONAL_BUILD_PUBLISHED_AT,
+};
+const DENSE_RELEASE_BUILD = {
+  ...NATIONAL_RELEASE_BUILD,
+  buildArtifactId: "dense-build",
+  releaseId: DENSE_NEWEST,
+};
+const EARLIER_CANDIDATE_RUN = "uk-frs-calibration-attempt-20261017T101500Z-3f9a1c2e";
+const EARLIER_CANDIDATE_PUBLISHED_AT = "2026-10-17T13:02:44Z";
+const EARLIER_CANDIDATE_BUILD = {
+  buildArtifactId: "earlier-candidate-build",
+  kind: "staging" as const,
+  releaseId: null,
+  stagingRunId: EARLIER_CANDIDATE_RUN,
+  createdAt: EARLIER_CANDIDATE_PUBLISHED_AT,
+  updatedAt: EARLIER_CANDIDATE_PUBLISHED_AT,
+};
+const LOCAL_AREA_COMPARISON = {
+  release_id: DENSE_NEWEST,
+  basis: "newest_local_area_release",
+  local_area_candidate: true,
+} as const;
+const NATIONAL_COMPARISON = {
+  release_id: NATIONAL_CURRENT,
+  basis: "current_release",
+  local_area_candidate: false,
+} as const;
+
+// A local-area candidate is compared with the dense release; the user picks
+// the national release build in "From".
+const NATIONAL_BUILD_NAME =
+  `${formatShortDateTime(NATIONAL_BUILD_PUBLISHED_AT)} · ${NATIONAL_CURRENT}`;
+
+test("a release build the user picks in From is named by its date and release ID", () => {
+  expect(stagingComparisonBaseline(LOCAL_AREA_COMPARISON, NATIONAL_RELEASE_BUILD)).toEqual({
+    releaseLabel: `Build ${NATIONAL_BUILD_NAME}`,
+    tabLabel: `Change from build ${NATIONAL_BUILD_NAME}`,
+    note: null,
+  });
+});
+
+test("the comparison map's mode help and target detail name the picked From build", () => {
+  const { releaseLabel } = stagingComparisonBaseline(
+    LOCAL_AREA_COMPARISON,
+    NATIONAL_RELEASE_BUILD,
+  );
+  expect(targetChangeModeHelp(releaseLabel).reported).toEndWith(
+    `subtract their contribution in the build ${NATIONAL_BUILD_NAME}.`,
+  );
+  const detail = stagingTargetDetailPresentation(null, null, null, releaseLabel);
+  expect(detail.eyebrow).toBe(`Build ${NATIONAL_BUILD_NAME} calibration target`);
+  expect(detail.metrics.map((metric) => metric.label)).toEqual([
+    "Official target",
+    `Build ${NATIONAL_BUILD_NAME} estimate`,
+    "Candidate estimate",
+    `Build ${NATIONAL_BUILD_NAME} error`,
+    "Candidate release error",
+    "Weighted target error change",
+  ]);
+});
+
+test("a staging build the user picks in From is named by its date and run ID", () => {
+  // A national candidate; the user picks an earlier candidate's published build.
+  const candidateBuildName =
+    `${formatShortDateTime(EARLIER_CANDIDATE_PUBLISHED_AT)} · ${EARLIER_CANDIDATE_RUN}`;
+  expect(stagingComparisonBaseline(NATIONAL_COMPARISON, EARLIER_CANDIDATE_BUILD)).toEqual({
+    releaseLabel: `Build ${candidateBuildName}`,
+    tabLabel: `Change from build ${candidateBuildName}`,
+    note: null,
+  });
+});
+
+test("a picked From build drops the note explaining the server's choice of release", () => {
+  expect(stagingComparisonBaseline(
+    { ...NATIONAL_COMPARISON, local_area_candidate: true },
+    EARLIER_CANDIDATE_BUILD,
+  ).note).toBeNull();
+});
+
+test("a picked From build the publisher could not date is named by its run ID alone", () => {
+  expect(stagingComparisonBaseline(NATIONAL_COMPARISON, {
+    ...EARLIER_CANDIDATE_BUILD,
+    createdAt: null,
+    updatedAt: null,
+  }).releaseLabel).toBe(`Build ${EARLIER_CANDIDATE_RUN}`);
+});
+
+test("without a pick, or with a pick of the compared release's build, the labels name the compared release", () => {
+  const localArea = stagingComparisonBaseline(LOCAL_AREA_COMPARISON);
+  expect(localArea.releaseLabel).toBe("Local-area release");
+  expect(stagingComparisonBaseline(LOCAL_AREA_COMPARISON, null)).toEqual(localArea);
+  expect(stagingComparisonBaseline(LOCAL_AREA_COMPARISON, undefined)).toEqual(localArea);
+  expect(stagingComparisonBaseline(LOCAL_AREA_COMPARISON, DENSE_RELEASE_BUILD)).toEqual(localArea);
+  expect(stagingComparisonBaseline(NATIONAL_COMPARISON, NATIONAL_RELEASE_BUILD)).toEqual(
+    stagingComparisonBaseline(NATIONAL_COMPARISON),
+  );
 });
