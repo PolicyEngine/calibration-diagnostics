@@ -63,9 +63,12 @@ export interface CandidateRunState {
 
 export type CandidateRunSummary = StagingRunSummary & CandidateRunState;
 
-// A healthy UK run uploads its Hugging Face copy every 5 minutes and sends the
-// collector a heartbeat every minute, so a copy this far behind has stopped
-// changing.
+// How far the Hugging Face copy may trail the collector's record before the
+// page says so. Staging writers upload the copy only when the build records
+// something, at most every 5 minutes for the UK writer, while the collector
+// gets a heartbeat every minute. So a copy this far behind has either stopped
+// changing or is in a long stage with nothing new to upload; either way the
+// page shows what the copy still records.
 export const HUGGING_FACE_LAG_MS = 15 * 60 * 1000;
 
 function timeMs(value: string | null): number | null {
