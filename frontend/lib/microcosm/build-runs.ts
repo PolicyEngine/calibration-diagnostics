@@ -9,6 +9,7 @@ import {
   buildTimeline,
   collectorMissedTheEnd,
   compactTimeline,
+  keepListedUploads,
   type StopStat,
   stopStatistics,
   forecastCompletion,
@@ -16,6 +17,7 @@ import {
   phaseTotals,
   sameStageSequence,
   stageStatistics,
+  withHuggingFaceUploads,
 } from "@/lib/microcosm/build-monitor";
 import {
   type CatalogGate,
@@ -337,7 +339,9 @@ export async function loadCollectorTimelines(
 // The hosted documents the build monitor shows, one per run id. During the
 // migration period a collector record replaces the run's historical Hugging
 // Face copy, unless the record stopped before an end the copy recorded later
-// (`collectorMissedTheEnd`, the rule the Candidate tab uses too).
+// (`collectorMissedTheEnd`, the rule the Candidate tab uses too). A record
+// that replaces a copy keeps the copy's upload record, which the collector
+// cannot know.
 export function mergeHostedDocuments(
   collector: readonly BuildRunDocuments[],
   huggingFace: readonly BuildRunDocuments[],
@@ -356,7 +360,10 @@ export function mergeHostedDocuments(
     ) {
       continue;
     }
-    byId.set(document.run_id, document);
+    byId.set(
+      document.run_id,
+      copy ? withHuggingFaceUploads(document, copy) : document,
+    );
   }
   return [...byId.values()];
 }
@@ -453,10 +460,11 @@ export async function refreshHostedRun(
     if (collectorRun) {
       // The list kept the Hugging Face copy when the collector's record
       // stopped before an end the copy recorded later; a fresh read of that
-      // record must not hide the end either.
+      // record must not hide the end either. Otherwise the fresh record wins,
+      // with the uploads the list read from the copy.
       return current && collectorMissedTheEnd(collectorRun, current)
         ? current
-        : collectorRun;
+        : keepListedUploads(collectorRun, current);
     }
   }
   if (!loaders.hasStagingHistory(country)) {
