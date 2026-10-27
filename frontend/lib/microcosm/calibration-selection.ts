@@ -137,15 +137,22 @@ function pickedFromBuildBaseline(build: ComparisonFromBuild): StagingComparisonB
  * by its date and run ID instead, and the note explaining the server's choice
  * of release is dropped. Picking the compared release's own build keeps the
  * release's name.
+ *
+ * `comparedReleaseId` is the release the comparison used (its `a.release_id`).
+ * The response names it in `comparisonRelease` only for a local-area
+ * candidate, so a national candidate's compared release is known only from
+ * this ID.
  */
 export function stagingComparisonBaseline(
   comparisonRelease: StagingComparisonRelease | undefined,
   pickedFromBuild?: ComparisonFromBuild | null,
+  comparedReleaseId?: string,
 ): StagingComparisonBaseline {
+  const defaultReleaseId = comparedReleaseId ?? comparisonRelease?.release_id;
   if (
     pickedFromBuild &&
     !(pickedFromBuild.kind === "release" &&
-      pickedFromBuild.releaseId === comparisonRelease?.release_id)
+      pickedFromBuild.releaseId === defaultReleaseId)
   ) {
     return pickedFromBuildBaseline(pickedFromBuild);
   }

@@ -169,6 +169,7 @@ export function StagingCalibrationMapPanel({
   const fromBaseline = stagingComparisonBaseline(
     comparisonRelease,
     builds.find((build) => build.buildArtifactId === buildPicks.from),
+    comparisonReleaseId,
   );
 
   const immutableComparison = Boolean(
