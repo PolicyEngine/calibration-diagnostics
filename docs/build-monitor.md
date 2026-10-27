@@ -53,11 +53,11 @@ checks stop builds. The run selected on either tab carries over to the other.
   in flight is shared only for 5 seconds after it was made, and a later call
   makes its own request: once the Candidate tab has stopped waiting for a
   request, nothing keeps it running, and Vercel can suspend the instance
-  with it in flight. The read of the collector's credential from Google
-  Secret Manager, which a list request starts, follows the same rule: a read
-  still in flight is shared for 5 seconds after it began, and a read that
-  answered is reused for 60 seconds after it began. Each run's own record is
-  read on every request, as before.
+  with it in flight. Every collector request needs the collector's read
+  credential from Google Secret Manager, and that read follows the same
+  rule: a read still in flight is shared for 5 seconds after it began, and a
+  read that answered is reused for 60 seconds after it began. Each run's own
+  record is read on every request, as before.
 - **Local run folders.** The dashboard can still inspect legacy or diagnostic
   run folders on the same machine. Point it at the directory that holds them:
 
