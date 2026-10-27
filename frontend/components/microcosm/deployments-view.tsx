@@ -124,13 +124,11 @@ export function DeploymentsView() {
         eyebrow="Microcosm · releases"
         title="Deployments"
         description={
-          <>
-            Which .py version, {modelLabel} version and {registration.dataset_label}{" "}build each
-            PolicyEngine surface declares. Each surface&apos;s dependency lock pins .py; that
-            .py tag&apos;s bundle manifest certifies one data build for each country. Versions
-            come from the lock on each repository&apos;s default branch, so a surface can run an
-            older deploy than shown here.
-          </>
+          <span className="block text-pretty">
+            {`Each PolicyEngine surface pins a .py version, and that .py certifies one ${registration.dataset_label} build. `}
+            Versions come from each repository&apos;s lock file on its default branch, so a
+            running service can be older.
+          </span>
         }
       />
 
