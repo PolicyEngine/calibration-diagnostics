@@ -40,7 +40,11 @@ checks stop builds. The run selected on either tab carries over to the other.
   only when it has no copy that records them.
 
   Every Staging route reads the collector's run list (the country's 60 most
-  recent runs) through one cache on each server instance. An answer is
+  recent runs) through one cache on each server instance. On Vercel the
+  Candidate tab's selected-run route (`staging/run`, `maxDuration` 300) runs
+  in a different function from the Build progress routes and the Candidate
+  run list (120), because Vercel groups routes into one function only when
+  their settings match, so it keeps its own cache. An answer is
   reused for 15 seconds, and a failed request is tried again on the next
   call. The Candidate tab waits at most 5 seconds for the list. After that it
   uses the list's latest earlier answer if that answered less than 60 seconds

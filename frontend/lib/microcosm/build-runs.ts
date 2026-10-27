@@ -50,10 +50,13 @@ import {
 
 const STAGING_LIST_TTL_MS = 30_000;
 const STAGING_RUN_LIMIT = 60;
-// How long one answer to the collector's run list serves every Staging route
+// How long one answer to the collector's run list serves the Staging routes
 // on a server instance. The Candidate tab's two routes poll together every 30
-// seconds, as does the Build progress list, so a poll makes at most one list
-// request per country. Each run's own record is read as before.
+// seconds, as does the Build progress list. On Vercel, `staging/run` (whose
+// `maxDuration` is 300) runs in a different function from `builds`,
+// `builds/run` and `staging/runs` (120), so it keeps its own cache, and a poll
+// makes one list request per country in each of the two functions. Each run's
+// own record is read as before.
 const COLLECTOR_LIST_TTL_MS = 15_000;
 // How long the Candidate tab waits for the collector's run list. Past it, the
 // tab uses the list's latest earlier answer, or shows the Hugging Face states
