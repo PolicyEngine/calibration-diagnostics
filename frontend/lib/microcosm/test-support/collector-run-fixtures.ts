@@ -31,6 +31,12 @@ export const UK_BLOCKED_RUN_ID =
 export const UK_COMPLETED_HUGGING_FACE_RUN_ID =
   "uk-local-candidate-f100-s42-20261007T120029Z-2ee47c99";
 
+// A UK national calibration attempt that uploaded its telemetry (39 of 39
+// files) and staged its dataset. The collector and the Hugging Face copy both
+// record it passing.
+export const UK_STAGED_RUN_ID =
+  "uk-frs-calibration-attempt-20261021T195620Z-a858c100";
+
 export const US_RELEASE_CHECK_FAILURE =
   "Release gates failed: Critical fiscal target 'ssa_supplement.cy2024.oasdi_ssi_payments.social_security_benefits.payment_amount@2024' (Social Security benefits) has relative_error=-0.0641635, exceeding 0.05";
 
@@ -246,4 +252,98 @@ export function ukBlockedCollectorDocuments(): BuildRunDocuments {
       { stage: "blocked", status: "blocked", time: "2026-10-18T23:45:50Z", details: block },
     ],
   );
+}
+
+// The collector's documents for the staged UK attempt. Its run manifest
+// records delivery the way the collector always does: mode "collector" with no
+// upload counts, because uploads to Hugging Face never pass through it.
+export function ukStagedCollectorDocuments(): BuildRunDocuments {
+  const documents = collectorDocuments(
+    UK_STAGED_RUN_ID,
+    "uk",
+    {
+      country_code: "GB",
+      pipeline: { id: "uk-frs-calibration", version: "collector-v1" },
+      run_kind: "calibration",
+      started_at: "2026-10-21T19:56:21Z",
+      updated_at: "2026-10-21T20:36:30Z",
+      heartbeat_at: "2026-10-21T20:36:02Z",
+      status: "completed",
+      current_stage: "complete",
+    },
+    [
+      { stage: "created", status: "started", time: "2026-10-21T19:56:21Z" },
+      { stage: "preflight", status: "started", time: "2026-10-21T19:56:21Z" },
+      { stage: "preflight", status: "completed", time: "2026-10-21T19:56:40Z" },
+      { stage: "calibration", status: "started", time: "2026-10-21T20:05:00Z" },
+      { stage: "calibration", status: "completed", time: "2026-10-21T20:25:00Z" },
+      { stage: "dataset_staging", status: "started", time: "2026-10-21T20:33:00Z" },
+      { stage: "dataset_staging", status: "completed", time: "2026-10-21T20:35:31Z" },
+      { stage: "complete", status: "completed", time: "2026-10-21T20:36:30Z" },
+    ],
+  );
+  return {
+    ...documents,
+    run_manifest: {
+      schema_version: 2,
+      run_id: UK_STAGED_RUN_ID,
+      country_code: "GB",
+      status: "completed",
+      delivery: { mode: "collector", upload_attempts: null, upload_successes: null },
+    },
+  };
+}
+
+// The staged UK attempt's Hugging Face copy: the progress document its final
+// upload wrote, with the writer's own count of uploaded files.
+export function ukStagedHuggingFaceDocuments(): BuildRunDocuments {
+  const delivery = {
+    configured_repository: "policyengine/populace-uk-staging",
+    contract_version: 2,
+    enabled: true,
+    last_error_code: null,
+    mode: "local_and_remote",
+    opt_out_reason: null,
+    read_back: "not_requested",
+    run_id: UK_STAGED_RUN_ID,
+    upload_attempts: 39,
+    upload_successes: 39,
+  };
+  return {
+    run_id: UK_STAGED_RUN_ID,
+    source: "staging",
+    country: "uk",
+    progress: {
+      schema_version: 3,
+      run_id: UK_STAGED_RUN_ID,
+      country_code: "GB",
+      pipeline: { id: "uk-frs-calibration", version: "0.1.0" },
+      run_kind: "calibration",
+      started_at: "2026-10-21T19:56:21+00:00",
+      updated_at: "2026-10-21T20:36:24+00:00",
+      status: "completed",
+      current_stage: "complete",
+      delivery,
+    },
+    run_manifest: { schema_version: 3, run_id: UK_STAGED_RUN_ID, status: "completed", delivery },
+    calibration_progress: null,
+    events: [
+      {
+        schema_version: 3,
+        sequence: 1,
+        event_type: "stage",
+        stage_id: "created",
+        status: "started",
+        timestamp: "2026-10-21T19:56:21+00:00",
+      },
+      {
+        schema_version: 3,
+        sequence: 2,
+        event_type: "stage",
+        stage_id: "complete",
+        status: "completed",
+        timestamp: "2026-10-21T20:36:24+00:00",
+      },
+    ],
+  };
 }

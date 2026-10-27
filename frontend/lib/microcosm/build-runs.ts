@@ -9,6 +9,7 @@ import {
   buildTimeline,
   collectorMissedTheEnd,
   compactTimeline,
+  keepListedUploads,
   type StopStat,
   stopStatistics,
   forecastCompletion,
@@ -16,6 +17,7 @@ import {
   phaseTotals,
   sameStageSequence,
   stageStatistics,
+  withHuggingFaceUploads,
 } from "@/lib/microcosm/build-monitor";
 import {
   type CatalogGate,
@@ -48,6 +50,23 @@ import {
 
 const STAGING_LIST_TTL_MS = 30_000;
 const STAGING_RUN_LIMIT = 60;
+// How long one answer to the collector's run list serves the Staging routes
+// on a server instance. The Candidate tab's two routes poll together every 30
+// seconds, as does the Build progress list. On Vercel, `staging/run` (whose
+// `maxDuration` is 300) runs in a different function from `builds`,
+// `builds/run` and `staging/runs` (120), so it keeps its own cache, and a poll
+// makes one list request per country in each of the two functions. Each run's
+// own record is read as before.
+const COLLECTOR_LIST_TTL_MS = 15_000;
+// How long the Candidate tab waits for the collector's run list. Past it, the
+// tab uses the list's latest earlier answer, or shows the Hugging Face states
+// when there is none. The request carries on while the server instance runs,
+// and its answer serves the next poll, but a later call does not share it.
+const COLLECTOR_LIST_WAIT_MS = 5_000;
+// How old that earlier answer may be: two of the Candidate tab's 30-second
+// polls. A list that answers after the wait is more than 15 seconds old at the
+// next poll, and that poll's own request may be as slow.
+const EARLIER_COLLECTOR_LIST_MAX_AGE_MS = 60_000;
 
 export interface BuildRunProblem {
   run_id: string;
@@ -95,6 +114,111 @@ const stagingListCache = new Map<
   string,
   { expiresAt: number; promise: Promise<LoadedRuns> }
 >();
+
+// The country's 60 most recent collector runs, shared by every caller: a list
+// that answered is reused for `COLLECTOR_LIST_TTL_MS` after it answered, a
+// request in flight is shared for `COLLECTOR_LIST_WAIT_MS` after it was made,
+// and a failed request is dropped so the next caller asks again.
+//
+// An older request in flight may have no caller left: the Candidate tab stops
+// waiting after `COLLECTOR_LIST_WAIT_MS`, and nothing keeps the request running
+// after the response, so Vercel can suspend the instance with it in flight. A
+// later caller that shared it would receive its overdue timeout error, so a
+// later caller makes a new request instead.
+const collectorLists = new Map<
+  MicrocosmCountry,
+  {
+    runs: Promise<CollectorRunSummary[]>;
+    requestedAt: number;
+    answeredAt: number | null;
+  }
+>();
+// The list of the latest request that answered for each country, kept while
+// a newer request is in flight.
+const answeredCollectorLists = new Map<
+  MicrocosmCountry,
+  { runs: CollectorRunSummary[]; requestedAt: number; answeredAt: number }
+>();
+// Counts `clear()` calls, so that a request made before one keeps no answer.
+let collectorListsGeneration = 0;
+
+export const collectorRunLists = {
+  recent(country: MicrocosmCountry): Promise<CollectorRunSummary[]> {
+    const now = Date.now();
+    const cached = collectorLists.get(country);
+    if (
+      cached &&
+      (cached.answeredAt == null
+        ? now - cached.requestedAt < COLLECTOR_LIST_WAIT_MS
+        : now - cached.answeredAt < COLLECTOR_LIST_TTL_MS)
+    ) {
+      return cached.runs;
+    }
+    const generation = collectorListsGeneration;
+    const entry = {
+      runs: loadCollectorRuns(country, STAGING_RUN_LIMIT),
+      requestedAt: now,
+      answeredAt: null as number | null,
+    };
+    collectorLists.set(country, entry);
+    entry.runs.then(
+      (runs) => {
+        entry.answeredAt = Date.now();
+        // An answer to a request a newer one replaced still counts, unless
+        // `clear()` ran since or a newer request has already answered.
+        const latest = answeredCollectorLists.get(country);
+        if (
+          generation === collectorListsGeneration &&
+          (!latest || latest.requestedAt <= entry.requestedAt)
+        ) {
+          answeredCollectorLists.set(country, {
+            runs,
+            requestedAt: entry.requestedAt,
+            answeredAt: entry.answeredAt,
+          });
+        }
+      },
+      () => {
+        if (collectorLists.get(country) === entry) collectorLists.delete(country);
+      },
+    );
+    return entry.runs;
+  },
+  // The latest list that answered less than `maxAgeMs` ago, or null.
+  answeredWithin(
+    country: MicrocosmCountry,
+    maxAgeMs: number,
+  ): CollectorRunSummary[] | null {
+    const answered = answeredCollectorLists.get(country);
+    return answered && Date.now() - answered.answeredAt < maxAgeMs
+      ? answered.runs
+      : null;
+  },
+  clear(): void {
+    collectorListsGeneration += 1;
+    collectorLists.clear();
+    answeredCollectorLists.clear();
+  },
+};
+
+const WAIT_OVER = Symbol("wait over");
+
+// `promise`'s value, or `WAIT_OVER` when it has not settled within `waitMs`.
+// A rejection within the wait is thrown.
+async function settledWithin<T>(
+  promise: Promise<T>,
+  waitMs: number,
+): Promise<T | typeof WAIT_OVER> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const waitOver = new Promise<typeof WAIT_OVER>((resolve) => {
+    timer = setTimeout(() => resolve(WAIT_OVER), waitMs);
+  });
+  try {
+    return await Promise.race([promise, waitOver]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 interface LoadedRuns {
   available: boolean;
@@ -253,7 +377,7 @@ async function loadCollectorDocuments(
 }
 
 async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
-  const summaries = await loadCollectorRuns(country, STAGING_RUN_LIMIT);
+  const summaries = await collectorRunLists.recent(country);
   const documents: BuildRunDocuments[] = [];
   const problems: BuildRunProblem[] = [];
   await Promise.all(
@@ -282,12 +406,14 @@ const HUGGING_FACE_FALLBACK =
 
 // The collector's state for runs the Candidate tab lists from Hugging Face.
 // It reads the same records the Build progress tab does (the country's 60
-// most recent collector runs) and derives each state with the same
-// `buildTimeline`, so the two tabs agree on every run the collector knows.
+// most recent collector runs, from the shared list) and derives each state
+// with the same `buildTimeline`, so the two tabs agree on every run the
+// collector knows. It waits at most `waitMs` for the list.
 export async function loadCollectorTimelines(
   country: MicrocosmCountry,
   runIds: readonly string[],
   nowMs: number = Date.now(),
+  waitMs: number = COLLECTOR_LIST_WAIT_MS,
 ): Promise<CollectorTimelines> {
   const timelines = new Map<string, BuildTimeline>();
   if (!runIds.length) return { timelines, note: null };
@@ -301,7 +427,24 @@ export async function loadCollectorTimelines(
         note: `The telemetry collector is not configured on this server, so ${HUGGING_FACE_FALLBACK}.`,
       };
     }
-    summaries = await loadCollectorRuns(country, STAGING_RUN_LIMIT);
+    const listed = await settledWithin(collectorRunLists.recent(country), waitMs);
+    if (listed !== WAIT_OVER) {
+      summaries = listed;
+    } else {
+      // The request carries on, and its answer serves a later poll. Until it
+      // answers, an earlier answer that is recent enough stands in.
+      const earlier = collectorRunLists.answeredWithin(
+        country,
+        EARLIER_COLLECTOR_LIST_MAX_AGE_MS,
+      );
+      if (!earlier) {
+        return {
+          timelines,
+          note: `The telemetry collector did not answer within ${waitMs / 1000} seconds, so ${HUGGING_FACE_FALLBACK}.`,
+        };
+      }
+      summaries = earlier;
+    }
   } catch (error) {
     return {
       timelines,
@@ -337,7 +480,9 @@ export async function loadCollectorTimelines(
 // The hosted documents the build monitor shows, one per run id. During the
 // migration period a collector record replaces the run's historical Hugging
 // Face copy, unless the record stopped before an end the copy recorded later
-// (`collectorMissedTheEnd`, the rule the Candidate tab uses too).
+// (`collectorMissedTheEnd`, the rule the Candidate tab uses too). A record
+// that replaces a copy keeps the copy's upload record, which the collector
+// cannot know.
 export function mergeHostedDocuments(
   collector: readonly BuildRunDocuments[],
   huggingFace: readonly BuildRunDocuments[],
@@ -356,7 +501,10 @@ export function mergeHostedDocuments(
     ) {
       continue;
     }
-    byId.set(document.run_id, document);
+    byId.set(
+      document.run_id,
+      copy ? withHuggingFaceUploads(document, copy) : document,
+    );
   }
   return [...byId.values()];
 }
@@ -453,10 +601,11 @@ export async function refreshHostedRun(
     if (collectorRun) {
       // The list kept the Hugging Face copy when the collector's record
       // stopped before an end the copy recorded later; a fresh read of that
-      // record must not hide the end either.
+      // record must not hide the end either. Otherwise the fresh record wins,
+      // with the uploads the list read from the copy.
       return current && collectorMissedTheEnd(collectorRun, current)
         ? current
-        : collectorRun;
+        : keepListedUploads(collectorRun, current);
     }
   }
   if (!loaders.hasStagingHistory(country)) {
