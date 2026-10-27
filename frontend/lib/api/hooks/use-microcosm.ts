@@ -16,10 +16,12 @@ import {
 } from "@/lib/api/cache-policy";
 import { withBasePath } from "@/lib/base-path";
 import type { BuildRunSource } from "@/lib/microcosm/build-monitor";
+import type { StagingComparisonRelease } from "@policyengine/calibration-tree/staging-artifact";
 import type { BuildRunResponse, BuildRunsResponse } from "@/lib/microcosm/build-runs";
 import type { DeploymentsResponse } from "@/lib/microcosm/deployments";
-import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
-import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
+import type { CandidateRunState } from "@/lib/microcosm/staging-run-state";
+import type { ExplorerState } from "@policyengine/calibration-tree/calibration-explorer";
+import type { CalibrationTreeResponse } from "@policyengine/calibration-tree/calibration-tree";
 import {
   calibrationTreeResponseFromBundle,
   calibrationTreeTargetDetailSelection,
@@ -35,12 +37,12 @@ import {
   type CalibrationTreeTargetDetailsArtifact,
   type CalibrationTreeTargetSummaryArtifact,
   type CalibrationTreeTierArtifact,
-} from "@/lib/microcosm/calibration-tree-artifact";
-import type { CalibrationProvenance } from "@/lib/microcosm/target-loss-attribution";
+} from "@policyengine/calibration-tree/calibration-tree-artifact";
+import type { CalibrationProvenance } from "@policyengine/calibration-tree/target-loss-attribution";
 import type {
   TargetChangeMode,
   TargetChangeRow,
-} from "@/lib/microcosm/target-change";
+} from "@policyengine/calibration-tree/target-change";
 import type {
   TargetChangeTreeApiResponse,
   TargetChangeTreeResponse,
@@ -50,7 +52,7 @@ import {
   hasCapability,
   type CountryCapability,
   type RepositoryVisibility,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 import { apiGet } from "../client";
 
 export interface MicrocosmGates {
@@ -237,7 +239,7 @@ export interface GeographyCoverageBlock {
 }
 
 // Typed `release_manifest.country` merged over the country registration
-// (server: releaseCountry in lib/microcosm/latest-artifact.ts).
+// (server: releaseCountry in @policyengine/calibration-tree/latest-artifact).
 export interface MicrocosmArtifactCountry {
   code: Country;
   label: string;
@@ -344,6 +346,8 @@ export interface MicrocosmReleaseEntry {
   dataset_role?: string | null;
   is_default?: boolean;
   is_local_area?: boolean;
+  // A Microcosm cut's line folder; absent when the folder is release_id.
+  release_directory?: string;
 }
 
 export interface MicrocosmReleasesResponse {
@@ -362,6 +366,8 @@ export interface MicrocosmCalibrationBuild {
   sourceId: string;
   label: string;
   releaseId: string | null;
+  // A Microcosm cut's line folder; absent when the folder is releaseId.
+  releaseDirectory?: string;
   stagingRunId: string | null;
   hfRepo: string;
   hfCommitSha: string;
@@ -569,7 +575,9 @@ export interface MicrocosmComparison {
   rows: MicrocosmComparisonRow[];
 }
 
-export interface MicrocosmStagingRunSummary {
+// Status, stage and times are the collector's when it has a record of the
+// run (`state_source`); the Hugging Face values are kept as `hugging_face_*`.
+export interface MicrocosmStagingRunSummary extends CandidateRunState {
   run_id: string;
   candidate_release_id?: string | null;
   release_id?: string | null;
@@ -577,10 +585,6 @@ export interface MicrocosmStagingRunSummary {
   run_kind?: string | null;
   non_release?: boolean | null;
   schema_version?: number | null;
-  status?: string | null;
-  stage?: string | null;
-  started_at?: string | null;
-  updated_at?: string | null;
   progress_path?: string | null;
   run_manifest_path?: string | null;
 }
@@ -596,6 +600,9 @@ export interface MicrocosmStagingRunsResponse {
     run_manifest_path: string;
     detail: string;
   }[];
+  // Why run states come from Hugging Face although the collector may know
+  // them: the collector is not configured, or could not be read.
+  collector_note?: string | null;
 }
 
 export interface MicrocosmStagingRunResponse {
@@ -629,6 +636,10 @@ export interface MicrocosmStagingRunResponse {
   reform_validation?: ReformValidationResponse | null;
   build_manifest?: Record<string, unknown> | null;
   release_manifest?: Record<string, unknown> | null;
+  // The run's state: the collector's when it has a record of the run, else
+  // the Hugging Face copy's. Null when staging is unavailable.
+  state?: CandidateRunState | null;
+  collector_note?: string | null;
 }
 
 export interface MicrocosmVariableValue {
@@ -809,7 +820,12 @@ export function useMicrocosmStagingCompare(runId?: string, release = "latest") {
   return useQuery({
     queryKey: ["microcosm", "staging", "compare", country, runId, release],
     queryFn: () =>
-      apiGet<MicrocosmComparison & { available?: boolean; detail?: string }>(
+      apiGet<MicrocosmComparison & {
+        available?: boolean;
+        detail?: string;
+        // Present for a local-area candidate: which release it is compared with.
+        comparison_release?: StagingComparisonRelease;
+      }>(
         "/microcosm/staging/compare",
         { run: runId, release, country },
       ),

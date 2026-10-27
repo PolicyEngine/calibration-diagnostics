@@ -164,8 +164,10 @@ Belgium requires `BE`, and UK accepts either `UK` or `GB`.
 
 ## Read the API
 
-`GET /api/microcosm/cross-dataset` accepts `country=us|uk|be` (default `us`)
-and these views:
+`GET /api/microcosm/cross-dataset` accepts `country=us|uk|be` (default `us`
+when absent; any other value is the 404 not-configured response described in
+[the request contract](spec-driven-countries.md#requests-for-a-country)) and
+these views:
 
 - `view=summary` (default): source-level score, coverage, capability statuses,
   unsupported reasons, period treatments, and target-performance buckets.

@@ -10,8 +10,8 @@ def test_service_workflow_is_path_scoped_and_uses_an_isolated_build_context() ->
     workflow = WORKFLOW.read_text(encoding="utf-8")
     deploy_script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
 
-    assert workflow.count("- telemetry-service/**") == 2
-    assert "branches: [main]" in workflow
+    # Only pull requests are path-scoped: the workflow no longer runs on push.
+    assert workflow.count("- telemetry-service/**") == 1
     assert "github.ref == 'refs/heads/main'" in workflow
     assert "working-directory: telemetry-service" in workflow
     assert "docker build \\" in deploy_script

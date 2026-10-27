@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import {
   classifyApiError,
   loadComparison,
   loadPointerReleaseId,
-  parseCountry,
   scrub,
-} from "@/lib/microcosm/latest-artifact";
+} from "@policyengine/calibration-tree/latest-artifact";
 
 export const revalidate = 21_600;
 export const runtime = "nodejs";
@@ -16,7 +16,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   let a = url.searchParams.get("a");
   let b = url.searchParams.get("b");
-  const country = parseCountry(url.searchParams.get("country"));
+  const country = requestedCountry(url.searchParams);
+  if (country instanceof Response) return country;
   try {
     // Default b to the latest release; a is required for a real diff.
     if (!b) b = (await loadPointerReleaseId(revalidate, country)).release_id;

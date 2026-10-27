@@ -4,6 +4,24 @@ The calibration explorer reads precomputed schema-6 JSON from private Vercel
 Blob storage. The browser does not download calibration diagnostics or rebuild
 the hierarchy. Schemas 1 through 5 are unsupported.
 
+## Code
+
+The builder, the schema-6 types, parsers and serializers, the Blob I/O, the
+release and staging readers the builder reads from, and the publisher
+(`src/publish-calibration-tree.ts`, run by `bun run publish:calibration-tree`)
+live in the `@policyengine/calibration-tree` workspace package at
+`frontend/packages/calibration-tree/`. The dashboard imports it through its
+subpath exports, such as `@policyengine/calibration-tree/calibration-tree-bundle`.
+The package imports only its own modules, Node built-ins and `@vercel/blob`,
+and its boundary test enforces that.
+
+`src/fixtures/calibration-tree-golden.json` records the exact bytes the builder
+writes for representative inputs: US, UK and Belgium releases, US and UK
+staging runs, a US and a UK release-to-staging comparison, and the manifest
+holding every recorded build. The golden tests require every change to
+reproduce it. Regenerate it only for an intended output change, as
+`src/test-support/calibration-tree-golden-cases.ts` describes.
+
 ## Required Blob folder schema
 
 ```text
@@ -127,13 +145,48 @@ release repository update
   -> audit the existing Blob build for each release
   -> skip complete builds without downloading their diagnostics
   -> build and upload only missing builds or missing files
-  -> update latestReleaseBuildArtifactId from upstream latest.json
+  -> update latestReleaseBuildArtifactId from the country's upstream pointer
 ```
 
 A release directory or tag without calibration diagnostics is reported as
 ineligible and is not treated as an error. The next repository webhook repeats
 the inventory check, so it also finds a historical release missed by an older
 webhook. There is no scheduled reconciliation.
+
+A release whose build cannot be published or repaired, for example because the
+schema 8 reader refuses its diagnostics, its tag moved to another commit, or a
+repair's rebuilt index differs from the recorded digest, is reported as
+`failed` with the error. The remaining releases are still reconciled and the
+latest-release selection is still updated, unless the release the upstream
+pointer names is the one that failed; the workflow then fails. A failed release
+gets no new manifest entry (an entry it already had is left unchanged), unless
+the manifest write was stored and only its read-back check failed ("Calibration
+tree manifest verification failed."). The latest-release selection is never
+moved to a failed release.
+
+#### Microcosm release lines
+
+Microcosm publishes a release line (microcosm#823) under a constant release id:
+its files stay in one folder, `releases/<release id>/`, and each cut is an
+immutable tag named `<release id>-<YYYYMMDDTHHMMSSZ>-<attempt>`. The folder on
+`main` is a mutable copy of whichever cut was published last; a line published
+for inspection only, such as the UK dense local-area line, has no copy on
+`main` at all.
+
+- A cut tag is a release build of its own. Its manifest entry has the tag as
+  `releaseId` (and source ID) and records the folder as `releaseDirectory`.
+  Readers fetch `releases/<releaseDirectory>/` at the entry's commit. Entries
+  without `releaseDirectory` read `releases/<releaseId>/` as before.
+- A tag counts as a cut only when `releases/<release id>/release_manifest.json`
+  at the tag names it as `build.cut_tag`. Any other cut-shaped tag is
+  ineligible.
+- A line folder on `main` is not published again once its cuts are. A build
+  already published from the folder stays pinned at its own commit.
+- A country registration may name a per-line pointer (`pointer_path`, for the
+  UK `latest-national.json`). Its `revision` names the current cut, which
+  becomes the country's latest release. Other countries keep `latest.json`.
+- The release picker adds every published cut beside the folders on `main` and
+  hides a line folder unless the dashboard's latest release still points at it.
 
 ### Finalized staging builds
 
@@ -149,9 +202,16 @@ staging repository main-branch update
 ```
 
 Active or failed staging runs remain on the live 30-second API path. Historical
-staging runs with no calibration diagnostics are reported as ineligible. A
-declared diagnostics file that is missing or has the wrong digest fails the
-workflow.
+staging runs with no calibration diagnostics are reported as ineligible. A run
+whose build cannot be published or repaired, for example because a declared
+diagnostics file is missing or has the wrong digest, is reported as `failed`
+with the error. The remaining runs are still reconciled, and the workflow then
+fails.
+
+A staged dataset's diagnostics are the `calibration_diagnostics.json` its
+receipt records or, failing that, the one `<dataset>.diagnostics.json` it
+records: Microcosm's UK local lane stages its outputs under the dataset's own
+stem. A receipt recording several stem files has no target view.
 
 US and UK staging use the same inventory, source-normalization, build,
 validation, and Blob publication functions. Country registration supplies the
@@ -210,6 +270,41 @@ Hierarchy levels, groups, and nodes store sorted target ordinals.
 `filter-index.json.gz` stores postings for geography level, geography, fit band,
 comparison fit, and calibration status. Target-summary shards store the compact
 metric inputs used to recalculate visible aggregates after filtering.
+
+Geography values are the labels `buildCalibration` produces, so a label that
+more than one geography level uses in a build carries its level, such as
+"Ashfield (constituency)" and "Ashfield (local authority)" (see
+[Geography labels shared by several levels](calibration-map-hierarchy.md#geography-labels-shared-by-several-levels)).
+A tree keeps the labels it was published with. Its build ID derives from its
+inputs, not from the builder's code, so a tree published before that rule keeps
+one merged label for both areas, and a repair of it is refused because the
+rebuilt index differs from the recorded digest. For a staging build, the refusal
+is reported as that run's `failed` outcome.
+
+Geography nodes group rows by geography ID, and a geography that rows spell
+more than one way is listed once (see
+[Geographies spelled more than one way](calibration-map-hierarchy.md#geographies-spelled-more-than-one-way)).
+Geography postings and the index's geography filter options use the node
+labels: one posting per geography node, holding every target of that node, so
+the Geography filter offers one option per geography and selects all of its
+targets. Bundle validation compares each geography posting with the geography
+root node of the same label. It cannot recompute them from the target
+summaries alone, whose compact rows carry each row's own spelling and no
+geography ID. Because the nodes and the postings come from the same labels,
+validation also checks the postings against the target rows: they must be the
+postings that `geographyLabeller` gives the target detail rows, which carry
+the geography IDs, or the postings by each row's own spelling, as trees built
+before geographies were grouped by ID have them. A comparison tree has no
+detail rows and its compact rows carry no geography ID, so both rules give
+each row's own spelling there. For rows that spell every geography one way,
+labels, postings and files are unchanged.
+
+A tree published before geographies were grouped by ID has one node and one
+posting per spelling. Its nodes and postings agree with each other and with
+each row's own spelling, so it still validates, and reconciliation finds it
+complete and leaves its files as they are. Rebuilding
+one whose rows spell a geography ID two ways would give a different index and
+filter index, so a repair of it is refused, like the trees above.
 
 The browser unions selected values within one category, intersects categories,
 filters hierarchy memberships, and recalculates visible metrics from compact
@@ -311,8 +406,27 @@ Failure meanings and recovery:
 - `502` from the application means GitHub rejected or did not receive the
   workflow dispatch; check `GITHUB_ACTIONS_DISPATCH_TOKEN` and its Actions
   permission.
-- A failed GitHub workflow means publication started but did not complete.
-  Rerun that workflow after correcting the reported error.
+- A failed release workflow either stopped before reconciling any release (for
+  example, the manifest, the release listing or the repository's tags could
+  not be read, or one tag's folder or one folder's commit could not be
+  resolved), or printed a report in which at least one release is `failed`
+  or `latestReleaseFailure` says why the latest-release selection was not
+  updated. In the second case every release with another outcome was
+  reconciled, and the error names the failed releases. Every later release
+  workflow for that country retries them and fails again until their errors
+  are corrected. Rerunning does not correct a refused repair of a published
+  tree ("Rebuilt calibration index differs from immutable manifest entry") or
+  a release whose tag moved ("Released dataset … changed from … to …").
+- A failed staging workflow either stopped before reconciling any run (for
+  example, the staging repository was unavailable or listed incompatible
+  runs), or printed a report in which at least one run is `failed`. In the
+  second case every run with another outcome was reconciled, and the error
+  names the failed runs. Every later staging workflow for that country retries
+  them and fails again until their errors are corrected. Rerunning does not
+  correct a refused repair of a published tree ("Rebuilt staging index differs
+  from immutable manifest entry"): the same rebuild differs from the recorded
+  digest again, so that run keeps failing until the tree's missing files are
+  restored.
 - Hugging Face retries non-2xx deliveries and can suspend a repeatedly failing
   webhook. Correct the failure, re-enable the webhook, and replay the delivery;
   see the [Hugging Face delivery and retry documentation](https://huggingface.co/docs/hub/webhooks#delivery-and-retries).
@@ -342,11 +456,50 @@ Remove `--dry-run` to publish. For staging, an automated invocation also passes
 repository state. The GitHub workflow exposes the same `dry_run` option for an
 authenticated verification using Actions secrets.
 
-Each outcome is `complete`, `published`, `repaired`, or `ineligible`.
+Each outcome is `complete`, `published`, `repaired`, `ineligible`, or
+`failed`.
 `complete` means no bundle construction or source-diagnostics download occurred.
 `repaired` means the publisher deterministically rebuilt an existing identity
 and restored only missing files. Any reconstructed index must match the digest
 already recorded in the manifest.
+
+Release and staging reconciliation both record a source they cannot publish or
+repair as `failed`, with the error as its `reason`, and continue with the
+remaining sources; after printing the report the command exits with an error
+naming every failed source. One release or run that cannot be published
+therefore no longer leaves the sources after it unpublished on every later
+invocation. Errors before the per-source loop still stop reconciliation before
+any source and print no report: reading the manifest, listing releases, tags or
+staging runs, the first Blob listing, and, for releases, the Hugging Face
+lookups that build the release list (the folder probe and
+`release_manifest.json` of each tag the manifest does not already pin at its
+commit, and the commit of each folder release without a tag).
+An error in one of those lookups therefore stops every release, as one failed
+release did before.
+
+For a release, the steps that write run in this order: upload the bundle's
+files (the index last), list the stored files and audit the build against its
+own index, then add the manifest entry. An error at any step before the
+manifest write leaves a new release without a manifest entry, and leaves a
+release that already had an entry with that entry unchanged. Files a new
+release uploaded before the error stay under the build's ID, which is a digest
+of the country, the release ID and the source files' digests; no manifest entry
+refers to them, and the next reconciliation rebuilds the same ID and checks
+each existing file byte for byte before reusing it. Each manifest write reads
+the stored manifest, adds one entry, and writes it back on the condition that
+the stored manifest has not changed since that read (after a conflict it reads
+once more and writes without the condition). A failed release makes no
+manifest write, so the writes for the releases after it are the same as
+without it.
+
+After the releases, release reconciliation points `latestReleaseBuildArtifactId`
+at the release the upstream pointer names. It leaves the selection unchanged,
+and records why in the report's `latestReleaseFailure`, when that release
+failed in the same run, is not completely published, or the pointer cannot be
+read; the command then exits with an error. A dry run reads the pointer and
+reports the same `latestReleaseFailure` when the pointer cannot be read or names
+a release that failed in the same run; it does not check whether the named
+release is completely published, because it writes no manifest entries.
 
 `CALIBRATION_TREE_MAX_RAW_BYTES` defaults to 100,000,000 bytes per file, in
 addition to the fixed summary- and detail-shard limits.
@@ -355,13 +508,17 @@ fails publication and therefore fails the GitHub Actions job.
 
 ## Verification
 
-Run from `frontend/`:
+Run from `frontend/`; `bun test` includes the package's tests and
+`bun run lint` also typechecks the package:
 
 ```sh
 bun test
 bun run lint
 bun run build
 ```
+
+To check the package on its own, run `bun test` and `bun run typecheck` from
+`frontend/packages/calibration-tree/`.
 
 Then verify that:
 

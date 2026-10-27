@@ -1,5 +1,7 @@
 import { formatNumber } from "@policyengine/ui-kit";
 
+import { parseReleaseCutTag } from "@policyengine/calibration-tree/release-cut";
+
 // Tax/benefit acronyms shown uppercase rather than as words.
 const ACRONYMS = new Set([
   "salt", "agi", "eitc", "ctc", "actc", "qbi", "ira", "aca", "ptc", "snap",
@@ -27,6 +29,21 @@ export function formatReleaseDate(date: string | null | undefined): string {
   return h ? `${y}-${mo}-${d} ${h}:${mi}Z` : `${y}-${mo}-${d}`;
 }
 
+// The Staging page's date and time, in the viewer's locale and time zone,
+// such as "Oct 19, 08:33 AM" in US English. An empty value shows "—" and an
+// unparseable one is shown as given.
+export function formatShortDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function releaseDateFromId(releaseId: string): string {
   return releaseId.match(/-(\d{8}(?:T\d{6}Z)?)$/)?.[1] ?? "";
 }
@@ -38,8 +55,17 @@ export function shortReleaseId(releaseId: string, length = 6): string {
   return releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0].slice(0, length);
 }
 
-// A readable label for a release: "2026-06-14 · f32c2e5".
+// A readable label for a release: "2026-06-14 · f32c2e5". A Microcosm cut
+// (microcosm#823) names its line and attempt instead:
+// "2026-10-19 08:33Z · 2024-25-national · 6cba5d71".
 export function releaseLabel(releaseId: string, date?: string | null): string {
+  const cut = parseReleaseCutTag(releaseId);
+  if (cut) {
+    // Deprecated upstream identifier: Microcosm release IDs may still use the
+    // former Populace prefix.
+    const line = cut.releaseId.replace(/^(?:microcosm|populace)-[a-z]{2}-/, "");
+    return `${formatReleaseDate(date || cut.cutAt)} · ${line} · ${cut.attempt}`;
+  }
   // Deprecated upstream identifier: Microcosm release IDs still use the former
   // Populace prefix.
   const belgiumChronicleSha =

@@ -4,7 +4,16 @@ import { getVercelOidcToken } from "@vercel/oidc";
 import { GoogleAuth, IdentityPoolClient } from "google-auth-library";
 
 const CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
+// How long a read that answered is reused, counted from when it began.
 const SECRET_CACHE_MS = 60_000;
+// How long a read still in flight is shared, counted from when it began. The
+// build monitor's Candidate tab stops waiting for the collector's run list
+// after 5 seconds, which can leave this read in flight with nothing keeping it
+// running after the response, so Vercel can suspend the instance with it in
+// flight. A later caller that shared it would receive its overdue timeout
+// error, so a later caller makes its own read. Keep this no longer than that
+// wait.
+const SECRET_IN_FLIGHT_SHARE_MS = 5_000;
 const SECRET_VERSION_PATTERN =
   /^projects\/[a-zA-Z0-9-]+\/secrets\/[a-zA-Z0-9_-]+\/versions\/(?:[1-9][0-9]*|latest)$/;
 const PROVIDER_PATTERN =
@@ -57,15 +66,25 @@ export function createSecretReader(
   access: AccessVersion,
   now: () => number = Date.now,
 ) {
-  const cache = new Map<string, { expires: number; value: Promise<string> }>();
+  const cache = new Map<
+    string,
+    { requestedAt: number; answered: boolean; value: Promise<string> }
+  >();
 
   return {
     async readVersion(name: string): Promise<string> {
       if (!validSecretVersion(name)) {
         throw new Error("Invalid Google Secret Manager version resource.");
       }
+      const requestedAt = now();
       const cached = cache.get(name);
-      if (cached && cached.expires > now()) return cached.value;
+      if (
+        cached &&
+        requestedAt - cached.requestedAt <
+          (cached.answered ? SECRET_CACHE_MS : SECRET_IN_FLIGHT_SHARE_MS)
+      ) {
+        return cached.value;
+      }
 
       const value = Promise.resolve()
         .then(() => access(name))
@@ -83,7 +102,16 @@ export function createSecretReader(
             "Unable to load the telemetry credential from Secret Manager.",
           );
         });
-      cache.set(name, { expires: now() + SECRET_CACHE_MS, value });
+      const entry = { requestedAt, answered: false, value };
+      value.then(
+        () => {
+          entry.answered = true;
+        },
+        // The caller receives the error; this handler only keeps the
+        // rejection from being reported as unhandled.
+        () => undefined,
+      );
+      cache.set(name, entry);
       return value;
     },
   };

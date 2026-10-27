@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 
+import { requestedCountry } from "@/lib/api/request-country";
 import { ArtifactError } from "@/lib/cross-dataset/artifact";
 import { crossDatasetApiResponse } from "@/lib/cross-dataset/query";
 import { configuredCrossDatasetReader } from "@/lib/cross-dataset/source";
-import { parseCountry } from "@/lib/microcosm/latest-artifact";
 
 export const revalidate = 300;
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const country = parseCountry(new URL(request.url).searchParams.get("country"));
+  const country = requestedCountry(new URL(request.url).searchParams);
+  if (country instanceof Response) return country;
   try {
     const response = await crossDatasetApiResponse(
       request.url,

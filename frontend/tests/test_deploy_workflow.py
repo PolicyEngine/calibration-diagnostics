@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -11,6 +13,18 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+FRONTEND_INSTALL_COMMAND = ["bun", "install", "--frozen-lockfile"]
+# `bun run <script or file>`, `bun test` and `bun <file>` load repository code, which
+# resolves packages through frontend/node_modules. `bunx` fetches its own package.
+BUN_SCRIPT_COMMAND = re.compile(
+    r"(?<![\w-])bun\s+(?:--\S+\s+)*(?:run|test|\S+\.[cm]?[jt]sx?)(?:\s|$)"
+)
+# The Bun command words between `bun` and the calibration smoke script's path.
+# Words after the path are the script's own arguments.
+CALIBRATION_SMOKE_INVOCATION = re.compile(
+    r"(?<![\w-])bun\s+(?P<bun_words>(?:\S+[ \t]+)*?)"
+    r"frontend/scripts/calibration-deployment-smoke\.ts(?=\s|$)"
+)
 
 
 def _workflow():
@@ -20,15 +34,152 @@ def _workflow():
     )
 
 
+def _step_label(step):
+    return step.get("name") or step.get("uses") or step.get("run", "").strip()
+
+
+def _installs_locked_frontend_dependencies(step, job):
+    """A one-line `bun install --frozen-lockfile [--option ...]` run in frontend."""
+    default_directory = job.get("defaults", {}).get("run", {}).get("working-directory")
+    directory = step.get("working-directory", default_directory)
+    command = step.get("run", "").strip()
+    if "\n" in command or directory != "frontend":
+        return False
+    arguments = shlex.split(command)
+    extra_options = arguments[len(FRONTEND_INSTALL_COMMAND) :]
+    return arguments[: len(FRONTEND_INSTALL_COMMAND)] == FRONTEND_INSTALL_COMMAND and all(
+        option.startswith("--") for option in extra_options
+    )
+
+
+PRODUCTION_CONCURRENCY_GROUP = "calibration-diagnostics-production"
+SUCCESSFUL_MAIN_PUSH_CLAUSES = {
+    "github.event.workflow_run.conclusion == 'success'",
+    "github.event.workflow_run.event == 'push'",
+    "github.event.workflow_run.head_branch == 'main'",
+}
+
+
+def _concurrency_group(job):
+    concurrency = job.get("concurrency", {})
+    return concurrency if isinstance(concurrency, str) else concurrency.get("group")
+
+
 def test_deployment_waits_for_successful_main_ci():
+    # Without the branch filter, every CI run, pull-request runs included,
+    # creates a run of this workflow (see #260).
     workflow = _workflow()
     assert workflow["on"] == {
-        "workflow_run": {"workflows": ["CI"], "types": ["completed"]}
+        "workflow_run": {
+            "workflows": ["CI"],
+            "types": ["completed"],
+            "branches": ["main"],
+        }
     }
     condition = workflow["jobs"]["deploy"]["if"]
     assert "conclusion == 'success'" in condition
     assert "event == 'push'" in condition
     assert "head_branch == 'main'" in condition
+
+
+def test_production_concurrency_group_belongs_to_the_deploy_job_not_the_workflow():
+    # A workflow-level group admits a run as soon as GitHub creates it, before
+    # its job's `if:` skips it, and replaces any older pending run in the
+    # group. On 2026-10-21, a pull-request CI run's deploy run, which would
+    # have skipped, cancelled the pending deploy of #248 that way.
+    workflow = _workflow()
+    assert "concurrency" not in workflow
+    assert workflow["jobs"]["deploy"]["concurrency"] == {
+        "group": PRODUCTION_CONCURRENCY_GROUP,
+        "cancel-in-progress": "false",
+    }
+
+
+def _requires_every_clause(condition, required_clauses):
+    """Whether `condition` is a conjunction that includes every required clause.
+
+    The `${{ }}` wrapper, whitespace, clause order, grouping parentheses and
+    extra `&&`-joined clauses are accepted. Any `||` or `!` (other than `!=`)
+    is rejected, because either could let the job run without the clauses.
+    """
+    expression = " ".join(condition.split())
+    if expression.startswith("${{") and expression.endswith("}}"):
+        expression = expression[3:-2].strip()
+    if "||" in expression or re.search(r"!(?!=)", expression):
+        return False
+    clauses = {clause.strip(" ()") for clause in expression.split("&&")}
+    return required_clauses <= clauses
+
+
+def test_every_job_in_the_production_group_requires_a_successful_main_push():
+    # The branch filter matches the triggering run's head branch name, and a
+    # pull request from a fork whose branch is named main passes it. The job
+    # condition, which requires a push run, is what rejects such a run, so each
+    # job holding the production group requires all of these clauses.
+    jobs = _workflow()["jobs"]
+    jobs_in_production_group = [
+        job_name
+        for job_name, job in jobs.items()
+        if _concurrency_group(job) == PRODUCTION_CONCURRENCY_GROUP
+    ]
+    assert jobs_in_production_group
+    for job_name in jobs_in_production_group:
+        condition = jobs[job_name].get("if", "")
+        assert _requires_every_clause(condition, SUCCESSFUL_MAIN_PUSH_CLAUSES), job_name
+
+
+SUCCESSFUL_CONCLUSION, PUSH_EVENT, MAIN_HEAD_BRANCH = sorted(SUCCESSFUL_MAIN_PUSH_CLAUSES)
+
+
+@pytest.mark.parametrize(
+    ("condition", "requires_every_clause"),
+    [
+        pytest.param(
+            f"{SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH}",
+            True,
+            id="current wording",
+        ),
+        pytest.param(
+            f"${{{{ {SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH} }}}}",
+            True,
+            id="expression wrapper",
+        ),
+        pytest.param(
+            f"({MAIN_HEAD_BRANCH} &&\n  {PUSH_EVENT}) && {SUCCESSFUL_CONCLUSION}",
+            True,
+            id="reordered and grouped",
+        ),
+        pytest.param(
+            f"{SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH}"
+            " && github.repository == 'PolicyEngine/calibration-diagnostics'",
+            True,
+            id="extra required clause",
+        ),
+        pytest.param(
+            f"{SUCCESSFUL_CONCLUSION} && {MAIN_HEAD_BRANCH}",
+            False,
+            id="missing push clause",
+        ),
+        pytest.param(
+            f"{SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH}"
+            " || github.event.workflow_run.event == 'pull_request'",
+            False,
+            id="alternative after or",
+        ),
+        pytest.param(
+            f"!({SUCCESSFUL_CONCLUSION} && {PUSH_EVENT} && {MAIN_HEAD_BRANCH})",
+            False,
+            id="negated",
+        ),
+    ],
+)
+def test_clause_check_accepts_rewordings_and_rejects_weaker_conditions(
+    condition, requires_every_clause
+):
+    assert (
+        _requires_every_clause(condition, SUCCESSFUL_MAIN_PUSH_CLAUSES)
+        is requires_every_clause
+    )
 
 
 def test_deployment_uses_exact_project_and_backend_first_order():
@@ -112,6 +263,110 @@ def test_deployment_supplies_private_release_secret_and_checks_views_before_prom
         check["env"]["VERCEL_AUTOMATION_BYPASS_SECRET"]
         == "${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}"
     )
+
+
+def test_every_bun_script_step_runs_after_its_job_installs_locked_frontend_dependencies():
+    # Bun resolves the frontend's workspace packages, such as
+    # @policyengine/calibration-tree, only through frontend/node_modules, so a
+    # job must install before it runs repository code with Bun.
+    uninstalled_steps = []
+    for workflow_file in sorted((ROOT / ".github/workflows").glob("*.yml")):
+        workflow = yaml.load(workflow_file.read_text(), Loader=yaml.BaseLoader)
+        for job_name, job in workflow["jobs"].items():
+            installed = False
+            for step in job.get("steps", []):
+                if _installs_locked_frontend_dependencies(step, job):
+                    installed = True
+                elif BUN_SCRIPT_COMMAND.search(step.get("run", "")) and not installed:
+                    uninstalled_steps.append(
+                        f"{workflow_file.name} / {job_name} / {_step_label(step)}"
+                    )
+    assert uninstalled_steps == []
+
+
+def test_bun_script_detection_covers_repository_scripts_but_not_package_runners():
+    for command in (
+        "bun run frontend/scripts/calibration-deployment-smoke.ts --url x",
+        "bun run lint",
+        "bun test",
+        "bun --no-install frontend/scripts/replay-build-run.ts",
+        'set -e\nbun run publish:calibration-tree -- "${args[@]}"',
+    ):
+        assert BUN_SCRIPT_COMMAND.search(command), command
+    for command in (
+        'bunx --bun "vercel@${VERCEL_CLI_VERSION}" promote "$URL"',
+        "bun install --frozen-lockfile",
+        "uv pip install modal==1.5.5",
+    ):
+        assert not BUN_SCRIPT_COMMAND.search(command), command
+
+
+def test_deploy_installs_locked_frontend_dependencies_without_credentials_after_the_vercel_upload():
+    job = _workflow()["jobs"]["deploy"]
+    steps = job["steps"]
+    install_indexes = [
+        index
+        for index, step in enumerate(steps)
+        if _installs_locked_frontend_dependencies(step, job)
+    ]
+    assert len(install_indexes) == 1
+    install = steps[install_indexes[0]]
+    assert "env" not in install
+    assert "${{" not in install["run"]
+    names = [step.get("name") for step in steps]
+    # `vercel deploy .` uploads the repository root; installing afterwards keeps
+    # frontend/node_modules out of the uploaded working tree.
+    assert names.index("Build unaliased Vercel production candidate") < install_indexes[0]
+    assert install_indexes[0] < names.index(
+        "Verify staged calibration releases and staging"
+    )
+
+
+def test_deploy_dependency_install_skips_lifecycle_scripts():
+    # The deploy job holds Google Cloud credentials and can request GitHub OIDC
+    # tokens, so neither the project's nor any dependency's install scripts may
+    # run there. The calibration checks need no install script.
+    job = _workflow()["jobs"]["deploy"]
+    install_commands = [
+        shlex.split(step["run"])
+        for step in job["steps"]
+        if _installs_locked_frontend_dependencies(step, job)
+    ]
+    assert install_commands == [
+        ["bun", "install", "--frozen-lockfile", "--ignore-scripts"]
+    ]
+
+
+def test_every_calibration_check_turns_off_bun_auto_install():
+    # In a directory tree without node_modules, Bun installs a missing package
+    # from npm when a script imports it. A check must instead fail when the
+    # workspace install is missing. Bun reads --no-install only before the
+    # script path; after it, the flag is passed to the script.
+    steps = _workflow()["jobs"]["deploy"]["steps"]
+    bun_words_by_step = {}
+    for step in steps:
+        invocation = CALIBRATION_SMOKE_INVOCATION.search(step.get("run", ""))
+        if invocation:
+            bun_words_by_step[step["name"]] = invocation.group("bun_words").split()
+    assert sorted(bun_words_by_step) == [
+        "Verify promoted calibration releases and staging",
+        "Verify staged calibration releases and staging",
+    ]
+    assert {
+        name: "--no-install" in bun_words for name, bun_words in bun_words_by_step.items()
+    } == {name: True for name in bun_words_by_step}
+
+
+def test_calibration_smoke_invocation_reads_only_the_words_before_the_script():
+    for command, bun_words in (
+        ("bun run --no-install frontend/scripts/calibration-deployment-smoke.ts --url x", ["run", "--no-install"]),
+        ("bun --no-install run frontend/scripts/calibration-deployment-smoke.ts", ["--no-install", "run"]),
+        ("bun run frontend/scripts/calibration-deployment-smoke.ts --no-install", ["run"]),
+        ("bun run frontend/scripts/calibration-deployment-smoke.ts \\\n--url x || {\n  exit 1\n}", ["run"]),
+    ):
+        invocation = CALIBRATION_SMOKE_INVOCATION.search(command)
+        assert invocation, command
+        assert invocation.group("bun_words").split() == bun_words, command
 
 
 def test_timestamp_migration_can_run_through_the_publication_workflow():

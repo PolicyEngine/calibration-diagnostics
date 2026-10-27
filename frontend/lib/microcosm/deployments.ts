@@ -8,7 +8,7 @@
 // necessarily what is deployed. Isomorphic types; the fetchers take an
 // injected `fetch` so they can be tested without the network.
 
-import type { MicrocosmCountry } from "@/lib/microcosm/countries";
+import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 
 export const PY_REPOSITORY = "PolicyEngine/policyengine.py";
 export const PY_BUNDLE_MANIFEST_PATH = "src/policyengine/data/bundle/manifest.json";

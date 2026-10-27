@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import { useMicrocosmDeployments } from "@/lib/api/hooks/use-microcosm";
-import { countryRegistration, hasCapability } from "@/lib/microcosm/countries";
+import { countryRegistration, hasCapability } from "@policyengine/calibration-tree/countries";
 import {
   isMicrocosmBuild,
   PY_BUNDLE_MANIFEST_PATH,

@@ -4,7 +4,7 @@ import {
   selectableCountries,
   type MicrocosmCountry,
   type RepositoryEnvironment,
-} from "./countries";
+} from "@policyengine/calibration-tree/countries";
 
 export interface WebhookRepositoryRegistration {
   country: MicrocosmCountry;

@@ -7,8 +7,8 @@ import {
   type ComparisonFit,
   type ExplorerFilters,
   type ExplorerState,
-} from "@/lib/microcosm/calibration-explorer";
-import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
+} from "@policyengine/calibration-tree/calibration-explorer";
+import type { CalibrationTreeResponse } from "@policyengine/calibration-tree/calibration-tree";
 
 const FIT_BAND_LABELS: Record<string, string> = {
   "0_5": "0–5%",

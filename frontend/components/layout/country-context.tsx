@@ -1,19 +1,23 @@
 "use client";
 
 import {
+  Suspense,
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   DEFAULT_COUNTRY,
+  countryParam,
   isCountry,
+  isSelectableCountry,
   type MicrocosmCountry,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 export type Country = MicrocosmCountry;
 
@@ -54,33 +58,80 @@ function persistCountry(country: Country) {
   }
 }
 
+function storedCountry(): string | null {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export type UrlCountryState =
+  | { kind: "country"; country: Country; persist: boolean }
+  | { kind: "not_configured"; requested: string };
+
+// The dashboard state a URL's `?country=` selects. A selectable country is
+// selected (and remembered); no parameter keeps the remembered choice or the
+// default; any other value is not configured, so the page shows that state
+// instead of another country's release.
+export function urlCountryState(
+  urlValue: string | null,
+  stored: string | null,
+): UrlCountryState {
+  const param = countryParam(urlValue);
+  if (!param.configured) return { kind: "not_configured", requested: param.requested };
+  if (param.explicit) return { kind: "country", country: param.country, persist: true };
+  return {
+    kind: "country",
+    country: isSelectableCountry(stored) ? stored : DEFAULT_COUNTRY,
+    persist: false,
+  };
+}
+
 interface CountryContextValue {
   country: Country;
+  // The URL's country code when it names no configured country; the page then
+  // shows the not-configured state and `country` is only the selector's
+  // fallback for navigation.
+  unconfiguredCountry: string | null;
   setCountry: (country: Country) => void;
 }
 
 const CountryContext = createContext<CountryContextValue>({
   country: DEFAULT_COUNTRY,
+  unconfiguredCountry: null,
   setCountry: () => {},
 });
+
+// Follows the URL's country, including client-side navigations. Kept in its
+// own Suspense boundary so reading search params never suspends the pages.
+function CountryUrlSync({ onUrlCountry }: { onUrlCountry: (value: string | null) => void }) {
+  const urlValue = useSearchParams().get("country");
+  useEffect(() => {
+    onUrlCountry(urlValue);
+  }, [onUrlCountry, urlValue]);
+  return null;
+}
 
 export function CountryProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [country, setCountryState] = useState<Country>(DEFAULT_COUNTRY);
+  const [unconfiguredCountry, setUnconfiguredCountry] = useState<string | null>(null);
 
-  useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("country");
-    if (isCountry(requested)) {
-      setCountryState(requested);
-      persistCountry(requested);
+  const applyUrlCountry = useCallback((urlValue: string | null) => {
+    const state = urlCountryState(urlValue, storedCountry());
+    if (state.kind === "not_configured") {
+      setUnconfiguredCountry(state.requested);
       return;
     }
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (isCountry(stored)) setCountryState(stored);
+    setUnconfiguredCountry(null);
+    setCountryState(state.country);
+    if (state.persist) persistCountry(state.country);
   }, []);
 
   const setCountry = (next: Country) => {
-    if (next === country) return;
+    if (next === country && unconfiguredCountry == null) return;
+    setUnconfiguredCountry(null);
     setCountryState(next);
     persistCountry(next);
     // Route through Next so server page search parameters are recalculated;
@@ -89,7 +140,10 @@ export function CountryProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <CountryContext.Provider value={{ country, setCountry }}>
+    <CountryContext.Provider value={{ country, unconfiguredCountry, setCountry }}>
+      <Suspense fallback={null}>
+        <CountryUrlSync onUrlCountry={applyUrlCountry} />
+      </Suspense>
       {children}
     </CountryContext.Provider>
   );

@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 
+import {
+  countryNotConfiguredResponse,
+  requiredCountry,
+} from "@/lib/api/request-country";
 import { withBasePath } from "@/lib/base-path";
-import { getCalibrationTreeBlob } from "@/lib/microcosm/calibration-tree-blob";
+import { getCalibrationTreeBlob } from "@policyengine/calibration-tree/calibration-tree-blob";
 import { immutableCalibrationTreePartResponse } from "@/lib/microcosm/calibration-tree-http";
 import {
   isCalibrationTreePart,
   isSha256,
   type CalibrationTreePart,
-} from "@/lib/microcosm/calibration-tree-artifact";
-import { resolveCalibrationRelease } from "@/lib/microcosm/calibration-release-locator";
-import {
-  isCountry,
-  selectableCountries,
-  type MicrocosmCountry,
-} from "@/lib/microcosm/countries";
+} from "@policyengine/calibration-tree/calibration-tree-artifact";
+import { resolveCalibrationRelease } from "@policyengine/calibration-tree/calibration-release-locator";
+import { CountryNotConfiguredError } from "@policyengine/calibration-tree/countries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,11 +29,6 @@ const ALIAS_CACHE_HEADERS = {
   "Cache-Control": "public, max-age=0, must-revalidate",
   "Vercel-CDN-Cache-Control": "public, max-age=60, stale-if-error=86400",
 };
-
-function countryParameter(url: URL): MicrocosmCountry | null {
-  const value = url.searchParams.get("country");
-  return isCountry(value) && selectableCountries().includes(value) ? value : null;
-}
 
 function partParameter(url: URL): CalibrationTreePart | null {
   const value = url.searchParams.get("part");
@@ -53,13 +48,8 @@ export function createCalibrationTreeHandler(
 ) {
   return async function GET(request: Request) {
     const url = new URL(request.url);
-    const country = countryParameter(url);
-    if (!country) {
-      return NextResponse.json(
-        { detail: "Unknown calibration country." },
-        { status: 400 },
-      );
-    }
+    const country = requiredCountry(url.searchParams);
+    if (country instanceof Response) return country;
     const part = partParameter(url);
     if (!part) {
       return NextResponse.json(
@@ -101,6 +91,9 @@ export function createCalibrationTreeHandler(
           },
         });
       } catch (error) {
+        if (error instanceof CountryNotConfiguredError) {
+          return countryNotConfiguredResponse(error);
+        }
         console.error("Calibration release resolution failed:", error);
         const missing =
           release &&

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import type { TargetChangeRow } from "@/lib/microcosm/target-change";
+import type { TargetChangeRow } from "@policyengine/calibration-tree/target-change";
 import { stagingTargetDetailPresentation } from "./staging-target-detail-presentation";
 
 const TARGET_CHANGE: TargetChangeRow = {
@@ -100,6 +100,7 @@ test("builds the staging-only six-metric and shared-target presentation", () => 
     text: "Candidate dataset decreased absolute error by 5.00 percentage points relative to the current release dataset.",
     tone: "positive",
   });
+  expect(presentation.eyebrow).toBe("Candidate calibration target");
 });
 
 test("omits the unavailable release from added and removed target chart labels", () => {
@@ -144,4 +145,69 @@ test("omits the unavailable release from added and removed target chart labels",
     text: "Current release contains this target, but the candidate does not.",
     tone: "neutral",
   });
+  expect(removed.eyebrow).toBe("Current release calibration target");
+});
+
+const ADDED_TARGET_CHANGE: TargetChangeRow = {
+  ...TARGET_CHANGE,
+  comparison_status: "added",
+  match_kind: null,
+  current_name: null,
+  current_representation: null,
+  current: null,
+  currentDetail: null,
+};
+const REMOVED_TARGET_CHANGE: TargetChangeRow = {
+  ...TARGET_CHANGE,
+  comparison_status: "removed",
+  match_kind: null,
+  candidate_name: null,
+  candidate_representation: null,
+  candidate: null,
+  candidateDetail: null,
+};
+
+test("names the release a local-area candidate is compared with", () => {
+  const shared = stagingTargetDetailPresentation(
+    TARGET_CHANGE,
+    -0.07,
+    TARGET_CHANGE.candidateDetail,
+    "Local-area release",
+  );
+  expect(shared.metrics.map((metric) => [metric.label, metric.caption])).toEqual([
+    ["Official target", undefined],
+    ["Local-area release estimate", undefined],
+    ["Candidate estimate", undefined],
+    ["Local-area release error", "Relative to target"],
+    ["Candidate release error", "Relative to target"],
+    ["Weighted target error change", "Candidate dataset minus local-area release"],
+  ]);
+  expect(shared.afterCalibrationSeries.map((series) => [series.label, series.shortLabel])).toEqual([
+    ["Local-area release after calibration", "Local-area release"],
+    ["Candidate after calibration", "Candidate"],
+  ]);
+  expect(shared.fitSummary?.text).toBe(
+    "Candidate dataset decreased absolute error by 5.00 percentage points relative to the local-area release dataset.",
+  );
+
+  const added = stagingTargetDetailPresentation(
+    ADDED_TARGET_CHANGE,
+    -0.07,
+    TARGET_CHANGE.candidateDetail,
+    "Local-area release",
+  );
+  expect(added.fitSummary?.text).toBe(
+    "Candidate contains this target, but the local-area release does not.",
+  );
+
+  const removed = stagingTargetDetailPresentation(
+    REMOVED_TARGET_CHANGE,
+    -0.07,
+    null,
+    "Local-area release",
+  );
+  expect(removed.eyebrow).toBe("Local-area release calibration target");
+  expect(removed.fitSummary?.text).toBe(
+    "Local-area release contains this target, but the candidate does not.",
+  );
 });

@@ -2,9 +2,11 @@ import { parseArgs } from "node:util";
 
 import {
   hasCapability,
+  isCountry,
+  isCountryNotConfiguredBody,
   selectableCountries,
   type MicrocosmCountry,
-} from "../lib/microcosm/countries";
+} from "@policyengine/calibration-tree/countries";
 
 type JsonObject = Record<string, unknown>;
 type Fetcher = (url: string | URL, init?: RequestInit) => Promise<Response>;
@@ -68,8 +70,9 @@ async function errorDetail(
 async function requestJson(
   options: CalibrationDeploymentOptions,
   path: string,
-  country: MicrocosmCountry,
+  country: string,
   label: string,
+  expectedStatus = 200,
 ): Promise<JsonObject> {
   const url = new URL(options.url);
   if (url.username || url.password || url.search || url.hash) {
@@ -114,7 +117,7 @@ async function requestJson(
       await sleep(RETRY_BACKOFF_MS[attempt]);
       continue;
     }
-    if (response.status !== 200) {
+    if (response.status !== expectedStatus) {
       const detail = await errorDetail(response, options);
       throw new Error(
         `${country} ${label} returned HTTP ${response.status}${detail ? `: ${detail}` : "."}`,
@@ -221,6 +224,40 @@ export async function verifyCalibrationDeployment(
   return receipts;
 }
 
+// The first two-letter code no registration uses.
+export function unregisteredCountryCode(): string {
+  const letters = "xyzqabcdefghijklmnoprstuvw";
+  for (const first of letters) {
+    for (const second of letters) {
+      const code = `${first}${second}`;
+      if (!isCountry(code)) return code;
+    }
+  }
+  throw new Error("Every two-letter country code is registered.");
+}
+
+// A country with no configured release must be refused as not configured,
+// never answered with another country's release (on 2026-10-20 production
+// answered ?country=nz with the US release).
+export async function verifyUnconfiguredCountryRefused(
+  options: CalibrationDeploymentOptions,
+): Promise<string> {
+  const code = unregisteredCountryCode();
+  const body = await requestJson(
+    options,
+    "",
+    code,
+    "calibration summary for an unregistered country",
+    404,
+  );
+  if (!isCountryNotConfiguredBody(body) || body.requested_country !== code) {
+    throw new Error(
+      `${code} calibration summary for an unregistered country is not a not-configured response.`,
+    );
+  }
+  return code;
+}
+
 if (import.meta.main) {
   try {
     const { values } = parseArgs({
@@ -240,6 +277,11 @@ if (import.meta.main) {
         `Validated ${receipt.country} calibration release ${receipt.releaseId}`,
       );
     }
+    const refused = await verifyUnconfiguredCountryRefused({
+      url: values.url,
+      bypassSecret: values["vercel-bypass-secret"],
+    });
+    console.log(`Validated that unregistered country ${refused} is not configured`);
   } catch (error) {
     console.error(
       error instanceof Error

@@ -1,7 +1,15 @@
 import { expect, spyOn, test } from "bun:test";
 
-import { verifyCalibrationDeployment } from "./calibration-deployment-smoke";
-import { hasCapability, selectableCountries } from "../lib/microcosm/countries";
+import {
+  unregisteredCountryCode,
+  verifyCalibrationDeployment,
+  verifyUnconfiguredCountryRefused,
+} from "./calibration-deployment-smoke";
+import {
+  hasCapability,
+  isCountry,
+  selectableCountries,
+} from "@policyengine/calibration-tree/countries";
 
 type Fetcher = (url: string | URL, init?: RequestInit) => Promise<Response>;
 const noSleep = async (_milliseconds: number) => {};
@@ -431,4 +439,69 @@ test("retries a timeout while consuming the successful JSON response body", asyn
     },
   });
   expect(backoffs).toEqual([1000]);
+});
+
+test("the refusal check uses a code no registration claims", () => {
+  const code = unregisteredCountryCode();
+  expect(code).toMatch(/^[a-z]{2}$/);
+  expect(isCountry(code)).toBe(false);
+});
+
+test("an unregistered country refused as not configured qualifies", async () => {
+  const requests: URL[] = [];
+  const fetcher: Fetcher = async (input) => {
+    const url = new URL(input);
+    requests.push(url);
+    const code = url.searchParams.get("country")!;
+    return Response.json(
+      {
+        error: "country_not_configured",
+        requested_country: code,
+        reason: "unknown_country",
+        detail: `No Microcosm calibration release is configured for country "${code}".`,
+      },
+      { status: 404 },
+    );
+  };
+
+  const code = await verifyUnconfiguredCountryRefused({
+    url: "https://candidate.vercel.app/calibration/dashboard",
+    fetcher,
+  });
+  expect(code).toBe(unregisteredCountryCode());
+  expect(requests.map((url) => `${url.pathname}?${url.searchParams}`)).toEqual([
+    `/calibration/dashboard/api/microcosm?country=${code}`,
+  ]);
+});
+
+test("rejects a deployment that serves another country's release for an unregistered code", async () => {
+  // The 2026-10-20 production behaviour: the default country's release.
+  const fetcher: Fetcher = async () =>
+    Response.json({
+      release_id: "us-published-release",
+      calibration: { available: true, country: { code: "us" }, total_targets: 2 },
+    });
+  await expect(
+    verifyUnconfiguredCountryRefused({
+      url: "https://candidate.vercel.app/calibration/dashboard",
+      fetcher,
+    }),
+  ).rejects.toThrow("returned HTTP 200");
+});
+
+test("rejects a 404 that is not the not-configured response for the requested code", async () => {
+  for (const body of [{ detail: "Not found" }, {
+    error: "country_not_configured",
+    requested_country: "us",
+    reason: "unknown_country",
+    detail: "No release.",
+  }]) {
+    const fetcher: Fetcher = async () => Response.json(body, { status: 404 });
+    await expect(
+      verifyUnconfiguredCountryRefused({
+        url: "https://candidate.vercel.app/calibration/dashboard",
+        fetcher,
+      }),
+    ).rejects.toThrow("is not a not-configured response");
+  }
 });

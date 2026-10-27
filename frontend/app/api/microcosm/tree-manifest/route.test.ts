@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { emptyCalibrationTreeManifest, withCalibrationTreeManifestEntry } from "@/lib/microcosm/calibration-tree-manifest";
+import { emptyCalibrationTreeManifest, withCalibrationTreeManifestEntry } from "@policyengine/calibration-tree/calibration-tree-manifest";
 import { createCalibrationTreeManifestHandler } from "./route";
 
 test("manifest API returns one country's current immutable release identity", async () => {
@@ -41,7 +41,7 @@ test("manifest API returns one country's current immutable release identity", as
   expect(response.headers.get("vercel-cdn-cache-control")).toContain("max-age=60");
 });
 
-test("manifest API rejects unselectable countries", async () => {
+test("manifest API refuses unselectable countries as not configured", async () => {
   let read = false;
   const handler = createCalibrationTreeManifestHandler({
     readManifest: async () => {
@@ -52,6 +52,37 @@ test("manifest API rejects unselectable countries", async () => {
   const response = await handler(new Request(
     "https://dashboard.example/api/microcosm/tree-manifest?country=zz",
   ));
-  expect(response.status).toBe(400);
+  expect(response.status).toBe(404);
+  expect(await response.json()).toMatchObject({
+    error: "country_not_configured",
+    requested_country: "zz",
+    reason: "unknown_country",
+  });
   expect(read).toBe(false);
+});
+
+test("manifest API requires a country", async () => {
+  const handler = createCalibrationTreeManifestHandler({
+    readManifest: async () => ({ manifest: emptyCalibrationTreeManifest(), etag: null }),
+  });
+  const response = await handler(new Request(
+    "https://dashboard.example/api/microcosm/tree-manifest",
+  ));
+  expect(response.status).toBe(400);
+});
+
+test("manifest API reports a registered country with no published builds as not configured", async () => {
+  const handler = createCalibrationTreeManifestHandler({
+    readManifest: async () => ({ manifest: emptyCalibrationTreeManifest(), etag: null }),
+  });
+  const response = await handler(new Request(
+    "https://dashboard.example/api/microcosm/tree-manifest?country=be",
+  ));
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({
+    error: "country_not_configured",
+    requested_country: "be",
+    reason: "no_published_release",
+    detail: "No Microcosm calibration release has been published for Belgium yet.",
+  });
 });

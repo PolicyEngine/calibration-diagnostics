@@ -48,9 +48,9 @@ census==0.8.27 \
     --hash=sha256:207aae0f83650004f6b7dab6a730b6a60df96a119f55167260c3153313f15a32 \
     --hash=sha256:6ef36f5d2e7759824e28051bc2c7fa0706d41e153ccb353a6c2d4d9eb354cd7e
     # via spm-calculator
-certifi==2026.7.22 \
-    --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775 \
-    --hash=sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55
+certifi==2026.10.19 \
+    --hash=sha256:035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae \
+    --hash=sha256:42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b
     # via
     #   httpcore
     #   httpx

@@ -1,4 +1,8 @@
 import { BASE_PATH } from "@/lib/base-path";
+import {
+  isCountryNotConfiguredBody,
+  type CountryNotConfiguredBody,
+} from "@policyengine/calibration-tree/countries";
 
 const EXPLICIT_API_BASE = process.env.NEXT_PUBLIC_API_URL?.trim();
 
@@ -31,6 +35,25 @@ function appendParams(url: URL, params: Record<string, ParamValue>): void {
   }
 }
 
+// A non-OK API response. `notConfigured` is the route's explicit
+// not-configured body when the requested country has no configured release,
+// so views can show that state instead of a generic failure.
+export class ApiError extends Error {
+  readonly status: number;
+  readonly notConfigured: CountryNotConfiguredBody | null;
+
+  constructor(message: string, status: number, notConfigured: CountryNotConfiguredBody | null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.notConfigured = notConfigured;
+  }
+}
+
+export function countryNotConfiguredError(error: unknown): CountryNotConfiguredBody | null {
+  return error instanceof ApiError ? error.notConfigured : null;
+}
+
 export async function apiGet<T>(
   path: string,
   params?: Record<string, ParamValue>,
@@ -41,9 +64,11 @@ export async function apiGet<T>(
   if (!res.ok) {
     const body = await res.text();
     let detail = body;
+    let notConfigured: CountryNotConfiguredBody | null = null;
     try {
       const parsed = JSON.parse(body);
       if (typeof parsed.detail === "string") detail = parsed.detail;
+      if (isCountryNotConfiguredBody(parsed)) notConfigured = parsed;
     } catch {
       // Keep the raw response text.
     }
@@ -55,7 +80,7 @@ export async function apiGet<T>(
       detail = `API error ${res.status}: the server returned an HTML error page instead of JSON.`;
     }
     if (detail.length > 600) detail = `${detail.slice(0, 600)}...`;
-    throw new Error(detail || `API error ${res.status}`);
+    throw new ApiError(detail || `API error ${res.status}`, res.status, notConfigured);
   }
   return res.json();
 }

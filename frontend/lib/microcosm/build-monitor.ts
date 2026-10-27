@@ -96,6 +96,9 @@ export interface StageWork {
 // Whether a run's telemetry reached the staging repository. `local_only`
 // runs kept it on the build machine (no write token, uploads failed, or a
 // local-only run); `uploaded` says how many files reached the repository.
+// The collector does not know (its record says delivery mode "collector"),
+// so a collector record reports the uploads its run's Hugging Face copy
+// records, and `unknown` when there is no such record.
 export interface RunDelivery {
   uploads: "local_only" | "uploaded" | "disabled" | "unknown";
   repository: string | null;
@@ -257,6 +260,16 @@ export function formatStageName(stage: string): string {
   return text ? text[0].toUpperCase() + text.slice(1) : stage;
 }
 
+// Run kinds that are not comparable with full runs of the same pipeline, with
+// the label suffix for each. A smoke run builds a synthetic fixture; a dry run
+// (`--dry-run`) checks its configuration, pins its inputs and stops. The run
+// kind is part of their pipeline key, so they have their own group, history
+// and forecasts.
+const SEPARATE_RUN_KINDS: ReadonlyMap<string, string> = new Map([
+  ["smoke", "smoke"],
+  ["dry_run", "dry run"],
+]);
+
 function pipelineIdentity(
   documents: BuildRunDocuments,
   schemaVersion: 1 | 2 | 3,
@@ -266,13 +279,11 @@ function pipelineIdentity(
   const pipelineId = str(pipeline?.id);
   const country = str(identity?.country_code) ?? documents.country.toUpperCase();
   if (schemaVersion >= 2 && pipelineId) {
-    // A smoke run on a synthetic fixture is not comparable with a full run of
-    // the same pipeline, so the run kind is part of the key.
     const kind = str(identity?.run_kind);
-    const smoke = kind === "smoke";
+    const kindLabel = kind == null ? undefined : SEPARATE_RUN_KINDS.get(kind);
     return {
-      key: `${country}:${pipelineId}${smoke ? ":smoke" : ""}`,
-      label: `${formatStageName(pipelineId)}${smoke ? " (smoke)" : ""}`,
+      key: `${country}:${pipelineId}${kindLabel ? `:${kind}` : ""}`,
+      label: `${formatStageName(pipelineId)}${kindLabel ? ` (${kindLabel})` : ""}`,
     };
   }
   return {
@@ -281,7 +292,10 @@ function pipelineIdentity(
   };
 }
 
-function runState(
+// A run's state from its recorded status and when it last reported. The
+// Staging page's Candidate tab uses the same rule for runs the collector does
+// not know.
+export function runState(
   rawStatus: string | null,
   updatedMs: number | null,
   nowMs: number,
@@ -294,6 +308,33 @@ function runState(
   if (rawStatus === "blocked") return "blocked";
   if (updatedMs != null && nowMs - updatedMs > stallMs) return "stalled";
   return "running";
+}
+
+const FINAL_RUN_STATES: ReadonlySet<BuildRunState> = new Set(["passed", "blocked", "failed"]);
+
+export interface RecordedRunState {
+  state: BuildRunState | null;
+  // The record's latest update.
+  updated_ms: number | null;
+}
+
+// Whether a run's collector record must give way to its Hugging Face copy:
+// the record stopped before the run ended (it says running, or stalled once
+// its heartbeats stopped), and the copy recorded the end (passed, blocked or
+// failed) after the record's latest update. Otherwise the collector's record
+// stands, final or newer. Both Staging tabs choose between the two sources
+// with this rule.
+export function collectorMissedTheEnd(
+  collector: RecordedRunState,
+  huggingFace: RecordedRunState,
+): boolean {
+  return (
+    (collector.state == null || !FINAL_RUN_STATES.has(collector.state)) &&
+    huggingFace.state != null &&
+    FINAL_RUN_STATES.has(huggingFace.state) &&
+    huggingFace.updated_ms != null &&
+    (collector.updated_ms == null || huggingFace.updated_ms > collector.updated_ms)
+  );
 }
 
 function resourceSnapshot(value: unknown, at: number | null): ResourceSnapshot | null {
@@ -364,6 +405,52 @@ function runDelivery(documents: BuildRunDocuments): RunDelivery | null {
     attempts,
     successes,
   };
+}
+
+function uploadsKnown(delivery: RunDelivery | null): boolean {
+  return delivery != null && delivery.uploads !== "unknown";
+}
+
+// A collector record with its run's upload record taken from the run's Hugging
+// Face copy: the copy's failed write check (version 1) or delivery block
+// (version 2 and later). Uploads to Hugging Face never pass through the
+// collector, so its own delivery block always says mode "collector" with no
+// counts. The record is unchanged when the copy records no uploads.
+export function withHuggingFaceUploads(
+  collector: BuildRunDocuments,
+  huggingFace: BuildRunDocuments,
+): BuildRunDocuments {
+  const check = obj(huggingFace.run_manifest?.delivery_check);
+  const delivery =
+    obj(huggingFace.progress?.delivery) ?? obj(huggingFace.run_manifest?.delivery);
+  if (!check && !delivery) return collector;
+  let progress = collector.progress;
+  if (progress && "delivery" in progress) {
+    const { delivery: _collectorDelivery, ...rest } = progress;
+    progress = rest;
+  }
+  return {
+    ...collector,
+    progress,
+    run_manifest: {
+      ...collector.run_manifest,
+      ...(check ? { delivery_check: check } : {}),
+      ...(delivery ? { delivery } : {}),
+    },
+  };
+}
+
+// A run read again from the collector, keeping the uploads `listed` (the same
+// run in the monitor's list, where they came from the Hugging Face copy) when
+// the collector's record does not know them.
+export function keepListedUploads(
+  fresh: BuildTimeline,
+  listed: BuildTimeline | null,
+): BuildTimeline {
+  if (uploadsKnown(fresh.delivery) || !listed || !uploadsKnown(listed.delivery)) {
+    return fresh;
+  }
+  return { ...fresh, delivery: listed.delivery };
 }
 
 function runIdentity(manifest: JsonObject | null): RunIdentity | null {

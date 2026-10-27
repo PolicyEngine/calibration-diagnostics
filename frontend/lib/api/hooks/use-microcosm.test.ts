@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { createExplorerState } from "@/lib/microcosm/calibration-explorer";
+import { createExplorerState } from "@policyengine/calibration-tree/calibration-explorer";
 
 import {
   fetchCalibrationTreePartsConcurrently,

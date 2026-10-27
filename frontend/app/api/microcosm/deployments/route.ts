@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 
-import { hasCapability, parseCountry } from "@/lib/microcosm/countries";
+import { requestedCountry } from "@/lib/api/request-country";
 import { loadDeployments } from "@/lib/microcosm/deployments";
+import { hasCapability } from "@policyengine/calibration-tree/countries";
 
 // Lock files and .py tags change at most a few times a day.
 export const revalidate = 900;
 
 export async function GET(request: Request) {
-  const country = parseCountry(new URL(request.url).searchParams.get("country"));
+  const country = requestedCountry(new URL(request.url).searchParams);
+  if (country instanceof Response) return country;
   if (!hasCapability(country, "deployments")) {
     return NextResponse.json(
       { detail: `No .py bundle tracks a ${country.toUpperCase()} data release.` },

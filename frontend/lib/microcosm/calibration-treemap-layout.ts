@@ -1,11 +1,11 @@
-import type { ExplorerNodeSelection } from "./calibration-explorer";
+import type { ExplorerNodeSelection } from "@policyengine/calibration-tree/calibration-explorer";
 import type {
   CalibrationTreeGroup,
   CalibrationTreeMetrics,
   CalibrationTreeNode,
   CalibrationTreeSizeMode,
   CalibrationTreeTarget,
-} from "./calibration-tree";
+} from "@policyengine/calibration-tree/calibration-tree";
 
 // Keep these aligned with the original calibration map. They represent roughly
 // a 51px square for groups and a 28px square for nodes.

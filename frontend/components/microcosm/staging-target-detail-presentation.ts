@@ -6,10 +6,15 @@ import {
   type MicrocosmTargetErrorSummary,
 } from "@/components/microcosm/microcosm-target-detail";
 import type { MicrocosmTargetRow } from "@/lib/api/hooks/use-microcosm";
-import type { TargetChangeRow } from "@/lib/microcosm/target-change";
-import { formatTargetChange } from "@/lib/microcosm/target-change-visualization";
+import type { TargetChangeRow } from "@policyengine/calibration-tree/target-change";
+import {
+  formatTargetChange,
+  sentenceCaseToPhrase,
+} from "@/lib/microcosm/target-change-visualization";
 
 export interface StagingTargetDetailPresentation {
+  /** Which side the shown detail row comes from. */
+  eyebrow: string;
   metrics: MicrocosmTargetDetailMetric[];
   afterCalibrationSeries: MicrocosmTargetErrorSeries[];
   fitSummary: MicrocosmTargetErrorSummary | null;
@@ -55,6 +60,7 @@ function rowFromDetail(
 function candidateComparisonSummary(
   currentError: ReturnType<typeof targetError>,
   candidateError: ReturnType<typeof targetError>,
+  comparisonReleasePhrase: string,
 ): MicrocosmTargetErrorSummary | null {
   if (
     currentError.kind !== candidateError.kind ||
@@ -66,7 +72,7 @@ function candidateComparisonSummary(
   const change = Math.abs(candidateError.value) - Math.abs(currentError.value);
   if (Math.abs(change) < 0.00005) {
     return {
-      text: "Candidate dataset left absolute error unchanged relative to the current release dataset.",
+      text: `Candidate dataset left absolute error unchanged relative to the ${comparisonReleasePhrase} dataset.`,
       tone: "neutral",
     };
   }
@@ -76,16 +82,23 @@ function candidateComparisonSummary(
       : `${(Math.abs(change) * 100).toFixed(Math.abs(change) >= 0.1 ? 1 : 2)} percentage points`;
   const increased = change > 0;
   return {
-    text: `Candidate dataset ${increased ? "increased" : "decreased"} absolute error by ${amount} relative to the current release dataset.`,
+    text: `Candidate dataset ${increased ? "increased" : "decreased"} absolute error by ${amount} relative to the ${comparisonReleasePhrase} dataset.`,
     tone: increased ? "negative" : "positive",
   };
 }
 
+/**
+ * The staging target detail's metrics, chart series and summary.
+ * `comparisonReleaseLabel` names the release the candidate is compared with,
+ * such as "Local-area release" for a UK local-area candidate.
+ */
 export function stagingTargetDetailPresentation(
   targetChange: TargetChangeRow | null,
   weightedTargetErrorChange: number | null,
   candidateFallback: MicrocosmTargetRow | null,
+  comparisonReleaseLabel = "Current release",
 ): StagingTargetDetailPresentation {
+  const comparisonReleasePhrase = sentenceCaseToPhrase(comparisonReleaseLabel);
   const currentRow = rowFromDetail(targetChange?.currentDetail ?? null);
   const candidateRow = rowFromDetail(targetChange?.candidateDetail ?? null) ?? candidateFallback;
   const currentError = targetError(currentRow);
@@ -105,8 +118,8 @@ export function stagingTargetDetailPresentation(
   const afterCalibrationSeries: MicrocosmTargetErrorSeries[] = [];
   if (currentRow) {
     afterCalibrationSeries.push({
-      label: "Current release after calibration",
-      shortLabel: "Current release",
+      label: `${comparisonReleaseLabel} after calibration`,
+      shortLabel: comparisonReleaseLabel,
       value: currentError.value,
       tone: "primary",
     });
@@ -121,6 +134,9 @@ export function stagingTargetDetailPresentation(
   }
 
   return {
+    eyebrow: targetChange?.candidateDetail
+      ? "Candidate calibration target"
+      : `${comparisonReleaseLabel} calibration target`,
     metrics: [
       {
         label: "Official target",
@@ -128,7 +144,7 @@ export function stagingTargetDetailPresentation(
         caption: unit,
       },
       {
-        label: "Current release estimate",
+        label: `${comparisonReleaseLabel} estimate`,
         value: targetEstimateText(currentEstimate),
         caption: unit,
       },
@@ -138,7 +154,7 @@ export function stagingTargetDetailPresentation(
         caption: unit,
       },
       {
-        label: "Current release error",
+        label: `${comparisonReleaseLabel} error`,
         value: targetErrorText(currentError.kind, currentError.value, true),
         caption: currentError.kind === "absolute" ? "Absolute difference" : "Relative to target",
         tone: errorTone(currentError.kind, currentError.value),
@@ -152,7 +168,7 @@ export function stagingTargetDetailPresentation(
       {
         label: "Weighted target error change",
         value: formatTargetChange(weightedTargetErrorChange),
-        caption: "Candidate dataset minus current release",
+        caption: `Candidate dataset minus ${comparisonReleasePhrase}`,
         tone:
           weightedTargetErrorChange == null || weightedTargetErrorChange === 0
             ? "neutral"
@@ -163,15 +179,15 @@ export function stagingTargetDetailPresentation(
     ],
     afterCalibrationSeries,
     fitSummary: currentRow && candidateRow
-      ? candidateComparisonSummary(currentError, candidateError)
+      ? candidateComparisonSummary(currentError, candidateError, comparisonReleasePhrase)
       : candidateRow
         ? {
-            text: "Candidate contains this target, but the current release does not.",
+            text: `Candidate contains this target, but the ${comparisonReleasePhrase} does not.`,
             tone: "neutral",
           }
         : currentRow
           ? {
-              text: "Current release contains this target, but the candidate does not.",
+              text: `${comparisonReleaseLabel} contains this target, but the candidate does not.`,
               tone: "neutral",
             }
           : null,

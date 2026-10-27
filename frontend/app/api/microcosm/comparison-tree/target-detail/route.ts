@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { loadCalibrationComparisonTargetDetail } from "@/lib/microcosm/calibration-comparison-blob";
-import { isSha256 } from "@/lib/microcosm/calibration-tree-artifact";
-import {
-  isCountry,
-  selectableCountries,
-  type MicrocosmCountry,
-} from "@/lib/microcosm/countries";
+import { requiredCountry } from "@/lib/api/request-country";
+import { loadCalibrationComparisonTargetDetail } from "@policyengine/calibration-tree/calibration-comparison-blob";
+import { isSha256 } from "@policyengine/calibration-tree/calibration-tree-artifact";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,11 +13,6 @@ const IMMUTABLE_CACHE_HEADERS = {
   "Vercel-CDN-Cache-Control": "public, max-age=31536000",
   "X-Content-Type-Options": "nosniff",
 };
-
-function countryParameter(url: URL): MicrocosmCountry | null {
-  const value = url.searchParams.get("country");
-  return isCountry(value) && selectableCountries().includes(value) ? value : null;
-}
 
 function targetOrdinalParameter(url: URL): number | null {
   const value = url.searchParams.get("target");
@@ -41,12 +32,13 @@ export function createCalibrationComparisonTargetDetailHandler(
 ) {
   return async function GET(request: Request) {
     const url = new URL(request.url);
-    const country = countryParameter(url);
+    const country = requiredCountry(url.searchParams);
+    if (country instanceof Response) return country;
     const buildArtifactId = url.searchParams.get("build") ?? "";
     const targetOrdinal = targetOrdinalParameter(url);
-    if (!country || !isSha256(buildArtifactId) || targetOrdinal == null) {
+    if (!isSha256(buildArtifactId) || targetOrdinal == null) {
       return NextResponse.json(
-        { detail: "A valid country, comparison build id, and target ordinal are required." },
+        { detail: "A valid comparison build id and target ordinal are required." },
         { status: 400 },
       );
     }

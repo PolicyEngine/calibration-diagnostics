@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { isCountry as isClientCountry } from "@/components/layout/country-context";
 import { navGroupsForCountry } from "@/components/layout/nav-items";
-import { countryCapabilities, selectableCountries } from "@/lib/microcosm/countries";
-import { sourceAuthorityLabel } from "@/lib/source-labels";
+import { countryCapabilities, selectableCountries } from "@policyengine/calibration-tree/countries";
+import { sourceAuthorityLabel } from "@policyengine/calibration-tree/source-labels";
 
 import diagnosticsFixture from "./fixtures/zz-release/calibration_diagnostics.json";
 import releaseManifestFixture from "./fixtures/zz-release/release_manifest.json";
@@ -16,8 +16,9 @@ import {
   microcosmRepo,
   microcosmRevision,
   microcosmTargetTreemap,
-  parseCountry,
-} from "./latest-artifact";
+  countryParam,
+  isCountry,
+} from "@policyengine/calibration-tree/latest-artifact";
 
 const COUNTRY = "zz" as const;
 const RELEASE_ID = "microcosm-zz-2026-conformance";
@@ -43,7 +44,9 @@ const calibration = buildCalibration(
 
 describe("synthetic third-country conformance", () => {
   test("one country registration supplies repository, national geography, and country block behavior", () => {
-    expect(parseCountry(COUNTRY)).toBe(COUNTRY);
+    expect(isCountry(COUNTRY)).toBe(true);
+    // Builders accept the fixture; a dashboard request for it is not configured.
+    expect(countryParam(COUNTRY)).toEqual({ configured: false, requested: COUNTRY });
     expect(microcosmRepo(COUNTRY)).toBe("policyengine/microcosm-zz-fixture");
     expect(microcosmRevision(COUNTRY)).toBe("main");
     expect(hfResolveUrl("latest.json", COUNTRY)).toBe(

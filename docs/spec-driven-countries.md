@@ -4,7 +4,11 @@
 
 The calibration dashboard resolves a country and release through its
 Vercel-backed build manifest, whose publisher pins the corresponding Hugging
-Face commit and reads `releases/<id>/calibration_diagnostics.json`.
+Face commit and reads `releases/<folder>/calibration_diagnostics.json`: the
+release's own folder, or its line's folder for a Microcosm cut tag (see
+[the release lines note](calibration-tree-artifacts.md#microcosm-release-lines)).
+The country's current release comes from `latest.json` unless the registration
+names a per-line pointer in `pointer_path` (the UK: `latest-national.json`).
 `build_manifest.json`,
 `release_manifest.json`, and `demographics.json` are optional enrichments. The
 diagnostics artifact owns fit values and target metadata; the build manifest owns
@@ -24,7 +28,7 @@ contract: they are served only by `/microcosm/datasets` from
 
 ## Code-owned metadata that remains
 
-`COUNTRY_REGISTRY` in `frontend/lib/microcosm/countries.ts` is the only required
+`COUNTRY_REGISTRY` in `frontend/packages/calibration-tree/src/countries.ts` is the only required
 registration point: country unions and parsers, selector lists, dataset and
 national-geography labels, public/private link behavior, and page gating read
 the registration or the artifact `country` block. Overview and target-browser
@@ -73,10 +77,10 @@ production tables.
 ### Country
 
 `release_manifest.country` is read by `releaseCountry` in
-`frontend/lib/microcosm/latest-artifact.ts` and served as `country` on the
+`frontend/packages/calibration-tree/src/latest-artifact.ts` and served as `country` on the
 overview summary and the target-diagnostics page (client type
 `MicrocosmArtifactCountry`). Registration lives in
-`frontend/lib/microcosm/countries.ts`; adding a country is one entry there.
+`frontend/packages/calibration-tree/src/countries.ts`; adding a country is one entry there.
 
 ```json
 {
@@ -113,6 +117,46 @@ Schema readers remain backward-compatible for declared diagnostics schemas 2
 through 7 while published releases migrate. The top-level schema version selects
 one reader for the complete file, never by country or individual row shape. See
 [Calibration map hierarchy](calibration-map-hierarchy.md).
+
+### Requests for a country
+
+Every API route and page that takes `?country=` resolves it with
+`countryParam` in `frontend/packages/calibration-tree/src/countries.ts`:
+
+- absent (or empty): the registry default, `us`;
+- a selectable registration key, exactly: that country;
+- anything else (an unregistered code such as `nz`, another spelling such as
+  `US`, or a conformance fixture such as `zz`): not configured.
+
+A not-configured code never resolves to another country. API routes answer
+it before validating other parameters or reading any artifact
+(`frontend/lib/api/request-country.ts`) with HTTP 404 and:
+
+```json
+{
+  "error": "country_not_configured",
+  "requested_country": "nz",
+  "reason": "unknown_country",
+  "detail": "No Microcosm calibration release is configured for country \"nz\"."
+}
+```
+
+A registered country that the dashboard manifest names no current release for
+gets the same response with `reason: "no_published_release"`. That is a newly
+registered country before its first publication. Routes addressed by build
+artifact (`tree`, `tree-manifest`, `comparison-tree`) also require the
+parameter, and a request without it is a 400.
+
+Pages follow the URL's country. A not-configured code renders an empty state
+naming the requested code in place of the page, and the selector shows no
+dataset. The deployment smoke check asserts that an unregistered code is
+refused this way.
+
+Registering a country before its first release fails the deployment smoke
+check, which requires every selectable `calibration` country to serve a
+release, until `publish-calibration-tree.yml` has written that country's
+manifest entry. Merge the registration, dispatch the publisher for the
+country from `main`, then re-run the deployment.
 
 ### Presentation
 
@@ -230,7 +274,9 @@ inference.
 
 The top-level diagnostics schema selects exactly one target reader. Schemas 2–6
 use the legacy reader, schema 7 uses the structured reader described above, and
-schema 8 uses the normalized hierarchy reader. Missing versions, version 1, and
+schemas 8 and 9 use the normalized hierarchy reader (schema 9 after its
+hierarchy catalogs are expanded into schema 8 rows; see
+[Calibration map hierarchy](calibration-map-hierarchy.md#schema-9-catalogs)). Missing versions, version 1, and
 unsupported future versions are rejected explicitly. A row that does not match
 its file's declared representation is rejected; the dashboard does not choose a
 different reader from that row's shape.
