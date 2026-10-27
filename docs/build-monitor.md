@@ -45,8 +45,12 @@ checks stop builds. The run selected on either tab carries over to the other.
   call. The Candidate tab waits at most 5 seconds for the list. After that it
   uses the list's latest earlier answer if that answered less than 60 seconds
   ago (two of its 30-second polls), and otherwise shows the Hugging Face
-  states with a note; the late answer serves the next poll. Each run's own
-  record is read on every request, as before.
+  states with a note; the late answer serves the next poll. A request still
+  in flight is shared only for 5 seconds after it was made, and a later call
+  makes its own request: once the Candidate tab has stopped waiting for a
+  request, nothing keeps it running, and Vercel can suspend the instance
+  with it in flight. Each run's own record is read on every request, as
+  before.
 - **Local run folders.** The dashboard can still inspect legacy or diagnostic
   run folders on the same machine. Point it at the directory that holds them:
 
