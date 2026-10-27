@@ -3,7 +3,10 @@ import { expect, test } from "bun:test";
 import {
   DEPLOYMENT_SURFACES,
   classifyDeployment,
+  compareServed,
   loadDeployments,
+  parseApiV2Model,
+  parseGatewayVersions,
   parseBundleManifest,
   parseRequirementsLock,
   parseUvLock,
@@ -184,6 +187,17 @@ test("loads every surface, resolves bundles once per .py version, and inherits t
   const requested: string[] = [];
   const fetchImpl = async (url: string) => {
     requested.push(url);
+    if (url.endsWith("/v2/tax-benefit-models/by-country/us")) {
+      // The API still runs an older .py than its lock declares.
+      return Response.json({ status: "ok", result: { policyengine_version: "6.9.0" } });
+    }
+    if (url.endsWith("/versions")) {
+      return Response.json({
+        policyengine: { "6.2.1": "app-6-2-1", "6.10.0": "app-6-10-0", latest: "6.10.0" },
+        us: { latest: "2.2.1" },
+        bundles: { "6.10.0": { us: { model_version: "2.2.1", data_version: "us-old" } } },
+      });
+    }
     if (url.startsWith("https://pypi.org/")) {
       return Response.json({ info: { version: "6.11.1" } });
     }
@@ -211,6 +225,79 @@ test("loads every surface, resolves bundles once per .py version, and inherits t
   expect(app.py_version).toBe("6.10.0");
   expect(app.detail.startsWith("Through PolicyEngine API.")).toBe(true);
   expect(requested.filter((url) => url.includes("/policyengine.py/6.10.0/"))).toHaveLength(1);
+
+  const served = Object.fromEntries(response.rows.map((row) => [row.surface.id, row.served.status]));
+  expect(served).toEqual({
+    api: "differs",
+    "app-v3": "differs",
+    "sim-api": "matches",
+    "household-api": "not_reported",
+    "api-v2-alpha": "not_reported",
+    "dashboard-runtime": "not_reported",
+  });
+  expect(app.served.detail).toBe(
+    "Not deployed as declared: it serves .py 6.9.0, but the lock declares 6.10.0.",
+  );
+  const sim = response.rows.find((row) => row.surface.id === "sim-api")!;
+  expect(sim.served).toMatchObject({ py_version: "6.10.0", data_build_id: "us-old", data_basis: "reported" });
+  expect(sim.served.detail).toContain("1 older .py versions routable");
+});
+
+test("reads the served .py from the API's model route", () => {
+  expect(parseApiV2Model({ result: { policyengine_version: "6.10.0" } }, "u")).toEqual({
+    py_version: "6.10.0",
+    model_version: null,
+    data_build_id: null,
+    source_url: "u",
+    other_py_versions: 0,
+  });
+  expect(() => parseApiV2Model({ result: {} }, "u")).toThrow();
+});
+
+test("reads the latest route and its bundle from the gateway", () => {
+  const report = parseGatewayVersions(
+    {
+      policyengine: { "6.7.5": "a", "6.10.0": "b", latest: "6.10.0" },
+      uk: { latest: "2.132.6" },
+      bundles: { "6.10.0": { uk: { model_version: "2.132.6", data_version: "uk-b" } } },
+    },
+    "uk",
+    "u",
+  );
+  expect(report).toEqual({
+    py_version: "6.10.0",
+    model_version: "2.132.6",
+    data_build_id: "uk-b",
+    source_url: "u",
+    other_py_versions: 1,
+  });
+});
+
+test("a served data build that differs from the declared one is not deployed", () => {
+  const row = classifyDeployment(
+    api,
+    { versions: { policyengine: "6.11.1", "policyengine-uk": "2.151.0" }, error: null },
+    "uk",
+    bundles([["6.11.1", LATEST], ["6.10.0", OLDER]]),
+    LATEST,
+  );
+  expect(row.data_build_id).toBe("uk-new");
+  const served = compareServed(
+    row,
+    { py_version: "6.10.0", model_version: null, data_build_id: null, source_url: "u", other_py_versions: 0 },
+    bundles([["6.11.1", LATEST], ["6.10.0", OLDER]]),
+    "uk",
+  );
+  expect(served.status).toBe("differs");
+  expect(served.data_build_id).toBe("uk-old");
+  expect(served.data_basis).toBe("served_py_bundle");
+  expect(served.detail).toBe(
+    "Not deployed as declared: it serves .py 6.10.0, but the lock declares 6.11.1; " +
+      "it serves data build uk-old, but the lock declares uk-new.",
+  );
+  expect(compareServed(row, { error: "timeout", source_url: "u" }, bundles([]), "us").status).toBe(
+    "unavailable",
+  );
 });
 
 test("the dashboard runtime appears only for the US, which is the only extra it installs", () => {

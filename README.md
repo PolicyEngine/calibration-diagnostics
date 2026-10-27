@@ -63,7 +63,8 @@ dashboard API layer.
   the simulation API, the household API, API v2 alpha, and this dashboard's
   variable runtime) declares, and whether that build is the one the latest .py
   certifies. Versions come from each repository's dependency lock on its default
-  branch, not from the running service. See
+  branch; a Served column shows what the API and the simulation gateway report
+  at runtime and flags a surface that is not deployed as declared. See
   [the deployments notes](docs/deployments.md).
 - **Calibration target investigations** (`docs/ai/`) — tool-independent procedures,
   specialist review responsibilities, and a reusable checklist for identifying

@@ -40,11 +40,34 @@ entry.
 | Country not in bundle | The pinned .py certifies no build for this country. |
 | Lock unavailable | The lock file or the bundle manifest could not be read. |
 
+## Served versions
+
+A merged change that is not deployed does not serve anyone. The Served column
+compares the lock with what the running service reports:
+
+| Service | Report | What it gives |
+|---|---|---|
+| PolicyEngine API (and app v3, which calls it) | `GET https://api.policyengine.org/v2/tax-benefit-models/by-country/{country}` | The served .py. The data build is the one that .py's bundle certifies, shown as "via served .py". |
+| Simulation API | `GET https://policyengine--policyengine-simulation-gateway-web-app.modal.run/versions` | The `latest` .py route, and the model and data build of that route's bundle. |
+
+The API's `/{country}/metadata` also reports `data_version`, but the US
+response is about 75 MB and the server does not support range requests, so
+the page does not read it.
+
+| Served status | Meaning |
+|---|---|
+| Deployed | The served .py, model and data build equal the declared ones. |
+| Not deployed | At least one served value differs from the lock. The page header counts these rows. |
+| Report unavailable | The service report could not be read. |
+| Not reported | The service reports no versions at runtime (household API, API v2 alpha, this dashboard's runtime). Only the lock is known. |
+
+The simulation gateway also keeps older .py versions routable for callers that
+ask for them by version. The page compares only its `latest` route.
+
 ## Limits
 
-- The page shows **declared** versions: the lock on the default branch. A
-  service can run an older deploy. To show the served version, each service
-  must report its .py version and data build ID at runtime (for example in
-  `/metadata`), and this page must read that report.
+- For services that report no versions, the page shows only the declared
+  versions, and a service can run an older deploy.
 - The route caches results for 15 minutes. It reads public files from
-  `raw.githubusercontent.com` and PyPI and needs no credentials.
+  `raw.githubusercontent.com`, PyPI and the two service reports, and needs no
+  credentials.

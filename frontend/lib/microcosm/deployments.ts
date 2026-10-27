@@ -3,10 +3,11 @@
 // The chain is: a surface's dependency lock pins `policyengine` (.py) -> that
 // .py tag's bundle manifest (`src/policyengine/data/bundle/manifest.json`)
 // certifies one data build and one country-model version per country -> the
-// data build is a release on this dashboard. This module reads the *declared*
-// side only: the lock file on each repository's default branch, which is not
-// necessarily what is deployed. Isomorphic types; the fetchers take an
-// injected `fetch` so they can be tested without the network.
+// data build is a release on this dashboard. The *declared* side is the lock
+// file on each repository's default branch. The *served* side is what a
+// running service reports, for the services that report it; a merged change
+// that is not deployed is declared but not served. Isomorphic types; the
+// fetchers take an injected `fetch` so they can be tested without the network.
 
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 
@@ -15,6 +16,14 @@ export const PY_BUNDLE_MANIFEST_PATH = "src/policyengine/data/bundle/manifest.js
 export const PY_PYPI_URL = "https://pypi.org/pypi/policyengine/json";
 
 export type LockFormat = "uv" | "requirements";
+
+// Runtime reports. `api_v2` is the API's small model route (the full
+// `/metadata` is ~75 MB for the US and has no range support); it reports the
+// served .py only. `sim_gateway` reports .py, model and data build directly.
+export type ServedSourceKind = "api_v2" | "sim_gateway";
+
+export const API_ORIGIN = "https://api.policyengine.org";
+export const SIM_GATEWAY_ORIGIN = "https://policyengine--policyengine-simulation-gateway-web-app.modal.run";
 
 export interface DeploymentSurface {
   id: string;
@@ -32,6 +41,9 @@ export interface DeploymentSurface {
   // False for a surface that calculates single households and loads no
   // microdata, so no data build applies to it.
   loads_dataset?: boolean;
+  // Where the running service reports its versions; omitted when it reports
+  // none.
+  served?: { kind: ServedSourceKind; origin: string };
   note?: string;
 }
 
@@ -43,6 +55,7 @@ export const DEPLOYMENT_SURFACES: readonly DeploymentSurface[] = [
     repository: "PolicyEngine/policyengine-api",
     branch: "master",
     lock: { path: "uv.lock", format: "uv" },
+    served: { kind: "api_v2", origin: API_ORIGIN },
   },
   {
     id: "app-v3",
@@ -60,6 +73,7 @@ export const DEPLOYMENT_SURFACES: readonly DeploymentSurface[] = [
     repository: "PolicyEngine/policyengine-sim-api",
     branch: "main",
     lock: { path: "projects/policyengine-simulation-executor/uv.lock", format: "uv" },
+    served: { kind: "sim_gateway", origin: SIM_GATEWAY_ORIGIN },
   },
   {
     id: "household-api",
@@ -233,13 +247,143 @@ export interface DeploymentRow {
   certified_model_version: string | null;
   status: DeploymentStatus;
   detail: string;
+  served: ServedState;
+}
+
+// What a running service reports. A field is null when the service does not
+// report it.
+export interface ServedReport {
+  py_version: string | null;
+  model_version: string | null;
+  data_build_id: string | null;
+  source_url: string;
+  // Other .py versions the service also serves on request (the gateway keeps
+  // older worker apps routable).
+  other_py_versions: number;
+}
+
+export type ServedStatus = "matches" | "differs" | "unavailable" | "not_reported";
+
+export interface ServedState {
+  status: ServedStatus;
+  py_version: string | null;
+  model_version: string | null;
+  data_build_id: string | null;
+  // "reported": the service names the data build itself. "served_py_bundle":
+  // the build the served .py's bundle certifies.
+  data_basis: "reported" | "served_py_bundle" | null;
+  source_url: string | null;
+  detail: string;
+}
+
+export const NOT_REPORTED: ServedState = {
+  status: "not_reported",
+  py_version: null,
+  model_version: null,
+  data_build_id: null,
+  data_basis: null,
+  source_url: null,
+  detail: "The service reports no versions at runtime, so only the lock is known.",
+};
+
+export function servedUrl(
+  served: NonNullable<DeploymentSurface["served"]>,
+  country: MicrocosmCountry,
+): string {
+  return served.kind === "api_v2"
+    ? `${served.origin}/v2/tax-benefit-models/by-country/${country}`
+    : `${served.origin}/versions`;
+}
+
+// GET /v2/tax-benefit-models/by-country/{country}
+export function parseApiV2Model(json: unknown, sourceUrl: string): ServedReport {
+  const py = str(record(record(json)?.result)?.policyengine_version);
+  if (!py) throw new Error(`${sourceUrl} reported no policyengine_version`);
+  return { py_version: py, model_version: null, data_build_id: null, source_url: sourceUrl, other_py_versions: 0 };
+}
+
+// GET /versions on the simulation gateway: the `latest` route per kind, and
+// the bundle each .py route serves.
+export function parseGatewayVersions(
+  json: unknown,
+  country: MicrocosmCountry,
+  sourceUrl: string,
+): ServedReport {
+  const versions = record(json);
+  const pyRoutes = record(versions?.policyengine) ?? {};
+  const py = str(pyRoutes.latest);
+  if (!py) throw new Error(`${sourceUrl} reported no latest .py route`);
+  const bundle = record(record(record(versions?.bundles)?.[py])?.[country]);
+  return {
+    py_version: py,
+    model_version: str(bundle?.model_version) ?? str(record(versions?.[country])?.latest),
+    data_build_id: str(bundle?.data_version),
+    source_url: sourceUrl,
+    other_py_versions: Object.keys(pyRoutes).filter((key) => key !== "latest" && key !== py).length,
+  };
+}
+
+// Pure: compare what a service serves with what its lock declares.
+export function compareServed(
+  row: DeploymentRow,
+  report: ServedReport | { error: string; source_url: string },
+  bundles: ReadonlyMap<string, BundleSummary | null>,
+  country: MicrocosmCountry,
+): ServedState {
+  if ("error" in report) {
+    return {
+      ...NOT_REPORTED,
+      status: "unavailable",
+      source_url: report.source_url,
+      detail: `Could not read the runtime report: ${report.error}`,
+    };
+  }
+  const servedRelease = report.py_version ? bundles.get(report.py_version)?.countries[country] : undefined;
+  const reportedBuild = row.surface.loads_dataset === false ? null : report.data_build_id;
+  const dataBuild = reportedBuild ?? servedRelease?.build_id ?? null;
+  const state: Omit<ServedState, "status" | "detail"> = {
+    py_version: report.py_version,
+    model_version: report.model_version ?? servedRelease?.certified_model_version ?? null,
+    data_build_id: row.surface.loads_dataset === false ? null : dataBuild,
+    data_basis:
+      row.surface.loads_dataset === false || !dataBuild
+        ? null
+        : reportedBuild
+          ? "reported"
+          : "served_py_bundle",
+    source_url: report.source_url,
+  };
+
+  const differences: string[] = [];
+  const compare = (label: string, served: string | null, declared: string | null) => {
+    if (served && declared && served !== declared) {
+      differences.push(`serves ${label} ${served}, but the lock declares ${declared}`);
+    }
+  };
+  compare(".py", state.py_version, row.py_version);
+  compare("model", state.model_version, row.model_version);
+  compare("data build", state.data_build_id, row.data_build_id);
+
+  const others =
+    report.other_py_versions > 0
+      ? ` It also keeps ${report.other_py_versions} older .py versions routable for callers that ask for them.`
+      : "";
+  if (differences.length) {
+    const text = differences.join("; it ");
+    return {
+      ...state,
+      status: "differs",
+      detail: `Not deployed as declared: it ${text}.${others}`,
+    };
+  }
+  return { ...state, status: "matches", detail: `Serves what the lock declares.${others}` };
 }
 
 export interface DeploymentsResponse {
   country: MicrocosmCountry;
   model_package: string | null;
   checked_at: string;
-  basis: "declared_default_branch";
+  basis: "declared_default_branch_and_served";
   latest: {
     py_version: string;
     data_build_id: string | null;
@@ -303,6 +447,7 @@ export function classifyDeployment(
     model_version: modelVersion,
     data_build_id: release?.build_id ?? null,
     certified_model_version: release?.certified_model_version ?? null,
+    served: NOT_REPORTED,
   };
   const latestRelease = latest?.countries[country] ?? null;
 
@@ -408,6 +553,26 @@ export async function loadBundle(
   return parseBundleManifest(await response.json(), pyVersion);
 }
 
+export async function loadServedReport(
+  surface: DeploymentSurface,
+  country: MicrocosmCountry,
+  fetchImpl: FetchLike,
+  revalidate: number,
+): Promise<ServedReport | { error: string; source_url: string } | null> {
+  if (!surface.served) return null;
+  const url = servedUrl(surface.served, country);
+  try {
+    const response = await fetchImpl(url, { next: { revalidate } });
+    if (!response.ok) throw new Error(`${response.status} from ${url}`);
+    const json = await response.json();
+    return surface.served.kind === "api_v2"
+      ? parseApiV2Model(json, url)
+      : parseGatewayVersions(json, country, url);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error), source_url: url };
+  }
+}
+
 export async function loadLatestPyVersion(fetchImpl: FetchLike, revalidate: number): Promise<string> {
   const response = await fetchImpl(PY_PYPI_URL, { next: { revalidate } });
   if (!response.ok) throw new Error(`${response.status} from ${PY_PYPI_URL}`);
@@ -423,11 +588,16 @@ export async function loadDeployments(
   now: () => Date = () => new Date(),
 ): Promise<DeploymentsResponse> {
   const surfaces = surfacesForCountry(country);
-  const declared = new Map(
-    await Promise.all(
+  const [declaredEntries, servedEntries] = await Promise.all([
+    Promise.all(
       surfaces.map(async (surface) => [surface.id, await loadSurfaceDeclaration(surface, fetchImpl, revalidate)] as const),
     ),
-  );
+    Promise.all(
+      surfaces.map(async (surface) => [surface.id, await loadServedReport(surface, country, fetchImpl, revalidate)] as const),
+    ),
+  ]);
+  const declared = new Map(declaredEntries);
+  const served = new Map(servedEntries);
 
   let latestVersion: string | null = null;
   let latestError: string | null = null;
@@ -440,6 +610,9 @@ export async function loadDeployments(
   const pyVersions = new Set<string>();
   for (const declaration of declared.values()) {
     if (declaration.versions?.policyengine) pyVersions.add(declaration.versions.policyengine);
+  }
+  for (const report of served.values()) {
+    if (report && !("error" in report) && report.py_version) pyVersions.add(report.py_version);
   }
   if (latestVersion) pyVersions.add(latestVersion);
 
@@ -473,14 +646,19 @@ export async function loadDeployments(
       bundles,
       latest,
     );
+    // A surface that calls another surface is served by it, too.
+    const report = served.get(source?.id ?? surface.id);
+    const withServed: DeploymentRow = report
+      ? { ...row, served: compareServed(row, report, bundles, country) }
+      : row;
     if (surface.via && source) {
       return {
-        ...row,
+        ...withServed,
         lock_url: lockBrowseUrl(source),
-        detail: `Through ${source.label}. ${row.detail}`,
+        detail: `Through ${source.label}. ${withServed.detail}`,
       };
     }
-    return row;
+    return withServed;
   });
 
   const latestRelease = latest?.countries[country] ?? null;
@@ -488,7 +666,7 @@ export async function loadDeployments(
     country,
     model_package: countryModelPackage(country),
     checked_at: now().toISOString(),
-    basis: "declared_default_branch",
+    basis: "declared_default_branch_and_served",
     latest: latest
       ? {
           py_version: latest.py_version,

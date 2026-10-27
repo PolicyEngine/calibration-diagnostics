@@ -16,12 +16,14 @@ import {
   PY_REPOSITORY,
   type DeploymentRow,
   type DeploymentStatus,
+  type ServedStatus,
 } from "@/lib/microcosm/deployments";
 
 // ---------------------------------------------------------------------------
-// Which .py, country model and data build each PolicyEngine surface declares.
-// Declared = the dependency lock on the repository's default branch; it can
-// differ from what is deployed until each service reports its own versions.
+// Which .py, country model and data build each PolicyEngine surface declares,
+// and, for services that report it at runtime, what they serve. Declared = the
+// dependency lock on the repository's default branch; a merged change that is
+// not deployed is declared but not served.
 // ---------------------------------------------------------------------------
 
 const STATUS: Record<DeploymentStatus, { label: string; tone: StatusTone }> = {
@@ -34,6 +36,61 @@ const STATUS: Record<DeploymentStatus, { label: string; tone: StatusTone }> = {
   no_dataset: { label: "No dataset", tone: "neutral" },
   unavailable: { label: "Lock unavailable", tone: "neutral" },
 };
+
+const SERVED: Record<ServedStatus, { label: string; tone: StatusTone }> = {
+  matches: { label: "Deployed", tone: "success" },
+  differs: { label: "Not deployed", tone: "danger" },
+  unavailable: { label: "Report unavailable", tone: "warning" },
+  not_reported: { label: "Not reported", tone: "neutral" },
+};
+
+function ServedCell({ row, country }: { row: DeploymentRow; country: string }) {
+  const { served } = row;
+  return (
+    <>
+      <StatusPill tone={SERVED[served.status].tone}>{SERVED[served.status].label}</StatusPill>
+      {served.py_version && (
+        <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-xs">
+          <dt className="text-muted-foreground">.py</dt>
+          <dd>
+            <Version value={served.py_version} />
+          </dd>
+          <dt className="text-muted-foreground">Model</dt>
+          <dd>
+            <Version value={served.model_version} />
+          </dd>
+          {served.data_build_id && (
+            <>
+              <dt className="text-muted-foreground">Data</dt>
+              <dd>
+                <BuildLink buildId={served.data_build_id} country={country} />
+                {served.data_basis === "served_py_bundle" && (
+                  <span className="text-muted-foreground"> (via served .py)</span>
+                )}
+              </dd>
+            </>
+          )}
+        </dl>
+      )}
+      <div className="mt-1.5 text-xs leading-snug text-muted-foreground">
+        {served.detail}
+        {served.source_url && (
+          <>
+            {" "}
+            <a
+              href={served.source_url}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-dotted underline-offset-2 hover:text-primary"
+            >
+              Source
+            </a>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
 
 function bundleUrl(pyVersion: string): string {
   return `https://github.com/${PY_REPOSITORY}/blob/${pyVersion}/${PY_BUNDLE_MANIFEST_PATH}`;
@@ -118,22 +175,30 @@ export function DeploymentsView() {
 
   const data = query.data;
   const modelLabel = data?.model_package ?? "Country model";
+  const notDeployed = data?.rows.filter((row) => row.served.status === "differs").length ?? 0;
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Microcosm · releases"
         title="Deployments"
+        status={
+          notDeployed > 0 ? (
+            <StatusPill tone="danger">
+              {notDeployed} {notDeployed === 1 ? "surface" : "surfaces"} not deployed
+            </StatusPill>
+          ) : undefined
+        }
         description={
           <span className="block text-pretty">
             {`Each PolicyEngine surface pins a .py version, and that .py certifies one ${registration.dataset_label} build. `}
-            Versions come from each repository&apos;s lock file on its default branch, so a
-            running service can be older.
+            The lock file on each repository&apos;s default branch declares the versions. For
+            services that report their versions, the Served column shows what is deployed.
           </span>
         }
       />
 
-      {query.isLoading && <LoadingBlock label="Reading lock files and .py bundle manifests…" />}
+      {query.isLoading && <LoadingBlock label="Reading lock files, .py bundle manifests and service reports…" />}
       {query.error && (
         <EmptyState
           title="Could not read deployments"
@@ -184,20 +249,21 @@ export function DeploymentsView() {
 
           <SectionCard
             title="Surfaces"
-            description="Declared on each repository's default branch. The data build is the one the surface's .py certifies for this country."
+            description="Declared: the lock on each repository's default branch, and the data build its .py certifies for this country. Served: what the running service reports."
             padded={false}
             footer={`Checked ${new Date(data.checked_at).toLocaleString("en-US")}. Cached for 15 minutes.`}
           >
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[960px] text-sm">
+              <table className="w-full min-w-[1200px] text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/10 text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th scope="col" className="min-w-[220px] px-4 py-2.5">Surface</th>
                     <th scope="col" className="min-w-[240px] px-4 py-2.5">Status</th>
-                    <th scope="col" className="px-4 py-2.5">.py</th>
+                    <th scope="col" className="min-w-[260px] px-4 py-2.5">Served</th>
+                    <th scope="col" className="px-4 py-2.5">Declared .py</th>
                     <th scope="col" className="px-4 py-2.5">{modelLabel}</th>
                     <th scope="col" className="px-4 py-2.5">Core</th>
-                    <th scope="col" className="min-w-[260px] px-4 py-2.5">Data build</th>
+                    <th scope="col" className="min-w-[260px] px-4 py-2.5">Declared data build</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -216,6 +282,9 @@ export function DeploymentsView() {
                         <div className="mt-1.5 text-xs leading-snug text-muted-foreground">
                           {row.detail}
                         </div>
+                      </td>
+                      <td className="max-w-[300px] px-4 py-3 align-top">
+                        <ServedCell row={row} country={country} />
                       </td>
                       <td className="px-4 py-3 align-top">
                         {row.py_version ? (
