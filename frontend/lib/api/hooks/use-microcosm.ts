@@ -17,6 +17,7 @@ import {
 import { withBasePath } from "@/lib/base-path";
 import type { BuildRunSource } from "@/lib/microcosm/build-monitor";
 import type { BuildRunResponse, BuildRunsResponse } from "@/lib/microcosm/build-runs";
+import type { DeploymentsResponse } from "@/lib/microcosm/deployments";
 import type { ExplorerState } from "@/lib/microcosm/calibration-explorer";
 import type { CalibrationTreeResponse } from "@/lib/microcosm/calibration-tree";
 import {
@@ -1622,5 +1623,16 @@ export function useBuildRun(source: BuildRunSource, runId?: string) {
     placeholderData: keepPreviousData,
     staleTime: 5 * 1000,
     refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+  });
+}
+
+export function useMicrocosmDeployments() {
+  const { country } = useCountry();
+  const tracked = hasCapability(country, "deployments");
+  return useQuery({
+    queryKey: ["microcosm", "deployments", country],
+    queryFn: () => apiGet<DeploymentsResponse>("/microcosm/deployments", { country }),
+    enabled: tracked,
+    staleTime: 5 * 60 * 1000,
   });
 }

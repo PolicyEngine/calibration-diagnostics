@@ -52,6 +52,13 @@ dashboard API layer.
   goes across past runs of the same pipeline, and which checks fail and how
   much compute had run when they did. See
   [the build progress notes](docs/build-monitor.md).
+- **Deployments** (`/microcosm/deployments`) — which .py version, country-model
+  version and Microcosm data build each PolicyEngine surface (the API, app v3,
+  the simulation API, the household API, API v2 alpha, and this dashboard's
+  variable runtime) declares, and whether that build is the one the latest .py
+  certifies. Versions come from each repository's dependency lock on its default
+  branch, not from the running service. See
+  [the deployments notes](docs/deployments.md).
 - **Calibration target investigations** (`docs/ai/`) — tool-independent procedures,
   specialist review responsibilities, and a reusable checklist for identifying
   the cause of a discrepant target from release artifacts and relevant source
@@ -75,6 +82,7 @@ Published-release endpoints accept `country=us|uk|be` (default `us`).
 | `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics for a published release |
 | `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one published target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks |
 | `GET /api/microcosm/compare?a=<id>&b=<id>` | Version-over-version diff |
+| `GET /api/microcosm/deployments?country=<code>` | Declared .py, country-model and data-build versions for each PolicyEngine surface |
 | `GET /api/microcosm/builds?country=<code>&source=local\|staging` | Every build run from one source as a stage timeline |
 | `GET /api/microcosm/builds/run?id=<run_id>&country=<code>&source=local\|staging` | One run's timeline and completion forecast, with stage-time and gate-failure statistics for its pipeline |
 | `GET /api/microcosm/staging/runs` | List staging build runs |

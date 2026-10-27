@@ -140,3 +140,16 @@ test("names the page the reader is on for the phone-width nav bar", () => {
   expect(activeNavItem("/microcosm/targets", uk)).toBeUndefined();
   expect(activeNavItem("/microcosm/staging", navGroupsForCountry("be"))).toBeUndefined();
 });
+
+test("Deployments is a release page for the countries a .py bundle tracks", () => {
+  const releases = NAV_GROUPS.find((group) => group.label === "Releases")!;
+  expect(releases.items.find((item) => item.href === "/microcosm/deployments")?.capability).toBe(
+    "deployments",
+  );
+  expect(navGroupsForCountry("uk").flatMap((group) => group.items).map((item) => item.href)).toContain(
+    "/microcosm/deployments",
+  );
+  expect(navGroupsForCountry("be").flatMap((group) => group.items).map((item) => item.href)).not.toContain(
+    "/microcosm/deployments",
+  );
+});

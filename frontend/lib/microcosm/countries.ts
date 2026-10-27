@@ -17,6 +17,7 @@ export const COUNTRY_CAPABILITIES = [
   "pipeline",
   "variables",
   "external_checks",
+  "deployments",
 ] as const;
 export type CountryCapability = (typeof COUNTRY_CAPABILITIES)[number];
 
@@ -104,7 +105,7 @@ export const COUNTRY_REGISTRY = {
     geography: "United Kingdom",
     geography_id: null,
     visibility: "private",
-    capabilities: [...CALIBRATION_CAPABILITIES, "staging"],
+    capabilities: [...CALIBRATION_CAPABILITIES, "staging", "deployments"],
     staging: {
       repo: "policyengine/populace-uk-staging",
       revision: "main",

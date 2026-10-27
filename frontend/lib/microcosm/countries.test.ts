@@ -80,7 +80,7 @@ test("keeps the live registrations on their published repositories and labels", 
     label: "United Kingdom",
     dataset_label: "Microcosm UK",
     visibility: "private",
-    capabilities: ["calibration", "targets", "compare", "cross_dataset", "staging"],
+    capabilities: ["calibration", "targets", "compare", "cross_dataset", "staging", "deployments"],
     staging: {
       repo: "policyengine/populace-uk-staging",
       repo_env: "POPULACE_UK_STAGING_HF_REPO",

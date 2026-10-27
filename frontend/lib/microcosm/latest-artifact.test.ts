@@ -2875,6 +2875,7 @@ test("releaseCountry falls back to the registration when the manifest has no cou
       "pipeline",
       "variables",
       "external_checks",
+      "deployments",
     ],
   });
 });
