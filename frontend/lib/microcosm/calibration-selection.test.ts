@@ -298,3 +298,17 @@ test("without a pick, or with a pick of the compared release's build, the labels
     stagingComparisonBaseline(NATIONAL_COMPARISON),
   );
 });
+
+test("a national candidate's pick of its compared release's build keeps the release's labels", () => {
+  // `/microcosm/staging/compare` sends `comparison_release` only for a
+  // local-area candidate. For a US, Belgian or UK national candidate the
+  // compared release is known only from the response's `a.release_id`.
+  const current = stagingComparisonBaseline(undefined);
+  expect(stagingComparisonBaseline(undefined, NATIONAL_RELEASE_BUILD, NATIONAL_CURRENT))
+    .toEqual(current);
+  // Another build is still named by its date and run ID.
+  expect(stagingComparisonBaseline(undefined, EARLIER_CANDIDATE_BUILD, NATIONAL_CURRENT)
+    .releaseLabel).toBe(
+    `Build ${formatShortDateTime(EARLIER_CANDIDATE_PUBLISHED_AT)} · ${EARLIER_CANDIDATE_RUN}`,
+  );
+});
