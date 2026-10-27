@@ -29,6 +29,9 @@ export interface DeploymentSurface {
   lock?: { path: string; format: LockFormat };
   // Countries the surface serves; omitted means every country .py bundles.
   countries?: readonly MicrocosmCountry[];
+  // False for a surface that calculates single households and loads no
+  // microdata, so no data build applies to it.
+  loads_dataset?: boolean;
   note?: string;
 }
 
@@ -65,6 +68,8 @@ export const DEPLOYMENT_SURFACES: readonly DeploymentSurface[] = [
     repository: "PolicyEngine/policyengine-household-api",
     branch: "main",
     lock: { path: "uv.lock", format: "uv" },
+    // Its country metadata reports `dataset: None` and `data_version: None`.
+    loads_dataset: false,
   },
   {
     id: "api-v2-alpha",
@@ -214,6 +219,7 @@ export type DeploymentStatus =
   | "no_bundle"
   | "no_py"
   | "not_in_bundle"
+  | "no_dataset"
   | "unavailable";
 
 export interface DeploymentRow {
@@ -302,6 +308,18 @@ export function classifyDeployment(
 
   if (declaration.error) {
     return { ...base, status: "unavailable", detail: declaration.error };
+  }
+  if (surface.loads_dataset === false) {
+    const pin = modelVersion ? `${modelPackage} ${modelVersion}` : "its country model";
+    return {
+      ...base,
+      data_build_id: null,
+      certified_model_version: null,
+      status: "no_dataset",
+      detail: `Calculates single households and loads no microdata. Pins ${pin}${
+        pyVersion ? ` through .py ${pyVersion}` : " directly, without .py"
+      }.`,
+    };
   }
   if (!pyVersion) {
     return {

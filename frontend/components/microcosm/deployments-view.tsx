@@ -31,6 +31,7 @@ const STATUS: Record<DeploymentStatus, { label: string; tone: StatusTone }> = {
   no_bundle: { label: "No certified data", tone: "danger" },
   no_py: { label: "No .py", tone: "warning" },
   not_in_bundle: { label: "Country not in bundle", tone: "neutral" },
+  no_dataset: { label: "No dataset", tone: "neutral" },
   unavailable: { label: "Lock unavailable", tone: "neutral" },
 };
 

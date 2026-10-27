@@ -203,7 +203,7 @@ test("loads every surface, resolves bundles once per .py version, and inherits t
     api: "behind",
     "app-v3": "behind",
     "sim-api": "behind",
-    "household-api": "no_py",
+    "household-api": "no_dataset",
     "api-v2-alpha": "unavailable",
     "dashboard-runtime": "no_bundle",
   });
@@ -222,4 +222,20 @@ test("only Microcosm builds are dashboard releases", () => {
   expect(isMicrocosmBuild("populace-us-2024-spm-20260915")).toBe(true);
   expect(isMicrocosmBuild("microcosm-uk-2024-25-national-20261025T091414Z-a6299504")).toBe(true);
   expect(isMicrocosmBuild("policyengine-uk-data-1.58.1")).toBe(false);
+});
+
+test("a surface that loads no microdata has no data build to compare", () => {
+  const household = DEPLOYMENT_SURFACES.find((surface) => surface.id === "household-api")!;
+  const row = classifyDeployment(
+    household,
+    { versions: { "policyengine-us": "2.53.1" }, error: null },
+    "us",
+    bundles([]),
+    LATEST,
+  );
+  expect(row.status).toBe("no_dataset");
+  expect(row.data_build_id).toBeNull();
+  expect(row.detail).toBe(
+    "Calculates single households and loads no microdata. Pins policyengine-us 2.53.1 directly, without .py.",
+  );
 });

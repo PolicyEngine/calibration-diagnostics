@@ -36,6 +36,7 @@ entry.
 | Model mismatch | The lock pins a country-model version that differs from the one the bundle certifies the data for. |
 | No certified data | The pinned .py is older than bundle manifests, so it certifies no data build. |
 | No .py | The lock pins the country model without .py. The data comes from the country package's own default. |
+| No dataset | The surface calculates single households and loads no microdata (the household API), so no data build applies. |
 | Country not in bundle | The pinned .py certifies no build for this country. |
 | Lock unavailable | The lock file or the bundle manifest could not be read. |
 
