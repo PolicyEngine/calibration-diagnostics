@@ -149,13 +149,16 @@ release repository update
 ```
 
 A release directory or tag without calibration diagnostics is reported as
-ineligible and is not treated as an error. The next repository webhook repeats
+ineligible and is not treated as an error. A tag named `latest` is never a
+release and is left out of the report. The next repository webhook repeats
 the inventory check, so it also finds a historical release missed by an older
 webhook. There is no scheduled reconciliation.
 
 A release whose build cannot be published or repaired, for example because the
-schema 8 reader refuses its diagnostics, its tag moved to another commit, or a
-repair's rebuilt index differs from the recorded digest, is reported as
+schema 8 reader refuses its diagnostics, its tag moved to another commit, its
+commit cannot be read from Hugging Face (its tag's commit, or for a release
+folder without a tag, the newest commit behind the folder), or a repair's
+rebuilt index differs from the recorded digest, is reported as
 `failed` with the error. The remaining releases are still reconciled and the
 latest-release selection is still updated, unless the release the upstream
 pointer names is the one that failed; the workflow then fails. A failed release
@@ -181,7 +184,11 @@ for inspection only, such as the UK dense local-area line, has no copy on
   at the tag names it as `build.cut_tag`. Any other cut-shaped tag is
   ineligible.
 - A line folder on `main` is not published again once its cuts are. A build
-  already published from the folder stays pinned at its own commit.
+  already published from the folder stays pinned at its own commit. Nor is the
+  folder published while the commit of a tag named
+  `<release id>-<YYYYMMDDTHHMMSSZ>-<attempt>` for it cannot be read. If the
+  folder has no build yet, it is then reported as `ineligible`, with a reason
+  naming that tag; the next run looks the tag up again.
 - A country registration may name a per-line pointer (`pointer_path`, for the
   UK `latest-national.json`). Its `revision` names the current cut, which
   becomes the country's latest release. Other countries keep `latest.json`.
@@ -473,7 +480,7 @@ any source and print no report: reading the manifest, listing releases, tags or
 staging runs, the first Blob listing, and, for releases, the Hugging Face
 lookups that build the release list (the folder probe and
 `release_manifest.json` of each tag the manifest does not already pin at its
-commit, and the commit of each folder release without a tag).
+commit).
 An error in one of those lookups therefore stops every release, as one failed
 release did before.
 

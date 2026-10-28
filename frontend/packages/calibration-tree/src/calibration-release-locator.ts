@@ -25,8 +25,18 @@ function hfHeaders(): HeadersInit | undefined {
   return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
+/**
+ * Whether a value may name a release or Hugging Face revision: safe to put
+ * in a Hugging Face URL, and never `latest`, which names no fixed release.
+ */
+export function isReleaseId(value: unknown): value is string {
+  return typeof value === "string" &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value) &&
+    value !== "latest";
+}
+
 function safeReleaseId(value: string, label = "release"): string {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value) || value === "latest") {
+  if (!isReleaseId(value)) {
     throw new Error(`Invalid ${label} id.`);
   }
   return value;
@@ -60,6 +70,10 @@ export async function resolveHfRevisionSha(
     `https://huggingface.co/api/datasets/${repo}/revision/${encodeURIComponent(safeRevision)}`,
     {
       headers: hfHeaders(),
+      // Each Hugging Face lookup in this module stops after 30 seconds. The
+      // publisher reads one revision per release tag, so no slow response
+      // may hold its run indefinitely.
+      signal: AbortSignal.timeout(30_000),
       ...(revalidate <= 0
         ? { cache: "no-store" as const }
         : { next: { revalidate } }),
@@ -105,6 +119,7 @@ export async function resolveHfReleaseDirectorySha(
       "?recursive=false&expand=true",
     {
       headers: hfHeaders(),
+      signal: AbortSignal.timeout(30_000),
       ...(revalidate <= 0
         ? { cache: "no-store" as const }
         : { next: { revalidate } }),
@@ -197,6 +212,7 @@ export async function resolveHfRepositoryCommitPublishedAt(
     `https://huggingface.co/api/datasets/${repo}/commits/${commitSha}?limit=1`,
     {
       headers: hfHeaders(),
+      signal: AbortSignal.timeout(30_000),
       ...(revalidate <= 0
         ? { cache: "no-store" as const }
         : { next: { revalidate } }),

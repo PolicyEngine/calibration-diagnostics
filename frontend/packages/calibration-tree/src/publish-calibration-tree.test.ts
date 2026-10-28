@@ -480,6 +480,8 @@ const DENSE_CUT = `${DENSE_LINE}-20261019T000432Z-4e5f6a7b`;
 // A cut-shaped tag whose folder names another cut: never published.
 const STRAY_CUT = `${NATIONAL_LINE}-20261001T000000Z-99999999`;
 const JUNE_RELEASE = "populace-uk-2023-test-20260619T023711Z";
+// A release folder on main with no tag.
+const MAY_RELEASE = "populace-uk-2023-test-20260515T101500Z";
 const NATIONAL_SHA = "1".repeat(40);
 const DENSE_SHA = "2".repeat(40);
 const STRAY_SHA = "3".repeat(40);
@@ -489,6 +491,18 @@ const COMMIT_DATES: Record<string, string> = {
   [NATIONAL_SHA]: "2026-10-19T10:21:22.000Z",
   [DENSE_SHA]: "2026-10-19T07:53:18.000Z",
 };
+const RELEASE_TAG_COMMITS: Array<[string, string]> = [
+  [NATIONAL_CUT, NATIONAL_SHA],
+  [DENSE_CUT, DENSE_SHA],
+  [STRAY_CUT, STRAY_SHA],
+  [JUNE_RELEASE, JUNE_SHA],
+];
+// Microcosm makes an annotated tag when it publishes a release with a tag
+// message (microcosm#1301); the other tags are lightweight. Hugging Face's
+// `/refs` listing gives an annotated tag's `targetCommit` as the ID of the
+// tag's own object in place of the tag's commit.
+const ANNOTATED_TAGS = new Set([DENSE_CUT, JUNE_RELEASE]);
+const tagObjectId = (commit: string) => `a${commit.slice(1)}`;
 
 const SCHEMA_8_DIAGNOSTICS = {
   schema_version: 8,
@@ -525,6 +539,12 @@ function juneEntry(): CalibrationTreeManifestEntry {
 function lineRepositoryFetch(
   requested: string[],
   diagnosticsFor: (directory: string) => Record<string, unknown> = () => SCHEMA_8_DIAGNOSTICS,
+  failures: {
+    /** Tags whose `/revision` lookup fails with 500. */
+    unreadableTags?: ReadonlySet<string>;
+    /** A folder on main with no tag, whose newest-commit lookup fails with 500. */
+    untaggedFolder?: string;
+  } = {},
 ) {
   const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
   const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
@@ -532,30 +552,69 @@ function lineRepositoryFetch(
     { type: "file", path: `releases/${directory}/calibration_diagnostics.json` },
     { type: "file", path: `releases/${directory}/release_manifest.json` },
   ]);
+  const commitOfTagObject = new Map(
+    RELEASE_TAG_COMMITS
+      .filter(([name]) => ANNOTATED_TAGS.has(name))
+      .map(([, commit]) => [tagObjectId(commit), commit]),
+  );
   return (async (input: string | URL | Request) => {
-    const url = String(input);
-    requested.push(url);
+    const requestedUrl = String(input);
+    requested.push(requestedUrl);
+    // As Hugging Face does, files are read at a tag object's ID as at its
+    // commit, and a commit log read there starts at that commit.
+    const url = requestedUrl.replace(
+      /[0-9a-f]{40}/,
+      (id) => commitOfTagObject.get(id) ?? id,
+    );
     if (url === `${api}/tree/main/releases?recursive=true`) {
       return Response.json([
         { type: "file", path: `releases/${NATIONAL_LINE}/calibration_diagnostics.json` },
         { type: "file", path: `releases/${JUNE_RELEASE}/calibration_diagnostics.json` },
+        ...(failures.untaggedFolder
+          ? [{ type: "file", path: `releases/${failures.untaggedFolder}/calibration_diagnostics.json` }]
+          : []),
       ]);
+    }
+    if (
+      failures.untaggedFolder &&
+      url === `${api}/tree/main/releases/${failures.untaggedFolder}?recursive=false&expand=true`
+    ) {
+      return new Response(null, { status: 500 });
     }
     if (url === `${api}/refs`) {
       return Response.json({
         branches: [{ name: "main", targetCommit: MAIN_SHA }],
         tags: [
-          { name: NATIONAL_CUT, targetCommit: NATIONAL_SHA },
-          { name: DENSE_CUT, targetCommit: DENSE_SHA },
-          { name: STRAY_CUT, targetCommit: STRAY_SHA },
-          { name: JUNE_RELEASE, targetCommit: JUNE_SHA },
+          ...RELEASE_TAG_COMMITS.map(([name, commit]) => ({
+            name,
+            targetCommit: ANNOTATED_TAGS.has(name) ? tagObjectId(commit) : commit,
+          })),
+          // Never a release, and a name the revision lookup refuses.
+          { name: "latest", targetCommit: MAIN_SHA },
         ],
       });
+    }
+    const revisionTag = RELEASE_TAG_COMMITS.find(([name]) => url === `${api}/revision/${name}`);
+    if (revisionTag) {
+      const [tagName, tagCommit] = revisionTag;
+      return failures.unreadableTags?.has(tagName)
+        ? new Response(null, { status: 500 })
+        : Response.json({ sha: tagCommit });
     }
     // No cut has a folder of its own; each keeps its files in its line's.
     for (const [sha, tag] of [[NATIONAL_SHA, NATIONAL_CUT], [DENSE_SHA, DENSE_CUT], [STRAY_SHA, STRAY_CUT]]) {
       if (url === `${api}/tree/${sha}/releases/${tag}?recursive=false`) {
         return new Response(null, { status: 404 });
+      }
+    }
+    // The newest commit behind each folder on main is its newest tag's.
+    for (const [directory, sha] of [[NATIONAL_LINE, NATIONAL_SHA], [JUNE_RELEASE, JUNE_SHA]]) {
+      if (url === `${api}/tree/main/releases/${directory}?recursive=false&expand=true`) {
+        return Response.json([{
+          type: "file",
+          path: `releases/${directory}/calibration_diagnostics.json`,
+          lastCommit: { id: sha, date: "2026-10-19T10:21:22.000Z" },
+        }]);
       }
     }
     if (url === `${api}/tree/${NATIONAL_SHA}/releases/${NATIONAL_LINE}?recursive=false`) return folderListing(NATIONAL_LINE);
@@ -588,7 +647,6 @@ function lineRepositoryFetch(
       return Response.json([{ id: commit, date: COMMIT_DATES[commit] }]);
     }
     if (url === `${api}/revision/main`) return Response.json({ sha: MAIN_SHA });
-    if (url === `${api}/revision/${NATIONAL_CUT}`) return Response.json({ sha: NATIONAL_SHA });
     if (url === `${resolve}/${MAIN_SHA}/latest-national.json`) {
       return Response.json({
         schema_version: 1,
@@ -603,6 +661,10 @@ function lineRepositoryFetch(
   }) as typeof fetch;
 }
 
+// The dense snapshot's tag and the June release's tag are annotated. Each
+// build must still pin, and be dated by, the commit its tag points at, never
+// the tag object's ID; the national snapshot's lightweight tag is read as
+// before.
 test("release reconciliation publishes each line cut from its folder and follows the line pointer", async () => {
   // The folder's build from before cuts were recognised, and the June
   // release, which is latest until the line pointer is read.
@@ -665,6 +727,11 @@ test("release reconciliation publishes each line cut from its folder and follows
     );
     expect(requested.some((url) => url.includes("expand=true"))).toBe(false);
     expect(requested.some((url) => url.endsWith("/latest.json"))).toBe(false);
+    // Nothing is read at a tag object's ID, which Hugging Face would accept
+    // for files but not for a commit's date.
+    expect(requested.filter((url) =>
+      RELEASE_TAG_COMMITS.some(([, commit]) => url.includes(tagObjectId(commit)))
+    )).toEqual([]);
 
     // A second run finds every build complete and does not probe the
     // published cuts again.
@@ -755,6 +822,79 @@ test("release reconciliation records a release it cannot build as failed and sti
       .toEqual([JUNE_RELEASE, NATIONAL_LINE, NATIONAL_CUT].sort());
     expect(store.current().countries.uk!.latestReleaseBuildArtifactId)
       .toBe(builds.find((build) => build.releaseId === NATIONAL_CUT)!.buildArtifactId);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a release whose commit cannot be read is reported as failed, and the other releases are still reconciled", async () => {
+  // The tag lookups of the national snapshot and the June release fail. The
+  // June release has a folder of its own, and the national snapshot's tag is
+  // the only tag that marks the national release series' folder, so neither
+  // folder may be pinned to its newest commit on main in place of the tag.
+  // The series folder has no build yet, so it could be published. The May
+  // release's folder has no tag, and the lookup of its newest commit fails.
+  const mayEntry = {
+    ...juneEntry(),
+    buildArtifactId: "b".repeat(64),
+    sourceId: MAY_RELEASE,
+    label: MAY_RELEASE,
+    releaseId: MAY_RELEASE,
+    hfCommitSha: "6".repeat(40),
+  };
+  const store = memoryStore(withCalibrationTreeManifestEntry(
+    withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", juneEntry(), true),
+    "uk",
+    mayEntry,
+  ));
+  const requested: string[] = [];
+  globalThis.fetch = lineRepositoryFetch(requested, undefined, {
+    unreadableTags: new Set([NATIONAL_CUT, JUNE_RELEASE]),
+    untaggedFolder: MAY_RELEASE,
+  });
+  try {
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+    const status = Object.fromEntries(
+      report.outcomes.map((outcome) => [outcome.sourceId, outcome.status]),
+    );
+    expect(status).toEqual({
+      [NATIONAL_CUT]: "failed",
+      [JUNE_RELEASE]: "failed",
+      [MAY_RELEASE]: "failed",
+      [DENSE_CUT]: "published",
+      [STRAY_CUT]: "ineligible",
+      [NATIONAL_LINE]: "ineligible",
+    });
+    expect(report.outcomes.find((outcome) => outcome.sourceId === NATIONAL_LINE)?.reason).toBe(
+      `Held back in this run because the commit of its release snapshot tag ${NATIONAL_CUT} ` +
+        "could not be read. The next run retries the lookup.",
+    );
+    // Only the May release's folder, which has no tag, is looked up for its
+    // newest commit.
+    expect(requested.filter((url) => url.includes("expand=true"))).toEqual([
+      `https://huggingface.co/api/datasets/${UK_REPO}/tree/main/releases/${MAY_RELEASE}?recursive=false&expand=true`,
+    ]);
+    const lookupFailure = "Hugging Face revision lookup failed with 500.";
+    expect(report.outcomes.filter((outcome) => outcome.status === "failed")).toEqual([
+      { sourceId: NATIONAL_CUT, status: "failed", buildArtifactId: null, reason: lookupFailure },
+      {
+        sourceId: JUNE_RELEASE,
+        status: "failed",
+        buildArtifactId: juneEntry().buildArtifactId,
+        reason: lookupFailure,
+      },
+      {
+        sourceId: MAY_RELEASE,
+        status: "failed",
+        buildArtifactId: mayEntry.buildArtifactId,
+        reason: "Hugging Face release directory lookup failed with 500.",
+      },
+    ]);
+    // Only the dense tagged build is uploaded and written; the June release
+    // stays the latest.
+    expect(store.uploads.map((bundle) => bundle.index.build.releaseId)).toEqual([DENSE_CUT]);
+    expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+      .toEqual([[DENSE_CUT, false]]);
   } finally {
     globalThis.fetch = originalFetch;
   }
