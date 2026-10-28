@@ -592,6 +592,16 @@ function lineRepositoryFetch(
         return new Response(null, { status: 404 });
       }
     }
+    // The newest commit behind each folder on main is its newest tag's.
+    for (const [directory, sha] of [[NATIONAL_LINE, NATIONAL_SHA], [JUNE_RELEASE, JUNE_SHA]]) {
+      if (url === `${api}/tree/main/releases/${directory}?recursive=false&expand=true`) {
+        return Response.json([{
+          type: "file",
+          path: `releases/${directory}/calibration_diagnostics.json`,
+          lastCommit: { id: sha, date: "2026-10-19T10:21:22.000Z" },
+        }]);
+      }
+    }
     if (url === `${api}/tree/${NATIONAL_SHA}/releases/${NATIONAL_LINE}?recursive=false`) return folderListing(NATIONAL_LINE);
     if (url === `${api}/tree/${STRAY_SHA}/releases/${NATIONAL_LINE}?recursive=false`) return folderListing(NATIONAL_LINE);
     if (url === `${api}/tree/${DENSE_SHA}/releases/${DENSE_LINE}?recursive=false`) return folderListing(DENSE_LINE);
@@ -805,9 +815,16 @@ test("release reconciliation records a release it cannot build as failed and sti
 test("a release tag whose commit cannot be read is reported as failed, and the other releases are still reconciled", async () => {
   // The June release has a folder of its own, and the national snapshot's
   // tag is the only tag that marks the national release series' folder, so
-  // neither folder may be published from main in place of the tag.
-  const store = lineStoreWithJuneLatest();
-  globalThis.fetch = lineRepositoryFetch([], undefined, new Set([NATIONAL_CUT, JUNE_RELEASE]));
+  // neither folder may be pinned to its newest commit on main in place of the
+  // tag. The series folder has no build yet, so it would be published.
+  const store = memoryStore(withCalibrationTreeManifestEntry(
+    emptyCalibrationTreeManifest(),
+    "uk",
+    juneEntry(),
+    true,
+  ));
+  const requested: string[] = [];
+  globalThis.fetch = lineRepositoryFetch(requested, undefined, new Set([NATIONAL_CUT, JUNE_RELEASE]));
   try {
     const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     const status = Object.fromEntries(
@@ -818,9 +835,9 @@ test("a release tag whose commit cannot be read is reported as failed, and the o
       [JUNE_RELEASE]: "failed",
       [DENSE_CUT]: "published",
       [STRAY_CUT]: "ineligible",
-      // The series folder's recorded build is still audited at its own commit.
-      [NATIONAL_LINE]: "complete",
+      [NATIONAL_LINE]: "ineligible",
     });
+    expect(requested.filter((url) => url.includes("expand=true"))).toEqual([]);
     const lookupFailure = "Hugging Face revision lookup failed with 500.";
     expect(report.outcomes.filter((outcome) => outcome.status === "failed")).toEqual([
       { sourceId: NATIONAL_CUT, status: "failed", buildArtifactId: null, reason: lookupFailure },
@@ -831,7 +848,9 @@ test("a release tag whose commit cannot be read is reported as failed, and the o
         reason: lookupFailure,
       },
     ]);
-    // Only the dense tagged build is written; the June release stays the latest.
+    // Only the dense tagged build is uploaded and written; the June release
+    // stays the latest.
+    expect(store.uploads.map((bundle) => bundle.index.build.releaseId)).toEqual([DENSE_CUT]);
     expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
       .toEqual([[DENSE_CUT, false]]);
   } finally {
