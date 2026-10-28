@@ -837,6 +837,10 @@ test("a release tag whose commit cannot be read is reported as failed, and the o
       [STRAY_CUT]: "ineligible",
       [NATIONAL_LINE]: "ineligible",
     });
+    expect(report.outcomes.find((outcome) => outcome.sourceId === NATIONAL_LINE)?.reason).toBe(
+      `Held back in this run because the commit of its release snapshot tag ${NATIONAL_CUT} ` +
+        "could not be read. The next run retries the lookup.",
+    );
     expect(requested.filter((url) => url.includes("expand=true"))).toEqual([]);
     const lookupFailure = "Hugging Face revision lookup failed with 500.";
     expect(report.outcomes.filter((outcome) => outcome.status === "failed")).toEqual([
