@@ -489,6 +489,15 @@ const COMMIT_DATES: Record<string, string> = {
   [NATIONAL_SHA]: "2026-10-19T10:21:22.000Z",
   [DENSE_SHA]: "2026-10-19T07:53:18.000Z",
 };
+const RELEASE_TAG_COMMITS: Array<[string, string]> = [
+  [NATIONAL_CUT, NATIONAL_SHA],
+  [DENSE_CUT, DENSE_SHA],
+  [STRAY_CUT, STRAY_SHA],
+  [JUNE_RELEASE, JUNE_SHA],
+];
+// The ID of an annotated tag's own object, which Hugging Face's `/refs`
+// listing gives as the tag's `targetCommit` in place of the tag's commit.
+const tagObjectId = (commit: string) => `a${commit.slice(1)}`;
 
 const SCHEMA_8_DIAGNOSTICS = {
   schema_version: 8,
@@ -525,6 +534,7 @@ function juneEntry(): CalibrationTreeManifestEntry {
 function lineRepositoryFetch(
   requested: string[],
   diagnosticsFor: (directory: string) => Record<string, unknown> = () => SCHEMA_8_DIAGNOSTICS,
+  tagKind: "lightweight" | "annotated" = "lightweight",
 ) {
   const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
   const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
@@ -532,9 +542,20 @@ function lineRepositoryFetch(
     { type: "file", path: `releases/${directory}/calibration_diagnostics.json` },
     { type: "file", path: `releases/${directory}/release_manifest.json` },
   ]);
+  const commitOfTagObject = new Map(
+    tagKind === "annotated"
+      ? RELEASE_TAG_COMMITS.map(([, commit]) => [tagObjectId(commit), commit])
+      : [],
+  );
   return (async (input: string | URL | Request) => {
-    const url = String(input);
-    requested.push(url);
+    const requestedUrl = String(input);
+    requested.push(requestedUrl);
+    // As Hugging Face does, files are read at a tag object's ID as at its
+    // commit, and a commit log read there starts at that commit.
+    const url = requestedUrl.replace(
+      /[0-9a-f]{40}/,
+      (id) => commitOfTagObject.get(id) ?? id,
+    );
     if (url === `${api}/tree/main/releases?recursive=true`) {
       return Response.json([
         { type: "file", path: `releases/${NATIONAL_LINE}/calibration_diagnostics.json` },
@@ -544,14 +565,14 @@ function lineRepositoryFetch(
     if (url === `${api}/refs`) {
       return Response.json({
         branches: [{ name: "main", targetCommit: MAIN_SHA }],
-        tags: [
-          { name: NATIONAL_CUT, targetCommit: NATIONAL_SHA },
-          { name: DENSE_CUT, targetCommit: DENSE_SHA },
-          { name: STRAY_CUT, targetCommit: STRAY_SHA },
-          { name: JUNE_RELEASE, targetCommit: JUNE_SHA },
-        ],
+        tags: RELEASE_TAG_COMMITS.map(([name, commit]) => ({
+          name,
+          targetCommit: tagKind === "annotated" ? tagObjectId(commit) : commit,
+        })),
       });
     }
+    const taggedCommit = RELEASE_TAG_COMMITS.find(([name]) => url === `${api}/revision/${name}`)?.[1];
+    if (taggedCommit) return Response.json({ sha: taggedCommit });
     // No cut has a folder of its own; each keeps its files in its line's.
     for (const [sha, tag] of [[NATIONAL_SHA, NATIONAL_CUT], [DENSE_SHA, DENSE_CUT], [STRAY_SHA, STRAY_CUT]]) {
       if (url === `${api}/tree/${sha}/releases/${tag}?recursive=false`) {
@@ -588,7 +609,6 @@ function lineRepositoryFetch(
       return Response.json([{ id: commit, date: COMMIT_DATES[commit] }]);
     }
     if (url === `${api}/revision/main`) return Response.json({ sha: MAIN_SHA });
-    if (url === `${api}/revision/${NATIONAL_CUT}`) return Response.json({ sha: NATIONAL_SHA });
     if (url === `${resolve}/${MAIN_SHA}/latest-national.json`) {
       return Response.json({
         schema_version: 1,
@@ -603,7 +623,10 @@ function lineRepositoryFetch(
   }) as typeof fetch;
 }
 
-test("release reconciliation publishes each line cut from its folder and follows the line pointer", async () => {
+// Microcosm makes an annotated tag when it publishes a release with a tag
+// message (microcosm#1301). Each build must still pin, and be dated by, the
+// commit the tag points at, never the tag object's ID.
+test.each(["lightweight", "annotated"] as const)("release reconciliation publishes each line cut from its folder and follows the line pointer (%s tags)", async (tagKind) => {
   // The folder's build from before cuts were recognised, and the June
   // release, which is latest until the line pointer is read.
   const legacy = placeholderEntry();
@@ -617,7 +640,7 @@ test("release reconciliation publishes each line cut from its folder and follows
     ),
   );
   const requested: string[] = [];
-  globalThis.fetch = lineRepositoryFetch(requested);
+  globalThis.fetch = lineRepositoryFetch(requested, undefined, tagKind);
   try {
     const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     const status = Object.fromEntries(
@@ -665,6 +688,11 @@ test("release reconciliation publishes each line cut from its folder and follows
     );
     expect(requested.some((url) => url.includes("expand=true"))).toBe(false);
     expect(requested.some((url) => url.endsWith("/latest.json"))).toBe(false);
+    // Nothing is read at a tag object's ID, which Hugging Face would accept
+    // for files but not for a commit's date.
+    expect(requested.filter((url) =>
+      RELEASE_TAG_COMMITS.some(([, commit]) => url.includes(tagObjectId(commit)))
+    )).toEqual([]);
 
     // A second run finds every build complete and does not probe the
     // published cuts again.
