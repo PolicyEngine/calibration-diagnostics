@@ -156,8 +156,9 @@ webhook. There is no scheduled reconciliation.
 
 A release whose build cannot be published or repaired, for example because the
 schema 8 reader refuses its diagnostics, its tag moved to another commit, its
-tag's commit cannot be read from Hugging Face, or a repair's rebuilt index
-differs from the recorded digest, is reported as
+commit cannot be read from Hugging Face (its tag's commit, or for a release
+folder without a tag, the newest commit behind the folder), or a repair's
+rebuilt index differs from the recorded digest, is reported as
 `failed` with the error. The remaining releases are still reconciled and the
 latest-release selection is still updated, unless the release the upstream
 pointer names is the one that failed; the workflow then fails. A failed release
@@ -479,7 +480,7 @@ any source and print no report: reading the manifest, listing releases, tags or
 staging runs, the first Blob listing, and, for releases, the Hugging Face
 lookups that build the release list (the folder probe and
 `release_manifest.json` of each tag the manifest does not already pin at its
-commit, and the commit of each folder release without a tag).
+commit).
 An error in one of those lookups therefore stops every release, as one failed
 release did before.
 

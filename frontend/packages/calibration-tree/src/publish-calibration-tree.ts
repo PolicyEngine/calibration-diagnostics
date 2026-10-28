@@ -544,7 +544,7 @@ async function enumerateReleaseCandidates(
 ): Promise<{
   candidates: ReleaseCandidate[];
   ineligible: ReconciliationOutcome[];
-  /** Releases whose tag's commit could not be read. */
+  /** Releases whose commit could not be read, from their tag or their folder. */
   failed: ReconciliationOutcome[];
 }> {
   const [releases, { tags, unreadable }] = await Promise.all([
@@ -559,6 +559,17 @@ async function enumerateReleaseCandidates(
   );
   const candidates = new Map<string, ReleaseCandidate>();
   const ineligible: ReconciliationOutcome[] = [];
+  // A release whose commit cannot be read fails on its own and keeps any
+  // build it already has, as a release that cannot be published does.
+  const failed: ReconciliationOutcome[] = [];
+  const reportFailure = (sourceId: string, reason: string) => failed.push({
+    sourceId,
+    status: "failed",
+    buildArtifactId:
+      manifestBuildForSource(manifest, country, "release", sourceId)?.buildArtifactId ?? null,
+    reason,
+  });
+  for (const [name, reason] of unreadable) reportFailure(name, reason);
 
   // Tags are resolved first: a verified cut tag makes its line's folder on
   // main a mutable copy of whichever cut was published last.
@@ -629,15 +640,22 @@ async function enumerateReleaseCandidates(
       }
       continue;
     }
-    const tag = tagsByName.get(release.release_id);
     // The build pins the tag's commit, or the newest commit behind the
     // release directory when no tag exists. Its publication timestamp is
     // that commit's date, read by publishRelease when a bundle is built.
+    let hfCommitSha = tagsByName.get(release.release_id)?.commit;
+    if (hfCommitSha == null) {
+      try {
+        hfCommitSha = await resolveHfReleaseDirectorySha(country, release.release_id, 0);
+      } catch (error) {
+        reportFailure(release.release_id, error instanceof Error ? error.message : String(error));
+        continue;
+      }
+    }
     candidates.set(release.release_id, {
       releaseId: release.release_id,
       releaseDirectory: release.release_id,
-      hfCommitSha: tag?.commit ??
-        await resolveHfReleaseDirectorySha(country, release.release_id, 0),
+      hfCommitSha,
     });
   }
   for (const [name, tagged] of taggedReleases) {
@@ -675,13 +693,7 @@ async function enumerateReleaseCandidates(
       left.releaseId.localeCompare(right.releaseId)
     ),
     ineligible,
-    failed: [...unreadable].map(([name, reason]) => ({
-      sourceId: name,
-      status: "failed",
-      buildArtifactId:
-        manifestBuildForSource(manifest, country, "release", name)?.buildArtifactId ?? null,
-      reason,
-    })),
+    failed,
   };
 }
 
