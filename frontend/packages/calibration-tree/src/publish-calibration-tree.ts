@@ -581,12 +581,12 @@ async function enumerateReleaseCandidates(
         ? [tagged.releaseDirectory]
         : []
     ),
-    // A cut tag whose commit could not be read may be its line's only cut,
-    // so its line's folder is not published from main as a release of its
-    // own in this run.
+    // A tag named as one snapshot of a release series whose commit could not
+    // be read may be the series' only such tag, so the series' folder is not
+    // published from main as a release of its own in this run.
     ...[...unreadable.keys()].flatMap((name) => {
-      const cut = parseReleaseCutTag(name);
-      return cut ? [cut.releaseId] : [];
+      const releaseSnapshot = parseReleaseCutTag(name);
+      return releaseSnapshot ? [releaseSnapshot.releaseId] : [];
     }),
   ]);
 

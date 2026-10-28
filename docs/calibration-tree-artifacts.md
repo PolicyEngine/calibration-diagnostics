@@ -183,8 +183,9 @@ for inspection only, such as the UK dense local-area line, has no copy on
   at the tag names it as `build.cut_tag`. Any other cut-shaped tag is
   ineligible.
 - A line folder on `main` is not published again once its cuts are. A build
-  already published from the folder stays pinned at its own commit. While a
-  cut tag's commit cannot be read, its line's folder is not published either.
+  already published from the folder stays pinned at its own commit. Nor is the
+  folder published while the commit of a tag named
+  `<release id>-<YYYYMMDDTHHMMSSZ>-<attempt>` for it cannot be read.
 - A country registration may name a per-line pointer (`pointer_path`, for the
   UK `latest-national.json`). Its `revision` names the current cut, which
   becomes the country's latest release. Other countries keep `latest.json`.

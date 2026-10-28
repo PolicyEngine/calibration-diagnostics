@@ -636,9 +636,10 @@ function lineRepositoryFetch(
   }) as typeof fetch;
 }
 
-// The dense cut and the June release have annotated tags. Each build must
-// still pin, and be dated by, the commit its tag points at, never the tag
-// object's ID; the national cut's lightweight tag is read as before.
+// The dense snapshot's tag and the June release's tag are annotated. Each
+// build must still pin, and be dated by, the commit its tag points at, never
+// the tag object's ID; the national snapshot's lightweight tag is read as
+// before.
 test("release reconciliation publishes each line cut from its folder and follows the line pointer", async () => {
   // The folder's build from before cuts were recognised, and the June
   // release, which is latest until the line pointer is read.
@@ -802,9 +803,9 @@ test("release reconciliation records a release it cannot build as failed and sti
 });
 
 test("a release tag whose commit cannot be read is reported as failed, and the other releases are still reconciled", async () => {
-  // The June release has a folder of its own, and the national cut is the
-  // only cut that marks its line's folder, so neither folder may be
-  // published from main in place of the tag.
+  // The June release has a folder of its own, and the national snapshot's
+  // tag is the only tag that marks the national release series' folder, so
+  // neither folder may be published from main in place of the tag.
   const store = lineStoreWithJuneLatest();
   globalThis.fetch = lineRepositoryFetch([], undefined, new Set([NATIONAL_CUT, JUNE_RELEASE]));
   try {
@@ -817,7 +818,7 @@ test("a release tag whose commit cannot be read is reported as failed, and the o
       [JUNE_RELEASE]: "failed",
       [DENSE_CUT]: "published",
       [STRAY_CUT]: "ineligible",
-      // The line folder's recorded build is still audited at its own commit.
+      // The series folder's recorded build is still audited at its own commit.
       [NATIONAL_LINE]: "complete",
     });
     const lookupFailure = "Hugging Face revision lookup failed with 500.";
