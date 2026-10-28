@@ -575,20 +575,22 @@ async function enumerateReleaseCandidates(
         : await resolveTaggedReleaseDirectory(country, tag),
     );
   }
-  const lineFolders = new Set([
-    ...[...taggedReleases].flatMap(([name, tagged]) =>
+  const lineFolders = new Set(
+    [...taggedReleases].flatMap(([name, tagged]) =>
       tagged.releaseDirectory && tagged.releaseDirectory !== name
         ? [tagged.releaseDirectory]
         : []
     ),
-    // A tag named as one snapshot of a release series whose commit could not
-    // be read may be the series' only such tag, so the series' folder is not
-    // published from main as a release of its own in this run.
-    ...[...unreadable.keys()].flatMap((name) => {
-      const releaseSnapshot = parseReleaseCutTag(name);
-      return releaseSnapshot ? [releaseSnapshot.releaseId] : [];
-    }),
-  ]);
+  );
+  // A tag named as one snapshot of a release series whose commit could not
+  // be read may be the series' only such tag, so the series' folder is held
+  // back in this run: it is not published from main as a release of its own.
+  // Each held-back folder maps to the tags that hold it back.
+  const heldBackFolders = new Map<string, string[]>();
+  for (const name of unreadable.keys()) {
+    const folder = parseReleaseCutTag(name)?.releaseId;
+    if (folder) heldBackFolders.set(folder, [...(heldBackFolders.get(folder) ?? []), name]);
+  }
 
   for (const release of releases) {
     // A folder whose tag's commit could not be read is reported as failed,
@@ -600,7 +602,8 @@ async function enumerateReleaseCandidates(
       "release",
       release.release_id,
     );
-    if (lineFolders.has(release.release_id)) {
+    const heldBackBy = heldBackFolders.get(release.release_id);
+    if (lineFolders.has(release.release_id) || heldBackBy) {
       // The cut tags publish the line. A build already published from the
       // folder stays pinned at its own commit, so it audits and repairs as
       // before instead of following the folder to a newer cut.
@@ -615,7 +618,13 @@ async function enumerateReleaseCandidates(
           sourceId: release.release_id,
           status: "ineligible",
           buildArtifactId: null,
-          reason: "A release line folder; its cut tags are published instead.",
+          // A folder that only a failed lookup holds back is not known to
+          // be a series' folder, so it gets that reason instead.
+          reason: heldBackBy && !lineFolders.has(release.release_id)
+            ? `Held back in this run because the commit of its release snapshot ` +
+              `${heldBackBy.length === 1 ? "tag" : "tags"} ${heldBackBy.join(", ")} ` +
+              "could not be read. The next run retries the lookup."
+            : "A release line folder; its cut tags are published instead.",
         });
       }
       continue;
