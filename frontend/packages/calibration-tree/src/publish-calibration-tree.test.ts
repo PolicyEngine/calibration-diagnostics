@@ -480,6 +480,8 @@ const DENSE_CUT = `${DENSE_LINE}-20261019T000432Z-4e5f6a7b`;
 // A cut-shaped tag whose folder names another cut: never published.
 const STRAY_CUT = `${NATIONAL_LINE}-20261001T000000Z-99999999`;
 const JUNE_RELEASE = "populace-uk-2023-test-20260619T023711Z";
+// A release folder on main with no tag.
+const MAY_RELEASE = "populace-uk-2023-test-20260515T101500Z";
 const NATIONAL_SHA = "1".repeat(40);
 const DENSE_SHA = "2".repeat(40);
 const STRAY_SHA = "3".repeat(40);
@@ -537,8 +539,12 @@ function juneEntry(): CalibrationTreeManifestEntry {
 function lineRepositoryFetch(
   requested: string[],
   diagnosticsFor: (directory: string) => Record<string, unknown> = () => SCHEMA_8_DIAGNOSTICS,
-  // Tags whose `/revision` lookup fails with 500.
-  unreadableTags: ReadonlySet<string> = new Set(),
+  failures: {
+    /** Tags whose `/revision` lookup fails with 500. */
+    unreadableTags?: ReadonlySet<string>;
+    /** A folder on main with no tag, whose newest-commit lookup fails with 500. */
+    untaggedFolder?: string;
+  } = {},
 ) {
   const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
   const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
@@ -564,7 +570,16 @@ function lineRepositoryFetch(
       return Response.json([
         { type: "file", path: `releases/${NATIONAL_LINE}/calibration_diagnostics.json` },
         { type: "file", path: `releases/${JUNE_RELEASE}/calibration_diagnostics.json` },
+        ...(failures.untaggedFolder
+          ? [{ type: "file", path: `releases/${failures.untaggedFolder}/calibration_diagnostics.json` }]
+          : []),
       ]);
+    }
+    if (
+      failures.untaggedFolder &&
+      url === `${api}/tree/main/releases/${failures.untaggedFolder}?recursive=false&expand=true`
+    ) {
+      return new Response(null, { status: 500 });
     }
     if (url === `${api}/refs`) {
       return Response.json({
@@ -582,7 +597,7 @@ function lineRepositoryFetch(
     const revisionTag = RELEASE_TAG_COMMITS.find(([name]) => url === `${api}/revision/${name}`);
     if (revisionTag) {
       const [tagName, tagCommit] = revisionTag;
-      return unreadableTags.has(tagName)
+      return failures.unreadableTags?.has(tagName)
         ? new Response(null, { status: 500 })
         : Response.json({ sha: tagCommit });
     }
@@ -812,19 +827,31 @@ test("release reconciliation records a release it cannot build as failed and sti
   }
 });
 
-test("a release tag whose commit cannot be read is reported as failed, and the other releases are still reconciled", async () => {
-  // The June release has a folder of its own, and the national snapshot's
-  // tag is the only tag that marks the national release series' folder, so
-  // neither folder may be pinned to its newest commit on main in place of the
-  // tag. The series folder has no build yet, so it would be published.
+test("a release whose commit cannot be read is reported as failed, and the other releases are still reconciled", async () => {
+  // The tag lookups of the national snapshot and the June release fail. The
+  // June release has a folder of its own, and the national snapshot's tag is
+  // the only tag that marks the national release series' folder, so neither
+  // folder may be pinned to its newest commit on main in place of the tag.
+  // The series folder has no build yet, so it could be published. The May
+  // release's folder has no tag, and the lookup of its newest commit fails.
+  const mayEntry = {
+    ...juneEntry(),
+    buildArtifactId: "b".repeat(64),
+    sourceId: MAY_RELEASE,
+    label: MAY_RELEASE,
+    releaseId: MAY_RELEASE,
+    hfCommitSha: "6".repeat(40),
+  };
   const store = memoryStore(withCalibrationTreeManifestEntry(
-    emptyCalibrationTreeManifest(),
+    withCalibrationTreeManifestEntry(emptyCalibrationTreeManifest(), "uk", juneEntry(), true),
     "uk",
-    juneEntry(),
-    true,
+    mayEntry,
   ));
   const requested: string[] = [];
-  globalThis.fetch = lineRepositoryFetch(requested, undefined, new Set([NATIONAL_CUT, JUNE_RELEASE]));
+  globalThis.fetch = lineRepositoryFetch(requested, undefined, {
+    unreadableTags: new Set([NATIONAL_CUT, JUNE_RELEASE]),
+    untaggedFolder: MAY_RELEASE,
+  });
   try {
     const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     const status = Object.fromEntries(
@@ -833,6 +860,7 @@ test("a release tag whose commit cannot be read is reported as failed, and the o
     expect(status).toEqual({
       [NATIONAL_CUT]: "failed",
       [JUNE_RELEASE]: "failed",
+      [MAY_RELEASE]: "failed",
       [DENSE_CUT]: "published",
       [STRAY_CUT]: "ineligible",
       [NATIONAL_LINE]: "ineligible",
@@ -841,7 +869,11 @@ test("a release tag whose commit cannot be read is reported as failed, and the o
       `Held back in this run because the commit of its release snapshot tag ${NATIONAL_CUT} ` +
         "could not be read. The next run retries the lookup.",
     );
-    expect(requested.filter((url) => url.includes("expand=true"))).toEqual([]);
+    // Only the May release's folder, which has no tag, is looked up for its
+    // newest commit.
+    expect(requested.filter((url) => url.includes("expand=true"))).toEqual([
+      `https://huggingface.co/api/datasets/${UK_REPO}/tree/main/releases/${MAY_RELEASE}?recursive=false&expand=true`,
+    ]);
     const lookupFailure = "Hugging Face revision lookup failed with 500.";
     expect(report.outcomes.filter((outcome) => outcome.status === "failed")).toEqual([
       { sourceId: NATIONAL_CUT, status: "failed", buildArtifactId: null, reason: lookupFailure },
@@ -850,6 +882,12 @@ test("a release tag whose commit cannot be read is reported as failed, and the o
         status: "failed",
         buildArtifactId: juneEntry().buildArtifactId,
         reason: lookupFailure,
+      },
+      {
+        sourceId: MAY_RELEASE,
+        status: "failed",
+        buildArtifactId: mayEntry.buildArtifactId,
+        reason: "Hugging Face release directory lookup failed with 500.",
       },
     ]);
     // Only the dense tagged build is uploaded and written; the June release
