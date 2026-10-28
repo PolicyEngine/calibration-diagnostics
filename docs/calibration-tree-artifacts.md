@@ -149,13 +149,15 @@ release repository update
 ```
 
 A release directory or tag without calibration diagnostics is reported as
-ineligible and is not treated as an error. The next repository webhook repeats
+ineligible and is not treated as an error. A tag named `latest` is never a
+release and is left out of the report. The next repository webhook repeats
 the inventory check, so it also finds a historical release missed by an older
 webhook. There is no scheduled reconciliation.
 
 A release whose build cannot be published or repaired, for example because the
-schema 8 reader refuses its diagnostics, its tag moved to another commit, or a
-repair's rebuilt index differs from the recorded digest, is reported as
+schema 8 reader refuses its diagnostics, its tag moved to another commit, its
+tag's commit cannot be read from Hugging Face, or a repair's rebuilt index
+differs from the recorded digest, is reported as
 `failed` with the error. The remaining releases are still reconciled and the
 latest-release selection is still updated, unless the release the upstream
 pointer names is the one that failed; the workflow then fails. A failed release
@@ -181,7 +183,8 @@ for inspection only, such as the UK dense local-area line, has no copy on
   at the tag names it as `build.cut_tag`. Any other cut-shaped tag is
   ineligible.
 - A line folder on `main` is not published again once its cuts are. A build
-  already published from the folder stays pinned at its own commit.
+  already published from the folder stays pinned at its own commit. While a
+  cut tag's commit cannot be read, its line's folder is not published either.
 - A country registration may name a per-line pointer (`pointer_path`, for the
   UK `latest-national.json`). Its `revision` names the current cut, which
   becomes the country's latest release. Other countries keep `latest.json`.

@@ -412,7 +412,8 @@ interface ReleaseTag {
 }
 
 /**
- * The repository's release tags, each with the commit it points at.
+ * The repository's release tags, each with the commit it points at, and the
+ * error for each tag whose commit could not be read.
  *
  * `/refs` gives an annotated tag's `targetCommit` as the ID of the tag
  * object, not of its commit. Hugging Face serves files at that ID, but its
@@ -421,11 +422,12 @@ interface ReleaseTag {
  * commit. Microcosm makes an annotated tag whenever it publishes a release
  * with a tag message (microcosm#1301), so each tag's commit is read from
  * `/revision/<tag>`, which follows an annotated tag to its commit: one
- * request per tag, made concurrently.
+ * request per tag, made concurrently. A failed lookup is returned rather
+ * than thrown, so it fails only its own release.
  */
 async function listReleaseTags(
   country: MicrocosmCountry,
-): Promise<ReleaseTag[]> {
+): Promise<{ tags: ReleaseTag[]; unreadable: Map<string, string> }> {
   const response = await fetch(
     `https://huggingface.co/api/datasets/${microcosmRepo(country)}/refs`,
     {
@@ -450,10 +452,22 @@ async function listReleaseTags(
       ? [name]
       : [];
   });
-  return Promise.all(names.map(async (name) => ({
-    name,
-    commit: await resolveHfRevisionSha(country, name, 0),
-  })));
+  const lookups = await Promise.allSettled(
+    names.map((name) => resolveHfRevisionSha(country, name, 0)),
+  );
+  const tags: ReleaseTag[] = [];
+  const unreadable = new Map<string, string>();
+  lookups.forEach((lookup, index) => {
+    if (lookup.status === "fulfilled") {
+      tags.push({ name: names[index], commit: lookup.value });
+    } else {
+      unreadable.set(
+        names[index],
+        lookup.reason instanceof Error ? lookup.reason.message : String(lookup.reason),
+      );
+    }
+  });
+  return { tags, unreadable };
 }
 
 async function releaseFolderHasDiagnostics(
@@ -533,8 +547,10 @@ async function enumerateReleaseCandidates(
 ): Promise<{
   candidates: ReleaseCandidate[];
   ineligible: ReconciliationOutcome[];
+  /** Releases whose tag's commit could not be read. */
+  failed: ReconciliationOutcome[];
 }> {
-  const [releases, tags] = await Promise.all([
+  const [releases, { tags, unreadable }] = await Promise.all([
     loadReleases(0, country),
     listReleaseTags(country),
   ]);
@@ -562,16 +578,25 @@ async function enumerateReleaseCandidates(
         : await resolveTaggedReleaseDirectory(country, tag),
     );
   }
-  const lineFolders = new Set(
-    [...taggedReleases].flatMap(([name, tagged]) =>
+  const lineFolders = new Set([
+    ...[...taggedReleases].flatMap(([name, tagged]) =>
       tagged.releaseDirectory && tagged.releaseDirectory !== name
         ? [tagged.releaseDirectory]
         : []
     ),
-  );
+    // A cut tag whose commit could not be read may be its line's only cut,
+    // so its line's folder is not published from main as a release of its
+    // own in this run.
+    ...[...unreadable.keys()].flatMap((name) => {
+      const cut = parseReleaseCutTag(name);
+      return cut ? [cut.releaseId] : [];
+    }),
+  ]);
 
   for (const release of releases) {
-    if (!release.has_calibration) continue;
+    // A folder whose tag's commit could not be read is reported as failed,
+    // not pinned to another commit.
+    if (!release.has_calibration || unreadable.has(release.release_id)) continue;
     const existing = manifestBuildForSource(
       manifest,
       country,
@@ -626,7 +651,11 @@ async function enumerateReleaseCandidates(
     }
   }
   for (const release of releases) {
-    if (!release.has_calibration && !ineligible.some((item) => item.sourceId === release.release_id)) {
+    if (
+      !release.has_calibration &&
+      !unreadable.has(release.release_id) &&
+      !ineligible.some((item) => item.sourceId === release.release_id)
+    ) {
       ineligible.push({
         sourceId: release.release_id,
         status: "ineligible",
@@ -640,6 +669,13 @@ async function enumerateReleaseCandidates(
       left.releaseId.localeCompare(right.releaseId)
     ),
     ineligible,
+    failed: [...unreadable].map(([name, reason]) => ({
+      sourceId: name,
+      status: "failed",
+      buildArtifactId:
+        manifestBuildForSource(manifest, country, "release", name)?.buildArtifactId ?? null,
+      reason,
+    })),
   };
 }
 
@@ -1195,7 +1231,7 @@ export async function reconcileReleaseBuilds(
   let manifest = await store.readManifest();
   const inventory = await enumerateReleaseCandidates(country, manifest);
   let blobs = await store.listBlobs();
-  const outcomes = [...inventory.ineligible];
+  const outcomes = [...inventory.ineligible, ...inventory.failed];
 
   for (const candidate of inventory.candidates) {
     const existing = manifestBuildForSource(
