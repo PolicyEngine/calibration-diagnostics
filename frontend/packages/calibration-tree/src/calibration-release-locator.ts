@@ -60,6 +60,9 @@ export async function resolveHfRevisionSha(
     `https://huggingface.co/api/datasets/${repo}/revision/${encodeURIComponent(safeRevision)}`,
     {
       headers: hfHeaders(),
+      // The publisher reads one revision per release tag; like its other
+      // Hugging Face metadata requests, none may hold a run for long.
+      signal: AbortSignal.timeout(30_000),
       ...(revalidate <= 0
         ? { cache: "no-store" as const }
         : { next: { revalidate } }),

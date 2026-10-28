@@ -405,14 +405,27 @@ interface ReleaseCandidate {
   hfCommitSha: string;
 }
 
-interface HfTagRef {
+interface ReleaseTag {
   name: string;
-  targetCommit: string;
+  /** The commit the tag points at. */
+  commit: string;
 }
 
+/**
+ * The repository's release tags, each with the commit it points at.
+ *
+ * `/refs` gives an annotated tag's `targetCommit` as the ID of the tag
+ * object, not of its commit. Hugging Face serves files at that ID, but its
+ * commit log read there starts at the tag's commit, so the build could not
+ * be dated, and a build pinned to it would not match one pinned to the
+ * commit. Microcosm makes an annotated tag whenever it publishes a release
+ * with a tag message (microcosm#1301), so each tag's commit is read from
+ * `/revision/<tag>`, which follows an annotated tag to its commit: one
+ * request per tag, made concurrently.
+ */
 async function listReleaseTags(
   country: MicrocosmCountry,
-): Promise<HfTagRef[]> {
+): Promise<ReleaseTag[]> {
   const response = await fetch(
     `https://huggingface.co/api/datasets/${microcosmRepo(country)}/refs`,
     {
@@ -428,15 +441,19 @@ async function listReleaseTags(
   if (!Array.isArray(payload.tags)) {
     throw new Error("Hugging Face refs response has no tag list.");
   }
-  return payload.tags.flatMap((value) => {
+  const names = payload.tags.flatMap((value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-    const tag = value as JsonObject;
-    if (typeof tag.name !== "string" || typeof tag.targetCommit !== "string") return [];
-    if (!RELEASE_ID_RE.test(tag.name) || !/^[0-9a-f]{40,64}$/i.test(tag.targetCommit)) {
-      return [];
-    }
-    return [{ name: tag.name, targetCommit: tag.targetCommit.toLowerCase() }];
+    const { name } = value as JsonObject;
+    // A name `releaseId` refuses is never a release, and the revision lookup
+    // would refuse it too.
+    return typeof name === "string" && RELEASE_ID_RE.test(name) && name !== "latest"
+      ? [name]
+      : [];
   });
+  return Promise.all(names.map(async (name) => ({
+    name,
+    commit: await resolveHfRevisionSha(country, name, 0),
+  })));
 }
 
 async function releaseFolderHasDiagnostics(
@@ -480,21 +497,21 @@ type TaggedRelease =
  */
 async function resolveTaggedReleaseDirectory(
   country: MicrocosmCountry,
-  tag: HfTagRef,
+  tag: ReleaseTag,
 ): Promise<TaggedRelease> {
-  if (await releaseFolderHasDiagnostics(country, tag.targetCommit, tag.name)) {
+  if (await releaseFolderHasDiagnostics(country, tag.commit, tag.name)) {
     return { releaseDirectory: tag.name };
   }
   const cut = parseReleaseCutTag(tag.name);
   if (!cut) return { reason: "Release has no calibration diagnostics." };
-  if (!await releaseFolderHasDiagnostics(country, tag.targetCommit, cut.releaseId)) {
+  if (!await releaseFolderHasDiagnostics(country, tag.commit, cut.releaseId)) {
     return {
       reason: `Release cut has no calibration diagnostics under releases/${cut.releaseId}/.`,
     };
   }
   const releaseManifest = await fetchJsonArtifact(
     country,
-    tag.targetCommit,
+    tag.commit,
     `releases/${cut.releaseId}/release_manifest.json`,
     false,
   );
@@ -540,7 +557,7 @@ async function enumerateReleaseCandidates(
     const known = manifestBuildForSource(manifest, country, "release", tag.name);
     taggedReleases.set(
       tag.name,
-      known && known.hfCommitSha === tag.targetCommit
+      known && known.hfCommitSha === tag.commit
         ? { releaseDirectory: releaseDirectoryOf(known) ?? tag.name }
         : await resolveTaggedReleaseDirectory(country, tag),
     );
@@ -588,7 +605,7 @@ async function enumerateReleaseCandidates(
     candidates.set(release.release_id, {
       releaseId: release.release_id,
       releaseDirectory: release.release_id,
-      hfCommitSha: tag?.targetCommit ??
+      hfCommitSha: tag?.commit ??
         await resolveHfReleaseDirectorySha(country, release.release_id, 0),
     });
   }
@@ -597,7 +614,7 @@ async function enumerateReleaseCandidates(
       candidates.set(name, {
         releaseId: name,
         releaseDirectory: tagged.releaseDirectory,
-        hfCommitSha: tagsByName.get(name)!.targetCommit,
+        hfCommitSha: tagsByName.get(name)!.commit,
       });
     } else {
       ineligible.push({
@@ -634,7 +651,7 @@ async function releaseDirectoryForTag(
 ): Promise<string> {
   const tagged = await resolveTaggedReleaseDirectory(country, {
     name: id,
-    targetCommit: commit,
+    commit,
   });
   if (!tagged.releaseDirectory) {
     throw new Error(`Release ${id} cannot be published: ${tagged.reason}`);
