@@ -70,8 +70,9 @@ export async function resolveHfRevisionSha(
     `https://huggingface.co/api/datasets/${repo}/revision/${encodeURIComponent(safeRevision)}`,
     {
       headers: hfHeaders(),
-      // The publisher reads one revision per release tag; like its other
-      // Hugging Face metadata requests, none may hold a run for long.
+      // Each Hugging Face lookup in this module stops after 30 seconds. The
+      // publisher reads one revision per release tag, so no slow response
+      // may hold its run indefinitely.
       signal: AbortSignal.timeout(30_000),
       ...(revalidate <= 0
         ? { cache: "no-store" as const }
@@ -118,6 +119,7 @@ export async function resolveHfReleaseDirectorySha(
       "?recursive=false&expand=true",
     {
       headers: hfHeaders(),
+      signal: AbortSignal.timeout(30_000),
       ...(revalidate <= 0
         ? { cache: "no-store" as const }
         : { next: { revalidate } }),
@@ -210,6 +212,7 @@ export async function resolveHfRepositoryCommitPublishedAt(
     `https://huggingface.co/api/datasets/${repo}/commits/${commitSha}?limit=1`,
     {
       headers: hfHeaders(),
+      signal: AbortSignal.timeout(30_000),
       ...(revalidate <= 0
         ? { cache: "no-store" as const }
         : { next: { revalidate } }),
