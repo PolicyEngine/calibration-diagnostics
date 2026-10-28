@@ -495,8 +495,11 @@ const RELEASE_TAG_COMMITS: Array<[string, string]> = [
   [STRAY_CUT, STRAY_SHA],
   [JUNE_RELEASE, JUNE_SHA],
 ];
-// The ID of an annotated tag's own object, which Hugging Face's `/refs`
-// listing gives as the tag's `targetCommit` in place of the tag's commit.
+// Microcosm makes an annotated tag when it publishes a release with a tag
+// message (microcosm#1301); the other tags are lightweight. Hugging Face's
+// `/refs` listing gives an annotated tag's `targetCommit` as the ID of the
+// tag's own object in place of the tag's commit.
+const ANNOTATED_TAGS = new Set([DENSE_CUT, JUNE_RELEASE]);
 const tagObjectId = (commit: string) => `a${commit.slice(1)}`;
 
 const SCHEMA_8_DIAGNOSTICS = {
@@ -534,7 +537,6 @@ function juneEntry(): CalibrationTreeManifestEntry {
 function lineRepositoryFetch(
   requested: string[],
   diagnosticsFor: (directory: string) => Record<string, unknown> = () => SCHEMA_8_DIAGNOSTICS,
-  tagKind: "lightweight" | "annotated" = "lightweight",
 ) {
   const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
   const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
@@ -543,9 +545,9 @@ function lineRepositoryFetch(
     { type: "file", path: `releases/${directory}/release_manifest.json` },
   ]);
   const commitOfTagObject = new Map(
-    tagKind === "annotated"
-      ? RELEASE_TAG_COMMITS.map(([, commit]) => [tagObjectId(commit), commit])
-      : [],
+    RELEASE_TAG_COMMITS
+      .filter(([name]) => ANNOTATED_TAGS.has(name))
+      .map(([, commit]) => [tagObjectId(commit), commit]),
   );
   return (async (input: string | URL | Request) => {
     const requestedUrl = String(input);
@@ -565,10 +567,14 @@ function lineRepositoryFetch(
     if (url === `${api}/refs`) {
       return Response.json({
         branches: [{ name: "main", targetCommit: MAIN_SHA }],
-        tags: RELEASE_TAG_COMMITS.map(([name, commit]) => ({
-          name,
-          targetCommit: tagKind === "annotated" ? tagObjectId(commit) : commit,
-        })),
+        tags: [
+          ...RELEASE_TAG_COMMITS.map(([name, commit]) => ({
+            name,
+            targetCommit: ANNOTATED_TAGS.has(name) ? tagObjectId(commit) : commit,
+          })),
+          // Never a release, and a name the revision lookup refuses.
+          { name: "latest", targetCommit: MAIN_SHA },
+        ],
       });
     }
     const taggedCommit = RELEASE_TAG_COMMITS.find(([name]) => url === `${api}/revision/${name}`)?.[1];
@@ -623,10 +629,10 @@ function lineRepositoryFetch(
   }) as typeof fetch;
 }
 
-// Microcosm makes an annotated tag when it publishes a release with a tag
-// message (microcosm#1301). Each build must still pin, and be dated by, the
-// commit the tag points at, never the tag object's ID.
-test.each(["lightweight", "annotated"] as const)("release reconciliation publishes each line cut from its folder and follows the line pointer (%s tags)", async (tagKind) => {
+// The dense cut and the June release have annotated tags. Each build must
+// still pin, and be dated by, the commit its tag points at, never the tag
+// object's ID; the national cut's lightweight tag is read as before.
+test("release reconciliation publishes each line cut from its folder and follows the line pointer", async () => {
   // The folder's build from before cuts were recognised, and the June
   // release, which is latest until the line pointer is read.
   const legacy = placeholderEntry();
@@ -640,7 +646,7 @@ test.each(["lightweight", "annotated"] as const)("release reconciliation publish
     ),
   );
   const requested: string[] = [];
-  globalThis.fetch = lineRepositoryFetch(requested, undefined, tagKind);
+  globalThis.fetch = lineRepositoryFetch(requested);
   try {
     const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     const status = Object.fromEntries(
