@@ -25,8 +25,18 @@ function hfHeaders(): HeadersInit | undefined {
   return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
+/**
+ * Whether a value may name a release or Hugging Face revision: safe to put
+ * in a Hugging Face URL, and never `latest`, which names no fixed release.
+ */
+export function isReleaseId(value: unknown): value is string {
+  return typeof value === "string" &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value) &&
+    value !== "latest";
+}
+
 function safeReleaseId(value: string, label = "release"): string {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value) || value === "latest") {
+  if (!isReleaseId(value)) {
     throw new Error(`Invalid ${label} id.`);
   }
   return value;

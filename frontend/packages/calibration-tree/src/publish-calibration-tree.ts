@@ -24,6 +24,7 @@ import {
 import { createHash } from "node:crypto";
 import {
   CalibrationReleaseNotFoundError,
+  isReleaseId,
   resolveHfCommitPublishedAt,
   resolveHfReleaseDirectorySha,
   resolveHfRepositoryCommitPublishedAt,
@@ -80,7 +81,6 @@ interface FetchedArtifact {
   source: CalibrationTreeSourceArtifact;
 }
 
-const RELEASE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const DEFAULT_MAX_RAW_BYTES = 100_000_000;
 const FINAL_STAGING_STATUSES = new Set(["passed", "published", "completed"]);
 
@@ -126,7 +126,7 @@ function object(value: unknown, label: string): JsonObject {
 
 function releaseId(value: string | undefined): string {
   const result = value?.trim() ?? "";
-  if (!RELEASE_ID_RE.test(result) || result === "latest") {
+  if (!isReleaseId(result)) {
     throw new Error("A valid immutable release id is required.");
   }
   return result;
@@ -446,11 +446,8 @@ async function listReleaseTags(
   const names = payload.tags.flatMap((value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return [];
     const { name } = value as JsonObject;
-    // A name `releaseId` refuses is never a release, and the revision lookup
-    // would refuse it too.
-    return typeof name === "string" && RELEASE_ID_RE.test(name) && name !== "latest"
-      ? [name]
-      : [];
+    // A name the revision lookup refuses, such as `latest`, is never a release.
+    return isReleaseId(name) ? [name] : [];
   });
   const lookups = await Promise.allSettled(
     names.map((name) => resolveHfRevisionSha(country, name, 0)),
