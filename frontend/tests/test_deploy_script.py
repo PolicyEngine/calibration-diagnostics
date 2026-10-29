@@ -7,6 +7,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github/scripts/deploy-dashboard.sh"
 CONFIGURATION = (
@@ -87,3 +89,88 @@ def test_frontend_receives_release_token_as_server_environment(tmp_path):
     assert arguments[arguments.index(token_argument) - 1] == "--env"
     assert not any("NEXT_PUBLIC_HF" in argument for argument in arguments)
     assert "test-HF_RELEASE_READ_TOKEN" not in result.stdout + result.stderr
+
+
+READ_SECRET_METADATA_CALL = [
+    "secrets",
+    "describe",
+    "test-read-secret",
+    "--project",
+    "test-project",
+    "--format=none",
+]
+
+
+def _read_secret_check(tmp_path, gcloud_exit_code=0, **configuration):
+    """Run check-read-secret-exists with a gcloud that records every call.
+
+    Returns the script's result and the arguments of each gcloud call, in order.
+    """
+    calls_file = tmp_path / "gcloud-calls.jsonl"
+    stub = tmp_path / "gcloud"
+    stub.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
+        "with open(os.environ['GCLOUD_CALLS_FILE'], 'a') as calls:\n"
+        "    calls.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        f"sys.exit({gcloud_exit_code})\n"
+    )
+    stub.chmod(0o755)
+    environment = {
+        "PATH": f"{tmp_path}:{os.environ['PATH']}",
+        "GCLOUD_CALLS_FILE": str(calls_file),
+        **configuration,
+    }
+    result = subprocess.run(
+        ["bash", str(SCRIPT), "check-read-secret-exists"],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    gcloud_calls = (
+        [json.loads(call) for call in calls_file.read_text().splitlines()]
+        if calls_file.exists()
+        else []
+    )
+    return result, gcloud_calls
+
+
+def test_read_secret_check_reads_only_the_secret_metadata(tmp_path):
+    result, gcloud_calls = _read_secret_check(
+        tmp_path, PROJECT_ID="test-project", READ_SECRET_NAME="test-read-secret"
+    )
+    assert result.returncode == 0
+    # Every call is recorded, so any other call, such as one that reads the
+    # secret's value with `gcloud secrets versions access`, fails this test.
+    assert gcloud_calls == [READ_SECRET_METADATA_CALL]
+
+
+def test_missing_read_secret_stops_deployment(tmp_path):
+    result, gcloud_calls = _read_secret_check(
+        tmp_path,
+        gcloud_exit_code=1,
+        PROJECT_ID="test-project",
+        READ_SECRET_NAME="test-read-secret",
+    )
+    assert result.returncode != 0
+    assert "test-read-secret" in result.stderr
+    assert gcloud_calls == [READ_SECRET_METADATA_CALL]
+
+
+@pytest.mark.parametrize("missing_name", ["PROJECT_ID", "READ_SECRET_NAME"])
+@pytest.mark.parametrize("missing_value", [None, ""], ids=["unset", "empty"])
+def test_read_secret_check_requires_its_configuration(
+    tmp_path, missing_name, missing_value
+):
+    # GitHub Actions expands `${{ vars.NAME }}` to an empty string when the
+    # variable doesn't exist, so the deploy passes an empty value, not none.
+    configuration = {"PROJECT_ID": "test-project", "READ_SECRET_NAME": "test-secret"}
+    if missing_value is None:
+        configuration.pop(missing_name)
+    else:
+        configuration[missing_name] = missing_value
+    result, gcloud_calls = _read_secret_check(tmp_path, **configuration)
+    assert result.returncode != 0
+    assert missing_name in result.stderr
+    assert gcloud_calls == []
