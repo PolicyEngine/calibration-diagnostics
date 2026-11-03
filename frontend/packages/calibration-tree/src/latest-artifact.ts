@@ -216,6 +216,15 @@ function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+// A count a release writes as metadata. Microcosm stores every metadata value
+// as a string (TargetSpec, registry.py:149-150), so "2" reads as 2; a number
+// still reads as itself. Anything but a whole, non-negative count reads null.
+function countOrNull(value: unknown): number | null {
+  const count =
+    typeof value === "string" && /^\s*\d+\s*$/.test(value) ? Number(value) : numberOrNull(value);
+  return count != null && Number.isSafeInteger(count) && count >= 0 ? count : null;
+}
+
 export function calibrationLossKind(
   diag: JsonObject,
   buildManifest: JsonObject,
@@ -479,7 +488,7 @@ function chronicleFactFields(metadata: JsonObject): ChronicleFactFields {
     layout_measure_id: stringValue(metadata.ledger_layout_measure_id),
     dimension_set_key: stringValue(metadata.ledger_dimension_set_key),
     universe_constraint_set_key: stringValue(metadata.ledger_universe_constraint_set_key),
-    universe_constraint_count: numberOrNull(metadata.ledger_universe_constraint_count),
+    universe_constraint_count: countOrNull(metadata.ledger_universe_constraint_count),
     filters: chronicleFilters(metadata),
   };
 }
