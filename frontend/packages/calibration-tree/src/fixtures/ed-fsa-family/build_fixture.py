@@ -98,13 +98,15 @@ Where each field comes from, at SOURCE_COMMIT:
     rows are ``country`` or ``state``. The rule also indexes every ``state``
     spec as a parent, FSA's 102 state rows included, and raises if two share
     a parent key (``ledger_targets.py:785-796``); FSA's 102 keys are
-    distinct, and the key includes ``family`` (``:6031-6054``).
+    distinct, and the key includes ``family``, one of the ``match.spec_fields``
+    that rule lists (read at ``:6031-6054``).
   - ``fiscal_targets.py:1126-1135``: aging, restated in ``row_metadata``.
   - ``fiscal_targets.py:1136-1140``: the period contract, which adds nothing
     (above).
   - in the release tool, between ``:13002`` and the diagnostics write
-    (``:15656``), every use of the registry reads, filters or rebuilds it
-    with the same specs. ``apply_us_medicaid_enrollment_substitutions``
+    (``:15656``), every use of the registry reads, filters, appends to or
+    rebuilds it, and passes every FSA spec through unchanged.
+    ``apply_us_medicaid_enrollment_substitutions``
     (``:13041-13043``; ``us_runtime/medicaid_take_up.py:677-715``) keeps
     every spec as it is and only appends Medicaid specs.
     ``_without_opt_in_student_loan_targets`` (``:12619-12632``, called at
@@ -139,12 +141,15 @@ Where each field comes from, at SOURCE_COMMIT:
   - the ``--exact-k`` solve: ``calibrate_exact_k_ladder`` (release tool
     ``:15131``) passes the same ``TargetSet`` to ``calibrate`` and
     ``refit_l0_selection`` (``us_runtime/exact_k_ladder.py:190-252``).
-  - a target that fails to compile goes to ``skipped`` (``matrix.py:326-334``;
-    only a target with ``monetary_binding`` metadata raises instead, and no
-    FSA target has it), so the release drops its row rather than changing it.
-  - Nothing on that path changes a target's metadata or fields. After
-    ``_target_row``, the diagnostics write still adds fields to the row (the
-    attribution merge, below) and orders them (the typed writer, below).
+  - a target whose compile raises ``KeyError`` or ``ValueError`` goes to
+    ``skipped`` (``matrix.py:326-334``), and the release drops its row rather
+    than changing it. Any other exception, and any failure of a target with
+    ``monetary_binding`` metadata (no FSA target has it), propagate instead
+    (``:301-306``, ``:327-332``), so no row changes there either.
+  - Apart from aging, nothing on that path changes a target's metadata or
+    fields. After ``_target_row``, the diagnostics write still adds fields to
+    the row (the attribution merge, below) and orders them (the typed writer,
+    below).
 - ``fsa_published_value``: the compiled value, one fact's value or the sum of
   the five loan-type values, every weight 1.0
   (``fsa_student_loan_targets.py:606``). The values are integers below 2**53,
