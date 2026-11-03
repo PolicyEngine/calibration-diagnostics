@@ -12,6 +12,7 @@ import {
   buildComparison,
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
+  latestMicrocosmTargetInvestigation,
   microcosmTargetTreemap,
 } from "./latest-artifact";
 import { schema9Diagnostics } from "./test-support/schema-9-diagnostics";
@@ -442,21 +443,29 @@ describe("the ED Federal Student Aid target family", () => {
     expect(targetsPage({ geography: "Alabama" }).filtered_total).toBe(3);
   });
 
-  // latestMicrocosmTargetDiagnosticsPage builds `variables` with
-  // microcosmVariableSummary, which gives a category the level of its first
-  // row (latest-artifact.ts:1526). Each measure category holds 51 state
-  // targets and 14 country targets, so it is listed at "state" alone. A
-  // category's level should hold for every target in it; how a category at
-  // two levels is shown (a list of levels, or a mixed marker) is the hub's
-  // call, and this assertion changes with it.
-  test.failing("a category with state and country targets is not listed at one level", () => {
+  // This pins one row's level for a category whose targets sit at two levels.
+  // microcosmVariableSummary gives a category the level of its first row
+  // (latest-artifact.ts:1526), so each measure category, 14 country and 51
+  // state targets, is listed at "state" alone. A reader that reports every
+  // level of a category must change this test.
+  test("a category at two levels is listed at its first row's level", () => {
     const page = targetsPage({});
     for (const category of MIXED_CATEGORIES) {
+      const rows = release.rows.filter((row) => row.variable_key === variableKey(category));
+      const levels = new Map<string, number>();
+      for (const row of rows) levels.set(String(row.level), (levels.get(String(row.level)) ?? 0) + 1);
+      expect(Object.fromEntries(levels)).toEqual({
+        [UNITED_STATES.level]: BANDS_PER_MEASURE,
+        state: STATE_COUNT,
+      });
+
       const variable = page.variables.find((candidate) =>
         candidate.variable_key === variableKey(category)
       )!;
-      const rows = release.rows.filter((row) => row.variable_key === variable.variable_key);
-      expect(rows.filter((row) => row.level === variable.level)).toHaveLength(variable.n_targets);
+      expect(variable.n_targets).toBe(BANDS_PER_MEASURE + STATE_COUNT);
+      expect(variable.level).toBe("state");
+      // The first of the category's rows in the release's own order.
+      expect(variable.level).toBe(String(rows[0].level));
     }
   });
 
@@ -653,21 +662,150 @@ describe("the ED Federal Student Aid target family", () => {
     ]);
   });
 
-  // buildComparison's per-category rows take the level of the category's first
-  // row (comparisonVariableRows, latest-artifact.ts:3220). Its rows are sorted
-  // by fit change, so a measure category is compared at whichever level that
-  // row has: "country" here, with 51 of its 65 targets at "state". See the
-  // targets page's expected failure above.
-  test.failing("a compared category with state and country targets is not at one level", () => {
-    const comparison = buildComparison(release, release);
-    for (const category of MIXED_CATEGORIES) {
-      const variable = comparison.variables.find((candidate) =>
-        candidate.variable_key === variableKey(category)
-      )!;
-      const rows = comparison.rows.filter((row) => row.variable_key === variable.variable_key);
-      expect(rows.filter((row) => row.level === variable.level)).toHaveLength(
-        variable.common_targets,
+  // This pins one row's level for a category whose targets sit at two levels.
+  // comparisonVariableRows gives a compared category the level of its first
+  // row (latest-artifact.ts:3220). buildComparison sorts the common rows by
+  // |abs_rel_delta| (:3304-3308); when every delta is 0 they keep the
+  // matcher's key order, in which a measure category's age bands come first,
+  // so it reads "country". Once one state row's fit changes most, it sorts
+  // first and its category reads "state". A reader that reports every level
+  // of a category must change this test.
+  test("a compared category at two levels takes the level of the row whose fit changed most", () => {
+    const levelOf = (comparison: ReturnType<typeof buildComparison>) =>
+      Object.fromEntries(
+        comparison.variables
+          .filter((variable) => variable.source === PROVIDER.id)
+          .map((variable) => [variable.variable_key, variable.level]),
       );
+    const allCountry = Object.fromEntries(
+      CATEGORIES.map((category) => [variableKey(category), UNITED_STATES.level]),
+    );
+
+    const unchanged = buildComparison(release, release);
+    expect(levelOf(unchanged)).toEqual(allCountry);
+    for (const category of MIXED_CATEGORIES) {
+      const first = unchanged.rows.find((row) => row.variable_key === variableKey(category))!;
+      expect([first.level, first.breakdown]).toEqual([UNITED_STATES.level, AGE.values[0]]);
     }
+
+    // Alabama's balance now misses by 100%, so its row sorts first.
+    const document = schema8();
+    const alabama = (document.targets as JsonObject[]).find((row) =>
+      row.target_name === ALABAMA_BALANCE
+    )!;
+    alabama.final_estimate = 2 * Number(alabama.target);
+    alabama.relative_error = 1;
+    const refit = buildComparison(release, calibrationOf(document, "populace-us-2024-alabama-miss"));
+    expect(refit.rows[0].name).toBe(ALABAMA_BALANCE);
+    expect(levelOf(refit)).toEqual({ ...allCountry, [variableKey(BALANCE)]: "state" });
+  });
+
+  // The target detail of one row of each kind: the Chronicle fields the
+  // detail page shows (microcosm-target-detail.tsx), from the metadata a
+  // release writes for it.
+  test("a target's detail shows its Chronicle fact", () => {
+    const investigate = (target: string) => {
+      const url = new URL("https://dashboard.test/api/microcosm/target-investigation");
+      url.searchParams.set("target", target);
+      const detail = latestMicrocosmTargetInvestigation(url.toString(), release);
+      if (!detail.available || !("target" in detail)) throw new Error(`No detail for ${target}.`);
+      return detail;
+    };
+    const metadataOf = (targetName: string) =>
+      (fsaRows.find((row) => row.target_name === targetName)!.metadata as Record<string, string>);
+    const chronicle = (targetName: string) => {
+      const detail = investigate(`${targetName}@2024`);
+      expect(detail.available).toBe(true);
+      expect(detail.target.name).toBe(`${targetName}@2024`);
+      const fields = detail.target.chronicle as unknown as Row;
+      return {
+        measure_concept: fields.measure_concept,
+        source_concept: fields.source_concept,
+        filters: (fields.filters as Row[]).map((filter) => [filter.key, filter.value]),
+        fact_key: fields.fact_key,
+        aggregate_fact_key: fields.aggregate_fact_key,
+        semantic_fact_key: fields.semantic_fact_key,
+        legacy_fact_key: fields.legacy_fact_key,
+        source_record_id: fields.source_record_id,
+        value_operation: fields.value_operation,
+      };
+    };
+    // The fact keys are the ones the fixture carries from the member fact.
+    const factKeys = (targetName: string) => {
+      const metadata = metadataOf(targetName);
+      expect(metadata.ledger_fact_key).toBe(metadata.ledger_aggregate_fact_key);
+      return {
+        fact_key: metadata.ledger_aggregate_fact_key,
+        aggregate_fact_key: metadata.ledger_aggregate_fact_key,
+        semantic_fact_key: metadata.ledger_semantic_fact_key,
+        legacy_fact_key: metadata.ledger_legacy_fact_key,
+      };
+    };
+    const BALANCE_CONCEPT = "ed_fsa.dollars_outstanding";
+
+    expect(chronicle(ALABAMA_BALANCE)).toEqual({
+      measure_concept: BALANCE_CONCEPT,
+      source_concept: "Balance (in billions)",
+      filters: [],
+      ...factKeys(ALABAMA_BALANCE),
+      source_record_id: ALABAMA_BALANCE,
+      value_operation: "identity",
+    });
+    // An age band's edges: "24 and Younger" is age < 25.
+    expect(chronicle(YOUNGEST_BORROWERS)).toEqual({
+      measure_concept: "ed_fsa.borrower_count",
+      source_concept: "Borrowers (in millions)",
+      filters: [["ledger_filter_age_upper_bound", "25"]],
+      ...factKeys(YOUNGEST_BORROWERS),
+      source_record_id: YOUNGEST_BORROWERS,
+      value_operation: "identity",
+    });
+    // A debt-size band's edges: "10K to 20K" is 10000 <= balance < 20000.
+    const tenToTwenty = fsaName(
+      "portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_10k_to_20k.dollars_outstanding",
+    );
+    expect(chronicle(tenToTwenty)).toEqual({
+      measure_concept: BALANCE_CONCEPT,
+      source_concept: "Dollars Outstanding (in billions)",
+      filters: [
+        ["ledger_filter_federal_student_loan_balance_lower_bound", "10000"],
+        ["ledger_filter_federal_student_loan_balance_upper_bound", "20000"],
+      ],
+      ...factKeys(tenToTwenty),
+      source_record_id: tenToTwenty,
+      value_operation: "identity",
+    });
+    // Parent PLUS is a loan type, an equality constraint, so it has no edge.
+    expect(chronicle(PARENT_PLUS_TARGET)).toEqual({
+      measure_concept: BALANCE_CONCEPT,
+      source_concept: "Dollars Outstanding (in billions)",
+      filters: [],
+      ...factKeys(PARENT_PLUS_TARGET),
+      source_record_id: PARENT_PLUS_TARGET,
+      value_operation: "identity",
+    });
+
+    // This pins a release's behavior, which a follow-up may change. The
+    // balance excluding Parent PLUS sums five member facts, but its Chronicle
+    // fields are its representative's, the last member, stafford_unsubsidized
+    // (microcosm ledger_targets.py:1086-1089, :1232-1245), so its detail names
+    // that one member as its record. A lookup of the member's record id also
+    // finds the aggregate.
+    const stafford =
+      "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding";
+    expect(chronicle(EXCLUDING_PARENT_PLUS_TARGET)).toEqual({
+      measure_concept: BALANCE_CONCEPT,
+      source_concept: "Dollars Outstanding (in billions)",
+      filters: [],
+      ...factKeys(EXCLUDING_PARENT_PLUS_TARGET),
+      source_record_id: stafford,
+      value_operation: "linear_combination",
+    });
+    const excluding = rowNamed(release.rows, EXCLUDING_PARENT_PLUS_TARGET);
+    expect((excluding.metadata as Record<string, string>).ledger_member_fact_count).toBe("5");
+    expect(
+      JSON.parse((excluding.metadata as Record<string, string>).ledger_member_fact_keys),
+    ).toHaveLength(5);
+    expect(investigate(stafford).target.name).toBe(`${EXCLUDING_PARENT_PLUS_TARGET}@2024`);
   });
 });
