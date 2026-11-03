@@ -15,7 +15,9 @@
    "packages/microcosm-build/src/microcosm/build/us_runtime/target_aging.py": "b4dc33e1cabbebdec806325a24ca7d863068d517b39e2724ee6562164c1c9170",
    "packages/microcosm-build/src/microcosm/build/us_runtime/fiscal_targets.py": "19ec9db17110ef8d8db16c7c7d23cee8efdc4231d2d59fc1221cba7d7317df41",
    "tools/build_us_fiscal_refresh_release.py": "1b7cb863448bb96c00af126b34ff2754fb006e5c6a99669d7750b815d30bb7a1",
-   "packages/microcosm-calibrate/src/microcosm/calibrate/solve.py": "6cea5b8cb68e28f16f3589b6273b6a471b653d967cd4e62d49ff369dce45c470"
+   "packages/microcosm-calibrate/src/microcosm/calibrate/solve.py": "6cea5b8cb68e28f16f3589b6273b6a471b653d967cd4e62d49ff369dce45c470",
+   "packages/microcosm-diagnostics/src/microcosm/diagnostics/schema.py": "fa1173b27c6d3aae67624f8f5b7ac6b7bde8535d0f058df9b6525d14d39566d9",
+   "packages/microcosm-diagnostics/src/microcosm/diagnostics/writer.py": "3376b9dea2fb1c78206c001cff155778276cd00250fe92e1615fb618ff1da701"
   },
   "script": "build_fixture.py"
  },
@@ -96,12 +98,6 @@
    "final_estimate": 26808967189.14933,
    "relative_error": -0.0006162064112295516,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -129,6 +125,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.al.dollars_outstanding",
      "label": "Federal student loan balance, Alabama"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -206,12 +208,6 @@
    "final_estimate": 2471464575.901251,
    "relative_error": -0.0019122724853979523,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -239,6 +235,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ak.dollars_outstanding",
      "label": "Federal student loan balance, Alaska"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -316,12 +318,6 @@
    "final_estimate": 35066330519.24732,
    "relative_error": -0.0003753150161678959,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -349,6 +345,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.az.dollars_outstanding",
      "label": "Federal student loan balance, Arizona"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -426,12 +428,6 @@
    "final_estimate": 14959718370.46382,
    "relative_error": -4.378808727447918e-05,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -459,6 +455,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ar.dollars_outstanding",
      "label": "Federal student loan balance, Arkansas"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -536,12 +538,6 @@
    "final_estimate": 161788395432.2775,
    "relative_error": 0.000700089474394004,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -569,6 +565,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ca.dollars_outstanding",
      "label": "Federal student loan balance, California"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -646,12 +648,6 @@
    "final_estimate": 30589718126.402794,
    "relative_error": -0.0017378768800061116,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -679,6 +675,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.co.dollars_outstanding",
      "label": "Federal student loan balance, Colorado"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -756,12 +758,6 @@
    "final_estimate": 20456257970.291992,
    "relative_error": 0.0013515372125151115,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -789,6 +785,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ct.dollars_outstanding",
      "label": "Federal student loan balance, Connecticut"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -866,12 +868,6 @@
    "final_estimate": 5784345717.216734,
    "relative_error": 0.0011330115204555174,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -899,6 +895,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.de.dollars_outstanding",
      "label": "Federal student loan balance, Delaware"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -976,12 +978,6 @@
    "final_estimate": 6612600807.761501,
    "relative_error": 0.0014237778584902433,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1009,6 +1005,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.dc.dollars_outstanding",
      "label": "Federal student loan balance, District of Columbia"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -1086,12 +1088,6 @@
    "final_estimate": 116736175665.97353,
    "relative_error": 0.0003878854259180606,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1119,6 +1115,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.fl.dollars_outstanding",
      "label": "Federal student loan balance, Florida"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -1196,12 +1198,6 @@
    "final_estimate": 76973691089.3685,
    "relative_error": 6.689784872230596e-05,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1229,6 +1225,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ga.dollars_outstanding",
      "label": "Federal student loan balance, Georgia"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -1306,12 +1308,6 @@
    "final_estimate": 5047210422.285864,
    "relative_error": -0.0016544224969605177,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1339,6 +1335,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.hi.dollars_outstanding",
      "label": "Federal student loan balance, Hawaii"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -1416,12 +1418,6 @@
    "final_estimate": 7730724748.640401,
    "relative_error": -0.0009562334304321907,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1449,6 +1445,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.id.dollars_outstanding",
      "label": "Federal student loan balance, Idaho"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -1526,12 +1528,6 @@
    "final_estimate": 67191288568.98292,
    "relative_error": -0.002701063577209848,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1559,6 +1555,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.il.dollars_outstanding",
      "label": "Federal student loan balance, Illinois"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -1636,12 +1638,6 @@
    "final_estimate": 32011624817.368282,
    "relative_error": 0.000855987552323544,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1669,6 +1665,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.in.dollars_outstanding",
      "label": "Federal student loan balance, Indiana"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -1746,12 +1748,6 @@
    "final_estimate": 13935031027.771067,
    "relative_error": 0.000460021386783528,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1779,6 +1775,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ia.dollars_outstanding",
      "label": "Federal student loan balance, Iowa"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -1856,12 +1858,6 @@
    "final_estimate": 13543824212.236744,
    "relative_error": 0.0020642767324497305,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1889,6 +1885,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ks.dollars_outstanding",
      "label": "Federal student loan balance, Kansas"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -1966,12 +1968,6 @@
    "final_estimate": 22314459080.32409,
    "relative_error": 0.0012860827258248237,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -1999,6 +1995,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ky.dollars_outstanding",
      "label": "Federal student loan balance, Kentucky"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -2076,12 +2078,6 @@
    "final_estimate": 23994270877.394115,
    "relative_error": -0.07347017637112539,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -2109,6 +2105,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.la.dollars_outstanding",
      "label": "Federal student loan balance, Louisiana"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -2186,12 +2188,6 @@
    "final_estimate": 6909087919.380033,
    "relative_error": -0.0005260397077825749,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -2219,6 +2215,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.me.dollars_outstanding",
      "label": "Federal student loan balance, Maine"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -2296,12 +2298,6 @@
    "final_estimate": 39619892919.91679,
    "relative_error": 1.7592665458017697e-05,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -2329,6 +2325,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.md.dollars_outstanding",
      "label": "Federal student loan balance, Maryland"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -2406,12 +2408,6 @@
    "final_estimate": 34446011780.137344,
    "relative_error": -0.0004188763122729745,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -2439,6 +2435,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ma.dollars_outstanding",
      "label": "Federal student loan balance, Massachusetts"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -2516,12 +2518,6 @@
    "final_estimate": 54914105943.04848,
    "relative_error": 0.00045567532171978574,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -2549,6 +2545,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.mi.dollars_outstanding",
      "label": "Federal student loan balance, Michigan"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -2626,12 +2628,6 @@
    "final_estimate": 28405829193.08943,
    "relative_error": 0.0011527501322844658,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -2659,6 +2655,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.mn.dollars_outstanding",
      "label": "Federal student loan balance, Minnesota"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -2736,12 +2738,6 @@
    "final_estimate": 18371620725.737057,
    "relative_error": 0.00035244041341450866,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -2769,6 +2765,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ms.dollars_outstanding",
      "label": "Federal student loan balance, Mississippi"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -2846,12 +2848,6 @@
    "final_estimate": 31603786446.852547,
    "relative_error": 0.0010211632713544084,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -2879,6 +2875,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.mo.dollars_outstanding",
      "label": "Federal student loan balance, Missouri"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -2956,12 +2958,6 @@
    "final_estimate": 4650965679.018977,
    "relative_error": 0.0017427044318811937,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -2989,6 +2985,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.mt.dollars_outstanding",
      "label": "Federal student loan balance, Montana"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -3066,12 +3068,6 @@
    "final_estimate": 8452616131.9912815,
    "relative_error": -0.0009140279052926283,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -3099,6 +3095,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ne.dollars_outstanding",
      "label": "Federal student loan balance, Nebraska"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -3176,12 +3178,6 @@
    "final_estimate": 13612057110.47988,
    "relative_error": -0.0005170301431470159,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -3209,6 +3205,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nv.dollars_outstanding",
      "label": "Federal student loan balance, Nevada"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -3286,12 +3288,6 @@
    "final_estimate": 7014849769.041722,
    "relative_error": -0.00014958982686399204,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -3319,6 +3315,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nh.dollars_outstanding",
      "label": "Federal student loan balance, New Hampshire"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -3396,12 +3398,6 @@
    "final_estimate": 49946310516.94556,
    "relative_error": 0.00019255717122526532,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -3429,6 +3425,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nj.dollars_outstanding",
      "label": "Federal student loan balance, New Jersey"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -3506,12 +3508,6 @@
    "final_estimate": 8262377704.333782,
    "relative_error": 0.001015090468606078,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -3539,6 +3535,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nm.dollars_outstanding",
      "label": "Federal student loan balance, New Mexico"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -3616,12 +3618,6 @@
    "final_estimate": 103017536248.83508,
    "relative_error": -0.0005266048533366206,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -3649,6 +3645,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ny.dollars_outstanding",
      "label": "Federal student loan balance, New York"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -3726,12 +3728,6 @@
    "final_estimate": 57671195685.94808,
    "relative_error": 0.0017291780874465618,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -3759,6 +3755,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nc.dollars_outstanding",
      "label": "Federal student loan balance, North Carolina"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -3836,12 +3838,6 @@
    "final_estimate": 2788981149.9050393,
    "relative_error": 0.00116897311553375,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -3869,6 +3865,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nd.dollars_outstanding",
      "label": "Federal student loan balance, North Dakota"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -3946,12 +3948,6 @@
    "final_estimate": 66331341091.249405,
    "relative_error": -0.00015340415569965252,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -3979,6 +3975,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.oh.dollars_outstanding",
      "label": "Federal student loan balance, Ohio"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -4056,12 +4058,6 @@
    "final_estimate": 17674474115.221878,
    "relative_error": 0.001788305432438949,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -4089,6 +4085,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ok.dollars_outstanding",
      "label": "Federal student loan balance, Oklahoma"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -4166,12 +4168,6 @@
    "final_estimate": 21436642432.949627,
    "relative_error": -0.001106939084260222,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -4199,6 +4195,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.or.dollars_outstanding",
      "label": "Federal student loan balance, Oregon"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -4276,12 +4278,6 @@
    "final_estimate": 71906924907.07704,
    "relative_error": 0.001352633281338598,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -4309,6 +4305,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.pa.dollars_outstanding",
      "label": "Federal student loan balance, Pennsylvania"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -4386,12 +4388,6 @@
    "final_estimate": 5257512643.705235,
    "relative_error": -0.000838441045762014,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -4419,6 +4415,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ri.dollars_outstanding",
      "label": "Federal student loan balance, Rhode Island"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -4496,12 +4498,6 @@
    "final_estimate": 32428590461.096027,
    "relative_error": 0.0009767526453788589,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -4529,6 +4525,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.sc.dollars_outstanding",
      "label": "Federal student loan balance, South Carolina"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -4606,12 +4608,6 @@
    "final_estimate": 3811497142.4410176,
    "relative_error": -0.001565816238000074,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -4639,6 +4635,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.sd.dollars_outstanding",
      "label": "Federal student loan balance, South Dakota"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -4716,12 +4718,6 @@
    "final_estimate": 35692589708.45849,
    "relative_error": -0.0001668585780101538,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -4749,6 +4745,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.tn.dollars_outstanding",
      "label": "Federal student loan balance, Tennessee"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -4826,12 +4828,6 @@
    "final_estimate": 142643010143.84976,
    "relative_error": -0.00033639214717457166,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -4859,6 +4855,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.tx.dollars_outstanding",
      "label": "Federal student loan balance, Texas"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -4936,12 +4938,6 @@
    "final_estimate": 11449743822.685226,
    "relative_error": -0.00023401123288566944,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -4969,6 +4965,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ut.dollars_outstanding",
      "label": "Federal student loan balance, Utah"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -5046,12 +5048,6 @@
    "final_estimate": 2985727800.6757474,
    "relative_error": -0.002121234026390724,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -5079,6 +5075,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.vt.dollars_outstanding",
      "label": "Federal student loan balance, Vermont"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -5156,12 +5158,6 @@
    "final_estimate": 46864783860.98283,
    "relative_error": -0.001700648459292222,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -5189,6 +5185,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.va.dollars_outstanding",
      "label": "Federal student loan balance, Virginia"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -5266,12 +5268,6 @@
    "final_estimate": 30573816068.2637,
    "relative_error": 0.0011139307537460753,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -5299,6 +5295,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.wa.dollars_outstanding",
      "label": "Federal student loan balance, Washington"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -5376,12 +5378,6 @@
    "final_estimate": 7939686656.872319,
    "relative_error": -0.0006026230838714822,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -5409,6 +5405,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.wv.dollars_outstanding",
      "label": "Federal student loan balance, West Virginia"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -5486,12 +5488,6 @@
    "final_estimate": 24771289952.861736,
    "relative_error": 0.00037527293472023633,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -5519,6 +5515,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.wi.dollars_outstanding",
      "label": "Federal student loan balance, Wisconsin"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -5596,12 +5598,6 @@
    "final_estimate": 1861315482.7524452,
    "relative_error": 0.002243047021718946,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -5629,6 +5625,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.wy.dollars_outstanding",
      "label": "Federal student loan balance, Wyoming"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -5706,12 +5708,6 @@
    "final_estimate": 693709.0031939199,
    "relative_error": -0.0008468225319544138,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -5739,6 +5735,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.al.borrowers",
      "label": "Federal student loan borrowers, Alabama"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -5816,12 +5818,6 @@
    "final_estimate": 67353.68128777898,
    "relative_error": -0.0013243862347720346,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -5849,6 +5845,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ak.borrowers",
      "label": "Federal student loan borrowers, Alaska"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -5926,12 +5928,6 @@
    "final_estimate": 956836.4002164718,
    "relative_error": -0.0011100868726520554,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -5959,6 +5955,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.az.borrowers",
      "label": "Federal student loan borrowers, Arizona"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -6036,12 +6038,6 @@
    "final_estimate": 426374.9395311766,
    "relative_error": -0.001544394197963533,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -6069,6 +6065,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ar.borrowers",
      "label": "Federal student loan borrowers, Arkansas"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -6146,12 +6148,6 @@
    "final_estimate": 4232292.789984276,
    "relative_error": 0.032684974291635735,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -6179,6 +6175,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ca.borrowers",
      "label": "Federal student loan borrowers, California"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -6256,12 +6258,6 @@
    "final_estimate": 798939.3602070913,
    "relative_error": -0.0006851388022437729,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -6289,6 +6285,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.co.borrowers",
      "label": "Federal student loan borrowers, Colorado"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -6366,12 +6368,6 @@
    "final_estimate": 483745.09216988576,
    "relative_error": -0.10237491687170548,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -6399,6 +6395,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ct.borrowers",
      "label": "Federal student loan borrowers, Connecticut"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -6476,12 +6478,6 @@
    "final_estimate": 125863.84569109904,
    "relative_error": -0.12647648232306657,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -6509,6 +6505,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.de.borrowers",
      "label": "Federal student loan borrowers, Delaware"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -6586,12 +6588,6 @@
    "final_estimate": 119567.18203007248,
    "relative_error": -0.002184609052020925,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -6619,6 +6615,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.dc.borrowers",
      "label": "Federal student loan borrowers, District of Columbia"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -6696,12 +6698,6 @@
    "final_estimate": 2872497.143069222,
    "relative_error": -0.00020004255487584129,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -6729,6 +6725,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.fl.borrowers",
      "label": "Federal student loan borrowers, Florida"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -6806,12 +6808,6 @@
    "final_estimate": 1780834.4401829597,
    "relative_error": 0.0002492450579269024,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -6839,6 +6835,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ga.borrowers",
      "label": "Federal student loan borrowers, Georgia"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -6916,12 +6918,6 @@
    "final_estimate": 126285.89632417394,
    "relative_error": -0.0018580628259764517,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -6949,6 +6945,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.hi.borrowers",
      "label": "Federal student loan borrowers, Hawaii"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -7026,12 +7028,6 @@
    "final_estimate": 226231.21690869075,
    "relative_error": -0.0006503765418469078,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -7059,6 +7055,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.id.borrowers",
      "label": "Federal student loan borrowers, Idaho"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -7136,12 +7138,6 @@
    "final_estimate": 1673352.8668219256,
    "relative_error": -0.0007287066958607732,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -7169,6 +7165,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.il.borrowers",
      "label": "Federal student loan borrowers, Illinois"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -7246,12 +7248,6 @@
    "final_estimate": 939740.9813176465,
    "relative_error": 0.0002600124451896339,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -7279,6 +7275,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.in.borrowers",
      "label": "Federal student loan borrowers, Indiana"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -7356,12 +7358,6 @@
    "final_estimate": 442913.8595813111,
    "relative_error": 0.0004404408733046794,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -7389,6 +7385,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ia.borrowers",
      "label": "Federal student loan borrowers, Iowa"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -7466,12 +7468,6 @@
    "final_estimate": 397535.9239759612,
    "relative_error": 0.002342996002013927,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -7499,6 +7495,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ks.borrowers",
      "label": "Federal student loan borrowers, Kansas"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -7576,12 +7578,6 @@
    "final_estimate": 612160.1736984606,
    "relative_error": -0.048980804975219776,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -7609,6 +7605,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ky.borrowers",
      "label": "Federal student loan borrowers, Kentucky"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -7686,12 +7688,6 @@
    "final_estimate": 726299.4927637369,
    "relative_error": 0.0008732741716540846,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -7719,6 +7715,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.la.borrowers",
      "label": "Federal student loan borrowers, Louisiana"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -7796,12 +7798,6 @@
    "final_estimate": 172282.76233563243,
    "relative_error": -0.11701564363703515,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -7829,6 +7825,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.me.borrowers",
      "label": "Federal student loan borrowers, Maine"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -7906,12 +7908,6 @@
    "final_estimate": 880547.3761768811,
    "relative_error": -0.00021009139872351322,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -7939,6 +7935,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.md.borrowers",
      "label": "Federal student loan borrowers, Maryland"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -8016,12 +8018,6 @@
    "final_estimate": 941438.1084340219,
    "relative_error": -0.00027016325358997754,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -8049,6 +8045,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ma.borrowers",
      "label": "Federal student loan borrowers, Massachusetts"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -8126,12 +8128,6 @@
    "final_estimate": 1441530.8788826521,
    "relative_error": 0.0009634614799316413,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -8159,6 +8155,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.mi.borrowers",
      "label": "Federal student loan borrowers, Michigan"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -8236,12 +8238,6 @@
    "final_estimate": 809206.1325902689,
    "relative_error": 0.0016760359661627646,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -8269,6 +8265,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.mn.borrowers",
      "label": "Federal student loan borrowers, Minnesota"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -8346,12 +8348,6 @@
    "final_estimate": 477628.8449341006,
    "relative_error": 0.0010664355188429093,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -8379,6 +8375,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ms.borrowers",
      "label": "Federal student loan borrowers, Mississippi"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -8456,12 +8458,6 @@
    "final_estimate": 865294.1581226342,
    "relative_error": 0.001252782500551966,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -8489,6 +8485,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.mo.borrowers",
      "label": "Federal student loan borrowers, Missouri"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -8566,12 +8568,6 @@
    "final_estimate": 132440.56308882727,
    "relative_error": 0.0020670153149108706,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -8599,6 +8595,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.mt.borrowers",
      "label": "Federal student loan borrowers, Montana"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -8676,12 +8678,6 @@
    "final_estimate": 254409.29194099287,
    "relative_error": -0.0007898753140539471,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -8709,6 +8705,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ne.borrowers",
      "label": "Federal student loan borrowers, Nebraska"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -8786,12 +8788,6 @@
    "final_estimate": 384459.04303150147,
    "relative_error": -0.0005913246429612142,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -8819,6 +8815,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nv.borrowers",
      "label": "Federal student loan borrowers, Nevada"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -8896,12 +8898,6 @@
    "final_estimate": 196351.78983107032,
    "relative_error": 0.00044545145601253673,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -8929,6 +8925,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nh.borrowers",
      "label": "Federal student loan borrowers, New Hampshire"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9006,12 +9008,6 @@
    "final_estimate": 1308724.524122396,
    "relative_error": 0.013044010598684454,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -9039,6 +9035,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nj.borrowers",
      "label": "Federal student loan borrowers, New Jersey"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9116,12 +9118,6 @@
    "final_estimate": 236428.14745450986,
    "relative_error": 0.0004918665333671835,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -9149,6 +9145,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nm.borrowers",
      "label": "Federal student loan borrowers, New Mexico"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9226,12 +9228,6 @@
    "final_estimate": 2569075.85121198,
    "relative_error": 0.000150373821328734,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -9259,6 +9255,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ny.borrowers",
      "label": "Federal student loan borrowers, New York"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9336,12 +9338,6 @@
    "final_estimate": 1444188.4760409745,
    "relative_error": 0.0013547476390189167,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -9369,6 +9365,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nc.borrowers",
      "label": "Federal student loan borrowers, North Carolina"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9446,12 +9448,6 @@
    "final_estimate": 92390.57551640531,
    "relative_error": -0.0004644854983751701,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -9479,6 +9475,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.nd.borrowers",
      "label": "Federal student loan borrowers, North Dakota"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9556,12 +9558,6 @@
    "final_estimate": 1754220.3502949593,
    "relative_error": -0.052591113961382226,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -9589,6 +9585,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.oh.borrowers",
      "label": "Federal student loan borrowers, Ohio"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9666,12 +9668,6 @@
    "final_estimate": 534087.7838574765,
    "relative_error": 0.00016029325645139963,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -9699,6 +9695,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ok.borrowers",
      "label": "Federal student loan borrowers, Oklahoma"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9776,12 +9778,6 @@
    "final_estimate": 551112.3638620565,
    "relative_error": 0.0008802550204871383,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -9809,6 +9805,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.or.borrowers",
      "label": "Federal student loan borrowers, Oregon"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9886,12 +9888,6 @@
    "final_estimate": 1962094.9843020402,
    "relative_error": 0.012177188573068749,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -9919,6 +9915,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.pa.borrowers",
      "label": "Federal student loan borrowers, Pennsylvania"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -9996,12 +9998,6 @@
    "final_estimate": 156520.36278757596,
    "relative_error": -6.47747843292529e-05,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -10029,6 +10025,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ri.borrowers",
      "label": "Federal student loan borrowers, Rhode Island"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -10106,12 +10108,6 @@
    "final_estimate": 819067.3598882724,
    "relative_error": 0.0013112866397776422,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -10139,6 +10135,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.sc.borrowers",
      "label": "Federal student loan borrowers, South Carolina"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -10216,12 +10218,6 @@
    "final_estimate": 121938.80396197141,
    "relative_error": -0.000704579573825913,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -10249,6 +10245,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.sd.borrowers",
      "label": "Federal student loan borrowers, South Dakota"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -10326,12 +10328,6 @@
    "final_estimate": 935830.8960656659,
    "relative_error": 0.00010521827363163767,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -10359,6 +10355,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.tn.borrowers",
      "label": "Federal student loan borrowers, Tennessee"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -10436,12 +10438,6 @@
    "final_estimate": 4130654.202216061,
    "relative_error": 0.00015326329457064576,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -10469,6 +10465,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.tx.borrowers",
      "label": "Federal student loan borrowers, Texas"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -10546,12 +10548,6 @@
    "final_estimate": 327596.74386875663,
    "relative_error": 4.6139999414683845e-06,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -10579,6 +10575,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.ut.borrowers",
      "label": "Federal student loan borrowers, Utah"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -10656,12 +10658,6 @@
    "final_estimate": 78213.34278720869,
    "relative_error": 4.771273451143926e-06,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -10689,6 +10685,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.vt.borrowers",
      "label": "Federal student loan borrowers, Vermont"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -10766,12 +10768,6 @@
    "final_estimate": 1134849.7671768656,
    "relative_error": -0.00015802002955270773,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -10799,6 +10795,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.va.borrowers",
      "label": "Federal student loan borrowers, Virginia"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -10876,12 +10878,6 @@
    "final_estimate": 811796.2032889295,
    "relative_error": 0.00035041037713285685,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -10909,6 +10905,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.wa.borrowers",
      "label": "Federal student loan borrowers, Washington"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -10986,12 +10988,6 @@
    "final_estimate": 234182.8693783432,
    "relative_error": -0.018993163906773802,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -11019,6 +11015,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.wv.borrowers",
      "label": "Federal student loan borrowers, West Virginia"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -11096,12 +11098,6 @@
    "final_estimate": 741855.6392019944,
    "relative_error": 0.0005406530660429796,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -11129,6 +11125,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.wi.borrowers",
      "label": "Federal student loan borrowers, Wisconsin"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -11206,12 +11208,6 @@
    "final_estimate": 57400.11392044902,
    "relative_error": 0.0017400054706604563,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -11239,6 +11235,12 @@
      "id": "ed_fsa.portfolio_by_location.2026_03_31.wy.borrowers",
      "label": "Federal student loan borrowers, Wyoming"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -11320,12 +11322,6 @@
    "final_estimate": 84882138103.32043,
    "relative_error": -0.00015941934621035387,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -11353,6 +11349,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_24_and_younger.dollars_outstanding",
      "label": "Federal student loan balance, borrower age 24 and Younger"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -11436,12 +11438,6 @@
    "final_estimate": 461883537967.0942,
    "relative_error": -0.00018139662880679364,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -11469,6 +11465,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_25_to_34.dollars_outstanding",
      "label": "Federal student loan balance, borrower age 25 to 34"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -11552,12 +11554,6 @@
    "final_estimate": 677890984314.0103,
    "relative_error": -0.002313480477636543,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -11585,6 +11581,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_35_to_49.dollars_outstanding",
      "label": "Federal student loan balance, borrower age 35 to 49"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -11668,12 +11670,6 @@
    "final_estimate": 310222466064.4977,
    "relative_error": -1.2168641123073436e-05,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -11701,6 +11697,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_50_to_61.dollars_outstanding",
      "label": "Federal student loan balance, borrower age 50 to 61"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -11782,12 +11784,6 @@
    "final_estimate": 142453143985.93988,
    "relative_error": -0.0004523918354583573,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -11815,6 +11811,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_62_and_older.dollars_outstanding",
      "label": "Federal student loan balance, borrower age 62 and Older"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -11896,12 +11898,6 @@
    "final_estimate": 6133783.137043165,
    "relative_error": 0.0002731904541186942,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -11929,6 +11925,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_24_and_younger.borrowers",
      "label": "Federal student loan borrowers, borrower age 24 and Younger"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -12012,12 +12014,6 @@
    "final_estimate": 13835281.428205932,
    "relative_error": -0.0008243005276256887,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -12045,6 +12041,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_25_to_34.borrowers",
      "label": "Federal student loan borrowers, borrower age 25 to 34"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -12128,12 +12130,6 @@
    "final_estimate": 14830932.289964661,
    "relative_error": -0.00032439478877849785,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -12161,6 +12157,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_35_to_49.borrowers",
      "label": "Federal student loan borrowers, borrower age 35 to 49"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -12244,12 +12246,6 @@
    "final_estimate": 6330080.809990909,
    "relative_error": 2.574660800569155e-05,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -12277,6 +12273,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_50_to_61.borrowers",
      "label": "Federal student loan borrowers, borrower age 50 to 61"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -12358,12 +12360,6 @@
    "final_estimate": 3130274.9343246636,
    "relative_error": -0.010958746894467084,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -12391,6 +12387,12 @@
      "id": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_62_and_older.borrowers",
      "label": "Federal student loan borrowers, borrower age 62 and Older"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -12471,12 +12473,6 @@
    "final_estimate": 18457971834.568336,
    "relative_error": -0.013365965863236226,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -12504,6 +12500,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_less_than_5k.dollars_outstanding",
      "label": "Federal student loan balance, borrower debt size Less than 5K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -12586,12 +12588,6 @@
    "final_estimate": 50843611427.35877,
    "relative_error": -0.021612252699654517,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -12619,6 +12615,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_5k_to_10k.dollars_outstanding",
      "label": "Federal student loan balance, borrower debt size 5K to 10K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -12701,12 +12703,6 @@
    "final_estimate": 131105275530.378,
    "relative_error": -0.0003724728204289513,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -12734,6 +12730,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_10k_to_20k.dollars_outstanding",
      "label": "Federal student loan balance, borrower debt size 10K to 20K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -12816,12 +12818,6 @@
    "final_estimate": 268003551717.58005,
    "relative_error": -0.00017082059176817967,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -12849,6 +12845,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_20k_to_40k.dollars_outstanding",
      "label": "Federal student loan balance, borrower debt size 20K to 40K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -12931,12 +12933,6 @@
    "final_estimate": 204219392263.77588,
    "relative_error": -0.0004116078862358501,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -12964,6 +12960,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_40k_to_60k.dollars_outstanding",
      "label": "Federal student loan balance, borrower debt size 40K to 60K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -13046,12 +13048,6 @@
    "final_estimate": 175669534805.00638,
    "relative_error": 0.00040707261356366637,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -13079,6 +13075,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_60k_to_80k.dollars_outstanding",
      "label": "Federal student loan balance, borrower debt size 60K to 80K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -13161,12 +13163,6 @@
    "final_estimate": 126371680355.4723,
    "relative_error": -0.0002468510218265879,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -13194,6 +13190,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_80k_to_100k.dollars_outstanding",
      "label": "Federal student loan balance, borrower debt size 80K to 100K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -13276,12 +13278,6 @@
    "final_estimate": 350642680671.3064,
    "relative_error": -0.0001668240378458457,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -13309,6 +13305,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_100k_to_200k.dollars_outstanding",
      "label": "Federal student loan balance, borrower debt size 100K to 200K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -13389,12 +13391,6 @@
    "final_estimate": 352018571829.4148,
    "relative_error": -0.0004752544229726786,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -13422,6 +13418,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_200k_plus.dollars_outstanding",
      "label": "Federal student loan balance, borrower debt size 200K+"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -13502,12 +13504,6 @@
    "final_estimate": 6647229.630419818,
    "relative_error": -0.025967400599289765,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -13535,6 +13531,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_less_than_5k.borrowers",
      "label": "Federal student loan borrowers, borrower debt size Less than 5K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -13617,12 +13619,6 @@
    "final_estimate": 7120831.972355158,
    "relative_error": -4.5721953099437275e-05,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -13650,6 +13646,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_5k_to_10k.borrowers",
      "label": "Federal student loan borrowers, borrower debt size 5K to 10K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -13732,12 +13734,6 @@
    "final_estimate": 8972005.04345278,
    "relative_error": -0.013984861341551117,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -13765,6 +13761,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_10k_to_20k.borrowers",
      "label": "Federal student loan borrowers, borrower debt size 10K to 20K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -13847,12 +13849,6 @@
    "final_estimate": 9389378.449373392,
    "relative_error": -0.0007017197053398819,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -13880,6 +13876,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_20k_to_40k.borrowers",
      "label": "Federal student loan borrowers, borrower debt size 20K to 40K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -13962,12 +13964,6 @@
    "final_estimate": 4192792.6117491154,
    "relative_error": 0.009336531467595615,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -13995,6 +13991,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_40k_to_60k.borrowers",
      "label": "Federal student loan borrowers, borrower debt size 40K to 60K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -14077,12 +14079,6 @@
    "final_estimate": 2555630.679479067,
    "relative_error": -0.006182485470700631,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -14110,6 +14106,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_60k_to_80k.borrowers",
      "label": "Federal student loan borrowers, borrower debt size 60K to 80K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -14192,12 +14194,6 @@
    "final_estimate": 1446972.7292447137,
    "relative_error": 0.04499499801502515,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -14225,6 +14221,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_80k_to_100k.borrowers",
      "label": "Federal student loan borrowers, borrower debt size 80K to 100K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -14307,12 +14309,6 @@
    "final_estimate": 2579347.281474521,
    "relative_error": 0.0030402768937764077,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -14340,6 +14336,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_100k_to_200k.borrowers",
      "label": "Federal student loan borrowers, borrower debt size 100K to 200K"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -14420,12 +14422,6 @@
    "final_estimate": 1356164.2019807717,
    "relative_error": 0.14264923040127336,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -14453,6 +14449,12 @@
      "id": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_200k_plus.borrowers",
      "label": "Federal student loan borrowers, borrower debt size 200K+"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -14531,12 +14533,6 @@
    "final_estimate": 114846618687.4453,
    "relative_error": 5.190185180759451e-05,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -14564,6 +14560,12 @@
      "id": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.parent_plus.dollars_outstanding",
      "label": "Parent PLUS loan balance"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   },
   {
@@ -14648,12 +14650,6 @@
    "final_estimate": 1562485651747.415,
    "relative_error": -0.0011145853026752253,
    "within_tolerance": null,
-   "registry": {
-    "family": "ed_fsa",
-    "se": null,
-    "signed": false,
-    "notes": ""
-   },
    "hierarchy": {
     "provider": {
      "id": "ed_fsa",
@@ -14674,6 +14670,12 @@
      "id": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding",
      "label": "Federal student loan balance excluding Parent PLUS"
     }
+   },
+   "registry": {
+    "family": "ed_fsa",
+    "se": null,
+    "signed": false,
+    "notes": ""
    }
   }
  ]

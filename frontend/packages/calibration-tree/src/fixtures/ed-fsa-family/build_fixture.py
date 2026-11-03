@@ -79,7 +79,7 @@ Where each field comes from, at SOURCE_COMMIT:
     keys; this fixture matches the default release.
 - what runs between ``apply_fsa_student_loan_plan`` and the diagnostics row,
   at SOURCE_COMMIT, and why only aging is restated:
-  - ``fiscal_targets.py:1104-1125``: six passes, none of which changes an FSA
+  - ``fiscal_targets.py:1104-1125``: seven passes, none of which changes an FSA
     spec. ``_uprate_cross_period_eitc_decompositions`` rewrites only specs
     with ``requires_total_eitc_uprating == "true"`` (``:1465-1468``);
     ``_with_derived_chip_enrollment_targets`` keeps every existing spec and
@@ -95,16 +95,33 @@ Where each field comes from, at SOURCE_COMMIT:
     (``ledger_targets.py:740-774``, ``reconcile_ledger_target_hierarchy`` at
     ``:777-864``) replaces only ``congressional_district`` children under the
     US profile's one rule (``us/fiscal_target_references.json``), and FSA
-    rows are ``country`` or ``state``.
+    rows are ``country`` or ``state``. The rule also indexes every ``state``
+    spec as a parent, FSA's 102 state rows included, and raises if two share
+    a parent key (``ledger_targets.py:785-796``); FSA's 102 keys are
+    distinct, and the key includes ``family`` (``:6031-6054``).
   - ``fiscal_targets.py:1126-1135``: aging, restated in ``row_metadata``.
   - ``fiscal_targets.py:1136-1140``: the period contract, which adds nothing
     (above).
-  - in the release tool, ``apply_us_medicaid_enrollment_substitutions``
+  - in the release tool, between ``:13002`` and the diagnostics write
+    (``:15656``), every use of the registry reads, filters or rebuilds it
+    with the same specs. ``apply_us_medicaid_enrollment_substitutions``
     (``:13041-13043``; ``us_runtime/medicaid_take_up.py:677-715``) keeps
-    every spec as it is and only appends Medicaid specs;
-    ``_select_target_surface`` (``:9118-9145``) and
-    ``_compile_materialized_target_registry`` (``:6195-6213``) only filter
-    specs.
+    every spec as it is and only appends Medicaid specs.
+    ``_without_opt_in_student_loan_targets`` (``:12619-12632``, called at
+    ``:13054``) drops FSA only from the registry the parity gate reads;
+    ``target_specs`` comes from the full registry (``:13065``). The
+    ``TargetRegistry`` rebuilds at ``:13066`` and ``:13097`` keep the specs
+    (``registry.py:281-300``). ``_select_target_surface`` (``:9118-9145``)
+    under ``national_state`` drops what ``is_congressional_district_target``
+    names (``microcosm-data``'s ``us_critical_targets.py:68-83``), none of
+    the FSA rows. ``--selection-mass-protection`` appends non-FSA specs
+    (``:14899-14902``). The checkpoint reload (``:2899``) and the fresh build
+    (``:7113``) go through ``_compile_materialized_target_registry``
+    (``:6195-6213``), which only filters specs. The frame stages take the
+    specs and return frames (e.g. ``:13306-13309``, ``:14551-14556``), the
+    loss weights read them (``:15042-15050``), and
+    ``_without_calibrated_frames`` replaces only the result's frame
+    (``:7468-7482``).
   - ``TargetSpec.to_target`` (``registry.py:242-255``, via
     ``to_target_set``, ``:370-372``) passes ``measure``, ``filter``,
     ``tolerance``, ``source``, ``metadata`` and ``hierarchy`` through;
@@ -118,14 +135,40 @@ Where each field comes from, at SOURCE_COMMIT:
     (``monetary_binding.py:185-200``) only checks, and returns early for a
     target without receipt keys. ``refit_l0_selection`` and
     ``calibrate_l0_refit`` solve through ``calibrate`` (``solve.py:3197``,
-    ``:3335``). Nothing on that path changes a target's metadata or fields.
+    ``:3335``).
+  - the ``--exact-k`` solve: ``calibrate_exact_k_ladder`` (release tool
+    ``:15131``) passes the same ``TargetSet`` to ``calibrate`` and
+    ``refit_l0_selection`` (``us_runtime/exact_k_ladder.py:190-252``).
+  - a target that fails to compile goes to ``skipped`` (``matrix.py:326-334``;
+    only a target with ``monetary_binding`` metadata raises instead, and no
+    FSA target has it), so the release drops its row rather than changing it.
+  - Nothing on that path changes a target's metadata or fields. After
+    ``_target_row``, the diagnostics write still adds fields to the row (the
+    attribution merge, below) and orders them (the typed writer, below).
 - ``fsa_published_value``: the compiled value, one fact's value or the sum of
   the five loan-type values, every weight 1.0
   (``fsa_student_loan_targets.py:606``). The values are integers below 2**53,
   so the sum is exact whichever way it is added.
-- row shape: every field of ``_target_row`` in its order
-  (``diagnostics.py:212-245``), then ``hierarchy`` (``:401-403``,
-  ``:159-164``):
+- row shape: ``_target_row``'s fields (``diagnostics.py:212-245``, with
+  ``registry`` from ``:236-244``) and ``hierarchy`` (``:401-403``,
+  ``:159-164``), in the order the writer puts them on disk, without the
+  attribution fields:
+  - order: ``write_calibration_diagnostics`` validates the payload as
+    ``CalibrationDiagnosticsV8`` (``diagnostics.py:525``), and the writer
+    dumps it with ``model_dump(mode="python", exclude_defaults=True)``
+    (``microcosm-diagnostics``'s ``writer.py:103-104``). That follows
+    ``TargetDiagnosticV8``'s declared order (``schema.py:128-149``):
+    ``... within_tolerance, hierarchy, registry``. ``filter`` and
+    ``within_tolerance`` have no default, so the dump keeps them as ``null``.
+  - left out: when ``assemble_target_loss_attribution`` succeeds,
+    ``diagnostics_payload`` writes ``target_loss_basis`` beside the targets
+    and merges ``target_loss_weight``, ``target_loss_weight_share``,
+    ``target_loss_scale``, ``final_capped_scaled_error`` and
+    ``final_loss_contribution`` into every row (``diagnostics.py:482-485``,
+    ``_target_loss_attribution.py:167-175``); when it raises, the release
+    logs a ``diagnostic_warnings`` entry and leaves them out (``:450-481``).
+    They depend on the whole release's loss basis, so this fixture of one
+    family leaves them out.
   - ``measure``: ``_selector_payload(target.measure)`` (``:89-102``), a
     column named for the target: the plan sets ``measure=name``
     (``fsa_student_loan_targets.py:593``, ``:611``) and the compile copies it
@@ -195,6 +238,13 @@ SOURCES = {
     ),
     "packages/microcosm-calibrate/src/microcosm/calibrate/solve.py": (
         "6cea5b8cb68e28f16f3589b6273b6a471b653d967cd4e62d49ff369dce45c470"
+    ),
+    # The typed row model and the writer that set the row's field order on disk.
+    "packages/microcosm-diagnostics/src/microcosm/diagnostics/schema.py": (
+        "fa1173b27c6d3aae67624f8f5b7ac6b7bde8535d0f058df9b6525d14d39566d9"
+    ),
+    "packages/microcosm-diagnostics/src/microcosm/diagnostics/writer.py": (
+        "3376b9dea2fb1c78206c001cff155778276cd00250fe92e1615fb618ff1da701"
     ),
 }
 
@@ -1108,8 +1158,11 @@ def main(root: Path) -> dict:
             raise ValueError(f"{target['name']!r}: member facts differ from the plan's operands.")
         category_id = CATEGORY_BY_ROLE[target["target_role"]]
         representative = members[-1]
-        # diagnostics.py:212-245, in its order; the module docstring says
-        # where measure, filter, compiled_target and within_tolerance come from.
+        # _target_row's fields (diagnostics.py:212-245) and hierarchy
+        # (:401-403), in the order the writer dumps them (schema.py:128-149,
+        # writer.py:103-104): hierarchy before registry. The module docstring
+        # says where measure, filter, compiled_target and within_tolerance
+        # come from, and why the attribution fields are left out.
         rows.append(
             {
                 "name": f"{target['name']}@{TARGET_PERIOD}",
@@ -1126,7 +1179,6 @@ def main(root: Path) -> dict:
                 "final_estimate": target["b_with_fsa"],
                 "relative_error": target["b_with_fsa_error"],
                 "within_tolerance": None,
-                "registry": {"family": "ed_fsa", "se": None, "signed": False, "notes": ""},
                 "hierarchy": {
                     "provider": dict(PROVIDER),
                     "category": {
@@ -1138,6 +1190,7 @@ def main(root: Path) -> dict:
                     "dimensions": inherited_dimensions(members),
                     "target": {"id": target["name"], "label": target["label"]},
                 },
+                "registry": {"family": "ed_fsa", "se": None, "signed": False, "notes": ""},
             }
         )
     if len(rows) != 132:
