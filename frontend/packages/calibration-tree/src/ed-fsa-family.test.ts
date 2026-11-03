@@ -443,12 +443,10 @@ describe("the ED Federal Student Aid target family", () => {
     expect(targetsPage({ geography: "Alabama" }).filtered_total).toBe(3);
   });
 
-  // This pins one row's level for a category whose targets sit at two levels.
-  // microcosmVariableSummary gives a category the level of its first row
-  // (latest-artifact.ts:1526), so each measure category, 14 country and 51
-  // state targets, is listed at "state" alone. A reader that reports every
-  // level of a category must change this test.
-  test("a category at two levels is listed at its first row's level", () => {
+  // A category whose targets sit at two levels reports both. Each measure
+  // category holds 14 country and 51 state targets; microcosmVariableSummary
+  // lists its levels and gives it no single level.
+  test("a category at two levels is listed at both", () => {
     const page = targetsPage({});
     for (const category of MIXED_CATEGORIES) {
       const rows = release.rows.filter((row) => row.variable_key === variableKey(category));
@@ -463,10 +461,18 @@ describe("the ED Federal Student Aid target family", () => {
         candidate.variable_key === variableKey(category)
       )!;
       expect(variable.n_targets).toBe(BANDS_PER_MEASURE + STATE_COUNT);
-      expect(variable.level).toBe("state");
-      // The first of the category's rows in the release's own order.
-      expect(variable.level).toBe(String(rows[0].level));
+      expect(variable.levels).toEqual([UNITED_STATES.level, "state"]);
+      expect(variable.level).toBeNull();
     }
+    // A category at one level keeps that level.
+    const levelsOf = (key: string) => {
+      const variable = page.variables.find((candidate) => candidate.variable_key === key)!;
+      return [variable.level, variable.levels];
+    };
+    for (const category of ONE_TARGET_CATEGORIES) {
+      expect(levelsOf(variableKey(category))).toEqual([UNITED_STATES.level, [UNITED_STATES.level]]);
+    }
+    expect(levelsOf(String(release.rows[0].variable_key))).toEqual(["state", ["state"]]);
   });
 
   test("a mixed category's facets are its geographies, location and both bands", () => {
@@ -662,33 +668,36 @@ describe("the ED Federal Student Aid target family", () => {
     ]);
   });
 
-  // This pins one row's level for a category whose targets sit at two levels.
-  // comparisonVariableRows gives a compared category the level of its first
-  // row (latest-artifact.ts:3220). buildComparison sorts the common rows by
-  // |abs_rel_delta| (:3304-3308); when every delta is 0 they keep the
-  // matcher's key order, in which a measure category's age bands come first,
-  // so it reads "country". Once one state row's fit changes most, it sorts
-  // first and its category reads "state". A reader that reports every level
-  // of a category must change this test.
-  test("a compared category at two levels takes the level of the row whose fit changed most", () => {
-    const levelOf = (comparison: ReturnType<typeof buildComparison>) =>
+  // A compared category reports every level it holds, whatever order
+  // buildComparison sorts its rows in (by |abs_rel_delta|, :3304-3308).
+  test("a compared category at two levels reports both, whichever row's fit changed most", () => {
+    const levelsOf = (comparison: ReturnType<typeof buildComparison>) =>
       Object.fromEntries(
         comparison.variables
           .filter((variable) => variable.source === PROVIDER.id)
-          .map((variable) => [variable.variable_key, variable.level]),
+          .map((variable) => [variable.variable_key, [variable.level, variable.levels]]),
       );
-    const allCountry = Object.fromEntries(
-      CATEGORIES.map((category) => [variableKey(category), UNITED_STATES.level]),
-    );
+    const expected = Object.fromEntries([
+      ...MIXED_CATEGORIES.map((category) => [
+        variableKey(category),
+        [null, [UNITED_STATES.level, "state"]],
+      ]),
+      ...ONE_TARGET_CATEGORIES.map((category) => [
+        variableKey(category),
+        [UNITED_STATES.level, [UNITED_STATES.level]],
+      ]),
+    ]);
 
+    // Every delta is 0, so the rows keep the matcher's key order, in which a
+    // measure category's age bands come first.
     const unchanged = buildComparison(release, release);
-    expect(levelOf(unchanged)).toEqual(allCountry);
     for (const category of MIXED_CATEGORIES) {
       const first = unchanged.rows.find((row) => row.variable_key === variableKey(category))!;
       expect([first.level, first.breakdown]).toEqual([UNITED_STATES.level, AGE.values[0]]);
     }
+    expect(levelsOf(unchanged)).toEqual(expected);
 
-    // Alabama's balance now misses by 100%, so its row sorts first.
+    // Alabama's balance now misses by 100%, so its state row sorts first.
     const document = schema8();
     const alabama = (document.targets as JsonObject[]).find((row) =>
       row.target_name === ALABAMA_BALANCE
@@ -697,7 +706,7 @@ describe("the ED Federal Student Aid target family", () => {
     alabama.relative_error = 1;
     const refit = buildComparison(release, calibrationOf(document, "populace-us-2024-alabama-miss"));
     expect(refit.rows[0].name).toBe(ALABAMA_BALANCE);
-    expect(levelOf(refit)).toEqual({ ...allCountry, [variableKey(BALANCE)]: "state" });
+    expect(levelsOf(refit)).toEqual(expected);
   });
 
   // The target detail of one row of each kind: the Chronicle fields the
