@@ -194,7 +194,10 @@ export interface MicrocosmVariableRow {
   variable: string;
   variable_label?: string | null;
   measure: string | null;
-  level: string;
+  // The category's one level, or null when its targets sit at several.
+  level: string | null;
+  // Every level the category's targets sit at.
+  levels: string[];
   policyengine_variables?: string[];
   policyengine_map_to?: string | null;
   policyengine_filter_variable?: string | null;
@@ -514,7 +517,10 @@ export interface MicrocosmComparisonVariableRow {
   source?: string | null;
   variable?: string | null;
   measure?: string | null;
+  // The category's one level, or null when its targets sit at several.
   level?: string | null;
+  // Every level the category's targets sit at.
+  levels: string[];
   common_targets: number;
   relative_targets: number;
   improved: number;

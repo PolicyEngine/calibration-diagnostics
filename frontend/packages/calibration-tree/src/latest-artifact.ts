@@ -1477,6 +1477,18 @@ export function microcosmTargetGeographies(rows: TargetRow[]): string[] {
     );
 }
 
+// Every level a category's targets sit at, and its one level when it has
+// just one. A category at two levels (an FSA measure: 14 country and 51 state
+// targets) has no single level, so its level is null. A category with no
+// level takes `none`, which each caller keeps from before.
+function categoryLevels(
+  group: TargetRow[],
+  none: string | null,
+): { level: string | null; levels: string[] } {
+  const levels = microcosmTargetLevels(group);
+  return { level: levels.length > 1 ? null : (levels[0] ?? none), levels };
+}
+
 export function microcosmVariableSummary(rows: TargetRow[]) {
   const groups = new Map<string, TargetRow[]>();
   for (const row of rows) {
@@ -1523,7 +1535,7 @@ export function microcosmVariableSummary(rows: TargetRow[]) {
         variable: String(first.variable ?? ""),
         variable_label: uniqueString("variable_label"),
         measure: first.measure ? String(first.measure) : null,
-        level: String(first.level ?? ""),
+        ...categoryLevels(group, ""),
         policyengine_variables: policyengineVariables,
         policyengine_map_to: uniqueString("policyengine_map_to"),
         policyengine_filter_variable: uniqueString("policyengine_filter_variable"),
@@ -3217,7 +3229,7 @@ function comparisonVariableRows(rows: TargetRow[]) {
         source: sample.source ?? null,
         variable: sample.variable ?? null,
         measure: sample.measure ?? null,
-        level: sample.level ?? null,
+        ...categoryLevels(group, null),
         common_targets: group.length,
         relative_targets: relativeRows.length,
         improved: relativeRows.filter((row) => (numberOrNull(row.abs_rel_delta) ?? 0) < -1e-9).length,

@@ -26,6 +26,7 @@ import {
   type MicrocosmTargetRow,
   type MicrocosmVariableRow,
 } from "@/lib/api/hooks/use-microcosm";
+import { statisticGroupKey } from "@/lib/microcosm/statistic-groups";
 
 const PAGE_SIZE = 50;
 
@@ -54,7 +55,7 @@ interface VariableGroup {
   sourceLabel: string;
   variable: string;
   variableLabel: string | null;
-  level: string;
+  levels: string[];
   options: VariableMeasureOption[];
   defaultKey: string;
   nTargets: number;
@@ -259,11 +260,7 @@ function measureRank(measure: string | null | undefined): number {
 function groupVariables(variables: MicrocosmVariableRow[]): VariableGroup[] {
   const groups = new Map<string, MicrocosmVariableRow[]>();
   for (const variable of variables) {
-    const key = [
-      variable.source,
-      variable.level,
-      variable.variable,
-    ].join("::");
+    const key = statisticGroupKey(variable);
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(variable);
   }
 
@@ -290,7 +287,7 @@ function groupVariables(variables: MicrocosmVariableRow[]): VariableGroup[] {
         sourceLabel: first.source_label || sourceLabel(first.source),
         variable: first.variable,
         variableLabel: first.variable_label ?? null,
-        level: first.level,
+        levels: first.levels,
         options,
         defaultKey: defaultOption.key,
         nTargets,
