@@ -804,30 +804,78 @@ describe("the ED Federal Student Aid target family", () => {
       universe_constraint_count: 1,
     });
 
-    // This pins a release's behavior, which a follow-up may change. The
-    // balance excluding Parent PLUS sums five member facts, but its Chronicle
-    // fields are its representative's, the last member, stafford_unsubsidized
-    // (microcosm ledger_targets.py:1086-1089, :1232-1245), so its detail names
-    // that one member as its record. A lookup of the member's record id also
-    // finds the aggregate.
+    // A single-fact target lists no member facts.
+    const alabamaFields = investigate(`${ALABAMA_BALANCE}@2024`).target.chronicle as unknown as Row;
+    expect([alabamaFields.member_fact_count, alabamaFields.member_fact_keys]).toEqual([null, []]);
+
+    // The balance excluding Parent PLUS sums five member facts. Microcosm
+    // stamps its single-fact keys from its representative, the last member,
+    // stafford_unsubsidized (ledger_targets.py:1085-1089, :1232-1245 at
+    // 0ff293b). Its detail names none of the five as its record: it lists the
+    // member facts instead, and leaves out the fields that belong to one
+    // member (its record, fact keys, group-by value and universe constraint).
     const stafford =
       "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding";
+    const excluding = rowNamed(release.rows, EXCLUDING_PARENT_PLUS_TARGET);
+    const excludingMetadata = metadataOf(EXCLUDING_PARENT_PLUS_TARGET);
+    // These read the fixture, not a reader.
+    expect(excludingMetadata.ledger_member_fact_count).toBe("5");
+    expect(excludingMetadata.ledger_source_record_id).toBe(stafford);
+    const members = JSON.parse(excludingMetadata.ledger_member_fact_keys) as string[];
+    expect(members).toHaveLength(5);
+    expect(members).toContain(excludingMetadata.ledger_fact_key);
+
     expect(chronicle(EXCLUDING_PARENT_PLUS_TARGET)).toEqual({
       measure_concept: BALANCE_CONCEPT,
       source_concept: "Dollars Outstanding (in billions)",
       filters: [],
-      ...factKeys(EXCLUDING_PARENT_PLUS_TARGET),
-      source_record_id: stafford,
+      fact_key: null,
+      aggregate_fact_key: null,
+      semantic_fact_key: null,
+      legacy_fact_key: null,
+      source_record_id: null,
       value_operation: "linear_combination",
-      universe_constraint_count: 1,
+      universe_constraint_count: null,
     });
-    // These two read the row's raw metadata, which buildCalibration passes
-    // through from the fixture: they describe the fixture, not a reader.
-    const excluding = rowNamed(release.rows, EXCLUDING_PARENT_PLUS_TARGET);
-    expect((excluding.metadata as Record<string, string>).ledger_member_fact_count).toBe("5");
+    const detail = investigate(`${EXCLUDING_PARENT_PLUS_TARGET}@2024`);
+    const fields = detail.target.chronicle as unknown as Row;
+    expect({
+      member_fact_count: fields.member_fact_count,
+      member_fact_keys: fields.member_fact_keys,
+      layout_record_set_id: fields.layout_record_set_id,
+      layout_groupby_dimension: fields.layout_groupby_dimension,
+      layout_groupby_value_id: fields.layout_groupby_value_id,
+      universe_constraint_set_key: fields.universe_constraint_set_key,
+    }).toEqual({
+      member_fact_count: 5,
+      member_fact_keys: members,
+      // The members share their record set and group-by dimension.
+      layout_record_set_id: excludingMetadata.ledger_layout_record_set_id,
+      layout_groupby_dimension: "ed_fsa.loan_type",
+      layout_groupby_value_id: null,
+      universe_constraint_set_key: null,
+    });
+    // Its code searches look for each member fact, not the representative.
+    const searches = (detail as unknown as { repo_searches: { label: string; query: string }[] })
+      .repo_searches;
+    expect(searches.filter((search) => search.label === "Member fact").map((search) => search.query))
+      .toEqual(members.map((key) => `"${key}"`));
+    expect(searches.some((search) => search.query.includes(stafford))).toBe(false);
+    expect(searches.map((search) => search.label)).not.toContain("Source record");
+    // The targets page row shows the same fields.
+    const listed = targetsPage({ variable: variableKey(EXCLUDING_PARENT_PLUS) }).targets[0];
+    expect(listed.chronicle).toEqual(detail.target.chronicle);
+    // A lookup of the representative's record id finds no target: no target
+    // of the release is that one loan type's balance.
+    const lookup = new URL("https://dashboard.test/api/microcosm/target-investigation");
+    lookup.searchParams.set("target", stafford);
+    expect(latestMicrocosmTargetInvestigation(lookup.toString(), release).available).toBe(false);
+    // The row keeps its keys, so a comparison still matches it by fact key.
+    expect((excluding.chronicle as Row).fact_key).toBe(excludingMetadata.ledger_fact_key);
     expect(
-      JSON.parse((excluding.metadata as Record<string, string>).ledger_member_fact_keys),
-    ).toHaveLength(5);
-    expect(investigate(stafford).target.name).toBe(`${EXCLUDING_PARENT_PLUS_TARGET}@2024`);
+      buildComparison(release, release).rows.find((row) =>
+        row.name === EXCLUDING_PARENT_PLUS_TARGET
+      )?.match_kind,
+    ).toBe("chronicle_fact_key");
   });
 });
