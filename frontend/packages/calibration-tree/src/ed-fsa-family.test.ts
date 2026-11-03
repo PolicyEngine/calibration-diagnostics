@@ -475,7 +475,12 @@ describe("the ED Federal Student Aid target family", () => {
     expect(levelsOf(String(release.rows[0].variable_key))).toEqual(["state", ["state"]]);
   });
 
-  test("a mixed category's facets are its geographies, location and both bands", () => {
+  // Each state target's Borrower location repeats its geography: no
+  // geography holds two locations. The page hides that facet, as the
+  // calibration map adds no tier for a dimension with one value under a
+  // geography (calibration-tree.ts:601-610), and keeps the bands, which the
+  // United States holds several of.
+  test("a mixed category's facets are its geographies and both bands", () => {
     const variable = variableKey(BALANCE);
     const page = targetsPage({ variable });
 
@@ -489,11 +494,20 @@ describe("the ED Federal Student Aid target family", () => {
         label: "Geography",
         values: sorted([UNITED_STATES.label, ...STATES]),
       },
-      { key: LOCATION.id, label: LOCATION.label, values: sorted(STATES) },
       { key: AGE.id, label: AGE.label, values: sorted(AGE.values) },
       { key: DEBT_SIZE.id, label: DEBT_SIZE.label, values: sorted(DEBT_SIZE.values) },
     ]);
     expect(page.dimensions[0].values[0]).toBe(UNITED_STATES.label);
+    // The state targets alone still list no location facet.
+    expect(
+      targetsPage({ variable, level: "state" }).dimensions.map((dimension) => dimension.key),
+    ).toEqual(["geography"]);
+    // The United States alone keeps both bands.
+    expect(
+      targetsPage({ variable, geography: UNITED_STATES.label }).dimensions.map(
+        (dimension) => dimension.key,
+      ),
+    ).toEqual([AGE.id, DEBT_SIZE.id]);
 
     const names = (query: Record<string, string>, facets: string[]) =>
       targetsPage({ variable, ...query }, facets).targets.map((target) => target.name);
