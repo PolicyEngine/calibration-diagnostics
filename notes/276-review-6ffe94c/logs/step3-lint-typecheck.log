@@ -1,0 +1,6 @@
+$ cd frontend && bun run lint
+$ tsc --noEmit && tsc --noEmit -p packages/calibration-tree
+exit 0
+$ cd frontend/packages/calibration-tree && bun run typecheck
+$ tsc --noEmit
+exit 0

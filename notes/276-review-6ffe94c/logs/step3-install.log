@@ -1,0 +1,7 @@
+# bun 1.4.4; worktree of 6ffe94c at /tmp/claude-0/-home-user-calibration-diagnostics/20d9b2f5-5732-5b18-be25-806b0849c303/scratchpad/pr
+$ cd frontend && bun install --frozen-lockfile
++ react-markdown@10.1.0
++ reactflow@11.11.4
++ recharts@2.15.4
+
+358 packages installed [6.21s]

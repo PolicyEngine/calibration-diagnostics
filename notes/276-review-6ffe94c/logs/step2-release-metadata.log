@@ -1,0 +1,85 @@
+# step 2: python3 -I scripts/realmeta.py mc out.json  (restates ledger_targets.py:5855-5934 ledger_filter_* and the reader-read keys a release would stamp; script below)
+ed_fsa.portfolio_by_location.2026_03_31.al.dollars_outstanding
+  fixture metadata keys: ['ledger_domain', 'ledger_entity_name', 'ledger_entity_role', 'ledger_geography_id', 'ledger_geography_level', 'ledger_layout_groupby_dimension', 'ledger_layout_groupby_value_id', 'ledger_layout_measure_id', 'ledger_layout_record_set_id', 'ledger_measure_unit', 'ledger_period_type', 'ledger_source_concept', 'ledger_source_record_id', 'ledger_value_operation', 'materializer', 'measure_mode', 'source_measure_id', 'source_period', 'target_period', 'target_role']
+  release ledger_filter_*: {}
+  fact constraints: []
+  release keys the reader reads but fixture lacks: {'ledger_aggregate_fact_key': 'ledger.aggregate_fact.v2:a0011046b3023d61a3b35832', 'ledger_semantic_fact_key': 'ledger.semantic_fact.v2:a0f61559a8a14f91e6193477', 'ledger_legacy_fact_key': 'ledger.fact.v1:0c5671a82b1a44dac5f2496f', 'ledger_geography_vintage': 'current', 'ledger_geography_name': 'Alabama', 'ledger_dimension_set_key': 'ledger.dimension_set.v2:44136fa355b3678a1146ad16', 'ledger_universe_constraint_set_key': 'ledger.universe_constraint_set.v2:8b5d381ca57e5b7d384c8607', 'ledger_concept_relation': 'source_label', 'ledger_concept_authority': 'ed_fsa'}
+ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_24_and_younger.dollars_outstanding
+  fixture metadata keys: ['ledger_domain', 'ledger_entity_name', 'ledger_entity_role', 'ledger_geography_id', 'ledger_geography_level', 'ledger_layout_groupby_dimension', 'ledger_layout_groupby_value_id', 'ledger_layout_measure_id', 'ledger_layout_record_set_id', 'ledger_measure_unit', 'ledger_period_type', 'ledger_source_concept', 'ledger_source_record_id', 'ledger_value_operation', 'materializer', 'measure_mode', 'source_measure_id', 'source_period', 'target_period', 'target_role']
+  release ledger_filter_*: {'ledger_filter_age_upper_bound': '25'}
+  fact constraints: [{"operator": "<", "role": "filter", "unit": "years", "value": 25, "variable": "age"}]
+  release keys the reader reads but fixture lacks: {'ledger_aggregate_fact_key': 'ledger.aggregate_fact.v2:30ac6a5834f67de477efb786', 'ledger_semantic_fact_key': 'ledger.semantic_fact.v2:c7afed51efb42afaa5ba6f21', 'ledger_legacy_fact_key': 'ledger.fact.v1:585f8cd7762f00634ccee2c5', 'ledger_geography_vintage': 'current', 'ledger_geography_name': 'United States', 'ledger_dimension_set_key': 'ledger.dimension_set.v2:44136fa355b3678a1146ad16', 'ledger_universe_constraint_set_key': 'ledger.universe_constraint_set.v2:73fc2ae5891d41ebcbba5761', 'ledger_concept_relation': 'source_label', 'ledger_concept_authority': 'ed_fsa'}
+ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_200k_plus.dollars_outstanding
+  fixture metadata keys: ['ledger_domain', 'ledger_entity_name', 'ledger_entity_role', 'ledger_geography_id', 'ledger_geography_level', 'ledger_layout_groupby_dimension', 'ledger_layout_groupby_value_id', 'ledger_layout_measure_id', 'ledger_layout_record_set_id', 'ledger_measure_unit', 'ledger_period_type', 'ledger_source_concept', 'ledger_source_record_id', 'ledger_value_operation', 'materializer', 'measure_mode', 'source_measure_id', 'source_period', 'target_period', 'target_role']
+  release ledger_filter_*: {'ledger_filter_federal_student_loan_balance_lower_bound': '200000'}
+  fact constraints: [{"operator": ">=", "role": "filter", "unit": "usd", "value": 200000, "variable": "federal_student_loan_balance"}]
+  release keys the reader reads but fixture lacks: {'ledger_aggregate_fact_key': 'ledger.aggregate_fact.v2:c92f23d10c5fa1694c2b8120', 'ledger_semantic_fact_key': 'ledger.semantic_fact.v2:15bf38f1aea5a25af4395a9c', 'ledger_legacy_fact_key': 'ledger.fact.v1:227367ec354281c0f08a07d4', 'ledger_geography_vintage': 'current', 'ledger_geography_name': 'United States', 'ledger_dimension_set_key': 'ledger.dimension_set.v2:44136fa355b3678a1146ad16', 'ledger_universe_constraint_set_key': 'ledger.universe_constraint_set.v2:e3a4642a8f67387e6f61abbe', 'ledger_concept_relation': 'source_label', 'ledger_concept_authority': 'ed_fsa'}
+ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.parent_plus.dollars_outstanding
+  fixture metadata keys: ['ledger_domain', 'ledger_entity_name', 'ledger_entity_role', 'ledger_geography_id', 'ledger_geography_level', 'ledger_layout_groupby_dimension', 'ledger_layout_groupby_value_id', 'ledger_layout_measure_id', 'ledger_layout_record_set_id', 'ledger_measure_unit', 'ledger_period_type', 'ledger_source_concept', 'ledger_source_record_id', 'ledger_value_operation', 'materializer', 'measure_mode', 'source_measure_id', 'source_period', 'target_period', 'target_role']
+  release ledger_filter_*: {}
+  fact constraints: [{"operator": "==", "role": "filter", "value": "parent_plus", "variable": "federal_student_loan_type"}]
+  release keys the reader reads but fixture lacks: {'ledger_aggregate_fact_key': 'ledger.aggregate_fact.v2:dd4ea2b212ee0ef9c9ffce43', 'ledger_semantic_fact_key': 'ledger.semantic_fact.v2:40482898459d80f3f7f046af', 'ledger_legacy_fact_key': 'ledger.fact.v1:d38219e349eb631bbd1b9198', 'ledger_geography_vintage': 'current', 'ledger_geography_name': 'United States', 'ledger_dimension_set_key': 'ledger.dimension_set.v2:44136fa355b3678a1146ad16', 'ledger_universe_constraint_set_key': 'ledger.universe_constraint_set.v2:480c1f8abc7c04aa91931a2a', 'ledger_concept_relation': 'source_label', 'ledger_concept_authority': 'ed_fsa'}
+ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding
+  fixture metadata keys: ['ledger_domain', 'ledger_entity_name', 'ledger_entity_role', 'ledger_geography_id', 'ledger_geography_level', 'ledger_layout_groupby_dimension', 'ledger_layout_groupby_value_id', 'ledger_layout_measure_id', 'ledger_layout_record_set_id', 'ledger_measure_unit', 'ledger_member_fact_count', 'ledger_period_type', 'ledger_source_concept', 'ledger_source_record_id', 'ledger_value_operation', 'materializer', 'measure_mode', 'source_measure_id', 'source_period', 'target_period', 'target_role']
+  release ledger_filter_*: {}
+  fact constraints: [{"operator": "==", "role": "filter", "value": "stafford_unsubsidized", "variable": "federal_student_loan_type"}]
+  release keys the reader reads but fixture lacks: {'ledger_aggregate_fact_key': 'ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef', 'ledger_semantic_fact_key': 'ledger.semantic_fact.v2:a9044a89f255104a18e272a0', 'ledger_legacy_fact_key': 'ledger.fact.v1:b85494d1886654886efc27ee', 'ledger_geography_vintage': 'current', 'ledger_geography_name': 'United States', 'ledger_dimension_set_key': 'ledger.dimension_set.v2:44136fa355b3678a1146ad16', 'ledger_universe_constraint_set_key': 'ledger.universe_constraint_set.v2:a48a17c172590a8794ecd3d5', 'ledger_concept_relation': 'source_label', 'ledger_concept_authority': 'ed_fsa'}
+rows whose release metadata would carry ledger_filter_* keys: 28 of 132
+source_period values in fixture: ['2026-03']
+
+# receipt checks
+max |(b_with_fsa-target)/target - b_with_fsa_error| = 0.0
+within 10% (|b_with_fsa_error|<=0.1): 128 of 132
+weights b_with_fsa initial borrower-household share 0.16413671000206656
+
+# scripts/realmeta.py
+"""Restate ledger_targets.py:5855-5934 ledger_filter_* and the keys the fixture drops, for sample facts."""
+import gzip, json, math, sys
+root = sys.argv[1]; fix = json.load(open(sys.argv[2]))
+fs = [json.loads(l) for l in gzip.open(root + '/packages/microcosm-build/tests/fixtures/us_fsa_portfolio_chronicle_347_facts.jsonl.gz', 'rt')]
+by = {f['lineage']['source_record_id']: f for f in fs}
+SUF = {">=": "_lower_bound", ">": "_lower_bound_exclusive", "<": "_upper_bound", "<=": "_upper_bound_inclusive"}
+def at(o, *p):
+    for k in p:
+        if not isinstance(o, dict): return None
+        o = o.get(k)
+    return o
+def rows(f):
+    c = f.get('constraints')
+    if isinstance(c, list): return c
+    c = at(f, 'universe_constraints', 'constraints')
+    return c if isinstance(c, list) else []
+def dims(f):
+    for k in ('filters', 'dimensions'):
+        if isinstance(f.get(k), dict): return f[k]
+    return {}
+def filt(f):
+    out = {}
+    d = dims(f)
+    for k, v in sorted(d.items()):
+        if v is not None: out[f'ledger_filter_{k}'] = str(v)
+    for r in rows(f):
+        if (r.get('role') or 'filter') != 'filter': continue
+        var, op = r.get('variable'), r.get('operator'); s = SUF.get(op)
+        if not var or s is None or var in d: continue
+        v = r.get('value')
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(float(v)): continue
+        out.setdefault(f'ledger_filter_{var}{s}', str(v))
+    return out
+n_with = 0
+for row in fix['targets']:
+    rid = row['metadata'].get('ledger_source_record_id')
+    f = by[rid]; fl = filt(f)
+    if fl: n_with += 1
+    if row['target_name'].endswith(('.al.dollars_outstanding', 'age_24_and_younger.dollars_outstanding', 'debt_200k_plus.dollars_outstanding')) or 'parent_plus' in row['target_name']:
+        print(row['target_name']); print('  fixture metadata keys:', sorted(row['metadata']))
+        print('  release ledger_filter_*:', fl)
+        print('  fact constraints:', json.dumps(rows(f))[:400])
+        print('  release keys the reader reads but fixture lacks:', {k: at(f, *p) for k, p in {
+            'ledger_aggregate_fact_key': ('aggregate_fact_key',), 'ledger_semantic_fact_key': ('semantic_fact_key',),
+            'ledger_legacy_fact_key': ('legacy_fact_key',), 'ledger_geography_vintage': ('geography', 'vintage'),
+            'ledger_geography_name': ('geography', 'name'), 'ledger_dimension_set_key': ('dimension_set_key',),
+            'ledger_universe_constraint_set_key': ('universe_constraint_set_key',),
+            'ledger_concept_relation': ('concept_alignment', 'relation'), 'ledger_concept_authority': ('concept_alignment', 'authority')}.items() if at(f, *p)})
+print('rows whose release metadata would carry ledger_filter_* keys:', n_with, 'of', len(fix['targets']))
+print('source_period values in fixture:', sorted({r['metadata'].get('source_period') for r in fix['targets']}))

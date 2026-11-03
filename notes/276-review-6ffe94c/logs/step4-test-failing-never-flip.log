@@ -1,0 +1,35 @@
+# step 4b: do the two test.failing tests ever flip? Each patch is applied to the worktree, the PR's own ed-fsa-family.test.ts is run, then the patch is reverted.
+## A plausible fix: a mixed category's level is "mixed" (summary) / null (comparison)
+ frontend/packages/calibration-tree/src/latest-artifact.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+-        level: String(first.level ?? ""),
++        level: uniqueString("level") ?? "mixed",
+-        level: sample.level ?? null,
++        level: [...new Set(group.map((row) => row.level))].length === 1 ? sample.level ?? null : null,
+ 12 pass
+ 0 fail
+Ran 12 tests across 1 file. [217.00ms]
+
+## Another fix: the level lists every level ("country,state")
+ frontend/packages/calibration-tree/src/latest-artifact.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+-        level: String(first.level ?? ""),
++        level: [...new Set(group.map((row) => String(row.level ?? "")))].sort().join(","),
+-        level: sample.level ?? null,
++        level: [...new Set(group.map((row) => String(row.level ?? "")))].sort().join(","),
+ 12 pass
+ 0 fail
+Ran 12 tests across 1 file. [258.00ms]
+
+## A regression: every category's level is blank
+ frontend/packages/calibration-tree/src/latest-artifact.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+-        level: String(first.level ?? ""),
++        level: "",
+-        level: sample.level ?? null,
++        level: null,
+(fail) the ED Federal Student Aid target family > the targets page lists the family under its provider, at both levels [7.73ms]
+ 11 pass
+ 1 fail
+Ran 12 tests across 1 file. [217.00ms]
+

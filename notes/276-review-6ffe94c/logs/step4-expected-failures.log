@@ -1,0 +1,38 @@
+# step 4: worktree copy of ed-fsa-family.test.ts with test.failing( -> test( (sed), saved as src/ed-fsa-family-unfailed.scratch.test.ts, deleted after the run
+$ bun test src/ed-fsa-family-unfailed.scratch.test.ts
+bun test v1.4.4 (38afee6c8)
+
+src/ed-fsa-family-unfailed.scratch.test.ts:
+454 |     for (const category of MIXED_CATEGORIES) {
+455 |       const variable = page.variables.find((candidate) =>
+456 |         candidate.variable_key === variableKey(category)
+457 |       )!;
+458 |       const rows = release.rows.filter((row) => row.variable_key === variable.variable_key);
+459 |       expect(rows.filter((row) => row.level === variable.level)).toHaveLength(variable.n_targets);
+                                                                       ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 65
+Received length: 51
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/20d9b2f5-5732-5b18-be25-806b0849c303/scratchpad/pr/frontend/packages/calibration-tree/src/ed-fsa-family-unfailed.scratch.test.ts:459:66)
+(fail) the ED Federal Student Aid target family > a category with state and country targets is not listed at one level [1.35ms]
+663 |     for (const category of MIXED_CATEGORIES) {
+664 |       const variable = comparison.variables.find((candidate) =>
+665 |         candidate.variable_key === variableKey(category)
+666 |       )!;
+667 |       const rows = comparison.rows.filter((row) => row.variable_key === variable.variable_key);
+668 |       expect(rows.filter((row) => row.level === variable.level)).toHaveLength(
+                                                                       ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 65
+Received length: 14
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/20d9b2f5-5732-5b18-be25-806b0849c303/scratchpad/pr/frontend/packages/calibration-tree/src/ed-fsa-family-unfailed.scratch.test.ts:668:66)
+(fail) the ED Federal Student Aid target family > a compared category with state and country targets is not at one level [2.04ms]
+
+ 10 pass
+ 2 fail
+ 283 expect() calls
+Ran 12 tests across 1 file. [237.00ms]

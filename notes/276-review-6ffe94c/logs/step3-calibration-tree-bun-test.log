@@ -1,0 +1,7 @@
+$ cd frontend/packages/calibration-tree && bun test
+bun test v1.4.4 (38afee6c8)
+
+ 412 pass
+ 0 fail
+ 8580 expect() calls
+Ran 412 tests across 36 files. [56.36s]

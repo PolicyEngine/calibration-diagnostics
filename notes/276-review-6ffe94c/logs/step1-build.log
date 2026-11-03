@@ -1,0 +1,5 @@
+# step 1: python3 -I /tmp/claude-0/-home-user-calibration-diagnostics/20d9b2f5-5732-5b18-be25-806b0849c303/scratchpad/build/build_fixture.py /tmp/claude-0/-home-user-calibration-diagnostics/20d9b2f5-5732-5b18-be25-806b0849c303/scratchpad/mc  (cwd /tmp/claude-0/-home-user-calibration-diagnostics/20d9b2f5-5732-5b18-be25-806b0849c303/scratchpad; python Python 3.13.18)
+exit 0
+ee283be7a4138e0a486c3d1e495b2c57b9e5febc710252197e08914c80b4df23  out.json
+ee283be7a4138e0a486c3d1e495b2c57b9e5febc710252197e08914c80b4df23  /tmp/claude-0/-home-user-calibration-diagnostics/20d9b2f5-5732-5b18-be25-806b0849c303/scratchpad/pr/frontend/packages/calibration-tree/src/fixtures/ed-fsa-family/ed-fsa-family-schema-8.json
+cmp: byte-identical

@@ -1,0 +1,22 @@
+# step 5 probe: /tmp/claude-0/-home-user-calibration-diagnostics/20d9b2f5-5732-5b18-be25-806b0849c303/scratchpad/probe/ed-fsa-probe.scratch.test.ts copied into src/, run, deleted
+bun test v1.4.4 (38afee6c8)
+
+src/ed-fsa-probe.scratch.test.ts:
+FACET Geography ["United States","Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","District of Columbia"]
+FACET Borrower location ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","District of Columbia","Florida"]
+FACET Borrower age ["24 and Younger","25 to 34","35 to 49","50 to 61","62 and Older"]
+FACET Borrower debt size ["100K to 200K","10K to 20K","200K+","20K to 40K","40K to 60K","5K to 10K","60K to 80K","80K to 100K","Less than 5K"]
+SOURCES ["ed_fsa"] LEVELS ["country","state"]
+VARIABLE LEVELS [["Federal student loan balance","state",65],["Federal student loan borrowers","state",65],["Parent PLUS loan balance","country",1],["Federal student loan balance excluding Parent PLUS","country",1]]
+MAP GEOS first5 ["United States","Alabama","Alaska","Arizona","Arkansas"]
+MAP BANDS Borrower age ["24 and Younger","25 to 34","35 to 49","50 to 61","62 and Older"]
+MAP BANDS Borrower debt size ["100K to 200K","10K to 20K","200K+","20K to 40K","40K to 60K","5K to 10K","60K to 80K","80K to 100K","Less than 5K"]
+INVESTIGATION excluding_parent_plus keys: available,release_id,target,source_artifact,source_metadata,signals,next_steps,repo_searches,limits
+  chronicle {"source_record_id":"ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding","layout_groupby_value_id":"stafford_unsubsidized","aggregate_fact_key":null,"measure_concept":null,"filters":[]}
+INVESTIGATION debt_200k_plus keys: available,release_id,target,source_artifact,source_metadata,signals,next_steps,repo_searches,limits
+  chronicle {"source_record_id":"ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_200k_plus.dollars_outstanding","layout_groupby_value_id":"debt_200k_plus","aggregate_fact_key":null,"measure_concept":null,"filters":[]}
+LARGEST ABS MISSES [["ed_fsa.portfolio_by_location.2026_03_31.la.dollars_outstanding@2024","Federal student loan balance, Louisiana"],["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding@2024","Federal student loan balance excluding Parent PLUS"],["ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_35_to_49.dollars_outstanding@2024","Federal student loan balance, borrower age 35 to 49"],["ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_5k_to_10k.dollars_outstanding@2024","Federal student loan balance, borrower debt size 5K to 10K"],["ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_less_than_5k.dollars_outstanding@2024","Federal student loan balance, borrower debt size Less than 5K"]]
+
+ 1 pass
+ 0 fail
+Ran 1 test across 1 file. [153.00ms]
