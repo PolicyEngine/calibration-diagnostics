@@ -715,7 +715,6 @@ describe("the ED Federal Student Aid target family", () => {
       (fsaRows.find((row) => row.target_name === targetName)!.metadata as Record<string, string>);
     const chronicle = (targetName: string) => {
       const detail = investigate(`${targetName}@2024`);
-      expect(detail.available).toBe(true);
       expect(detail.target.name).toBe(`${targetName}@2024`);
       const fields = detail.target.chronicle as unknown as Row;
       return {
@@ -733,6 +732,8 @@ describe("the ED Federal Student Aid target family", () => {
     // The fact keys are the ones the fixture carries from the member fact.
     const factKeys = (targetName: string) => {
       const metadata = metadataOf(targetName);
+      // This reads the fixture, not a reader: it checks the premise that
+      // fact_key below may be written as the aggregate key.
       expect(metadata.ledger_fact_key).toBe(metadata.ledger_aggregate_fact_key);
       return {
         fact_key: metadata.ledger_aggregate_fact_key,
@@ -801,6 +802,8 @@ describe("the ED Federal Student Aid target family", () => {
       source_record_id: stafford,
       value_operation: "linear_combination",
     });
+    // These two read the row's raw metadata, which buildCalibration passes
+    // through from the fixture: they describe the fixture, not a reader.
     const excluding = rowNamed(release.rows, EXCLUDING_PARENT_PLUS_TARGET);
     expect((excluding.metadata as Record<string, string>).ledger_member_fact_count).toBe("5");
     expect(

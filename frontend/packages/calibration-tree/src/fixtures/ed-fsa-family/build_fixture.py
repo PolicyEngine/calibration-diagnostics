@@ -40,20 +40,27 @@ Where each field comes from, at SOURCE_COMMIT:
   target is its fact; of the linear combination, the last member (all share
   one period, ``:1232-1245``), in the operand order of
   ``fsa_student_loan_targets.py:819-824``.
-- metadata: every key a release's spec carries, in the order it writes them
-  (``row_metadata``). The compile merges ``_ledger_metadata`` of the
-  representative fact, ``_multi_fact_reference_metadata``,
-  ``publication_metadata``, ``_diagnostic_target_label_metadata``,
-  ``ledger_resolved_assertion`` and ``_reference_metadata``
-  (``ledger_targets.py:1085-1095``); ``apply_fsa_student_loan_plan`` then
-  drops ``diagnostic_target_label`` and adds the plan's reconciliation keys,
-  ``fsa_published_value`` and ``target_period``
-  (``fsa_student_loan_targets.py:398-413``). The plan's own keys, its
-  reference period (``source_period``, ``:579``), its controls and each
-  table's partition are restated in ``fsa_plan`` from ``:262-364`` and
+- metadata: every key the diagnostics row of a release carries, in the order
+  it writes them (``row_metadata``). The release this matches is one built
+  by ``tools/build_us_fiscal_refresh_release.py`` with
+  ``--scf-education-debt`` (the only way FSA targets compile,
+  ``:13002-13013``) and the default ``--age-targets`` (``:1867-1871``).
+  The compile merges ``_ledger_metadata`` of the representative fact,
+  ``_multi_fact_reference_metadata``, ``publication_metadata``,
+  ``_diagnostic_target_label_metadata``, ``ledger_resolved_assertion`` and
+  ``_reference_metadata`` (``ledger_targets.py:1085-1095``);
+  ``apply_fsa_student_loan_plan`` then drops ``diagnostic_target_label`` and
+  adds the plan's reconciliation keys, ``fsa_published_value`` and
+  ``target_period`` (``fsa_student_loan_targets.py:398-413``); and
+  ``age_us_dollar_targets`` then adds ``basis``, ``aged_to``,
+  ``aging_factor`` and ``aging_factor_source`` (``fiscal_targets.py:1126-1135``,
+  ``target_aging.py:337-369``, ``:455-483``, ``:664-682``). The plan's own
+  keys, its reference period (``source_period``, ``:579``), its controls and
+  each table's partition are restated in ``fsa_plan`` from ``:262-364`` and
   ``:572-910``; the script checks the restated reference period, label,
-  controls and every target value against the receipt's ``fsa`` block and
-  ``fsa_targets``, and refuses to write the fixture if any differs.
+  controls, every target value and the excluding-Parent-PLUS operands against
+  the receipt's ``fsa`` block and ``fsa_targets`` and against the member facts,
+  and refuses to write the fixture if any differs.
 - keys left out of the metadata:
   - ``diagnostic_target_label``: ``_diagnostic_target_label_metadata``
     (``ledger_targets.py:5998-6018``) stamps only that key, and
@@ -63,15 +70,78 @@ Where each field comes from, at SOURCE_COMMIT:
     ``identity`` and ``linear_combination`` leave ``value_metadata`` empty
     (``:933``, ``:965-975``), and the publication keys are added only for the
     monthly window operations.
-  - this restates the spec's metadata up to ``apply_fsa_student_loan_plan``.
-    The diagnostics row writes the compiled target's metadata
-    (``diagnostics.py:228``); a stage between the two that lives outside the
-    nine pinned files is not restated here.
+  - ``period_contract_waiver``: ``enforce_period_contract``
+    (``fiscal_targets.py:1136-1140``, ``target_aging.py:300-334``) adds it
+    only to a violating spec, and ``find_period_contract_violations`` skips
+    every spec ``_not_ageable_reason`` names (``target_aging.py:256-258``),
+    which is every FSA spec.
+  - a release built with ``--no-age-targets`` carries none of the four aging
+    keys; this fixture matches the default release.
+- what runs between ``apply_fsa_student_loan_plan`` and the diagnostics row,
+  at SOURCE_COMMIT, and why only aging is restated:
+  - ``fiscal_targets.py:1104-1125``: six passes, none of which changes an FSA
+    spec. ``_uprate_cross_period_eitc_decompositions`` rewrites only specs
+    with ``requires_total_eitc_uprating == "true"`` (``:1465-1468``);
+    ``_with_derived_chip_enrollment_targets`` keeps every existing spec and
+    appends CHIP specs derived from ``family == "cms_medicaid"`` ones
+    (``:1295-1330``, ``:1388-1397``), and
+    ``_without_m_chip_state_chip_enrollment_targets`` drops only
+    ``cms_medicaid`` specs (``:1347-1351``, ``:1357-1362``); the taxable-interest and capital-gains
+    rebases pass on every spec whose ``source_measure_id`` is not one of
+    theirs (``:1810-1814``, ``:1560-1564``, ``:363-364``, ``:1659-1664``),
+    and FSA's are ``dollars_outstanding`` and ``borrowers``;
+    ``_rebase_soi_state_agi_bands`` passes on every spec without its flag
+    (``:2108-2112``); and ``apply_ledger_target_profile``
+    (``ledger_targets.py:740-774``, ``reconcile_ledger_target_hierarchy`` at
+    ``:777-864``) replaces only ``congressional_district`` children under the
+    US profile's one rule (``us/fiscal_target_references.json``), and FSA
+    rows are ``country`` or ``state``.
+  - ``fiscal_targets.py:1126-1135``: aging, restated in ``row_metadata``.
+  - ``fiscal_targets.py:1136-1140``: the period contract, which adds nothing
+    (above).
+  - in the release tool, ``apply_us_medicaid_enrollment_substitutions``
+    (``:13041-13043``; ``us_runtime/medicaid_take_up.py:677-715``) keeps
+    every spec as it is and only appends Medicaid specs;
+    ``_select_target_surface`` (``:9118-9145``) and
+    ``_compile_materialized_target_registry`` (``:6195-6213``) only filter
+    specs.
+  - ``TargetSpec.to_target`` (``registry.py:242-255``, via
+    ``to_target_set``, ``:370-372``) passes ``measure``, ``filter``,
+    ``tolerance``, ``source``, ``metadata`` and ``hierarchy`` through;
+    ``Target.__post_init__`` (``target.py:88-138``) copies the metadata as
+    the same str-to-str mapping, in order.
+  - the solve: ``calibrate`` and ``rebuild_calibration_result`` build the
+    problem with ``build_constraint_matrix`` (``solve.py:2505``, ``:2815``),
+    which appends each compiled ``Target`` object unchanged to
+    ``problem.targets`` and its ``value`` to ``target_vector``
+    (``matrix.py:298-343``, ``:368-376``); ``verify_monetary_binding``
+    (``monetary_binding.py:185-200``) only checks, and returns early for a
+    target without receipt keys. ``refit_l0_selection`` and
+    ``calibrate_l0_refit`` solve through ``calibrate`` (``solve.py:3197``,
+    ``:3335``). Nothing on that path changes a target's metadata or fields.
 - ``fsa_published_value``: the compiled value, one fact's value or the sum of
   the five loan-type values, every weight 1.0
   (``fsa_student_loan_targets.py:606``). The values are integers below 2**53,
   so the sum is exact whichever way it is added.
-- row shape: ``diagnostics.py:212-245`` and ``:159-164``.
+- row shape: every field of ``_target_row`` in its order
+  (``diagnostics.py:212-245``), then ``hierarchy`` (``:401-403``,
+  ``:159-164``):
+  - ``measure``: ``_selector_payload(target.measure)`` (``:89-102``), a
+    column named for the target: the plan sets ``measure=name``
+    (``fsa_student_loan_targets.py:593``, ``:611``) and the compile copies it
+    (``ledger_targets.py:1075``); the apply step and aging replace only the
+    value, period, metadata and hierarchy
+    (``fsa_student_loan_targets.py:403-415``, ``target_aging.py:682``).
+  - ``filter``: ``null``. FSA references set none and
+    ``LedgerTargetReference.filter`` defaults to ``None``
+    (``ledger_targets.py:267``, copied at ``:1077``).
+  - ``target`` and ``compiled_target``: both the receipt's ``target``.
+    ``compiled_target`` is ``problem.target_vector[index]``
+    (``diagnostics.py:398``, ``:230``), and ``target`` is the diagnostic's,
+    which ``solve.py:931`` and ``:946`` set from that same entry.
+  - ``within_tolerance``: ``null``. ``solve.py:939-940`` gives ``None`` for
+    a target without a tolerance, and FSA references declare none
+    (``ledger_targets.py:273``, copied at ``:1083``).
 """
 
 from __future__ import annotations
@@ -111,6 +181,20 @@ SOURCES = {
     ),
     "packages/microcosm-build/tests/engine_free/us/test_us_fsa_student_loan_targets.py": (
         "56a94d46388a4bf666f3ab4d4130c969a10b75593042217ac8d714d121549968"
+    ),
+    # The release's aging stage and its default (row_metadata), and the solve
+    # that sets target, compiled_target and within_tolerance (main).
+    "packages/microcosm-build/src/microcosm/build/us_runtime/target_aging.py": (
+        "b4dc33e1cabbebdec806325a24ca7d863068d517b39e2724ee6562164c1c9170"
+    ),
+    "packages/microcosm-build/src/microcosm/build/us_runtime/fiscal_targets.py": (
+        "19ec9db17110ef8d8db16c7c7d23cee8efdc4231d2d59fc1221cba7d7317df41"
+    ),
+    "tools/build_us_fiscal_refresh_release.py": (
+        "1b7cb863448bb96c00af126b34ff2754fb006e5c6a99669d7750b815d30bb7a1"
+    ),
+    "packages/microcosm-calibrate/src/microcosm/calibrate/solve.py": (
+        "6cea5b8cb68e28f16f3589b6273b6a471b653d967cd4e62d49ff369dce45c470"
     ),
 }
 
@@ -437,7 +521,7 @@ def fsa_plan(facts: list) -> dict:
     reference_label = next(iter(labels)) if len(labels) == 1 else None
     planned: dict = {}
 
-    def add(name, measure, source_measure, value, compiled, reconciliation):
+    def add(name, measure, source_measure, value, compiled, reconciliation, operands=None):
         if name in planned:
             raise ValueError(f"FSA target {name!r} planned twice.")
         planned[name] = {
@@ -446,6 +530,8 @@ def fsa_plan(facts: list) -> dict:
             "value": float(value),
             "compiled": compiled,
             "reconciliation": reconciliation,
+            # The linear combination's operands, by source record id (:605-608).
+            "operands": operands,
         }
 
     # Locations, :624-710.
@@ -541,6 +627,9 @@ def fsa_plan(facts: list) -> dict:
         and _text(f, "layout", "table_record_kind") in {"detail", ""}
     ]
     parent_plus = [f for f in rows if _text(f, "layout", "groupby_value_id") == "parent_plus"]
+    if len(parent_plus) != 1:  # :817-818
+        raise ValueError("FSA loan-type table needs exactly one Parent PLUS row.")
+    # :819-824: every other loan-type balance row, sorted by source record id.
     others = sorted(
         (f for f in rows if f is not parent_plus[0]),
         key=lambda f: _text(f, "lineage", "source_record_id"),
@@ -569,6 +658,7 @@ def fsa_plan(facts: list) -> dict:
                 "fsa_partition_value": _format_float(partition),
                 "fsa_control_value": _format_float(control),
             },
+            [_text(f, "lineage", "source_record_id") for f in members] if len(members) > 1 else None,
         )
     return {
         "reference_period": reference,
@@ -857,8 +947,65 @@ def compiled_value(members: list) -> float:
     return sum(1.0 * value for value in values)
 
 
+#: target_aging.py:89-91.
+DECLARED_UNAGED_PERIOD_ALIGNMENTS = frozenset({"stock_at_source_reference_date"})
+
+
+def _aging_format_float(value: float) -> str:
+    """target_aging.py:711-712."""
+
+    return f"{value:.15g}"
+
+
+def _not_ageable_reason(metadata: dict) -> str:
+    """target_aging.py:455-483, for the two branches an FSA spec reaches.
+
+    Every FSA spec stops at one of them: a borrower count is ``indicator_sum``
+    and a balance is ``sum`` with the plan's ``period_alignment``. A spec that
+    reached the unit or assertion checks below them would not be an FSA spec
+    this script knows, so it refuses one.
+    """
+
+    if metadata.get("measure_mode") != "sum":
+        return "not_dollar_amount"
+    alignment = metadata.get("period_alignment", "")
+    if alignment in DECLARED_UNAGED_PERIOD_ALIGNMENTS:
+        return alignment
+    raise ValueError(f"Unexpected ageable FSA spec, period_alignment {alignment!r}.")
+
+
+def aged_metadata(metadata: dict) -> dict:
+    """age_us_dollar_targets on one FSA spec, as a default release runs it
+    (fiscal_targets.py:1126-1135; --age-targets on by default,
+    tools/build_us_fiscal_refresh_release.py:1867-1871, passed at :13008).
+
+    _age_spec (target_aging.py:337-369) checks uprating_factor (:346), which no
+    FSA spec carries, then takes the not-ageable branch (:357-369):
+    _with_aging_metadata (:664-682) appends basis, aged_to, aging_factor and
+    aging_factor_source after every existing key, then sets source_period
+    again to the value it already holds, which keeps its position (:680-681).
+    aged_to is str(target_period) (:345), and the release passes PERIOD, 2024
+    (tools/build_us_fiscal_refresh_release.py:428, :13004).
+    """
+
+    if "uprating_factor" in metadata:
+        raise ValueError("An FSA spec carries uprating_factor.")
+    aged = {
+        **metadata,
+        "basis": "fact",
+        "aged_to": str(TARGET_PERIOD),
+        "aging_factor": _aging_format_float(1.0),
+        "aging_factor_source": _not_ageable_reason(metadata),
+    }
+    source_period = metadata.get("source_period", "")
+    if source_period:
+        aged["source_period"] = source_period
+    return aged
+
+
 def row_metadata(target: dict, members: list, representative: dict, plan: dict) -> dict:
-    """The metadata a release writes for one FSA target, key for key.
+    """The metadata a default release's diagnostics row writes for one FSA
+    target, key for key (see the module docstring for the release).
 
     The compile merges, in this order (ledger_targets.py:1085-1095):
     _ledger_metadata of the representative fact, _multi_fact_reference_metadata,
@@ -866,7 +1013,9 @@ def row_metadata(target: dict, members: list, representative: dict, plan: dict) 
     ledger_resolved_assertion and _reference_metadata. Then
     apply_fsa_student_loan_plan drops diagnostic_target_label and adds the
     plan's reconciliation keys, fsa_published_value and target_period
-    (fsa_student_loan_targets.py:398-413).
+    (fsa_student_loan_targets.py:398-413). Then age_us_dollar_targets adds the
+    four aging keys (aged_metadata). Nothing after it changes the metadata
+    (module docstring).
     """
 
     planned = plan["targets"][target["name"]]
@@ -882,12 +1031,15 @@ def row_metadata(target: dict, members: list, representative: dict, plan: dict) 
         "ledger_resolved_assertion": _text(representative, "assertion") or "observation",  # :5004-5005
         **reference_metadata(plan_reference_metadata(planned, plan, target["target_role"]), members),
     }
-    return {
+    # apply_fsa_student_loan_plan (fsa_student_loan_targets.py:408-413);
+    # target_period is already present, so it keeps its position.
+    applied = {
         **metadata,
         **planned["reconciliation"],
         "fsa_published_value": _format_float(compiled_value(members)),
         "target_period": str(TARGET_PERIOD),
     }
+    return aged_metadata(applied)
 
 
 def member_facts(target: dict, facts_by_id: dict, facts: list) -> list:
@@ -945,20 +1097,35 @@ def main(root: Path) -> dict:
         if plan["targets"][target["name"]]["value"] != target["target"]:
             raise ValueError(f"{target['name']!r}: restated value differs from the receipt's.")
         members = member_facts(target, facts_by_id, facts)
+        # The balance excluding Parent PLUS: the member facts selected above
+        # must be the plan's operands, in order (fsa_student_loan_targets.py:819-824).
+        operands = plan["targets"][target["name"]]["operands"]
+        if (operands is not None) != (target["target_role"] == "fsa_balance_excluding_parent_plus"):
+            raise ValueError(f"{target['name']!r}: unexpected plan operands {operands!r}.")
+        if operands is not None and [
+            _text(f, "lineage", "source_record_id") for f in members
+        ] != operands:
+            raise ValueError(f"{target['name']!r}: member facts differ from the plan's operands.")
         category_id = CATEGORY_BY_ROLE[target["target_role"]]
         representative = members[-1]
+        # diagnostics.py:212-245, in its order; the module docstring says
+        # where measure, filter, compiled_target and within_tolerance come from.
         rows.append(
             {
                 "name": f"{target['name']}@{TARGET_PERIOD}",
                 "target_name": target["name"],
                 "period": TARGET_PERIOD,
                 "entity": "household",
+                "measure": {"kind": "column", "name": target["name"]},
+                "filter": None,
                 "source": source_citation(representative),
                 "metadata": row_metadata(target, members, representative, plan),
                 "target": target["target"],
+                "compiled_target": target["target"],
                 "initial_estimate": target["release"],
                 "final_estimate": target["b_with_fsa"],
                 "relative_error": target["b_with_fsa_error"],
+                "within_tolerance": None,
                 "registry": {"family": "ed_fsa", "se": None, "signed": False, "notes": ""},
                 "hierarchy": {
                     "provider": dict(PROVIDER),

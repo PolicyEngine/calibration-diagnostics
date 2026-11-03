@@ -11,7 +11,11 @@
    "packages/microcosm-calibrate/src/microcosm/calibrate/hierarchy.py": "d9a79463f954b42af2e89014cc681ab7a27085581a9ed5d0a0db70adeeaa0112",
    "packages/microcosm-calibrate/src/microcosm/calibrate/provider_labels.py": "65ed20e0c1a53652320820c922563a47e50a0ca64ee91c319188e7a3d255dff3",
    "packages/microcosm-calibrate/src/microcosm/calibrate/variable_labels.py": "a336ce350ced1843b6b16d89aae154de42560d3a471d33529cc094cc73c86475",
-   "packages/microcosm-build/tests/engine_free/us/test_us_fsa_student_loan_targets.py": "56a94d46388a4bf666f3ab4d4130c969a10b75593042217ac8d714d121549968"
+   "packages/microcosm-build/tests/engine_free/us/test_us_fsa_student_loan_targets.py": "56a94d46388a4bf666f3ab4d4130c969a10b75593042217ac8d714d121549968",
+   "packages/microcosm-build/src/microcosm/build/us_runtime/target_aging.py": "b4dc33e1cabbebdec806325a24ca7d863068d517b39e2724ee6562164c1c9170",
+   "packages/microcosm-build/src/microcosm/build/us_runtime/fiscal_targets.py": "19ec9db17110ef8d8db16c7c7d23cee8efdc4231d2d59fc1221cba7d7317df41",
+   "tools/build_us_fiscal_refresh_release.py": "1b7cb863448bb96c00af126b34ff2754fb006e5c6a99669d7750b815d30bb7a1",
+   "packages/microcosm-calibrate/src/microcosm/calibrate/solve.py": "6cea5b8cb68e28f16f3589b6273b6a471b653d967cd4e62d49ff369dce45c470"
   },
   "script": "build_fixture.py"
  },
@@ -22,6 +26,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.al.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.al.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -75,12 +84,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "26000000000.0"
+    "fsa_published_value": "26000000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 26825497232.528435,
+   "compiled_target": 26825497232.528435,
    "initial_estimate": 8305673853.103367,
    "final_estimate": 26808967189.14933,
    "relative_error": -0.0006162064112295516,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -121,6 +136,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ak.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ak.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -174,12 +194,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "2400000000.0"
+    "fsa_published_value": "2400000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 2476199744.541086,
+   "compiled_target": 2476199744.541086,
    "initial_estimate": 1148878706.6359432,
    "final_estimate": 2471464575.901251,
    "relative_error": -0.0019122724853979523,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -220,6 +246,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.az.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.az.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -273,12 +304,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "34000000000.0"
+    "fsa_published_value": "34000000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 35079496380.99872,
+   "compiled_target": 35079496380.99872,
    "initial_estimate": 24321650675.30658,
    "final_estimate": 35066330519.24732,
    "relative_error": -0.0003753150161678959,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -319,6 +356,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ar.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ar.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -372,12 +414,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "14500000000.0"
+    "fsa_published_value": "14500000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 14960373456.602396,
+   "compiled_target": 14960373456.602396,
    "initial_estimate": 5993258429.895809,
    "final_estimate": 14959718370.46382,
    "relative_error": -4.378808727447918e-05,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -418,6 +466,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ca.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ca.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -471,12 +524,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "156700000000.0"
+    "fsa_published_value": "156700000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 161675208320.66174,
+   "compiled_target": 161675208320.66174,
    "initial_estimate": 91288748679.2521,
    "final_estimate": 161788395432.2775,
    "relative_error": 0.000700089474394004,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -517,6 +576,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.co.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.co.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -570,12 +634,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "29700000000.0"
+    "fsa_published_value": "29700000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 30642971838.695942,
+   "compiled_target": 30642971838.695942,
    "initial_estimate": 12246615950.529167,
    "final_estimate": 30589718126.402794,
    "relative_error": -0.0017378768800061116,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -616,6 +686,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ct.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ct.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -669,12 +744,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "19800000000.0"
+    "fsa_published_value": "19800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 20428647892.46396,
+   "compiled_target": 20428647892.46396,
    "initial_estimate": 8221406294.5546875,
    "final_estimate": 20456257970.291992,
    "relative_error": 0.0013515372125151115,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -715,6 +796,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.de.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.de.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -768,12 +854,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "5600000000.0"
+    "fsa_published_value": "5600000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 5777799403.929201,
+   "compiled_target": 5777799403.929201,
    "initial_estimate": 2617801463.3130417,
    "final_estimate": 5784345717.216734,
    "relative_error": 0.0011330115204555174,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -814,6 +906,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.dc.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.dc.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -867,12 +964,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "6400000000.0"
+    "fsa_published_value": "6400000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 6603199318.77623,
+   "compiled_target": 6603199318.77623,
    "initial_estimate": 2599656531.2344103,
    "final_estimate": 6612600807.761501,
    "relative_error": 0.0014237778584902433,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -913,6 +1016,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.fl.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.fl.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -966,12 +1074,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "113100000000.0"
+    "fsa_published_value": "113100000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 116690912961.49869,
+   "compiled_target": 116690912961.49869,
    "initial_estimate": 42937210291.70776,
    "final_estimate": 116736175665.97353,
    "relative_error": 0.0003878854259180606,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1012,6 +1126,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ga.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ga.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1065,12 +1184,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "74600000000.0"
+    "fsa_published_value": "74600000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 76968542059.48543,
+   "compiled_target": 76968542059.48543,
    "initial_estimate": 38439192429.426,
    "final_estimate": 76973691089.3685,
    "relative_error": 6.689784872230596e-05,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1111,6 +1236,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.hi.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.hi.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1164,12 +1294,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "4900000000.0"
+    "fsa_published_value": "4900000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 5055574478.438051,
+   "compiled_target": 5055574478.438051,
    "initial_estimate": 3255533576.0909986,
    "final_estimate": 5047210422.285864,
    "relative_error": -0.0016544224969605177,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1210,6 +1346,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.id.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.id.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1263,12 +1404,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "7500000000.0"
+    "fsa_published_value": "7500000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 7738124201.690894,
+   "compiled_target": 7738124201.690894,
    "initial_estimate": 6151169637.166891,
    "final_estimate": 7730724748.640401,
    "relative_error": -0.0009562334304321907,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1309,6 +1456,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.il.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.il.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1362,12 +1514,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "65300000000.0"
+    "fsa_published_value": "65300000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 67373268049.38872,
+   "compiled_target": 67373268049.38872,
    "initial_estimate": 34143177599.567707,
    "final_estimate": 67191288568.98292,
    "relative_error": -0.002701063577209848,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1408,6 +1566,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.in.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.in.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1461,12 +1624,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "31000000000.0"
+    "fsa_published_value": "31000000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 31984246700.32236,
+   "compiled_target": 31984246700.32236,
    "initial_estimate": 25340483538.178738,
    "final_estimate": 32011624817.368282,
    "relative_error": 0.000855987552323544,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1507,6 +1676,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ia.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ia.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1560,12 +1734,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "13500000000.0"
+    "fsa_published_value": "13500000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 13928623563.04361,
+   "compiled_target": 13928623563.04361,
    "initial_estimate": 5484448371.887898,
    "final_estimate": 13935031027.771067,
    "relative_error": 0.000460021386783528,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1606,6 +1786,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ks.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ks.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1659,12 +1844,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "13100000000.0"
+    "fsa_published_value": "13100000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 13515923605.620094,
+   "compiled_target": 13515923605.620094,
    "initial_estimate": 6467831591.838855,
    "final_estimate": 13543824212.236744,
    "relative_error": 0.0020642767324497305,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1705,6 +1896,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ky.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ky.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1758,12 +1954,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "21600000000.0"
+    "fsa_published_value": "21600000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 22285797700.869774,
+   "compiled_target": 22285797700.869774,
    "initial_estimate": 12794424525.133045,
    "final_estimate": 22314459080.32409,
    "relative_error": 0.0012860827258248237,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1804,6 +2006,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.la.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.la.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1857,12 +2064,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "25100000000.0"
+    "fsa_published_value": "25100000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 25896922328.325527,
+   "compiled_target": 25896922328.325527,
    "initial_estimate": 6070047019.202428,
    "final_estimate": 23994270877.394115,
    "relative_error": -0.07347017637112539,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -1903,6 +2116,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.me.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.me.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -1956,12 +2174,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "6700000000.0"
+    "fsa_published_value": "6700000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 6912724286.843865,
+   "compiled_target": 6912724286.843865,
    "initial_estimate": 4008420739.073031,
    "final_estimate": 6909087919.380033,
    "relative_error": -0.0005260397077825749,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2002,6 +2226,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.md.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.md.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2055,12 +2284,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "38400000000.0"
+    "fsa_published_value": "38400000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 39619195912.65738,
+   "compiled_target": 39619195912.65738,
    "initial_estimate": 14358911296.270561,
    "final_estimate": 39619892919.91679,
    "relative_error": 1.7592665458017697e-05,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2101,6 +2336,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ma.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ma.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2154,12 +2394,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "33400000000.0"
+    "fsa_published_value": "33400000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 34460446444.86345,
+   "compiled_target": 34460446444.86345,
    "initial_estimate": 19283679885.624725,
    "final_estimate": 34446011780.137344,
    "relative_error": -0.0004188763122729745,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2200,6 +2446,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.mi.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.mi.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2253,12 +2504,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "53200000000.0"
+    "fsa_published_value": "53200000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 54889094337.32741,
+   "compiled_target": 54889094337.32741,
    "initial_estimate": 33956792514.97786,
    "final_estimate": 54914105943.04848,
    "relative_error": 0.00045567532171978574,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2299,6 +2556,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.mn.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.mn.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2352,12 +2614,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "27500000000.0"
+    "fsa_published_value": "27500000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 28373122072.86661,
+   "compiled_target": 28373122072.86661,
    "initial_estimate": 20891193585.03671,
    "final_estimate": 28405829193.08943,
    "relative_error": 0.0011527501322844658,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2398,6 +2666,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ms.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ms.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2451,12 +2724,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "17800000000.0"
+    "fsa_published_value": "17800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 18365148105.34639,
+   "compiled_target": 18365148105.34639,
    "initial_estimate": 7875869255.9178505,
    "final_estimate": 18371620725.737057,
    "relative_error": 0.00035244041341450866,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2497,6 +2776,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.mo.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.mo.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2550,12 +2834,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "30600000000.0"
+    "fsa_published_value": "30600000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 31571546742.89885,
+   "compiled_target": 31571546742.89885,
    "initial_estimate": 15712567803.619015,
    "final_estimate": 31603786446.852547,
    "relative_error": 0.0010211632713544084,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2596,6 +2886,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.mt.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.mt.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2649,12 +2944,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "4500000000.0"
+    "fsa_published_value": "4500000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 4642874521.014537,
+   "compiled_target": 4642874521.014537,
    "initial_estimate": 3551105188.0317473,
    "final_estimate": 4650965679.018977,
    "relative_error": 0.0017427044318811937,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2695,6 +2996,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ne.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ne.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2748,12 +3054,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "8200000000.0"
+    "fsa_published_value": "8200000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 8460349127.182044,
+   "compiled_target": 8460349127.182044,
    "initial_estimate": 3864699647.1679335,
    "final_estimate": 8452616131.9912815,
    "relative_error": -0.0009140279052926283,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2794,6 +3106,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nv.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nv.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2847,12 +3164,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "13200000000.0"
+    "fsa_published_value": "13200000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 13619098594.975973,
+   "compiled_target": 13619098594.975973,
    "initial_estimate": 5392235864.376257,
    "final_estimate": 13612057110.47988,
    "relative_error": -0.0005170301431470159,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2893,6 +3216,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nh.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nh.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -2946,12 +3274,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "6800000000.0"
+    "fsa_published_value": "6800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 7015899276.199744,
+   "compiled_target": 7015899276.199744,
    "initial_estimate": 3619803965.920487,
    "final_estimate": 7014849769.041722,
    "relative_error": -0.00014958982686399204,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -2992,6 +3326,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nj.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nj.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3045,12 +3384,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "48400000000.0"
+    "fsa_published_value": "48400000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 49936694848.24524,
+   "compiled_target": 49936694848.24524,
    "initial_estimate": 22920481793.537766,
    "final_estimate": 49946310516.94556,
    "relative_error": 0.00019255717122526532,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3091,6 +3436,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nm.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nm.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3144,12 +3494,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "8000000000.0"
+    "fsa_published_value": "8000000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 8253999148.470287,
+   "compiled_target": 8253999148.470287,
    "initial_estimate": 9559916075.590015,
    "final_estimate": 8262377704.333782,
    "relative_error": 0.001015090468606078,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3190,6 +3546,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ny.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ny.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3243,12 +3604,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "99900000000.0"
+    "fsa_published_value": "99900000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 103071814366.5227,
+   "compiled_target": 103071814366.5227,
    "initial_estimate": 59048689439.81896,
    "final_estimate": 103017536248.83508,
    "relative_error": -0.0005266048533366206,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3289,6 +3656,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nc.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nc.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3342,12 +3714,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "55800000000.0"
+    "fsa_published_value": "55800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 57571644060.58025,
+   "compiled_target": 57571644060.58025,
    "initial_estimate": 30687722220.27408,
    "final_estimate": 57671195685.94808,
    "relative_error": 0.0017291780874465618,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3388,6 +3766,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nd.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nd.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3441,12 +3824,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "2700000000.0"
+    "fsa_published_value": "2700000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 2785724712.6087217,
+   "compiled_target": 2785724712.6087217,
    "initial_estimate": 1474008198.7061641,
    "final_estimate": 2788981149.9050393,
    "relative_error": 0.00116897311553375,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3487,6 +3876,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.oh.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.oh.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3540,12 +3934,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "64300000000.0"
+    "fsa_published_value": "64300000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 66341518155.82993,
+   "compiled_target": 66341518155.82993,
    "initial_estimate": 24944215874.46098,
    "final_estimate": 66331341091.249405,
    "relative_error": -0.00015340415569965252,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3586,6 +3986,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ok.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ok.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3639,12 +4044,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "17100000000.0"
+    "fsa_published_value": "17100000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 17642923179.85524,
+   "compiled_target": 17642923179.85524,
    "initial_estimate": 12680909295.635565,
    "final_estimate": 17674474115.221878,
    "relative_error": 0.001788305432438949,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3685,6 +4096,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.or.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.or.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3738,12 +4154,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "20800000000.0"
+    "fsa_published_value": "20800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 21460397786.022747,
+   "compiled_target": 21460397786.022747,
    "initial_estimate": 9759168192.994923,
    "final_estimate": 21436642432.949627,
    "relative_error": -0.001106939084260222,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3784,6 +4206,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.pa.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.pa.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3837,12 +4264,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "69600000000.0"
+    "fsa_published_value": "69600000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 71809792591.6915,
+   "compiled_target": 71809792591.6915,
    "initial_estimate": 27902007994.1302,
    "final_estimate": 71906924907.07704,
    "relative_error": 0.001352633281338598,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3883,6 +4316,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ri.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ri.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -3936,12 +4374,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "5100000000.0"
+    "fsa_published_value": "5100000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 5261924457.149808,
+   "compiled_target": 5261924457.149808,
    "initial_estimate": 2796053711.7570615,
    "final_estimate": 5257512643.705235,
    "relative_error": -0.000838441045762014,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -3982,6 +4426,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.sc.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.sc.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4035,12 +4484,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "31400000000.0"
+    "fsa_published_value": "31400000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 32396946657.745876,
+   "compiled_target": 32396946657.745876,
    "initial_estimate": 17451435371.19304,
    "final_estimate": 32428590461.096027,
    "relative_error": 0.0009767526453788589,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4081,6 +4536,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.sd.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.sd.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4134,12 +4594,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "3700000000.0"
+    "fsa_published_value": "3700000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 3817474606.1675076,
+   "compiled_target": 3817474606.1675076,
    "initial_estimate": 2544913149.0658116,
    "final_estimate": 3811497142.4410176,
    "relative_error": -0.001565816238000074,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4180,6 +4646,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.tn.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.tn.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4233,12 +4704,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "34600000000.0"
+    "fsa_published_value": "34600000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 35698546317.133995,
+   "compiled_target": 35698546317.133995,
    "initial_estimate": 30689349951.29,
    "final_estimate": 35692589708.45849,
    "relative_error": -0.0001668585780101538,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4279,6 +4756,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.tx.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.tx.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4332,12 +4814,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "138300000000.0"
+    "fsa_published_value": "138300000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 142691010279.18008,
+   "compiled_target": 142691010279.18008,
    "initial_estimate": 69020094508.7879,
    "final_estimate": 142643010143.84976,
    "relative_error": -0.00033639214717457166,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4378,6 +4866,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ut.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ut.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4431,12 +4924,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "11100000000.0"
+    "fsa_published_value": "11100000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 11452423818.502523,
+   "compiled_target": 11452423818.502523,
    "initial_estimate": 7082955146.543638,
    "final_estimate": 11449743822.685226,
    "relative_error": -0.00023401123288566944,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4477,6 +4976,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.vt.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.vt.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4530,12 +5034,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "2900000000.0"
+    "fsa_published_value": "2900000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 2992074691.320479,
+   "compiled_target": 2992074691.320479,
    "initial_estimate": 1522891012.1873512,
    "final_estimate": 2985727800.6757474,
    "relative_error": -0.002121234026390724,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4576,6 +5086,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.va.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.va.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4629,12 +5144,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "45500000000.0"
+    "fsa_published_value": "45500000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 46944620156.92476,
+   "compiled_target": 46944620156.92476,
    "initial_estimate": 23891264239.204063,
    "final_estimate": 46864783860.98283,
    "relative_error": -0.001700648459292222,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4675,6 +5196,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.wa.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.wa.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4728,12 +5254,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "29600000000.0"
+    "fsa_published_value": "29600000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 30539796849.34006,
+   "compiled_target": 30539796849.34006,
    "initial_estimate": 16049838285.016233,
    "final_estimate": 30573816068.2637,
    "relative_error": 0.0011139307537460753,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4774,6 +5306,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.wv.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.wv.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4827,12 +5364,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "7700000000.0"
+    "fsa_published_value": "7700000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 7944474180.402651,
+   "compiled_target": 7944474180.402651,
    "initial_estimate": 5630654714.986314,
    "final_estimate": 7939686656.872319,
    "relative_error": -0.0006026230838714822,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4873,6 +5416,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.wi.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.wi.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -4926,12 +5474,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "24000000000.0"
+    "fsa_published_value": "24000000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 24761997445.410862,
+   "compiled_target": 24761997445.410862,
    "initial_estimate": 11622497858.766003,
    "final_estimate": 24771289952.861736,
    "relative_error": 0.00037527293472023633,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -4972,6 +5526,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.wy.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.wy.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5025,12 +5584,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0317498935587859",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "1800000000.0"
+    "fsa_published_value": "1800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 1857149808.4058146,
+   "compiled_target": 1857149808.4058146,
    "initial_estimate": 799653010.9431404,
    "final_estimate": 1861315482.7524452,
    "relative_error": 0.002243047021718946,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5071,6 +5636,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.al.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.al.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5124,12 +5694,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "664000.0"
+    "fsa_published_value": "664000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 694296.9494946192,
+   "compiled_target": 694296.9494946192,
    "initial_estimate": 299660.64127607393,
    "final_estimate": 693709.0031939199,
    "relative_error": -0.0008468225319544138,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5170,6 +5746,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ak.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ak.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5223,12 +5804,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "64500.0"
+    "fsa_published_value": "64500.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 67443.00187108875,
+   "compiled_target": 67443.00187108875,
    "initial_estimate": 42677.70625471767,
    "final_estimate": 67353.68128777898,
    "relative_error": -0.0013243862347720346,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5269,6 +5856,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.az.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.az.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5322,12 +5914,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "916100.0"
+    "fsa_published_value": "916100.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 957899.7521566575,
+   "compiled_target": 957899.7521566575,
    "initial_estimate": 581654.414915702,
    "final_estimate": 956836.4002164718,
    "relative_error": -0.0011100868726520554,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5368,6 +5966,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ar.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ar.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5421,12 +6024,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "408400.0"
+    "fsa_published_value": "408400.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 427034.4490566302,
+   "compiled_target": 427034.4490566302,
    "initial_estimate": 178289.27660903882,
    "final_estimate": 426374.9395311766,
    "relative_error": -0.001544394197963533,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5467,6 +6076,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ca.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ca.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5520,12 +6134,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "3919500.0"
+    "fsa_published_value": "3919500.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 4098338.6950966264,
+   "compiled_target": 4098338.6950966264,
    "initial_estimate": 2277884.264727672,
    "final_estimate": 4232292.789984276,
    "relative_error": 0.032684974291635735,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5566,6 +6186,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.co.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.co.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5619,12 +6244,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "764600.0"
+    "fsa_published_value": "764600.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 799487.119854798,
+   "compiled_target": 799487.119854798,
    "initial_estimate": 334925.6516082026,
    "final_estimate": 798939.3602070913,
    "relative_error": -0.0006851388022437729,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5665,6 +6296,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ct.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ct.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5718,12 +6354,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "515400.0"
+    "fsa_published_value": "515400.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 538916.6382071185,
+   "compiled_target": 538916.6382071185,
    "initial_estimate": 209988.21377416077,
    "final_estimate": 483745.09216988576,
    "relative_error": -0.10237491687170548,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5764,6 +6406,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.de.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.de.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5817,12 +6464,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "137800.0"
+    "fsa_published_value": "137800.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 144087.5295788532,
+   "compiled_target": 144087.5295788532,
    "initial_estimate": 59671.684939128034,
    "final_estimate": 125863.84569109904,
    "relative_error": -0.12647648232306657,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5863,6 +6516,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.dc.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.dc.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -5916,12 +6574,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "114600.0"
+    "fsa_published_value": "114600.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 119828.96146398096,
+   "compiled_target": 119828.96146398096,
    "initial_estimate": 54420.929383690665,
    "final_estimate": 119567.18203007248,
    "relative_error": -0.002184609052020925,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -5962,6 +6626,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.fl.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.fl.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6015,12 +6684,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "2747700.0"
+    "fsa_published_value": "2747700.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 2873071.879708381,
+   "compiled_target": 2873071.879708381,
    "initial_estimate": 987744.0907100096,
    "final_estimate": 2872497.143069222,
    "relative_error": -0.00020004255487584129,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6061,6 +6736,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ga.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ga.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6114,12 +6794,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1702700.0"
+    "fsa_published_value": "1702700.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1780390.6866031447,
+   "compiled_target": 1780390.6866031447,
    "initial_estimate": 917964.2046790165,
    "final_estimate": 1780834.4401829597,
    "relative_error": 0.0002492450579269024,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6160,6 +6846,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.hi.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.hi.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6213,12 +6904,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "121000.0"
+    "fsa_published_value": "121000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 126520.98025429054,
+   "compiled_target": 126520.98025429054,
    "initial_estimate": 67915.06417929725,
    "final_estimate": 126285.89632417394,
    "relative_error": -0.0018580628259764517,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6259,6 +6956,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.id.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.id.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6312,12 +7014,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "216500.0"
+    "fsa_published_value": "216500.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 226378.44814094133,
+   "compiled_target": 226378.44814094133,
    "initial_estimate": 167324.7579832254,
    "final_estimate": 226231.21690869075,
    "relative_error": -0.0006503765418469078,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6358,6 +7066,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.il.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.il.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6411,12 +7124,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1601500.0"
+    "fsa_published_value": "1601500.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1674573.1394813743,
+   "compiled_target": 1674573.1394813743,
    "initial_estimate": 832380.2833203801,
    "final_estimate": 1673352.8668219256,
    "relative_error": -0.0007287066958607732,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6457,6 +7176,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.in.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.in.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6510,12 +7234,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "898500.0"
+    "fsa_published_value": "898500.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 939496.7004833062,
+   "compiled_target": 939496.7004833062,
    "initial_estimate": 516324.2498256706,
    "final_estimate": 939740.9813176465,
    "relative_error": 0.0002600124451896339,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6556,6 +7286,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ia.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ia.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6609,12 +7344,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "423400.0"
+    "fsa_published_value": "423400.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 442718.8680964183,
+   "compiled_target": 442718.8680964183,
    "initial_estimate": 212727.3081598001,
    "final_estimate": 442913.8595813111,
    "relative_error": 0.0004404408733046794,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6655,6 +7396,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ks.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ks.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6708,12 +7454,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "379300.0"
+    "fsa_published_value": "379300.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 396606.67611944134,
+   "compiled_target": 396606.67611944134,
    "initial_estimate": 215827.92380567404,
    "final_estimate": 397535.9239759612,
    "relative_error": 0.002342996002013927,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6754,6 +7506,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ky.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ky.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6807,12 +7564,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "615600.0"
+    "fsa_published_value": "615600.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 643688.5573929029,
+   "compiled_target": 643688.5573929029,
    "initial_estimate": 292354.8541871355,
    "final_estimate": 612160.1736984606,
    "relative_error": -0.048980804975219776,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6853,6 +7616,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.la.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.la.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -6906,12 +7674,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "694000.0"
+    "fsa_published_value": "694000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 725665.7875741953,
+   "compiled_target": 725665.7875741953,
    "initial_estimate": 235996.30097340568,
    "final_estimate": 726299.4927637369,
    "relative_error": 0.0008732741716540846,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -6952,6 +7726,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.me.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.me.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7005,12 +7784,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "186600.0"
+    "fsa_published_value": "186600.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 195114.17285496375,
+   "compiled_target": 195114.17285496375,
    "initial_estimate": 118655.57825833226,
    "final_estimate": 172282.76233563243,
    "relative_error": -0.11701564363703515,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7051,6 +7836,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.md.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.md.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7104,12 +7894,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "842300.0"
+    "fsa_published_value": "842300.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 880732.4104809002,
+   "compiled_target": 880732.4104809002,
    "initial_estimate": 395479.93680944823,
    "final_estimate": 880547.3761768811,
    "relative_error": -0.00021009139872351322,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7150,6 +7946,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ma.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ma.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7203,12 +8004,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "900600.0"
+    "fsa_published_value": "900600.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 941692.5191488765,
+   "compiled_target": 941692.5191488765,
    "initial_estimate": 463105.9838920997,
    "final_estimate": 941438.1084340219,
    "relative_error": -0.00027016325358997754,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7249,6 +8056,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.mi.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.mi.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7302,12 +8114,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1377300.0"
+    "fsa_published_value": "1377300.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1440143.3562333419,
+   "compiled_target": 1440143.3562333419,
    "initial_estimate": 799646.8920924211,
    "final_estimate": 1441530.8788826521,
    "relative_error": 0.0009634614799316413,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7348,6 +8166,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.mn.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.mn.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7401,12 +8224,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "772600.0"
+    "fsa_published_value": "772600.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 807852.1433426848,
+   "compiled_target": 807852.1433426848,
    "initial_estimate": 479453.95315025107,
    "final_estimate": 809206.1325902689,
    "relative_error": 0.0016760359661627646,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7447,6 +8276,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ms.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ms.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7500,12 +8334,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "456300.0"
+    "fsa_published_value": "456300.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 477120.0271903535,
+   "compiled_target": 477120.0271903535,
    "initial_estimate": 213184.86340196797,
    "final_estimate": 477628.8449341006,
    "relative_error": 0.0010664355188429093,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7546,6 +8386,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.mo.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.mo.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7599,12 +8444,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "826500.0"
+    "fsa_published_value": "826500.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 864211.4890923233,
+   "compiled_target": 864211.4890923233,
    "initial_estimate": 472395.4279904787,
    "final_estimate": 865294.1581226342,
    "relative_error": 0.001252782500551966,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7645,6 +8496,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.mt.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.mt.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7698,12 +8554,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "126400.0"
+    "fsa_published_value": "126400.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 132167.37110861426,
+   "compiled_target": 132167.37110861426,
    "initial_estimate": 88576.2355027902,
    "final_estimate": 132440.56308882727,
    "relative_error": 0.0020670153149108706,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7744,6 +8606,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ne.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ne.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7797,12 +8664,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "243500.0"
+    "fsa_published_value": "243500.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 254610.4024125599,
+   "compiled_target": 254610.4024125599,
    "initial_estimate": 123018.40957040986,
    "final_estimate": 254409.29194099287,
    "relative_error": -0.0007898753140539471,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7843,6 +8716,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nv.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nv.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7896,12 +8774,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "367900.0"
+    "fsa_published_value": "367900.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 384686.5176492024,
+   "compiled_target": 384686.5176492024,
    "initial_estimate": 176511.93952379236,
    "final_estimate": 384459.04303150147,
    "relative_error": -0.0005913246429612142,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -7942,6 +8826,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nh.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nh.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -7995,12 +8884,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "187700.0"
+    "fsa_published_value": "187700.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 196264.3635845482,
+   "compiled_target": 196264.3635845482,
    "initial_estimate": 104937.6029087654,
    "final_estimate": 196351.78983107032,
    "relative_error": 0.00044545145601253673,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8041,6 +8936,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nj.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nj.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8094,12 +8994,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1235500.0"
+    "fsa_published_value": "1235500.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1291873.3149105452,
+   "compiled_target": 1291873.3149105452,
    "initial_estimate": 450355.9164135196,
    "final_estimate": 1308724.524122396,
    "relative_error": 0.013044010598684454,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8140,6 +9046,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nm.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nm.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8193,12 +9104,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "226000.0"
+    "fsa_published_value": "226000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 236311.9135328071,
+   "compiled_target": 236311.9135328071,
    "initial_estimate": 153771.50269997696,
    "final_estimate": 236428.14745450986,
    "relative_error": 0.0004918665333671835,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8239,6 +9156,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ny.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ny.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8292,12 +9214,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "2456600.0"
+    "fsa_published_value": "2456600.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 2568689.587542894,
+   "compiled_target": 2568689.587542894,
    "initial_estimate": 1218896.422932909,
    "final_estimate": 2569075.85121198,
    "relative_error": 0.000150373821328734,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8338,6 +9266,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nc.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nc.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8391,12 +9324,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1379300.0"
+    "fsa_published_value": "1379300.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1442234.6121053135,
+   "compiled_target": 1442234.6121053135,
    "initial_estimate": 732860.7559010923,
    "final_estimate": 1444188.4760409745,
    "relative_error": 0.0013547476390189167,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8437,6 +9376,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.nd.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.nd.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8490,12 +9434,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "88400.0"
+    "fsa_published_value": "88400.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 92433.5095411511,
+   "compiled_target": 92433.5095411511,
    "initial_estimate": 52350.8952984563,
    "final_estimate": 92390.57551640531,
    "relative_error": -0.0004644854983751701,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8536,6 +9486,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.oh.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.oh.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8589,12 +9544,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1770800.0"
+    "fsa_published_value": "1770800.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1851597.9490437824,
+   "compiled_target": 1851597.9490437824,
    "initial_estimate": 699900.1151267327,
    "final_estimate": 1754220.3502949593,
    "relative_error": -0.052591113961382226,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8635,6 +9596,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ok.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ok.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8688,12 +9654,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "510700.0"
+    "fsa_published_value": "510700.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 534002.1869079849,
+   "compiled_target": 534002.1869079849,
    "initial_estimate": 315479.7158029133,
    "final_estimate": 534087.7838574765,
    "relative_error": 0.00016029325645139963,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8734,6 +9706,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.or.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.or.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8787,12 +9764,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "526600.0"
+    "fsa_published_value": "526600.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 550627.6710901603,
+   "compiled_target": 550627.6710901603,
    "initial_estimate": 312082.1217905176,
    "final_estimate": 551112.3638620565,
    "relative_error": 0.0008802550204871383,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8833,6 +9816,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.pa.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.pa.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8886,12 +9874,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1853900.0"
+    "fsa_published_value": "1853900.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1938489.6305242085,
+   "compiled_target": 1938489.6305242085,
    "initial_estimate": 633413.2224533451,
    "final_estimate": 1962094.9843020402,
    "relative_error": 0.012177188573068749,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -8932,6 +9926,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ri.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ri.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -8985,12 +9984,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "149700.0"
+    "fsa_published_value": "149700.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 156530.50201708506,
+   "compiled_target": 156530.50201708506,
    "initial_estimate": 91242.25816610051,
    "final_estimate": 156520.36278757596,
    "relative_error": -6.47747843292529e-05,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9031,6 +10036,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.sc.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.sc.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9084,12 +10094,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "782300.0"
+    "fsa_published_value": "782300.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 817994.7343217478,
+   "compiled_target": 817994.7343217478,
    "initial_estimate": 307173.6792835799,
    "final_estimate": 819067.3598882724,
    "relative_error": 0.0013112866397776422,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9130,6 +10146,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.sd.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.sd.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9183,12 +10204,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "116700.0"
+    "fsa_published_value": "116700.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 122024.78012955129,
+   "compiled_target": 122024.78012955129,
    "initial_estimate": 49540.153662184995,
    "final_estimate": 121938.80396197141,
    "relative_error": -0.000704579573825913,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9229,6 +10256,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.tn.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.tn.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9282,12 +10314,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "894900.0"
+    "fsa_published_value": "894900.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 935732.439913757,
+   "compiled_target": 935732.439913757,
    "initial_estimate": 645573.8122887461,
    "final_estimate": 935830.8960656659,
    "relative_error": 0.00010521827363163767,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9328,6 +10366,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.tx.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.tx.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9381,12 +10424,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "3949800.0"
+    "fsa_published_value": "3949800.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 4130021.2215569983,
+   "compiled_target": 4130021.2215569983,
    "initial_estimate": 1799115.9671694795,
    "final_estimate": 4130654.202216061,
    "relative_error": 0.00015326329457064576,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9427,6 +10476,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.ut.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.ut.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9480,12 +10534,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "313300.0"
+    "fsa_published_value": "313300.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 327595.23234437377,
+   "compiled_target": 327595.23234437377,
    "initial_estimate": 239327.1041554662,
    "final_estimate": 327596.74386875663,
    "relative_error": 4.6139999414683845e-06,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9526,6 +10586,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.vt.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.vt.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9579,12 +10644,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "74800.0"
+    "fsa_published_value": "74800.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 78212.96961174325,
+   "compiled_target": 78212.96961174325,
    "initial_estimate": 50912.25411705035,
    "final_estimate": 78213.34278720869,
    "relative_error": 4.771273451143926e-06,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9625,6 +10696,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.va.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.va.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9678,12 +10754,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1085500.0"
+    "fsa_published_value": "1085500.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1135029.1245126643,
+   "compiled_target": 1135029.1245126643,
    "initial_estimate": 542755.0749534387,
    "final_estimate": 1134849.7671768656,
    "relative_error": -0.00015802002955270773,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9724,6 +10806,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.wa.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.wa.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9777,12 +10864,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "776100.0"
+    "fsa_published_value": "776100.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 811511.8411186354,
+   "compiled_target": 811511.8411186354,
    "initial_estimate": 507889.2370290313,
    "final_estimate": 811796.2032889295,
    "relative_error": 0.00035041037713285685,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9823,6 +10916,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.wv.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.wv.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9876,12 +10974,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "228300.0"
+    "fsa_published_value": "228300.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 238716.85778557463,
+   "compiled_target": 238716.85778557463,
    "initial_estimate": 97732.96010272118,
    "final_estimate": 234182.8693783432,
    "relative_error": -0.018993163906773802,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -9922,6 +11026,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.wi.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.wi.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -9975,12 +11084,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "709100.0"
+    "fsa_published_value": "709100.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 741454.769407582,
+   "compiled_target": 741454.769407582,
    "initial_estimate": 322917.9462745847,
    "final_estimate": 741855.6392019944,
    "relative_error": 0.0005406530660429796,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10021,6 +11136,11 @@
    "target_name": "ed_fsa.portfolio_by_location.2026_03_31.wy.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_location.2026_03_31.wy.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Location | Portfolio-by-Location.xls | fsa_portfolio_by_location_2026_03_31 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Location.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -10074,12 +11194,18 @@
     "fsa_reconciliation": "not_reported_allocated_pro_rata",
     "fsa_reconciliation_factor": "1.0456279359858722",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "54800.0"
+    "fsa_published_value": "54800.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 57300.4108920258,
+   "compiled_target": 57300.4108920258,
    "initial_estimate": 33514.1781105738,
    "final_estimate": 57400.11392044902,
    "relative_error": 0.0017400054706604563,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10120,6 +11246,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_24_and_younger.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_24_and_younger.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -10177,12 +11308,18 @@
     "fsa_share": "0.05056113408151211",
     "fsa_partition_value": "1693000000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "85600000000.0"
+    "fsa_published_value": "85600000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 84895672115.86523,
+   "compiled_target": 84895672115.86523,
    "initial_estimate": 52137719851.71084,
    "final_estimate": 84882138103.32043,
    "relative_error": -0.00015941934621035387,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10223,6 +11360,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_25_to_34.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_25_to_34.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -10282,12 +11424,18 @@
     "fsa_share": "0.2751329001772002",
     "fsa_partition_value": "1693000000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "465800000000.0"
+    "fsa_published_value": "465800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 461967337284.6965,
+   "compiled_target": 461967337284.6965,
    "initial_estimate": 216227118967.37558,
    "final_estimate": 461883537967.0942,
    "relative_error": -0.00018139662880679364,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10328,6 +11476,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_35_to_49.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_35_to_49.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -10387,12 +11540,18 @@
     "fsa_share": "0.4046662728883639",
     "fsa_partition_value": "1693000000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "685100000000.0"
+    "fsa_published_value": "685100000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 679462908488.0756,
+   "compiled_target": 679462908488.0756,
    "initial_estimate": 353428881766.99976,
    "final_estimate": 677890984314.0103,
    "relative_error": -0.002313480477636543,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10433,6 +11592,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_50_to_61.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_50_to_61.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -10492,12 +11656,18 @@
     "fsa_share": "0.18476077968103957",
     "fsa_partition_value": "1693000000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "312800000000.0"
+    "fsa_published_value": "312800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 310226241096.29254,
+   "compiled_target": 310226241096.29254,
    "initial_estimate": 168531843341.06357,
    "final_estimate": 310222466064.4977,
    "relative_error": -1.2168641123073436e-05,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10538,6 +11708,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_62_and_older.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.dollars_outstanding.age_62_and_older.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -10595,12 +11770,18 @@
     "fsa_share": "0.08487891317188423",
     "fsa_partition_value": "1693000000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "143700000000.0"
+    "fsa_published_value": "143700000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 142517617792.63824,
+   "compiled_target": 142517617792.63824,
    "initial_estimate": 68095645027.780594,
    "final_estimate": 142453143985.93988,
    "relative_error": -0.0004523918354583573,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10641,6 +11822,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_24_and_younger.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_24_and_younger.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -10698,12 +11884,18 @@
     "fsa_share": "0.13839285714285715",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "6200000.0"
+    "fsa_published_value": "6200000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 6132107.903700248,
+   "compiled_target": 6132107.903700248,
    "initial_estimate": 2581827.639193066,
    "final_estimate": 6133783.137043165,
    "relative_error": 0.0002731904541186942,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10744,6 +11936,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_25_to_34.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_25_to_34.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -10803,12 +12000,18 @@
     "fsa_share": "0.3125",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "14000000.0"
+    "fsa_published_value": "14000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 13846695.266419914,
+   "compiled_target": 13846695.266419914,
    "initial_estimate": 6589408.84575269,
    "final_estimate": 13835281.428205932,
    "relative_error": -0.0008243005276256887,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10849,6 +12052,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_35_to_49.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_35_to_49.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -10908,12 +12116,18 @@
     "fsa_share": "0.33482142857142855",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "15000000.0"
+    "fsa_published_value": "15000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 14835744.92830705,
+   "compiled_target": 14835744.92830705,
    "initial_estimate": 7872017.318872907,
    "final_estimate": 14830932.289964661,
    "relative_error": -0.00032439478877849785,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -10954,6 +12168,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_50_to_61.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_50_to_61.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11013,12 +12232,18 @@
     "fsa_share": "0.14285714285714285",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "6400000.0"
+    "fsa_published_value": "6400000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 6329917.836077675,
+   "compiled_target": 6329917.836077675,
    "initial_estimate": 2905496.92771755,
    "final_estimate": 6330080.809990909,
    "relative_error": 2.574660800569155e-05,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11059,6 +12284,11 @@
    "target_name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_62_and_older.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_62_and_older.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Age | Portfolio-by-Age.xls | fsa_portfolio_by_age_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Age.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11116,12 +12346,18 @@
     "fsa_share": "0.07142857142857142",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "3200000.0"
+    "fsa_published_value": "3200000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 3164958.9180388376,
+   "compiled_target": 3164958.9180388376,
    "initial_estimate": 1228753.2066090046,
    "final_estimate": 3130274.9343246636,
    "relative_error": -0.010958746894467084,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11162,6 +12398,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_less_than_5k.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_less_than_5k.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11218,12 +12459,18 @@
     "fsa_share": "0.011141897070093734",
     "fsa_partition_value": "1696300000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "18900000000.0"
+    "fsa_published_value": "18900000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 18708022626.360928,
+   "compiled_target": 18708022626.360928,
    "initial_estimate": 7194840956.187957,
    "final_estimate": 18457971834.568336,
    "relative_error": -0.013365965863236226,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11264,6 +12511,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_5k_to_10k.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_5k_to_10k.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11322,12 +12574,18 @@
     "fsa_share": "0.030949714083593705",
     "fsa_partition_value": "1696300000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "52500000000.0"
+    "fsa_published_value": "52500000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 51966729517.669235,
+   "compiled_target": 51966729517.669235,
    "initial_estimate": 20403100746.587627,
    "final_estimate": 50843611427.35877,
    "relative_error": -0.021612252699654517,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11368,6 +12626,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_10k_to_20k.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_10k_to_20k.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11426,12 +12689,18 @@
     "fsa_share": "0.07811118316335554",
     "fsa_partition_value": "1696300000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "132500000000.0"
+    "fsa_published_value": "132500000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 131154126877.92712,
+   "compiled_target": 131154126877.92712,
    "initial_estimate": 55243407927.39507,
    "final_estimate": 131105275530.378,
    "relative_error": -0.0003724728204289513,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11472,6 +12741,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_20k_to_40k.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_20k_to_40k.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11530,12 +12804,18 @@
     "fsa_share": "0.1596415728349938",
     "fsa_partition_value": "1696300000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "270800000000.0"
+    "fsa_published_value": "270800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 268049340064.47293,
+   "compiled_target": 268049340064.47293,
    "initial_estimate": 139894702305.24088,
    "final_estimate": 268003551717.58005,
    "relative_error": -0.00017082059176817967,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11576,6 +12856,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_40k_to_60k.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_40k_to_60k.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11634,12 +12919,18 @@
     "fsa_share": "0.12167659022578553",
     "fsa_partition_value": "1696300000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "206400000000.0"
+    "fsa_published_value": "206400000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 204303485189.46533,
+   "compiled_target": 204303485189.46533,
    "initial_estimate": 110356140311.40195,
    "final_estimate": 204219392263.77588,
    "relative_error": -0.0004116078862358501,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11680,6 +12971,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_60k_to_80k.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_60k_to_80k.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11738,12 +13034,18 @@
     "fsa_share": "0.10458055768437187",
     "fsa_partition_value": "1696300000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "177400000000.0"
+    "fsa_published_value": "177400000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 175598053646.37186,
+   "compiled_target": 175598053646.37186,
    "initial_estimate": 131469954513.0081,
    "final_estimate": 175669534805.00638,
    "relative_error": 0.00040707261356366637,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11784,6 +13086,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_80k_to_100k.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_80k_to_100k.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11842,12 +13149,18 @@
     "fsa_share": "0.07528149501856983",
     "fsa_partition_value": "1696300000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "127700000000.0"
+    "fsa_published_value": "127700000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 126402883036.31165,
+   "compiled_target": 126402883036.31165,
    "initial_estimate": 62852695832.42822,
    "final_estimate": 126371680355.4723,
    "relative_error": -0.0002468510218265879,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11888,6 +13201,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_100k_to_200k.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_100k_to_200k.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -11946,12 +13264,18 @@
     "fsa_share": "0.20886635618699523",
     "fsa_partition_value": "1696300000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "354300000000.0"
+    "fsa_published_value": "354300000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 350701186059.2421,
+   "compiled_target": 350701186059.2421,
    "initial_estimate": 140740402028.01462,
    "final_estimate": 350642680671.3064,
    "relative_error": -0.0001668240378458457,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -11992,6 +13316,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_200k_plus.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_200k_plus.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12048,12 +13377,18 @@
     "fsa_share": "0.20975063373224076",
     "fsa_partition_value": "1696300000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "355800000000.0"
+    "fsa_published_value": "355800000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 352185949759.74695,
+   "compiled_target": 352185949759.74695,
    "initial_estimate": 190265964334.6665,
    "final_estimate": 352018571829.4148,
    "relative_error": -0.0004752544229726786,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -12094,6 +13429,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_less_than_5k.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_less_than_5k.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12150,12 +13490,18 @@
     "fsa_share": "0.15401785714285715",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "6900000.0"
+    "fsa_published_value": "6900000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 6824442.667021244,
+   "compiled_target": 6824442.667021244,
    "initial_estimate": 2701286.054707425,
    "final_estimate": 6647229.630419818,
    "relative_error": -0.025967400599289765,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -12196,6 +13542,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_5k_to_10k.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_5k_to_10k.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12254,12 +13605,18 @@
     "fsa_share": "0.16071428571428573",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "7200000.0"
+    "fsa_published_value": "7200000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 7121157.565587386,
+   "compiled_target": 7121157.565587386,
    "initial_estimate": 2892278.969669795,
    "final_estimate": 7120831.972355158,
    "relative_error": -4.5721953099437275e-05,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -12300,6 +13657,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_10k_to_20k.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_10k_to_20k.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12358,12 +13720,18 @@
     "fsa_share": "0.20535714285714285",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "9200000.0"
+    "fsa_published_value": "9200000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 9099256.889361657,
+   "compiled_target": 9099256.889361657,
    "initial_estimate": 3824581.1286443486,
    "final_estimate": 8972005.04345278,
    "relative_error": -0.013984861341551117,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -12404,6 +13772,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_20k_to_40k.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_20k_to_40k.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12462,12 +13835,18 @@
     "fsa_share": "0.21205357142857142",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "9500000.0"
+    "fsa_published_value": "9500000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 9395971.787927799,
+   "compiled_target": 9395971.787927799,
    "initial_estimate": 5062327.412636923,
    "final_estimate": 9389378.449373392,
    "relative_error": -0.0007017197053398819,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -12508,6 +13887,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_40k_to_60k.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_40k_to_60k.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12566,12 +13950,18 @@
     "fsa_share": "0.09375",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "4200000.0"
+    "fsa_published_value": "4200000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 4154008.5799259744,
+   "compiled_target": 4154008.5799259744,
    "initial_estimate": 2270434.8601837642,
    "final_estimate": 4192792.6117491154,
    "relative_error": 0.009336531467595615,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -12612,6 +14002,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_60k_to_80k.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_60k_to_80k.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12670,12 +14065,18 @@
     "fsa_share": "0.05803571428571429",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "2600000.0"
+    "fsa_published_value": "2600000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 2571529.1209065556,
+   "compiled_target": 2571529.1209065556,
    "initial_estimate": 1906859.772196471,
    "final_estimate": 2555630.679479067,
    "relative_error": -0.006182485470700631,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -12716,6 +14117,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_80k_to_100k.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_80k_to_100k.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12774,12 +14180,18 @@
     "fsa_share": "0.03125",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1400000.0"
+    "fsa_published_value": "1400000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1384669.5266419915,
+   "compiled_target": 1384669.5266419915,
    "initial_estimate": 728545.0784757418,
    "final_estimate": 1446972.7292447137,
    "relative_error": 0.04499499801502515,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -12820,6 +14232,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_100k_to_200k.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_100k_to_200k.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12878,12 +14295,18 @@
     "fsa_share": "0.05803571428571429",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "2600000.0"
+    "fsa_published_value": "2600000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 2571529.1209065556,
+   "compiled_target": 2571529.1209065556,
    "initial_estimate": 1091197.0412239158,
    "final_estimate": 2579347.281474521,
    "relative_error": 0.0030402768937764077,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -12924,6 +14347,11 @@
    "target_name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_200k_plus.borrowers",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_200k_plus.borrowers"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Federal Student Loan Portfolio by Borrower Debt Size | Portfolio-by-Debt-Size.xls | fsa_portfolio_by_debt_size_fy2026_q2 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/Portfolio-by-Debt-Size.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -12980,12 +14408,18 @@
     "fsa_share": "0.026785714285714284",
     "fsa_partition_value": "44800000.0",
     "fsa_control_value": "44309424.85254373",
-    "fsa_published_value": "1200000.0"
+    "fsa_published_value": "1200000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "not_dollar_amount"
    },
    "target": 1186859.594264564,
+   "compiled_target": 1186859.594264564,
    "initial_estimate": 699993.6204068068,
    "final_estimate": 1356164.2019807717,
    "relative_error": 0.14264923040127336,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -13026,6 +14460,11 @@
    "target_name": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.parent_plus.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.parent_plus.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Portfolio by Loan Type | PortfoliobyLoanType.xls | fsa_portfolio_by_loan_type_fy2026_q3 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/PortfoliobyLoanType.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -13080,12 +14519,18 @@
     "fsa_share": "0.0683954054994779",
     "fsa_partition_value": "1723800000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "117900000000.0"
+    "fsa_published_value": "117900000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 114840658244.6196,
+   "compiled_target": 114840658244.6196,
    "initial_estimate": 91774549445.12498,
    "final_estimate": 114846618687.4453,
    "relative_error": 5.190185180759451e-05,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
@@ -13126,6 +14571,11 @@
    "target_name": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding",
    "period": 2024,
    "entity": "household",
+   "measure": {
+    "kind": "column",
+    "name": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding"
+   },
+   "filter": null,
    "source": "ed_fsa | FSA Portfolio by Loan Type | PortfoliobyLoanType.xls | fsa_portfolio_by_loan_type_fy2026_q3 | https://studentaid.gov/sites/default/files/fsawg/datacenter/library/PortfoliobyLoanType.xls",
    "metadata": {
     "ledger_source": "policyengine-ledger-data",
@@ -13186,12 +14636,18 @@
     "fsa_share": "0.9316045945005221",
     "fsa_partition_value": "1723800000000.0",
     "fsa_control_value": "1679069776777.568",
-    "fsa_published_value": "1605900000000.0"
+    "fsa_published_value": "1605900000000.0",
+    "basis": "fact",
+    "aged_to": "2024",
+    "aging_factor": "1",
+    "aging_factor_source": "stock_at_source_reference_date"
    },
    "target": 1564229118532.9485,
+   "compiled_target": 1564229118532.9485,
    "initial_estimate": 766646659509.804,
    "final_estimate": 1562485651747.415,
    "relative_error": -0.0011145853026752253,
+   "within_tolerance": null,
    "registry": {
     "family": "ed_fsa",
     "se": null,
