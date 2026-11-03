@@ -475,11 +475,11 @@ describe("the ED Federal Student Aid target family", () => {
     expect(levelsOf(String(release.rows[0].variable_key))).toEqual(["state", ["state"]]);
   });
 
-  // Each state target's Borrower location repeats its geography: no
-  // geography holds two locations. The page hides that facet, as the
-  // calibration map adds no tier for a dimension with one value under a
-  // geography (calibration-tree.ts:601-610), and keeps the bands, which the
-  // United States holds several of.
+  // Each state target's Borrower location is its geography, so the facet
+  // repeats Geography. The page hides it, as the calibration map adds no tier
+  // for a dimension with one value under a geography
+  // (calibration-tree.ts:601-610), and keeps the bands, which the United
+  // States holds several of.
   test("a mixed category's facets are its geographies and both bands", () => {
     const variable = variableKey(BALANCE);
     const page = targetsPage({ variable });

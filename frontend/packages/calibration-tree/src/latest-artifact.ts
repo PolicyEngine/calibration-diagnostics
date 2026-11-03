@@ -907,6 +907,23 @@ export interface TargetDimension {
   values: string[];
 }
 
+// A dimension whose value is its row's geography, such as an FSA state
+// target's Borrower location, only repeats the Geography facet: under each
+// geography it holds one value, and the calibration map adds no tier for a
+// dimension with one value under a node (calibration-tree.ts:601-610). A
+// dimension that merely has one value per geography in this page (one
+// target per region, each of a different sex) is a real breakdown and stays.
+function repeatsGeography(rows: TargetRow[], key: string): boolean {
+  let carried = false;
+  for (const row of rows) {
+    const value = rowFacetValue(row, key);
+    if (!value) continue;
+    if (value !== rowFacetValue(row, "geography")) return false;
+    carried = true;
+  }
+  return carried;
+}
+
 function computeDimensions(rows: TargetRow[]): TargetDimension[] {
   const geographyLabel =
     rows.length > 0 && rows.every((row) => row.level === "region")
@@ -932,6 +949,7 @@ function computeDimensions(rows: TargetRow[]): TargetDimension[] {
       ),
     ];
     if (values.length <= 1) continue;
+    if (candidate.key !== "geography" && repeatsGeography(rows, candidate.key)) continue;
     const label = candidate.label ?? classifyDimension(values);
     const ranks = new Map<string, number>();
     let everyValueRanked = true;
