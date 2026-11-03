@@ -17,6 +17,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
+import {
+  levelFilterOptions,
+  sourceFilterOptions,
+} from "@/components/microcosm/target-filter-options";
 import { sourceLabel } from "@policyengine/calibration-tree/source-label";
 import {
   releaseSelectOptions,
@@ -754,10 +758,7 @@ export function MicrocosmTargetsView({
                   setSelected(null);
                   setPage(0);
                 }}
-                options={[
-                  { value: "", label: "Any" },
-                  ...sources.map((value) => ({ value, label: value })),
-                ]}
+                options={sourceFilterOptions(sources, variables)}
                 className="w-full"
                 layout="stacked"
               />
@@ -769,10 +770,7 @@ export function MicrocosmTargetsView({
                   setSelected(null);
                   setPage(0);
                 }}
-                options={[
-                  { value: "", label: "Any" },
-                  ...levels.map((value) => ({ value, label: value })),
-                ]}
+                options={levelFilterOptions(levels)}
                 className="w-full"
                 layout="stacked"
               />
