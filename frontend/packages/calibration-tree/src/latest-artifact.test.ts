@@ -1198,7 +1198,9 @@ test("legacy Ledger metadata populates the complete Chronicle contract", () => {
         ledger_layout_measure_id: "taxable_interest_amount",
         ledger_dimension_set_key: "dimension-set",
         ledger_universe_constraint_set_key: "universe-set",
-        ledger_universe_constraint_count: 2,
+        // microcosm writes the count as a string (ledger_targets.py:5913) and
+        // TargetSpec turns every metadata value into one (registry.py:149-150).
+        ledger_universe_constraint_count: "2",
         ledger_filter_income_range: "1_to_10k",
         ledger_filter_filing_status: "all",
         source_measure_id: "taxable_interest_amount",

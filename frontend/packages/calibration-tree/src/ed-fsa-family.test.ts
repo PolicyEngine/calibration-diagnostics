@@ -736,6 +736,7 @@ describe("the ED Federal Student Aid target family", () => {
         legacy_fact_key: fields.legacy_fact_key,
         source_record_id: fields.source_record_id,
         value_operation: fields.value_operation,
+        universe_constraint_count: fields.universe_constraint_count,
       };
     };
     // The fact keys are the ones the fixture carries from the member fact.
@@ -760,6 +761,8 @@ describe("the ED Federal Student Aid target family", () => {
       ...factKeys(ALABAMA_BALANCE),
       source_record_id: ALABAMA_BALANCE,
       value_operation: "identity",
+      // A state fact has no universe constraint, so the release writes no count.
+      universe_constraint_count: null,
     });
     // An age band's edges: "24 and Younger" is age < 25.
     expect(chronicle(YOUNGEST_BORROWERS)).toEqual({
@@ -769,11 +772,15 @@ describe("the ED Federal Student Aid target family", () => {
       ...factKeys(YOUNGEST_BORROWERS),
       source_record_id: YOUNGEST_BORROWERS,
       value_operation: "identity",
+      // The release writes the count as the string "1".
+      universe_constraint_count: 1,
     });
     // A debt-size band's edges: "10K to 20K" is 10000 <= balance < 20000.
     const tenToTwenty = fsaName(
       "portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_10k_to_20k.dollars_outstanding",
     );
+    // The fixture, as a release writes it, carries the count as a string.
+    expect(metadataOf(tenToTwenty).ledger_universe_constraint_count).toBe("2");
     expect(chronicle(tenToTwenty)).toEqual({
       measure_concept: BALANCE_CONCEPT,
       source_concept: "Dollars Outstanding (in billions)",
@@ -784,6 +791,7 @@ describe("the ED Federal Student Aid target family", () => {
       ...factKeys(tenToTwenty),
       source_record_id: tenToTwenty,
       value_operation: "identity",
+      universe_constraint_count: 2,
     });
     // Parent PLUS is a loan type, an equality constraint, so it has no edge.
     expect(chronicle(PARENT_PLUS_TARGET)).toEqual({
@@ -793,6 +801,7 @@ describe("the ED Federal Student Aid target family", () => {
       ...factKeys(PARENT_PLUS_TARGET),
       source_record_id: PARENT_PLUS_TARGET,
       value_operation: "identity",
+      universe_constraint_count: 1,
     });
 
     // This pins a release's behavior, which a follow-up may change. The
@@ -810,6 +819,7 @@ describe("the ED Federal Student Aid target family", () => {
       ...factKeys(EXCLUDING_PARENT_PLUS_TARGET),
       source_record_id: stafford,
       value_operation: "linear_combination",
+      universe_constraint_count: 1,
     });
     // These two read the row's raw metadata, which buildCalibration passes
     // through from the fixture: they describe the fixture, not a reader.
