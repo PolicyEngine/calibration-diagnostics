@@ -1,0 +1,61 @@
+# Finding 1: do the two pinned tests fail when a reader changes? Each patch is applied to latest-artifact.ts in the scratch worktree at f7c0e25, the PR's ed-fsa-family.test.ts is run, then the file is restored.
+## Baseline (no patch)
+ 13 pass
+ 0 fail
+Ran 13 tests across 1 file. [1308.00ms]
+
+## Patch A (last review): a mixed category's level is "mixed" (summary) / null (comparison)
+ frontend/packages/calibration-tree/src/latest-artifact.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+-        level: String(first.level ?? ""),
++        level: uniqueString("level") ?? "mixed",
+-        level: sample.level ?? null,
++        level: [...new Set(group.map((row) => row.level))].length === 1 ? sample.level ?? null : null,
+Expected: "state"
+Received: "mixed"
+(fail) the ED Federal Student Aid target family > a category at two levels is listed at its first row's level [9.11ms]
+- Expected  - 2
++ Received  + 2
+(fail) the ED Federal Student Aid target family > a compared category at two levels takes the level of the row whose fit changed most [89.99ms]
+ 11 pass
+ 2 fail
+Ran 13 tests across 1 file. [321.00ms]
+
+## Patch B (last review): the level lists every level
+ frontend/packages/calibration-tree/src/latest-artifact.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+-        level: String(first.level ?? ""),
++        level: [...new Set(group.map((row) => String(row.level ?? "")))].sort().join(","),
+-        level: sample.level ?? null,
++        level: [...new Set(group.map((row) => String(row.level ?? "")))].sort().join(","),
+Expected: "state"
+Received: "country,state"
+(fail) the ED Federal Student Aid target family > a category at two levels is listed at its first row's level [0.79ms]
+- Expected  - 2
++ Received  + 2
+(fail) the ED Federal Student Aid target family > a compared category at two levels takes the level of the row whose fit changed most [1.06ms]
+ 11 pass
+ 2 fail
+Ran 13 tests across 1 file. [214.00ms]
+
+## Regression: every category's level is blank
+ frontend/packages/calibration-tree/src/latest-artifact.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+-        level: String(first.level ?? ""),
++        level: "",
+-        level: sample.level ?? null,
++        level: null,
+Expected: "country"
+Received: ""
+(fail) the ED Federal Student Aid target family > the targets page lists the family under its provider, at both levels [4.09ms]
+Expected: "state"
+Received: ""
+(fail) the ED Federal Student Aid target family > a category at two levels is listed at its first row's level [1.14ms]
+- Expected  - 4
++ Received  + 4
+(fail) the ED Federal Student Aid target family > a compared category at two levels takes the level of the row whose fit changed most [1.08ms]
+ 10 pass
+ 3 fail
+Ran 13 tests across 1 file. [200.00ms]
+
+## After restore

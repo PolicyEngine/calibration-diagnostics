@@ -1,0 +1,19 @@
+# Step 3: the f7c0e25 test file run against the 6ffe94c fixture (git show 6ffe94c:<fixture>), then the fixture restored.
+ee283be7a4138e0a486c3d1e495b2c57b9e5febc710252197e08914c80b4df23  src/fixtures/ed-fsa-family/ed-fsa-family-schema-8.json
+-   "aggregate_fact_key": undefined,
+-   "fact_key": undefined,
++   "aggregate_fact_key": null,
++   "fact_key": null,
+-   "legacy_fact_key": undefined,
+-   "measure_concept": "ed_fsa.dollars_outstanding",
+-   "semantic_fact_key": undefined,
++   "legacy_fact_key": null,
++   "measure_concept": null,
++   "semantic_fact_key": null,
+- Expected  - 5
++ Received  + 5
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [3.49ms]
+ 12 pass
+ 1 fail
+Ran 13 tests across 1 file. [191.00ms]
+3f0c8454d2a0f4144b1e0a8b1d49ed5f89b3b9f6eca8bc8bc4415c9d872359ed  src/fixtures/ed-fsa-family/ed-fsa-family-schema-8.json

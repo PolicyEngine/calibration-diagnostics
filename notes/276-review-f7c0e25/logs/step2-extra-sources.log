@@ -1,0 +1,29 @@
+# Step 2: microcosm files at 0ff293b fetched beyond build_fixture.py's nine SOURCES (raw.githubusercontent.com), to find what runs between apply_fsa_student_loan_plan and diagnostics.py:228
+19ec9db17110ef8d8db16c7c7d23cee8efdc4231d2d59fc1221cba7d7317df41  mc2/fiscal_targets.py
+b4dc33e1cabbebdec806325a24ca7d863068d517b39e2724ee6562164c1c9170  mc2/packages/microcosm-build/src/microcosm/build/us_runtime/target_aging.py
+1b7cb863448bb96c00af126b34ff2754fb006e5c6a99669d7750b815d30bb7a1  mc2/tools/build_us_fiscal_refresh_release.py
+84e6542dd994a1c6b8d3b26f987afb4ab8c66d66a933ec1a351f3832bc8430bb  mc2/fiscal_target_references.json
+6daf34d536326ef6368a1275375f0a06645cddca554020cec9e54012c56f6faa  mc2/cal_registry.py
+a833dc34ecc37f6667a9a744c6e33103b8af02cd546e0069b2344a41241ff5f3  mc2/cal_target.py
+3c778d4e80962eabb5e7d9c543556c13bced6721665f8c7f7831ec3896e69616  mc2/cal_geography_constants.py
+033a188865401404788cbe9ce6b16cf236d4876b6ccf47e919f295650704d305  mc2/packages/microcosm-build/src/microcosm/build/us_runtime/__init__.py
+
+(mc2/fiscal_targets.py = packages/microcosm-build/src/microcosm/build/us_runtime/fiscal_targets.py; mc2/fiscal_target_references.json = packages/microcosm-build/src/microcosm/build/us/fiscal_target_references.json; mc2/cal_X.py = packages/microcosm-calibrate/src/microcosm/calibrate/X.py)
+
+# The review harness package (pkg/): real microcosm modules at 0ff293b plus three stubs
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./microcosm/build/__init__.py
+03ac7b648d8cb6c0595b3bd41b17a1205254c3995afed582cf27b08988988679  ./microcosm/build/ledger_artifact.py
+b8bd1fb6e06747b80e6096f13e6599341c42c45f9b93bb6dd89ea744abbc2cf0  ./microcosm/build/ledger_targets.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./microcosm/build/us_runtime/__init__.py
+574203e5588ff1e44cd46bd4b42a6a63abece94ba4235659ef842adf5f3c824b  ./microcosm/build/us_runtime/fsa_student_loan_targets.py
+b4dc33e1cabbebdec806325a24ca7d863068d517b39e2724ee6562164c1c9170  ./microcosm/build/us_runtime/target_aging.py
+336d6313508692e78b145b7e4b80fe5dfecffa81d33a8fc1638af5e2a2324545  ./microcosm/calibrate/__init__.py
+3c778d4e80962eabb5e7d9c543556c13bced6721665f8c7f7831ec3896e69616  ./microcosm/calibrate/geography_constants.py
+d9a79463f954b42af2e89014cc681ab7a27085581a9ed5d0a0db70adeeaa0112  ./microcosm/calibrate/hierarchy.py
+65ed20e0c1a53652320820c922563a47e50a0ca64ee91c319188e7a3d255dff3  ./microcosm/calibrate/provider_labels.py
+6daf34d536326ef6368a1275375f0a06645cddca554020cec9e54012c56f6faa  ./microcosm/calibrate/registry.py
+a833dc34ecc37f6667a9a744c6e33103b8af02cd546e0069b2344a41241ff5f3  ./microcosm/calibrate/target.py
+a336ce350ced1843b6b16d89aae154de42560d3a471d33529cc094cc73c86475  ./microcosm/calibrate/variable_labels.py
+18f5349e84207d28679b4a6ed86e6c2b615817fae04bb6790d3c418061f94639  ./microcosm/frame.py
+
+Stubs: microcosm/build/ledger_artifact.py (LexicalFloat = float subclass; facts are loaded with json.loads, so none is created), microcosm/frame.py (Frame, an annotation only), microcosm/calibrate/__init__.py (re-exports of the real hierarchy, registry, provider_labels and variable_labels). Every other module is the byte-identical file at 0ff293b.

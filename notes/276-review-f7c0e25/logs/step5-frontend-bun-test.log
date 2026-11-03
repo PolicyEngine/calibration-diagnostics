@@ -1,0 +1,22 @@
+$ cd frontend && bun test
+bun test v1.4.4 (38afee6c8)
+
+app/api/hf-webhook/route.test.ts:
+Calibration tree workflow dispatch failed: 82 |       signal: AbortSignal.timeout(15_000),
+83 |     },
+84 |   );
+85 |   if (response.status !== 204) {
+86 |     const body = await response.text();
+87 |     throw new Error(
+                   ^
+error: GitHub workflow dispatch returned 403: forbidden
+      at dispatchTreeBuild (/tmp/claude-0/-home-user-calibration-diagnostics/17838bc7-0213-5efe-8818-5e472e8ea447/scratchpad/wt/frontend/lib/microcosm/hf-webhook-handler.ts:87:15)
+      at async handleHfWebhook (/tmp/claude-0/-home-user-calibration-diagnostics/17838bc7-0213-5efe-8818-5e472e8ea447/scratchpad/wt/frontend/lib/microcosm/hf-webhook-handler.ts:166:15)
+      at async <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/17838bc7-0213-5efe-8818-5e472e8ea447/scratchpad/wt/frontend/app/api/hf-webhook/route.test.ts:296:78)
+
+
+ 864 pass
+ 0 fail
+ 21935 expect() calls
+Ran 864 tests across 99 files. [32.94s]
+exit 0

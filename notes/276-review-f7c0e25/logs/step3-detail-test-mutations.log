@@ -1,0 +1,36 @@
+# Step 3: does the target detail test catch a reader that shows the family wrongly? Each mutation of chronicleFactFields is applied, ed-fsa-family.test.ts run, the file restored.
+## measure concept read from the source concept
+-    measure_concept: stringValue(metadata.ledger_measure_concept),
++    measure_concept: stringValue(metadata.ledger_source_concept),
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [1.07ms]
+ 12 pass
+ 1 fail
+
+## filters dropped
+-    filters: chronicleFilters(metadata),
++    filters: [],
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [1.53ms]
+ 12 pass
+ 1 fail
+
+## fact key read from the legacy key
+-    fact_key: stringValue(metadata.ledger_fact_key),
++    fact_key: stringValue(metadata.ledger_legacy_fact_key),
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [1.12ms]
+ 12 pass
+ 1 fail
+
+## value operation dropped
+-    value_operation: stringValue(metadata.ledger_value_operation),
++    value_operation: null,
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [1.12ms]
+ 12 pass
+ 1 fail
+
+## universe constraint count parsed from its string (the step 6 fix)
+-    universe_constraint_count: numberOrNull(metadata.ledger_universe_constraint_count),
++    universe_constraint_count: numberOrNull(Number(stringValue(metadata.ledger_universe_constraint_count) ?? NaN)),
+ 13 pass
+ 0 fail
+
+## After restore

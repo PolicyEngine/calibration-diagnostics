@@ -1,0 +1,38 @@
+# Step 6: universe_constraint_count
+## latest-artifact.ts at f7c0e25
+215	function numberOrNull(value: unknown): number | null {
+216	  return typeof value === "number" && Number.isFinite(value) ? value : null;
+217	}
+482	    universe_constraint_count: numberOrNull(metadata.ledger_universe_constraint_count),
+## microcosm ledger_targets.py at 0ff293b
+5911	    constraint_rows = _constraint_rows(fact)
+5912	    if constraint_rows:
+5913	        metadata["ledger_universe_constraint_count"] = str(len(constraint_rows))
+## microcosm calibrate/registry.py at 0ff293b (TargetSpec coerces every metadata value to str)
+149	        metadata = {str(key): str(value) for key, value in self.metadata.items()}
+150	        object.__setattr__(self, "metadata", metadata)
+## the fixture: value types of ledger_universe_constraint_count
+Counter({'str': 30})
+## every mention in frontend/ (excluding node_modules and fixtures)
+./packages/calibration-tree/src/latest-artifact.ts:303:  universe_constraint_count: number | null;
+./packages/calibration-tree/src/latest-artifact.ts:482:    universe_constraint_count: numberOrNull(metadata.ledger_universe_constraint_count),
+./packages/calibration-tree/src/chronicle-metadata.test.ts:27:        ledger_universe_constraint_count: 4,
+./packages/calibration-tree/src/chronicle-metadata.test.ts:28:        chronicle_universe_constraint_count: 0,
+./packages/calibration-tree/src/chronicle-metadata.test.ts:32:      chronicle_universe_constraint_count: 0,
+./packages/calibration-tree/src/latest-artifact.test.ts:1100:      universe_constraint_count: null,
+./packages/calibration-tree/src/latest-artifact.test.ts:1201:        ledger_universe_constraint_count: 2,
+./packages/calibration-tree/src/latest-artifact.test.ts:1247:    universe_constraint_count: 2,
+./lib/api/hooks/use-microcosm.ts:166:    universe_constraint_count?: number | null;
+## components that read row.chronicle (none reads universe_constraint_count)
+      2 domain
+      1 geography_id
+      1 geography_level
+      1 institute
+      1 layout_groupby_value_id
+      2 layout_measure_id
+      1 layout_record_set_id
+      3 measure_concept
+      6 measure_unit
+      1 source_period
+      1 source_record_id
+      1 target_period

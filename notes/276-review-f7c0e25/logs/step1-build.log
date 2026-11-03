@@ -1,0 +1,11 @@
+$ python3 --version
+Python 3.13.18
+$ python3 -I build/build_fixture.py mc > out1.json
+exit 0
+$ python3 -I build/build_fixture.py mc > out2.json
+exit 0
+3f0c8454d2a0f4144b1e0a8b1d49ed5f89b3b9f6eca8bc8bc4415c9d872359ed  out1.json
+3f0c8454d2a0f4144b1e0a8b1d49ed5f89b3b9f6eca8bc8bc4415c9d872359ed  out2.json
+3f0c8454d2a0f4144b1e0a8b1d49ed5f89b3b9f6eca8bc8bc4415c9d872359ed  wt/frontend/packages/calibration-tree/src/fixtures/ed-fsa-family/ed-fsa-family-schema-8.json
+cmp out1 vs committed: identical
+cmp out2 vs committed: identical

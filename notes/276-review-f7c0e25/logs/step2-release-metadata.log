@@ -1,0 +1,330 @@
+# Step 2: five rows, key by key.
+# 'release' = microcosm's own compile_ledger_target_references -> apply_fsa_student_loan_plan -> age_us_dollar_targets at 0ff293b, run by scripts/release_specs.py
+
+names equal: True 132 132
+
+[after_apply] keys a release has that the fixture lacks: {}
+[after_apply] keys the fixture has that a release lacks: {}
+[after_apply] keys whose values differ: {}
+[after_apply] rows whose key order differs: 0
+
+[after_aging] keys a release has that the fixture lacks: {'aging_factor': 132, 'aging_factor_source': 132, 'aged_to': 132, 'basis': 132}
+[after_aging] keys the fixture has that a release lacks: {}
+[after_aging] keys whose values differ: {}
+[after_aging] rows whose key order differs: 132
+
+aging keys by measure_mode (mode, basis, aged_to, factor, source): {('sum', 'fact', '2024', '1', 'stock_at_source_reference_date'): 67, ('indicator_sum', 'fact', '2024', '1', 'not_dollar_amount'): 65}
+non-metadata fields that differ (count of rows): none
+diagnostic_target_label stamped at compile (then dropped by apply): 131 of 132
+
+=== state balance (Alabama): ed_fsa.portfolio_by_location.2026_03_31.al.dollars_outstanding@2024
+key                                              release (after aging)                      fixture                                    verdict
+ledger_source                                    policyengine-ledger-data                   policyengine-ledger-data                   same
+ledger_fact_key                                  ledger.aggregate_fact.v2:a0011046b3023d61a ledger.aggregate_fact.v2:a0011046b3023d61a same
+ledger_source_record_id                          ed_fsa.portfolio_by_location.2026_03_31.al ed_fsa.portfolio_by_location.2026_03_31.al same
+ledger_aggregate_fact_key                        ledger.aggregate_fact.v2:a0011046b3023d61a ledger.aggregate_fact.v2:a0011046b3023d61a same
+ledger_semantic_fact_key                         ledger.semantic_fact.v2:a0f61559a8a14f91e6 ledger.semantic_fact.v2:a0f61559a8a14f91e6 same
+ledger_legacy_fact_key                           ledger.fact.v1:0c5671a82b1a44dac5f2496f    ledger.fact.v1:0c5671a82b1a44dac5f2496f    same
+ledger_observed_measure_key                      ledger.observed_measure.v2:63b7cb803aa9f5d ledger.observed_measure.v2:63b7cb803aa9f5d same
+ledger_dimension_set_key                         ledger.dimension_set.v2:44136fa355b3678a11 ledger.dimension_set.v2:44136fa355b3678a11 same
+ledger_universe_constraint_set_key               ledger.universe_constraint_set.v2:8b5d381c ledger.universe_constraint_set.v2:8b5d381c same
+ledger_measure_concept                           ed_fsa.dollars_outstanding                 ed_fsa.dollars_outstanding                 same
+ledger_measure_unit                              usd                                        usd                                        same
+ledger_source_concept                            Balance (in billions)                      Balance (in billions)                      same
+ledger_concept_relation                          source_label                               source_label                               same
+ledger_concept_authority                         ed_fsa                                     ed_fsa                                     same
+ledger_period_type                               month                                      month                                      same
+ledger_fact_period                               2026-03                                    2026-03                                    same
+ledger_assertion                                 observation                                observation                                same
+ledger_geography_level                           state                                      state                                      same
+ledger_geography_id                              0400000US01                                0400000US01                                same
+ledger_geography_name                            Alabama                                    Alabama                                    same
+ledger_geography_vintage                         current                                    current                                    same
+ledger_fact_label                                Alabama 2026-03 month sum ed fsa dollars o Alabama 2026-03 month sum ed fsa dollars o same
+ledger_entity_name                               person                                     person                                     same
+ledger_entity_role                               federal_student_loan_borrower              federal_student_loan_borrower              same
+ledger_domain                                    federal_student_loans                      federal_student_loans                      same
+ledger_layout_record_set_id                      ed_fsa.portfolio_by_location.2026_03_31    ed_fsa.portfolio_by_location.2026_03_31    same
+ledger_layout_record_set_spec_id                 ed_fsa.portfolio_by_location.v1            ed_fsa.portfolio_by_location.v1            same
+ledger_layout_groupby_dimension                  ed_fsa.borrower_location                   ed_fsa.borrower_location                   same
+ledger_layout_groupby_value_id                   al                                         al                                         same
+ledger_layout_groupby_value_label                Alabama                                    Alabama                                    same
+ledger_layout_measure_id                         dollars_outstanding                        dollars_outstanding                        same
+ledger_aggregation_method                        sum                                        sum                                        same
+ledger_resolved_assertion                        observation                                observation                                same
+materializer                                     fsa_stored_student_loan_balances           fsa_stored_student_loan_balances           same
+fsa_measure                                      total_balance                              total_balance                              same
+measure_mode                                     sum                                        sum                                        same
+fsa_columns                                      federal_student_loan_balance,federal_paren federal_student_loan_balance,federal_paren same
+target_role                                      fsa_state_balance                          fsa_state_balance                          same
+source_measure_id                                dollars_outstanding                        dollars_outstanding                        same
+source_period                                    2026-03                                    2026-03                                    same
+target_period                                    2024                                       2024                                       same
+period_alignment                                 stock_at_source_reference_date             stock_at_source_reference_date             same
+fsa_reference_period                             2026-03                                    2026-03                                    same
+state_fips                                       01                                         01                                         same
+fsa_reference_label                              Data as of Mar. 31, 2026                   Data as of Mar. 31, 2026                   same
+ledger_value_operation                           identity                                   identity                                   same
+ledger_assertion_policy                          observed_only                              observed_only                              same
+ledger_period_match_policy                       exact                                      exact                                      same
+fsa_reconciliation                               not_reported_allocated_pro_rata            not_reported_allocated_pro_rata            same
+fsa_reconciliation_factor                        1.0317498935587859                         1.0317498935587859                         same
+fsa_control_value                                1679069776777.568                          1679069776777.568                          same
+fsa_published_value                              26000000000.0                              26000000000.0                              same
+basis                                            fact                                       <absent>                                   MISSING in fixture
+aged_to                                          2024                                       <absent>                                   MISSING in fixture
+aging_factor                                     1                                          <absent>                                   MISSING in fixture
+aging_factor_source                              stock_at_source_reference_date             <absent>                                   MISSING in fixture
+
+=== age band borrowers (24 and Younger): ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_24_and_younger.borrowers@2024
+key                                              release (after aging)                      fixture                                    verdict
+ledger_source                                    policyengine-ledger-data                   policyengine-ledger-data                   same
+ledger_fact_key                                  ledger.aggregate_fact.v2:210c8f039984e1d19 ledger.aggregate_fact.v2:210c8f039984e1d19 same
+ledger_source_record_id                          ed_fsa.portfolio_by_age.fy2026_q2.borrower ed_fsa.portfolio_by_age.fy2026_q2.borrower same
+ledger_aggregate_fact_key                        ledger.aggregate_fact.v2:210c8f039984e1d19 ledger.aggregate_fact.v2:210c8f039984e1d19 same
+ledger_semantic_fact_key                         ledger.semantic_fact.v2:61504758a9529a8e46 ledger.semantic_fact.v2:61504758a9529a8e46 same
+ledger_legacy_fact_key                           ledger.fact.v1:03f7fa53c2efe2351aa3a56f    ledger.fact.v1:03f7fa53c2efe2351aa3a56f    same
+ledger_observed_measure_key                      ledger.observed_measure.v2:bf09a5fb711ec01 ledger.observed_measure.v2:bf09a5fb711ec01 same
+ledger_dimension_set_key                         ledger.dimension_set.v2:44136fa355b3678a11 ledger.dimension_set.v2:44136fa355b3678a11 same
+ledger_universe_constraint_set_key               ledger.universe_constraint_set.v2:73fc2ae5 ledger.universe_constraint_set.v2:73fc2ae5 same
+ledger_measure_concept                           ed_fsa.borrower_count                      ed_fsa.borrower_count                      same
+ledger_measure_unit                              count                                      count                                      same
+ledger_source_concept                            Borrowers (in millions)                    Borrowers (in millions)                    same
+ledger_concept_relation                          source_label                               source_label                               same
+ledger_concept_authority                         ed_fsa                                     ed_fsa                                     same
+ledger_period_type                               month                                      month                                      same
+ledger_fact_period                               2026-03                                    2026-03                                    same
+ledger_assertion                                 observation                                observation                                same
+ledger_geography_level                           country                                    country                                    same
+ledger_geography_id                              0100000US                                  0100000US                                  same
+ledger_geography_name                            United States                              United States                              same
+ledger_geography_vintage                         current                                    current                                    same
+ledger_fact_label                                United States 2026-03 month count ed fsa b United States 2026-03 month count ed fsa b same
+ledger_entity_name                               person                                     person                                     same
+ledger_entity_role                               federal_student_loan_borrower              federal_student_loan_borrower              same
+ledger_domain                                    federal_student_loans                      federal_student_loans                      same
+ledger_layout_record_set_id                      ed_fsa.portfolio_by_age.fy2026_q2.borrower ed_fsa.portfolio_by_age.fy2026_q2.borrower same
+ledger_layout_record_set_spec_id                 ed_fsa.portfolio_by_age.borrowers.v1       ed_fsa.portfolio_by_age.borrowers.v1       same
+ledger_layout_groupby_dimension                  ed_fsa.borrower_age_band                   ed_fsa.borrower_age_band                   same
+ledger_layout_groupby_value_id                   age_24_and_younger                         age_24_and_younger                         same
+ledger_layout_groupby_value_label                24 and Younger                             24 and Younger                             same
+ledger_layout_measure_id                         borrowers                                  borrowers                                  same
+ledger_aggregation_method                        sum                                        sum                                        same
+ledger_universe_constraint_count                 1                                          1                                          same
+ledger_filter_age_upper_bound                    25                                         25                                         same
+ledger_resolved_assertion                        observation                                observation                                same
+materializer                                     fsa_stored_student_loan_balances           fsa_stored_student_loan_balances           same
+fsa_measure                                      borrowers                                  borrowers                                  same
+measure_mode                                     indicator_sum                              indicator_sum                              same
+fsa_columns                                      federal_student_loan_balance,federal_paren federal_student_loan_balance,federal_paren same
+target_role                                      fsa_age_band_borrowers                     fsa_age_band_borrowers                     same
+source_measure_id                                borrowers                                  borrowers                                  same
+source_period                                    2026-03                                    2026-03                                    same
+target_period                                    2024                                       2024                                       same
+period_alignment                                 stock_at_source_reference_date             stock_at_source_reference_date             same
+fsa_reference_period                             2026-03                                    2026-03                                    same
+age_bound_stamp_source                           constraint_rows                            constraint_rows                            same
+age_upper_bound                                  25                                         25                                         same
+fsa_reference_label                              Data as of Mar. 31, 2026                   Data as of Mar. 31, 2026                   same
+ledger_value_operation                           identity                                   identity                                   same
+ledger_assertion_policy                          observed_only                              observed_only                              same
+ledger_period_match_policy                       exact                                      exact                                      same
+fsa_reconciliation                               share_of_in_scope_location_control         share_of_in_scope_location_control         same
+fsa_share                                        0.13839285714285715                        0.13839285714285715                        same
+fsa_partition_value                              44800000.0                                 44800000.0                                 same
+fsa_control_value                                44309424.85254373                          44309424.85254373                          same
+fsa_published_value                              6200000.0                                  6200000.0                                  same
+basis                                            fact                                       <absent>                                   MISSING in fixture
+aged_to                                          2024                                       <absent>                                   MISSING in fixture
+aging_factor                                     1                                          <absent>                                   MISSING in fixture
+aging_factor_source                              not_dollar_amount                          <absent>                                   MISSING in fixture
+
+=== debt-size band balance (10K to 20K): ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_10k_to_20k.dollars_outstanding@2024
+key                                              release (after aging)                      fixture                                    verdict
+ledger_source                                    policyengine-ledger-data                   policyengine-ledger-data                   same
+ledger_fact_key                                  ledger.aggregate_fact.v2:0ae73ce581fa69e2b ledger.aggregate_fact.v2:0ae73ce581fa69e2b same
+ledger_source_record_id                          ed_fsa.portfolio_by_debt_size.fy2026_q2.do ed_fsa.portfolio_by_debt_size.fy2026_q2.do same
+ledger_aggregate_fact_key                        ledger.aggregate_fact.v2:0ae73ce581fa69e2b ledger.aggregate_fact.v2:0ae73ce581fa69e2b same
+ledger_semantic_fact_key                         ledger.semantic_fact.v2:dbcde8986280ed4e77 ledger.semantic_fact.v2:dbcde8986280ed4e77 same
+ledger_legacy_fact_key                           ledger.fact.v1:abb5ce4e4d7a77a1b2c01d0e    ledger.fact.v1:abb5ce4e4d7a77a1b2c01d0e    same
+ledger_observed_measure_key                      ledger.observed_measure.v2:c7b12961a28bac3 ledger.observed_measure.v2:c7b12961a28bac3 same
+ledger_dimension_set_key                         ledger.dimension_set.v2:44136fa355b3678a11 ledger.dimension_set.v2:44136fa355b3678a11 same
+ledger_universe_constraint_set_key               ledger.universe_constraint_set.v2:8c95b861 ledger.universe_constraint_set.v2:8c95b861 same
+ledger_measure_concept                           ed_fsa.dollars_outstanding                 ed_fsa.dollars_outstanding                 same
+ledger_measure_unit                              usd                                        usd                                        same
+ledger_source_concept                            Dollars Outstanding (in billions)          Dollars Outstanding (in billions)          same
+ledger_concept_relation                          source_label                               source_label                               same
+ledger_concept_authority                         ed_fsa                                     ed_fsa                                     same
+ledger_period_type                               month                                      month                                      same
+ledger_fact_period                               2026-03                                    2026-03                                    same
+ledger_assertion                                 observation                                observation                                same
+ledger_geography_level                           country                                    country                                    same
+ledger_geography_id                              0100000US                                  0100000US                                  same
+ledger_geography_name                            United States                              United States                              same
+ledger_geography_vintage                         current                                    current                                    same
+ledger_fact_label                                United States 2026-03 month sum ed fsa dol United States 2026-03 month sum ed fsa dol same
+ledger_entity_name                               person                                     person                                     same
+ledger_entity_role                               federal_student_loan_borrower              federal_student_loan_borrower              same
+ledger_domain                                    federal_student_loans                      federal_student_loans                      same
+ledger_layout_record_set_id                      ed_fsa.portfolio_by_debt_size.fy2026_q2.do ed_fsa.portfolio_by_debt_size.fy2026_q2.do same
+ledger_layout_record_set_spec_id                 ed_fsa.portfolio_by_debt_size.dollars_outs ed_fsa.portfolio_by_debt_size.dollars_outs same
+ledger_layout_groupby_dimension                  ed_fsa.borrower_debt_size                  ed_fsa.borrower_debt_size                  same
+ledger_layout_groupby_value_id                   debt_10k_to_20k                            debt_10k_to_20k                            same
+ledger_layout_groupby_value_label                10K to 20K                                 10K to 20K                                 same
+ledger_layout_measure_id                         dollars_outstanding                        dollars_outstanding                        same
+ledger_aggregation_method                        sum                                        sum                                        same
+ledger_universe_constraint_count                 2                                          2                                          same
+ledger_filter_federal_student_loan_balance_lower_bound 10000                                      10000                                      same
+ledger_filter_federal_student_loan_balance_upper_bound 20000                                      20000                                      same
+ledger_resolved_assertion                        observation                                observation                                same
+materializer                                     fsa_stored_student_loan_balances           fsa_stored_student_loan_balances           same
+fsa_measure                                      total_balance                              total_balance                              same
+measure_mode                                     sum                                        sum                                        same
+fsa_columns                                      federal_student_loan_balance,federal_paren federal_student_loan_balance,federal_paren same
+target_role                                      fsa_debt_size_band_balance                 fsa_debt_size_band_balance                 same
+source_measure_id                                dollars_outstanding                        dollars_outstanding                        same
+source_period                                    2026-03                                    2026-03                                    same
+target_period                                    2024                                       2024                                       same
+period_alignment                                 stock_at_source_reference_date             stock_at_source_reference_date             same
+fsa_reference_period                             2026-03                                    2026-03                                    same
+fsa_balance_lower_bound                          10000                                      10000                                      same
+fsa_balance_upper_bound                          20000                                      20000                                      same
+fsa_reference_label                              Data as of Mar. 31, 2026                   Data as of Mar. 31, 2026                   same
+ledger_value_operation                           identity                                   identity                                   same
+ledger_assertion_policy                          observed_only                              observed_only                              same
+ledger_period_match_policy                       exact                                      exact                                      same
+fsa_reconciliation                               share_of_in_scope_location_control         share_of_in_scope_location_control         same
+fsa_share                                        0.07811118316335554                        0.07811118316335554                        same
+fsa_partition_value                              1696300000000.0                            1696300000000.0                            same
+fsa_control_value                                1679069776777.568                          1679069776777.568                          same
+fsa_published_value                              132500000000.0                             132500000000.0                             same
+basis                                            fact                                       <absent>                                   MISSING in fixture
+aged_to                                          2024                                       <absent>                                   MISSING in fixture
+aging_factor                                     1                                          <absent>                                   MISSING in fixture
+aging_factor_source                              stock_at_source_reference_date             <absent>                                   MISSING in fixture
+
+=== Parent PLUS balance: ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.parent_plus.dollars_outstanding@2024
+key                                              release (after aging)                      fixture                                    verdict
+ledger_source                                    policyengine-ledger-data                   policyengine-ledger-data                   same
+ledger_fact_key                                  ledger.aggregate_fact.v2:dd4ea2b212ee0ef9c ledger.aggregate_fact.v2:dd4ea2b212ee0ef9c same
+ledger_source_record_id                          ed_fsa.portfolio_by_loan_type.fy2026_q2.do ed_fsa.portfolio_by_loan_type.fy2026_q2.do same
+ledger_aggregate_fact_key                        ledger.aggregate_fact.v2:dd4ea2b212ee0ef9c ledger.aggregate_fact.v2:dd4ea2b212ee0ef9c same
+ledger_semantic_fact_key                         ledger.semantic_fact.v2:40482898459d80f3f7 ledger.semantic_fact.v2:40482898459d80f3f7 same
+ledger_legacy_fact_key                           ledger.fact.v1:d38219e349eb631bbd1b9198    ledger.fact.v1:d38219e349eb631bbd1b9198    same
+ledger_observed_measure_key                      ledger.observed_measure.v2:468875d55feab13 ledger.observed_measure.v2:468875d55feab13 same
+ledger_dimension_set_key                         ledger.dimension_set.v2:44136fa355b3678a11 ledger.dimension_set.v2:44136fa355b3678a11 same
+ledger_universe_constraint_set_key               ledger.universe_constraint_set.v2:480c1f8a ledger.universe_constraint_set.v2:480c1f8a same
+ledger_measure_concept                           ed_fsa.dollars_outstanding                 ed_fsa.dollars_outstanding                 same
+ledger_measure_unit                              usd                                        usd                                        same
+ledger_source_concept                            Dollars Outstanding (in billions)          Dollars Outstanding (in billions)          same
+ledger_concept_relation                          source_label                               source_label                               same
+ledger_concept_authority                         ed_fsa                                     ed_fsa                                     same
+ledger_period_type                               month                                      month                                      same
+ledger_fact_period                               2026-03                                    2026-03                                    same
+ledger_assertion                                 observation                                observation                                same
+ledger_geography_level                           country                                    country                                    same
+ledger_geography_id                              0100000US                                  0100000US                                  same
+ledger_geography_name                            United States                              United States                              same
+ledger_geography_vintage                         current                                    current                                    same
+ledger_fact_label                                United States 2026-03 month sum ed fsa dol United States 2026-03 month sum ed fsa dol same
+ledger_entity_name                               person                                     person                                     same
+ledger_entity_role                               federal_student_loan_recipient             federal_student_loan_recipient             same
+ledger_domain                                    federal_student_loans                      federal_student_loans                      same
+ledger_layout_record_set_id                      ed_fsa.portfolio_by_loan_type.fy2026_q2.do ed_fsa.portfolio_by_loan_type.fy2026_q2.do same
+ledger_layout_record_set_spec_id                 ed_fsa.portfolio_by_loan_type.dollars_outs ed_fsa.portfolio_by_loan_type.dollars_outs same
+ledger_layout_groupby_dimension                  ed_fsa.loan_type                           ed_fsa.loan_type                           same
+ledger_layout_groupby_value_id                   parent_plus                                parent_plus                                same
+ledger_layout_groupby_value_label                Parent PLUS                                Parent PLUS                                same
+ledger_layout_measure_id                         dollars_outstanding                        dollars_outstanding                        same
+ledger_aggregation_method                        sum                                        sum                                        same
+ledger_universe_constraint_count                 1                                          1                                          same
+ledger_resolved_assertion                        observation                                observation                                same
+materializer                                     fsa_stored_student_loan_balances           fsa_stored_student_loan_balances           same
+fsa_measure                                      parent_plus_balance                        parent_plus_balance                        same
+measure_mode                                     sum                                        sum                                        same
+fsa_columns                                      federal_parent_plus_loan_balance           federal_parent_plus_loan_balance           same
+target_role                                      fsa_parent_plus_balance                    fsa_parent_plus_balance                    same
+source_measure_id                                dollars_outstanding                        dollars_outstanding                        same
+source_period                                    2026-03                                    2026-03                                    same
+target_period                                    2024                                       2024                                       same
+period_alignment                                 stock_at_source_reference_date             stock_at_source_reference_date             same
+fsa_reference_period                             2026-03                                    2026-03                                    same
+fsa_reference_label                              Data as of Mar. 31, 2026                   Data as of Mar. 31, 2026                   same
+ledger_value_operation                           identity                                   identity                                   same
+ledger_assertion_policy                          observed_only                              observed_only                              same
+ledger_period_match_policy                       exact                                      exact                                      same
+fsa_reconciliation                               share_of_in_scope_location_control         share_of_in_scope_location_control         same
+fsa_share                                        0.0683954054994779                         0.0683954054994779                         same
+fsa_partition_value                              1723800000000.0                            1723800000000.0                            same
+fsa_control_value                                1679069776777.568                          1679069776777.568                          same
+fsa_published_value                              117900000000.0                             117900000000.0                             same
+basis                                            fact                                       <absent>                                   MISSING in fixture
+aged_to                                          2024                                       <absent>                                   MISSING in fixture
+aging_factor                                     1                                          <absent>                                   MISSING in fixture
+aging_factor_source                              stock_at_source_reference_date             <absent>                                   MISSING in fixture
+
+=== balance excluding Parent PLUS: ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding@2024
+key                                              release (after aging)                      fixture                                    verdict
+ledger_source                                    policyengine-ledger-data                   policyengine-ledger-data                   same
+ledger_fact_key                                  ledger.aggregate_fact.v2:bd20dfa6694f6ea4e ledger.aggregate_fact.v2:bd20dfa6694f6ea4e same
+ledger_source_record_id                          ed_fsa.portfolio_by_loan_type.fy2026_q2.do ed_fsa.portfolio_by_loan_type.fy2026_q2.do same
+ledger_aggregate_fact_key                        ledger.aggregate_fact.v2:bd20dfa6694f6ea4e ledger.aggregate_fact.v2:bd20dfa6694f6ea4e same
+ledger_semantic_fact_key                         ledger.semantic_fact.v2:a9044a89f255104a18 ledger.semantic_fact.v2:a9044a89f255104a18 same
+ledger_legacy_fact_key                           ledger.fact.v1:b85494d1886654886efc27ee    ledger.fact.v1:b85494d1886654886efc27ee    same
+ledger_observed_measure_key                      ledger.observed_measure.v2:468875d55feab13 ledger.observed_measure.v2:468875d55feab13 same
+ledger_dimension_set_key                         ledger.dimension_set.v2:44136fa355b3678a11 ledger.dimension_set.v2:44136fa355b3678a11 same
+ledger_universe_constraint_set_key               ledger.universe_constraint_set.v2:a48a17c1 ledger.universe_constraint_set.v2:a48a17c1 same
+ledger_measure_concept                           ed_fsa.dollars_outstanding                 ed_fsa.dollars_outstanding                 same
+ledger_measure_unit                              usd                                        usd                                        same
+ledger_source_concept                            Dollars Outstanding (in billions)          Dollars Outstanding (in billions)          same
+ledger_concept_relation                          source_label                               source_label                               same
+ledger_concept_authority                         ed_fsa                                     ed_fsa                                     same
+ledger_period_type                               month                                      month                                      same
+ledger_fact_period                               2026-03                                    2026-03                                    same
+ledger_assertion                                 observation                                observation                                same
+ledger_geography_level                           country                                    country                                    same
+ledger_geography_id                              0100000US                                  0100000US                                  same
+ledger_geography_name                            United States                              United States                              same
+ledger_geography_vintage                         current                                    current                                    same
+ledger_fact_label                                United States 2026-03 month sum ed fsa dol United States 2026-03 month sum ed fsa dol same
+ledger_entity_name                               person                                     person                                     same
+ledger_entity_role                               federal_student_loan_recipient             federal_student_loan_recipient             same
+ledger_domain                                    federal_student_loans                      federal_student_loans                      same
+ledger_layout_record_set_id                      ed_fsa.portfolio_by_loan_type.fy2026_q2.do ed_fsa.portfolio_by_loan_type.fy2026_q2.do same
+ledger_layout_record_set_spec_id                 ed_fsa.portfolio_by_loan_type.dollars_outs ed_fsa.portfolio_by_loan_type.dollars_outs same
+ledger_layout_groupby_dimension                  ed_fsa.loan_type                           ed_fsa.loan_type                           same
+ledger_layout_groupby_value_id                   stafford_unsubsidized                      stafford_unsubsidized                      same
+ledger_layout_groupby_value_label                Stafford Unsubsidized                      Stafford Unsubsidized                      same
+ledger_layout_measure_id                         dollars_outstanding                        dollars_outstanding                        same
+ledger_aggregation_method                        sum                                        sum                                        same
+ledger_universe_constraint_count                 1                                          1                                          same
+ledger_member_fact_count                         5                                          5                                          same
+ledger_member_aggregate_fact_keys                ["ledger.aggregate_fact.v2:4bcad22c0fcea86 ["ledger.aggregate_fact.v2:4bcad22c0fcea86 same
+ledger_member_fact_keys                          ["ledger.aggregate_fact.v2:4bcad22c0fcea86 ["ledger.aggregate_fact.v2:4bcad22c0fcea86 same
+ledger_member_fact_digest                        f88c689c63b10221f7b72096f31e53e4091c5f43e8 f88c689c63b10221f7b72096f31e53e4091c5f43e8 same
+ledger_resolved_assertion                        observation                                observation                                same
+materializer                                     fsa_stored_student_loan_balances           fsa_stored_student_loan_balances           same
+fsa_measure                                      balance_excluding_parent_plus              balance_excluding_parent_plus              same
+measure_mode                                     sum                                        sum                                        same
+fsa_columns                                      federal_student_loan_balance               federal_student_loan_balance               same
+target_role                                      fsa_balance_excluding_parent_plus          fsa_balance_excluding_parent_plus          same
+source_measure_id                                dollars_outstanding                        dollars_outstanding                        same
+source_period                                    2026-03                                    2026-03                                    same
+target_period                                    2024                                       2024                                       same
+period_alignment                                 stock_at_source_reference_date             stock_at_source_reference_date             same
+fsa_reference_period                             2026-03                                    2026-03                                    same
+fsa_reference_label                              Data as of Mar. 31, 2026                   Data as of Mar. 31, 2026                   same
+ledger_value_operation                           linear_combination                         linear_combination                         same
+ledger_assertion_policy                          observed_only                              observed_only                              same
+ledger_period_match_policy                       exact                                      exact                                      same
+ledger_value_formula                             +operand_0 +operand_1 +operand_2 +operand_ +operand_0 +operand_1 +operand_2 +operand_ same
+ledger_selector_source_name                      ed_fsa                                     ed_fsa                                     same
+fsa_reconciliation                               share_of_in_scope_location_control         share_of_in_scope_location_control         same
+fsa_share                                        0.9316045945005221                         0.9316045945005221                         same
+fsa_partition_value                              1723800000000.0                            1723800000000.0                            same
+fsa_control_value                                1679069776777.568                          1679069776777.568                          same
+fsa_published_value                              1605900000000.0                            1605900000000.0                            same
+basis                                            fact                                       <absent>                                   MISSING in fixture
+aged_to                                          2024                                       <absent>                                   MISSING in fixture
+aging_factor                                     1                                          <absent>                                   MISSING in fixture
+aging_factor_source                              stock_at_source_reference_date             <absent>                                   MISSING in fixture
