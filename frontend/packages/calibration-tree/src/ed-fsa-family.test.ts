@@ -806,7 +806,8 @@ describe("the ED Federal Student Aid target family", () => {
 
     // A single-fact target lists no member facts.
     const alabamaFields = investigate(`${ALABAMA_BALANCE}@2024`).target.chronicle as unknown as Row;
-    expect([alabamaFields.member_fact_count, alabamaFields.member_fact_keys]).toEqual([null, []]);
+    expect("member_fact_count" in alabamaFields).toBe(false);
+    expect("member_fact_keys" in alabamaFields).toBe(false);
 
     // The balance excluding Parent PLUS sums five member facts. Microcosm
     // stamps its single-fact keys from its representative, the last member,
@@ -870,12 +871,20 @@ describe("the ED Federal Student Aid target family", () => {
     const lookup = new URL("https://dashboard.test/api/microcosm/target-investigation");
     lookup.searchParams.set("target", stafford);
     expect(latestMicrocosmTargetInvestigation(lookup.toString(), release).available).toBe(false);
-    // The row keeps its keys, so a comparison still matches it by fact key.
+    // The row keeps its keys, so a comparison still matches it by fact key
+    // when its name changes (target-surface-matcher.ts tries the name first).
     expect((excluding.chronicle as Row).fact_key).toBe(excludingMetadata.ledger_fact_key);
+    const renamed = schema8();
+    const renamedRow = (renamed.targets as JsonObject[]).find((row) =>
+      row.target_name === EXCLUDING_PARENT_PLUS_TARGET
+    )!;
+    renamedRow.target_name = `${EXCLUDING_PARENT_PLUS_TARGET}_renamed`;
+    renamedRow.name = `${EXCLUDING_PARENT_PLUS_TARGET}_renamed@2024`;
+    (renamedRow.hierarchy as { target: { id: string } }).target.id = String(renamedRow.target_name);
+    const afterRename = buildComparison(release, calibrationOf(renamed, "populace-us-2024-renamed"));
+    expect(afterRename.summary).toMatchObject({ added: 0, removed: 0 });
     expect(
-      buildComparison(release, release).rows.find((row) =>
-        row.name === EXCLUDING_PARENT_PLUS_TARGET
-      )?.match_kind,
+      afterRename.rows.find((row) => row.candidate_name === renamedRow.name)?.match_kind,
     ).toBe("chronicle_fact_key");
   });
 });

@@ -164,6 +164,11 @@ export interface MicrocosmTargetRow {
     dimension_set_key?: string | null;
     universe_constraint_set_key?: string | null;
     universe_constraint_count?: number | null;
+    // A target built from several facts lists them here, and its single-fact
+    // fields above (record, fact keys, group-by value, universe constraint)
+    // are null; a single-fact target carries neither field.
+    member_fact_count?: number | null;
+    member_fact_keys?: string[];
     filters?: {
       key: string;
       label: string;

@@ -493,6 +493,48 @@ function chronicleFactFields(metadata: JsonObject): ChronicleFactFields {
   };
 }
 
+// A JSON list of strings, as Microcosm writes ledger_member_fact_keys
+// (ledger_targets.py:1321-1327 at 0ff293b); anything else reads [].
+function stringListOrEmpty(value: unknown): string[] {
+  let list: unknown = value;
+  if (typeof value === "string") {
+    try {
+      list = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(list) && list.every((item) => typeof item === "string") ? list : [];
+}
+
+// The Chronicle fields a page shows for a target. Microcosm stamps a target's
+// single-fact keys from one representative fact, which for a linear
+// combination is its last operand (ledger_targets.py:1085-1089, :1232-1245 at
+// 0ff293b). A target built from several facts (ledger_member_fact_count above
+// 1) is none of them, so it shows its member facts (member_fact_count,
+// member_fact_keys) and not the fields that belong to that one member: its
+// record, fact keys, group-by value and universe constraint. The row itself
+// keeps every field, so a comparison still matches it by fact key. A
+// single-fact target's fields show as they are.
+function shownChronicle(row: TargetRow): unknown {
+  const metadata = asObject(row.metadata);
+  const memberFactCount = countOrNull(metadata.ledger_member_fact_count);
+  if (memberFactCount == null || memberFactCount <= 1) return row.chronicle;
+  return {
+    ...asObject(row.chronicle),
+    member_fact_count: memberFactCount,
+    member_fact_keys: stringListOrEmpty(metadata.ledger_member_fact_keys),
+    fact_key: null,
+    source_record_id: null,
+    semantic_fact_key: null,
+    aggregate_fact_key: null,
+    legacy_fact_key: null,
+    layout_groupby_value_id: null,
+    universe_constraint_set_key: null,
+    universe_constraint_count: null,
+  };
+}
+
 function isDuplicateDimension(
   dimensions: TargetBreakdownDimension[],
   label: string,
@@ -2720,7 +2762,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     aggregation: row.aggregation,
     measure_name: row.measure_name,
     period: row.period,
-    chronicle: row.chronicle,
+    chronicle: shownChronicle(row),
     estimate_warning: row.estimate_warning,
     calibration_status: row.calibration_status,
     calibration_status_label: row.calibration_status_label,
@@ -2738,14 +2780,18 @@ function githubSearchUrl(query: string): string {
 }
 
 function investigationSearches(row: TargetRow): InvestigationSearch[] {
-  const chronicle = asObject(row.chronicle);
+  const chronicle = asObject(shownChronicle(row));
   const metadata = asObject(row.metadata);
+  const memberFactKeys = Array.isArray(chronicle.member_fact_keys)
+    ? chronicle.member_fact_keys.map(stringValue)
+    : [];
   const terms: [string, string | null][] = [
     ["Source record", stringValue(chronicle.source_record_id)],
     ["Fact key", stringValue(chronicle.fact_key)],
     ["Semantic fact", stringValue(chronicle.semantic_fact_key)],
     ["Aggregate fact", stringValue(chronicle.aggregate_fact_key)],
     ["Legacy fact", stringValue(chronicle.legacy_fact_key)],
+    ...memberFactKeys.map((key): [string, string | null] => ["Member fact", key]),
     ["Record set", stringValue(chronicle.layout_record_set_id)],
     ["Measure concept", stringValue(chronicle.measure_concept)],
     ["Source concept", stringValue(chronicle.source_concept)],
@@ -3165,7 +3211,9 @@ export function latestMicrocosmTargetInvestigation(requestUrl: string, cal: Cali
     };
   }
   const row = cal.rows.find((candidate) => {
-    const chronicle = asObject(candidate.chronicle);
+    // A target built from several facts is found by its own name, not by
+    // its representative member's record or keys.
+    const chronicle = asObject(shownChronicle(candidate));
     return [
       stringValue(candidate.name),
       stringValue(candidate.base_name),
