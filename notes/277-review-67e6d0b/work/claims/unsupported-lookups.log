@@ -1,0 +1,11 @@
+bun test v1.3.12 (700fc117)
+
+work/claims/lookup.test.ts:
+Unsupported lookup keys: age_24_and_younger; ledger.universe_constraint_set.v2:73fc2ae5891d41ebcbba5761
+(pass) a ratio identity's group-by value and universe set are not lookup keys [15.49ms]
+
+ 1 pass
+ 2 filtered out
+ 0 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [1377.00ms]

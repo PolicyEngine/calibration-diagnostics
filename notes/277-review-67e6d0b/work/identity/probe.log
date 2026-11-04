@@ -1,0 +1,11 @@
+{"identity": ["atom-a"], "label": "signed=False; base=['a']", "member_count": "3", "receipt_base": ["atom-a"], "representative": "atom-a", "version": 1}
+{"identity": ["atom-a", "atom-b"], "label": "signed=False; base=['a', 'b']", "member_count": "3", "receipt_base": ["atom-a", "atom-b"], "representative": "atom-a", "version": 1}
+{"identity": ["atom-a"], "label": "signed=False; growth denominator is a base atom", "member_count": "4", "receipt_base": ["atom-a"], "representative": "atom-a", "version": 1}
+{"identity": ["atom-a"], "label": "signed=True; base=['a']", "member_count": "3", "receipt_base": ["atom-a"], "representative": "atom-a", "version": 2}
+{"identity": ["atom-a", "atom-b"], "label": "signed=True; base=['a', 'b']", "member_count": "3", "receipt_base": ["atom-a", "atom-b"], "representative": "atom-a", "version": 2}
+{"identity": ["atom-a"], "label": "signed=True; growth denominator is a base atom", "member_count": "4", "receipt_base": ["atom-a"], "representative": "atom-a", "version": 2}
+extra growth fact matching base selector REJECTED: Ledger target reference 'allocation': allocated_residual_by_ratio base must be its exact declared subset of the partition.
+preselected internal resolver labelled: ['atom-a', 'atom-b', 'total', 'growth-2025', 'growth-2024']
+final compiler REJECTED matching nonpartition growth fact: Ledger target reference 'allocation': allocated_residual_by_ratio base must be its exact declared subset of the partition.
+ALLOWED_VALUE_OPERATIONS ['allocated_residual_by_ratio', 'calendar_year_average', 'calendar_year_window', 'calendar_year_window_scaled_by_ratio', 'count_x_mean', 'difference', 'identity', 'latest_plateau', 'linear_combination', 'monthly_window_average', 'monthly_window_count_x_mean', 'monthly_window_sum_average', 'rolled_forward_by_ratio', 'scaled_by_ratio', 'sum']
+successful mixed-period linear tuple; representative is not last: newer-first identity: ('newer-first', 'older-last')

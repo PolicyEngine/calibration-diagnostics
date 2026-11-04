@@ -1,0 +1,52 @@
+# Check 2: identity size, allocation receipt and representative
+
+Verdict for this check: the new identity classification is correct for successful compilations from the supplied producer logic, assuming the computed `ledger_*` fields have not been overwritten by arbitrary reference metadata. There is no allocated-residual counterexample. Comments/hand-off need a few wording qualifications below.
+
+## Commands and actual results
+
+Read the source with `sed` and `rg` at the supplied local commit. Primary reads: Ledger `:850-1120`, `:1130-1260`, `:2720-3230`, `:3245-3535`, `:3960-4055`, `:4235-4445`, `:4520-4685`, `:4900-5030`, `:5502-5590`; dashboard `:460-680`.
+
+Ran `python3 -I work/identity/probe.py > work/identity/probe.log 2>&1` (exit 0). The script parses and compiles the actual complete Ledger module's AST, removes only unavailable Microcosm imports, stubs only model/output types, and intercepts the hierarchy output to observe `identity_facts`; executable allocation/selector/validation code remains the committed input. It does not claim an end-to-end real Microcosm environment test.
+
+The log reports six accepted allocation cases: receipt versions 1 and 2, each with one base atom, two base atoms, and a denominator reusing the one base atom. Every accepted case has `receipt_base == identity` and its representative is an identity member. The last case has four labelled members, yet a one-atom identity, as intended. A distinct growth denominator matching the base selector is rejected with `base must be its exact declared subset of the partition.` The script also calls the internal resolver with a preselected `base_matches` list; that initially accepts the extra matching growth fact in its labelled tuple, but the final compiler's mandatory second resolution rejects it with the same error. A final successful direct linear-combination call uses a newer 2024 fact first and an older 2023 fact last, both with +1 weights and target period 2024; the log prints `representative is not last: newer-first identity: ('newer-first', 'older-last')`, substantiating the PR-body wording caveat below.
+
+## Allocation proof
+
+`target_spec_from_ledger_reference` unconditionally invokes `_resolve_allocation_reference_facts(reference, facts)` before calculating the value (`ledger_targets.py:883-886`), without `base_matches`. Therefore the decisive resolver computes its `base` by filtering **all input facts** with `reference.ledger_selector` (`:2932-2940`). It requires the exact declared base count and requires every base fact's key to be an atom key (`:2942-2949`). The tuple it returns is sorted base, sorted partition atoms, total and growth (`:3001-3006`), deduplicated by `_fact_key`; nonidentical facts reusing a key are rejected (`:3011-3022`). Base facts are included first, so `facts[0]` is the first selected base atom.
+
+The identity subsequently filters that returned tuple by the exact same selector (`:1024-1029`). Every returned fact matching it was already included in the decisive resolver's base, and hence was a partition atom (or the identical fact under another operand role). Conversely every matching partition atom is present in the returned tuple and matches the identity filter. Thus identity equals the selected atoms. The version-2 receipt computes `base_keys` by filtering atoms with that selector (`:3069-3071`); the version-1 value computes `base` with the same filter (`:3145-3149`) and emits those keys (`:3188-3189`). All four sets coincide after deduplication. Total cannot match the exact atomic dimension-name selector because the total's dimensions are a strict subset (`:2800-2805`); a new matching growth fact is rejected as above.
+
+`allocationBaseCellCount` (`latest-artifact.ts:513-521`) correctly reads the producer's JSON string receipt, and its one-element test (`:533`) is the identity's size-one test. It need not compare the first key against the representative because valid compilation above proves membership and ordering.
+
+## All value operations
+
+`ALLOWED_VALUE_OPERATIONS` lists precisely 15 operations (`ledger_targets.py:78-115`). For all operations the producer only emits `ledger_member_fact_count` when the actual tuple length is greater than one (`:1318-1327`); `shownChronicle` returns the original Chronicle object first for all other cases (`latest-artifact.ts:606-608`). So the default branch below means "all facts, **if the tuple actually has several**," rather than treating every instance of an operation as several.
+
+| Operation | Produced facts / identity | Dashboard's decision | Representative in identity? |
+|---|---|---|---|
+| `identity` | One resolved fact; a tuple longer than one is rejected at `:887-892` | Early exit; `default` is unreachable for a normal emitted multi-fact identity target | Yes, sole fact |
+| `scaled_by_ratio` | Ordered base/numerator/denominator (`:3534-3587`); identity is representative alone (`:1021-1023`) | `true` at `:528-529`; preserve record, keys and constraints | Yes, `facts[0]` (`:1239-1244`) |
+| `rolled_forward_by_ratio` | Base cells followed by numerator/denominator (`:3299-3357`); identity is `facts[:-2]` (`:1030-1031`), with exactly `len(base_values)` recorded as string `ledger_value_base_cells` (`:1152-1178`) | Count equals one (`:530-531`) | Yes, first base cell (`:1243-1244`); base nonempty is enforced |
+| `allocated_residual_by_ratio` | Deduplicated selected bases, atoms, total, optional growth; identity is selector-matching subset (`:1024-1029`) | Receipt base count equals one (`:532-533`) | Yes, first sorted base, proven above |
+| `calendar_year_window_scaled_by_ratio` | Window followed by numerator and denominator groups (`:4256-4304`); identity is window (`:1032-1033`, `:4235-4240`); each series has two annual facts (`:4331`, `:4414-4428`) | `default: false`; always several window facts | Yes; representative is chosen from window explicitly (`:1011-1016`), by latest period/tie index (`:1245`) |
+| `linear_combination` | All resolved operand members (`:3692-3767`); identity is all facts (`:1034`) | `default: false` for multi-fact tuples; one-member combinations early-exit | Yes |
+| `sum` | All selected cells at chosen latest period (`:2146-2183`); identity is all facts | `default: false` for multi-fact tuples; a singleton early-exits | Yes |
+| `difference` | Minuend, subtrahend (`:2186-2242`); identity is both facts | `default: false` | Yes |
+| `count_x_mean` | One count, one mean (`:4566-4617`); identity is both facts | `default: false` | Yes |
+| `calendar_year_average` | Selected monthly series in target year (`:3988-4007`); identity is all facts; one month is possible | `default: false` for multi-fact tuple; singleton early-exits | Yes |
+| `latest_plateau` | Contiguous trailing equal-valued monthly facts (`:4542-4563`); identity is all plateau facts, even though numeric value is last (`:928-929`) | `default: false` for multi-fact plateau; singleton early-exits | Yes |
+| `calendar_year_window` | Two years for every selected series (`:4307-4428`); identity is all facts | `default: false` | Yes |
+| `monthly_window_average` | Exact declared month/cell grid (`:3909-3985`); identity is all grid facts | `default: false` for multi-fact grid; a one-month one-cell grid early-exits | Yes |
+| `monthly_window_sum_average` | Same grid resolver and identity | Same | Yes |
+| `monthly_window_count_x_mean` | Count/mean for every declared month (`:2405-2474`); identity is all facts | `default: false`; at least two | Yes |
+
+For every default operation the representative is one of all facts by definition (`max(enumerate(facts), ...)`, `:1245`), so it belongs to identity. For the four special identity operations, the separate checks above prove it. The dashboard clears representative record/keys for identity cardinality greater than one, but retains them for exactly one, matching the requested distinction.
+
+## Mechanism comment citations / textual qualifications
+
+- `latest-artifact.ts:508-511` citing `ledger_targets.py:3069-3071,3188-3189` is correct: both are receipt `fact_keys.base` emitters (version 2 constructs it at the first range, version 1 serializes the selected base at the second).
+- `latest-artifact.ts:574-589`: `:1085-1090` copies `_ledger_metadata(representative_fact)` then members, correctly described. `:1318-1341` includes all value tuple facts, ratio operands too. `:1018-1035` correctly supports its operation table. `:1174` truly counts rolled base values. `:4270-4272` is prose about two years and `:4331` declares the two year offsets; executable completeness enforcement also exists at `:4362,4414-4428`.
+- `latest-artifact.ts:589` says "The representative is the first base cell". The cited function does that only for `scaled_by_ratio`, `rolled_forward_by_ratio`, `allocated_residual_by_ratio` (`:1239-1244`); all other multi-fact operations take latest period and last tuple index on a tie (`:1245`). The conclusion "an identity of one fact is the representative" is correct. Smallest wording fix: "For these base-cell operations, the representative is the first base cell."
+- Hand-off item 1's "calendar_year_window_scaled_by_ratio and every other operation span several facts" is too broad: identity and singleton sums/averages/plateaus do not. Smallest fix: "For targets with several member facts, every other operation's identity contains every member (the calendar-year ratio contains its several window facts)." The implementation itself correctly handles the singleton cases before the switch.
+- PR body item's "for a linear combination [representative] is its last operand" is true for the actual catalog resolver, which enforces one shared period and resolves facts in operand order (`:3692-3767`). The cited representative function itself only promises latest period, then last index. A direct successful `target_spec_from_ledger_reference` call need not share periods. Smallest fix: "for this linear combination is its last member, because its facts share a period."
+- The public source permits arbitrary reference metadata to overwrite computed `ledger_member_fact_count`, receipt or base-count metadata because `_reference_metadata(reference)` is merged last (`:1094`, `:5388-5390`). This is an upstream integrity limitation, not introduced by this PR and not a practical review finding without evidence a supplied real reference does so. The source proves the identity classification for the producer's own computed fields.

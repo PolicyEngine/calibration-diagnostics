@@ -1,0 +1,14 @@
+bun test v1.3.12 (700fc117)
+
+work/claims/lookup.test.ts:
+Checked 10 member/representative identifiers and both target names.
+(pass) every aggregate member key and representative identifier names the aggregate; its names resolve directly [1.47ms]
+1000 aggregate rows, missing key: base 170.79 ms; head 36.21 ms.
+10000 aggregate rows, missing key: base 265.25 ms; head 221.00 ms.
+100000 aggregate rows, missing key: base 129.68 ms; head 835.46 ms.
+(pass) not-found scans remain linear in rows (synthetic aggregate rows, informational timing) [5362.18ms]
+
+ 2 pass
+ 0 fail
+ 34 expect() calls
+Ran 2 tests across 1 file. [6.15s]

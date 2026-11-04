@@ -1,0 +1,18 @@
+bun test v1.3.12 (700fc117)
+
+work/root/hierarchy-probe.test.ts:
+(pass) producer hierarchy to shown Chronicle: shared [4.34ms]
+(pass) producer hierarchy to shown Chronicle: different_value [0.05ms]
+(pass) producer hierarchy to shown Chronicle: different_dimension [0.11ms]
+(pass) producer hierarchy to shown Chronicle: whitespace [0.13ms]
+(pass) producer hierarchy to shown Chronicle: shared_universe [0.01ms]
+(pass) producer hierarchy to shown Chronicle: different_universe [0.04ms]
+(pass) same dimension label or same value under another id does not prove the group-by shared [0.96ms]
+(pass) no hierarchy means group-by sharedness unknown, with a null shown value [0.14ms]
+(pass) representative identity keeps its universe and raw whitespace, reports shared group-by [0.08ms]
+(pass) single-fact row has no three member fields added [0.20ms]
+
+ 10 pass
+ 0 fail
+ 33 expect() calls
+Ran 10 tests across 1 file. [351.00ms]

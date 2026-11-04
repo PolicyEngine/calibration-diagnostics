@@ -1,0 +1,10 @@
+FIXTURE_SHA256 037d28028b28b865eb0bacd09bb81285ff7b18e442bcf5e27ec762ae1008459b
+FIXTURE {"schema": 8, "targets": 132, "single": 131, "multi": 1, "single_matching_groupby": 131}
+MULTI {"name": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding@2024", "member_count": "5", "dimensions": [], "varying": null, "groupby": ["ed_fsa.loan_type", "stafford_unsubsidized"]}
+HIERARCHY shared [{"id": "loan_type", "label": "Loan type", "value_id": "a", "value_label": "A"}]
+HIERARCHY different_value []
+HIERARCHY different_dimension []
+HIERARCHY whitespace [{"id": "loan_type", "label": "Loan type", "value_id": "a", "value_label": "A"}]
+HIERARCHY shared_universe [{"id": "loan_type", "label": "Loan type", "value_id": "a", "value_label": "A"}]
+HIERARCHY different_universe [{"id": "loan_type", "label": "Loan type", "value_id": "a", "value_label": "A"}]
+UNIVERSE Shared and different universe keys produce identical hierarchy dimensions; only representative key is stamped by _ledger_metadata.

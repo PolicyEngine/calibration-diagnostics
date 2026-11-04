@@ -1,0 +1,44 @@
+COMMAND: /Users/maxghenis/.bun/bin/bun test --preload <review>/work/tests/deny-network.ts src/latest-artifact.test.ts -t a universe constraint count that is not a whole count reads null
+bun test v1.3.12 (700fc117)
+
+src/latest-artifact.test.ts:
+1276 |   expect(
+1277 |     cal.rows.map((row) => {
+1278 |       const chronicle = row.chronicle as Record<string, unknown>;
+1279 |       return [chronicle.source_record_id, chronicle.universe_constraint_count];
+1280 |     }),
+1281 |   ).toEqual(counts.map((_, index) => [`source-record-${index}`, null]));
+           ^
+error: expect(received).toEqual(expected)
+
+  [
+    [
+      "source-record-0",
+      null,
+    ],
+    [
+      "source-record-1",
+-     null,
++     -1,
+    ],
+    [
+      "source-record-2",
+      null,
+    ],
+    [
+      "source-record-3",
+      null,
+    ],
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (<review>/work/tests/isolated-head/src/latest-artifact.test.ts:1281:5)
+(fail) a universe constraint count that is not a whole count reads null [27.14ms]
+
+ 0 pass
+ 87 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [1.87s]

@@ -1,0 +1,10 @@
+bun test v1.3.12 (700fc117)
+
+work/root/export-probe.test.ts:
+{"added":["categoryLevels","computeDimensions","countOrNull","repeatsGeography"]}
+(pass) new property-test helpers are consumer-visible module exports [32.82ms]
+
+ 1 pass
+ 0 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [839.00ms]

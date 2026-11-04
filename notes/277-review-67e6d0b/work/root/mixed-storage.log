@@ -1,0 +1,24 @@
+bun test v1.3.12 (700fc117)
+
+work/root/mixed-storage.test.ts:
+{"version":"base","semanticValues":["a","a"],"dimensions":[],"shown":{"fact_key":null,"source_record_id":null,"semantic_fact_key":null,"aggregate_fact_key":null,"legacy_fact_key":null,"period_type":"calendar_year","source_period":null,"target_period":null,"geography_level":"country","geography_id":"GB","geography_vintage":"2024","domain":null,"entity_name":"person","entity_role":"person","measure_concept":"balance","source_concept":"balance","concept_relation":null,"concept_authority":null,"measure_unit":null,"value_operation":"sum","layout_record_set_id":"table","layout_groupby_dimension":"loan_type","layout_groupby_value_id":null,"layout_measure_id":null,"dimension_set_key":null,"universe_constraint_set_key":null,"universe_constraint_count":null,"filters":[{"key":"ledger_filter_sex","label":"Sex","value":"male","raw_value":"male"}],"member_fact_count":2,"member_fact_keys":["a-explicit","b-layout"]}}
+(pass) base: one semantic loan type must not be reported as several loan type values [44.65ms]
+{"version":"head","semanticValues":["a","a"],"dimensions":[],"shown":{"fact_key":null,"source_record_id":null,"semantic_fact_key":null,"aggregate_fact_key":null,"legacy_fact_key":null,"period_type":"calendar_year","source_period":null,"target_period":null,"geography_level":"country","geography_id":"GB","geography_vintage":"2024","domain":null,"entity_name":"person","entity_role":"person","measure_concept":"balance","source_concept":"balance","concept_relation":null,"concept_authority":null,"measure_unit":null,"value_operation":"sum","layout_record_set_id":"table","layout_groupby_dimension":"loan_type","layout_groupby_value_id":null,"layout_measure_id":null,"dimension_set_key":null,"universe_constraint_set_key":null,"universe_constraint_count":null,"filters":[{"key":"ledger_filter_sex","label":"Sex","value":"male","raw_value":"male"}],"member_fact_count":2,"member_fact_keys":["a-explicit","b-layout"],"layout_groupby_value_varies":true}}
+23 |     expect(new Set(semanticValues).size).toBe(1);
+24 |     const release = build({ ...fixture, targets: [row] }, "mixed-storage-test", null, {}, {}, {}, "uk");
+25 |     const response = page("https://test.invalid/api/microcosm/target-diagnostics", release);
+26 |     const chronicle = response.targets[0].chronicle as any;
+27 |     console.log(JSON.stringify({ version, semanticValues, dimensions: response.targets[0].target_dimensions, shown: chronicle }));
+28 |     expect(chronicle.layout_groupby_value_varies).not.toBe(true);
+                                                           ^
+error: expect(received).not.toBe(expected)
+
+Expected: not true
+
+      at <anonymous> (<review>/work/root/mixed-storage.test.ts:28:55)
+(fail) head: one semantic loan type must not be reported as several loan type values [2.71ms]
+
+ 1 pass
+ 1 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [952.00ms]

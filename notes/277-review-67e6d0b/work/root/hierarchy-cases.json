@@ -1,0 +1,90 @@
+[
+  {
+    "name": "shared",
+    "dimensions": [
+      {
+        "id": "loan_type",
+        "label": "Loan type",
+        "value_id": "a",
+        "value_label": "A"
+      }
+    ],
+    "representative_layout": {
+      "groupby_dimension": "loan_type",
+      "groupby_value_id": "a",
+      "groupby_dimension_label": "Loan type",
+      "groupby_value_label": "A"
+    }
+  },
+  {
+    "name": "different_value",
+    "dimensions": [],
+    "representative_layout": {
+      "groupby_dimension": "loan_type",
+      "groupby_value_id": "a",
+      "groupby_dimension_label": "Loan type",
+      "groupby_value_label": "A"
+    }
+  },
+  {
+    "name": "different_dimension",
+    "dimensions": [],
+    "representative_layout": {
+      "groupby_dimension": "loan_type",
+      "groupby_value_id": "a",
+      "groupby_dimension_label": "Loan type",
+      "groupby_value_label": "A"
+    }
+  },
+  {
+    "name": "whitespace",
+    "dimensions": [
+      {
+        "id": "loan_type",
+        "label": "Loan type",
+        "value_id": "a",
+        "value_label": "A"
+      }
+    ],
+    "representative_layout": {
+      "groupby_dimension": " loan_type ",
+      "groupby_value_id": " a ",
+      "groupby_dimension_label": "Loan type",
+      "groupby_value_label": "A"
+    }
+  },
+  {
+    "name": "shared_universe",
+    "dimensions": [
+      {
+        "id": "loan_type",
+        "label": "Loan type",
+        "value_id": "a",
+        "value_label": "A"
+      }
+    ],
+    "representative_layout": {
+      "groupby_dimension": "loan_type",
+      "groupby_value_id": "a",
+      "groupby_dimension_label": "Loan type",
+      "groupby_value_label": "A"
+    }
+  },
+  {
+    "name": "different_universe",
+    "dimensions": [
+      {
+        "id": "loan_type",
+        "label": "Loan type",
+        "value_id": "a",
+        "value_label": "A"
+      }
+    ],
+    "representative_layout": {
+      "groupby_dimension": "loan_type",
+      "groupby_value_id": "a",
+      "groupby_dimension_label": "Loan type",
+      "groupby_value_label": "A"
+    }
+  }
+]
