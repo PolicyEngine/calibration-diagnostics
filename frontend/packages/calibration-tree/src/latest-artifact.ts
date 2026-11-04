@@ -536,11 +536,17 @@ function identityIsRepresentative(metadata: JsonObject): boolean {
   }
 }
 
-// Whether a target's hierarchy lists the group-by value its Chronicle fields
-// carry. Microcosm lists a group-by in the hierarchy only when every fact of
-// the target's identity shares it (_inherited_dimensions,
-// ledger_targets.py:1578-1611 at 0ff293b, which _calibration_hierarchy applies
-// to those facts: :1096-1100, :1369, :1429).
+// Whether a target's hierarchy lists the group-by pair its Chronicle fields
+// carry. A listed pair shows that every fact of the target's identity shares
+// it; an omitted pair shows nothing. _calibration_hierarchy builds the
+// hierarchy from the identity facts (ledger_targets.py:1096-1100 at 0ff293b),
+// and _inherited_dimensions (:1578-1611) lists a pair only when every fact's
+// ordinary dimensions share it (_common_dimensions, :1614-1623) or every
+// fact's layout carries the same group-by pair (_constant_text, :1649-1651).
+// The label validator reads a fact's group-by pair as one of its dimensions
+// (:1486-1490), but _inherited_dimensions does not, so two facts that both
+// describe one value, one in its dimensions and one in its layout, leave it
+// out of the hierarchy.
 function hierarchyListsGroupBy(row: TargetRow, chronicle: JsonObject): boolean {
   const groupBy = stringValue(chronicle.layout_groupby_dimension)?.trim();
   const value = stringValue(chronicle.layout_groupby_value_id)?.trim();
@@ -552,15 +558,17 @@ function hierarchyListsGroupBy(row: TargetRow, chronicle: JsonObject): boolean {
   });
 }
 
-// Whether the facts of a multi-fact target's identity share the group-by
-// value its Chronicle fields carry: "shared" when the identity is one fact or
-// the hierarchy lists the value, "differs" when the hierarchy leaves it out,
-// and null when the target carries no group-by value or no hierarchy.
+// What a multi-fact target's fields establish about the group-by pair its
+// Chronicle fields carry: "shared" when its identity is one fact or its
+// hierarchy lists the pair, so every identity fact shares it; "unlisted" when
+// its identity spans several facts and its hierarchy leaves the pair out, which
+// does not show whether the facts share it; null when it carries no pair or
+// has no hierarchy to read.
 function groupByAcrossIdentity(
   row: TargetRow,
   chronicle: JsonObject,
   oneFact: boolean,
-): "shared" | "differs" | null {
+): "shared" | "unlisted" | null {
   if (
     !stringValue(chronicle.layout_groupby_dimension) ||
     !stringValue(chronicle.layout_groupby_value_id)
@@ -568,7 +576,7 @@ function groupByAcrossIdentity(
     return null;
   }
   if (oneFact || hierarchyListsGroupBy(row, chronicle)) return "shared";
-  return row.dimension_adapter === "hierarchy" ? "differs" : null;
+  return row.dimension_adapter === "hierarchy" ? "unlisted" : null;
 }
 
 // The Chronicle fields a page shows for a target. Microcosm stamps a target's
@@ -586,22 +594,25 @@ function groupByAcrossIdentity(
 // - calendar_year_window_scaled_by_ratio: its window, two years of each
 //   series (:4270-4272, :4331);
 // - any other operation: every fact.
-// The representative is the first base cell (_value_representative_fact,
-// :1232-1245), so an identity of one fact is the representative. Such a
-// target shows its fields as they are, with member_fact_count and
+// For the first three operations the representative is the first base cell
+// (_value_representative_fact, :1232-1245), so an identity of one fact is the
+// representative. For any other multi-fact operation it is the fact of the
+// latest period, the last in the tuple on a tie, taken from the window for
+// calendar_year_window_scaled_by_ratio (:1012-1016). A target whose identity
+// is one fact shows its fields as they are, with member_fact_count and
 // member_fact_keys added. An identity of several facts has no one record or
 // fact key, so those read null. Its group-by value shows when its hierarchy
-// lists it, because every identity fact then shares it, and reads null
-// otherwise; layout_groupby_value_varies says which, so the targets page can
-// say the target combines several values. Nothing Microcosm writes says
-// whether the identity facts share a universe constraint, so its set key and
-// count read null.
-// ledger_aggregation_varying_dimensions cannot tell either: it compares only
-// the facts' dimensions, ratio operands included (:1323, :1626-1646), and it
-// lists none for the FSA balance excluding Parent PLUS, whose five loan types
-// differ in their group-by value. The row itself keeps every field, so a
-// comparison still matches it by fact key. A single-fact target's fields show
-// as they are.
+// lists the pair, because every identity fact then shares it, and reads null
+// otherwise. layout_groupby_unlisted_across_facts says the second: the
+// identity spans several facts and its hierarchy lists no group-by pair the
+// target carries. That does not show that the facts differ in it (see
+// hierarchyListsGroupBy). Nothing Microcosm writes says whether the identity
+// facts share a universe constraint, so its set key and count read null.
+// ledger_aggregation_varying_dimensions cannot settle either question: it
+// compares each fact's ordinary dimensions, ratio operands included, and
+// counts a dimension one fact carries and another lacks as varying (:1323,
+// :1626-1646). The row itself keeps every field, so a comparison still matches
+// it by fact key. A single-fact target's fields show as they are.
 function shownChronicle(row: TargetRow): unknown {
   const metadata = asObject(row.metadata);
   const memberFactCount = countOrNull(metadata.ledger_member_fact_count);
@@ -612,7 +623,7 @@ function shownChronicle(row: TargetRow): unknown {
   const members = {
     member_fact_count: memberFactCount,
     member_fact_keys: stringListOrEmpty(metadata.ledger_member_fact_keys),
-    layout_groupby_value_varies: groupBy == null ? null : groupBy === "differs",
+    layout_groupby_unlisted_across_facts: groupBy == null ? null : groupBy === "unlisted",
   };
   if (oneFact) return { ...chronicle, ...members };
   return {
