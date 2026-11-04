@@ -262,8 +262,9 @@ revision). No country registration names the layout.
   error code (`X-Error-Code`) is `RepoNotFound` or `RevisionNotFound`, any
   other failure, and a record the writer's rules refuse are errors: the
   release picker answers 502 for that country, reconciliation publishes
-  nothing and leaves the latest release as it was, and a Staging candidate
-  has no comparison baseline. No reader falls back to tags or pointer files.
+  nothing and leaves the latest release as it was, and a local-area Staging
+  candidate has no comparison baseline. No reader falls back to tags or
+  pointer files.
 
 - A build's release id is its folder, `<release>/<build>`. Its manifest entry
   records no separate `releaseDirectory`, and readers fetch
@@ -278,8 +279,14 @@ revision). No country registration names the layout.
   reported as `failed`, and the other builds are still reconciled.
   A build the manifest already holds is not looked up again.
 - The latest release is the current build of the record's default release.
-  While the record names none, reconciliation publishes the listed builds and
-  fails without moving the latest release.
+  While the record names none, or that build cannot be published,
+  reconciliation publishes the other listed builds and fails without moving
+  the latest release, naming the reason.
+- `--latest` and `--release <release>/<build>` publish one listed build. The
+  promotion check that follows compares the build with the record's current
+  build by name, and reads that build's folder only when they match; if the
+  folder cannot be read then, the build stays published and the next
+  reconciliation moves the latest release.
 - Entries published from tags or release folders stay in the manifest and
   stay readable by their ids; reconciliation no longer repairs them, and the
   picker no longer lists them. The one exception is the dashboard's latest

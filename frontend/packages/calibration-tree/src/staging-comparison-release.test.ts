@@ -334,6 +334,41 @@ test("for a repository without releases.json, the baseline comes from its releas
   }
 });
 
+test("a releases.json the release writer would refuse leaves a local-area candidate without a baseline", async () => {
+  const refused = recordedReleases();
+  // A current build that is withdrawn is refused by the writer's rules.
+  refused.releases[NATIONAL_FOLDER].builds[NATIONAL_BUILD.split("/")[1]].withdrawn = true;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith("/resolve/main/releases.json")) return Response.json(refused);
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+  try {
+    const manifest = buildFolderManifest();
+    await expect(stagingBaselineReleases(0, "uk", manifest)).rejects.toThrow("is withdrawn");
+    let currentReleaseRead = false;
+    const comparison = resolveStagingComparisonRelease(LOCAL_CANDIDATE_RUN, "uk", {
+      runPipelineId: async () => "uk-local-candidate",
+      currentReleaseId: async () => {
+        currentReleaseRead = true;
+        return NATIONAL_BUILD;
+      },
+      newestLocalAreaReleaseId: async (country) =>
+        newestPublishedLocalAreaRelease(
+          manifest,
+          country,
+          await stagingBaselineReleases(0, country, manifest),
+        )?.releaseId ?? null,
+    });
+    // The comparison fails: it is not made against the current release.
+    await expect(comparison).rejects.toThrow("is withdrawn");
+    expect(currentReleaseRead).toBe(false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("a staging candidate's target changes can be compared with a build in its own folder", async () => {
   const originalFetch = globalThis.fetch;
   const requested: string[] = [];

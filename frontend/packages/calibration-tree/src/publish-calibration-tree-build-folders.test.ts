@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 
 import {
   migrateReleaseTimestamps,
@@ -102,8 +102,16 @@ interface RepositoryOptions {
   diagnosticsFor?: (folderId: string) => Record<string, unknown>;
   /** A build folder whose listing Hugging Face answers with a server error. */
   unreadableFolder?: string;
+  /**
+   * A build folder whose listing never answers: the request settles only
+   * when its abort signal fires. Records the timeout the request asked for
+   * (see withShortTimeouts).
+   */
+  stalledFolder?: { folderId: string; requestedTimeouts: Array<number | null> };
   /** The dataset repository; the UK's by default. */
   repo?: string;
+  /** A build folder whose listing answers its first request, then 503. */
+  folderReadableOnce?: string;
 }
 
 function buildFolderRepository(requested: string[], options: RepositoryOptions = {}) {
@@ -112,7 +120,8 @@ function buildFolderRepository(requested: string[], options: RepositoryOptions =
   const repo = options.repo ?? UK_REPO;
   const api = `https://huggingface.co/api/datasets/${repo}`;
   const resolve = `https://huggingface.co/datasets/${repo}/resolve`;
-  return (async (input: string | URL | Request) => {
+  let readableOnceListings = 0;
+  return (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     requested.push(url);
     if (url === `${api}/revision/main`) return Response.json({ sha: MAIN_SHA });
@@ -125,6 +134,19 @@ function buildFolderRepository(requested: string[], options: RepositoryOptions =
       const prefix = `releases/${folderId}`;
       if (url === `${api}/tree/${MAIN_SHA}/releases/${release}/${build}?recursive=false&expand=true`) {
         if (folderId === options.unreadableFolder) return new Response(null, { status: 503 });
+        if (folderId === options.folderReadableOnce && readableOnceListings++ > 0) {
+          return new Response(null, { status: 503 });
+        }
+        if (folderId === options.stalledFolder?.folderId) {
+          const signal = init?.signal;
+          options.stalledFolder.requestedTimeouts.push(
+            (signal as TimedSignal | undefined)?.requestedTimeout ?? null,
+          );
+          if (!signal) throw new Error("The build folder listing was requested without a timeout.");
+          return new Promise<Response>((_, reject) => {
+            signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+          });
+        }
         const names = build === UNCALIBRATED_BUILD
           ? ["release_manifest.json", "microcosm_uk_2024_25.h5"]
           : ["release_manifest.json", "calibration_diagnostics.json", "microcosm_uk_2024_25.h5"];
@@ -153,6 +175,25 @@ function buildFolderRepository(requested: string[], options: RepositoryOptions =
     }
     throw new Error(`Unexpected URL ${url}`);
   }) as typeof fetch;
+}
+
+// A timeout signal that remembers the duration the code asked for.
+type TimedSignal = AbortSignal & { requestedTimeout?: number };
+
+// Every AbortSignal.timeout(...) fires after a few milliseconds instead, so a
+// stalled request settles at once; each signal records the duration asked for.
+async function withShortTimeouts<T>(run: () => Promise<T>): Promise<T> {
+  const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
+  const timeouts = spyOn(AbortSignal, "timeout").mockImplementation((milliseconds: number) => {
+    const signal: TimedSignal = originalTimeout(5);
+    signal.requestedTimeout = milliseconds;
+    return signal;
+  });
+  try {
+    return await run();
+  } finally {
+    timeouts.mockRestore();
+  }
 }
 
 function memoryStore(initial: CalibrationTreeManifest, country: MicrocosmCountry = "uk") {
@@ -280,6 +321,27 @@ test("a build whose folder cannot be read is reported as failed, and the other l
   expect(manifest.latestReleaseBuildArtifactId).toBe(
     manifest.builds.find((build) => build.releaseId === folder(NATIONAL, NATIONAL_CURRENT))!.buildArtifactId,
   );
+});
+
+test("a build folder listing that never answers times out after 30 seconds and fails only its own build", async () => {
+  const store = memoryStore(manifestWithEarlierEntries());
+  const requestedTimeouts: Array<number | null> = [];
+  globalThis.fetch = buildFolderRepository([], {
+    stalledFolder: { folderId: folder(NATIONAL, NATIONAL_OLDER), requestedTimeouts },
+  });
+
+  const report = await withShortTimeouts(() => reconcileReleaseBuilds("uk", "blob-token", false, store));
+
+  expect(requestedTimeouts).toEqual([30_000]);
+  const stalled = report.outcomes.find((outcome) => outcome.sourceId === folder(NATIONAL, NATIONAL_OLDER));
+  expect(stalled?.status).toBe("failed");
+  expect(stalled?.reason ?? "").toMatch(/timed out/i);
+  expect(Object.fromEntries(report.outcomes.map((outcome) => [outcome.sourceId, outcome.status])))
+    .toMatchObject({
+      [folder(DENSE, DENSE_BUILD)]: "published",
+      [folder(NATIONAL, NATIONAL_CURRENT)]: "published",
+    });
+  expect(report.latestReleaseFailure).toBeUndefined();
 });
 
 test("a build is dated by the publication time releases.json records, not by the commit that wrote its folder", async () => {
@@ -483,6 +545,85 @@ async function withBlobToken<T>(run: () => Promise<T>): Promise<T> {
     else process.env.BLOB_READ_WRITE_TOKEN = priorBlobToken;
   }
 }
+
+// The single-build modes print their result; the tests read the store.
+async function quietly<T>(run: () => Promise<T>): Promise<T> {
+  const printed = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    return await run();
+  } finally {
+    printed.mockRestore();
+  }
+}
+
+test("--latest publishes the current build of the default release and makes it the latest", async () => {
+  const store = memoryStore(manifestWithEarlierEntries());
+  globalThis.fetch = buildFolderRepository([]);
+
+  await withBlobToken(() => quietly(() => runPublisher({ country: "uk", mode: "latest" }, { store })));
+
+  const current = folder(NATIONAL, NATIONAL_CURRENT);
+  expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+    .toEqual([[current, false], [current, true]]);
+  expect(store.writes[0].entry).toMatchObject({
+    hfCommitSha: FOLDER_COMMITS[current].sha,
+    createdAt: "2026-10-19T08:33:23.000Z",
+  });
+});
+
+test("--release of another build publishes it without making it the latest or reading the current build's folder", async () => {
+  const store = memoryStore(manifestWithEarlierEntries());
+  const latestBefore = store.current().countries.uk!.latestReleaseBuildArtifactId;
+  const requested: string[] = [];
+  globalThis.fetch = buildFolderRepository(requested);
+
+  await withBlobToken(() => quietly(() =>
+    runPublisher({ country: "uk", mode: "release", releaseId: folder(NATIONAL, NATIONAL_OLDER) }, { store })
+  ));
+
+  expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+    .toEqual([[folder(NATIONAL, NATIONAL_OLDER), false]]);
+  expect(store.current().countries.uk!.latestReleaseBuildArtifactId).toBe(latestBefore);
+  // The promotion check compares names from releases.json: the current
+  // build's folder is never listed for it.
+  expect(requested.some((url) => url.includes(`/releases/${NATIONAL}/${NATIONAL_CURRENT}`))).toBe(false);
+});
+
+test("--release of the current build still succeeds when its folder cannot be read again for the promotion check", async () => {
+  const store = memoryStore(manifestWithEarlierEntries());
+  const latestBefore = store.current().countries.uk!.latestReleaseBuildArtifactId;
+  globalThis.fetch = buildFolderRepository([], { folderReadableOnce: folder(NATIONAL, NATIONAL_CURRENT) });
+  const warned = spyOn(console, "warn").mockImplementation(() => {});
+
+  try {
+    const publication = withBlobToken(() => quietly(() =>
+      runPublisher({ country: "uk", mode: "release", releaseId: folder(NATIONAL, NATIONAL_CURRENT) }, { store })
+    ));
+    await expect(publication).resolves.toBeUndefined();
+    // The build is registered; reconciliation moves the latest release later.
+    expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+      .toEqual([[folder(NATIONAL, NATIONAL_CURRENT), false]]);
+    expect(store.current().countries.uk!.latestReleaseBuildArtifactId).toBe(latestBefore);
+    expect(warned.mock.calls.map((call) => call.map(String).join(" ")).join("\n"))
+      .toContain("latest release was not moved");
+  } finally {
+    warned.mockRestore();
+  }
+});
+
+test("when the current build is ineligible, the latest-release failure says why", async () => {
+  const record = releasesRecord();
+  (record.releases as Record<string, Record<string, unknown>>)[NATIONAL].current = UNCALIBRATED_BUILD;
+  const store = memoryStore(manifestWithEarlierEntries());
+  globalThis.fetch = buildFolderRepository([], { record });
+
+  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+
+  expect(report.latestReleaseFailure ?? "").toContain(
+    `${folder(NATIONAL, UNCALIBRATED_BUILD)} cannot be published: releases/${folder(NATIONAL, UNCALIBRATED_BUILD)}/ has no calibration diagnostics.`,
+  );
+  expect(report.latestReleaseFailure ?? "").not.toContain("@ is not completely published");
+});
 
 test("a single-build publication refuses a build releases.json does not list, before reading any build file", async () => {
   const requested: string[] = [];

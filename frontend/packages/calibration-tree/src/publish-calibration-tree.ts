@@ -1182,25 +1182,34 @@ async function promoteIfCurrent(
   country: MicrocosmCountry,
   candidate: Awaited<ReturnType<typeof publishRelease>>,
   entry: CalibrationTreeManifestEntry,
-  blobToken: string,
+  store: CalibrationManifestStore,
 ): Promise<boolean> {
   const headSha = await publicationRevisionSha(country);
   const record = await readReleasesRecord(country, headSha);
-  const latest = record
-    ? await recordedCurrentBuild(country, record, headSha)
-    : await readUpstreamLatest(country);
-  if (
-    latest.releaseId !== candidate.bundle.index.build.releaseId ||
-    latest.hfCommitSha !== candidate.bundle.index.build.hfCommitSha
-  ) {
+  const published = candidate.bundle.index.build;
+  let latest: { releaseId: string; hfCommitSha: string };
+  if (record) {
+    // Names first: another build's folder is never read for this check.
+    const current = currentDefaultBuild(record);
+    if (!current || current.id !== published.releaseId) return false;
+    try {
+      latest = await selectRecordedBuild(country, record, current.id, headSha);
+    } catch (error) {
+      // The build is registered; the next reconciliation moves the latest
+      // release once the current build's folder can be read.
+      console.warn(
+        `The latest release was not moved to ${current.id}: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
+  } else {
+    latest = await readUpstreamLatest(country, headSha);
+  }
+  if (latest.releaseId !== published.releaseId || latest.hfCommitSha !== published.hfCommitSha) {
     return false;
   }
-  await updateCalibrationTreeManifest({
-    country,
-    token: blobToken,
-    entry,
-    makeLatest: true,
-  });
+  await store.updateManifest(entry, true);
   return true;
 }
 
@@ -1272,12 +1281,11 @@ function blobCalibrationManifestStore(
 }
 
 async function registerReleaseBuild(
-  country: MicrocosmCountry,
   published: Awaited<ReturnType<typeof publishRelease>>,
-  blobToken: string,
+  store: CalibrationManifestStore,
 ): Promise<CalibrationTreeManifestEntry> {
   const entry = releaseManifestEntry(published);
-  await updateCalibrationTreeManifest({ country, entry, token: blobToken });
+  await store.updateManifest(entry);
   return entry;
 }
 
@@ -1626,8 +1634,8 @@ export async function reconcileReleaseBuilds(
     dryRun,
     store,
     record
-      ? async () => recordedLatest(record, inventory.candidates)
-      : (current) => readUpstreamLatest(country, undefined, current),
+      ? async () => recordedLatest(record, inventory.candidates, inventory.ineligible)
+      : (current) => readUpstreamLatest(country, headSha, current),
   );
   return {
     country,
@@ -1684,15 +1692,24 @@ async function selectLatestRelease(
   }
 }
 
-// The latest release under build folders: the record's current build, at the
-// commit reconciliation pinned it to (none when that build was ineligible).
+// The latest release for a repository with releases.json: the record's
+// current build of its default release, at the commit reconciliation pinned
+// it to. A current build that could not be published gives its reason.
 function recordedLatest(
   record: ReleasesRecord,
   candidates: readonly ReleaseCandidate[],
+  ineligible: readonly ReconciliationOutcome[],
 ): { releaseId: string; hfCommitSha: string } {
   const current = requireCurrentDefaultBuild(record);
   const candidate = candidates.find((entry) => entry.releaseId === current.id);
-  return { releaseId: current.id, hfCommitSha: candidate?.hfCommitSha ?? "" };
+  if (!candidate) {
+    const reason = ineligible.find((outcome) => outcome.sourceId === current.id)?.reason;
+    throw new Error(
+      `Latest release ${current.id} cannot be published: ` +
+        `${reason ?? "releases.json lists it, but reconciliation found no candidate."}`,
+    );
+  }
+  return { releaseId: current.id, hfCommitSha: candidate.hfCommitSha };
 }
 
 interface TimestampMigrationOutcome {
@@ -1816,7 +1833,7 @@ export function reconciliationFailureMessage(report: ReconciliationReport): stri
 }
 
 export interface PublisherDependencies {
-  /** The manifest and Blob store the reconciliation and migration modes use. */
+  /** The manifest and Blob store every release mode reads and writes. */
   store?: CalibrationManifestStore;
 }
 
@@ -1916,10 +1933,12 @@ export async function runPublisher(
       blobToken,
       useExpectedShaExactly: true,
       indexCreatedAt: selection.publishedAt,
+      uploadBundle: store.uploadBundle,
     });
   } else {
+    // The pointer file is read at the commit releases.json was looked for.
     const selection: ReleaseSelection = options.mode === "latest"
-      ? await readUpstreamLatest(options.country, options.hfCommitSha)
+      ? await readUpstreamLatest(options.country, revisionSha)
       : await requestedReleaseSelection(
           options.country,
           releaseId(options.releaseId),
@@ -1932,15 +1951,11 @@ export async function runPublisher(
       expectedSha: selection.hfCommitSha,
       blobToken,
       allowMissingReleaseTag: options.mode === "latest",
+      uploadBundle: store.uploadBundle,
     });
   }
-  const entry = await registerReleaseBuild(options.country, published, blobToken);
-  const promoted = await promoteIfCurrent(
-    options.country,
-    published,
-    entry,
-    blobToken,
-  );
+  const entry = await registerReleaseBuild(published, store);
+  const promoted = await promoteIfCurrent(options.country, published, entry, store);
   console.log(JSON.stringify({
     country: options.country,
     releaseId: published.bundle.index.build.releaseId,
