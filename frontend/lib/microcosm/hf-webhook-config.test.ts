@@ -51,3 +51,11 @@ test("applies repository and GitHub overrides from an explicit environment", () 
     false,
   );
 });
+
+test("reads the Hugging Face token for releases.json alerts from HF_TOKEN, or else HUGGINGFACE_TOKEN", () => {
+  expect(resolveHfWebhookConfig({ HF_TOKEN: "  hf-token  ", HUGGINGFACE_TOKEN: "other" }).huggingFaceToken)
+    .toBe("hf-token");
+  expect(resolveHfWebhookConfig({ HUGGINGFACE_TOKEN: "  fallback-token  " }).huggingFaceToken)
+    .toBe("fallback-token");
+  expect(resolveHfWebhookConfig({}).huggingFaceToken).toBeUndefined();
+});
