@@ -21,6 +21,7 @@ import {
   levelFilterOptions,
   sourceFilterOptions,
 } from "@/components/microcosm/target-filter-options";
+import { dimensionSummary, titleFromIdentifier } from "@/components/microcosm/target-row-labels";
 import { sourceLabel } from "@policyengine/calibration-tree/source-label";
 import {
   releaseSelectOptions,
@@ -90,12 +91,6 @@ function finalError(row: MicrocosmTargetRow) {
   return fmt(row.final_error, { pct: true, digits: 1 });
 }
 
-function titleFromIdentifier(value: string | null | undefined): string {
-  if (!value) return "";
-  const leaf = value.split(/[.#:]/).filter(Boolean).at(-1) ?? value;
-  return humanizeName(leaf.replace(/[^a-zA-Z0-9]+/g, "_"));
-}
-
 function measureTitle(row: MicrocosmTargetRow): string {
   return (
     titleFromIdentifier(row.chronicle?.measure_concept) ||
@@ -104,14 +99,6 @@ function measureTitle(row: MicrocosmTargetRow): string {
     titleFromIdentifier(row.chronicle?.layout_measure_id) ||
     "—"
   );
-}
-
-function dimensionSummary(row: MicrocosmTargetRow): string {
-  const dims = row.target_dimensions?.map((dim) => dim.value).filter(Boolean) ?? [];
-  if (dims.length) return dims.join(" · ");
-  const group = row.chronicle?.layout_groupby_value_id;
-  if (group && group !== "all") return humanizeName(group);
-  return "All";
 }
 
 function calculationLine(row: {
