@@ -14,12 +14,16 @@ import {
   type CalibrationTreeManifestEntry,
 } from "./calibration-tree-manifest";
 import type { CalibrationTreeBundle } from "./calibration-tree-bundle";
+import type { MicrocosmCountry } from "./countries";
+import { missingReleasesRecord, missingRevision } from "./test-support/releases-record-responses";
 
 // A dataset repository that publishes each build in its own folder,
 // releases/<release>/<build>/, with releases.json as the only record of
-// which build is current (microcosm-emitter#24). Microcosm's migration (P1)
+// which build is current (microcosm-emitter#24). Microcosm's switch commit
 // writes this layout; nothing does yet, so every value here is synthetic.
+// The readers find the layout by finding releases.json, whatever the country.
 const UK_REPO = "policyengine/populace-uk-private";
+const BE_REPO = "policyengine/populace-be-private";
 const API = `https://huggingface.co/api/datasets/${UK_REPO}`;
 const RESOLVE = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
 const NATIONAL = "microcosm-uk-2024-25-national";
@@ -72,7 +76,7 @@ function releasesRecord(): Record<string, unknown> {
     default: NATIONAL,
     releases: {
       [NATIONAL]: {
-        role: "national_default",
+        role: "national",
         current: NATIONAL_CURRENT,
         builds: {
           [NATIONAL_OLDER]: build("2026-10-14T21:44:43+00:00"),
@@ -82,7 +86,7 @@ function releasesRecord(): Record<string, unknown> {
         },
       },
       [DENSE]: {
-        role: "non_default_local_area",
+        role: "local_area",
         current: null,
         builds: { [DENSE_BUILD]: build("2026-10-19T07:53:18+00:00") },
       },
@@ -91,24 +95,35 @@ function releasesRecord(): Record<string, unknown> {
 }
 
 interface RepositoryOptions {
-  record?: Record<string, unknown>;
+  /** The repository's releases.json; null when it has none. */
+  record?: Record<string, unknown> | null;
+  /** Hugging Face's answer for releases.json, in place of the record. */
+  recordResponse?: () => Response;
   diagnosticsFor?: (folderId: string) => Record<string, unknown>;
   /** A build folder whose listing Hugging Face answers with a server error. */
   unreadableFolder?: string;
+  /** The dataset repository; the UK's by default. */
+  repo?: string;
 }
 
 function buildFolderRepository(requested: string[], options: RepositoryOptions = {}) {
-  const record = options.record ?? releasesRecord();
+  const record = options.record === undefined ? releasesRecord() : options.record;
   const diagnosticsFor = options.diagnosticsFor ?? (() => SCHEMA_8_DIAGNOSTICS);
+  const repo = options.repo ?? UK_REPO;
+  const api = `https://huggingface.co/api/datasets/${repo}`;
+  const resolve = `https://huggingface.co/datasets/${repo}/resolve`;
   return (async (input: string | URL | Request) => {
     const url = String(input);
     requested.push(url);
-    if (url === `${API}/revision/main`) return Response.json({ sha: MAIN_SHA });
-    if (url === `${RESOLVE}/${MAIN_SHA}/releases.json`) return Response.json(record);
+    if (url === `${api}/revision/main`) return Response.json({ sha: MAIN_SHA });
+    if (url === `${resolve}/${MAIN_SHA}/releases.json`) {
+      if (options.recordResponse) return options.recordResponse();
+      return record == null ? missingReleasesRecord() : Response.json(record);
+    }
     for (const [folderId, commit] of Object.entries(FOLDER_COMMITS)) {
       const [release, build] = folderId.split("/");
       const prefix = `releases/${folderId}`;
-      if (url === `${API}/tree/${MAIN_SHA}/releases/${release}/${build}?recursive=false&expand=true`) {
+      if (url === `${api}/tree/${MAIN_SHA}/releases/${release}/${build}?recursive=false&expand=true`) {
         if (folderId === options.unreadableFolder) return new Response(null, { status: 503 });
         const names = build === UNCALIBRATED_BUILD
           ? ["release_manifest.json", "microcosm_uk_2024_25.h5"]
@@ -119,19 +134,19 @@ function buildFolderRepository(requested: string[], options: RepositoryOptions =
           lastCommit: { id: commit.sha, date: commit.date },
         })));
       }
-      if (url === `${RESOLVE}/${commit.sha}/${prefix}/release_manifest.json`) {
+      if (url === `${resolve}/${commit.sha}/${prefix}/release_manifest.json`) {
         return Response.json({
           release,
           build: build === MISLABELLED_BUILD ? NATIONAL_CURRENT : build,
           artifacts: {},
         });
       }
-      if (url === `${RESOLVE}/${commit.sha}/${prefix}/calibration_diagnostics.json`) {
+      if (url === `${resolve}/${commit.sha}/${prefix}/calibration_diagnostics.json`) {
         return Response.json(diagnosticsFor(folderId));
       }
       if (
-        url === `${RESOLVE}/${commit.sha}/${prefix}/build_manifest.json` ||
-        url === `${RESOLVE}/${commit.sha}/${prefix}/demographics.json`
+        url === `${resolve}/${commit.sha}/${prefix}/build_manifest.json` ||
+        url === `${resolve}/${commit.sha}/${prefix}/demographics.json`
       ) {
         return new Response(null, { status: 404 });
       }
@@ -140,7 +155,7 @@ function buildFolderRepository(requested: string[], options: RepositoryOptions =
   }) as typeof fetch;
 }
 
-function memoryStore(initial: CalibrationTreeManifest) {
+function memoryStore(initial: CalibrationTreeManifest, country: MicrocosmCountry = "uk") {
   let manifest = initial;
   const uploads: CalibrationTreeBundle[] = [];
   const writes: Array<{ entry: CalibrationTreeManifestEntry; makeLatest?: boolean }> = [];
@@ -153,7 +168,7 @@ function memoryStore(initial: CalibrationTreeManifest) {
     audit: async () => ({ complete: true, repairable: true, reasons: [], index: null }),
     updateManifest: async (entry: CalibrationTreeManifestEntry, makeLatest?: boolean) => {
       writes.push({ entry, makeLatest });
-      manifest = withCalibrationTreeManifestEntry(manifest, "uk", entry, makeLatest);
+      manifest = withCalibrationTreeManifestEntry(manifest, country, entry, makeLatest);
       return manifest;
     },
     uploadBundle: async (bundle: CalibrationTreeBundle) => {
@@ -219,7 +234,7 @@ test("release reconciliation publishes every build releases.json lists, from its
   const requested: string[] = [];
   globalThis.fetch = buildFolderRepository(requested);
 
-  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
 
   expect(Object.fromEntries(report.outcomes.map((outcome) => [outcome.sourceId, outcome.status])))
     .toEqual({
@@ -247,7 +262,7 @@ test("a build whose folder cannot be read is reported as failed, and the other l
   const store = memoryStore(manifestWithEarlierEntries());
   globalThis.fetch = buildFolderRepository([], { unreadableFolder: folder(NATIONAL, NATIONAL_OLDER) });
 
-  const reconciliation = reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  const reconciliation = reconcileReleaseBuilds("uk", "blob-token", false, store);
   await expect(reconciliation).resolves.toBeDefined();
   const report = await reconciliation;
 
@@ -271,7 +286,7 @@ test("a build is dated by the publication time releases.json records, not by the
   const store = memoryStore(emptyCalibrationTreeManifest());
   globalThis.fetch = buildFolderRepository([]);
 
-  await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  await reconcileReleaseBuilds("uk", "blob-token", false, store);
 
   const older = store.current().countries.uk!.builds
     .find((build) => build.releaseId === folder(NATIONAL, NATIONAL_OLDER))!;
@@ -283,7 +298,7 @@ test("the latest release becomes the current build of the record's default relea
   const store = memoryStore(manifestWithEarlierEntries());
   globalThis.fetch = buildFolderRepository([]);
 
-  await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  await reconcileReleaseBuilds("uk", "blob-token", false, store);
 
   const manifest = store.current().countries.uk!;
   const current = manifest.builds.find(
@@ -300,8 +315,7 @@ test("reconciliation reads nothing but releases.json and the build folders it li
     "uk",
     "blob-token",
     false,
-    memoryStore(emptyCalibrationTreeManifest()),
-    "build_folders",
+    memoryStore(emptyCalibrationTreeManifest())
   );
 
   // No tag list, no pointer file, no listing of releases/ itself.
@@ -323,7 +337,7 @@ test("entries published before the build folders stay in the dashboard manifest 
   const store = memoryStore(manifestWithEarlierEntries());
   globalThis.fetch = buildFolderRepository([]);
 
-  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
 
   const builds = store.current().countries.uk!.builds;
   for (const earlier of earlierEntries()) {
@@ -335,11 +349,11 @@ test("entries published before the build folders stay in the dashboard manifest 
 test("a second reconciliation finds every listed build complete without listing their folders again", async () => {
   const store = memoryStore(emptyCalibrationTreeManifest());
   globalThis.fetch = buildFolderRepository([]);
-  await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  await reconcileReleaseBuilds("uk", "blob-token", false, store);
 
   const requested: string[] = [];
   globalThis.fetch = buildFolderRepository(requested);
-  const again = await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  const again = await reconcileReleaseBuilds("uk", "blob-token", false, store);
 
   expect(again.outcomes.filter((outcome) => outcome.status !== "ineligible")
     .every((outcome) => outcome.status === "complete")).toBe(true);
@@ -356,8 +370,7 @@ test("a listed build is not published when its folder has no calibration diagnos
     "uk",
     "blob-token",
     false,
-    memoryStore(emptyCalibrationTreeManifest()),
-    "build_folders",
+    memoryStore(emptyCalibrationTreeManifest())
   );
 
   const reason = (build: string) =>
@@ -374,7 +387,7 @@ test("a build's comparison metadata names the build, not the release its diagnos
     diagnosticsFor: (folderId) => ({ ...SCHEMA_8_DIAGNOSTICS, release_id: folderId.split("/")[0] }),
   });
 
-  await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  await reconcileReleaseBuilds("uk", "blob-token", false, store);
 
   expect(store.uploads).toHaveLength(3);
   for (const bundle of store.uploads) {
@@ -390,7 +403,7 @@ test("reconciliation refuses a releases.json the release writer would refuse, be
   const store = memoryStore(emptyCalibrationTreeManifest());
   globalThis.fetch = buildFolderRepository([], { record });
 
-  await expect(reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders"))
+  await expect(reconcileReleaseBuilds("uk", "blob-token", false, store))
     .rejects.toThrow("is withdrawn");
   expect(store.uploads).toHaveLength(0);
   expect(store.writes).toHaveLength(0);
@@ -408,7 +421,7 @@ test("reconciliation refuses a releases.json larger than the release writer acce
       ? new Response(oversized)
       : repository(input)) as typeof fetch;
 
-  await expect(reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders"))
+  await expect(reconcileReleaseBuilds("uk", "blob-token", false, store))
     .rejects.toThrow("releases.json is larger than 4194304 bytes.");
   expect(store.uploads).toHaveLength(0);
   expect(store.writes).toHaveLength(0);
@@ -423,7 +436,7 @@ test("without a current build of the default release, reconciliation publishes t
 
   // Reconciliation reports why the latest release was not selected, and the
   // publisher then exits with an error (reconciliationFailureMessage).
-  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
   expect(report.latestReleaseFailure).toContain("names no current build of its default release");
   expect(store.uploads).toHaveLength(3);
   expect(store.current().countries.uk!.latestReleaseBuildArtifactId).toBe(latestBefore);
@@ -478,33 +491,67 @@ test("a single-build publication refuses a build releases.json does not list, be
   await withBlobToken(async () => {
     await expect(runPublisher(
       { country: "uk", mode: "release", releaseId: folder(NATIONAL, "uk-frs-calibration-attempt-unlisted") },
-      { releaseLayout: "build_folders" },
     )).rejects.toThrow("does not list build");
   });
   expect(requested.some((url) => url.includes("/tree/"))).toBe(false);
 });
 
-test("a single-build publication names a build folder only where the country publishes build folders", async () => {
-  const requested: string[] = [];
-  globalThis.fetch = buildFolderRepository(requested);
+test("a single-build publication takes a build folder only from a repository with releases.json, and a tag only from one without", async () => {
+  const withoutRecord: string[] = [];
+  const withRecord: string[] = [];
 
   await withBlobToken(async () => {
+    globalThis.fetch = buildFolderRepository(withoutRecord, { record: null });
     await expect(runPublisher(
       { country: "uk", mode: "release", releaseId: folder(NATIONAL, NATIONAL_CURRENT) },
-      { releaseLayout: "release_folders" },
-    )).rejects.toThrow("publishes release folders");
+    )).rejects.toThrow("has no releases.json");
+    globalThis.fetch = buildFolderRepository(withRecord);
     await expect(runPublisher(
       { country: "uk", mode: "release", releaseId: TAGGED_BUILD },
-      { releaseLayout: "build_folders" },
-    )).rejects.toThrow("publishes build folders");
+    )).rejects.toThrow("has releases.json; --release takes <release>/<build>");
   });
-  expect(requested).toEqual([]);
+  // Each refusal follows the one read that tells the layouts apart.
+  for (const requested of [withoutRecord, withRecord]) {
+    expect(requested).toEqual([`${API}/revision/main`, `${RESOLVE}/${MAIN_SHA}/releases.json`]);
+  }
+});
+
+test("a repository with releases.json is reconciled from it, whichever country it belongs to", async () => {
+  const store = memoryStore(emptyCalibrationTreeManifest(), "be");
+  const requested: string[] = [];
+  globalThis.fetch = buildFolderRepository(requested, { repo: BE_REPO });
+
+  const reconciliation = reconcileReleaseBuilds("be", "blob-token", false, store);
+  await expect(reconciliation).resolves.toBeDefined();
+  const report = await reconciliation;
+
+  expect(Object.fromEntries(report.outcomes.map((outcome) => [outcome.sourceId, outcome.status])))
+    .toMatchObject({
+      [folder(NATIONAL, NATIONAL_CURRENT)]: "published",
+      [folder(DENSE, DENSE_BUILD)]: "published",
+    });
+  const manifest = store.current().countries.be!;
+  expect(manifest.latestReleaseBuildArtifactId).toBe(
+    manifest.builds.find((build) => build.releaseId === folder(NATIONAL, NATIONAL_CURRENT))!.buildArtifactId,
+  );
+  expect(requested.some((url) => url.endsWith("/refs"))).toBe(false);
+});
+
+test("a 404 that says the revision is missing is an error, not a repository without releases.json", async () => {
+  const requested: string[] = [];
+  globalThis.fetch = buildFolderRepository(requested, { repo: BE_REPO, recordResponse: missingRevision });
+
+  await expect(reconcileReleaseBuilds("be", "blob-token", false, memoryStore(emptyCalibrationTreeManifest(), "be")))
+    .rejects.toThrow("404");
+  // Neither tags nor pointer files are read in its place.
+  expect(requested.some((url) => url.endsWith("/refs"))).toBe(false);
+  expect(requested.some((url) => /\/latest[^/]*\.json$/.test(url))).toBe(false);
 });
 
 test("the timestamp migration leaves build-folder entries dated as releases.json dated them", async () => {
   const store = memoryStore(emptyCalibrationTreeManifest());
   globalThis.fetch = buildFolderRepository([]);
-  await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  await reconcileReleaseBuilds("uk", "blob-token", false, store);
   const writesBefore = store.writes.length;
 
   const requested: string[] = [];

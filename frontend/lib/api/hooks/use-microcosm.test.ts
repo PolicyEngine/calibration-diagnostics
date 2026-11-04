@@ -8,6 +8,7 @@ import {
   microcosmComparisonTreeIndexQueryOptions,
   microcosmStagingCalibrationTreeQueryOptions,
   microcosmStagingTargetChangeSourceParameters,
+  releaseSelectOptions,
 } from "./use-microcosm";
 
 test("calibration tree part requests start without waiting for earlier parts", async () => {
@@ -92,4 +93,28 @@ test("live candidates compare with the selected immutable staging build", () => 
   expect(
     microcosmStagingTargetChangeSourceParameters("latest-release"),
   ).toEqual({ release: "latest-release" });
+});
+
+test("the release picker keeps a withdrawn build selectable and labels it Withdrawn", () => {
+  const release = "microcosm-uk-2024-25-national";
+  const entry = (build: string, withdrawn: boolean) => ({
+    release_id: `${release}/${build}`,
+    date: "20261019T083323Z",
+    files: [],
+    has_calibration: true,
+    release,
+    build,
+    withdrawn,
+  });
+  const withdrawn = entry("uk-frs-calibration-attempt-20261014T214443Z-d12ff9b3", true);
+  const current = entry("uk-frs-calibration-attempt-20261019T083323Z-6cba5d71", false);
+  const options = releaseSelectOptions({
+    latest_release_id: current.release_id,
+    updated_at: null,
+    releases: [current, withdrawn],
+    all_releases: [current, withdrawn],
+  });
+  const label = (id: string) => options.find((option) => option.value === id)?.label ?? "";
+  expect(label(withdrawn.release_id)).toEndWith(" · Withdrawn");
+  expect(label(current.release_id)).not.toContain("Withdrawn");
 });

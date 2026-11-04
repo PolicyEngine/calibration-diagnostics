@@ -19,6 +19,7 @@ import {
   type CalibrationTreeManifestEntry,
 } from "./calibration-tree-manifest";
 import type { CalibrationTreeBundle } from "./calibration-tree-bundle";
+import { missingReleasesRecord } from "./test-support/releases-record-responses";
 import { schema9Diagnostics } from "./test-support/schema-9-diagnostics";
 
 const originalFetch = globalThis.fetch;
@@ -442,6 +443,8 @@ test("release reconciliation leaves a complete entry's metadata to the migration
       ]);
     }
     if (url.includes(`/api/datasets/${UK_REPO}/revision/main`)) return Response.json({ sha: UK_SHA });
+    // The repository has no releases.json, so its tags and pointer files are read.
+    if (url.endsWith(`/resolve/${UK_SHA}/releases.json`)) return missingReleasesRecord();
     if (url.includes(`/api/datasets/${UK_REPO}/revision/${UK_RELEASE}`)) {
       return new Response(null, { status: 404 });
     }
@@ -458,7 +461,7 @@ test("release reconciliation leaves a complete entry's metadata to the migration
     throw new Error(`Unexpected URL ${url}`);
   }) as typeof fetch;
   try {
-    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     expect(report.outcomes.find((item) => item.sourceId === UK_RELEASE)?.status).toBe("complete");
     expect(report.outcomes.find((item) => item.sourceId === currentTag)?.status).toBe("complete");
     expect(store.current().countries.uk?.builds).toHaveLength(2);
@@ -649,6 +652,8 @@ function lineRepositoryFetch(
       return Response.json([{ id: commit, date: COMMIT_DATES[commit] }]);
     }
     if (url === `${api}/revision/main`) return Response.json({ sha: MAIN_SHA });
+    // The repository has no releases.json, so its tags and pointer files are read.
+    if (url === `${resolve}/${MAIN_SHA}/releases.json`) return missingReleasesRecord();
     if (url === `${resolve}/${MAIN_SHA}/latest-national.json`) {
       return Response.json({
         schema_version: 1,
@@ -683,7 +688,7 @@ test("release reconciliation publishes each line cut from its folder and follows
   const requested: string[] = [];
   globalThis.fetch = lineRepositoryFetch(requested);
   try {
-    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     const status = Object.fromEntries(
       report.outcomes.map((outcome) => [outcome.sourceId, outcome.status]),
     );
@@ -738,7 +743,7 @@ test("release reconciliation publishes each line cut from its folder and follows
     // A second run finds every build complete and does not probe the
     // published cuts again.
     requested.length = 0;
-    const again = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
+    const again = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     expect(again.outcomes.filter((outcome) => outcome.status !== "ineligible")
       .every((outcome) => outcome.status === "complete")).toBe(true);
     expect(store.uploads).toHaveLength(2);
@@ -771,6 +776,27 @@ const REFUSED_SCHEMA_8_DIAGNOSTICS = {
 const REFUSED_SCHEMA_8_ERROR =
   "Schema 8 category provider.category references inconsistent providers: provider and other.";
 
+test("a repository without releases.json is reconciled from its tags and pointer files", async () => {
+  const requested: string[] = [];
+  globalThis.fetch = lineRepositoryFetch(requested);
+  const store = lineStoreWithJuneLatest();
+  try {
+    const reconciliation = reconcileReleaseBuilds("uk", "blob-token", false, store);
+    await expect(reconciliation).resolves.toBeDefined();
+    const report = await reconciliation;
+    expect(report.outcomes.find((outcome) => outcome.sourceId === NATIONAL_CUT)?.status).toBe("published");
+    const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
+    const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
+    // releases.json is looked for once, at main's head, and then never again.
+    expect(requested.filter((url) => url.endsWith("/releases.json")))
+      .toEqual([`${resolve}/${MAIN_SHA}/releases.json`]);
+    expect(requested).toContain(`${api}/refs`);
+    expect(requested).toContain(`${resolve}/${MAIN_SHA}/latest-national.json`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 function lineStoreWithJuneLatest(
   options: { incompleteAfterUpload?: ReadonlySet<string> } = {},
 ) {
@@ -794,7 +820,7 @@ test("release reconciliation records a release it cannot build as failed and sti
     directory === DENSE_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS
   );
   try {
-    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     const status = Object.fromEntries(
       report.outcomes.map((outcome) => [outcome.sourceId, outcome.status]),
     );
@@ -855,7 +881,7 @@ test("a release whose commit cannot be read is reported as failed, and the other
     untaggedFolder: MAY_RELEASE,
   });
   try {
-    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     const status = Object.fromEntries(
       report.outcomes.map((outcome) => [outcome.sourceId, outcome.status]),
     );
@@ -906,7 +932,7 @@ test("a release whose uploaded build fails its audit gets no manifest entry, and
   const store = lineStoreWithJuneLatest({ incompleteAfterUpload: new Set([DENSE_CUT]) });
   globalThis.fetch = lineRepositoryFetch([]);
   try {
-    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     const dense = report.outcomes.find((outcome) => outcome.sourceId === DENSE_CUT);
     expect(dense?.status).toBe("failed");
     expect(dense?.buildArtifactId).toBeNull();
@@ -944,7 +970,7 @@ test("when the release the pointer file names fails, the latest-release selectio
     directory === NATIONAL_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS
   );
   try {
-    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
     expect(report.outcomes.find((outcome) => outcome.sourceId === NATIONAL_CUT)).toEqual({
       sourceId: NATIONAL_CUT,
       status: "failed",
@@ -991,7 +1017,7 @@ test("the publisher prints every release outcome, then exits with an error namin
   };
   try {
     await expect(
-      runPublisher({ country: "uk", mode: "reconcile-releases" }, { store, releaseLayout: "release_folders" }),
+      runPublisher({ country: "uk", mode: "reconcile-releases" }, { store }),
     ).rejects.toThrow(
       `2 of 5 releases failed to reconcile: ${DENSE_CUT}, ${JUNE_RELEASE}. ` +
         "The printed report gives each reason.",
@@ -1025,7 +1051,7 @@ test("a dry run records a failed release, writes nothing and still reports the r
     directory === DENSE_LINE ? REFUSED_SCHEMA_8_DIAGNOSTICS : SCHEMA_8_DIAGNOSTICS
   );
   try {
-    const report = await reconcileReleaseBuilds("uk", "blob-token", true, store, "release_folders");
+    const report = await reconcileReleaseBuilds("uk", "blob-token", true, store);
     expect(report.dryRun).toBe(true);
     expect(report.outcomes.find((outcome) => outcome.sourceId === DENSE_CUT)?.status)
       .toBe("failed");
@@ -1045,9 +1071,9 @@ test("release reconciliation publishes a schema 9 release with the tree of its s
   const schema9Store = lineStoreWithJuneLatest();
   try {
     globalThis.fetch = lineRepositoryFetch([]);
-    await reconcileReleaseBuilds("uk", "blob-token", false, schema8Store, "release_folders");
+    await reconcileReleaseBuilds("uk", "blob-token", false, schema8Store);
     globalThis.fetch = lineRepositoryFetch([], () => schema9Diagnostics(SCHEMA_8_DIAGNOSTICS));
-    const report = await reconcileReleaseBuilds("uk", "blob-token", false, schema9Store, "release_folders");
+    const report = await reconcileReleaseBuilds("uk", "blob-token", false, schema9Store);
 
     expect(report.outcomes.filter((outcome) => outcome.status === "published")
       .map((outcome) => outcome.sourceId).sort()).toEqual([DENSE_CUT, NATIONAL_CUT].sort());
@@ -1079,12 +1105,12 @@ test("a dry run reports the same latest-release failure as a run that writes whe
     `Latest release ${NATIONAL_CUT} failed to reconcile, so the latest-release selection was not changed.`;
   try {
     globalThis.fetch = lineRepositoryFetch([], refuseNationalDiagnostics);
-    const writingReport = await reconcileReleaseBuilds("uk", "blob-token", false, lineStoreWithJuneLatest(), "release_folders");
+    const writingReport = await reconcileReleaseBuilds("uk", "blob-token", false, lineStoreWithJuneLatest());
     expect(writingReport.latestReleaseFailure).toBe(expectedFailure);
 
     const dryRunStore = lineStoreWithJuneLatest();
     globalThis.fetch = lineRepositoryFetch([], refuseNationalDiagnostics);
-    const dryRunReport = await reconcileReleaseBuilds("uk", "blob-token", true, dryRunStore, "release_folders");
+    const dryRunReport = await reconcileReleaseBuilds("uk", "blob-token", true, dryRunStore);
     expect(dryRunReport.outcomes.find((outcome) => outcome.sourceId === NATIONAL_CUT)?.status)
       .toBe("failed");
     expect(dryRunReport.latestReleaseFailure).toBe(expectedFailure);
@@ -1166,7 +1192,7 @@ test("the latest publication refuses a pointer tag whose release manifest names 
   process.env.BLOB_READ_WRITE_TOKEN = "blob-token";
   try {
     await expect(readUpstreamLatest("uk")).rejects.toThrow("does not name it as its cut");
-    await expect(runPublisher({ country: "uk", mode: "latest" }, { releaseLayout: "release_folders" }))
+    await expect(runPublisher({ country: "uk", mode: "latest" }))
       .rejects.toThrow("does not name it as its cut");
     // Refused before any calibration file was read or any Blob was written.
     expect(requested.some((url) => url.endsWith("/calibration_diagnostics.json"))).toBe(false);
@@ -1234,7 +1260,7 @@ test("a published tag's comparison metadata names the tag, as its build does", a
     release_id: directory,
   }));
   try {
-    await reconcileReleaseBuilds("uk", "blob-token", false, store, "release_folders");
+    await reconcileReleaseBuilds("uk", "blob-token", false, store);
     const identities = store.uploads
       .map((bundle) => [bundle.index.build.releaseId, bundle.index.targetComparison.releaseId])
       .sort();

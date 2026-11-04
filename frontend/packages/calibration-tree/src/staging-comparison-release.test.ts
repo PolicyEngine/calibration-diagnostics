@@ -17,6 +17,7 @@ import {
   stagingResolveUrl,
   type StagingComparisonReleaseDependencies,
 } from "./staging-artifact";
+import { missingReleasesRecord } from "./test-support/releases-record-responses";
 
 // UK shapes as published on 19 Oct 2026. A local-area candidate's staged
 // receipt and run manifest record no dataset role, and its dataset file name
@@ -234,12 +235,12 @@ function recordedReleases() {
     default: NATIONAL_FOLDER,
     releases: {
       [NATIONAL_FOLDER]: {
-        role: "national_default",
+        role: "national",
         current: NATIONAL_BUILD.split("/")[1],
         builds: { [NATIONAL_BUILD.split("/")[1]]: build("2026-10-19T08:33:23+00:00") },
       },
       [DENSE_FOLDER]: {
-        role: "non_default_local_area",
+        role: "local_area",
         current: null,
         builds: {
           [DENSE_OLDER_BUILD.split("/")[1]]: build("2026-10-05T10:15:00+00:00"),
@@ -263,7 +264,7 @@ function buildFolderManifest(): CalibrationTreeManifest {
   );
 }
 
-test("for a country publishing build folders, a local-area candidate's baseline is the newest published build of a local-area release releases.json lists", async () => {
+test("for a repository with releases.json, a local-area candidate's baseline is the newest published build of a local-area release it lists", async () => {
   const originalFetch = globalThis.fetch;
   const requested: string[] = [];
   globalThis.fetch = (async (input: string | URL | Request) => {
@@ -274,11 +275,60 @@ test("for a country publishing build folders, a local-area candidate's baseline 
   }) as typeof fetch;
   try {
     const manifest = buildFolderManifest();
-    const releases = await stagingBaselineReleases(0, "uk", manifest, "build_folders");
+    const releases = await stagingBaselineReleases(0, "uk", manifest);
     expect(newestPublishedLocalAreaRelease(manifest, "uk", releases)?.releaseId)
       .toBe(DENSE_NEWER_BUILD);
     // Nothing but releases.json: no release-folder listing and no tags.
     expect(requested).toHaveLength(1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a withdrawn build is never a local-area candidate's baseline", async () => {
+  const record = recordedReleases();
+  record.releases[DENSE_FOLDER].builds[DENSE_NEWER_BUILD.split("/")[1]].withdrawn = true;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith("/resolve/main/releases.json")) return Response.json(record);
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+  try {
+    const manifest = buildFolderManifest();
+    const releases = await stagingBaselineReleases(0, "uk", manifest);
+    // The withdrawn build stays in the inventory, marked, as the picker shows it.
+    expect(releases.find((release) => release.release_id === DENSE_NEWER_BUILD)?.withdrawn).toBe(true);
+    expect(newestPublishedLocalAreaRelease(manifest, "uk", releases)?.releaseId)
+      .toBe(DENSE_OLDER_BUILD);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("for a repository without releases.json, the baseline comes from its release folders and published tagged builds", async () => {
+  const originalFetch = globalThis.fetch;
+  const requested: string[] = [];
+  const taggedDense = `${DENSE_FOLDER}-20261020T000000Z-ffffffff`;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.endsWith("/resolve/main/releases.json")) return missingReleasesRecord();
+    if (url.endsWith("/tree/main/releases?recursive=true")) return Response.json([]);
+    if (url.endsWith(`/resolve/${"9".repeat(40)}/releases/${DENSE_FOLDER}/release_manifest.json`)) {
+      return Response.json({ dataset_role: "non_default_local_area", is_default: false });
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  }) as typeof fetch;
+  try {
+    const manifest = buildFolderManifest();
+    const baseline = stagingBaselineReleases(0, "uk", manifest);
+    await expect(baseline).resolves.toBeDefined();
+    const releases = await baseline;
+    // Builds in their own folders are listed only from releases.json, so the
+    // tagged build published before them is the baseline.
+    expect(newestPublishedLocalAreaRelease(manifest, "uk", releases)?.releaseId).toBe(taggedDense);
+    expect(requested.some((url) => url.endsWith("/tree/main/releases?recursive=true"))).toBe(true);
   } finally {
     globalThis.fetch = originalFetch;
   }

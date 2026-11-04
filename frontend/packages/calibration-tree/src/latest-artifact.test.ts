@@ -51,9 +51,11 @@ import {
 import {
   emptyCalibrationTreeManifest,
   withCalibrationTreeManifestEntry,
+  type CalibrationTreeManifest,
   type CalibrationTreeManifestEntry,
 } from "./calibration-tree-manifest";
 import { buildCalibrationTree } from "./calibration-tree";
+import { missingReleasesRecord, missingRevision } from "./test-support/releases-record-responses";
 
 test("keeps Microcosm deployment configuration on its published Populace env contract", () => {
   expect([
@@ -3514,7 +3516,7 @@ const RECORDED_RELEASES = {
   default: LINE,
   releases: {
     [LINE]: {
-      role: "national_default",
+      role: "national",
       current: NATIONAL_CURRENT,
       builds: {
         [NATIONAL_OLDER]: { published_at: "2026-10-14T21:44:43+00:00", withdrawn: true },
@@ -3522,7 +3524,7 @@ const RECORDED_RELEASES = {
       },
     },
     [DENSE_LINE]: {
-      role: "non_default_local_area",
+      role: "local_area",
       current: null,
       builds: {
         [DENSE_BUILD]: { published_at: "2026-10-19T07:53:18+00:00", withdrawn: false },
@@ -3555,13 +3557,14 @@ function publishedBuildManifest(releaseIds: string[]) {
 async function withRecordedReleases<T>(
   record: unknown,
   run: (requested: string[]) => Promise<T>,
+  recordResponse: () => Response = () => Response.json(record),
 ): Promise<T> {
   const originalFetch = globalThis.fetch;
   const requested: string[] = [];
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input);
     requested.push(url);
-    if (url === hfResolveUrl("releases.json", "uk")) return Response.json(record);
+    if (url === hfResolveUrl("releases.json", "uk")) return recordResponse();
     throw new Error(`Unexpected URL ${url}`);
   }) as typeof fetch;
   try {
@@ -3569,6 +3572,13 @@ async function withRecordedReleases<T>(
   } finally {
     globalThis.fetch = originalFetch;
   }
+}
+
+// The picker inventory of a repository that has releases.json.
+async function recordedInventory(manifest: CalibrationTreeManifest) {
+  const releases = await loadRecordedReleases(0, "uk", manifest);
+  if (!releases) throw new Error("The fixture repository's releases.json was not read.");
+  return releases;
 }
 
 test("the release picker lists every build releases.json lists, named by its folder, with its release's role and publication time", async () => {
@@ -3586,7 +3596,7 @@ test("the release picker lists every build releases.json lists, named by its fol
       date: "20261019T083323Z",
       files: [],
       has_calibration: true,
-      dataset_role: "national_default",
+      dataset_role: "national",
       is_default: true,
       is_local_area: false,
       release: LINE,
@@ -3598,7 +3608,7 @@ test("the release picker lists every build releases.json lists, named by its fol
       date: "20261019T075318Z",
       files: [],
       has_calibration: true,
-      dataset_role: "non_default_local_area",
+      dataset_role: "local_area",
       is_default: false,
       is_local_area: true,
       release: DENSE_LINE,
@@ -3610,13 +3620,12 @@ test("the release picker lists every build releases.json lists, named by its fol
       date: "20261014T214443Z",
       files: [],
       has_calibration: true,
-      dataset_role: "national_default",
+      dataset_role: "national",
       is_default: true,
       is_local_area: false,
       release: LINE,
       build: NATIONAL_OLDER,
-      // Carried as releases.json records it; how the picker shows a
-      // withdrawn build is not decided here.
+      // Listed and selectable; the picker labels it "Withdrawn".
       withdrawn: true,
     },
   ]);
@@ -3624,7 +3633,7 @@ test("the release picker lists every build releases.json lists, named by its fol
 
 test("a listed build counts as calibrated only once its calibration tree is in the dashboard manifest", async () => {
   const releases = await withRecordedReleases(RECORDED_RELEASES, () =>
-    loadRecordedReleases(0, "uk", publishedBuildManifest([`${LINE}/${NATIONAL_CURRENT}`])),
+    recordedInventory(publishedBuildManifest([`${LINE}/${NATIONAL_CURRENT}`])),
   );
   expect(Object.fromEntries(releases.map((release) => [release.release_id, release.has_calibration])))
     .toEqual({
@@ -3672,7 +3681,7 @@ test("the dashboard's latest release stays listed until reconciliation moves it 
     true,
   );
   const releases = await withRecordedReleases(RECORDED_RELEASES, () =>
-    loadRecordedReleases(0, "uk", beforeReconciliation),
+    recordedInventory(beforeReconciliation),
   );
   expect(releases.map((release) => release.release_id)).toEqual([
     taggedBuild,
@@ -3704,13 +3713,28 @@ test("the dashboard's latest release stays listed until reconciliation moves it 
     true,
   );
   const reconciled = await withRecordedReleases(RECORDED_RELEASES, () =>
-    loadRecordedReleases(0, "uk", afterReconciliation),
+    recordedInventory(afterReconciliation),
   );
   expect(reconciled.map((release) => release.release_id)).toEqual([
     recordedCurrent,
     `${DENSE_LINE}/${DENSE_BUILD}`,
     `${LINE}/${NATIONAL_OLDER}`,
   ]);
+});
+
+test("the release picker reads no record from a repository without releases.json", async () => {
+  const requested = await withRecordedReleases(null, async (requested) => {
+    await expect(loadRecordedReleases(0, "uk", emptyCalibrationTreeManifest())).resolves.toBeNull();
+    return requested;
+  }, missingReleasesRecord);
+  // The route then lists the release folders and tagged builds instead.
+  expect(requested).toEqual([hfResolveUrl("releases.json", "uk")]);
+});
+
+test("for the release picker, a 404 that says the revision is missing is an error, not a repository without releases.json", async () => {
+  await withRecordedReleases(null, async () => {
+    await expect(loadRecordedReleases(0, "uk", emptyCalibrationTreeManifest())).rejects.toThrow("404");
+  }, missingRevision);
 });
 
 // The writer's ReleasesRecord.parse refuses a record over MAX_RECORD_BYTES

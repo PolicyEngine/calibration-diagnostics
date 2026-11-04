@@ -19,6 +19,7 @@ import {
   type CalibrationTreeGoldenRecord,
   type GoldenReleaseInput,
 } from "./test-support/calibration-tree-golden-cases";
+import { missingReleasesRecord } from "./test-support/releases-record-responses";
 import {
   reconcileReleaseBuilds,
   reconcileStagingBuilds,
@@ -27,8 +28,8 @@ import {
   type ReconciliationReport,
 } from "@policyengine/calibration-tree/publish-calibration-tree";
 
-// The recorded releases are release folders, so every repair here names that
-// layout, including the UK's, whose registration now publishes build folders.
+// The recorded releases are release folders: the repositories here have no
+// releases.json, so they are read from their tags and pointer files.
 //
 // A repair rebuilds a published release whose index went missing and refuses
 // any rebuilt index whose digest differs from the manifest entry. Seeding the
@@ -82,6 +83,7 @@ function huggingFaceReleaseRepository(release: GoldenReleaseInput): typeof fetch
       }),
     ],
     [`${api}/revision/main`, () => Response.json({ sha: MAIN_REVISION_SHA })],
+    [resolveUrl(MAIN_REVISION_SHA, "releases.json"), missingReleasesRecord],
     [`${api}/revision/${release.releaseId}`, () => Response.json({ sha: release.hfCommitSha })],
   ]);
   const pointerPath = countryPointerPath(release.country);
@@ -193,7 +195,7 @@ for (const [name, description] of Object.entries(RELEASE_DESCRIPTIONS) as Array<
       globalThis.fetch = huggingFaceReleaseRepository(release);
 
       const report = await withRegisteredRepositories(() =>
-        reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry), "release_folders")
+        reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry))
       );
 
       expect(report.outcomes).toEqual([{
@@ -213,7 +215,7 @@ test("a repair refuses a rebuilt index that differs from the recorded digest and
   globalThis.fetch = huggingFaceReleaseRepository(release);
 
   const report = await withRegisteredRepositories(() =>
-    reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry), "release_folders")
+    reconcileReleaseBuilds(release.country, "unused-blob-token", true, storeMissingIndex(release, entry))
   );
 
   expect(report.outcomes).toEqual([{
