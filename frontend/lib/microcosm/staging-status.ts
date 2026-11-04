@@ -39,3 +39,32 @@ export function formatStagingCurrentStatus(progress: JsonObject): string {
 
   return formatStagingStatus(progress.status);
 }
+
+export interface CandidateCurrentStatus {
+  status: string | null;
+  stage: string | null;
+  failure: { stage: string | null; message: string | null } | null;
+  calibration: { epoch: number | null; epochs: number | null } | null;
+}
+
+// The Candidate tab's "Current status": the stage a failed or refused run
+// stopped at, otherwise the current stage as the Hugging Face progress
+// document presents it.
+export function formatCandidateCurrentStatus(state: CandidateCurrentStatus): string {
+  const stoppedAt = stringValue(state.failure?.stage);
+  if (state.status === "failed") {
+    return stoppedAt ? `Failed during ${sentenceCaseIdentifier(stoppedAt)}` : "Failed";
+  }
+  if (state.status === "blocked") {
+    return stoppedAt ? `Refused at ${sentenceCaseIdentifier(stoppedAt)}` : "Refused";
+  }
+  return formatStagingCurrentStatus({
+    status: state.status,
+    stage: state.stage,
+    calibration: state.calibration,
+  });
+}
+
+export function formatStateSource(source: "collector" | "hugging_face"): string {
+  return source === "collector" ? "Telemetry collector" : "Hugging Face staging repository";
+}

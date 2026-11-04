@@ -29,7 +29,35 @@ checks stop builds. The run selected on either tab carries over to the other.
 - **Historical Hugging Face telemetry.** During migration, the hosted view also
   reads version 1, 2 and 3 run documents from each country's Hugging Face
   staging repository. A collector record replaces a historical record with the
-  same run id.
+  same run id, except that a collector record that stopped before the run
+  ended never hides an end the Hugging Face copy recorded after the record's
+  latest update. The Candidate tab applies the same rule to the runs it lists.
+
+  Uploads to Hugging Face never pass through the collector, so its record
+  always says delivery mode `collector` with no counts. A collector record
+  that replaces a copy keeps the copy's upload record (files attempted and
+  uploaded, or a failed write check), and a run's uploads show as `unknown`
+  only when it has no copy that records them.
+
+  Every Staging route reads the collector's run list (the country's 60 most
+  recent runs) through one cache on each server instance. On Vercel the
+  Candidate tab's selected-run route (`staging/run`, `maxDuration` 300) runs
+  in a different function from the Build progress routes and the Candidate
+  run list (120), because Vercel groups routes into one function only when
+  their settings match, so it keeps its own cache. An answer is
+  reused for 15 seconds, and a failed request is tried again on the next
+  call. The Candidate tab waits at most 5 seconds for the list. After that it
+  uses the list's latest earlier answer if that answered less than 60 seconds
+  ago (two of its 30-second polls), and otherwise shows the Hugging Face
+  states with a note; the late answer serves the next poll. A request still
+  in flight is shared only for 5 seconds after it was made, and a later call
+  makes its own request: once the Candidate tab has stopped waiting for a
+  request, nothing keeps it running, and Vercel can suspend the instance
+  with it in flight. Every collector request needs the collector's read
+  credential from Google Secret Manager, and that read follows the same
+  rule: a read still in flight is shared for 5 seconds after it began, and a
+  read that answered is reused for 60 seconds after it began. Each run's own
+  record is read on every request, as before.
 - **Local run folders.** The dashboard can still inspect legacy or diagnostic
   run folders on the same machine. Point it at the directory that holds them:
 
@@ -82,6 +110,13 @@ checks stop builds. The run selected on either tab carries over to the other.
 The forecast compares the run with finished runs of the same pipeline from
 the same source (version 2 and 3 runs by pipeline id; version 1 US runs as one
 release pipeline), up to the 12 most recent.
+
+Smoke runs (run kind `smoke`) and dry runs (`dry_run`) form pipelines of
+their own, labelled "(smoke)" and "(dry run)", with their own history and
+forecasts. A dry run checks its configuration, pins its inputs and stops, so
+it would otherwise count as a passed run that ended after its first two
+stages. The UK spine build registers its own pipeline id, `uk-frs-spine`, so
+it is never compared with the calibration runs that read its output.
 
 Runs of one pipeline can still differ in what they do: UK local candidates kept
 the pipeline id `uk-local-candidate` 0.1.0 when cloning and surface resolution

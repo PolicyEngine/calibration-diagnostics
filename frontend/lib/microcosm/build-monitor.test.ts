@@ -9,6 +9,7 @@ import {
   type BuildTimeline,
   buildTimeline,
   calibrationRate,
+  comparableHistory,
   stopStatistics,
   failureReason,
   forecastCompletion,
@@ -256,6 +257,84 @@ describe("buildTimeline, version 2 lifecycle", () => {
     );
     expect(smoke.pipeline).toBe("GB:uk-frs-calibration:smoke");
     expect(smoke.pipeline_label).toBe("UK FRS calibration (smoke)");
+  });
+
+  // A calibration dry run (`--dry-run`) registers run kind `dry_run`: it
+  // checks its configuration, pins its inputs and stops, so its two stages
+  // are the start of every full run's and it ends in minutes.
+  function dryRun(runId: string): BuildRunDocuments {
+    return {
+      run_id: runId,
+      source: "staging",
+      country: "uk",
+      progress: {
+        schema_version: 2,
+        run_id: runId,
+        country_code: "GB",
+        pipeline: { id: "uk-frs-calibration", version: "collector-v1" },
+        run_kind: "dry_run",
+        started_at: at(-min(20)),
+        updated_at: at(-min(2)),
+        status: "completed",
+        current_stage: "complete",
+      },
+      run_manifest: null,
+      calibration_progress: null,
+      events: [
+        v2Event(1, -min(20), "created", "started"),
+        v2Event(2, -min(20), "preflight", "started"),
+        v2Event(3, -min(19), "preflight", "completed"),
+        v2Event(4, -min(19), "input_pinning", "started"),
+        v2Event(5, -min(2), "input_pinning", "completed"),
+        v2Event(6, -min(2), "complete", "completed"),
+      ],
+    };
+  }
+
+  const calibrationRun: BuildRunDocuments = {
+    ...documents,
+    progress: { ...documents.progress!, run_kind: "calibration" },
+  };
+
+  test("keeps dry runs apart from full runs of the same pipeline", () => {
+    const dry = buildTimeline(dryRun("uk-dry"), T0 + min(9));
+
+    expect(dry.state).toBe("passed");
+    expect(dry.pipeline).toBe("GB:uk-frs-calibration:dry_run");
+    expect(dry.pipeline_label).toBe("UK FRS calibration (dry run)");
+  });
+
+  test("a dry run is not in a calibration run's history or forecast", () => {
+    const live = buildTimeline(calibrationRun, T0 + min(9));
+    const dry = buildTimeline(dryRun("uk-dry"), T0 + min(9));
+
+    expect(live.pipeline).toBe("GB:uk-frs-calibration");
+    expect(comparableHistory(live, [live, dry])).toEqual([]);
+    expect(forecastCompletion(live, [live, dry], T0 + min(9))?.basis_runs).toEqual([]);
+  });
+
+  test("a spine build is a pipeline of its own", () => {
+    // The spine build registers pipeline `uk-frs-spine` and run kind `spine`,
+    // so it never shares a calibration run's history.
+    const spine = buildTimeline(
+      {
+        ...calibrationRun,
+        run_id: "uk-spine",
+        progress: {
+          ...calibrationRun.progress!,
+          run_id: "uk-spine",
+          pipeline: { id: "uk-frs-spine", version: "collector-v1" },
+          run_kind: "spine",
+          status: "completed",
+        },
+      },
+      T0 + min(9),
+    );
+    const live = buildTimeline(calibrationRun, T0 + min(9));
+
+    expect(spine.pipeline).toBe("GB:uk-frs-spine");
+    expect(spine.pipeline_label).toBe("UK FRS spine");
+    expect(comparableHistory(live, [live, spine])).toEqual([]);
   });
 
   test("reads the solver rate from calibration progress", () => {

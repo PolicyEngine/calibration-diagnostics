@@ -13,10 +13,13 @@ describe("calibration target representation", () => {
     }
     expect(targetRepresentationForSchema(7)).toBe("structured");
     expect(targetRepresentationForSchema(8)).toBe("hierarchy");
+    // Schema 9 declares hierarchy labels in catalogs; its reader expands
+    // them into the schema 8 rows, so it shares the hierarchy reader.
+    expect(targetRepresentationForSchema(9)).toBe("hierarchy");
   });
 
   test("rejects versions without a supported compatibility contract", () => {
-    for (const schemaVersion of [undefined, null, "8", 0, 9, 7.5]) {
+    for (const schemaVersion of [undefined, null, "8", 0, 10, 7.5]) {
       expect(() => targetRepresentationForSchema(schemaVersion)).toThrow(
         UnsupportedCalibrationDiagnosticsSchemaError,
       );

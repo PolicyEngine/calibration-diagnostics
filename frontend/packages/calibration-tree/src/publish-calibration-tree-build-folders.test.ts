@@ -394,8 +394,10 @@ test("without a current build of the default release, reconciliation publishes t
   const latestBefore = store.current().countries.uk!.latestReleaseBuildArtifactId;
   globalThis.fetch = buildFolderRepository([], { record });
 
-  await expect(reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders"))
-    .rejects.toThrow("names no current build of its default release");
+  // Reconciliation reports why the latest release was not selected, and the
+  // publisher then exits with an error (reconciliationFailureMessage).
+  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  expect(report.latestReleaseFailure).toContain("names no current build of its default release");
   expect(store.uploads).toHaveLength(3);
   expect(store.current().countries.uk!.latestReleaseBuildArtifactId).toBe(latestBefore);
 });

@@ -15,6 +15,12 @@ test("uses curated authority names for Chronicle and calibration sources", () =>
   expect(sourceAuthorityLabel("ici")).toBe("Investment Company Institute");
 });
 
+test("names ED Federal Student Aid as Microcosm's US provider labels do", () => {
+  // PolicyEngine/microcosm#1357 registers this label for provider ed_fsa in
+  // microcosm.calibrate.provider_labels.
+  expect(sourceAuthorityLabel("ed_fsa")).toBe("ED · Federal Student Aid");
+});
+
 test("uses the calibration-fit acronym-aware fallback for unknown sources", () => {
   expect(sourceAuthorityLabel("new_api_source")).toBe("New API Source");
   expect(sourceAuthorityLabel("constructor")).toBe("Constructor");

@@ -182,6 +182,16 @@ test("fact rows show sparse supported and unsupported cells accessibly", () => {
   });
 });
 
+test("fact rows and detail name an ED Federal Student Aid fact's Chronicle source", () => {
+  const edFsaFact: CrossDatasetFact = { ...fact, ledger_source: "ed_fsa" };
+  expect(buildFactRowView(edFsaFact, sources).chronicleSource).toBe(
+    "ED · Federal Student Aid",
+  );
+  expect(buildFactDetailView(edFsaFact, sources).observation.sourceLabel).toBe(
+    "ED · Federal Student Aid",
+  );
+});
+
 test("fact detail separates original observation, aligned benchmark, and estimate", () => {
   const detail = buildFactDetailView(fact, sources);
   expect(detail.observation).toMatchObject({

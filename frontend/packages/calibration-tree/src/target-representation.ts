@@ -43,10 +43,12 @@ export function targetRepresentationForSchema(
   }
   if (schemaVersion >= 1 && schemaVersion <= 6) return "legacy";
   if (schemaVersion === 7) return "structured";
-  if (schemaVersion === 8) return "hierarchy";
+  // Schema 9 declares the schema 8 hierarchy's labels in catalogs;
+  // `expandHierarchyCatalogs` turns its rows back into schema 8 rows.
+  if (schemaVersion === 8 || schemaVersion === 9) return "hierarchy";
   throw new UnsupportedCalibrationDiagnosticsSchemaError(
     `Unsupported calibration diagnostics schema_version ${schemaVersion}; ` +
-      "this dashboard reads versions 1 through 8.",
+      "this dashboard reads versions 1 through 9.",
   );
 }
 

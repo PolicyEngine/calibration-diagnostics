@@ -24,6 +24,7 @@ import {
 import { createHash } from "node:crypto";
 import {
   CalibrationReleaseNotFoundError,
+  isReleaseId,
   resolveHfBuildFolderSha,
   resolveHfCommitPublishedAt,
   resolveHfReleaseDirectorySha,
@@ -95,7 +96,6 @@ interface FetchedArtifact {
   source: CalibrationTreeSourceArtifact;
 }
 
-const RELEASE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const DEFAULT_MAX_RAW_BYTES = 100_000_000;
 const FINAL_STAGING_STATUSES = new Set(["passed", "published", "completed"]);
 
@@ -103,7 +103,12 @@ export class CalibrationTreeArtifactSizeError extends Error {}
 
 export interface ReconciliationOutcome {
   sourceId: string;
-  // `failed`: staging only; `reason` gives the error.
+  // `failed`: the source could not be published or repaired; `reason` gives
+  // the error. A failed release gets no new manifest entry unless the
+  // manifest write was stored and only its read-back check failed; an entry
+  // it already had is left as it was, and files uploaded before the error
+  // stay under its build ID. A failed staging run can already have its
+  // entry, because staging writes the entry before it audits the upload.
   status: "complete" | "published" | "repaired" | "ineligible" | "failed";
   buildArtifactId: string | null;
   reason: string | null;
@@ -114,6 +119,13 @@ export interface ReconciliationReport {
   sourceKind: "releases" | "staging";
   dryRun: boolean;
   outcomes: ReconciliationOutcome[];
+  /**
+   * Release reconciliation only: why the latest-release selection could not
+   * be read or updated. Absent when it was updated. In a dry run, present
+   * only when the upstream pointer cannot be read or names a release that
+   * failed in this run.
+   */
+  latestReleaseFailure?: string;
 }
 
 function sha256Text(value: string): string {
@@ -129,7 +141,7 @@ function object(value: unknown, label: string): JsonObject {
 
 function releaseId(value: string | undefined): string {
   const result = value?.trim() ?? "";
-  if (!RELEASE_ID_RE.test(result) || result === "latest") {
+  if (!isReleaseId(result)) {
     throw new Error("A valid immutable release id is required.");
   }
   return result;
@@ -425,14 +437,29 @@ interface ReleaseCandidate {
   publishedAt?: string | null;
 }
 
-interface HfTagRef {
+interface ReleaseTag {
   name: string;
-  targetCommit: string;
+  /** The commit the tag points at. */
+  commit: string;
 }
 
+/**
+ * The repository's release tags, each with the commit it points at, and the
+ * error for each tag whose commit could not be read.
+ *
+ * `/refs` gives an annotated tag's `targetCommit` as the ID of the tag
+ * object, not of its commit. Hugging Face serves files at that ID, but its
+ * commit log read there starts at the tag's commit, so the build could not
+ * be dated, and a build pinned to it would not match one pinned to the
+ * commit. Microcosm makes an annotated tag whenever it publishes a release
+ * with a tag message (microcosm#1301), so each tag's commit is read from
+ * `/revision/<tag>`, which follows an annotated tag to its commit: one
+ * request per tag, made concurrently. A failed lookup is returned rather
+ * than thrown, so it fails only its own release.
+ */
 async function listReleaseTags(
   country: MicrocosmCountry,
-): Promise<HfTagRef[]> {
+): Promise<{ tags: ReleaseTag[]; unreadable: Map<string, string> }> {
   const response = await fetch(
     `https://huggingface.co/api/datasets/${microcosmRepo(country)}/refs`,
     {
@@ -448,15 +475,28 @@ async function listReleaseTags(
   if (!Array.isArray(payload.tags)) {
     throw new Error("Hugging Face refs response has no tag list.");
   }
-  return payload.tags.flatMap((value) => {
+  const names = payload.tags.flatMap((value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-    const tag = value as JsonObject;
-    if (typeof tag.name !== "string" || typeof tag.targetCommit !== "string") return [];
-    if (!RELEASE_ID_RE.test(tag.name) || !/^[0-9a-f]{40,64}$/i.test(tag.targetCommit)) {
-      return [];
-    }
-    return [{ name: tag.name, targetCommit: tag.targetCommit.toLowerCase() }];
+    const { name } = value as JsonObject;
+    // A name the revision lookup refuses, such as `latest`, is never a release.
+    return isReleaseId(name) ? [name] : [];
   });
+  const lookups = await Promise.allSettled(
+    names.map((name) => resolveHfRevisionSha(country, name, 0)),
+  );
+  const tags: ReleaseTag[] = [];
+  const unreadable = new Map<string, string>();
+  lookups.forEach((lookup, index) => {
+    if (lookup.status === "fulfilled") {
+      tags.push({ name: names[index], commit: lookup.value });
+    } else {
+      unreadable.set(
+        names[index],
+        lookup.reason instanceof Error ? lookup.reason.message : String(lookup.reason),
+      );
+    }
+  });
+  return { tags, unreadable };
 }
 
 async function releaseFolderHasDiagnostics(
@@ -500,21 +540,21 @@ type TaggedRelease =
  */
 async function resolveTaggedReleaseDirectory(
   country: MicrocosmCountry,
-  tag: HfTagRef,
+  tag: ReleaseTag,
 ): Promise<TaggedRelease> {
-  if (await releaseFolderHasDiagnostics(country, tag.targetCommit, tag.name)) {
+  if (await releaseFolderHasDiagnostics(country, tag.commit, tag.name)) {
     return { releaseDirectory: tag.name };
   }
   const cut = parseReleaseCutTag(tag.name);
   if (!cut) return { reason: "Release has no calibration diagnostics." };
-  if (!await releaseFolderHasDiagnostics(country, tag.targetCommit, cut.releaseId)) {
+  if (!await releaseFolderHasDiagnostics(country, tag.commit, cut.releaseId)) {
     return {
       reason: `Release cut has no calibration diagnostics under releases/${cut.releaseId}/.`,
     };
   }
   const releaseManifest = await fetchJsonArtifact(
     country,
-    tag.targetCommit,
+    tag.commit,
     `releases/${cut.releaseId}/release_manifest.json`,
     false,
   );
@@ -536,8 +576,10 @@ async function enumerateReleaseCandidates(
 ): Promise<{
   candidates: ReleaseCandidate[];
   ineligible: ReconciliationOutcome[];
+  /** Releases whose commit could not be read, from their tag or their folder. */
+  failed: ReconciliationOutcome[];
 }> {
-  const [releases, tags] = await Promise.all([
+  const [releases, { tags, unreadable }] = await Promise.all([
     loadReleases(0, country),
     listReleaseTags(country),
   ]);
@@ -549,6 +591,17 @@ async function enumerateReleaseCandidates(
   );
   const candidates = new Map<string, ReleaseCandidate>();
   const ineligible: ReconciliationOutcome[] = [];
+  // A release whose commit cannot be read fails on its own and keeps any
+  // build it already has, as a release that cannot be published does.
+  const failed: ReconciliationOutcome[] = [];
+  const reportFailure = (sourceId: string, reason: string) => failed.push({
+    sourceId,
+    status: "failed",
+    buildArtifactId:
+      manifestBuildForSource(manifest, country, "release", sourceId)?.buildArtifactId ?? null,
+    reason,
+  });
+  for (const [name, reason] of unreadable) reportFailure(name, reason);
 
   // Tags are resolved first: a verified cut tag makes its line's folder on
   // main a mutable copy of whichever cut was published last.
@@ -560,7 +613,7 @@ async function enumerateReleaseCandidates(
     const known = manifestBuildForSource(manifest, country, "release", tag.name);
     taggedReleases.set(
       tag.name,
-      known && known.hfCommitSha === tag.targetCommit
+      known && known.hfCommitSha === tag.commit
         ? { releaseDirectory: releaseDirectoryOf(known) ?? tag.name }
         : await resolveTaggedReleaseDirectory(country, tag),
     );
@@ -572,16 +625,28 @@ async function enumerateReleaseCandidates(
         : []
     ),
   );
+  // A tag named as one snapshot of a release series whose commit could not
+  // be read may be the series' only such tag, so the series' folder is held
+  // back in this run: it is not published from main as a release of its own.
+  // Each held-back folder maps to the tags that hold it back.
+  const heldBackFolders = new Map<string, string[]>();
+  for (const name of unreadable.keys()) {
+    const folder = parseReleaseCutTag(name)?.releaseId;
+    if (folder) heldBackFolders.set(folder, [...(heldBackFolders.get(folder) ?? []), name]);
+  }
 
   for (const release of releases) {
-    if (!release.has_calibration) continue;
+    // A folder whose tag's commit could not be read is reported as failed,
+    // not pinned to another commit.
+    if (!release.has_calibration || unreadable.has(release.release_id)) continue;
     const existing = manifestBuildForSource(
       manifest,
       country,
       "release",
       release.release_id,
     );
-    if (lineFolders.has(release.release_id)) {
+    const heldBackBy = heldBackFolders.get(release.release_id);
+    if (lineFolders.has(release.release_id) || heldBackBy) {
       // The cut tags publish the line. A build already published from the
       // folder stays pinned at its own commit, so it audits and repairs as
       // before instead of following the folder to a newer cut.
@@ -596,20 +661,33 @@ async function enumerateReleaseCandidates(
           sourceId: release.release_id,
           status: "ineligible",
           buildArtifactId: null,
-          reason: "A release line folder; its cut tags are published instead.",
+          // A folder that only a failed lookup holds back is not known to
+          // be a series' folder, so it gets that reason instead.
+          reason: heldBackBy && !lineFolders.has(release.release_id)
+            ? `Held back in this run because the commit of its release snapshot ` +
+              `${heldBackBy.length === 1 ? "tag" : "tags"} ${heldBackBy.join(", ")} ` +
+              "could not be read. The next run retries the lookup."
+            : "A release line folder; its cut tags are published instead.",
         });
       }
       continue;
     }
-    const tag = tagsByName.get(release.release_id);
     // The build pins the tag's commit, or the newest commit behind the
     // release directory when no tag exists. Its publication timestamp is
     // that commit's date, read by publishRelease when a bundle is built.
+    let hfCommitSha = tagsByName.get(release.release_id)?.commit;
+    if (hfCommitSha == null) {
+      try {
+        hfCommitSha = await resolveHfReleaseDirectorySha(country, release.release_id, 0);
+      } catch (error) {
+        reportFailure(release.release_id, error instanceof Error ? error.message : String(error));
+        continue;
+      }
+    }
     candidates.set(release.release_id, {
       releaseId: release.release_id,
       releaseDirectory: release.release_id,
-      hfCommitSha: tag?.targetCommit ??
-        await resolveHfReleaseDirectorySha(country, release.release_id, 0),
+      hfCommitSha,
     });
   }
   for (const [name, tagged] of taggedReleases) {
@@ -617,7 +695,7 @@ async function enumerateReleaseCandidates(
       candidates.set(name, {
         releaseId: name,
         releaseDirectory: tagged.releaseDirectory,
-        hfCommitSha: tagsByName.get(name)!.targetCommit,
+        hfCommitSha: tagsByName.get(name)!.commit,
       });
     } else {
       ineligible.push({
@@ -629,7 +707,11 @@ async function enumerateReleaseCandidates(
     }
   }
   for (const release of releases) {
-    if (!release.has_calibration && !ineligible.some((item) => item.sourceId === release.release_id)) {
+    if (
+      !release.has_calibration &&
+      !unreadable.has(release.release_id) &&
+      !ineligible.some((item) => item.sourceId === release.release_id)
+    ) {
       ineligible.push({
         sourceId: release.release_id,
         status: "ineligible",
@@ -643,6 +725,7 @@ async function enumerateReleaseCandidates(
       left.releaseId.localeCompare(right.releaseId)
     ),
     ineligible,
+    failed,
   };
 }
 
@@ -745,6 +828,7 @@ async function enumerateRecordedBuildCandidates(
 ): Promise<{
   candidates: ReleaseCandidate[];
   ineligible: ReconciliationOutcome[];
+  failed: ReconciliationOutcome[];
   record: ReleasesRecord;
 }> {
   const headSha = await resolveHfRevisionSha(country, microcosmRevision(country), 0);
@@ -769,7 +853,7 @@ async function enumerateRecordedBuildCandidates(
       });
     }
   }
-  return { candidates, ineligible, record };
+  return { candidates, ineligible, failed: [], record };
 }
 
 async function selectRecordedBuild(
@@ -832,7 +916,7 @@ async function releaseDirectoryForTag(
 ): Promise<string> {
   const tagged = await resolveTaggedReleaseDirectory(country, {
     name: id,
-    targetCommit: commit,
+    commit,
   });
   if (!tagged.releaseDirectory) {
     throw new Error(`Release ${id} cannot be published: ${tagged.reason}`);
@@ -1388,7 +1472,7 @@ export async function reconcileReleaseBuilds(
     ? await enumerateRecordedBuildCandidates(country, manifest)
     : { ...(await enumerateReleaseCandidates(country, manifest)), record: null };
   let blobs = await store.listBlobs();
-  const outcomes = [...inventory.ineligible];
+  const outcomes = [...inventory.ineligible, ...inventory.failed];
 
   for (const candidate of inventory.candidates) {
     const existing = manifestBuildForSource(
@@ -1397,87 +1481,159 @@ export async function reconcileReleaseBuilds(
       "release",
       candidate.releaseId,
     );
-    if (existing && existing.hfCommitSha !== candidate.hfCommitSha) {
-      throw new Error(
-        `Released dataset ${candidate.releaseId} changed from ${existing.hfCommitSha} ` +
-          `to ${candidate.hfCommitSha}.`,
-      );
-    }
-    if (existing && releaseDirectoryOf(existing) !== candidate.releaseDirectory) {
-      throw new Error(
-        `Released dataset ${candidate.releaseId} moved from releases/${releaseDirectoryOf(existing)}/ ` +
-          `to releases/${candidate.releaseDirectory}/.`,
-      );
-    }
-    const audit = existing ? await store.audit(existing, blobs) : null;
-    if (existing && audit?.complete) {
-      // Reconciliation validates and restores stored parts only; a stored
-      // entry's metadata is the timestamp migration's business.
-      outcomes.push({
-        sourceId: candidate.releaseId,
-        status: "complete",
-        buildArtifactId: existing.buildArtifactId,
-        reason: null,
-      });
-      continue;
-    }
-    if (audit && !audit.repairable) {
-      throw new Error(
-        `Release build ${candidate.releaseId} is corrupt and cannot be repaired automatically: ` +
-          audit.reasons.join("; "),
-      );
-    }
-    const published = await publishRelease({
-      country,
-      id: candidate.releaseId,
-      releaseDirectory: candidate.releaseDirectory,
-      expectedSha: existing?.hfCommitSha ?? candidate.hfCommitSha,
-      blobToken,
-      useExpectedShaExactly: true,
-      buildArtifactId: existing?.buildArtifactId,
-      dryRun,
-      expectedIndexSha256: existing?.indexSha256,
-      // A build folder is dated by releases.json; anything else by its commit.
-      indexCreatedAt: existing ? existing.createdAt : candidate.publishedAt,
-      uploadBundle: store.uploadBundle,
-    });
-    const entry = existing ?? releaseManifestEntry(published);
-    if (!dryRun) {
-      manifest = await store.updateManifest(entry);
-      blobs = await store.listBlobs();
-      const verified = await store.audit(entry, blobs);
-      if (!verified.complete) {
+    // A release whose build cannot be published or repaired is reported with
+    // the reason, and the releases after it are still reconciled: stopping
+    // here would leave every later release, and the latest-release
+    // selection, unreconciled on every later invocation. `runPublisher`
+    // exits with an error once the report is printed. The manifest write is
+    // a release's last step, after its files are uploaded and audited, so a
+    // release that fails gets no new manifest entry (unless that write's own
+    // read-back check fails after the write was stored); a release that
+    // already had an entry keeps it unchanged. The latest-release selection
+    // is never moved to a failed release.
+    try {
+      if (existing && existing.hfCommitSha !== candidate.hfCommitSha) {
         throw new Error(
-          `Release build ${candidate.releaseId} remains incomplete: ${verified.reasons.join("; ")}`,
+          `Released dataset ${candidate.releaseId} changed from ${existing.hfCommitSha} ` +
+            `to ${candidate.hfCommitSha}.`,
         );
       }
+      if (existing && releaseDirectoryOf(existing) !== candidate.releaseDirectory) {
+        throw new Error(
+          `Released dataset ${candidate.releaseId} moved from releases/${releaseDirectoryOf(existing)}/ ` +
+            `to releases/${candidate.releaseDirectory}/.`,
+        );
+      }
+      const audit = existing ? await store.audit(existing, blobs) : null;
+      if (existing && audit?.complete) {
+        // Reconciliation validates and restores stored parts only; a stored
+        // entry's metadata is the timestamp migration's business.
+        outcomes.push({
+          sourceId: candidate.releaseId,
+          status: "complete",
+          buildArtifactId: existing.buildArtifactId,
+          reason: null,
+        });
+        continue;
+      }
+      if (audit && !audit.repairable) {
+        throw new Error(
+          `Release build ${candidate.releaseId} is corrupt and cannot be repaired automatically: ` +
+            audit.reasons.join("; "),
+        );
+      }
+      const published = await publishRelease({
+        country,
+        id: candidate.releaseId,
+        releaseDirectory: candidate.releaseDirectory,
+        expectedSha: existing?.hfCommitSha ?? candidate.hfCommitSha,
+        blobToken,
+        useExpectedShaExactly: true,
+        buildArtifactId: existing?.buildArtifactId,
+        dryRun,
+        expectedIndexSha256: existing?.indexSha256,
+        // A build folder is dated by releases.json; anything else by its commit.
+        indexCreatedAt: existing ? existing.createdAt : candidate.publishedAt,
+        uploadBundle: store.uploadBundle,
+      });
+      const entry = existing ?? releaseManifestEntry(published);
+      if (!dryRun) {
+        // The uploaded files are audited before the manifest names them, so
+        // an incomplete upload never becomes a manifest entry. The audit
+        // reads the build's own index and the Blob listing, not the
+        // manifest.
+        blobs = await store.listBlobs();
+        const verified = await store.audit(entry, blobs);
+        if (!verified.complete) {
+          throw new Error(
+            `Release build ${candidate.releaseId} remains incomplete: ${verified.reasons.join("; ")}`,
+          );
+        }
+        manifest = await store.updateManifest(entry);
+      }
+      outcomes.push({
+        sourceId: candidate.releaseId,
+        status: existing ? "repaired" : "published",
+        buildArtifactId: entry.buildArtifactId,
+        reason: dryRun ? "Dry run; no Blob writes performed." : null,
+      });
+    } catch (error) {
+      outcomes.push({
+        sourceId: candidate.releaseId,
+        status: "failed",
+        buildArtifactId: existing?.buildArtifactId ?? null,
+        reason: error instanceof Error ? error.message : String(error),
+      });
     }
-    outcomes.push({
-      sourceId: candidate.releaseId,
-      status: existing ? "repaired" : "published",
-      buildArtifactId: entry.buildArtifactId,
-      reason: dryRun ? "Dry run; no Blob writes performed." : null,
-    });
   }
 
-  const latest = inventory.record
-    ? recordedLatest(inventory.record, inventory.candidates)
-    : await readUpstreamLatest(country, undefined, manifest);
-  const latestEntry = manifestBuildForSource(
-    manifest,
-    country,
-    "release",
-    latest.releaseId,
+  const failedReleaseIds = new Set(
+    outcomes.filter((outcome) => outcome.status === "failed").map((outcome) => outcome.sourceId),
   );
-  if (!dryRun) {
+  const { record } = inventory;
+  const latestReleaseFailure = await selectLatestRelease(
+    country,
+    manifest,
+    failedReleaseIds,
+    dryRun,
+    store,
+    record
+      ? async () => recordedLatest(record, inventory.candidates)
+      : (current) => readUpstreamLatest(country, undefined, current),
+  );
+  return {
+    country,
+    sourceKind: "releases",
+    dryRun,
+    outcomes,
+    ...(latestReleaseFailure == null ? {} : { latestReleaseFailure }),
+  };
+}
+
+/**
+ * Point the country's latest-release selection at the release `readLatest`
+ * names (the upstream pointer's release, or releases.json's current build of
+ * its default release), once that release is completely published. Returns
+ * why the selection could not be read or updated, or null. A release that
+ * failed in this reconciliation is never selected, so the selection keeps
+ * naming the build it named before. A dry run reads the latest release and
+ * reports one that failed, but neither checks nor changes the selection
+ * otherwise.
+ */
+async function selectLatestRelease(
+  country: MicrocosmCountry,
+  manifest: CalibrationTreeManifest,
+  failedReleaseIds: ReadonlySet<string>,
+  dryRun: boolean,
+  store: CalibrationManifestStore,
+  readLatest: (
+    manifest: CalibrationTreeManifest,
+  ) => Promise<{ releaseId: string; hfCommitSha: string }>,
+): Promise<string | null> {
+  try {
+    const latest = await readLatest(manifest);
+    // Checked before the dry-run return, so a dry run reports a failed
+    // latest release exactly as a run that writes does.
+    if (failedReleaseIds.has(latest.releaseId)) {
+      return `Latest release ${latest.releaseId} failed to reconcile, so the latest-release selection was not changed.`;
+    }
+    // A dry run writes no manifest entries, so it cannot check whether the
+    // release is completely published.
+    if (dryRun) return null;
+    const latestEntry = manifestBuildForSource(
+      manifest,
+      country,
+      "release",
+      latest.releaseId,
+    );
     if (!latestEntry || latestEntry.hfCommitSha !== latest.hfCommitSha) {
-      throw new Error(
-        `Latest release ${latest.releaseId}@${latest.hfCommitSha} is not completely published.`,
-      );
+      return `Latest release ${latest.releaseId}@${latest.hfCommitSha} is not completely published.`;
     }
     await store.updateManifest(latestEntry, true);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
   }
-  return { country, sourceKind: "releases", dryRun, outcomes };
 }
 
 // The latest release under build folders: the record's current build, at the
@@ -1590,15 +1746,25 @@ async function requestedReleaseSelection(
   };
 }
 
-/** The error a report's failed outcomes end the publisher with, if any. */
+/**
+ * The error a report's failed outcomes, or a latest-release selection that
+ * could not be updated, end the publisher with, if any.
+ */
 export function reconciliationFailureMessage(report: ReconciliationReport): string | null {
   const failed = report.outcomes.filter((outcome) => outcome.status === "failed");
-  if (failed.length === 0) return null;
-  return (
-    `${failed.length} of ${report.outcomes.length} ${report.sourceKind} sources failed to ` +
-    `reconcile: ${failed.map((outcome) => outcome.sourceId).join(", ")}. ` +
-    "The printed report gives each reason."
-  );
+  const messages: string[] = [];
+  if (failed.length > 0) {
+    const sources = report.sourceKind === "releases" ? "releases" : "staging sources";
+    messages.push(
+      `${failed.length} of ${report.outcomes.length} ${sources} failed to ` +
+        `reconcile: ${failed.map((outcome) => outcome.sourceId).join(", ")}.`,
+    );
+  }
+  if (report.latestReleaseFailure) {
+    messages.push(`The latest release was not selected: ${report.latestReleaseFailure}`);
+  }
+  if (messages.length === 0) return null;
+  return [...messages, "The printed report gives each reason."].join(" ");
 }
 
 export interface PublisherDependencies {

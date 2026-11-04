@@ -514,10 +514,15 @@ export async function withHuggingFaceFiles<Result>(
   }
 }
 
-function buildReleaseSource(input: GoldenReleaseInput): GoldenSourceBuild {
+// `diagnosticsJson` replaces the parsed document while every identity input
+// (the source digest, and so the build ID) stays the recorded file's.
+function buildReleaseSource(
+  input: GoldenReleaseInput,
+  diagnosticsJson: JsonObject = JSON.parse(input.diagnosticsText) as JsonObject,
+): GoldenSourceBuild {
   const prefix = `releases/${input.releaseId}`;
   const diagnostics = {
-    json: JSON.parse(input.diagnosticsText) as JsonObject,
+    json: diagnosticsJson,
     source: {
       path: `${prefix}/calibration_diagnostics.json`,
       sha256: sha256Text(input.diagnosticsText),
@@ -923,6 +928,24 @@ function readerRecord(bundle: CalibrationTreeBundle): GoldenSourceRecord["reader
 export async function goldenSourceRecord(name: GoldenSourceCaseName): Promise<GoldenSourceRecord> {
   const { bundle } = await goldenSourceBuild(name);
   return { ...bundleRecord(bundle), readers: readerRecord(bundle) };
+}
+
+/**
+ * A recorded release case compiled from another diagnostics document under
+ * the recorded file's identity: the same source digest, build ID, commit and
+ * publication time. It shows whether that document builds the recorded tree
+ * byte for byte. The build ID and the recorded source digest are derived from
+ * the file's bytes, so a document with other bytes would otherwise get
+ * another build ID.
+ */
+export function goldenReleaseRecordFromDocument(
+  name: "us-release" | "uk-release" | "uk-release-loss-attribution" | "be-release",
+  diagnosticsJson: JsonObject,
+): Promise<GoldenSourceRecord> {
+  return withRegisteredRepositories(async () => {
+    const { bundle } = buildReleaseSource(goldenReleaseInputs()[name], diagnosticsJson);
+    return { ...bundleRecord(bundle), readers: readerRecord(bundle) };
+  });
 }
 
 const COMPARISON_SOURCES: Record<

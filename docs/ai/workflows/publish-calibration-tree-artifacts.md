@@ -57,18 +57,24 @@ would assign different immutable paths to the same release.
    country-specific secret is also present in GitHub Actions.
 2. Publish compressed non-index files first, then `index.json.gz`.
 3. Verify uploaded bytes through a consistent Blob read and decompression.
-4. Add every immutable source build to `manifest.json`; change
+4. For a release build, audit the uploaded build (its index and every file the
+   index lists) before adding its entry, so an incomplete upload never gets a
+   manifest entry.
+5. Add every immutable source build to `manifest.json`; change
    `latestReleaseBuildArtifactId` only when the country's upstream pointer
    (`latest.json`, or the registration's `pointer_path`) still names the same
-   release and commit.
-5. For staging publication, include only `passed`, `published`, or `completed`
+   release and commit, and that release did not fail in the same run.
+6. For staging publication, include only `passed`, `published`, or `completed`
    runs from the exact webhook commit.
-6. Report the source ID, build artifact ID, commit, part count, and measured sizes without reporting
+7. Report the source ID, build artifact ID, commit, part count, and measured sizes without reporting
    credentials.
 
 Every release webhook reconciles the full enumerated release history. Every
 staging webhook reconciles all finalized runs at that webhook commit. A complete
 entry is audited and skipped; only missing entries or missing files are built.
+A release or staging run that cannot be published or repaired is reported as
+`failed` with its error, the remaining sources are still reconciled, and the
+command then exits with an error naming every failed source.
 There is no scheduled reconciliation, so the next webhook repairs omissions
 from an earlier failed or missed publication.
 
