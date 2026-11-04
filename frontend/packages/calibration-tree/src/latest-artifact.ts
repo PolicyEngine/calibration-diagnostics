@@ -3337,16 +3337,48 @@ export function latestMicrocosmTargetInvestigation(requestUrl: string, cal: Cali
     ].some((value) => value === target);
   });
   if (!row) {
+    // A member fact is not the target it belongs to, and one fact can be a
+    // member of many targets (a CGT share scales every region cell it is the
+    // numerator of), so the answer names each, for the caller to choose.
+    const memberOf = cal.rows
+      .filter((candidate) => listsMemberFact(candidate, target))
+      .map((candidate) => ({
+        name: stringValue(candidate.name),
+        target_label: stringValue(candidate.target_label),
+      }));
+    const targets = `${memberOf.length} target${memberOf.length === 1 ? "" : "s"}`;
     return {
       available: false,
       release_id: cal.release_id,
-      detail: `Target not found: ${target}`,
+      detail: memberOf.length
+        ? `Target not found: ${target}. It is a member fact of ${targets}: ` +
+          `${memberOf.map((candidate) => candidate.name).join(", ")}.`
+        : `Target not found: ${target}`,
+      member_of: memberOf,
     };
   }
   return {
     available: true,
     ...targetInvestigationPacket(row, cal),
   };
+}
+
+// Whether a target built from several facts lists one of them under this
+// key: the key Microcosm lists it under in ledger_member_fact_keys, or any
+// record id or key of its representative, which the row keeps.
+function listsMemberFact(row: TargetRow, key: string): boolean {
+  const shown = asObject(shownChronicle(row));
+  const members = Array.isArray(shown.member_fact_keys) ? shown.member_fact_keys : [];
+  if (!members.length) return false;
+  if (members.includes(key)) return true;
+  const representative = asObject(row.chronicle);
+  return [
+    representative.source_record_id,
+    representative.fact_key,
+    representative.semantic_fact_key,
+    representative.aggregate_fact_key,
+    representative.legacy_fact_key,
+  ].some((value) => stringValue(value) === key);
 }
 
 // --- version-over-version comparison ----------------------------------------
