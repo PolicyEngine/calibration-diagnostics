@@ -172,6 +172,10 @@ export interface MicrocosmTargetRow {
     // single-fact target carries neither field.
     member_fact_count?: number | null;
     member_fact_keys?: string[];
+    // On a target built from several facts: true when its group-by value is
+    // hidden because the facts of its identity differ in it, false when they
+    // share it, and null when the target has none or the release cannot say.
+    layout_groupby_value_varies?: boolean | null;
     filters?: {
       key: string;
       label: string;

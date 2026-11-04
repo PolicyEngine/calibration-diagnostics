@@ -286,6 +286,61 @@ describe("a target built from several facts shows the identity Microcosm gives i
     expect(identityOf(twoShown)).toEqual({ ...NULL_IDENTITY, layout_groupby_value_id: "al" });
   });
 
+  // The targets page says a target combines several group-by values when its
+  // group-by value is hidden because its identity facts differ in it: its
+  // hierarchy, which lists a group-by only when every identity fact shares
+  // it, leaves it out. Without a hierarchy the dashboard cannot tell.
+  test("layout_groupby_value_varies says whether the identity facts differ in the group-by value", () => {
+    const varies = (rows: JsonObject[], schemaVersion = 8) => {
+      const cal = buildCalibration(
+        { ...fixture, schema_version: schemaVersion, targets: rows },
+        "populace-us-2024-multi-fact-test",
+        null,
+        {},
+        {},
+        {},
+        "us",
+      );
+      const shown = detailOf(cal, String(cal.rows[0].name)).target.chronicle as unknown as Row;
+      return "layout_groupby_value_varies" in shown ? shown.layout_groupby_value_varies : "absent";
+    };
+    const parentPlus = fsaRow(PARENT_PLUS).metadata as Record<string, string>;
+    const twoLoanTypes = multiFactRow(
+      PARENT_PLUS,
+      "ed_fsa.test.two_loan_types_rolled_forward",
+      "rolled_forward_by_ratio",
+      [parentPlus.ledger_fact_key, SECOND_BASE_CELL, NUMERATOR, DENOMINATOR],
+      { ledger_value_base_cells: "2" },
+    );
+    (twoLoanTypes.hierarchy as { dimensions: unknown[] }).dimensions = [];
+    const twoAgeBands = multiFactRow(
+      ALABAMA_BALANCE,
+      "ed_fsa.test.alabama_two_age_bands_rolled_forward",
+      "rolled_forward_by_ratio",
+      [own.ledger_fact_key, SECOND_BASE_CELL, NUMERATOR, DENOMINATOR],
+      { ledger_value_base_cells: "2" },
+    );
+    const withoutHierarchy = fsaRow(EXCLUDING_PARENT_PLUS);
+    delete withoutHierarchy.hierarchy;
+
+    expect({
+      excludingParentPlus: varies([fsaRow(EXCLUDING_PARENT_PLUS)]),
+      twoLoanTypes: varies([twoLoanTypes]),
+      twoAgeBands: varies([twoAgeBands]),
+      ratioScaled: varies([ONE_FACT_IDENTITY[0].row()]),
+      singleFact: varies([fsaRow(ALABAMA_BALANCE)]),
+      // A schema 6 release has no hierarchy.
+      withoutHierarchy: varies([withoutHierarchy], 6),
+    }).toEqual({
+      excludingParentPlus: true,
+      twoLoanTypes: true,
+      twoAgeBands: false,
+      ratioScaled: false,
+      singleFact: "absent",
+      withoutHierarchy: null,
+    });
+  });
+
   // A linear combination's identity is every fact (:1034). The five loan
   // types differ in their record, keys, group-by value and universe
   // constraint, so none shows. This is the result before this test was
