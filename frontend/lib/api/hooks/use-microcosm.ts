@@ -176,6 +176,12 @@ export interface MicrocosmTargetRow {
     // identity differ in it, false when they share it, and null when the
     // target has none or the release cannot say.
     layout_groupby_value_varies?: boolean | null;
+    // True when its identity spans several facts and its hierarchy lists no
+    // group-by pair it carries, false when its identity is one fact or its
+    // hierarchy lists the pair, and null when it carries none or the release
+    // has no hierarchy. A hierarchy that leaves the pair out does not show
+    // that the facts differ in it.
+    layout_groupby_unlisted_across_facts?: boolean | null;
     filters?: {
       key: string;
       label: string;

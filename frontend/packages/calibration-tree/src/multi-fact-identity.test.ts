@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import edFsaFamily from "./fixtures/ed-fsa-family/ed-fsa-family-schema-8.json";
+import hierarchyProbeTargets from "./fixtures/mixed-groupby-storage/hierarchy-probe-targets.json";
 import {
   buildCalibration,
   latestMicrocosmTargetDiagnosticsPage,
@@ -74,6 +75,21 @@ function multiFactRow(
     ...metadata,
   });
   return row;
+}
+
+// The review's probe targets, as rows of a release.
+const PROBE_TARGETS = hierarchyProbeTargets as { case: string; dashboard_target: JsonObject }[];
+
+function probeRow(probe: (typeof PROBE_TARGETS)[number]): JsonObject {
+  return {
+    ...structuredClone(probe.dashboard_target),
+    name: "combined-balance@2024",
+    target_name: "combined-balance",
+    target: 40,
+    initial_estimate: 40,
+    final_estimate: 40,
+    relative_error: 0,
+  };
 }
 
 function releaseOf(rows: JsonObject[]) {
@@ -286,12 +302,17 @@ describe("a target built from several facts shows the identity Microcosm gives i
     expect(identityOf(twoShown)).toEqual({ ...NULL_IDENTITY, layout_groupby_value_id: "al" });
   });
 
-  // The targets page says a target combines several group-by values when its
-  // group-by value is hidden because its identity facts differ in it: its
-  // hierarchy, which lists a group-by only when every identity fact shares
-  // it, leaves it out. Without a hierarchy the dashboard cannot tell.
-  test("layout_groupby_value_varies says whether the identity facts differ in the group-by value", () => {
-    const varies = (rows: JsonObject[], schemaVersion = 8) => {
+  // A hierarchy that lists a group-by pair shows that every identity fact
+  // shares it. One that leaves the pair out shows nothing: Microcosm lists a
+  // pair only when every fact's ordinary dimensions share it or every fact's
+  // layout carries it (_inherited_dimensions, ledger_targets.py:1578-1611), so
+  // facts that share a value, one in its dimensions and one in its layout,
+  // leave it out too. layout_groupby_unlisted_across_facts says only what the
+  // fields establish: the identity spans several facts and its hierarchy lists
+  // no group-by pair the target carries. Without a hierarchy the dashboard
+  // cannot tell.
+  test("layout_groupby_unlisted_across_facts says the hierarchy leaves a several-fact identity's group-by out", () => {
+    const shownOf = (rows: JsonObject[], schemaVersion = 8) => {
       const cal = buildCalibration(
         { ...fixture, schema_version: schemaVersion, targets: rows },
         "populace-us-2024-multi-fact-test",
@@ -301,8 +322,13 @@ describe("a target built from several facts shows the identity Microcosm gives i
         {},
         "us",
       );
-      const shown = detailOf(cal, String(cal.rows[0].name)).target.chronicle as unknown as Row;
-      return "layout_groupby_value_varies" in shown ? shown.layout_groupby_value_varies : "absent";
+      return detailOf(cal, String(cal.rows[0].name)).target.chronicle as unknown as Row;
+    };
+    const unlisted = (rows: JsonObject[], schemaVersion = 8) => {
+      const shown = shownOf(rows, schemaVersion);
+      return "layout_groupby_unlisted_across_facts" in shown
+        ? shown.layout_groupby_unlisted_across_facts
+        : "absent";
     };
     const parentPlus = fsaRow(PARENT_PLUS).metadata as Record<string, string>;
     const twoLoanTypes = multiFactRow(
@@ -322,16 +348,20 @@ describe("a target built from several facts shows the identity Microcosm gives i
     );
     const withoutHierarchy = fsaRow(EXCLUDING_PARENT_PLUS);
     delete withoutHierarchy.hierarchy;
+    const cases = {
+      excludingParentPlus: () => [fsaRow(EXCLUDING_PARENT_PLUS)],
+      twoLoanTypes: () => [twoLoanTypes],
+      twoAgeBands: () => [twoAgeBands],
+      ratioScaled: () => [ONE_FACT_IDENTITY[0].row()],
+      singleFact: () => [fsaRow(ALABAMA_BALANCE)],
+    };
 
-    expect({
-      excludingParentPlus: varies([fsaRow(EXCLUDING_PARENT_PLUS)]),
-      twoLoanTypes: varies([twoLoanTypes]),
-      twoAgeBands: varies([twoAgeBands]),
-      ratioScaled: varies([ONE_FACT_IDENTITY[0].row()]),
-      singleFact: varies([fsaRow(ALABAMA_BALANCE)]),
+    const results: Record<string, unknown> = {
+      ...Object.fromEntries(Object.entries(cases).map(([name, rows]) => [name, unlisted(rows())])),
       // A schema 6 release has no hierarchy.
-      withoutHierarchy: varies([withoutHierarchy], 6),
-    }).toEqual({
+      withoutHierarchy: unlisted([withoutHierarchy], 6),
+    };
+    expect(results).toEqual({
       excludingParentPlus: true,
       twoLoanTypes: true,
       twoAgeBands: false,
@@ -339,6 +369,58 @@ describe("a target built from several facts shows the identity Microcosm gives i
       singleFact: "absent",
       withoutHierarchy: null,
     });
+    // No shown field claims that the identity facts differ in the value.
+    for (const rows of Object.values(cases)) {
+      expect(shownOf(rows())).not.toHaveProperty("layout_groupby_value_varies");
+    }
+    expect(shownOf([withoutHierarchy], 6)).not.toHaveProperty("layout_groupby_value_varies");
+  });
+
+  // Targets that Microcosm's own catalog resolver and compiler build at
+  // 0ff293b, from the review of 67e6d0b (hierarchy_probe.py). Each sums two
+  // facts of loan type A, by a sum reference that selects both:
+  // - mixed storage: one fact carries loan type A in its dimensions and the
+  //   other in its layout's group-by. The label validator reads the group-by
+  //   pair as a dimension (:1490), so both describe loan type A, but the
+  //   hierarchy lists no loan type, and the representative's layout pair is
+  //   loan type A;
+  // - both facts carry loan type A in their dimensions, so the hierarchy lists
+  //   it, whatever their layouts say.
+  test("a hierarchy that leaves out a pair the identity facts share claims no variation", () => {
+    const shown = PROBE_TARGETS.map((probe) => {
+      const cal = buildCalibration(
+        { ...fixture, targets: [probeRow(probe)] },
+        "mixed-groupby-storage-test",
+        null,
+        {},
+        {},
+        {},
+        "uk",
+      );
+      return [probe.case, listedChronicle(cal) as unknown as Row] as const;
+    });
+    const [mixed, ...listed] = shown;
+
+    expect(mixed[0]).toBe("ordinary a + layout a; disjoint sex cells");
+    expect(mixed[1]).not.toHaveProperty("layout_groupby_value_varies");
+    expect(mixed[1]).toMatchObject({
+      layout_groupby_dimension: "loan_type",
+      layout_groupby_value_id: null,
+      layout_groupby_unlisted_across_facts: true,
+      member_fact_count: 2,
+    });
+    expect(listed.map(([name]) => name)).toEqual([
+      "ordinary a in both; only representative layout a",
+      "ordinary a in both; first layout b and representative layout a",
+    ]);
+    for (const [, chronicle] of listed) {
+      expect(chronicle).not.toHaveProperty("layout_groupby_value_varies");
+      expect(chronicle).toMatchObject({
+        layout_groupby_dimension: "loan_type",
+        layout_groupby_value_id: "a",
+        layout_groupby_unlisted_across_facts: false,
+      });
+    }
   });
 
   // A member fact of a target is not the target, and one fact can be a member
