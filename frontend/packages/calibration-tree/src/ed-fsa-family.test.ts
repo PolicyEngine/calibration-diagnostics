@@ -683,7 +683,7 @@ describe("the ED Federal Student Aid target family", () => {
   });
 
   // A compared category reports every level it holds, whatever order
-  // buildComparison sorts its rows in (by |abs_rel_delta|, :3304-3308).
+  // buildComparison in latest-artifact.ts sorts its rows in (by |abs_rel_delta|).
   test("a compared category at two levels reports both, whichever row's fit changed most", () => {
     const levelsOf = (comparison: ReturnType<typeof buildComparison>) =>
       Object.fromEntries(
