@@ -369,6 +369,25 @@ describe("a target built from several facts shows the identity Microcosm gives i
       singleFact: "absent",
       withoutHierarchy: null,
     });
+    // Whether the identity spans several facts, which the Dimensions column
+    // reads: a ratio-scaled cell's operands raise its member count, not its
+    // identity.
+    const spans = (rows: JsonObject[], schemaVersion = 8) => {
+      const shown = shownOf(rows, schemaVersion);
+      return "identity_spans_several_facts" in shown ? shown.identity_spans_several_facts : "absent";
+    };
+    const spanning: Record<string, unknown> = {
+      ...Object.fromEntries(Object.entries(cases).map(([name, rows]) => [name, spans(rows())])),
+      withoutHierarchy: spans([withoutHierarchy], 6),
+    };
+    expect(spanning).toEqual({
+      excludingParentPlus: true,
+      twoLoanTypes: true,
+      twoAgeBands: true,
+      ratioScaled: false,
+      singleFact: "absent",
+      withoutHierarchy: true,
+    });
     // No shown field claims that the identity facts differ in the value.
     for (const rows of Object.values(cases)) {
       expect(shownOf(rows())).not.toHaveProperty("layout_groupby_value_varies");
@@ -377,15 +396,22 @@ describe("a target built from several facts shows the identity Microcosm gives i
   });
 
   // Targets that Microcosm's own catalog resolver and compiler build at
-  // 0ff293b, from the review of 67e6d0b (hierarchy_probe.py). Each sums two
-  // facts of loan type A, by a sum reference that selects both:
+  // 0ff293b, from the reviews of 67e6d0b (hierarchy_probe.py) and 836fc66
+  // (producer.py). Each sums two facts of loan type A, by a sum reference that
+  // selects both:
   // - mixed storage: one fact carries loan type A in its dimensions and the
   //   other in its layout's group-by. The label validator reads the group-by
   //   pair as a dimension (:1490), so both describe loan type A, but the
-  //   hierarchy lists no loan type, and the representative's layout pair is
-  //   loan type A;
-  // - both facts carry loan type A in their dimensions, so the hierarchy lists
-  //   it, whatever their layouts say.
+  //   hierarchy lists no loan type. The resolver sorts the facts by key
+  //   (:2178-2183) and the compiler takes the last as the representative
+  //   (:1232-1245), so with keys a-explicit and b-layout the representative
+  //   carries the layout pair loan type A, and with a-explicit renamed
+  //   z-explicit it carries none;
+  // - both facts carry loan type A in their dimensions, and either only the
+  //   representative's layout carries loan type A or the other's carries B.
+  //   Their layouts share no constant pair, so in these two cases the
+  //   hierarchy lists loan type A. A constant layout pair would take the place
+  //   of the ordinary one (_inherited_dimensions, :1582-1599).
   test("a hierarchy that leaves out a pair the identity facts share claims no variation", () => {
     const shown = PROBE_TARGETS.map((probe) => {
       const cal = buildCalibration(
@@ -399,7 +425,8 @@ describe("a target built from several facts shows the identity Microcosm gives i
       );
       return [probe.case, listedChronicle(cal) as unknown as Row] as const;
     });
-    const [mixed, ...listed] = shown;
+    const [mixed, onlyRepresentative, conflicting, renamed] = shown;
+    const listed = [onlyRepresentative, conflicting];
 
     expect(mixed[0]).toBe("ordinary a + layout a; disjoint sex cells");
     expect(mixed[1]).not.toHaveProperty("layout_groupby_value_varies");
@@ -407,6 +434,7 @@ describe("a target built from several facts shows the identity Microcosm gives i
       layout_groupby_dimension: "loan_type",
       layout_groupby_value_id: null,
       layout_groupby_unlisted_across_facts: true,
+      identity_spans_several_facts: true,
       member_fact_count: 2,
     });
     expect(listed.map(([name]) => name)).toEqual([
@@ -419,8 +447,20 @@ describe("a target built from several facts shows the identity Microcosm gives i
         layout_groupby_dimension: "loan_type",
         layout_groupby_value_id: "a",
         layout_groupby_unlisted_across_facts: false,
+        identity_spans_several_facts: true,
       });
     }
+    // The same facts as the first, one renamed: the representative carries no
+    // group-by pair, so the fields say nothing about one, but the identity
+    // still spans both facts.
+    expect(renamed[0]).toBe("ordinary a + layout a; disjoint sex cells; explicit fact renamed z-explicit");
+    expect(renamed[1]).not.toHaveProperty("layout_groupby_value_varies");
+    expect(renamed[1]).toMatchObject({
+      layout_groupby_value_id: null,
+      layout_groupby_unlisted_across_facts: null,
+      identity_spans_several_facts: true,
+      member_fact_count: 2,
+    });
   });
 
   // A member fact of a target is not the target, and one fact can be a member

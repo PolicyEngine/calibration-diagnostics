@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import edFsaFamily from "@/packages/calibration-tree/src/fixtures/ed-fsa-family/ed-fsa-family-schema-8.json";
 import hierarchyProbeTargets from "@/packages/calibration-tree/src/fixtures/mixed-groupby-storage/hierarchy-probe-targets.json";
+import listedDimensionTargets from "@/packages/calibration-tree/src/fixtures/mixed-groupby-storage/listed-dimension-targets.json";
 import type { MicrocosmTargetRow } from "@/lib/api/hooks/use-microcosm";
 import {
   buildCalibration,
@@ -54,14 +55,12 @@ describe("the targets page's Dimensions column", () => {
       .toBe("Alabama");
   });
 
-  // Microcosm's compiler at 0ff293b builds this target from two facts of loan
-  // type A, one storing it in its dimensions and one in its layout's
-  // group-by, and lists no loan type in its hierarchy (review of 67e6d0b,
-  // hierarchy_probe.py). The column claims no loan type varies.
-  test("a target whose facts share an unlisted group-by value names no varying dimension", () => {
-    const [mixed] = hierarchyProbeTargets as { dashboard_target: Record<string, unknown> }[];
+  // Targets that Microcosm's catalog resolver and compiler build at 0ff293b,
+  // each from two facts of loan type A (fixtures/mixed-groupby-storage), shown
+  // on the page.
+  const probeCell = (probe: { dashboard_target: Record<string, unknown> }) => {
     const row = {
-      ...mixed.dashboard_target,
+      ...probe.dashboard_target,
       name: "combined-balance@2024",
       target_name: "combined-balance",
       target: 40,
@@ -70,7 +69,45 @@ describe("the targets page's Dimensions column", () => {
       relative_error: 0,
     };
     const [shown] = pageRows({ ...(edFsaFamily as Record<string, unknown>), targets: [row] }, "uk");
-    expect(dimensionSummary(shown)).toBe("Combines several source cells");
+    return dimensionSummary(shown);
+  };
+  type Probe = { case: string; representative: string; dashboard_target: Record<string, unknown> };
+
+  // One fact stores loan type A in its dimensions and the other in its
+  // layout's group-by, and the hierarchy lists no loan type (review of
+  // 67e6d0b, hierarchy_probe.py). The column claims no loan type varies,
+  // whichever fact Microcosm picks as the representative: the resolver sorts
+  // the facts by key and the compiler takes the last of the latest period
+  // (ledger_targets.py:2178-2183, :1232-1245), so renaming the fact that stores
+  // A in its dimensions from a-explicit to z-explicit makes it the
+  // representative, and the target then carries no group-by pair (review of
+  // 836fc66, producer.py).
+  test("a target whose facts share an unlisted group-by value names no varying dimension", () => {
+    const probes = hierarchyProbeTargets as Probe[];
+    const [mixed, , , renamed] = probes;
+    expect([mixed.representative, renamed.representative]).toEqual(["b-layout", "z-explicit"]);
+    expect(probeCell(mixed)).toBe("Combines several source cells");
+    expect(probeCell(renamed)).toBe("Combines several source cells");
+  });
+
+  // Both facts are female, so the hierarchy lists Female. One stores loan type
+  // A in its dimensions and the other in its layout's group-by. Compiled once
+  // with the layout fact as the representative, and once with the other
+  // renamed z-explicit so that it is.
+  test("a several-fact target reads its listed dimensions whichever fact represents it", () => {
+    const probes = listedDimensionTargets as Probe[];
+    expect(probes.map((probe) => probe.representative)).toEqual(["b-layout", "z-explicit"]);
+    for (const probe of probes) {
+      expect(probeCell(probe)).toBe("Female · Combines several source cells");
+    }
+  });
+
+  // Both facts carry loan type A in their dimensions, so the hierarchy lists
+  // it; the target still combines two facts.
+  test("a several-fact target whose hierarchy lists its group-by value names it and combines several source cells", () => {
+    const [, onlyRepresentative, conflicting] = hierarchyProbeTargets as Probe[];
+    expect(probeCell(onlyRepresentative)).toBe("A · Combines several source cells");
+    expect(probeCell(conflicting)).toBe("A · Combines several source cells");
   });
 
   test("the dimensions its hierarchy lists come first, and no dimension is named as varying", () => {
@@ -81,6 +118,7 @@ describe("the targets page's Dimensions column", () => {
           layout_groupby_dimension: "ed_fsa.borrower_age_band",
           layout_groupby_value_id: null,
           layout_groupby_unlisted_across_facts: true,
+          identity_spans_several_facts: true,
           member_fact_count: 2,
         },
       }),
@@ -91,19 +129,49 @@ describe("the targets page's Dimensions column", () => {
     expect(dimensionSummary({ chronicle: { layout_groupby_value_id: "all" } })).toBe("All");
     expect(dimensionSummary({ chronicle: { layout_groupby_value_id: null } })).toBe("All");
     expect(dimensionSummary({})).toBe("All");
-    // A group-by value hidden without a hierarchy to read: the dashboard says
-    // nothing about the facts.
+    // A ratio-scaled cell whose identity is one fact and that carries no
+    // group-by pair reads as that fact does, though its ratio's operands raise
+    // its member count.
+    expect(
+      dimensionSummary({
+        chronicle: {
+          layout_groupby_value_id: null,
+          layout_groupby_unlisted_across_facts: null,
+          identity_spans_several_facts: false,
+          member_fact_count: 3,
+        },
+      }),
+    ).toBe("All");
+  });
+
+  // Microcosm picks one identity fact as the representative by fact key, so
+  // its group-by value, or its lack of one, says nothing about the others.
+  test("a several-fact target with no listed dimension combines several source cells, never All", () => {
     expect(
       dimensionSummary({
         chronicle: {
           layout_groupby_dimension: "ed_fsa.loan_type",
           layout_groupby_value_id: null,
           layout_groupby_unlisted_across_facts: null,
+          identity_spans_several_facts: true,
           member_fact_count: 5,
         },
       }),
-    ).toBe("All");
-    // A group-by value that shows names itself.
+    ).toBe("Combines several source cells");
+    // Nor does it name a group-by value its Chronicle fields show.
+    expect(
+      dimensionSummary({
+        chronicle: {
+          layout_groupby_value_id: "parent_plus",
+          layout_groupby_unlisted_across_facts: false,
+          identity_spans_several_facts: true,
+          member_fact_count: 2,
+        },
+      }),
+    ).toBe("Combines several source cells");
+  });
+
+  test("a single-fact target's group-by value names itself", () => {
     expect(dimensionSummary({ chronicle: { layout_groupby_value_id: "parent_plus" } }))
       .toBe("parent plus");
   });

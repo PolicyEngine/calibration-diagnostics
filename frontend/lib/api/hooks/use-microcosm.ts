@@ -179,6 +179,9 @@ export interface MicrocosmTargetRow {
     // has no hierarchy. A hierarchy that leaves the pair out does not show
     // that the facts differ in it.
     layout_groupby_unlisted_across_facts?: boolean | null;
+    // True when the target's identity spans several facts, false when it is
+    // one fact.
+    identity_spans_several_facts?: boolean;
     filters?: {
       key: string;
       label: string;
