@@ -1182,7 +1182,7 @@ async function promoteIfCurrent(
   country: MicrocosmCountry,
   candidate: Awaited<ReturnType<typeof publishRelease>>,
   entry: CalibrationTreeManifestEntry,
-  blobToken: string,
+  store: CalibrationManifestStore,
 ): Promise<boolean> {
   const headSha = await publicationRevisionSha(country);
   const record = await readReleasesRecord(country, headSha);
@@ -1195,12 +1195,7 @@ async function promoteIfCurrent(
   ) {
     return false;
   }
-  await updateCalibrationTreeManifest({
-    country,
-    token: blobToken,
-    entry,
-    makeLatest: true,
-  });
+  await store.updateManifest(entry, true);
   return true;
 }
 
@@ -1272,12 +1267,11 @@ function blobCalibrationManifestStore(
 }
 
 async function registerReleaseBuild(
-  country: MicrocosmCountry,
   published: Awaited<ReturnType<typeof publishRelease>>,
-  blobToken: string,
+  store: CalibrationManifestStore,
 ): Promise<CalibrationTreeManifestEntry> {
   const entry = releaseManifestEntry(published);
-  await updateCalibrationTreeManifest({ country, entry, token: blobToken });
+  await store.updateManifest(entry);
   return entry;
 }
 
@@ -1816,7 +1810,7 @@ export function reconciliationFailureMessage(report: ReconciliationReport): stri
 }
 
 export interface PublisherDependencies {
-  /** The manifest and Blob store the reconciliation and migration modes use. */
+  /** The manifest and Blob store every release mode reads and writes. */
   store?: CalibrationManifestStore;
 }
 
@@ -1916,6 +1910,7 @@ export async function runPublisher(
       blobToken,
       useExpectedShaExactly: true,
       indexCreatedAt: selection.publishedAt,
+      uploadBundle: store.uploadBundle,
     });
   } else {
     const selection: ReleaseSelection = options.mode === "latest"
@@ -1932,15 +1927,11 @@ export async function runPublisher(
       expectedSha: selection.hfCommitSha,
       blobToken,
       allowMissingReleaseTag: options.mode === "latest",
+      uploadBundle: store.uploadBundle,
     });
   }
-  const entry = await registerReleaseBuild(options.country, published, blobToken);
-  const promoted = await promoteIfCurrent(
-    options.country,
-    published,
-    entry,
-    blobToken,
-  );
+  const entry = await registerReleaseBuild(published, store);
+  const promoted = await promoteIfCurrent(options.country, published, entry, store);
   console.log(JSON.stringify({
     country: options.country,
     releaseId: published.bundle.index.build.releaseId,
