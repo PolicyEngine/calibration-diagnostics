@@ -267,9 +267,12 @@ export function createHfWebhookHandler(
     // its alerts come from comparing the record before and after the update.
     // A repository without releases.json reads as having none on both sides
     // and gets none, so its tag alerts above are its only ones.
-    const recordAlerted: string[] = [];
+    // Named in the answer only when releases.json was read, so a delivery
+    // without a main update answers as before.
+    let recordAlerted: string[] | null = null;
     const mainUpdate = mainUpdates.at(-1);
     if (registration.kind === "release" && mainUpdate) {
+      const posted: string[] = [];
       const alerts = await releaseRecordAlertsForUpdate(
         repo,
         mainUpdate,
@@ -279,11 +282,12 @@ export function createHfWebhookHandler(
       for (const alert of alerts) {
         try {
           const sent = await sendReleaseRecordAlert({ country, repo, alert });
-          if (sent) recordAlerted.push(describeAlert(alert));
+          if (sent) posted.push(describeAlert(alert));
         } catch (error) {
           console.error(`Slack alert failed for ${describeAlert(alert)}:`, error);
         }
       }
+      recordAlerted = posted;
     }
 
     return NextResponse.json({
@@ -295,7 +299,7 @@ export function createHfWebhookHandler(
         hf_commit_sha: dispatch.hfCommitSha,
       })),
       alerted,
-      release_record_alerted: recordAlerted,
+      ...(recordAlerted ? { release_record_alerted: recordAlerted } : {}),
     });
   };
 }
