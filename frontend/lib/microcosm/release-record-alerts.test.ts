@@ -136,6 +136,26 @@ test("the summary of a long releases.json stays within Slack's limits and names 
   }
 });
 
+test("a summary too long for Slack's 50 blocks ends by saying how many releases it leaves out", () => {
+  const releases = Array.from({ length: 2000 }, (_, index) => ({
+    release: `microcosm-uk-2024-25-local-k${String(index + 1).padStart(4, "0")}`,
+    currentBuild: `uk-local-candidate-f100-s42-20261104T${String(index).padStart(6, "0")}Z-ee5c2dbe`,
+  }));
+  const payload = releaseRecordAlertPayload("uk", REPO, {
+    kind: "record_created",
+    buildCount: 2000,
+    releases,
+  });
+
+  const sections = sectionTexts(payload.blocks);
+  expect(payload.blocks.length).toBeLessThanOrEqual(BLOCK_LIMIT);
+  for (const text of sections) expect(text.length).toBeLessThanOrEqual(SECTION_TEXT_LIMIT);
+  const last = sections.at(-1) ?? "";
+  const leftOut = Number(/^…and (\d+) more$/.exec(last)?.[1] ?? Number.NaN);
+  const listed = sections.slice(1, -1).join("\n").split("\n").length;
+  expect(listed + leftOut).toBe(2000);
+});
+
 test("a publication time is escaped for Slack's formatted text", () => {
   const payload = releaseRecordAlertPayload("uk", REPO, {
     kind: "published",

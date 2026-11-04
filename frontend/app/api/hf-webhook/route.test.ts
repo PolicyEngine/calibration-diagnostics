@@ -29,6 +29,8 @@ function webhookConfig(
     secret: "test-webhook-secret",
     githubToken: "test-github-token",
     huggingFaceToken: undefined,
+    // The countries whose Slack channel is configured, as in production.
+    releaseAlertCountries: new Set(["us", "uk"]),
     githubRepository: "PolicyEngine/calibration-diagnostics",
     githubWorkflow: "publish-calibration-tree.yml",
     repositories: new Map(TEST_REPOSITORIES),
@@ -620,6 +622,67 @@ test("a transient failure reading releases.json answers 503 before dispatching o
   expect(retried.dispatches).toHaveLength(1);
   expect(retried.tagAlerts).toEqual([newTag]);
   expect(retried.slackTexts).toEqual([`New Microcosm UK build \`${NATIONAL}/${NEWEST}\`: now current`]);
+});
+
+test("a connection that fails while the body of releases.json is read is transient, so the delivery is retried", async () => {
+  const before = nationalRecord(CURRENT, [OLDER, CURRENT]);
+  const after = nationalRecord(NEWEST, [OLDER, CURRENT, NEWEST]);
+  // The headers arrive, then the body fails, as a timeout or a dropped
+  // connection does.
+  const failingBody = () => new Response(new ReadableStream({
+    start(controller) {
+      controller.error(new TypeError("terminated"));
+    },
+  }), { status: 200 });
+
+  const result = await postMainUpdate({ before, after: failingBody, newTag: `${NATIONAL}-20261104T101500Z-0e0e0e0e` });
+
+  expect(result.status).toBe(503);
+  expect(result.dispatches).toEqual([]);
+  expect(result.tagAlerts).toEqual([]);
+  expect(result.slackTexts).toEqual([]);
+});
+
+test("when one side fails for a lasting reason and the other transiently, the lasting failure decides: no retry", async () => {
+  // A record the release writer refuses before the update cannot become
+  // readable by retrying, so the delivery is not retried for the other side.
+  const refused = nationalRecord(CURRENT, [OLDER, CURRENT], [CURRENT]);
+  const result = await postMainUpdate({
+    before: refused,
+    after: () => new Response("unavailable", { status: 503 }),
+  });
+
+  expect(result.status).toBe(200);
+  expect(result.dispatches).toHaveLength(1);
+  expect(result.slackTexts).toEqual([]);
+  expect(result.body.release_record_problem ?? "").toContain("is withdrawn");
+});
+
+test("a lasting failure is named in the answer, and a record that did not change is not", async () => {
+  const record = nationalRecord(CURRENT, [OLDER, CURRENT]);
+  const lasting = await postMainUpdate({
+    before: record,
+    after: () => new Response("Unauthorized", { status: 401 }),
+  });
+  expect(lasting.body.release_record_alerted).toEqual([]);
+  expect(lasting.body.release_record_problem ?? "").toContain("401");
+
+  const unchanged = await postMainUpdate({ before: record, after: record });
+  expect(unchanged.body.release_record_alerted).toEqual([]);
+  expect(unchanged.body).not.toHaveProperty("release_record_problem");
+});
+
+test("a release repository whose country has no Slack channel reads no releases.json and is never answered 503", async () => {
+  const result = await postMainUpdate({
+    before: nationalRecord(CURRENT, [OLDER, CURRENT]),
+    after: () => new Response("unavailable", { status: 503 }),
+    repo: REPOSITORIES.beRelease,
+  });
+
+  expect(result.status).toBe(200);
+  expect(result.hfRequests).toEqual([]);
+  expect(result.dispatches).toHaveLength(1);
+  expect(result.body).not.toHaveProperty("release_record_alerted");
 });
 
 test("a deleted releases.json, a change of default release and an un-withdrawal are logged and post nothing", async () => {
