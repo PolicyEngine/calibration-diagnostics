@@ -219,7 +219,7 @@ function numberOrNull(value: unknown): number | null {
 // A count a release writes as metadata. Microcosm stores every metadata value
 // as a string (TargetSpec, registry.py:149-150), so "2" reads as 2; a number
 // still reads as itself. Anything but a whole, non-negative count reads null.
-export function countOrNull(value: unknown): number | null {
+function countOrNull(value: unknown): number | null {
   const count =
     typeof value === "string" && /^\s*\d+\s*$/.test(value) ? Number(value) : numberOrNull(value);
   return count != null && Number.isSafeInteger(count) && count >= 0 ? count : null;
@@ -1018,7 +1018,7 @@ export interface TargetDimension {
 // dimension with one value under a node (calibration-tree.ts:601-610). A
 // dimension that merely has one value per geography in this page (one
 // target per region, each of a different sex) is a real breakdown and stays.
-export function repeatsGeography(rows: TargetRow[], key: string): boolean {
+function repeatsGeography(rows: TargetRow[], key: string): boolean {
   let carried = false;
   for (const row of rows) {
     const value = rowFacetValue(row, key);
@@ -1029,7 +1029,7 @@ export function repeatsGeography(rows: TargetRow[], key: string): boolean {
   return carried;
 }
 
-export function computeDimensions(rows: TargetRow[]): TargetDimension[] {
+function computeDimensions(rows: TargetRow[]): TargetDimension[] {
   const geographyLabel =
     rows.length > 0 && rows.every((row) => row.level === "region")
       ? "Region"
@@ -1655,7 +1655,7 @@ export function microcosmTargetGeographies(rows: TargetRow[]): string[] {
 // just one. A category at two levels (an FSA measure: 14 country and 51 state
 // targets) has no single level, so its level is null. A category with no
 // level takes `none`, which each caller keeps from before.
-export function categoryLevels(
+function categoryLevels(
   group: TargetRow[],
   none: string | null,
 ): { level: string | null; levels: string[] } {

@@ -1,18 +1,55 @@
 import { expect, test } from "bun:test";
 import fc from "fast-check";
 
+import edFsaFamily from "./fixtures/ed-fsa-family/ed-fsa-family-schema-8.json";
 import {
-  categoryLevels,
-  computeDimensions,
-  countOrNull,
-  repeatsGeography,
+  buildCalibration,
+  buildComparison,
+  latestMicrocosmTargetDiagnosticsPage,
+  microcosmVariableSummary,
 } from "./latest-artifact";
 
 // Generated-input checks of the readers that #277 adds, from the independent
 // review's scoped run (fast-check, seed 277, 20,000 runs each). Each holds
 // within the scope its comment states; outside it, the review's strict run
-// found the counterexample the comment names, each by design.
+// found the counterexample the comment names, each by design. Each runs
+// through a public reader that calls the helper, so the helpers stay private.
 const params = { numRuns: 20_000, seed: 277, endOnFailure: false };
+// 20,000 releases take a few seconds; leave room on a slow runner.
+const TIMEOUT_MS = 60_000;
+
+type JsonObject = Record<string, unknown>;
+type Calibration = ReturnType<typeof buildCalibration>;
+
+const fixture = edFsaFamily as JsonObject;
+const fsaTargets = fixture.targets as JsonObject[];
+// One single-fact FSA target, and the release it builds.
+const singleFactTarget = fsaTargets.find(
+  (row) => !(row.metadata as JsonObject).ledger_member_fact_count,
+)!;
+const fsaRelease = buildCalibration(fixture, "invariants-test", null, {}, {}, {}, "us");
+
+function releaseOf(rows: JsonObject[]): Calibration {
+  return { ...fsaRelease, rows } as Calibration;
+}
+
+function targetsPage(cal: Calibration, variable?: string) {
+  const url = new URL("https://dashboard.test/api/microcosm/target-diagnostics");
+  url.searchParams.set("limit", "500");
+  if (variable) url.searchParams.set("variable", variable);
+  return latestMicrocosmTargetDiagnosticsPage(url.toString(), cal);
+}
+
+// The universe constraint count the targets page shows for a release whose
+// one target's metadata carries `value` as ledger_universe_constraint_count
+// (countOrNull, through chronicleFactFields).
+function shownCount(value: unknown): unknown {
+  const target = structuredClone(singleFactTarget);
+  (target.metadata as JsonObject).ledger_universe_constraint_count = value;
+  const cal = buildCalibration({ ...fixture, targets: [target] }, "count-test", null, {}, {}, {}, "us");
+  const [row] = targetsPage(cal).targets;
+  return (row.chronicle as JsonObject).universe_constraint_count;
+}
 
 // Out of scope: countOrNull(-0) returns -0, which JSON writes as 0.
 const isCount = (value: unknown) =>
@@ -43,19 +80,27 @@ const countLike = fc.oneof(
   ),
 );
 
-test("countOrNull returns null or a safe non-negative integer", () => {
-  fc.assert(fc.property(countLike, (value) => isCount(countOrNull(value))), params);
-});
+test(
+  "a universe constraint count reads null or a safe non-negative integer",
+  () => {
+    fc.assert(fc.property(countLike, (value) => isCount(shownCount(value))), params);
+  },
+  TIMEOUT_MS,
+);
 
-test("countOrNull reads n and String(n) as n", () => {
-  fc.assert(
-    fc.property(
-      fc.integer({ min: 0, max: Number.MAX_SAFE_INTEGER }),
-      (n) => countOrNull(n) === n && countOrNull(String(n)) === n,
-    ),
-    params,
-  );
-});
+test(
+  "a universe constraint count reads n and String(n) as n",
+  () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: Number.MAX_SAFE_INTEGER }),
+        (n) => shownCount(n) === n && shownCount(String(n)) === n,
+      ),
+      params,
+    );
+  },
+  TIMEOUT_MS,
+);
 
 const levelValue = fc.oneof(
   fc.constantFrom("country", "state", "national", "region", "", null, undefined, " "),
@@ -64,21 +109,63 @@ const levelValue = fc.oneof(
 );
 const category = fc.array(fc.record({ level: levelValue }), { maxLength: 8 });
 
+// The levels a category's rows carry: sorted, unique and non-empty, read as
+// the page's Level filter reads them.
+const inputLevels = (rows: { level: unknown }[]) =>
+  [...new Set(rows.map((row) => String(row.level ?? "")))].filter(Boolean).sort();
+
+// The FSA targets the comparison property relabels, each its own target.
+const comparisonTargets = fsaRelease.rows.slice(0, 8);
+
+// A category's level and levels as each reader reports them: the targets
+// API's variable summary keeps none = "", and the comparison none = null
+// (categoryLevels). Both group the rows under one variable.
+const READERS = [
+  {
+    none: "",
+    read: (rows: { level: unknown }[]) =>
+      microcosmVariableSummary(rows.map((row) => ({ ...row, variable_key: "v" }))),
+  },
+  {
+    none: null,
+    read: (rows: { level: unknown }[]) => {
+      const cal = releaseOf(
+        rows.map((row, index) => ({ ...comparisonTargets[index], level: row.level, variable_key: "v" })),
+      );
+      return buildComparison(cal, cal).variables;
+    },
+  },
+] as const;
+
 // Out of scope: with none = null (the comparison's) and no level at all, a
 // category reads level null, as one at two levels does, by design.
-for (const none of ["", null] as const) {
-  test(`categoryLevels: sorted, unique, non-empty levels; level null exactly when two or more (none = ${JSON.stringify(none)})`, () => {
-    fc.assert(
-      fc.property(category, (rows) => {
-        const { level, levels } = categoryLevels(rows as never, none);
-        expect(levels).toEqual([...levels].sort());
-        expect(new Set(levels).size).toBe(levels.length);
-        expect(levels.every((value) => typeof value === "string" && value.length > 0)).toBe(true);
-        if (levels.length > 0 || none !== null) expect(level === null).toBe(levels.length >= 2);
-      }),
-      params,
-    );
-  });
+for (const { none, read } of READERS) {
+  test(
+    `a category's levels are its rows' sorted, unique, non-empty levels; level null exactly when two or more (none = ${JSON.stringify(none)})`,
+    () => {
+      fc.assert(
+        fc.property(category, (rows) => {
+          const summaries = read(rows);
+          if (rows.length === 0) {
+            expect(summaries).toEqual([]);
+            return;
+          }
+          expect(summaries).toHaveLength(1);
+          const { level, levels } = summaries[0];
+          // A reader that returns no levels, or levels the rows do not carry,
+          // fails here.
+          expect(levels).toEqual(inputLevels(rows));
+          expect(levels).toEqual([...levels].sort());
+          expect(new Set(levels).size).toBe(levels.length);
+          expect(levels.every((value) => typeof value === "string" && value.length > 0)).toBe(true);
+          if (levels.length > 0 || none !== null) expect(level === null).toBe(levels.length >= 2);
+          expect(level).toBe(levels.length >= 2 ? null : (levels[0] ?? none));
+        }),
+        params,
+      );
+    },
+    TIMEOUT_MS,
+  );
 }
 
 const geographies = ["United States", "Alabama", "Alaska", "Wales", "Flanders"];
@@ -99,6 +186,7 @@ const facetRow = fc
     ),
   })
   .map((row) => ({
+    variable_key: "v",
     geography: row.geography,
     level: row.level,
     target_dimensions: [
@@ -106,29 +194,35 @@ const facetRow = fc
     ],
   }));
 
-test("repeatsGeography never hides Geography, nor a dimension that differs from some row's geography", () => {
-  fc.assert(
-    fc.property(fc.array(facetRow, { maxLength: 10 }), (rows) => {
-      const facets = computeDimensions(rows as never).map((facet) => facet.key);
-      const geographyValues = new Set(rows.map((row) => row.geography).filter(Boolean));
-      if (geographyValues.size > 1) expect(facets).toContain("geography");
-      expect(repeatsGeography(rows as never, "geography")).toBe(
-        rows.some((row) => row.geography),
-      );
-      for (const key of ["loc", "sex", "age"]) {
-        const differs = rows.some((row) => {
-          const dim = row.target_dimensions.find((candidate) => candidate.key === key);
-          return dim && dim.value && dim.value !== (row.geography || undefined);
-        });
-        if (differs) expect(repeatsGeography(rows as never, key)).toBe(false);
-        const values = new Set(
-          rows
-            .map((row) => row.target_dimensions.find((candidate) => candidate.key === key)?.value)
-            .filter(Boolean),
-        );
-        if (differs && values.size > 1) expect(facets).toContain(key);
-      }
-    }),
-    params,
-  );
-});
+// The facets the targets page lists for one variable (computeDimensions,
+// which leaves out a dimension that only repeats the geography:
+// repeatsGeography).
+test(
+  "the facets never hide Geography, nor a dimension that differs from some row's geography",
+  () => {
+    fc.assert(
+      fc.property(fc.array(facetRow, { maxLength: 10 }), (rows) => {
+        const facets = targetsPage(releaseOf(rows), "v").dimensions.map((facet) => facet.key);
+        const geographyValues = new Set(rows.map((row) => row.geography).filter(Boolean));
+        if (geographyValues.size > 1) expect(facets).toContain("geography");
+        for (const key of ["loc", "sex", "age"]) {
+          const differs = rows.some((row) => {
+            const dim = row.target_dimensions.find((candidate) => candidate.key === key);
+            return dim && dim.value && dim.value !== (row.geography || undefined);
+          });
+          const values = new Set(
+            rows
+              .map((row) => row.target_dimensions.find((candidate) => candidate.key === key)?.value)
+              .filter(Boolean),
+          );
+          if (differs && values.size > 1) expect(facets).toContain(key);
+          // A dimension that equals its row's geography wherever it appears
+          // only repeats the Geography facet.
+          if (!differs) expect(facets).not.toContain(key);
+        }
+      }),
+      params,
+    );
+  },
+  TIMEOUT_MS,
+);

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import fc from "fast-check";
 
-import { categoryLevels } from "@policyengine/calibration-tree/latest-artifact";
+import { microcosmVariableSummary } from "@policyengine/calibration-tree/latest-artifact";
 
 import { statisticGroupCount, statisticGroupKey } from "./statistic-groups";
 
@@ -83,7 +83,11 @@ describe("statistic group keys, on generated input", () => {
       fc.property(
         fc.array(fc.record({ level: levelValue }), { minLength: 1, maxLength: 6 }),
         (rows) => {
-          const shown = categoryLevels(rows as never, "");
+          // The category's level and levels as the targets API reports them.
+          const [summary] = microcosmVariableSummary(
+            rows.map((categoryRow) => ({ ...categoryRow, variable_key: "v" })),
+          );
+          const shown = { level: summary.level, levels: summary.levels };
           fc.pre(shown.levels.length <= 1);
           fc.pre(String(rows[0].level ?? "") !== "" || shown.levels.length === 0);
           const oldKey = ["s", String(rows[0].level ?? ""), "v"].join("::");
