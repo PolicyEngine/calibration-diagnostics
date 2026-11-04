@@ -93,6 +93,8 @@ function releasesRecord(): Record<string, unknown> {
 interface RepositoryOptions {
   record?: Record<string, unknown>;
   diagnosticsFor?: (folderId: string) => Record<string, unknown>;
+  /** A build folder whose listing Hugging Face answers with a server error. */
+  unreadableFolder?: string;
 }
 
 function buildFolderRepository(requested: string[], options: RepositoryOptions = {}) {
@@ -107,6 +109,7 @@ function buildFolderRepository(requested: string[], options: RepositoryOptions =
       const [release, build] = folderId.split("/");
       const prefix = `releases/${folderId}`;
       if (url === `${API}/tree/${MAIN_SHA}/releases/${release}/${build}?recursive=false&expand=true`) {
+        if (folderId === options.unreadableFolder) return new Response(null, { status: 503 });
         const names = build === UNCALIBRATED_BUILD
           ? ["release_manifest.json", "microcosm_uk_2024_25.h5"]
           : ["release_manifest.json", "calibration_diagnostics.json", "microcosm_uk_2024_25.h5"];
@@ -237,6 +240,30 @@ test("release reconciliation publishes every build releases.json lists, from its
   expect(current.releaseDirectory).toBeUndefined();
   expect(requested).toContain(
     `${RESOLVE}/${FOLDER_COMMITS[folder(DENSE, DENSE_BUILD)].sha}/releases/${DENSE}/${DENSE_BUILD}/calibration_diagnostics.json`,
+  );
+});
+
+test("a build whose folder cannot be read is reported as failed, and the other listed builds are still reconciled", async () => {
+  const store = memoryStore(manifestWithEarlierEntries());
+  globalThis.fetch = buildFolderRepository([], { unreadableFolder: folder(NATIONAL, NATIONAL_OLDER) });
+
+  const reconciliation = reconcileReleaseBuilds("uk", "blob-token", false, store, "build_folders");
+  await expect(reconciliation).resolves.toBeDefined();
+  const report = await reconciliation;
+
+  const failed = report.outcomes.find((outcome) => outcome.sourceId === folder(NATIONAL, NATIONAL_OLDER));
+  expect(failed).toMatchObject({ status: "failed", buildArtifactId: null });
+  expect(failed?.reason).toContain("503");
+  expect(Object.fromEntries(report.outcomes.map((outcome) => [outcome.sourceId, outcome.status])))
+    .toMatchObject({
+      [folder(DENSE, DENSE_BUILD)]: "published",
+      [folder(NATIONAL, NATIONAL_CURRENT)]: "published",
+    });
+  // The failed build is not the current one, so the latest release still moves.
+  expect(report.latestReleaseFailure).toBeUndefined();
+  const manifest = store.current().countries.uk!;
+  expect(manifest.latestReleaseBuildArtifactId).toBe(
+    manifest.builds.find((build) => build.releaseId === folder(NATIONAL, NATIONAL_CURRENT))!.buildArtifactId,
   );
 });
 
