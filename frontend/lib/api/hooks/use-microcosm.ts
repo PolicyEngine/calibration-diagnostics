@@ -164,9 +164,12 @@ export interface MicrocosmTargetRow {
     dimension_set_key?: string | null;
     universe_constraint_set_key?: string | null;
     universe_constraint_count?: number | null;
-    // A target built from several facts lists them here, and its single-fact
-    // fields above (record, fact keys, group-by value, universe constraint)
-    // are null; a single-fact target carries neither field.
+    // A target built from several facts lists them here, ratio operands
+    // included. When its identity spans several of them, its record, fact
+    // keys and universe constraint above are null, and so is its group-by
+    // value unless every one of them shares it. A target whose identity is
+    // one fact, such as a ratio-scaled cell, shows that fact's fields. A
+    // single-fact target carries neither field.
     member_fact_count?: number | null;
     member_fact_keys?: string[];
     filters?: {
