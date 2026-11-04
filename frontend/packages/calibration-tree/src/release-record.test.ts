@@ -10,6 +10,7 @@ import {
   parseReleasesRecord,
   recordedBuilds,
   releaseManifestNamesBuild,
+  releasesRecordFromResponse,
 } from "./release-record";
 
 // The record's documented example (microcosm-emitter#24's
@@ -251,4 +252,32 @@ test("a release manifest names its build by its top-level release and build", ()
   expect(releaseManifestNamesBuild({ release: DENSE, build: NEWER_BUILD }, NATIONAL, NEWER_BUILD))
     .toBe(false);
   expect(releaseManifestNamesBuild(null, NATIONAL, NEWER_BUILD)).toBe(false);
+});
+
+// Only Hugging Face's 404 for the file means a repository has no
+// releases.json; every other answer is an error, never a fallback to tags.
+const notFound = (errorCode?: string) => new Response("Not found", {
+  status: 404,
+  headers: errorCode ? { "X-Error-Code": errorCode } : {},
+});
+
+test("a 404 for the file, with or without its error code, means the repository has no releases.json", async () => {
+  await expect(releasesRecordFromResponse(notFound("EntryNotFound"))).resolves.toBeNull();
+  await expect(releasesRecordFromResponse(notFound())).resolves.toBeNull();
+});
+
+test("a 404 that says the repository or the revision is missing is an error", async () => {
+  await expect(releasesRecordFromResponse(notFound("RepoNotFound")))
+    .rejects.toThrow("Hugging Face returned 404 (RepoNotFound) for releases.json.");
+  await expect(releasesRecordFromResponse(notFound("RevisionNotFound")))
+    .rejects.toThrow("Hugging Face returned 404 (RevisionNotFound) for releases.json.");
+});
+
+test("a server error or a refused token for releases.json is an error", async () => {
+  await expect(releasesRecordFromResponse(new Response("unavailable", { status: 503 })))
+    .rejects.toThrow("Hugging Face returned 503 for releases.json.");
+  await expect(releasesRecordFromResponse(new Response("unauthorized", {
+    status: 401,
+    headers: { "X-Error-Code": "RepoNotFound" },
+  }))).rejects.toThrow("Hugging Face returned 401 (RepoNotFound) for releases.json.");
 });

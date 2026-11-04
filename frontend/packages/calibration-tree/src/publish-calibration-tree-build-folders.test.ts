@@ -110,6 +110,8 @@ interface RepositoryOptions {
   stalledFolder?: { folderId: string; requestedTimeouts: Array<number | null> };
   /** The dataset repository; the UK's by default. */
   repo?: string;
+  /** A build folder whose listing answers its first request, then 503. */
+  folderReadableOnce?: string;
 }
 
 function buildFolderRepository(requested: string[], options: RepositoryOptions = {}) {
@@ -118,6 +120,7 @@ function buildFolderRepository(requested: string[], options: RepositoryOptions =
   const repo = options.repo ?? UK_REPO;
   const api = `https://huggingface.co/api/datasets/${repo}`;
   const resolve = `https://huggingface.co/datasets/${repo}/resolve`;
+  let readableOnceListings = 0;
   return (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     requested.push(url);
@@ -131,6 +134,9 @@ function buildFolderRepository(requested: string[], options: RepositoryOptions =
       const prefix = `releases/${folderId}`;
       if (url === `${api}/tree/${MAIN_SHA}/releases/${release}/${build}?recursive=false&expand=true`) {
         if (folderId === options.unreadableFolder) return new Response(null, { status: 503 });
+        if (folderId === options.folderReadableOnce && readableOnceListings++ > 0) {
+          return new Response(null, { status: 503 });
+        }
         if (folderId === options.stalledFolder?.folderId) {
           const signal = init?.signal;
           options.stalledFolder.requestedTimeouts.push(
@@ -539,6 +545,85 @@ async function withBlobToken<T>(run: () => Promise<T>): Promise<T> {
     else process.env.BLOB_READ_WRITE_TOKEN = priorBlobToken;
   }
 }
+
+// The single-build modes print their result; the tests read the store.
+async function quietly<T>(run: () => Promise<T>): Promise<T> {
+  const printed = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    return await run();
+  } finally {
+    printed.mockRestore();
+  }
+}
+
+test("--latest publishes the current build of the default release and makes it the latest", async () => {
+  const store = memoryStore(manifestWithEarlierEntries());
+  globalThis.fetch = buildFolderRepository([]);
+
+  await withBlobToken(() => quietly(() => runPublisher({ country: "uk", mode: "latest" }, { store })));
+
+  const current = folder(NATIONAL, NATIONAL_CURRENT);
+  expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+    .toEqual([[current, false], [current, true]]);
+  expect(store.writes[0].entry).toMatchObject({
+    hfCommitSha: FOLDER_COMMITS[current].sha,
+    createdAt: "2026-10-19T08:33:23.000Z",
+  });
+});
+
+test("--release of another build publishes it without making it the latest or reading the current build's folder", async () => {
+  const store = memoryStore(manifestWithEarlierEntries());
+  const latestBefore = store.current().countries.uk!.latestReleaseBuildArtifactId;
+  const requested: string[] = [];
+  globalThis.fetch = buildFolderRepository(requested);
+
+  await withBlobToken(() => quietly(() =>
+    runPublisher({ country: "uk", mode: "release", releaseId: folder(NATIONAL, NATIONAL_OLDER) }, { store })
+  ));
+
+  expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+    .toEqual([[folder(NATIONAL, NATIONAL_OLDER), false]]);
+  expect(store.current().countries.uk!.latestReleaseBuildArtifactId).toBe(latestBefore);
+  // The promotion check compares names from releases.json: the current
+  // build's folder is never listed for it.
+  expect(requested.some((url) => url.includes(`/releases/${NATIONAL}/${NATIONAL_CURRENT}`))).toBe(false);
+});
+
+test("--release of the current build still succeeds when its folder cannot be read again for the promotion check", async () => {
+  const store = memoryStore(manifestWithEarlierEntries());
+  const latestBefore = store.current().countries.uk!.latestReleaseBuildArtifactId;
+  globalThis.fetch = buildFolderRepository([], { folderReadableOnce: folder(NATIONAL, NATIONAL_CURRENT) });
+  const warned = spyOn(console, "warn").mockImplementation(() => {});
+
+  try {
+    const publication = withBlobToken(() => quietly(() =>
+      runPublisher({ country: "uk", mode: "release", releaseId: folder(NATIONAL, NATIONAL_CURRENT) }, { store })
+    ));
+    await expect(publication).resolves.toBeUndefined();
+    // The build is registered; reconciliation moves the latest release later.
+    expect(store.writes.map((write) => [write.entry.releaseId, write.makeLatest ?? false]))
+      .toEqual([[folder(NATIONAL, NATIONAL_CURRENT), false]]);
+    expect(store.current().countries.uk!.latestReleaseBuildArtifactId).toBe(latestBefore);
+    expect(warned.mock.calls.map((call) => call.map(String).join(" ")).join("\n"))
+      .toContain("latest release was not moved");
+  } finally {
+    warned.mockRestore();
+  }
+});
+
+test("when the current build is ineligible, the latest-release failure says why", async () => {
+  const record = releasesRecord();
+  (record.releases as Record<string, Record<string, unknown>>)[NATIONAL].current = UNCALIBRATED_BUILD;
+  const store = memoryStore(manifestWithEarlierEntries());
+  globalThis.fetch = buildFolderRepository([], { record });
+
+  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+
+  expect(report.latestReleaseFailure ?? "").toContain(
+    `${folder(NATIONAL, UNCALIBRATED_BUILD)} cannot be published: releases/${folder(NATIONAL, UNCALIBRATED_BUILD)}/ has no calibration diagnostics.`,
+  );
+  expect(report.latestReleaseFailure ?? "").not.toContain("@ is not completely published");
+});
 
 test("a single-build publication refuses a build releases.json does not list, before reading any build file", async () => {
   const requested: string[] = [];

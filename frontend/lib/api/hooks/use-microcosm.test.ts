@@ -118,3 +118,26 @@ test("the release picker keeps a withdrawn build selectable and labels it Withdr
   expect(label(withdrawn.release_id)).toEndWith(" · Withdrawn");
   expect(label(current.release_id)).not.toContain("Withdrawn");
 });
+
+test("the picker's Latest option is labelled Withdrawn when the latest release is a withdrawn build", () => {
+  const release = "microcosm-uk-2024-25-national";
+  const build = "uk-frs-calibration-attempt-20261014T214443Z-d12ff9b3";
+  const latest = {
+    release_id: `${release}/${build}`,
+    date: "20261014T214443Z",
+    files: [],
+    has_calibration: true,
+    release,
+    build,
+    withdrawn: true,
+  };
+  const [latestOption] = releaseSelectOptions({
+    latest_release_id: latest.release_id,
+    updated_at: null,
+    releases: [latest],
+    all_releases: [latest],
+  });
+  expect(latestOption.value).toBe("");
+  expect(latestOption.label).toStartWith("Latest · ");
+  expect(latestOption.label).toEndWith(" · Withdrawn");
+});

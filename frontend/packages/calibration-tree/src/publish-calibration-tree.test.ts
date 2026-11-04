@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 
 import {
   CalibrationTreeArtifactSizeError,
@@ -794,6 +794,57 @@ test("a repository without releases.json is reconciled from its tags and pointer
     expect(requested).toContain(`${resolve}/${MAIN_SHA}/latest-national.json`);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("a repository without releases.json has main's head resolved once per reconciliation, and its pointer file read at that commit", async () => {
+  const requested: string[] = [];
+  globalThis.fetch = lineRepositoryFetch(requested);
+  try {
+    await reconcileReleaseBuilds("uk", "blob-token", false, lineStoreWithJuneLatest());
+    const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
+    const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
+    expect(requested.filter((url) => url === `${api}/revision/main`)).toHaveLength(1);
+    expect(requested.filter((url) => url.endsWith("/latest-national.json")))
+      .toEqual([`${resolve}/${MAIN_SHA}/latest-national.json`]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("--latest without releases.json reads the pointer file at the commit where releases.json was looked for", async () => {
+  const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
+  const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
+  const laterSha = "9".repeat(40);
+  const requested: string[] = [];
+  const repository = lineRepositoryFetch([]);
+  let headLookups = 0;
+  // main moves on after the first lookup; the later commit has the same files.
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    requested.push(url);
+    if (url === `${api}/revision/main`) {
+      headLookups += 1;
+      return Response.json({ sha: headLookups === 1 ? MAIN_SHA : laterSha });
+    }
+    return repository(url.replace(`/resolve/${laterSha}/`, `/resolve/${MAIN_SHA}/`));
+  }) as typeof fetch;
+  const store = lineStoreWithJuneLatest();
+  const priorBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  process.env.BLOB_READ_WRITE_TOKEN = "blob-token";
+  const printed = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    await runPublisher({ country: "uk", mode: "latest" }, { store });
+    const firstRecordRead = requested.find((url) => url.endsWith("/releases.json"));
+    const firstPointerRead = requested.find((url) => url.endsWith("/latest-national.json"));
+    expect(firstRecordRead).toBe(`${resolve}/${MAIN_SHA}/releases.json`);
+    expect(firstPointerRead).toBe(`${resolve}/${MAIN_SHA}/latest-national.json`);
+    expect(store.writes.map((write) => write.entry.releaseId)).toContain(NATIONAL_CUT);
+  } finally {
+    printed.mockRestore();
+    globalThis.fetch = originalFetch;
+    if (priorBlobToken == null) delete process.env.BLOB_READ_WRITE_TOKEN;
+    else process.env.BLOB_READ_WRITE_TOKEN = priorBlobToken;
   }
 });
 
