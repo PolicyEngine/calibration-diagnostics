@@ -562,7 +562,7 @@ function hierarchyListsGroupBy(row: TargetRow, chronicle: JsonObject): boolean {
 // Chronicle fields carry, decided in this order:
 // - no complete pair: null, since the representative carries none;
 // - its identity is one fact, or its hierarchy lists the pair: "shared", since
-//   every identity fact then carries it. A one-fact identity counts whether or
+//   every identity fact then shares it. A one-fact identity counts whether or
 //   not the release has a hierarchy;
 // - its release has a hierarchy, which leaves the pair out: "unlisted", which
 //   does not show whether the identity facts share it;
@@ -610,12 +610,11 @@ function groupByAcrossIdentity(
 // member_fact_count, member_fact_keys, layout_groupby_unlisted_across_facts
 // and identity_spans_several_facts (false) added. An identity of several facts
 // has no one record or fact key, so those read null, and
-// identity_spans_several_facts reads true: with the hierarchy's dimensions, it
-// is the one field here that reads the same whichever identity fact is the
-// representative, so the Dimensions column reads it rather than the
-// representative's group-by pair. Its group-by value shows when its hierarchy
-// lists the pair, because every identity fact then shares it, and reads null
-// otherwise. layout_groupby_unlisted_across_facts reads true when its
+// identity_spans_several_facts reads true. Like the hierarchy's dimensions,
+// and unlike the representative's group-by pair, it reads the same whichever
+// identity fact is the representative, so the Dimensions column reads it. Its
+// group-by value shows when its hierarchy lists the pair, because every
+// identity fact then shares it, and reads null otherwise. layout_groupby_unlisted_across_facts reads true when its
 // hierarchy leaves out the pair the representative carries, which does not
 // show that the facts differ in it (see hierarchyListsGroupBy and
 // groupByAcrossIdentity for its order). Nothing Microcosm writes says whether
