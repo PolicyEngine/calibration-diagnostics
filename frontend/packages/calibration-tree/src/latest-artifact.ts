@@ -552,6 +552,25 @@ function hierarchyListsGroupBy(row: TargetRow, chronicle: JsonObject): boolean {
   });
 }
 
+// Whether the facts of a multi-fact target's identity share the group-by
+// value its Chronicle fields carry: "shared" when the identity is one fact or
+// the hierarchy lists the value, "differs" when the hierarchy leaves it out,
+// and null when the target carries no group-by value or no hierarchy.
+function groupByAcrossIdentity(
+  row: TargetRow,
+  chronicle: JsonObject,
+  oneFact: boolean,
+): "shared" | "differs" | null {
+  if (
+    !stringValue(chronicle.layout_groupby_dimension) ||
+    !stringValue(chronicle.layout_groupby_value_id)
+  ) {
+    return null;
+  }
+  if (oneFact || hierarchyListsGroupBy(row, chronicle)) return "shared";
+  return row.dimension_adapter === "hierarchy" ? "differs" : null;
+}
+
 // The Chronicle fields a page shows for a target. Microcosm stamps a target's
 // single-fact fields from one representative fact (ledger_targets.py:1085-1090
 // at 0ff293b). A target built from several facts also lists every one of them,
@@ -573,8 +592,10 @@ function hierarchyListsGroupBy(row: TargetRow, chronicle: JsonObject): boolean {
 // member_fact_keys added. An identity of several facts has no one record or
 // fact key, so those read null. Its group-by value shows when its hierarchy
 // lists it, because every identity fact then shares it, and reads null
-// otherwise. Nothing Microcosm writes says whether the identity facts share
-// a universe constraint, so its set key and count read null.
+// otherwise; layout_groupby_value_varies says which, so the targets page can
+// say the target combines several values. Nothing Microcosm writes says
+// whether the identity facts share a universe constraint, so its set key and
+// count read null.
 // ledger_aggregation_varying_dimensions cannot tell either: it compares only
 // the facts' dimensions, ratio operands included (:1323, :1626-1646), and it
 // lists none for the FSA balance excluding Parent PLUS, whose five loan types
@@ -586,11 +607,14 @@ function shownChronicle(row: TargetRow): unknown {
   const memberFactCount = countOrNull(metadata.ledger_member_fact_count);
   if (memberFactCount == null || memberFactCount <= 1) return row.chronicle;
   const chronicle = asObject(row.chronicle);
+  const oneFact = identityIsRepresentative(metadata);
+  const groupBy = groupByAcrossIdentity(row, chronicle, oneFact);
   const members = {
     member_fact_count: memberFactCount,
     member_fact_keys: stringListOrEmpty(metadata.ledger_member_fact_keys),
+    layout_groupby_value_varies: groupBy == null ? null : groupBy === "differs",
   };
-  if (identityIsRepresentative(metadata)) return { ...chronicle, ...members };
+  if (oneFact) return { ...chronicle, ...members };
   return {
     ...chronicle,
     ...members,
@@ -599,9 +623,7 @@ function shownChronicle(row: TargetRow): unknown {
     semantic_fact_key: null,
     aggregate_fact_key: null,
     legacy_fact_key: null,
-    layout_groupby_value_id: hierarchyListsGroupBy(row, chronicle)
-      ? chronicle.layout_groupby_value_id
-      : null,
+    layout_groupby_value_id: groupBy === "shared" ? chronicle.layout_groupby_value_id : null,
     universe_constraint_set_key: null,
     universe_constraint_count: null,
   };
