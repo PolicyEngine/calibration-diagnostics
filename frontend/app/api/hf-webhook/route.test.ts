@@ -379,8 +379,16 @@ async function postMainUpdate(options: {
   after: RecordAnswer;
   repo?: string;
   newTag?: string;
+  /** The update's oldSha; BEFORE_SHA unless given (null for a new main). */
+  oldSha?: string | null;
+  /** The configured Hugging Face token; "test-hf-token" unless given. */
+  token?: string;
+  /** Messages the Slack fake refuses with a 500. */
+  slackRefuses?: (text: string) => boolean;
 }) {
   const repo = options.repo ?? REPOSITORIES.ukRelease;
+  const oldSha = "oldSha" in options ? options.oldSha ?? null : BEFORE_SHA;
+  const token = "token" in options ? options.token : "test-hf-token";
   const hfRequests: Array<{ url: string; headers: HeadersInit | undefined }> = [];
   const dispatches: string[] = [];
   const tagAlerts: string[] = [];
@@ -409,13 +417,16 @@ async function postMainUpdate(options: {
   process.env.SLACK_WEBHOOK_POPULACE_UK = UK_SLACK_WEBHOOK;
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     if (String(input) !== UK_SLACK_WEBHOOK) throw new Error(`Unexpected URL ${String(input)}`);
-    slackPayloads.push(JSON.parse(String(init?.body)));
+    const payload = JSON.parse(String(init?.body));
+    if (options.slackRefuses?.(payload.text)) return new Response("invalid_blocks", { status: 500 });
+    slackPayloads.push(payload);
     return new Response("ok");
   }) as typeof fetch;
   const logged = spyOn(console, "error").mockImplementation(() => {});
+  const warned = spyOn(console, "warn").mockImplementation(() => {});
   try {
     const response = await createHfWebhookHandler(
-      webhookConfig({ huggingFaceToken: "test-hf-token" }),
+      webhookConfig({ huggingFaceToken: token }),
       {
         fetch: fetchImplementation,
         postReleaseAlert: async ({ releaseId }) => {
@@ -429,7 +440,7 @@ async function postMainUpdate(options: {
         ...(options.newTag
           ? [{ ref: `refs/tags/${options.newTag}`, oldSha: null, newSha: AFTER_SHA }]
           : []),
-        { ref: "refs/heads/main", oldSha: BEFORE_SHA, newSha: AFTER_SHA },
+        { ref: "refs/heads/main", oldSha, newSha: AFTER_SHA },
       ],
     }));
     return {
@@ -441,9 +452,11 @@ async function postMainUpdate(options: {
       slackPayloads,
       slackTexts: slackPayloads.map((payload) => payload.text),
       logged: logged.mock.calls.map((call) => call.map(String).join(" ")),
+      warned: warned.mock.calls.map((call) => call.map(String).join(" ")),
     };
   } finally {
     logged.mockRestore();
+    warned.mockRestore();
     globalThis.fetch = originalFetch;
     if (priorWebhook == null) delete process.env.SLACK_WEBHOOK_POPULACE_UK;
     else process.env.SLACK_WEBHOOK_POPULACE_UK = priorWebhook;
@@ -556,21 +569,118 @@ test("an invalid releases.json before or after the update is logged, and nothing
   }
 });
 
-test("a releases.json that cannot be read is logged, and nothing is posted", async () => {
+test("a releases.json that cannot be read for a lasting reason is logged, and nothing is posted", async () => {
   const valid = nationalRecord(CURRENT, [OLDER, CURRENT, NEWEST]);
   const unreadable = [
-    () => new Response("unavailable", { status: 503 }),
     // A missing revision is not a repository without releases.json.
     () => new Response("Revision not found", {
       status: 404,
       headers: { "X-Error-Code": "RevisionNotFound" },
     }),
+    // A token that cannot read the repository.
+    () => new Response("Unauthorized", { status: 401 }),
   ];
   for (const after of unreadable) {
-    const result = await postMainUpdate({ before: valid, after });
+    const result = await postMainUpdate({ before: valid, after, newTag: `${NATIONAL}-20261104T101500Z-0e0e0e0e` });
     expect(result.status).toBe(200);
     expect(result.slackTexts).toEqual([]);
     expect(result.logged.some((line) => line.includes("releases.json"))).toBe(true);
+    // Retrying would not help, so the dispatch and the tag alert go ahead.
+    expect(result.dispatches).toHaveLength(1);
+    expect(result.tagAlerts).toHaveLength(1);
+  }
+});
+
+test("a transient failure reading releases.json answers 503 before dispatching or posting anything, so Hugging Face's retry posts each alert once", async () => {
+  const before = nationalRecord(CURRENT, [OLDER, CURRENT]);
+  const after = nationalRecord(NEWEST, [OLDER, CURRENT, NEWEST]);
+  const newTag = `${NATIONAL}-20261104T101500Z-0e0e0e0e`;
+  const transient: Array<() => Response> = [
+    () => new Response("unavailable", { status: 503 }),
+    () => new Response("rate limited", { status: 429 }),
+    () => {
+      throw new TypeError("fetch failed");
+    },
+    () => {
+      throw new DOMException("The operation timed out.", "TimeoutError");
+    },
+  ];
+  for (const failure of transient) {
+    const result = await postMainUpdate({ before, after: failure, newTag });
+    expect(result.status).toBe(503);
+    expect(result.dispatches).toEqual([]);
+    expect(result.tagAlerts).toEqual([]);
+    expect(result.slackTexts).toEqual([]);
+    expect(result.logged.some((line) => line.includes("releases.json"))).toBe(true);
+  }
+  // The retried delivery, once Hugging Face answers, does everything once.
+  const retried = await postMainUpdate({ before, after, newTag });
+  expect(retried.status).toBe(200);
+  expect(retried.dispatches).toHaveLength(1);
+  expect(retried.tagAlerts).toEqual([newTag]);
+  expect(retried.slackTexts).toEqual([`New Microcosm UK build \`${NATIONAL}/${NEWEST}\`: now current`]);
+});
+
+test("a deleted releases.json, a change of default release and an un-withdrawal are logged and post nothing", async () => {
+  const record = nationalRecord(CURRENT, [OLDER, CURRENT], [OLDER]);
+  const deleted = await postMainUpdate({ before: record, after: null });
+  expect(deleted.slackTexts).toEqual([]);
+  expect(deleted.warned.join("\n")).toContain(`releases.json was removed from ${REPOSITORIES.ukRelease}`);
+
+  const otherDefault = nationalRecord(CURRENT, [OLDER, CURRENT], [OLDER]);
+  (otherDefault.releases as Record<string, unknown>)[DENSE] = {
+    role: "local_area",
+    current: null,
+    builds: {},
+  };
+  otherDefault.default = DENSE;
+  const defaultChanged = await postMainUpdate({ before: record, after: otherDefault });
+  expect(defaultChanged.slackTexts).toEqual([]);
+  expect(defaultChanged.warned.join("\n")).toContain(`default release changed from ${NATIONAL} to ${DENSE}`);
+
+  const restored = await postMainUpdate({ before: record, after: nationalRecord(CURRENT, [OLDER, CURRENT]) });
+  expect(restored.slackTexts).toEqual([]);
+  expect(restored.warned.join("\n")).toContain(`${NATIONAL}/${OLDER} is no longer withdrawn`);
+});
+
+test("a main created by the update (oldSha null) reads releases.json only after it", async () => {
+  const result = await postMainUpdate({
+    before: null,
+    after: nationalRecord(CURRENT, [OLDER, CURRENT]),
+    oldSha: null,
+  });
+
+  expect(result.hfRequests.map((read) => read.url)).toEqual([
+    `https://huggingface.co/datasets/${REPOSITORIES.ukRelease}/resolve/${AFTER_SHA}/releases.json`,
+  ]);
+  expect(result.slackTexts).toEqual([
+    "Microcosm UK now records its releases in `releases.json`: 2 builds in 1 release",
+  ]);
+});
+
+test("a Slack failure for one alert is logged, and the update's other alerts are still posted", async () => {
+  const result = await postMainUpdate({
+    before: nationalRecord(CURRENT, [OLDER, CURRENT]),
+    after: nationalRecord(CURRENT, [OLDER, CURRENT, NEWEST], [OLDER]),
+    slackRefuses: (text) => text.startsWith("New Microcosm"),
+  });
+
+  expect(result.status).toBe(200);
+  expect(result.slackTexts).toEqual([`Microcosm UK build \`${NATIONAL}/${OLDER}\` withdrawn`]);
+  expect(result.logged.some((line) => line.includes(`published ${NATIONAL}/${NEWEST}`))).toBe(true);
+  expect(result.body.release_record_alerted).toEqual([`withdrawn ${NATIONAL}/${OLDER}`]);
+});
+
+test("without a Hugging Face token, releases.json is requested with no Authorization header", async () => {
+  const result = await postMainUpdate({
+    before: nationalRecord(CURRENT, [OLDER, CURRENT]),
+    after: nationalRecord(CURRENT, [OLDER, CURRENT]),
+    token: undefined,
+  });
+
+  expect(result.hfRequests).toHaveLength(2);
+  for (const read of result.hfRequests) {
+    expect(new Headers(read.headers).has("Authorization")).toBe(false);
   }
 });
 

@@ -52,10 +52,13 @@ test("applies repository and GitHub overrides from an explicit environment", () 
   );
 });
 
-test("reads the Hugging Face token for releases.json alerts from HF_TOKEN, or else HUGGINGFACE_TOKEN", () => {
-  expect(resolveHfWebhookConfig({ HF_TOKEN: "  hf-token  ", HUGGINGFACE_TOKEN: "other" }).huggingFaceToken)
+test("reads the Hugging Face token for releases.json alerts as the dashboard's other readers do: HF_TOKEN, else HUGGINGFACE_TOKEN", () => {
+  expect(resolveHfWebhookConfig({ HF_TOKEN: "hf-token", HUGGINGFACE_TOKEN: "other" }).huggingFaceToken)
     .toBe("hf-token");
-  expect(resolveHfWebhookConfig({ HUGGINGFACE_TOKEN: "  fallback-token  " }).huggingFaceToken)
+  expect(resolveHfWebhookConfig({ HUGGINGFACE_TOKEN: "fallback-token" }).huggingFaceToken)
     .toBe("fallback-token");
   expect(resolveHfWebhookConfig({}).huggingFaceToken).toBeUndefined();
+  // As hfAuthHeaders: a set HF_TOKEN wins even when empty, and is used as it is.
+  expect(resolveHfWebhookConfig({ HF_TOKEN: "", HUGGINGFACE_TOKEN: "other" }).huggingFaceToken).toBe("");
+  expect(resolveHfWebhookConfig({ HF_TOKEN: " padded " }).huggingFaceToken).toBe(" padded ");
 });
