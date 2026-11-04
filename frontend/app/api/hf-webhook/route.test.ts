@@ -434,6 +434,7 @@ async function postMainUpdate(options: {
     }));
     return {
       status: response.status,
+      body: await response.json(),
       hfRequests,
       dispatches,
       tagAlerts,
@@ -447,6 +448,10 @@ async function postMainUpdate(options: {
     if (priorWebhook == null) delete process.env.SLACK_WEBHOOK_POPULACE_UK;
     else process.env.SLACK_WEBHOOK_POPULACE_UK = priorWebhook;
   }
+}
+
+async function postMainUpdateResponse(options: Parameters<typeof postMainUpdate>[0]) {
+  return (await postMainUpdate(options)).body;
 }
 
 test("a newly published build that becomes current is announced as now current", async () => {
@@ -588,4 +593,36 @@ test("a staging repository's main update reads no releases.json", async () => {
 
   expect(result.hfRequests).toEqual([]);
   expect(result.slackTexts).toEqual([]);
+});
+
+test("a delivery without a main update answers as before, naming no releases.json alerts", async () => {
+  const POST = handler(async () => new Response(null, { status: 204 }));
+
+  const response = await POST(
+    request({
+      repo: { name: REPOSITORIES.ukRelease },
+      updatedRefs: [
+        { ref: "refs/tags/microcosm-uk-release", oldSha: null, newSha: "1".repeat(40) },
+      ],
+    }),
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    ok: true,
+    country: "uk",
+    dispatched: [
+      { event_kind: "tag", release_id: "microcosm-uk-release", hf_commit_sha: "1".repeat(40) },
+    ],
+    alerted: [],
+  });
+});
+
+test("a main update's answer lists the releases.json alerts it posted", async () => {
+  const result = await postMainUpdateResponse({
+    before: nationalRecord(CURRENT, [OLDER, CURRENT]),
+    after: nationalRecord(CURRENT, [OLDER, CURRENT], [OLDER]),
+  });
+
+  expect(result.release_record_alerted).toEqual([`withdrawn ${NATIONAL}/${OLDER}`]);
 });
