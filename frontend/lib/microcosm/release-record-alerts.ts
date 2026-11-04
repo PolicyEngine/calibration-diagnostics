@@ -92,3 +92,40 @@ export function releaseRecordAlerts(
   }
   return [...published, ...currentChanges, ...withdrawals];
 }
+
+export type UnannouncedRecordChange =
+  | { kind: "removed" }
+  | { kind: "default_changed"; from: string | null; to: string | null }
+  | { kind: "unwithdrawn"; release: string; build: string };
+
+/**
+ * Changes between the two records that post no alert but should not pass
+ * unnoticed, for the log: the record's removal (readers then fall back to
+ * tags and pointer files), a change of default release, and a build that is
+ * no longer withdrawn.
+ */
+export function unannouncedRecordChanges(
+  before: ReleasesRecord | null,
+  after: ReleasesRecord | null,
+): UnannouncedRecordChange[] {
+  if (!before) return [];
+  if (!after) return [{ kind: "removed" }];
+  const changes: UnannouncedRecordChange[] = [];
+  if (before.default !== after.default) {
+    changes.push({ kind: "default_changed", from: before.default, to: after.default });
+  }
+  for (const release of Object.keys(after.releases).sort(byName)) {
+    const earlier = Object.hasOwn(before.releases, release) ? before.releases[release] : undefined;
+    if (!earlier) continue;
+    for (const build of Object.keys(after.releases[release].builds).sort(byName)) {
+      if (
+        Object.hasOwn(earlier.builds, build) &&
+        earlier.builds[build].withdrawn &&
+        !after.releases[release].builds[build].withdrawn
+      ) {
+        changes.push({ kind: "unwithdrawn", release, build });
+      }
+    }
+  }
+  return changes;
+}

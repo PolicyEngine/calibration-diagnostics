@@ -172,29 +172,46 @@ moved to a failed release.
 
 #### Slack release alerts
 
-After dispatching the reconciliation, the webhook posts release alerts to the
-country's Slack channel (`SLACK_WEBHOOK_POPULACE_US` or
-`SLACK_WEBHOOK_POPULACE_UK`; a country without one gets none). Failures are
-logged and never fail the delivery.
+The webhook posts release alerts to the country's Slack channel
+(`SLACK_WEBHOOK_POPULACE_US` or `SLACK_WEBHOOK_POPULACE_UK`; a country without
+one gets none). A Slack failure is logged and never fails the delivery.
 
-- **New tags:** one "New Microcosm … release" message per new tag, as before.
+- **New tags:** one "New Microcosm … release" message per new tag, as before,
+  after the reconciliation is dispatched.
 - **`releases.json`:** for an update to a release repository's `main`, the
-  webhook reads `releases.json` at the commits before and after the update,
-  with `HF_TOKEN` (or `HUGGINGFACE_TOKEN`), and posts one message for each
-  change:
+  webhook first reads `releases.json` at the commits before and after the
+  update (only after, for a new `main`), with `HF_TOKEN`, or
+  `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset, read when the server starts.
+  After dispatching, it posts one message for each change:
   - a newly published build: "New Microcosm UK build `<release>/<build>`: now
     current", or "...: published, not current (current stays `<build>`)";
   - a change of current build: "Microcosm UK `<release>`: current build
     changed from `<old>` to `<new>`";
   - a withdrawal: "Microcosm UK build `<release>/<build>` withdrawn".
 
-  Each message carries the repository, the publication time when known and the
-  dashboard link. The update that first creates `releases.json` gets one
+  Each message carries the repository and the dashboard link; new-build
+  messages also carry the build's `published_at`. Values the dashboard does
+  not check, such as `published_at` and tag names, are escaped for Slack's
+  formatted text. The update that first creates `releases.json` gets one
   summary message ("Microcosm UK now records its releases in `releases.json`:
-  N builds in M releases", with each release's current build) instead of one
-  per listed build. A repository without `releases.json` on either side gets
-  none of these. A record that cannot be read or that the release writer's
-  rules refuse, before or after the update, is logged and nothing is posted.
+  N builds in M releases", with each release's current build, split to stay
+  within Slack's block limits) instead of one per listed build. A repository
+  without `releases.json` on both sides gets none of these.
+- **When `releases.json` cannot be read:**
+  - A transient failure (Hugging Face answers 5xx or 429, or the request
+    fails or times out) is logged and the delivery is answered 503 before
+    anything is dispatched or posted. Hugging Face retries the delivery, so
+    the dispatch, the tag alerts and the record alerts each happen once,
+    when a retry succeeds. A long Hub outage can make Hugging Face suspend
+    the webhook; re-enable it and replay the delivery (see the failure list
+    under "Hugging Face webhook").
+  - Any other failure, such as a token that cannot read the repository, a
+    missing revision or a record the release writer's rules refuse, is
+    logged. The dispatch and the tag alerts go ahead, and no record alert is
+    posted for that update.
+- **Changes with no alert:** a deleted `releases.json` (its readers then read
+  tags and pointer files), a change of default release and a build that is
+  no longer withdrawn are logged as warnings, and nothing is posted.
 
 #### Microcosm release lines
 
@@ -528,6 +545,10 @@ Failure meanings and recovery:
 - `502` from the application means GitHub rejected or did not receive the
   workflow dispatch; check `GITHUB_ACTIONS_DISPATCH_TOKEN` and its Actions
   permission.
+- `503` from the application means a release repository's `releases.json`
+  could not be read for a reason that may pass (a Hugging Face 5xx or 429, or
+  a failed or timed-out request). Nothing was dispatched or posted; Hugging
+  Face retries the delivery.
 - A failed release workflow either stopped before reconciling any release (for
   example, the manifest, the release listing or the repository's tags could
   not be read, or one tag's folder or one folder's commit could not be

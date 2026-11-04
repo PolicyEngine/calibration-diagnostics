@@ -28,6 +28,7 @@ function webhookConfig(
   return {
     secret: "test-webhook-secret",
     githubToken: "test-github-token",
+    huggingFaceToken: undefined,
     githubRepository: "PolicyEngine/calibration-diagnostics",
     githubWorkflow: "publish-calibration-tree.yml",
     repositories: new Map(TEST_REPOSITORIES),

@@ -11,7 +11,12 @@ import {
   type ReleasesRecord,
 } from "@policyengine/calibration-tree/release-record";
 import type { HfWebhookConfig } from "./hf-webhook-config";
-import { releaseRecordAlerts, type ReleaseRecordAlert } from "./release-record-alerts";
+import {
+  releaseRecordAlerts,
+  unannouncedRecordChanges,
+  type ReleaseRecordAlert,
+  type UnannouncedRecordChange,
+} from "./release-record-alerts";
 
 interface UpdatedRef {
   ref: string;
@@ -47,9 +52,19 @@ const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 /**
+ * A failure that a later attempt may not repeat: Hugging Face answered 5xx
+ * or 429, or the request failed or timed out. The webhook answers 503 for
+ * it, before dispatching or posting anything, so Hugging Face's retry of
+ * the delivery does each of them once.
+ */
+class TransientRecordReadError extends Error {}
+
+/**
  * The repository's releases.json at a commit, or null when it has none there
- * (Hugging Face's 404 for the file). Throws when it cannot be read or the
- * release writer's rules refuse it (releasesRecordFromResponse).
+ * (Hugging Face's 404 for the file). Throws TransientRecordReadError for a
+ * failure worth retrying, and another error when the record cannot be read
+ * for a lasting reason or the release writer's rules refuse it
+ * (releasesRecordFromResponse).
  */
 async function readReleasesRecordAt(
   repo: string,
@@ -61,44 +76,82 @@ async function readReleasesRecordAt(
   if (!REPOSITORY_NAME.test(repo) || !COMMIT_SHA.test(commitSha)) {
     throw new Error(`Cannot read ${RELEASES_RECORD_PATH} of ${repo} at ${commitSha}.`);
   }
-  const response = await fetchImplementation(
-    `https://huggingface.co/datasets/${repo}/resolve/${commitSha}/${RELEASES_RECORD_PATH}`,
-    {
-      headers: config.huggingFaceToken
-        ? { Authorization: `Bearer ${config.huggingFaceToken}` }
-        : {},
-      cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
-    },
-  );
+  let response: Response;
+  try {
+    response = await fetchImplementation(
+      `https://huggingface.co/datasets/${repo}/resolve/${commitSha}/${RELEASES_RECORD_PATH}`,
+      {
+        headers: config.huggingFaceToken
+          ? { Authorization: `Bearer ${config.huggingFaceToken}` }
+          : {},
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+  } catch (error) {
+    throw new TransientRecordReadError(
+      `Reading ${RELEASES_RECORD_PATH} at ${commitSha} failed: ` +
+        `${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (response.status >= 500 || response.status === 429) {
+    throw new TransientRecordReadError(
+      `Hugging Face returned ${response.status} for ${RELEASES_RECORD_PATH} at ${commitSha}.`,
+    );
+  }
   return releasesRecordFromResponse(response);
 }
 
+type RecordComparison =
+  | { kind: "compared"; alerts: ReleaseRecordAlert[]; unannounced: UnannouncedRecordChange[] }
+  | { kind: "unavailable" }
+  | { kind: "retry"; reason: string };
+
 /**
  * What one update of a release repository's main changed in releases.json.
- * A record that cannot be read or is refused, before or after the update, is
+ * A transient read failure asks for a retry. A record that cannot be read
+ * for a lasting reason or is refused, before or after the update, is
  * logged and gives no alerts.
  */
-async function releaseRecordAlertsForUpdate(
+async function compareReleaseRecords(
   repo: string,
   update: UpdatedRef,
   config: HfWebhookConfig,
   fetchImplementation: FetchImplementation,
-): Promise<ReleaseRecordAlert[]> {
+): Promise<RecordComparison> {
+  const span = `${update.oldSha ?? "none"} to ${update.newSha ?? "none"}`;
   try {
     const [before, after] = await Promise.all([
       readReleasesRecordAt(repo, update.oldSha, config, fetchImplementation),
       readReleasesRecordAt(repo, update.newSha, config, fetchImplementation),
     ]);
-    return releaseRecordAlerts(before, after);
+    return {
+      kind: "compared",
+      alerts: releaseRecordAlerts(before, after),
+      unannounced: unannouncedRecordChanges(before, after),
+    };
   } catch (error) {
-    console.error(
-      `No ${RELEASES_RECORD_PATH} alerts for ${repo} ` +
-        `(${update.oldSha ?? "none"} to ${update.newSha ?? "none"}):`,
-      error,
-    );
-    return [];
+    if (error instanceof TransientRecordReadError) {
+      console.error(
+        `${RELEASES_RECORD_PATH} of ${repo} (${span}) could not be read; ` +
+          "answering 503 so that Hugging Face retries the delivery:",
+        error.message,
+      );
+      return { kind: "retry", reason: error.message };
+    }
+    console.error(`No ${RELEASES_RECORD_PATH} alerts for ${repo} (${span}):`, error);
+    return { kind: "unavailable" };
   }
+}
+
+function logUnannounced(repo: string, update: UpdatedRef, change: UnannouncedRecordChange) {
+  const span = `${update.oldSha ?? "none"} to ${update.newSha ?? "none"}`;
+  const what = change.kind === "removed"
+    ? `${RELEASES_RECORD_PATH} was removed from ${repo}; its readers now read tags and pointer files`
+    : change.kind === "default_changed"
+      ? `in ${repo}, the default release changed from ${change.from ?? "none"} to ${change.to ?? "none"}`
+      : `in ${repo}, ${change.release}/${change.build} is no longer withdrawn`;
+  console.warn(`${what} (${span}). No Slack alert is posted for this change.`);
 }
 
 function describeAlert(alert: ReleaseRecordAlert): string {
@@ -241,6 +294,20 @@ export function createHfWebhookHandler(
           ];
         })();
 
+    // releases.json is read before anything is dispatched or posted. A
+    // transient failure then answers 503 with nothing done, and Hugging
+    // Face's retry of the delivery does everything once.
+    const mainUpdate = mainUpdates.at(-1);
+    const comparison = registration.kind === "release" && mainUpdate
+      ? await compareReleaseRecords(repo, mainUpdate, config, fetchImplementation)
+      : null;
+    if (comparison?.kind === "retry") {
+      return NextResponse.json(
+        { detail: `Unable to read ${RELEASES_RECORD_PATH}; retry the delivery.` },
+        { status: 503 },
+      );
+    }
+
     try {
       for (const dispatch of dispatches) {
         await dispatchTreeBuild(dispatch, config, fetchImplementation);
@@ -270,15 +337,12 @@ export function createHfWebhookHandler(
     // Named in the answer only when releases.json was read, so a delivery
     // without a main update answers as before.
     let recordAlerted: string[] | null = null;
-    const mainUpdate = mainUpdates.at(-1);
-    if (registration.kind === "release" && mainUpdate) {
+    if (comparison && mainUpdate) {
       const posted: string[] = [];
-      const alerts = await releaseRecordAlertsForUpdate(
-        repo,
-        mainUpdate,
-        config,
-        fetchImplementation,
-      );
+      const alerts = comparison.kind === "compared" ? comparison.alerts : [];
+      for (const change of comparison.kind === "compared" ? comparison.unannounced : []) {
+        logUnannounced(repo, mainUpdate, change);
+      }
       for (const alert of alerts) {
         try {
           const sent = await sendReleaseRecordAlert({ country, repo, alert });

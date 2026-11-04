@@ -180,8 +180,19 @@ export function microcosmCountryGeography(country: MicrocosmCountry): string {
   return countryRepository(country).geography;
 }
 
+/**
+ * The Hugging Face read token the dashboard server uses: `HF_TOKEN`, or
+ * `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset, as set. An empty value
+ * sends no token.
+ */
+export function huggingFaceReadToken(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): string | undefined {
+  return environment.HF_TOKEN ?? environment.HUGGINGFACE_TOKEN;
+}
+
 function hfAuthHeaders(): HeadersInit | undefined {
-  const token = process.env.HF_TOKEN ?? process.env.HUGGINGFACE_TOKEN;
+  const token = huggingFaceReadToken();
   return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 

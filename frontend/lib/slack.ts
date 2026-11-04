@@ -22,6 +22,22 @@ interface SlackPayload {
   blocks: unknown[];
 }
 
+// Slack's limits on a message: a section's text holds 1 to 3,000
+// characters, and a message holds at most 50 blocks.
+const SECTION_TEXT_LIMIT = 3000;
+const BLOCK_LIMIT = 50;
+
+/**
+ * A value shown in Slack's formatted text, with `&`, `<` and `>` escaped as
+ * Slack requires, so a value can never mention a channel or form a link.
+ * Release, build and repository names are safe identifiers already; this is
+ * for values the dashboard does not check, such as a tag's name or a
+ * build's `published_at`.
+ */
+export function slackEscape(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // The context shown under every release alert: the repository, the
 // publication time when known, and the dashboard link.
 function alertContext(repo: string, publishedAt?: string | null) {
@@ -30,14 +46,43 @@ function alertContext(repo: string, publishedAt?: string | null) {
     elements: [{
       type: "mrkdwn",
       text: [
-        repo,
-        publishedAt ? `published ${publishedAt}` : "",
+        slackEscape(repo),
+        publishedAt ? `published ${slackEscape(publishedAt)}` : "",
         `<${DASHBOARD_URL}|calibration diagnostics>`,
       ]
         .filter(Boolean)
         .join(" · "),
     }],
   };
+}
+
+const section = (text: string) => ({ type: "section", text: { type: "mrkdwn", text } });
+
+/**
+ * Lines as section blocks within Slack's limits: as many whole lines per
+ * section as fit in 3,000 characters, no empty section, and at most
+ * `maxBlocks` sections, the last one saying how many lines were left out.
+ */
+function lineSections(lines: string[], maxBlocks: number) {
+  const sections: string[] = [];
+  let current = "";
+  for (const line of lines) {
+    const next = current ? `${current}\n${line}` : line;
+    if (next.length > SECTION_TEXT_LIMIT && current) {
+      sections.push(current);
+      current = line;
+    } else {
+      current = next;
+    }
+  }
+  if (current) sections.push(current);
+  if (sections.length > maxBlocks) {
+    const kept = sections.slice(0, maxBlocks - 1);
+    const shownLines = kept.reduce((count, text) => count + text.split("\n").length, 0);
+    kept.push(`…and ${lines.length - shownLines} more`);
+    return kept.map(section);
+  }
+  return sections.map(section);
 }
 
 // Post to the country's Slack incoming webhook. No-op (returns false) when
@@ -71,14 +116,16 @@ export async function postReleaseAlert(opts: {
   updatedAt?: string | null;
 }): Promise<boolean> {
   const label = COUNTRY_LABEL[opts.country] ?? opts.country.toUpperCase();
+  // A tag's name comes from the repository, unchecked.
+  const releaseId = slackEscape(opts.releaseId);
   return postToCountryChannel(opts.country, {
-    text: `New Microcosm ${opts.country.toUpperCase()} release: ${opts.releaseId}`,
+    text: `New Microcosm ${opts.country.toUpperCase()} release: ${releaseId}`,
     blocks: [
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `:rocket: *New Microcosm ${label} release*\n\`${opts.releaseId}\``,
+          text: `:rocket: *New Microcosm ${label} release*\n\`${releaseId}\``,
         },
       },
       alertContext(opts.repo, opts.updatedAt),
@@ -99,7 +146,6 @@ export function releaseRecordAlertPayload(
   alert: ReleaseRecordAlert,
 ): SlackPayload {
   const microcosm = `Microcosm ${country.toUpperCase()}`;
-  const section = (text: string) => ({ type: "section", text: { type: "mrkdwn", text } });
   const name = (build: string | null) => (build == null ? "none" : `\`${build}\``);
   switch (alert.kind) {
     case "published": {
@@ -131,9 +177,10 @@ export function releaseRecordAlertPayload(
           ? `• \`${release}\`: no current build`
           : `• \`${release}\`: current build \`${currentBuild}\``
       );
+      // The sentence and the context take two of the message's blocks.
       return {
         text,
-        blocks: [section(text), section(releases.join("\n")), alertContext(repo)],
+        blocks: [section(text), ...lineSections(releases, BLOCK_LIMIT - 2), alertContext(repo)],
       };
     }
   }
