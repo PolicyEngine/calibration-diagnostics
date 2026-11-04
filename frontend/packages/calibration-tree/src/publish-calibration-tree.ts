@@ -1047,7 +1047,7 @@ interface PublishReleaseOptions {
   dryRun?: boolean;
   expectedIndexSha256?: string;
   indexCreatedAt?: string | null;
-  uploadBundle?: CalibrationManifestStore["uploadBundle"];
+  uploadBundle: CalibrationManifestStore["uploadBundle"];
 }
 
 async function publishRelease(options: PublishReleaseOptions) {
@@ -1062,8 +1062,7 @@ async function publishRelease(options: PublishReleaseOptions) {
     dryRun = false,
     expectedIndexSha256,
     indexCreatedAt,
-    uploadBundle = (bundle: CalibrationTreeBundle) =>
-      uploadCalibrationTreeBundle({ bundle, token: blobToken }),
+    uploadBundle,
   } = options;
   // The folder is interpolated into authenticated Hugging Face URLs.
   const releaseDirectory = releaseOrBuildFolderId(options.releaseDirectory ?? id);
@@ -1253,8 +1252,12 @@ export interface CalibrationManifestStore {
     entry: CalibrationTreeManifestEntry,
     makeLatest?: boolean,
   ): Promise<CalibrationTreeManifest>;
-  /** Uploads a built bundle; defaults to the Blob upload. */
-  uploadBundle?(
+  /**
+   * Uploads a built bundle. Required: the store is the only route by which
+   * a publication writes to Blob, so a store in a test never falls back to
+   * the real upload.
+   */
+  uploadBundle(
     bundle: CalibrationTreeBundle,
   ): ReturnType<typeof uploadCalibrationTreeBundle>;
 }
@@ -1299,7 +1302,7 @@ async function publishStagingSource(options: {
   source: ResolvedStagingSource;
   repository: { repo: string };
   revisionSha: string;
-  uploadBundle: NonNullable<CalibrationManifestStore["uploadBundle"]>;
+  uploadBundle: CalibrationManifestStore["uploadBundle"];
   existing: CalibrationTreeManifestEntry | null;
   existingIndex: Awaited<ReturnType<typeof auditCalibrationTreeBuild>>["index"];
   dryRun: boolean;
@@ -1415,8 +1418,7 @@ export async function reconcileStagingBuilds(
   const finalized = runs.runs.filter((run) =>
     FINAL_STAGING_STATUSES.has(run.status ?? ""),
   );
-  const uploadBundle = store.uploadBundle ??
-    ((bundle: CalibrationTreeBundle) => uploadCalibrationTreeBundle({ bundle, token: blobToken }));
+  const uploadBundle = store.uploadBundle;
   let manifest = await store.readManifest();
   let blobs = await store.listBlobs();
   const outcomes: ReconciliationOutcome[] = [];

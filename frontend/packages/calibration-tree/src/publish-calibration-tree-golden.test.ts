@@ -175,6 +175,9 @@ function storeMissingIndex(
     updateManifest: async () => {
       throw new Error("A dry run must not write the manifest.");
     },
+    uploadBundle: async () => {
+      throw new Error("A dry run must not upload a bundle.");
+    },
   };
 }
 
@@ -285,6 +288,9 @@ function stagingRepositoryWithRefusedRepair(): {
     }),
     updateManifest: async () => {
       throw new Error("A dry run must not write the manifest.");
+    },
+    uploadBundle: async () => {
+      throw new Error("A dry run must not upload a bundle.");
     },
   };
   return { revisionSha, store, staleEntry };
