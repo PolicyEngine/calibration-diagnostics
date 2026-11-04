@@ -178,10 +178,11 @@ one gets none). A Slack failure is logged and never fails the delivery.
 
 - **New tags:** one "New Microcosm … release" message per new tag, as before,
   after the reconciliation is dispatched.
-- **`releases.json`:** for an update to a release repository's `main`, the
-  webhook first reads `releases.json` at the commits before and after the
-  update (only after, for a new `main`), with `HF_TOKEN`, or
-  `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset, read when the server starts.
+- **`releases.json`:** for an update to the `main` of a release repository
+  whose country has a Slack channel, the webhook first reads `releases.json`
+  at the commits before and after the update (only after, for a new `main`),
+  with `HF_TOKEN`, or `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset, read when
+  the server starts. A country without a channel (Belgium today) reads none.
   After dispatching, it posts one message for each change:
   - a newly published build: "New Microcosm UK build `<release>/<build>`: now
     current", or "...: published, not current (current stays `<build>`)";
@@ -198,17 +199,22 @@ one gets none). A Slack failure is logged and never fails the delivery.
   within Slack's block limits) instead of one per listed build. A repository
   without `releases.json` on both sides gets none of these.
 - **When `releases.json` cannot be read:**
-  - A transient failure (Hugging Face answers 5xx or 429, or the request
-    fails or times out) is logged and the delivery is answered 503 before
-    anything is dispatched or posted. Hugging Face retries the delivery, so
-    the dispatch, the tag alerts and the record alerts each happen once,
-    when a retry succeeds. A long Hub outage can make Hugging Face suspend
-    the webhook; re-enable it and replay the delivery (see the failure list
-    under "Hugging Face webhook").
+  - A transient failure (Hugging Face answers 5xx or 429, or the request or
+    its body fails or times out) is logged and the delivery is answered 503
+    before anything is dispatched or posted. Hugging Face retries the
+    delivery, so the dispatch, the tag alerts and the record alerts each
+    happen once, when a retry succeeds. A retry that comes late can post
+    after newer messages, so its "current stays `<build>`" may already be
+    out of date.
   - Any other failure, such as a token that cannot read the repository, a
-    missing revision or a record the release writer's rules refuse, is
-    logged. The dispatch and the tag alerts go ahead, and no record alert is
-    posted for that update.
+    missing revision or a record the release writer's rules refuse, on
+    either side, is logged and named in the answer as
+    `release_record_problem`. The dispatch and the tag alerts go ahead, and
+    no record alert is posted for that update.
+  - One Hugging Face webhook serves all five watched datasets. If a long run
+    of 503 answers makes Hugging Face suspend it, deliveries stop for every
+    repository, release and staging alike. To recover, see "Hugging Face
+    webhook" below.
 - **Changes with no alert:** a deleted `releases.json` (its readers then read
   tags and pointer files), a change of default release and a build that is
   no longer withdrawn are logged as warnings, and nothing is posted.
@@ -547,8 +553,20 @@ Failure meanings and recovery:
   permission.
 - `503` from the application means a release repository's `releases.json`
   could not be read for a reason that may pass (a Hugging Face 5xx or 429, or
-  a failed or timed-out request). Nothing was dispatched or posted; Hugging
-  Face retries the delivery.
+  a failed or timed-out request or body). Nothing was dispatched or posted,
+  and Hugging Face retries the delivery. If the webhook is suspended after
+  such failures:
+  1. Re-enable it.
+  2. Replay **every** delivery answered 503, oldest first, from the Activity
+     page. Each covers its own pair of commits, so replaying only the latest
+     would lose the earlier updates' alerts. Never replay a delivery that was
+     answered 200: its alerts were already posted.
+  3. For updates made while the webhook was suspended, which Hugging Face
+     never delivered, send one authenticated release `main`-update payload
+     per affected repository: `oldSha` is the last delivered commit and
+     `newSha` the repository's current head. It announces their net change
+     and dispatches one reconciliation. Send one staging `main`-update
+     payload per staging repository to redo the staging dispatch.
 - A failed release workflow either stopped before reconciling any release (for
   example, the manifest, the release listing or the repository's tags could
   not be read, or one tag's folder or one folder's commit could not be
