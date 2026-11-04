@@ -1,0 +1,16 @@
+bun test v1.3.12 (700fc117)
+
+work/tests-properties/public-readers.test.ts:
+(pass) public count shape and roundtrip witnesses [5.67ms]
+(pass) public count example rejects blank [0.20ms]
+(pass) public category row-level equality witnesses ("") [0.20ms]
+(pass) public category row-level equality witnesses (null) [0.74ms]
+(pass) public facet witnesses preserve real breakdown and drop geography repeats [0.63ms]
+20,000 buildCalibration + page calls: 2038 ms
+40,000 buildCalibration + page calls: 3629 ms
+(pass) benchmark public count paths: 20,000 shape calls and 40,000 roundtrip calls [5667.52ms]
+
+ 6 pass
+ 0 fail
+ 54 expect() calls
+Ran 6 tests across 1 file. [6.19s]

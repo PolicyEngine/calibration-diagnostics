@@ -1,0 +1,4 @@
+case 1: ordinary a + layout a; disjoint sex cells; exact equality of all five retained fields = True; omitted = ['dashboard_layout_groupby_value_varies', 'layout_pair', 'member_keys']
+case 2: ordinary a in both; only representative layout a; exact equality of all five retained fields = True; omitted = ['dashboard_layout_groupby_value_varies', 'layout_pair', 'member_keys']
+case 3: ordinary a in both; first layout b and representative layout a; exact equality of all five retained fields = True; omitted = ['dashboard_layout_groupby_value_varies', 'layout_pair', 'member_keys']
+fixture count = 3 ; probe first-three count = 3

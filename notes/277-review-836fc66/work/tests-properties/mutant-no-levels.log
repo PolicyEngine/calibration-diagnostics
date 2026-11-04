@@ -1,0 +1,50 @@
+bun test v1.3.12 (700fc117)
+
+work/tests-properties/public-readers.test.ts:
+(pass) public count shape and roundtrip witnesses [13.19ms]
+(pass) public count example rejects blank [0.25ms]
+14 | });
+15 | test('public count example rejects blank',()=>expect(shownCount(' ')).toBe(null));
+16 | const cases=[[],[{level:'state'}],[{level:'state'},{level:'country'},{level:'state'}],[{level:null},{level:''}],[{level:0},{level:' '}],[{level:undefined},{level:-2}]];
+17 | for(const none of ['',null] as const)test(`public category row-level equality witnesses (${JSON.stringify(none)})`,()=>{
+18 |  for(const rows of cases){const shown=none===''?microcosmVariableSummary(rows.map(row=>({...row,variable_key:'v'}))):buildComparison({...fsa,rows:rows.map((row,i)=>({...fsa.rows[i],level:row.level,variable_key:'v'}))},{...fsa,rows:rows.map((row,i)=>({...fsa.rows[i],level:row.level,variable_key:'v'}))}).variables;
+19 |  if(rows.length===0){expect(shown).toEqual([]);continue;}expect(shown).toHaveLength(1);const levels=[...new Set(rows.map(row=>String(row.level??'')))].filter(Boolean).sort();expect(shown[0].levels).toEqual(levels);expect(shown[0].level).toBe(levels.length>=2?null:(levels[0]??none));}
+                                                                                                                                                                                                           ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "state",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (<review>/work/tests-properties/public-readers.test.ts:19:199)
+(fail) public category row-level equality witnesses ("") [0.38ms]
+14 | });
+15 | test('public count example rejects blank',()=>expect(shownCount(' ')).toBe(null));
+16 | const cases=[[],[{level:'state'}],[{level:'state'},{level:'country'},{level:'state'}],[{level:null},{level:''}],[{level:0},{level:' '}],[{level:undefined},{level:-2}]];
+17 | for(const none of ['',null] as const)test(`public category row-level equality witnesses (${JSON.stringify(none)})`,()=>{
+18 |  for(const rows of cases){const shown=none===''?microcosmVariableSummary(rows.map(row=>({...row,variable_key:'v'}))):buildComparison({...fsa,rows:rows.map((row,i)=>({...fsa.rows[i],level:row.level,variable_key:'v'}))},{...fsa,rows:rows.map((row,i)=>({...fsa.rows[i],level:row.level,variable_key:'v'}))}).variables;
+19 |  if(rows.length===0){expect(shown).toEqual([]);continue;}expect(shown).toHaveLength(1);const levels=[...new Set(rows.map(row=>String(row.level??'')))].filter(Boolean).sort();expect(shown[0].levels).toEqual(levels);expect(shown[0].level).toBe(levels.length>=2?null:(levels[0]??none));}
+                                                                                                                                                                                                           ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "state",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (<review>/work/tests-properties/public-readers.test.ts:19:199)
+(fail) public category row-level equality witnesses (null) [1.32ms]
+(pass) public facet witnesses preserve real breakdown and drop geography repeats [0.96ms]
+(pass) benchmark public count paths: 20,000 shape calls and 40,000 roundtrip calls [0.30ms]
+
+ 4 pass
+ 2 fail
+ 28 expect() calls
+Ran 6 tests across 1 file. [505.00ms]

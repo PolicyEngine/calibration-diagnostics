@@ -1,0 +1,51 @@
+bun test v1.3.12 (700fc117)
+
+work/tests-properties/old-front/target-row-labels.test.ts:
+43 |   // "All", which would include Parent PLUS.
+44 |   test("a several-fact target whose hierarchy leaves out its group-by combines several source cells", () => {
+45 |     const rows = pageRows();
+46 |     expect(
+47 |       dimensionSummary(fsaRow(rows, "dollars_outstanding.excluding_parent_plus.dollars_outstanding")),
+48 |     ).toBe("Combines several source cells");
+           ^
+error: expect(received).toBe(expected)
+
+Expected: "Combines several source cells"
+Received: "Combines several loan type values"
+
+      at <anonymous> (<review>/work/tests-properties/old-front/target-row-labels.test.ts:48:7)
+(fail) the targets page's Dimensions column > a several-fact target whose hierarchy leaves out its group-by combines several source cells [15.80ms]
+68 |       initial_estimate: 40,
+69 |       final_estimate: 40,
+70 |       relative_error: 0,
+71 |     };
+72 |     const [shown] = pageRows({ ...(edFsaFamily as Record<string, unknown>), targets: [row] }, "uk");
+73 |     expect(dimensionSummary(shown)).toBe("Combines several source cells");
+                                         ^
+error: expect(received).toBe(expected)
+
+Expected: "Combines several source cells"
+Received: "Combines several loan type values"
+
+      at <anonymous> (<review>/work/tests-properties/old-front/target-row-labels.test.ts:73:37)
+(fail) the targets page's Dimensions column > a target whose facts share an unlisted group-by value names no varying dimension [0.57ms]
+82 |           layout_groupby_value_id: null,
+83 |           layout_groupby_unlisted_across_facts: true,
+84 |           member_fact_count: 2,
+85 |         },
+86 |       }),
+87 |     ).toBe("Female · Combines several source cells");
+           ^
+error: expect(received).toBe(expected)
+
+Expected: "Female · Combines several source cells"
+Received: "Female"
+
+      at <anonymous> (<review>/work/tests-properties/old-front/target-row-labels.test.ts:87:7)
+(fail) the targets page's Dimensions column > the dimensions its hierarchy lists come first, and no dimension is named as varying [0.08ms]
+(pass) the targets page's Dimensions column > a target whose group-by value reads all, or that has none, says All [0.02ms]
+
+ 1 pass
+ 3 fail
+ 8 expect() calls
+Ran 4 tests across 1 file. [1121.00ms]

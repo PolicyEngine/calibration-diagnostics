@@ -1,0 +1,39 @@
+$ rg -n layout_groupby_value_varies|layout_groupby_unlisted_across_facts|dimensionSummary|shownChronicle inputs/dashboard-836fc66
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.ts:17:export function dimensionSummary(row: MicrocosmTargetRow): string {
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.ts:19:  if (row.chronicle?.layout_groupby_unlisted_across_facts) {
+inputs/dashboard-836fc66/frontend/lib/api/hooks/use-microcosm.ts:181:    layout_groupby_unlisted_across_facts?: boolean | null;
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:11:import { dimensionSummary } from "./target-row-labels";
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:47:      dimensionSummary(fsaRow(rows, "dollars_outstanding.excluding_parent_plus.dollars_outstanding")),
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:51:      dimensionSummary(fsaRow(rows, "dollars_outstanding.parent_plus.dollars_outstanding")),
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:53:    expect(dimensionSummary(fsaRow(rows, "portfolio_by_location.2026_03_31.al.dollars_outstanding")))
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:73:    expect(dimensionSummary(shown)).toBe("Combines several source cells");
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:78:      dimensionSummary({
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:83:          layout_groupby_unlisted_across_facts: true,
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:91:    expect(dimensionSummary({ chronicle: { layout_groupby_value_id: "all" } })).toBe("All");
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:92:    expect(dimensionSummary({ chronicle: { layout_groupby_value_id: null } })).toBe("All");
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:93:    expect(dimensionSummary({})).toBe("All");
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:97:      dimensionSummary({
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:101:          layout_groupby_unlisted_across_facts: null,
+inputs/dashboard-836fc66/frontend/components/microcosm/target-row-labels.test.ts:107:    expect(dimensionSummary({ chronicle: { layout_groupby_value_id: "parent_plus" } }))
+inputs/dashboard-836fc66/frontend/components/microcosm/microcosm-targets-view.tsx:24:import { dimensionSummary, titleFromIdentifier } from "@/components/microcosm/target-row-labels";
+inputs/dashboard-836fc66/frontend/components/microcosm/microcosm-targets-view.tsx:201:      <div className="max-w-md truncate" title={dimensionSummary(row)}>
+inputs/dashboard-836fc66/frontend/components/microcosm/microcosm-targets-view.tsx:202:        {dimensionSummary(row)}
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:606:// otherwise. layout_groupby_unlisted_across_facts says the second: the
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:616:function shownChronicle(row: TargetRow): unknown {
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:626:    layout_groupby_unlisted_across_facts: groupBy == null ? null : groupBy === "unlisted",
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:2888:    chronicle: shownChronicle(row),
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:2906:  const chronicle = asObject(shownChronicle(row));
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:3339:    const chronicle = asObject(shownChronicle(candidate));
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:3382:  const shown = asObject(shownChronicle(row));
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:310:  // leave it out too. layout_groupby_unlisted_across_facts says only what the
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:314:  test("layout_groupby_unlisted_across_facts says the hierarchy leaves a several-fact identity's group-by out", () => {
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:329:      return "layout_groupby_unlisted_across_facts" in shown
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:330:        ? shown.layout_groupby_unlisted_across_facts
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:374:      expect(shownOf(rows())).not.toHaveProperty("layout_groupby_value_varies");
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:376:    expect(shownOf([withoutHierarchy], 6)).not.toHaveProperty("layout_groupby_value_varies");
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:405:    expect(mixed[1]).not.toHaveProperty("layout_groupby_value_varies");
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:409:      layout_groupby_unlisted_across_facts: true,
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:417:      expect(chronicle).not.toHaveProperty("layout_groupby_value_varies");
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts:421:        layout_groupby_unlisted_across_facts: false,
+
+EXIT 0

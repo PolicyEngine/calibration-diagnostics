@@ -1,0 +1,17 @@
+bun test v1.3.12 (700fc117)
+
+work/tests-properties/new-package/src/multi-fact-identity.test.ts:
+(pass) a target built from several facts shows the identity Microcosm gives it > scaled_by_ratio: its record and fact keys show, and its member facts are listed [6.83ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > rolled_forward_by_ratio, one base cell: its record and fact keys show, and its member facts are listed [0.81ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > a dimension that varies across a ratio's operands leaves its base's identity [0.44ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > rolled_forward_by_ratio, two base cells: no one cell names it [0.97ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > allocated_residual_by_ratio: one base cell names it, two do not [3.78ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > layout_groupby_unlisted_across_facts says the hierarchy leaves a several-fact identity's group-by out [10.09ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > a hierarchy that leaves out a pair the identity facts share claims no variation [1.04ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > a lookup by a member fact names the targets that list it [1.29ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > the FSA linear combination shows none of its five members' fields [0.41ms]
+
+ 9 pass
+ 0 fail
+ 72 expect() calls
+Ran 9 tests across 1 file. [426.00ms]

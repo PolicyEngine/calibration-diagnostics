@@ -1,0 +1,686 @@
+PR body
+inputs/pr/pr-body-836fc66.md:1, sentence 1: Follow-up to #276.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/pr-body-836fc66.md:3, sentence 1: #276 checked how the calibration dashboard shows the 132 Federal Student Aid student loan targets that PolicyEngine/microcosm#1357 compiles, and listed what the readers get wrong.
+Assessment: 132 targets is verified; scope includes earlier work outside this three-commit delta; review history is input evidence, not a code mechanism.
+
+inputs/pr/pr-body-836fc66.md:3, sentence 2: This PR fixes four of its follow-ups (2 on this repo's side, 3, 4 and 6), hides the repeated Borrower location facet that #276 listed under "Not changed", and corrects a sentence in the fixture builder's docstring.
+Assessment: 132 targets is verified; scope includes earlier work outside this three-commit delta; review history is input evidence, not a code mechanism.
+
+inputs/pr/pr-body-836fc66.md:3, sentence 3: Two independent reviews asked for changes, one of `43c62d2` and one of `67e6d0b`; [Review follow-ups](#review-follow-ups) says what each changes.
+Assessment: 132 targets is verified; scope includes earlier work outside this three-commit delta; review history is input evidence, not a code mechanism.
+
+inputs/pr/pr-body-836fc66.md:5, sentence 1: Citations of this repo point at the head, `836fc66`, unless they name another commit.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/pr-body-836fc66.md:5, sentence 2: Citations of microcosm point at `0ff293b`.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/pr-body-836fc66.md:11, sentence 1: `microcosmVariableSummary` gave a category the level of its first row, and `comparisonVariableRows` the level of its first sorted row (`latest-artifact.ts:1526` and `:3220` at `2306113`).
+Assessment: Original-main line citations cannot be opened from supplied snapshots; 14 country + 51 state in each of two FSA measure categories is confirmed from fixture. Old level choice at main is historical; current package consistently sorts levels.
+
+inputs/pr/pr-body-836fc66.md:11, sentence 2: Each FSA measure category holds 14 `country` and 51 `state` targets, so the targets API read it as `state`, and the comparison read `country` or `state` depending on which row's fit changed most.
+Assessment: Original-main line citations cannot be opened from supplied snapshots; 14 country + 51 state in each of two FSA measure categories is confirmed from fixture. Old level choice at main is historical; current package consistently sorts levels.
+
+inputs/pr/pr-body-836fc66.md:13, sentence 1: Both now return `levels`, every level the category holds, in the order the page's Level filter uses (`microcosmTargetLevels`).
+Assessment: Both readers now use categoryLevels; non-empty levels sorted with microcosmTargetLevels; singular level/null behavior correct; empty category default differs by caller exactly as described (:1712, :3445).
+
+inputs/pr/pr-body-836fc66.md:13, sentence 2: `level` keeps the one level when there is one, and reads `null` when there are several.
+Assessment: Both readers now use categoryLevels; non-empty levels sorted with microcosmTargetLevels; singular level/null behavior correct; empty category default differs by caller exactly as described (:1712, :3445).
+
+inputs/pr/pr-body-836fc66.md:13, sentence 3: A category with no level keeps its old value: `""` on the targets API, `null` in the comparison.
+Assessment: Both readers now use categoryLevels; non-empty levels sorted with microcosmTargetLevels; singular level/null behavior correct; empty category default differs by caller exactly as described (:1712, :3445).
+
+inputs/pr/pr-body-836fc66.md:15, sentence 1: Every reader of the field changes with it:
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/pr-body-836fc66.md:17, sentence 1: - The targets page's statistic picker grouped on `[source, level, variable]` (`microcosm-targets-view.tsx:259-266` at `2306113`), and the "N statistics" count on the targets landing cards did the same (`calibration-target-navigation-cards.tsx:94-100` at `2306113`).
+Assessment: Current key uses levels, joins by `+`, combines source/variable; single-level key unchanged. Main historical grouped-key citations unavailable.
+
+inputs/pr/pr-body-836fc66.md:17, sentence 2: Both now build one key from `levels`, `statisticGroupKey` in the new `lib/microcosm/statistic-groups.ts`.
+Assessment: Current key uses levels, joins by `+`, combines source/variable; single-level key unchanged. Main historical grouped-key citations unavailable.
+
+inputs/pr/pr-body-836fc66.md:17, sentence 3: A single-level category keeps the key it had.
+Assessment: Current key uses levels, joins by `+`, combines source/variable; single-level key unchanged. Main historical grouped-key citations unavailable.
+
+inputs/pr/pr-body-836fc66.md:18, sentence 1: - Nothing read `VariableGroup.level`.
+Assessment: VariableGroup uses levels; prior no-reader claim is historical but no remaining production reader of VariableGroup.level appears in supplied head.
+
+inputs/pr/pr-body-836fc66.md:18, sentence 2: It becomes `levels`.
+Assessment: VariableGroup uses levels; prior no-reader claim is historical but no remaining production reader of VariableGroup.level appears in supplied head.
+
+inputs/pr/pr-body-836fc66.md:19, sentence 1: - No UI reads the comparison's `variables[].level` (`/api/microcosm/compare` and staging compare).
+Assessment: No supplied UI reader of comparison variables[].level; API returns both via categoryLevels.
+
+inputs/pr/pr-body-836fc66.md:19, sentence 2: The API now returns `levels` beside it.
+Assessment: No supplied UI reader of comparison variables[].level; API returns both via categoryLevels.
+
+inputs/pr/pr-body-836fc66.md:21, sentence 1: The two `ed-fsa-family.test.ts` tests that pinned the old values now expect `levels: ["country", "state"]` and `level: null` for the measure categories, whichever row sorts first, and the one level for the single-level categories and the census family.
+Assessment: Test descriptions match source.
+
+inputs/pr/pr-body-836fc66.md:21, sentence 2: `statistic-groups.test.ts` covers the shared key.
+Assessment: Test descriptions match source.
+
+inputs/pr/pr-body-836fc66.md:25, sentence 1: The targets page labeled each Source and Level option with its own value (`microcosm-targets-view.tsx:760-763` and `:775-778` at `2306113`), so the options read "ed_fsa", "country" and "state".
+Assessment: Main historical labels unavailable; current changed option helpers and tests match intended labels.
+
+inputs/pr/pr-body-836fc66.md:27, sentence 1: A Source option now reads the release's own source label, as the statistic picker does (`microcosm-targets-view.tsx:278`), and falls back to `sourceLabel`; the FSA option reads "ED · Federal Student Aid".
+Assessment: Each sentence matches target-filter-options.ts:14-39 and targets-view.tsx:278. Options retain raw values. Tests exist.
+
+inputs/pr/pr-body-836fc66.md:27, sentence 2: A Level option reads the name the calibration map's level filter gives it (`explorerGeographyLevelLabel`, used at `calibration-explorer-filter-menu.tsx:96`): "Country", "State", "National".
+Assessment: Each sentence matches target-filter-options.ts:14-39 and targets-view.tsx:278. Options retain raw values. Tests exist.
+
+inputs/pr/pr-body-836fc66.md:27, sentence 3: Each option keeps the raw id the API filters on as its value.
+Assessment: Each sentence matches target-filter-options.ts:14-39 and targets-view.tsx:278. Options retain raw values. Tests exist.
+
+inputs/pr/pr-body-836fc66.md:27, sentence 4: `components/microcosm/target-filter-options.test.ts` covers both.
+Assessment: Each sentence matches target-filter-options.ts:14-39 and targets-view.tsx:278. Options retain raw values. Tests exist.
+
+inputs/pr/pr-body-836fc66.md:31, sentence 1: `chronicleFactFields` read the count with `numberOrNull`, which takes only numbers.
+Assessment: numberOrNull accepts only finite numbers; producer count is str(len(...)); registry stringifies metadata. Correct mechanism. Historical universal releases phrase assumes normal TargetSpec publication, as context supplies.
+
+inputs/pr/pr-body-836fc66.md:31, sentence 2: Microcosm writes it as a string (`ledger_targets.py:5913`), and `TargetSpec` turns every metadata value into one (`registry.py:149-150`), so every release's count read null.
+Assessment: numberOrNull accepts only finite numbers; producer count is str(len(...)); registry stringifies metadata. Correct mechanism. Historical universal releases phrase assumes normal TargetSpec publication, as context supplies.
+
+inputs/pr/pr-body-836fc66.md:33, sentence 1: A new `countOrNull` reads a whole, non-negative count from a number or a string, and the target investigation and the targets API's rows now show the count.
+Assessment: Safe non-negative integer reader accepts strings/numbers; public rows/investigation use it; malformed examples and fixture counts match tests (all multi-identity counts intentionally masked). Fixture debt 10K–20K metadata count is 2; no-state count omission observed.
+
+inputs/pr/pr-body-836fc66.md:33, sentence 2: `latest-artifact.test.ts` and `chronicle-metadata.test.ts` pass the count as a string, as a release writes it, and a further `latest-artifact.test.ts` test expects `"2.5"`, `"-1"`, `" "` and `""` to read null.
+Assessment: Safe non-negative integer reader accepts strings/numbers; public rows/investigation use it; malformed examples and fixture counts match tests (all multi-identity counts intentionally masked). Fixture debt 10K–20K metadata count is 2; no-state count omission observed.
+
+inputs/pr/pr-body-836fc66.md:33, sentence 3: The FSA detail test reads the fixture's own counts: 1 for the youngest age band, 2 for the 10K to 20K band, and none for a state.
+Assessment: Safe non-negative integer reader accepts strings/numbers; public rows/investigation use it; malformed examples and fixture counts match tests (all multi-identity counts intentionally masked). Fixture debt 10K–20K metadata count is 2; no-state count omission observed.
+
+inputs/pr/pr-body-836fc66.md:37, sentence 1: Microcosm takes a target's single-fact fields from one representative fact (`ledger_targets.py:1085-1090`).
+Assessment: Correct metadata representative (:1085-1090); FSA sum-like linear combination same-period representative is last operand (:1232-1245); old lookup behavior follows unmasked fields.
+
+inputs/pr/pr-body-836fc66.md:37, sentence 2: For the FSA balance excluding Parent PLUS, a same-period linear combination, that fact is its last operand (`_value_representative_fact`, `:1232-1245`).
+Assessment: Correct metadata representative (:1085-1090); FSA sum-like linear combination same-period representative is last operand (:1232-1245); old lookup behavior follows unmasked fields.
+
+inputs/pr/pr-body-836fc66.md:37, sentence 3: So the target investigation named `stafford_unsubsidized` as the aggregate's record, and a lookup of that record id found the aggregate too.
+Assessment: Correct metadata representative (:1085-1090); FSA sum-like linear combination same-period representative is last operand (:1232-1245); old lookup behavior follows unmasked fields.
+
+inputs/pr/pr-body-836fc66.md:39, sentence 1: Microcosm writes `ledger_member_fact_count` and `ledger_member_fact_keys` on every target it builds from several facts, ratio operands included (`_multi_fact_reference_metadata`, `:1318-1341`).
+Assessment: Correct complete member list (:1318-1341), ratio operands included; shownChronicle emits the three fields for >1 member.
+
+inputs/pr/pr-body-836fc66.md:39, sentence 2: The Chronicle fields the dashboard shows for such a target now carry `member_fact_count`, `member_fact_keys` and `layout_groupby_unlisted_across_facts`, and follow the identity Microcosm gives the target (`identity_facts`, `:1018-1035`; `shownChronicle`, `latest-artifact.ts:582-641`):
+Assessment: Correct complete member list (:1318-1341), ratio operands included; shownChronicle emits the three fields for >1 member.
+
+inputs/pr/pr-body-836fc66.md:41, sentence 1: - A target whose identity is its representative alone shows that fact's record id, fact keys, group-by value and universe constraint, and a lookup by its name, record id or fact keys finds it.
+Assessment: Correct identity-preserving branches; lookup accepts name/base_name/record/four fact keys, does not accept layout value or universe constraint.
+
+inputs/pr/pr-body-836fc66.md:41, sentence 2: That covers a `scaled_by_ratio` cell, and a `rolled_forward_by_ratio` or `allocated_residual_by_ratio` target with one base cell.
+Assessment: Correct identity-preserving branches; lookup accepts name/base_name/record/four fact keys, does not accept layout value or universe constraint.
+
+inputs/pr/pr-body-836fc66.md:42, sentence 1: - A target whose identity spans several facts shows no record id, none of its four fact keys and no universe constraint set key or count.
+Assessment: Correct masking; hierarchy pair is prerequisite for group-by shown on several-fact identity.
+
+inputs/pr/pr-body-836fc66.md:42, sentence 2: That covers the FSA linear combination.
+Assessment: Correct masking; hierarchy pair is prerequisite for group-by shown on several-fact identity.
+
+inputs/pr/pr-body-836fc66.md:42, sentence 3: It shows its group-by value only when its hierarchy lists the pair; see [Review of `67e6d0b`](#review-of-67e6d0b).
+Assessment: Correct masking; hierarchy pair is prerequisite for group-by shown on several-fact identity.
+
+inputs/pr/pr-body-836fc66.md:43, sentence 1: - The row itself keeps every field, so a comparison still matches the target by Chronicle fact key when its name changes.
+Assessment: Raw row Chronicle retained; matching logic reads raw fact keys; renamed-row regression exists.
+
+inputs/pr/pr-body-836fc66.md:43, sentence 2: A test checks this on a renamed copy.
+Assessment: Raw row Chronicle retained; matching logic reads raw fact keys; renamed-row regression exists.
+
+inputs/pr/pr-body-836fc66.md:44, sentence 1: - A single-fact target keeps its fields and carries no member fields.
+Assessment: Single-fact shownChronicle early-returns untouched; fifteen historical snapshot changes are not independently reconstructible from supplied commits.
+
+inputs/pr/pr-body-836fc66.md:44, sentence 2: Adding them to every row changed fifteen recorded reader outputs, so single-fact rows go without.
+Assessment: Single-fact shownChronicle early-returns untouched; fifteen historical snapshot changes are not independently reconstructible from supplied commits.
+
+inputs/pr/pr-body-836fc66.md:46, sentence 1: The member facts reach the targets API (`/api/microcosm/target-diagnostics`) and the target investigation API, not the page: no component reads `member_fact_count` or `member_fact_keys`, and no page calls the investigation API.
+Assessment: Only hook type declares member fields in production frontend outside package; no component displays them; script calls investigation, no page does in supplied components.
+
+inputs/pr/pr-body-836fc66.md:46, sentence 2: Two cells of the targets page change for the balance excluding Parent PLUS:
+Assessment: Only hook type declares member fields in production frontend outside package; no component displays them; script calls investigation, no page does in supplied components.
+
+inputs/pr/pr-body-836fc66.md:48, sentence 1: - Its Dimensions column read "stafford unsubsidized" at `2306113`, "All" at `43c62d2` and "Combines several loan type values" at `67e6d0b`.
+Assessment: Current source phrase correct and Dimensions invokes helper at :201; 67e6d0b phrase visible in snapshot. 2306113/43c62d2 UI wordings not independently reconstructible.
+
+inputs/pr/pr-body-836fc66.md:48, sentence 2: It now reads "Combines several source cells" (`dimensionSummary`, `target-row-labels.ts:10-26`, shown at `microcosm-targets-view.tsx:201`).
+Assessment: Current source phrase correct and Dimensions invokes helper at :201; 67e6d0b phrase visible in snapshot. 2306113/43c62d2 UI wordings not independently reconstructible.
+
+inputs/pr/pr-body-836fc66.md:49, sentence 1: - Its Source cell's tooltip read Stafford's record id at `2306113` and now reads the target's own name (`microcosm-targets-view.tsx:176`).
+Assessment: Source title :176 chooses shown record id else name; masked FSA record yields name; identity-preserving ratio base keeps own record.
+
+inputs/pr/pr-body-836fc66.md:49, sentence 2: A ratio-scaled cell's tooltip shows its base cell's record id, which is its own.
+Assessment: Source title :176 chooses shown record id else name; masked FSA record yields name; identity-preserving ratio base keeps own record.
+
+inputs/pr/pr-body-836fc66.md:51, sentence 1: The FSA detail test in `ed-fsa-family.test.ts` expects the member facts.
+Assessment: Tests build all four named operations.
+
+inputs/pr/pr-body-836fc66.md:51, sentence 2: `multi-fact-identity.test.ts` builds four operations: `scaled_by_ratio`, `rolled_forward_by_ratio`, `allocated_residual_by_ratio` and `linear_combination`.
+Assessment: Tests build all four named operations.
+
+inputs/pr/pr-body-836fc66.md:55, sentence 1: `build_fixture.py` said a skipped target leaves the diagnostics.
+Assessment: Provided microcosm sources do not include tools/build_us_fiscal_refresh_release.py or matrix.py, nor all fifteen producer source files; cannot independently verify those source claims/rebuild. Existing fixture hash exactly matches quoted `037d2802...8459b`. No new delta changes this docstring.
+
+inputs/pr/pr-body-836fc66.md:55, sentence 2: It now adds that the release gate also fails the release when calibration skips a target (`_release_gate_failures`, `tools/build_us_fiscal_refresh_release.py:9398-9399`), and that the gate leaves congressional district targets out of the count unless the build gates them (`:9389-9397`).
+Assessment: Provided microcosm sources do not include tools/build_us_fiscal_refresh_release.py or matrix.py, nor all fifteen producer source files; cannot independently verify those source claims/rebuild. Existing fixture hash exactly matches quoted `037d2802...8459b`. No new delta changes this docstring.
+
+inputs/pr/pr-body-836fc66.md:55, sentence 3: The `matrix.py` citations that follow now name their file.
+Assessment: Provided microcosm sources do not include tools/build_us_fiscal_refresh_release.py or matrix.py, nor all fifteen producer source files; cannot independently verify those source claims/rebuild. Existing fixture hash exactly matches quoted `037d2802...8459b`. No new delta changes this docstring.
+
+inputs/pr/pr-body-836fc66.md:55, sentence 4: Rebuilding the fixture with `python3 -I build_fixture.py <the fifteen SOURCES files at 0ff293b>` gives the same bytes: sha256 `037d28028b28b865eb0bacd09bb81285ff7b18e442bcf5e27ec762ae1008459b`.
+Assessment: Provided microcosm sources do not include tools/build_us_fiscal_refresh_release.py or matrix.py, nor all fifteen producer source files; cannot independently verify those source claims/rebuild. Existing fixture hash exactly matches quoted `037d2802...8459b`. No new delta changes this docstring.
+
+inputs/pr/pr-body-836fc66.md:59, sentence 1: `computeDimensions` listed every dimension with two or more values.
+Assessment: computeDimensions scans dimensions; fixture state locations match own geography and 51 states; old comparison to main cannot be opened.
+
+inputs/pr/pr-body-836fc66.md:59, sentence 2: Each FSA state target's Borrower location names its own state, so a measure category's targets page showed a Borrower location facet beside Geography, holding the same 51 states.
+Assessment: computeDimensions scans dimensions; fixture state locations match own geography and 51 states; old comparison to main cannot be opened.
+
+inputs/pr/pr-body-836fc66.md:61, sentence 1: A dimension whose value equals its row's geography on every row that carries it now lists no facet.
+Assessment: New/current geography repeat rule matches computeDimensions/repeatsGeography; map hierarchyPartitions elides one-value tier at :601-610; URL filtering still uses rows independent of listed facets.
+
+inputs/pr/pr-body-836fc66.md:61, sentence 2: The calibration map does the same: it adds no tier for a dimension with one value under a node (`calibration-tree.ts:601-610`).
+Assessment: New/current geography repeat rule matches computeDimensions/repeatsGeography; map hierarchyPartitions elides one-value tier at :601-610; URL filtering still uses rows independent of listed facets.
+
+inputs/pr/pr-body-836fc66.md:61, sentence 3: A filter on that dimension in the URL still works.
+Assessment: New/current geography repeat rule matches computeDimensions/repeatsGeography; map hierarchyPartitions elides one-value tier at :601-610; URL filtering still uses rows independent of listed facets.
+
+inputs/pr/pr-body-836fc66.md:63, sentence 1: The rule stays narrower than the follow-up's.
+Assessment: Belgium test source matches intended narrower rule; mixed-category test assertions match descriptions. Historical failed broader implementation unavailable.
+
+inputs/pr/pr-body-836fc66.md:63, sentence 2: Hiding any dimension with one value per geography failed the Belgium facet test (`latest-artifact.test.ts:251`): in a page with one target per region, each of a different sex and age band, Sex and Age band hold one value per region but form real breakdowns, so they stay.
+Assessment: Belgium test source matches intended narrower rule; mixed-category test assertions match descriptions. Historical failed broader implementation unavailable.
+
+inputs/pr/pr-body-836fc66.md:63, sentence 3: The mixed-category facet test now expects Geography and both bands, no location facet in the state targets alone, and both bands in the United States alone.
+Assessment: Belgium test source matches intended narrower rule; mixed-category test assertions match descriptions. Historical failed broader implementation unavailable.
+
+inputs/pr/pr-body-836fc66.md:67, sentence 1: Each change of behavior landed as a failing test commit, then a fix commit that touches no test.
+Assessment: Blanket test-first claims contradict line 86; see correction above. Current round's concrete test-first record is another agent's test audit.
+
+inputs/pr/pr-body-836fc66.md:67, sentence 2: Replaying each commit's tests at that commit shows every test commit failing only the tests it names, and every fix commit passing them.
+Assessment: Blanket test-first claims contradict line 86; see correction above. Current round's concrete test-first record is another agent's test audit.
+
+inputs/pr/pr-body-836fc66.md:71, sentence 1: 1.
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:71, sentence 2: A ratio-scaled target keeps its own identity.
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:71, sentence 3: At `43c62d2`, `shownChronicle` nulled a target's record id, fact keys, group-by value and universe constraint whenever `ledger_member_fact_count` exceeded 1.
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:71, sentence 4: A ratio-scaled cell carries that count too, but Microcosm keeps its base cell's identity, so its own record and keys read null and a lookup by its fact key found nothing.
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:71, sentence 5: The dashboard now reads the size of a target's identity from what Microcosm writes for its operation:
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:72, sentence 1: - `scaled_by_ratio`: the representative alone (`ledger_targets.py:1018-1023`).
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:73, sentence 1: - `rolled_forward_by_ratio`: its base cells (`:1030-1031`), which `ledger_value_base_cells` counts (`:1174`).
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:74, sentence 1: - `allocated_residual_by_ratio`: the cells its selector matches (`:1024-1029`), which its receipt lists under `fact_keys.base` (`:3069-3071`, `:3188-3189`).
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:75, sentence 1: - `calendar_year_window_scaled_by_ratio`: its window, two years of each series (`:4270-4272`, `:4331`).
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:76, sentence 1: - any other operation: every fact (`:1034`), so several for multi-member inputs.
+Assessment: Identity operation branches match producer :1018-1035; base-cell count :1174; allocation fact_keys.base :3069-3071/:3188-3189; window both years :4270-4272/:4331, weights :143-145; “several for multi-member inputs” is correct. Historical 43c62d2 lookup failure unavailable directly but earlier review supplies it.
+
+inputs/pr/pr-body-836fc66.md:78, sentence 1: For the first three operations the representative is the first base cell; for any other multi-fact operation, the fact of the latest period, the last in the tuple on a tie (`:1232-1245`).
+Assessment: First-three representative sentence correct; latest/tie sentence correct, with window ratio selects from window (:1012-1016); varying dimension limitation correct; shown group-by only hierarchy on multi identity, universe always null, own-ratio record/fact lookup correct.
+
+inputs/pr/pr-body-836fc66.md:78, sentence 2: `ledger_aggregation_varying_dimensions` can't show that the identity facts share a group-by value or a universe constraint: it compares each fact's ordinary dimensions, ratio operands included, and counts a dimension one fact carries and another lacks as varying (`:1323`, `:1626-1646`).
+Assessment: First-three representative sentence correct; latest/tie sentence correct, with window ratio selects from window (:1012-1016); varying dimension limitation correct; shown group-by only hierarchy on multi identity, universe always null, own-ratio record/fact lookup correct.
+
+inputs/pr/pr-body-836fc66.md:78, sentence 3: So the dashboard reads the group-by from the hierarchy and nulls the universe constraint.
+Assessment: First-three representative sentence correct; latest/tie sentence correct, with window ratio selects from window (:1012-1016); varying dimension limitation correct; shown group-by only hierarchy on multi identity, universe always null, own-ratio record/fact lookup correct.
+
+inputs/pr/pr-body-836fc66.md:78, sentence 4: A lookup by the ratio-scaled row's own record id and by its own fact key finds it, and its code searches include both.
+Assessment: First-three representative sentence correct; latest/tie sentence correct, with window ratio selects from window (:1012-1016); varying dimension limitation correct; shown group-by only hierarchy on multi identity, universe always null, own-ratio record/fact lookup correct.
+
+inputs/pr/pr-body-836fc66.md:78, sentence 5: Commits `8da55a3` (test) and `695fcfc` (fix).
+Assessment: First-three representative sentence correct; latest/tie sentence correct, with window ratio selects from window (:1012-1016); varying dimension limitation correct; shown group-by only hierarchy on multi identity, universe always null, own-ratio record/fact lookup correct.
+
+inputs/pr/pr-body-836fc66.md:79, sentence 1: 2.
+Assessment: Historical move/failure story comes from previous review; current no-All statement is overbroad for no-pair identity or no hierarchy (covered by root review), while following FSA-specific explanation is correct.
+
+inputs/pr/pr-body-836fc66.md:79, sentence 2: The Dimensions column no longer reads "All" for a target that combines several cells. "All" misstated the balance excluding Parent PLUS, which leaves Parent PLUS out.
+Assessment: Historical move/failure story comes from previous review; current no-All statement is overbroad for no-pair identity or no hierarchy (covered by root review), while following FSA-specific explanation is correct.
+
+inputs/pr/pr-body-836fc66.md:79, sentence 3: `dimensionSummary` first moved, unchanged, to `components/microcosm/target-row-labels.ts`, so its test failed on the wording, not on a missing module.
+Assessment: Historical move/failure story comes from previous review; current no-All statement is overbroad for no-pair identity or no hierarchy (covered by root review), while following FSA-specific explanation is correct.
+
+inputs/pr/pr-body-836fc66.md:79, sentence 4: Commits `daac655` (move), `fddf4de` (test) and `b658038` (fix); the review of `67e6d0b` corrected the field and wording they added.
+Assessment: Historical move/failure story comes from previous review; current no-All statement is overbroad for no-pair identity or no hierarchy (covered by root review), while following FSA-specific explanation is correct.
+
+inputs/pr/pr-body-836fc66.md:80, sentence 1: 3.
+Assessment: Lookup miss member_of matches member list or raw representative record/fact keys; available remains false; detail includes names; CGT source :1117-1119 says exactly twelve-area restatement by one Table 1 share.
+
+inputs/pr/pr-body-836fc66.md:80, sentence 2: A lookup by a member fact names its targets.
+Assessment: Lookup miss member_of matches member list or raw representative record/fact keys; available remains false; detail includes names; CGT source :1117-1119 says exactly twelve-area restatement by one Table 1 share.
+
+inputs/pr/pr-body-836fc66.md:80, sentence 3: A lookup that finds no target now lists, as `member_of`, every multi-fact target that lists the key in `ledger_member_fact_keys` or as one of its representative's record id and keys (`latest-artifact.ts:3381-3394`).
+Assessment: Lookup miss member_of matches member list or raw representative record/fact keys; available remains false; detail includes names; CGT source :1117-1119 says exactly twelve-area restatement by one Table 1 share.
+
+inputs/pr/pr-body-836fc66.md:80, sentence 4: The answer stays `available: false`, and its `detail` names the targets.
+Assessment: Lookup miss member_of matches member list or raw representative record/fact keys; available remains false; detail includes names; CGT source :1117-1119 says exactly twelve-area restatement by one Table 1 share.
+
+inputs/pr/pr-body-836fc66.md:80, sentence 5: One fact can belong to many targets: Microcosm restates its twelve CGT Table 5 region cells by one Table 1 share (`tools/generate_uk_target_references.py:1117-1119`).
+Assessment: Lookup miss member_of matches member list or raw representative record/fact keys; available remains false; detail includes names; CGT source :1117-1119 says exactly twelve-area restatement by one Table 1 share.
+
+inputs/pr/pr-body-836fc66.md:81, sentence 1: - The packet script prints the `detail` of an unavailable answer (`scripts/microcosm-investigation-packet.mjs:85-86`), so it carries the names without a change; a run against a local server that returned the new answer printed them.
+Assessment: Script :85-86 prints unavailable detail; claimed local-server historical run not independently repeatable without that server.
+
+inputs/pr/pr-body-836fc66.md:82, sentence 1: - The workflow doc told the investigator to stop on any API error.
+Assessment: Workflow source says to rerun packet for target named in membership error.
+
+inputs/pr/pr-body-836fc66.md:82, sentence 2: It now says that this error names the targets the fact belongs to, and to run the packet again for the one under investigation (`docs/ai/workflows/investigate-microcosm-target.md:26`).
+Assessment: Workflow source says to rerun packet for target named in membership error.
+
+inputs/pr/pr-body-836fc66.md:83, sentence 1: - Commits `0a50940` (test) and `8369b71` (fix).
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/pr-body-836fc66.md:84, sentence 1: 4.
+Assessment: Examples catch fractional/negative/space mutants; generated test descriptions agree with source. Broader property outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:84, sentence 2: `countOrNull` refuses non-counts.
+Assessment: Examples catch fractional/negative/space mutants; generated test descriptions agree with source. Broader property outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:84, sentence 3: The `latest-artifact.test.ts` test of `"2.5"`, `"-1"`, `" "` and `""` kills each of the review's three surviving mutants.
+Assessment: Examples catch fractional/negative/space mutants; generated test descriptions agree with source. Broader property outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:84, sentence 4: The review's scoped generated-input checks (fast-check, seed 277, 20,000 runs each) join the suites, each limited to the scope its comment states: the universe constraint count, category levels and the facet rule in `latest-artifact-invariants.test.ts`, and `statisticGroupKey` in `statistic-groups.test.ts`.
+Assessment: Examples catch fractional/negative/space mutants; generated test descriptions agree with source. Broader property outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:84, sentence 5: These tests pass on the code as it stood, so no fix follows them.
+Assessment: Examples catch fractional/negative/space mutants; generated test descriptions agree with source. Broader property outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:84, sentence 6: Commit `4e2c7a2`.
+Assessment: Examples catch fractional/negative/space mutants; generated test descriptions agree with source. Broader property outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:85, sentence 1: 5.
+Assessment: Earlier review provides citation/test-first history; line 86 qualifies line 67 and confirms exception.
+
+inputs/pr/pr-body-836fc66.md:85, sentence 2: Citations.
+Assessment: Earlier review provides citation/test-first history; line 86 qualifies line 67 and confirms exception.
+
+inputs/pr/pr-body-836fc66.md:85, sentence 3: `ed-fsa-family.test.ts:686` cited `buildComparison`'s sort as `:3304-3308`, which moved; it now names the function and its file.
+Assessment: Earlier review provides citation/test-first history; line 86 qualifies line 67 and confirms exception.
+
+inputs/pr/pr-body-836fc66.md:85, sentence 4: Commits `3eeca03` and `67e6d0b`.
+Assessment: Earlier review provides citation/test-first history; line 86 qualifies line 67 and confirms exception.
+
+inputs/pr/pr-body-836fc66.md:86, sentence 1: 6.
+Assessment: Earlier review provides citation/test-first history; line 86 qualifies line 67 and confirms exception.
+
+inputs/pr/pr-body-836fc66.md:86, sentence 2: Item 4's test-first record.
+Assessment: Earlier review provides citation/test-first history; line 86 qualifies line 67 and confirms exception.
+
+inputs/pr/pr-body-836fc66.md:86, sentence 3: Item 4's test commit, `6843fe0`, fails at `ed-fsa-family.test.ts:809` at `6843fe0`, which asserts that a single-fact target carries `member_fact_count: null` and `member_fact_keys: []`.
+Assessment: Earlier review provides citation/test-first history; line 86 qualifies line 67 and confirms exception.
+
+inputs/pr/pr-body-836fc66.md:86, sentence 4: The fix commit, `a5e604e`, dropped that premise and changed the test, so the test at `6843fe0` never reaches the member-fact assertions and still fails against `a5e604e`'s code.
+Assessment: Earlier review provides citation/test-first history; line 86 qualifies line 67 and confirms exception.
+
+inputs/pr/pr-body-836fc66.md:86, sentence 5: The test as `a5e604e` leaves it fails on the code before the fix, at the member-fact assertion (`:829` at `a5e604e`).
+Assessment: Earlier review provides citation/test-first history; line 86 qualifies line 67 and confirms exception.
+
+inputs/pr/pr-body-836fc66.md:90, sentence 1: 1.
+Assessment: All producer citations correct; actual compiler reproduced mixed target.
+
+inputs/pr/pr-body-836fc66.md:90, sentence 2: An omitted group-by pair claims no variation.
+Assessment: All producer citations correct; actual compiler reproduced mixed target.
+
+inputs/pr/pr-body-836fc66.md:90, sentence 3: At `67e6d0b`, a multi-fact target whose hierarchy left out its group-by pair carried `layout_groupby_value_varies: true`, and its Dimensions column read "Combines several <group-by> values".
+Assessment: All producer citations correct; actual compiler reproduced mixed target.
+
+inputs/pr/pr-body-836fc66.md:90, sentence 4: An omitted pair doesn't show that the values differ.
+Assessment: All producer citations correct; actual compiler reproduced mixed target.
+
+inputs/pr/pr-body-836fc66.md:90, sentence 5: Microcosm's label validator reads a fact's group-by pair as one of its dimensions (`ledger_targets.py:1486-1490`), but `_inherited_dimensions` (`:1578-1611`) lists a pair only when every fact's ordinary dimensions share it (`_common_dimensions`, `:1614-1623`) or every fact's layout carries the same pair (`_constant_text`, `:1649-1651`).
+Assessment: All producer citations correct; actual compiler reproduced mixed target.
+
+inputs/pr/pr-body-836fc66.md:90, sentence 6: The review compiled, with Microcosm's own resolver and compiler, a target whose two facts both describe loan type A, one in its dimensions and one in its layout, and whose hierarchy lists no loan type.
+Assessment: All producer citations correct; actual compiler reproduced mixed target.
+
+inputs/pr/pr-body-836fc66.md:91, sentence 1: - A listed pair still shows that every identity fact shares it, and the target keeps its group-by value.
+Assessment: Listed evidence/omitted no-evidence distinction correct within ordinary valid facts; shown group-by branch matches.
+
+inputs/pr/pr-body-836fc66.md:91, sentence 2: An omitted pair shows nothing.
+Assessment: Listed evidence/omitted no-evidence distinction correct within ordinary valid facts; shown group-by branch matches.
+
+inputs/pr/pr-body-836fc66.md:92, sentence 1: - `layout_groupby_unlisted_across_facts` replaces `layout_groupby_value_varies`: true when the identity spans several facts and the hierarchy lists no group-by pair the target carries, false when the identity is one fact or the hierarchy lists the pair, null when the target carries no pair or has no hierarchy.
+Assessment: Rename correct, no value asserts variation; false/null wording needs precedence qualification described above.
+
+inputs/pr/pr-body-836fc66.md:92, sentence 2: No value claims that the facts differ.
+Assessment: Rename correct, no value asserts variation; false/null wording needs precedence qualification described above.
+
+inputs/pr/pr-body-836fc66.md:93, sentence 1: - The Dimensions column now reads "Combines several source cells" for such a target, after any dimensions its hierarchy lists, and names no dimension.
+Assessment: Neutral phrase matches dimensionSummary; FSA row-only change delegated to exhaustive root probe. No generic phrase when no representative pair is code's remaining issue.
+
+inputs/pr/pr-body-836fc66.md:93, sentence 2: Of the FSA family's 132 rows only the balance excluding Parent PLUS changes, from "Combines several loan type values".
+Assessment: Neutral phrase matches dimensionSummary; FSA row-only change delegated to exhaustive root probe. No generic phrase when no representative pair is code's remaining issue.
+
+inputs/pr/pr-body-836fc66.md:94, sentence 1: - The new fixture `fixtures/mixed-groupby-storage/hierarchy-probe-targets.json` holds the review's three compiled targets.
+Assessment: Fixture matches first three old probe outputs projected to five named fields. Test uses ed_fsa.borrower_age_band.
+
+inputs/pr/pr-body-836fc66.md:94, sentence 2: The mixed-storage one reads `layout_groupby_unlisted_across_facts: true` and "Combines several source cells"; the two whose hierarchy lists loan type A show it as shared.
+Assessment: Fixture matches first three old probe outputs projected to five named fields. Test uses ed_fsa.borrower_age_band.
+
+inputs/pr/pr-body-836fc66.md:94, sentence 3: The Dimensions test uses a borrower age band group-by, so a phrase tied to loan types fails.
+Assessment: Fixture matches first three old probe outputs projected to five named fields. Test uses ed_fsa.borrower_age_band.
+
+inputs/pr/pr-body-836fc66.md:95, sentence 1: - Commits `5db3130` (test: 5 fail) and `4046000` (fix).
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/pr-body-836fc66.md:96, sentence 1: 2.
+Assessment: Lookup sentence is now exact: candidate name/base_name plus shown record and four shown keys at :3336-3348, no group-by/universe lookup.
+
+inputs/pr/pr-body-836fc66.md:96, sentence 2: Lookups.
+Assessment: Lookup sentence is now exact: candidate name/base_name plus shown record and four shown keys at :3336-3348, no group-by/universe lookup.
+
+inputs/pr/pr-body-836fc66.md:96, sentence 3: A lookup finds a target by its name, base name, shown record id or shown fact keys (`latest-artifact.ts:3336-3348`), not by a group-by value or universe constraint; item 4 above now says so.
+Assessment: Lookup sentence is now exact: candidate name/base_name plus shown record and four shown keys at :3336-3348, no group-by/universe lookup.
+
+inputs/pr/pr-body-836fc66.md:97, sentence 1: 3.
+Assessment: Narrowed representative statements correct; named four operations correct; legacy precedence correct :1250-1259, :1289-1293.
+
+inputs/pr/pr-body-836fc66.md:97, sentence 2: Narrower prose.
+Assessment: Narrowed representative statements correct; named four operations correct; legacy precedence correct :1250-1259, :1289-1293.
+
+inputs/pr/pr-body-836fc66.md:97, sentence 3: The comment above `shownChronicle` and this body scope "the representative is the first base cell" to the three base-cell ratio operations, and "its last operand" to the same-period FSA combination.
+Assessment: Narrowed representative statements correct; named four operations correct; legacy precedence correct :1250-1259, :1289-1293.
+
+inputs/pr/pr-body-836fc66.md:97, sentence 4: Item 4 names the four operations the test builds. "Left out" says a recognized legacy filter takes precedence over the representative's metadata.
+Assessment: Narrowed representative statements correct; named four operations correct; legacy precedence correct :1250-1259, :1289-1293.
+
+inputs/pr/pr-body-836fc66.md:98, sentence 1: 4.
+Assessment: Four exports removed; properties use public APIs; statistic-group property obtains levels from public summary. Full reachability/test strength delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:98, sentence 2: No test-only exports.
+Assessment: Four exports removed; properties use public APIs; statistic-group property obtains levels from public summary. Full reachability/test strength delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:98, sentence 3: `countOrNull`, `repeatsGeography`, `computeDimensions` and `categoryLevels` lose the `export` they gained for the property tests.
+Assessment: Four exports removed; properties use public APIs; statistic-group property obtains levels from public summary. Full reachability/test strength delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:98, sentence 4: The properties now run through the public readers that call them: the targets page's universe constraint count, its facets for one variable, `microcosmVariableSummary` and `buildComparison`.
+Assessment: Four exports removed; properties use public APIs; statistic-group property obtains levels from public summary. Full reachability/test strength delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:98, sentence 5: `statistic-groups.test.ts` reads a category's levels from `microcosmVariableSummary`.
+Assessment: Four exports removed; properties use public APIs; statistic-group property obtains levels from public summary. Full reachability/test strength delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:98, sentence 6: Commit `836fc66`.
+Assessment: Four exports removed; properties use public APIs; statistic-group property obtains levels from public summary. Full reachability/test strength delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:99, sentence 1: 5.
+Assessment: Properties compare sorted unique non-empty levels and exact singular level; facets add suppression converse. Mutant/run outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:99, sentence 2: Stronger category properties.
+Assessment: Properties compare sorted unique non-empty levels and exact singular level; facets add suppression converse. Mutant/run outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:99, sentence 3: Each compares the levels a reader returns with the rows' sorted, unique, non-empty levels, so a helper that always returns no levels fails both.
+Assessment: Properties compare sorted unique non-empty levels and exact singular level; facets add suppression converse. Mutant/run outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:99, sentence 4: The facet property adds that a dimension equal to its row's geography wherever it appears lists no facet.
+Assessment: Properties compare sorted unique non-empty levels and exact singular level; facets add suppression converse. Mutant/run outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:99, sentence 5: They pass on the code as it stands, so no fix follows them.
+Assessment: Properties compare sorted unique non-empty levels and exact singular level; facets add suppression converse. Mutant/run outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:99, sentence 6: Commit `836fc66`.
+Assessment: Properties compare sorted unique non-empty levels and exact singular level; facets add suppression converse. Mutant/run outcomes delegated to test audit.
+
+inputs/pr/pr-body-836fc66.md:110, sentence 1: From `2306113` to `43c62d2` the package count holds because the FSA file's tests changed in place (still 13), and the frontend adds `statistic-groups.test.ts` (3 tests) and `target-filter-options.test.ts` (2).
+Assessment: Added test counts from source are +1 package, +2 frontend; full-count validation unavailable without dependencies. Prior main/43c62d2 counts are supplied historical claims.
+
+inputs/pr/pr-body-836fc66.md:110, sentence 2: From `43c62d2` to `67e6d0b` the package adds `multi-fact-identity.test.ts` (8), `latest-artifact-invariants.test.ts` (5) and one `latest-artifact.test.ts` test, and the frontend adds those, `target-row-labels.test.ts` (3) and two `statistic-groups.test.ts` properties.
+Assessment: Added test counts from source are +1 package, +2 frontend; full-count validation unavailable without dependencies. Prior main/43c62d2 counts are supplied historical claims.
+
+inputs/pr/pr-body-836fc66.md:110, sentence 3: From `67e6d0b` to `836fc66` the package adds the mixed-storage test, and the frontend adds it and a mixed-storage Dimensions test.
+Assessment: Added test counts from source are +1 package, +2 frontend; full-count validation unavailable without dependencies. Prior main/43c62d2 counts are supplied historical claims.
+
+inputs/pr/pr-body-836fc66.md:110, sentence 4: Bun 1.4.4.
+Assessment: Added test counts from source are +1 package, +2 frontend; full-count validation unavailable without dependencies. Prior main/43c62d2 counts are supplied historical claims.
+
+inputs/pr/pr-body-836fc66.md:110, sentence 5: CI passes at `836fc66`.
+Assessment: Added test counts from source are +1 package, +2 frontend; full-count validation unavailable without dependencies. Prior main/43c62d2 counts are supplied historical claims.
+
+inputs/pr/pr-body-836fc66.md:114, sentence 1: - Debt-size order (follow-up 1) waits for Microcosm to carry a value order.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/pr-body-836fc66.md:115, sentence 1: - Chronicle entry links (follow-up 5) wait for an FSA package page on chronicle.institute.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/pr-body-836fc66.md:116, sentence 1: - The detail page, `microcosm-target-detail.tsx`, shows no record id or fact key, so it has nothing to swap.
+Assessment: Supplied detail component has no record id/fact-key presentation.
+
+inputs/pr/pr-body-836fc66.md:117, sentence 1: - The universe constraint of a several-fact identity reads null even where the facts share one, such as the months of a `calendar_year_average`, because nothing Microcosm writes on the target says they do.
+Assessment: shownChronicle nulls universe fields for multi identity; producer generic metadata only stamps representative universe info, not proof over every identity fact.
+
+inputs/pr/pr-body-836fc66.md:118, sentence 1: - The group-by value of a several-fact identity whose hierarchy omits it reads null even where the facts share it, as in the review's mixed-storage target, because the published fields can't tell.
+Assessment: Correct: omitted shared group-by nulls; mixed fixture is witness.
+
+inputs/pr/pr-body-836fc66.md:119, sentence 1: - A several-fact identity's `filters` and `dimension_set_key` still come from the representative.
+Assessment: Correct: mask does not remove filters/dimension_set_key.
+
+inputs/pr/pr-body-836fc66.md:119, sentence 2: They come out empty or shared for the FSA target, but another linear combination could differ.
+Assessment: Correct: mask does not remove filters/dimension_set_key.
+
+inputs/pr/pr-body-836fc66.md:120, sentence 1: - In a release without hierarchies (schema 6 and earlier), a several-fact target takes its dimensions from a recognized legacy filter when its `filter` decomposes (`decomposeTargetFilter`, `latest-artifact.ts:1250-1259`, `:1289-1293`), and otherwise from its representative's metadata (`metadataDimensions`), so its Dimensions column can show the representative's group-by value; `layout_groupby_unlisted_across_facts` reads null.
+Assessment: Correct precedence: hierarchy, structured identity, recognized filter decomposition, then metadataDimensions. No hierarchy several-identity flag null, representative metadata can produce a misleading dimension.
+
+inputs/pr/pr-body-836fc66.md:120, sentence 2: No fixture carries such a target.
+Assessment: Correct precedence: hierarchy, structured identity, recognized filter decomposition, then metadataDimensions. No hierarchy several-identity flag null, representative metadata can produce a misleading dimension.
+
+inputs/pr/pr-body-836fc66.md:121, sentence 1: - A lookup by another member's record id names no target.
+Assessment: Correct general limitation except a member record id can coincidentally equal a published member fact key; producer :1321 uses `_fact_key(fact) or _source_record_id(fact)`. Raw representative record is also matched.
+
+inputs/pr/pr-body-836fc66.md:121, sentence 2: A release lists each member by its fact key, or by its record id only when it has none (`ledger_targets.py:1321`), and carries no record id but the representative's.
+Assessment: Correct general limitation except a member record id can coincidentally equal a published member fact key; producer :1321 uses `_fact_key(fact) or _source_record_id(fact)`. Raw representative record is also matched.
+
+inputs/pr/pr-body-836fc66.md:122, sentence 1: - `targetNames`, which matches a skipped target by name, still reads the representative's record id; calibration-status matching stays as it was.
+Assessment: targetNames still reads raw representative record; unchanged.
+
+inputs/pr/pr-body-836fc66.md:124, sentence 1: 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+Hand-off
+inputs/pr/handoff-6994-6639793646.md:1, sentence 1: **Ready for hub review**
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:3, sentence 1: Head: `836fc66373f4384b0859d470d137f1a870a8f3a9` on `student-loan-dashboard-followups-1103`, three commits on `67e6d0b`, each pushed as a fast-forward after a check that the head still read `67e6d0b`.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:3, sentence 2: Main still reads `2306113`, and GitHub reports the PR mergeable and clean, so nothing merged in.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:3, sentence 3: The PR stays a draft.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:3, sentence 4: CI passes at the head: frontend tests, frontend typecheck and build, hosted Python, and Vercel.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:5, sentence 1: **Items**
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 1: 1. **No variation claim from an omitted pair (finding 1): done.** `layout_groupby_unlisted_across_facts` replaces `layout_groupby_value_varies` in `shownChronicle` (`latest-artifact.ts:616-641`), the Chronicle type (`use-microcosm.ts`) and `dimensionSummary` (`target-row-labels.ts:10-26`); a grep of `frontend`, `docs` and `scripts` finds the old name only in the tests' assertions that it stays absent.
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 2: The field reads true when the identity spans several facts and the hierarchy lists no group-by pair the target carries, false when the identity is one fact or the hierarchy lists the pair, and null when the target carries no pair or has no hierarchy.
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 3: No value claims that the facts differ.
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 4: The Dimensions column reads "Combines several source cells" after any listed dimensions.
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 5: A run of all 132 FSA rows through `dimensionSummary` at `67e6d0b` and at the head differs only for the balance excluding Parent PLUS ("Combines several loan type values" before).
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 6: The comments above `hierarchyListsGroupBy`, `groupByAcrossIdentity` and `shownChronicle` (`latest-artifact.ts:538-615`) state the rule and cite microcosm's `ledger_targets.py:1486-1490`, `:1578-1611`, `:1614-1623`, `:1626-1646` and `:1649-1651`, all read at `0ff293b` in this session.
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 7: Tests: the review's three compiled targets live in `fixtures/mixed-groupby-storage/hierarchy-probe-targets.json`.
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 8: The mixed-storage target carries no `layout_groupby_value_varies`, reads `layout_groupby_unlisted_across_facts: true` and the neutral phrase; the two whose hierarchy lists loan type A read `false` and keep `layout_groupby_value_id: "a"`.
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 9: The Dimensions test with listed dimensions uses an `ed_fsa.borrower_age_band` group-by.
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:6, sentence 10: `5db3130` (test: 5 fail, 3 in the frontend and 2 in the package), `4046000` (fix, touches no test).
+Assessment: Rename/readers neutral phrase correct; three-value rule has precedence ambiguity; comments' source references correct; fixture first three targets exact; dedicated tests exist. FSA comparison/test counts delegated.
+
+inputs/pr/handoff-6994-6639793646.md:7, sentence 1: 2. **Lookups (finding 2): done.** The body now says a lookup by its name, record id or fact keys finds it, and the review section cites the accepted fields at `latest-artifact.ts:3336-3348`: name, base name, shown record id and four shown fact keys.
+Assessment: Exact accepted lookup fields :3336-3348; no new lookup code added.
+
+inputs/pr/handoff-6994-6639793646.md:7, sentence 2: No new lookup.
+Assessment: Exact accepted lookup fields :3336-3348; no new lookup code added.
+
+inputs/pr/handoff-6994-6639793646.md:8, sentence 1: 3. **Narrower prose (finding 3): done.** `_value_representative_fact` (`ledger_targets.py:1232-1245`) picks the first fact for a single-fact input, the first base cell for the three base-cell ratio operations, and for any other multi-fact operation the fact of the latest period, the last in the tuple on a tie; `calendar_year_window_scaled_by_ratio` picks from its window (`:1012-1016`).
+Assessment: Singleton / first-three ratio / latest tie / window representative claims all correct; body now scoped correctly; recognized filter precedence correct.
+
+inputs/pr/handoff-6994-6639793646.md:8, sentence 2: The comment above `shownChronicle` says so (landed in `4046000`, a comment change).
+Assessment: Singleton / first-three ratio / latest tie / window representative claims all correct; body now scoped correctly; recognized filter precedence correct.
+
+inputs/pr/handoff-6994-6639793646.md:8, sentence 3: The body scopes "last operand" to the same-period FSA combination, names the four operations the test builds, and says a recognized legacy filter takes precedence over the representative's metadata (`latest-artifact.ts:1250-1259`, `:1289-1293`).
+Assessment: Singleton / first-three ratio / latest tie / window representative claims all correct; body now scoped correctly; recognized filter precedence correct.
+
+inputs/pr/handoff-6994-6639793646.md:9, sentence 1: 4. **Test-only exports (finding 4): done.** `countOrNull`, `repeatsGeography`, `computeDimensions` and `categoryLevels` lose `export`.
+Assessment: Four helpers no longer exported; properties public paths match code. Per-generated-input reachability delegated.
+
+inputs/pr/handoff-6994-6639793646.md:9, sentence 2: The properties run through public readers: the targets page's universe constraint count after `buildCalibration` for `countOrNull`, the page's facets for one variable for `computeDimensions` and `repeatsGeography`, and `microcosmVariableSummary` (none `""`) and `buildComparison` (none `null`) for `categoryLevels`.
+Assessment: Four helpers no longer exported; properties public paths match code. Per-generated-input reachability delegated.
+
+inputs/pr/handoff-6994-6639793646.md:9, sentence 3: `statistic-groups.test.ts` reads levels from `microcosmVariableSummary`.
+Assessment: Four helpers no longer exported; properties public paths match code. Per-generated-input reachability delegated.
+
+inputs/pr/handoff-6994-6639793646.md:9, sentence 4: Every property ran through a public reader, so no export stays.
+Assessment: Four helpers no longer exported; properties public paths match code. Per-generated-input reachability delegated.
+
+inputs/pr/handoff-6994-6639793646.md:9, sentence 5: `836fc66`.
+Assessment: Four helpers no longer exported; properties public paths match code. Per-generated-input reachability delegated.
+
+inputs/pr/handoff-6994-6639793646.md:10, sentence 1: 5. **Stronger category properties (check 6): done.** Each compares the returned levels with the rows' sorted, unique, non-empty levels, and also checks `level` exactly.
+Assessment: Strengthened expected-level comparison exists; mutant outcomes delegated.
+
+inputs/pr/handoff-6994-6639793646.md:10, sentence 2: With `categoryLevels` patched to always return no levels, both fail; restored, both pass.
+Assessment: Strengthened expected-level comparison exists; mutant outcomes delegated.
+
+inputs/pr/handoff-6994-6639793646.md:10, sentence 3: They pass on the code as it stands, so no failing commit: `836fc66`.
+Assessment: Strengthened expected-level comparison exists; mutant outcomes delegated.
+
+inputs/pr/handoff-6994-6639793646.md:11, sentence 1: 6. **PR body: done.** Rewritten to the rules, with items 1-5 folded in and a "Review of `67e6d0b`" subsection under "Review follow-ups".
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:11, sentence 2: It ends with the 🤖 line.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:12, sentence 1: 7. **Runs: done** (below).
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:14, sentence 1: **Counts** (bun 1.4.4 after `bun install --frozen-lockfile`)
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:23, sentence 1: **Test-first record.** In a scratch worktree, the four changed test files at `5db3130` give 18 pass, 5 fail.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:23, sentence 2: At `4046000` and at `836fc66` they give 23 pass, 0 fail.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:25, sentence 1: **Correction to the last hand-off.** Its item 1 said "`calendar_year_window_scaled_by_ratio` and every other operation span several facts".
+Assessment: Correction is correct: identity uses all facts for sum, but singleton sum has one member and shownChronicle early-returns; calendar window intrinsically requires two years per series, so this general multi-member qualification remains appropriate.
+
+inputs/pr/handoff-6994-6639793646.md:25, sentence 2: They span several facts for multi-member inputs.
+Assessment: Correction is correct: identity uses all facts for sum, but singleton sum has one member and shownChronicle early-returns; calendar window intrinsically requires two years per series, so this general multi-member qualification remains appropriate.
+
+inputs/pr/handoff-6994-6639793646.md:25, sentence 3: A singleton, such as a catalog `sum` that selects one fact, has a one-fact identity, and `shownChronicle` returns its fields unchanged.
+Assessment: Correction is correct: identity uses all facts for sum, but singleton sum has one member and shownChronicle early-returns; calendar window intrinsically requires two years per series, so this general multi-member qualification remains appropriate.
+
+inputs/pr/handoff-6994-6639793646.md:27, sentence 1: **Judgment calls**
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:28, sentence 1: - **Branch.** The harness named `claude/student-debt-pilot-277-us4pse`.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:28, sentence 2: Following the brief, only `student-loan-dashboard-followups-1103` received pushes.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:29, sentence 1: - **No Workflow.** The session said ultracode was on.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:29, sentence 2: Following the brief, no Workflow or subagent ran.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:30, sentence 1: - **Field name and values.** `layout_groupby_unlisted_across_facts` names what the fields establish.
+Assessment: This correctly states one-fact pair may return false without hierarchy, explaining ambiguity in line 6/body/type comment. No-pair guard still wins.
+
+inputs/pr/handoff-6994-6639793646.md:30, sentence 2: It keeps three values so that a reader can tell a listed or one-fact pair (false) from no evidence (null).
+Assessment: This correctly states one-fact pair may return false without hierarchy, explaining ambiguity in line 6/body/type comment. No-pair guard still wins.
+
+inputs/pr/handoff-6994-6639793646.md:30, sentence 3: It reads false for a one-fact identity even without a hierarchy, as `67e6d0b` read "shared" there.
+Assessment: This correctly states one-fact pair may return false without hierarchy, explaining ambiguity in line 6/body/type comment. No-pair guard still wins.
+
+inputs/pr/handoff-6994-6639793646.md:31, sentence 1: - **Wording.** "Combines several source cells" holds for every target it marks: each one sums several facts.
+Assessment: Neutral phrase makes no dimension-variation claim and source cells is acceptable wording; “each one sums” is false for all marked operations.
+
+inputs/pr/handoff-6994-6639793646.md:31, sentence 2: It names no dimension, so it makes no claim about which values differ. "Source cells" matches the base-cell language of the code comments; "facts" would read as jargon on the page.
+Assessment: Neutral phrase makes no dimension-variation claim and source cells is acceptable wording; “each one sums” is false for all marked operations.
+
+inputs/pr/handoff-6994-6639793646.md:32, sentence 1: - **Fixture.** The JSON keeps each probe line's `case`, `facts`, `hierarchy_dimensions`, `representative` and `dashboard_target`.
+Assessment: Fixture projection confirmed; uk release matches tests; third conflicting-layout case's Chronicle validity remains explicitly open.
+
+inputs/pr/handoff-6994-6639793646.md:32, sentence 2: It drops the probe's own `dashboard_layout_groupby_value_varies` output.
+Assessment: Fixture projection confirmed; uk release matches tests; third conflicting-layout case's Chronicle validity remains explicitly open.
+
+inputs/pr/handoff-6994-6639793646.md:32, sentence 3: As in the review's `mixed-storage.test.ts`, the rows run in a `uk` release built on the FSA fixture.
+Assessment: Fixture projection confirmed; uk release matches tests; third conflicting-layout case's Chronicle validity remains explicitly open.
+
+inputs/pr/handoff-6994-6639793646.md:32, sentence 4: The third case gives a fact conflicting layout and dimension values, and the review left its Chronicle validity open.
+Assessment: Fixture projection confirmed; uk release matches tests; third conflicting-layout case's Chronicle validity remains explicitly open.
+
+inputs/pr/handoff-6994-6639793646.md:32, sentence 5: It still gets tested because the brief asked for it.
+Assessment: Fixture projection confirmed; uk release matches tests; third conflicting-layout case's Chronicle validity remains explicitly open.
+
+inputs/pr/handoff-6994-6639793646.md:33, sentence 1: - **Count properties run `buildCalibration` 20,000 times each.** The invariants file takes about 9 s, so each property carries a 60 s timeout.
+Assessment: Public count tests do buildCalibration each run; no independent execution of fast-check possible without package. Source shape property rejects negative/fraction under mutants, accept-space remains a valid shape at 0; example catches it.
+
+inputs/pr/handoff-6994-6639793646.md:33, sentence 2: Of the review's three count mutants, accept-fraction and accept-negative fail the shape property.
+Assessment: Public count tests do buildCalibration each run; no independent execution of fast-check possible without package. Source shape property rejects negative/fraction under mutants, accept-space remains a valid shape at 0; example catches it.
+
+inputs/pr/handoff-6994-6639793646.md:33, sentence 3: Accept-space reads `" "` as 0, a valid count, so it passes the properties, as it did before.
+Assessment: Public count tests do buildCalibration each run; no independent execution of fast-check possible without package. Source shape property rejects negative/fraction under mutants, accept-space remains a valid shape at 0; example catches it.
+
+inputs/pr/handoff-6994-6639793646.md:33, sentence 4: The `latest-artifact.test.ts` example test catches it.
+Assessment: Public count tests do buildCalibration each run; no independent execution of fast-check possible without package. Source shape property rejects negative/fraction under mutants, accept-space remains a valid shape at 0; example catches it.
+
+inputs/pr/handoff-6994-6639793646.md:34, sentence 1: - **Facet property.** The page never asks `repeatsGeography` about Geography, so the old `repeatsGeography(rows, "geography")` assertion has no public path and goes.
+Assessment: Public computeDimensions doesn't invoke repeatsGeography for geography; converse added as stated.
+
+inputs/pr/handoff-6994-6639793646.md:34, sentence 2: The property gains the converse: a dimension equal to its row's geography wherever it appears lists no facet.
+Assessment: Public computeDimensions doesn't invoke repeatsGeography for geography; converse added as stated.
+
+inputs/pr/handoff-6994-6639793646.md:35, sentence 1: - **Comparison property.** It compares a release with itself, made from the first eight FSA rows with generated levels and one variable key.
+Assessment: Comparison property uses first eight FSA rows, generated levels, one variable and compares release with itself.
+
+inputs/pr/handoff-6994-6639793646.md:36, sentence 1: - **Type field in the test commit.** `5db3130` declares the new field in the frontend type so the failing tests typecheck.
+Assessment: Type-only declaration has no runtime effect; head removes old runtime field and type. Intermediate commit unavailable locally, so historical contents not independently opened.
+
+inputs/pr/handoff-6994-6639793646.md:36, sentence 2: It has no runtime effect, and `4046000` removes the old field.
+Assessment: Type-only declaration has no runtime effect; head removes old runtime field and type. Intermediate commit unavailable locally, so historical contents not independently opened.
+
+inputs/pr/handoff-6994-6639793646.md:37, sentence 1: - **Body ending.** `gh api -X PATCH` replaced the closing 🤖 line with the proxy's footer again.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:37, sentence 2: The same body went through the GitHub MCP `update_pull_request`, which kept the line.
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+
+inputs/pr/handoff-6994-6639793646.md:40, sentence 1: _Generated by [Claude Code](https://claude.ai/code)_
+Assessment: Not a code mechanism claim (scope, source/commit history, style, or logistics).
+

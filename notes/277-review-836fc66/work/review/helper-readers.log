@@ -1,0 +1,19 @@
+$ rg -n \b(countOrNull|repeatsGeography|computeDimensions|categoryLevels)\b inputs/dashboard-836fc66
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:222:function countOrNull(value: unknown): number | null {
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:491:    universe_constraint_count: countOrNull(metadata.ledger_universe_constraint_count),
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:531:      return countOrNull(metadata.ledger_value_base_cells) === 1;
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:618:  const memberFactCount = countOrNull(metadata.ledger_member_fact_count);
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:1021:function repeatsGeography(rows: TargetRow[], key: string): boolean {
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:1032:function computeDimensions(rows: TargetRow[]): TargetDimension[] {
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:1057:    if (candidate.key !== "geography" && repeatsGeography(rows, candidate.key)) continue;
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:1658:function categoryLevels(
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:1712:        ...categoryLevels(group, ""),
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:3254:  const dimensions = variable ? computeDimensions(filtered) : [];
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:3445:        ...categoryLevels(group, null),
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact-invariants.test.ts:45:// (countOrNull, through chronicleFactFields).
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact-invariants.test.ts:54:// Out of scope: countOrNull(-0) returns -0, which JSON writes as 0.
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact-invariants.test.ts:122:// (categoryLevels). Both group the rows under one variable.
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact-invariants.test.ts:197:// The facets the targets page lists for one variable (computeDimensions,
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact-invariants.test.ts:199:// repeatsGeography).
+
+EXIT 0

@@ -1,0 +1,24 @@
+bun test v1.3.12 (700fc117)
+
+work/review/matrix.test.ts:
+FSA {"total":132,"unchanged":131,"changed":[{"name":"ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding@2024","before":"Combines several loan type values","after":"Combines several source cells"}],"oldFormatterCalls":["loan_type"],"newFormatterCalls":[]}
+(pass) 132 FSA dimensions differ only for excluding Parent PLUS [126.79ms]
+MATRIX {"case":"single fact","field":"absent","group":"al","dimension_adapter":"hierarchy","dimensions":[{"key":"ed_fsa.borrower_location","label":"Borrower location","value":"Alabama","value_id":"al","source_key":"ed_fsa.borrower_location","raw_value":"al","rank":0}],"label":"Alabama"}
+MATRIX {"case":"scaled_by_ratio one identity fact","field":false,"group":"al","dimension_adapter":"hierarchy","dimensions":[{"key":"ed_fsa.borrower_location","label":"Borrower location","value":"Alabama","value_id":"al","source_key":"ed_fsa.borrower_location","raw_value":"al","rank":0}],"label":"Alabama"}
+MATRIX {"case":"rolled_forward_by_ratio one base","field":false,"group":"al","dimension_adapter":"hierarchy","dimensions":[{"key":"ed_fsa.borrower_location","label":"Borrower location","value":"Alabama","value_id":"al","source_key":"ed_fsa.borrower_location","raw_value":"al","rank":0}],"label":"Alabama"}
+MATRIX {"case":"allocated_residual_by_ratio one base","field":false,"group":"al","dimension_adapter":"hierarchy","dimensions":[{"key":"ed_fsa.borrower_location","label":"Borrower location","value":"Alabama","value_id":"al","source_key":"ed_fsa.borrower_location","raw_value":"al","rank":0}],"label":"Alabama"}
+MATRIX {"case":"one-fact identity without pair","field":null,"group":null,"dimension_adapter":"hierarchy","dimensions":[{"key":"ed_fsa.borrower_location","label":"Borrower location","value":"Alabama","value_id":"al","source_key":"ed_fsa.borrower_location","raw_value":"al","rank":0}],"label":"Alabama"}
+MATRIX {"case":"one-fact identity without hierarchy","field":false,"group":"al","dimension_adapter":"legacy_name","dimensions":[],"label":"[humanizeName:al]"}
+MATRIX {"case":"multi-identity pair listed","field":false,"group":"al","dimension_adapter":"hierarchy","dimensions":[{"key":"ed_fsa.borrower_location","label":"Borrower location","value":"Alabama","value_id":"al","source_key":"ed_fsa.borrower_location","raw_value":"al","rank":0}],"label":"Alabama"}
+MATRIX {"case":"multi-identity omitted FSA","field":true,"group":null,"dimension_adapter":"hierarchy","dimensions":[],"label":"Combines several source cells"}
+MATRIX {"case":"multi-identity omitted mixed","field":true,"group":null,"dimension_adapter":"hierarchy","dimensions":[],"label":"Combines several source cells"}
+MATRIX {"case":"multi-identity no representative pair","field":null,"group":null,"dimension_adapter":"hierarchy","dimensions":[],"label":"All"}
+MATRIX {"case":"schema6 no legacy filter","field":null,"group":null,"dimension_adapter":"legacy_name","dimensions":[{"key":"bd_loan_type","label":"Loan Type","value":"stafford unsubsidized","source_key":"ledger_layout_groupby_value_id","raw_value":"stafford_unsubsidized"}],"label":"stafford unsubsidized"}
+MATRIX {"case":"schema6 recognized legacy filter","field":null,"group":null,"dimension_adapter":"legacy_filter","dimensions":[{"key":"bd_sex","label":"Sex","value":"Female","source_key":"filter","raw_value":"female"},{"key":"bd_age_band","label":"Age band","value":"18–64","source_key":"filter","raw_value":"18_64"}],"label":"Female · 18–64"}
+MATRIX {"case":"schema7 structured without hierarchy","field":null,"group":null,"dimension_adapter":"structured","dimensions":[],"label":"All"}
+(pass) public reader matrix at 836fc66 [7.80ms]
+
+ 2 pass
+ 0 fail
+ 35 expect() calls
+Ran 2 tests across 1 file. [964.00ms]

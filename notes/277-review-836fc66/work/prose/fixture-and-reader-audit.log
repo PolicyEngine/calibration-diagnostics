@@ -1,0 +1,11 @@
+fixture sha256 037d28028b28b865eb0bacd09bb81285ff7b18e442bcf5e27ec762ae1008459b
+FSA rows 132
+ed_fsa.federal_student_loan_balance {'state': 51, 'country': 14}
+ed_fsa.federal_student_loan_borrowers {'state': 51, 'country': 14}
+ed_fsa.parent_plus_loan_balance {'country': 1}
+ed_fsa.loan_balance_excluding_parent_plus {'country': 1}
+age/debt example ed_fsa.portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_10k_to_20k.dollars_outstanding@2024 2
+age/debt example ed_fsa.portfolio_by_debt_size.fy2026_q2.borrowers.debt_10k_to_20k.borrowers@2024 2
+Production member readers
+inputs/dashboard-836fc66/frontend/lib/api/hooks/use-microcosm.ts 174 member_fact_count?: number | null;
+inputs/dashboard-836fc66/frontend/lib/api/hooks/use-microcosm.ts 175 member_fact_keys?: string[];

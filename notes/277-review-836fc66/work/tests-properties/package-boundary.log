@@ -1,0 +1,14 @@
+bun test v1.3.12 (700fc117)
+
+work/tests-properties/new-package/src/package-boundary.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find package 'typescript' from '<review>/work/tests-properties/new-package/src/test-support/package-boundary.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [501.00ms]

@@ -1,0 +1,58 @@
+bun test v1.3.12 (700fc117)
+
+work/tests-properties/old-package/src/multi-fact-identity.test.ts:
+(pass) a target built from several facts shows the identity Microcosm gives it > scaled_by_ratio: its record and fact keys show, and its member facts are listed [5.60ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > rolled_forward_by_ratio, one base cell: its record and fact keys show, and its member facts are listed [1.11ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > a dimension that varies across a ratio's operands leaves its base's identity [0.54ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > rolled_forward_by_ratio, two base cells: no one cell names it [0.77ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > allocated_residual_by_ratio: one base cell names it, two do not [2.36ms]
+359 |     const results: Record<string, unknown> = {
+360 |       ...Object.fromEntries(Object.entries(cases).map(([name, rows]) => [name, unlisted(rows())])),
+361 |       // A schema 6 release has no hierarchy.
+362 |       withoutHierarchy: unlisted([withoutHierarchy], 6),
+363 |     };
+364 |     expect(results).toEqual({
+                          ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "excludingParentPlus": true,
+-   "ratioScaled": false,
++   "excludingParentPlus": "absent",
++   "ratioScaled": "absent",
+    "singleFact": "absent",
+-   "twoAgeBands": false,
+-   "twoLoanTypes": true,
+-   "withoutHierarchy": null,
++   "twoAgeBands": "absent",
++   "twoLoanTypes": "absent",
++   "withoutHierarchy": "absent",
+  }
+
+- Expected  - 5
++ Received  + 5
+
+      at <anonymous> (<review>/work/tests-properties/old-package/src/multi-fact-identity.test.ts:364:21)
+(fail) a target built from several facts shows the identity Microcosm gives it > layout_groupby_unlisted_across_facts says the hierarchy leaves a several-fact identity's group-by out [25.49ms]
+400 |       return [probe.case, listedChronicle(cal) as unknown as Row] as const;
+401 |     });
+402 |     const [mixed, ...listed] = shown;
+403 | 
+404 |     expect(mixed[0]).toBe("ordinary a + layout a; disjoint sex cells");
+405 |     expect(mixed[1]).not.toHaveProperty("layout_groupby_value_varies");
+                               ^
+error: expect(received).not.toHaveProperty(path)
+
+Expected path: not "layout_groupby_value_varies"
+
+Received value: true
+
+      at <anonymous> (<review>/work/tests-properties/old-package/src/multi-fact-identity.test.ts:405:26)
+(fail) a target built from several facts shows the identity Microcosm gives it > a hierarchy that leaves out a pair the identity facts share claims no variation [6.84ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > a lookup by a member fact names the targets that list it [1.62ms]
+(pass) a target built from several facts shows the identity Microcosm gives it > the FSA linear combination shows none of its five members' fields [0.57ms]
+
+ 7 pass
+ 2 fail
+ 60 expect() calls
+Ran 9 tests across 1 file. [731.00ms]

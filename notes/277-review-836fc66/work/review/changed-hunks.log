@@ -1,0 +1,40 @@
+$ rg ^diff --git|^@@ inputs/pr/diff-67e6d0b-836fc66.diff
+diff --git a/frontend/components/microcosm/target-row-labels.test.ts b/frontend/components/microcosm/target-row-labels.test.ts
+@@ -1,6 +1,7 @@
+@@ -9,16 +10,19 @@ import {
+@@ -33,15 +37,15 @@ function fsaRow(rows: MicrocosmTargetRow[], suffix: string): MicrocosmTargetRow
+@@ -50,32 +54,51 @@ describe("the targets page's Dimensions column", () => {
+diff --git a/frontend/components/microcosm/target-row-labels.ts b/frontend/components/microcosm/target-row-labels.ts
+@@ -8,16 +8,16 @@ export function titleFromIdentifier(value: string | null | undefined): string {
+diff --git a/frontend/lib/api/hooks/use-microcosm.ts b/frontend/lib/api/hooks/use-microcosm.ts
+@@ -167,15 +167,18 @@ export interface MicrocosmTargetRow {
+diff --git a/frontend/lib/microcosm/statistic-groups.test.ts b/frontend/lib/microcosm/statistic-groups.test.ts
+@@ -1,7 +1,7 @@
+@@ -83,7 +83,11 @@ describe("statistic group keys, on generated input", () => {
+diff --git a/frontend/packages/calibration-tree/src/fixtures/mixed-groupby-storage/hierarchy-probe-targets.json b/frontend/packages/calibration-tree/src/fixtures/mixed-groupby-storage/hierarchy-probe-targets.json
+@@ -0,0 +1,529 @@
+diff --git a/frontend/packages/calibration-tree/src/latest-artifact-invariants.test.ts b/frontend/packages/calibration-tree/src/latest-artifact-invariants.test.ts
+@@ -1,18 +1,55 @@
+@@ -43,19 +80,27 @@ const countLike = fc.oneof(
+@@ -64,21 +109,63 @@ const levelValue = fc.oneof(
+@@ -99,6 +186,7 @@ const facetRow = fc
+@@ -106,29 +194,35 @@ const facetRow = fc
+diff --git a/frontend/packages/calibration-tree/src/latest-artifact.ts b/frontend/packages/calibration-tree/src/latest-artifact.ts
+@@ -219,7 +219,7 @@ function numberOrNull(value: unknown): number | null {
+@@ -536,11 +536,17 @@ function identityIsRepresentative(metadata: JsonObject): boolean {
+@@ -552,15 +558,17 @@ function hierarchyListsGroupBy(row: TargetRow, chronicle: JsonObject): boolean {
+@@ -568,7 +576,7 @@ function groupByAcrossIdentity(
+@@ -586,22 +594,25 @@ function groupByAcrossIdentity(
+@@ -612,7 +623,7 @@ function shownChronicle(row: TargetRow): unknown {
+@@ -1007,7 +1018,7 @@ export interface TargetDimension {
+@@ -1018,7 +1029,7 @@ export function repeatsGeography(rows: TargetRow[], key: string): boolean {
+@@ -1644,7 +1655,7 @@ export function microcosmTargetGeographies(rows: TargetRow[]): string[] {
+diff --git a/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts b/frontend/packages/calibration-tree/src/multi-fact-identity.test.ts
+@@ -1,6 +1,7 @@
+@@ -76,6 +77,21 @@ function multiFactRow(
+@@ -286,12 +302,17 @@ describe("a target built from several facts shows the identity Microcosm gives i
+@@ -301,8 +322,13 @@ describe("a target built from several facts shows the identity Microcosm gives i
+@@ -322,16 +348,20 @@ describe("a target built from several facts shows the identity Microcosm gives i
+@@ -339,6 +369,58 @@ describe("a target built from several facts shows the identity Microcosm gives i
+
+EXIT 0

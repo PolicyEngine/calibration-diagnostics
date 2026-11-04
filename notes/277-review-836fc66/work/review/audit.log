@@ -1,0 +1,6 @@
+CHANGED COMMON FILES 7
+FIXTURE MATCH 1 all five retained fields exact
+FIXTURE MATCH 2 all five retained fields exact
+FIXTURE MATCH 3 all five retained fields exact
+INPUT FILE HASHES 470
+LOGS work/review/{field-readers,helper-readers,changed-hunks,changed-snapshot-files,microcosm-citations}.log

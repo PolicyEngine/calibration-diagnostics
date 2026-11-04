@@ -1,0 +1,3 @@
+Reproduced first three original probe lines structurally equal: True
+Fixture matches selected fields of original first three lines: True
+Fixture keys: ['case', 'dashboard_target', 'facts', 'hierarchy_dimensions', 'representative']

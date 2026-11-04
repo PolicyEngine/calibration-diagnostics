@@ -1,0 +1,27 @@
+bun test v1.3.12 (700fc117)
+
+work/tests-properties/public-readers.test.ts:
+ 7 | const fsa=buildCalibration(artifact,'review',null,{},{},{},'us');
+ 8 | function page(cal:any,variable?:string){const u=new URL('https://dashboard.test/api/microcosm/target-diagnostics');u.searchParams.set('limit','500');if(variable)u.searchParams.set('variable',variable);return latestMicrocosmTargetDiagnosticsPage(String(u),cal);}
+ 9 | function shownCount(value:unknown){const row=structuredClone(target);(row.metadata as Record<string,unknown>).ledger_universe_constraint_count=value;return page(buildCalibration({...artifact,targets:[row]},'count',null,{},{},{},'us')).targets[0].chronicle.universe_constraint_count;}
+10 | const isCount=(v:unknown)=>v===null||(typeof v==='number'&&Number.isSafeInteger(v)&&v>=0);
+11 | test('public count shape and roundtrip witnesses',()=>{
+12 |  for(const v of [2.5,-1,'2.5','-1',' ','',0,'0',7,' 7 ',Number.MAX_SAFE_INTEGER,String(Number.MAX_SAFE_INTEGER)]) expect(isCount(shownCount(v))).toBe(true);
+                                                                                                                                                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (<review>/work/tests-properties/public-readers.test.ts:12:146)
+(fail) public count shape and roundtrip witnesses [7.93ms]
+(pass) public count example rejects blank [0.21ms]
+(pass) public category row-level equality witnesses ("") [0.25ms]
+(pass) public category row-level equality witnesses (null) [1.73ms]
+(pass) public facet witnesses preserve real breakdown and drop geography repeats [0.49ms]
+(pass) benchmark public count paths: 20,000 shape calls and 40,000 roundtrip calls [0.02ms]
+
+ 5 pass
+ 1 fail
+ 36 expect() calls
+Ran 6 tests across 1 file. [540.00ms]

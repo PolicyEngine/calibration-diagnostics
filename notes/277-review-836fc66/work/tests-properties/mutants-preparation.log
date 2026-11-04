@@ -1,0 +1,4 @@
+accept-fraction mutation applied = True
+accept-negative mutation applied = True
+accept-space mutation applied = True
+no-levels mutation applied = True

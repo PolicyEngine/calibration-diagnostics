@@ -1,0 +1,565 @@
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:86-124
+   86:         "latest_plateau",
+   87:         "count_x_mean",
+   88:         "scaled_by_ratio",
+   89:         ROLLED_FORWARD_BY_RATIO,
+   90:         ALLOCATED_RESIDUAL_BY_RATIO,
+   91:         CALENDAR_YEAR_WINDOW_SCALED_BY_RATIO,
+   92:         MONTHLY_WINDOW_COUNT_X_MEAN,
+   93:         *MONTHLY_WINDOW_OPERATIONS,
+   94:     )
+   95: )
+   96: MULTI_FACT_VALUE_OPERATIONS = frozenset(
+   97:     (
+   98:         "sum",
+   99:         "difference",
+  100:         "linear_combination",
+  101:         "calendar_year_average",
+  102:         "calendar_year_window",
+  103:         "latest_plateau",
+  104:         "count_x_mean",
+  105:         "scaled_by_ratio",
+  106:         ROLLED_FORWARD_BY_RATIO,
+  107:         ALLOCATED_RESIDUAL_BY_RATIO,
+  108:         CALENDAR_YEAR_WINDOW_SCALED_BY_RATIO,
+  109:         MONTHLY_WINDOW_COUNT_X_MEAN,
+  110:         *MONTHLY_WINDOW_OPERATIONS,
+  111:     )
+  112: )
+  113: #: Operations that compose or pin periods of their own, so a reference may
+  114: #: not move its fact selection with ``observation_period``.
+  115: PERIOD_COMPOSING_OPERATIONS = frozenset(
+  116:     (
+  117:         "calendar_year_average",
+  118:         "calendar_year_window",
+  119:         "latest_plateau",
+  120:         "scaled_by_ratio",
+  121:         ROLLED_FORWARD_BY_RATIO,
+  122:         CALENDAR_YEAR_WINDOW_SCALED_BY_RATIO,
+  123:     )
+  124: )
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:880-894
+  880:         facts = _resolve_monthly_window_count_x_mean_reference_facts(
+  881:             reference, list(facts)
+  882:         )
+  883:     elif reference.value_operation == ALLOCATED_RESIDUAL_BY_RATIO:
+  884:         # Direct callers receive the same exact selector, universe and roster
+  885:         # checks as catalog callers; a pre-resolved tuple is never trusted.
+  886:         facts = _resolve_allocation_reference_facts(reference, facts)
+  887:     if len(facts) > 1 and reference.value_operation not in MULTI_FACT_VALUE_OPERATIONS:
+  888:         raise ValueError(
+  889:             f"Ledger target reference {reference.name!r}: multiple Ledger facts "
+  890:             "require an aggregating value_operation, got "
+  891:             f"{reference.value_operation!r}."
+  892:         )
+  893:     numeric_values = []
+  894:     operand_facts = (
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:1012-1035
+ 1012:     representative_fact = _value_representative_fact(
+ 1013:         _window_ratio_window_facts(reference, facts)
+ 1014:         if reference.value_operation == CALENDAR_YEAR_WINDOW_SCALED_BY_RATIO
+ 1015:         else facts,
+ 1016:         operation=reference.value_operation,
+ 1017:     )
+ 1018:     # A ratio-scaled cell keeps the base cell's identity: the national
+ 1019:     # numerator and denominator translate its value, they do not relocate it,
+ 1020:     # so the hierarchy and label read the base alone.
+ 1021:     identity_facts = (
+ 1022:         (representative_fact,)
+ 1023:         if reference.value_operation == "scaled_by_ratio"
+ 1024:         else tuple(
+ 1025:             member
+ 1026:             for member in facts
+ 1027:             if _fact_matches_selector(member, reference.ledger_selector)
+ 1028:         )
+ 1029:         if reference.value_operation == ALLOCATED_RESIDUAL_BY_RATIO
+ 1030:         else facts[:-2]
+ 1031:         if reference.value_operation == ROLLED_FORWARD_BY_RATIO
+ 1032:         else _window_ratio_window_facts(reference, facts)
+ 1033:         if reference.value_operation == CALENDAR_YEAR_WINDOW_SCALED_BY_RATIO
+ 1034:         else facts
+ 1035:     )
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:1080-1100
+ 1080:         source=_source_citation(representative_fact),
+ 1081:         family=reference.family,
+ 1082:         signed=reference.signed,
+ 1083:         tolerance=reference.tolerance,
+ 1084:         notes=reference.notes,
+ 1085:         metadata={
+ 1086:             **_ledger_metadata(
+ 1087:                 representative_fact,
+ 1088:                 fact_key=_fact_key(representative_fact),
+ 1089:             ),
+ 1090:             **_multi_fact_reference_metadata(facts),
+ 1091:             **publication_metadata,
+ 1092:             **_diagnostic_target_label_metadata(identity_facts, target_period=period),
+ 1093:             "ledger_resolved_assertion": _fact_assertion(representative_fact),
+ 1094:             **_reference_metadata(reference),
+ 1095:         },
+ 1096:         hierarchy=_calibration_hierarchy(
+ 1097:             identity_facts,
+ 1098:             reference=reference,
+ 1099:             target_period=period,
+ 1100:         ),
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:1171-1178
+ 1171:     return value, {
+ 1172:         **geography,
+ 1173:         "ledger_value_base": repr(float(base)),
+ 1174:         "ledger_value_base_cells": str(len(base_values)),
+ 1175:         "ledger_value_base_fact_keys": json.dumps(
+ 1176:             [_fact_key(fact) or _source_record_id(fact) for fact in facts[:-2]],
+ 1177:             separators=(",", ":"),
+ 1178:         ),
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:1232-1245
+ 1232: def _value_representative_fact(
+ 1233:     facts: tuple[object, ...],
+ 1234:     *,
+ 1235:     operation: str,
+ 1236: ) -> object:
+ 1237:     if len(facts) == 1 or operation not in MULTI_FACT_VALUE_OPERATIONS:
+ 1238:         return facts[0]
+ 1239:     if operation in {
+ 1240:         "scaled_by_ratio",
+ 1241:         ROLLED_FORWARD_BY_RATIO,
+ 1242:         ALLOCATED_RESIDUAL_BY_RATIO,
+ 1243:     }:
+ 1244:         return facts[0]
+ 1245:     return max(enumerate(facts), key=lambda item: (_period_key(item[1]), item[0]))[1]
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:1318-1341
+ 1318: def _multi_fact_reference_metadata(facts: tuple[object, ...]) -> dict[str, str]:
+ 1319:     if len(facts) == 1:
+ 1320:         return {}
+ 1321:     member_keys = tuple(_fact_key(fact) or _source_record_id(fact) for fact in facts)
+ 1322:     payload = json.dumps(member_keys, separators=(",", ":"))
+ 1323:     varying_dimensions = _varying_dimension_ids(facts)
+ 1324:     return {
+ 1325:         "ledger_member_fact_count": str(len(facts)),
+ 1326:         "ledger_member_aggregate_fact_keys": payload,
+ 1327:         "ledger_member_fact_keys": payload,
+ 1328:         "ledger_member_fact_digest": hashlib.sha256(
+ 1329:             payload.encode("utf-8")
+ 1330:         ).hexdigest(),
+ 1331:         **(
+ 1332:             {
+ 1333:                 "ledger_aggregation_varying_dimensions": json.dumps(
+ 1334:                     varying_dimensions,
+ 1335:                     separators=(",", ":"),
+ 1336:                 )
+ 1337:             }
+ 1338:             if varying_dimensions
+ 1339:             else {}
+ 1340:         ),
+ 1341:     }
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:1352-1373
+ 1352:     seed = reference.hierarchy
+ 1353:     if seed is None:
+ 1354:         return None
+ 1355:     _validate_chronicle_hierarchy_labels(facts, reference_name=reference.name)
+ 1356:     composed = _composed_row_geography(facts, reference=reference)
+ 1357:     if composed is None:
+ 1358:         composed = _aliased_row_geography(facts, reference=reference)
+ 1359:     if composed is not None:
+ 1360:         geography_level, geography_id, geography_label = composed
+ 1361:         return CalibrationHierarchy(
+ 1362:             provider=seed.provider,
+ 1363:             category=seed.category,
+ 1364:             geography=HierarchyGeography(
+ 1365:                 id=geography_id,
+ 1366:                 label=geography_label,
+ 1367:                 level=geography_level,
+ 1368:             ),
+ 1369:             dimensions=_inherited_dimensions(facts),
+ 1370:             target=HierarchyNode(
+ 1371:                 id=reference.name,
+ 1372:                 label=_target_label(
+ 1373:                     facts, reference=reference, target_period=target_period
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:1421-1433
+ 1421:     return CalibrationHierarchy(
+ 1422:         provider=seed.provider,
+ 1423:         category=seed.category,
+ 1424:         geography=HierarchyGeography(
+ 1425:             id=geography_id,
+ 1426:             label=geography_label,
+ 1427:             level=geography_level,
+ 1428:         ),
+ 1429:         dimensions=_inherited_dimensions(facts),
+ 1430:         target=HierarchyNode(
+ 1431:             id=reference.name,
+ 1432:             label=target_label,
+ 1433:         ),
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:1485-1490
+ 1485:         raw_dimensions = _dimensions(fact)
+ 1486:         dimensions = {str(key): value for key, value in raw_dimensions.items()}
+ 1487:         groupby_id = _str_at(fact, "layout", "groupby_dimension").strip()
+ 1488:         groupby_value_id = _str_at(fact, "layout", "groupby_value_id").strip()
+ 1489:         if groupby_id and groupby_value_id:
+ 1490:             dimensions.setdefault(groupby_id, groupby_value_id)
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:1578-1651
+ 1578: def _inherited_dimensions(facts: tuple[object, ...]) -> tuple[HierarchyDimension, ...]:
+ 1579:     """Return dimensions constant across all facts in deterministic order."""
+ 1580: 
+ 1581:     common = _common_dimensions(facts)
+ 1582:     dimensions: list[HierarchyDimension] = []
+ 1583:     groupby_id = _constant_text(facts, "layout", "groupby_dimension")
+ 1584:     groupby_value_id = _constant_text(facts, "layout", "groupby_value_id")
+ 1585:     if groupby_id and groupby_value_id:
+ 1586:         raw_value = common.pop(groupby_id, groupby_value_id)
+ 1587:         dimensions.append(
+ 1588:             HierarchyDimension(
+ 1589:                 id=groupby_id,
+ 1590:                 label=(
+ 1591:                     _constant_text(facts, "layout", "groupby_dimension_label")
+ 1592:                     or _dimension_label(facts, groupby_id)
+ 1593:                 ),
+ 1594:                 value_id=_dimension_value_id(groupby_value_id),
+ 1595:                 value_label=(
+ 1596:                     _constant_text(facts, "layout", "groupby_value_label")
+ 1597:                     or _dimension_value_label(facts, groupby_id, raw_value)
+ 1598:                 ),
+ 1599:             )
+ 1600:         )
+ 1601:     for dimension_id in sorted(common):
+ 1602:         value = common[dimension_id]
+ 1603:         dimensions.append(
+ 1604:             HierarchyDimension(
+ 1605:                 id=dimension_id,
+ 1606:                 label=_dimension_label(facts, dimension_id),
+ 1607:                 value_id=_dimension_value_id(value),
+ 1608:                 value_label=_dimension_value_label(facts, dimension_id, value),
+ 1609:             )
+ 1610:         )
+ 1611:     return tuple(dimensions)
+ 1612: 
+ 1613: 
+ 1614: def _common_dimensions(facts: tuple[object, ...]) -> dict[str, object]:
+ 1615:     first = {str(key): value for key, value in _dimensions(facts[0]).items()}
+ 1616:     return {
+ 1617:         key: value
+ 1618:         for key, value in first.items()
+ 1619:         if all(
+ 1620:             key in _dimensions(fact) and _dimensions(fact)[key] == value
+ 1621:             for fact in facts[1:]
+ 1622:         )
+ 1623:     }
+ 1624: 
+ 1625: 
+ 1626: def _varying_dimension_ids(facts: tuple[object, ...]) -> list[str]:
+ 1627:     if len(facts) < 2:
+ 1628:         return []
+ 1629:     dimension_ids = sorted(
+ 1630:         {str(key) for fact in facts for key in _dimensions(fact).keys()}
+ 1631:     )
+ 1632:     return [
+ 1633:         dimension_id
+ 1634:         for dimension_id in dimension_ids
+ 1635:         if len(
+ 1636:             {
+ 1637:                 json.dumps(
+ 1638:                     _dimensions(fact).get(dimension_id),
+ 1639:                     sort_keys=True,
+ 1640:                     separators=(",", ":"),
+ 1641:                 )
+ 1642:                 for fact in facts
+ 1643:             }
+ 1644:         )
+ 1645:         > 1
+ 1646:     ]
+ 1647: 
+ 1648: 
+ 1649: def _constant_text(facts: tuple[object, ...], *path: str) -> str:
+ 1650:     values = {_str_at(fact, *path).strip() for fact in facts}
+ 1651:     return next(iter(values)) if len(values) == 1 else ""
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:3063-3075
+ 3063:     final_targets = {key: value * ratio for key, value in adjusted.items()}
+ 3064:     value = sum((final_targets[key] for key in base_keys), Fraction())
+ 3065: 
+ 3066:     def rational(number: Fraction) -> dict[str, int]:
+ 3067:         return {"numerator": number.numerator, "denominator": number.denominator}
+ 3068: 
+ 3069:     labelled_keys = {
+ 3070:         "base": base_keys,
+ 3071:         "partition": atom_keys,
+ 3072:         "recipients": recipients,
+ 3073:         "total": _fact_key(total),
+ 3074:         **(
+ 3075:             {"numerator": _fact_key(growth[0]), "denominator": _fact_key(growth[1])}
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:3180-3192
+ 3180:         for operand in reference.value_operands[3:]
+ 3181:     )
+ 3182:     ratio = _validated_growth_ratio(reference, total, *growth) if growth else 1.0
+ 3183:     value = (base_value + increment) * ratio
+ 3184:     if not math.isfinite(value):
+ 3185:         raise ValueError(
+ 3186:             f"Ledger target reference {reference.name!r}: allocation produced nonfinite value."
+ 3187:         )
+ 3188:     labelled_keys = {
+ 3189:         "base": sorted(_fact_key(fact) for fact in base),
+ 3190:         "partition": sorted(_fact_key(fact) for fact in atoms),
+ 3191:         "recipients": sorted(recipients),
+ 3192:         "total": _fact_key(total),
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:4260-4275
+ 4260: ) -> tuple[object, ...]:
+ 4261:     """Resolve the window from the selector and each operand exactly once.
+ 4262: 
+ 4263:     The window's two years come from the reference's own series, as for
+ 4264:     ``calendar_year_window``. The numerator and denominator are complete
+ 4265:     selectors over every fact the compile was given, each pinned at its own
+ 4266:     period, and each must match exactly its declared number of facts (one
+ 4267:     unless ``expected_member_count`` says otherwise), which it sums.
+ 4268:     """
+ 4269: 
+ 4270:     resolved = list(
+ 4271:         _resolve_calendar_year_window_reference_facts(reference, eligible_matches)
+ 4272:     )
+ 4273:     for operand, selector in zip(
+ 4274:         reference.value_operands[1:],
+ 4275:         _window_ratio_operand_selectors(reference),
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:4323-4333
+ 4323:     to its table, drops out of the identity. A selector that names
+ 4324:     several series (a list-valued ``source_concept``, ``source_measure_id`` or
+ 4325:     ``source_table``) resolves both years of every one of them, so the window
+ 4326:     of a sum of series is the sum of the windowed series; a series short of a
+ 4327:     year refuses the whole window.
+ 4328:     """
+ 4329: 
+ 4330:     target_year = _calendar_year_from_reference(reference)
+ 4331:     wanted = {target_year + offset for offset in CALENDAR_YEAR_WINDOW_WEIGHTS}
+ 4332:     for map_key, parse_map in (
+ 4333:         (SOURCE_MEASURE_ID_BY_OPENING_YEAR, _measure_id_by_opening_year),
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:5855-5874
+ 5855: def _ledger_metadata(fact: object, *, fact_key: str) -> dict[str, str]:
+ 5856:     metadata = {
+ 5857:         "ledger_source": "policyengine-ledger-data",
+ 5858:         "ledger_fact_key": fact_key,
+ 5859:         "ledger_source_record_id": _source_record_id(fact),
+ 5860:         "ledger_aggregate_fact_key": _str_at(fact, "aggregate_fact_key"),
+ 5861:         "ledger_semantic_fact_key": _str_at(fact, "semantic_fact_key"),
+ 5862:         "ledger_legacy_fact_key": _str_at(fact, "legacy_fact_key"),
+ 5863:         "ledger_observed_measure_key": _str_at(fact, "observed_measure_key"),
+ 5864:         "ledger_dimension_set_key": _str_at(fact, "dimension_set_key"),
+ 5865:         "ledger_universe_constraint_set_key": _str_at(
+ 5866:             fact, "universe_constraint_set_key"
+ 5867:         ),
+ 5868:         "ledger_measure_concept": _primary_measure_concept(fact),
+ 5869:         "ledger_measure_unit": _str_at(fact, "measure", "unit")
+ 5870:         or _str_at(fact, "observed_measure", "unit"),
+ 5871:         "ledger_source_concept": _source_measure_concept(fact),
+ 5872:         "ledger_concept_relation": _str_at(fact, "measure", "concept_relation")
+ 5873:         or _str_at(fact, "concept_alignment", "relation"),
+ 5874:         "ledger_concept_authority": _str_at(fact, "measure", "concept_authority")
+
+inputs/microcosm-0ff293b/packages/microcosm-build/src/microcosm/build/ledger_targets.py:5911-5918
+ 5911:     constraint_rows = _constraint_rows(fact)
+ 5912:     if constraint_rows:
+ 5913:         metadata["ledger_universe_constraint_count"] = str(len(constraint_rows))
+ 5914:     dimensions = _dimensions(fact)
+ 5915:     for key, value in sorted(dimensions.items()):
+ 5916:         if value is not None:
+ 5917:             metadata[f"ledger_filter_{key}"] = str(value)
+ 5918:     for key, value in sorted(_constraint_bound_filters(fact, dimensions).items()):
+
+inputs/microcosm-0ff293b/packages/microcosm-calibrate/src/microcosm/calibrate/registry.py:144-150
+  144:         if not isinstance(self.metadata, Mapping):
+  145:             raise TypeError(
+  146:                 f"TargetSpec {self.name!r}: metadata must be a mapping from "
+  147:                 f"str to str, got {type(self.metadata).__name__}."
+  148:             )
+  149:         metadata = {str(key): str(value) for key, value in self.metadata.items()}
+  150:         object.__setattr__(self, "metadata", metadata)
+
+inputs/microcosm-0ff293b/tools/generate_uk_target_references.py:1113-1120
+ 1113:             "signed_rationale": (
+ 1114:                 "The FY2024-25 individual CGT observations fan out five ways "
+ 1115:                 "(microcosm#725, #467, #1014): Table 6 age bands as dimension "
+ 1116:                 "rows (the 0-15 band and the all-ages total are signed out row "
+ 1117:                 "by row), Table 5 country/region cells over the twelve-area "
+ 1118:                 "region tier restated on the individuals basis by the Table 1 "
+ 1119:                 "share through the scaled_by_ratio operation, Table 2.1a "
+ 1120:                 "size-of-gain bands under the incumbent banded names (the "
+
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:539-641
+  539: // Whether a target's hierarchy lists the group-by pair its Chronicle fields
+  540: // carry. A listed pair shows that every fact of the target's identity shares
+  541: // it; an omitted pair shows nothing. _calibration_hierarchy builds the
+  542: // hierarchy from the identity facts (ledger_targets.py:1096-1100 at 0ff293b),
+  543: // and _inherited_dimensions (:1578-1611) lists a pair only when every fact's
+  544: // ordinary dimensions share it (_common_dimensions, :1614-1623) or every
+  545: // fact's layout carries the same group-by pair (_constant_text, :1649-1651).
+  546: // The label validator reads a fact's group-by pair as one of its dimensions
+  547: // (:1486-1490), but _inherited_dimensions does not, so two facts that both
+  548: // describe one value, one in its dimensions and one in its layout, leave it
+  549: // out of the hierarchy.
+  550: function hierarchyListsGroupBy(row: TargetRow, chronicle: JsonObject): boolean {
+  551:   const groupBy = stringValue(chronicle.layout_groupby_dimension)?.trim();
+  552:   const value = stringValue(chronicle.layout_groupby_value_id)?.trim();
+  553:   if (row.dimension_adapter !== "hierarchy" || !groupBy || !value) return false;
+  554:   const dimensions = Array.isArray(row.target_dimensions) ? row.target_dimensions : [];
+  555:   return dimensions.some((dimension) => {
+  556:     const listed = asObject(dimension);
+  557:     return listed.key === groupBy && listed.value_id === value;
+  558:   });
+  559: }
+  560: 
+  561: // What a multi-fact target's fields establish about the group-by pair its
+  562: // Chronicle fields carry: "shared" when its identity is one fact or its
+  563: // hierarchy lists the pair, so every identity fact shares it; "unlisted" when
+  564: // its identity spans several facts and its hierarchy leaves the pair out, which
+  565: // does not show whether the facts share it; null when it carries no pair or
+  566: // has no hierarchy to read.
+  567: function groupByAcrossIdentity(
+  568:   row: TargetRow,
+  569:   chronicle: JsonObject,
+  570:   oneFact: boolean,
+  571: ): "shared" | "unlisted" | null {
+  572:   if (
+  573:     !stringValue(chronicle.layout_groupby_dimension) ||
+  574:     !stringValue(chronicle.layout_groupby_value_id)
+  575:   ) {
+  576:     return null;
+  577:   }
+  578:   if (oneFact || hierarchyListsGroupBy(row, chronicle)) return "shared";
+  579:   return row.dimension_adapter === "hierarchy" ? "unlisted" : null;
+  580: }
+  581: 
+  582: // The Chronicle fields a page shows for a target. Microcosm stamps a target's
+  583: // single-fact fields from one representative fact (ledger_targets.py:1085-1090
+  584: // at 0ff293b). A target built from several facts also lists every one of them,
+  585: // ratio operands included, in ledger_member_fact_count and
+  586: // ledger_member_fact_keys (_multi_fact_reference_metadata, :1318-1341). Its
+  587: // identity depends on its value operation (identity_facts, :1018-1035):
+  588: // - scaled_by_ratio: the representative alone, the base cell that its
+  589: //   numerator and denominator translate;
+  590: // - rolled_forward_by_ratio: its base cells, which ledger_value_base_cells
+  591: //   counts (:1174);
+  592: // - allocated_residual_by_ratio: the cells its selector matches, the base its
+  593: //   ledger_allocation_receipt lists;
+  594: // - calendar_year_window_scaled_by_ratio: its window, two years of each
+  595: //   series (:4270-4272, :4331);
+  596: // - any other operation: every fact.
+  597: // For the first three operations the representative is the first base cell
+  598: // (_value_representative_fact, :1232-1245), so an identity of one fact is the
+  599: // representative. For any other multi-fact operation it is the fact of the
+  600: // latest period, the last in the tuple on a tie, taken from the window for
+  601: // calendar_year_window_scaled_by_ratio (:1012-1016). A target whose identity
+  602: // is one fact shows its fields as they are, with member_fact_count and
+  603: // member_fact_keys added. An identity of several facts has no one record or
+  604: // fact key, so those read null. Its group-by value shows when its hierarchy
+  605: // lists the pair, because every identity fact then shares it, and reads null
+  606: // otherwise. layout_groupby_unlisted_across_facts says the second: the
+  607: // identity spans several facts and its hierarchy lists no group-by pair the
+  608: // target carries. That does not show that the facts differ in it (see
+  609: // hierarchyListsGroupBy). Nothing Microcosm writes says whether the identity
+  610: // facts share a universe constraint, so its set key and count read null.
+  611: // ledger_aggregation_varying_dimensions cannot settle either question: it
+  612: // compares each fact's ordinary dimensions, ratio operands included, and
+  613: // counts a dimension one fact carries and another lacks as varying (:1323,
+  614: // :1626-1646). The row itself keeps every field, so a comparison still matches
+  615: // it by fact key. A single-fact target's fields show as they are.
+  616: function shownChronicle(row: TargetRow): unknown {
+  617:   const metadata = asObject(row.metadata);
+  618:   const memberFactCount = countOrNull(metadata.ledger_member_fact_count);
+  619:   if (memberFactCount == null || memberFactCount <= 1) return row.chronicle;
+  620:   const chronicle = asObject(row.chronicle);
+  621:   const oneFact = identityIsRepresentative(metadata);
+  622:   const groupBy = groupByAcrossIdentity(row, chronicle, oneFact);
+  623:   const members = {
+  624:     member_fact_count: memberFactCount,
+  625:     member_fact_keys: stringListOrEmpty(metadata.ledger_member_fact_keys),
+  626:     layout_groupby_unlisted_across_facts: groupBy == null ? null : groupBy === "unlisted",
+  627:   };
+  628:   if (oneFact) return { ...chronicle, ...members };
+  629:   return {
+  630:     ...chronicle,
+  631:     ...members,
+  632:     fact_key: null,
+  633:     source_record_id: null,
+  634:     semantic_fact_key: null,
+  635:     aggregate_fact_key: null,
+  636:     legacy_fact_key: null,
+  637:     layout_groupby_value_id: groupBy === "shared" ? chronicle.layout_groupby_value_id : null,
+  638:     universe_constraint_set_key: null,
+  639:     universe_constraint_count: null,
+  640:   };
+  641: }
+
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:1250-1259
+ 1250:   const filterDecomposition = hierarchyIdentity || structuredIdentity
+ 1251:     ? null
+ 1252:     : decomposeTargetFilter(row.filter);
+ 1253:   const dimensionAdapter = hierarchyIdentity
+ 1254:     ? "hierarchy"
+ 1255:     : structuredIdentity
+ 1256:       ? "structured"
+ 1257:       : filterDecomposition
+ 1258:         ? "legacy_filter"
+ 1259:         : "legacy_name";
+
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:1289-1299
+ 1289:   const metadataTargetDimensions =
+ 1290:     hierarchyIdentity?.dimensions ??
+ 1291:     structuredIdentity?.dimensions ??
+ 1292:     filterDecomposition?.dimensions ??
+ 1293:     metadataDimensions(row);
+ 1294:   const targetDimensions =
+ 1295:     metadataTargetDimensions ??
+ 1296:     splitBreakdown(parsed.breakdown).map((value, index) => ({
+ 1297:       key: `dim${index}`,
+ 1298:       label: classifyDimension([value]),
+ 1299:       value,
+
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:3336-3348
+ 3336:   const row = cal.rows.find((candidate) => {
+ 3337:     // A target is found by the record and keys it shows: a target whose
+ 3338:     // identity spans several facts by its own name, not by one member's.
+ 3339:     const chronicle = asObject(shownChronicle(candidate));
+ 3340:     return [
+ 3341:       stringValue(candidate.name),
+ 3342:       stringValue(candidate.base_name),
+ 3343:       stringValue(chronicle.source_record_id),
+ 3344:       stringValue(chronicle.fact_key),
+ 3345:       stringValue(chronicle.semantic_fact_key),
+ 3346:       stringValue(chronicle.aggregate_fact_key),
+ 3347:       stringValue(chronicle.legacy_fact_key),
+ 3348:     ].some((value) => value === target);
+
+inputs/dashboard-836fc66/frontend/packages/calibration-tree/src/latest-artifact.ts:3378-3394
+ 3378: // Whether a target built from several facts lists one of them under this
+ 3379: // key: the key Microcosm lists it under in ledger_member_fact_keys, or any
+ 3380: // record id or key of its representative, which the row keeps.
+ 3381: function listsMemberFact(row: TargetRow, key: string): boolean {
+ 3382:   const shown = asObject(shownChronicle(row));
+ 3383:   const members = Array.isArray(shown.member_fact_keys) ? shown.member_fact_keys : [];
+ 3384:   if (!members.length) return false;
+ 3385:   if (members.includes(key)) return true;
+ 3386:   const representative = asObject(row.chronicle);
+ 3387:   return [
+ 3388:     representative.source_record_id,
+ 3389:     representative.fact_key,
+ 3390:     representative.semantic_fact_key,
+ 3391:     representative.aggregate_fact_key,
+ 3392:     representative.legacy_fact_key,
+ 3393:   ].some((value) => stringValue(value) === key);
+ 3394: }
+
+PR body style scan: no I/we, no bold label leads, no is/are/was/were + participle candidate
+55 `build_fixture.py` said a skipped target leaves the diagnostics. It now adds that the release gate also fails the release when calibration skips a target (`_release_gate_failures`, `tools/build_us_fiscal_refresh_release.py:9398-9399`), and that the gate leaves congressional district targets out of the count unless the build gates them (`:9389-9397`). The `matrix.py` citations that follow now name their file. Rebuilding the fixture with `python3 -I build_fixture.py <the fifteen SOURCES files at 0ff293b>` gives the same bytes: sha256 `037d28028b28b865eb0bacd09bb81285ff7b18e442bcf5e27ec762ae1008459b`.
+Closing nonempty line: 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Body contains Review follow-ups: True
+All mechanism citations available except external fixture-build sources:
+**/build_us_fiscal_refresh_release.py []
+**/matrix.py []

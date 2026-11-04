@@ -1,0 +1,12 @@
+bun test v1.3.12 (700fc117)
+
+work/tests-properties/new-front/target-row-labels.test.ts:
+(pass) the targets page's Dimensions column > a several-fact target whose hierarchy leaves out its group-by combines several source cells [17.36ms]
+(pass) the targets page's Dimensions column > a target whose facts share an unlisted group-by value names no varying dimension [0.37ms]
+(pass) the targets page's Dimensions column > the dimensions its hierarchy lists come first, and no dimension is named as varying [0.03ms]
+(pass) the targets page's Dimensions column > a target whose group-by value reads all, or that has none, says All [0.03ms]
+
+ 4 pass
+ 0 fail
+ 10 expect() calls
+Ran 4 tests across 1 file. [1122.00ms]

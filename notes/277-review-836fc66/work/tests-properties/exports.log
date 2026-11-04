@@ -1,0 +1,13 @@
+bun test v1.3.12 (700fc117)
+
+work/tests-properties/exports.test.ts:
+countOrNull: before=true, after=false
+repeatsGeography: before=true, after=false
+computeDimensions: before=true, after=false
+categoryLevels: before=true, after=false
+(pass) four implementation helpers leave the public module [0.12ms]
+
+ 1 pass
+ 0 fail
+ 8 expect() calls
+Ran 1 test across 1 file. [770.00ms]
