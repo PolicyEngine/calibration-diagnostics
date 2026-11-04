@@ -972,7 +972,8 @@ export function releaseSelectOptions(
     {
       value: "",
       label: selectedDefault
-        ? `${defaultLabel} · ${releaseLabel(selectedDefault.release_id, selectedDefault.date)}`
+        ? `${defaultLabel} · ${releaseLabel(selectedDefault.release_id, selectedDefault.date)}` +
+          releaseWithdrawnSuffix(selectedDefault)
         : defaultLabel,
     },
     ...releases.map((r) => ({
