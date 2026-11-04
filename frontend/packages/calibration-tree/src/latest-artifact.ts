@@ -68,8 +68,9 @@ import {
   RELEASES_RECORD_PATH,
   isBuildFolderId,
   isReleaseDirectory,
-  parseReleasesRecordBytes,
   recordedBuilds,
+  releasesRecordFromResponse,
+  type ReleasesRecord,
 } from "./release-record";
 
 // The registry is the registration point; these re-exports keep the server
@@ -142,7 +143,7 @@ export function assertSafeReleaseId(id: string, label = "release"): string {
 }
 
 // A release id, or a build in its own folder (`<release>/<build>`), which is
-// how a country publishing build folders names each build. Each segment
+// how a repository with releases.json names each build. Each segment
 // passes the same allowlist, and nothing longer is accepted.
 export function assertSafeReleaseOrBuildFolderId(id: string, label = "release"): string {
   return isBuildFolderId(id) ? id : assertSafeReleaseId(id, label);
@@ -2465,8 +2466,8 @@ export async function loadReleases(
 // the publisher reads it. Roles are read from the release's own
 // release_manifest.json at its pinned commit, best-effort like the listing's.
 // A build in its own folder (`<release>/<build>`) is listed only from
-// releases.json (loadRecordedReleases); a country that returns to release
-// folders keeps such entries readable by id, but not listed here.
+// releases.json (recordedReleaseInventory), so such entries stay readable by
+// id but are never listed here.
 export async function loadPublishedCutReleases(
   revalidate: number,
   country: MicrocosmCountry,
@@ -2556,26 +2557,36 @@ function compactUtcTimestamp(value: string): string {
 }
 
 /**
- * The release inventory of a country that publishes build folders: every
- * build releases.json lists, named by its folder (`<release>/<build>`),
- * dated by the record's `published_at` and classified by its release's role
- * (the record's default release is the default dataset). releases.json is
- * the only file read from the dataset repository. A build is calibrated
- * (selectable for comparison) once the dashboard manifest holds its tree.
- * Withdrawn builds are listed with their flag: how the picker shows them is
- * not decided here. The dashboard's latest release is listed too while
- * releases.json does not name it (see dashboardLatestRelease).
+ * The country's releases.json at its configured revision, checked as the
+ * release writer checks it, or null when the repository has none (it then
+ * publishes through tags and pointer files) or the release is a local file.
+ * An unreadable or refused record throws: see releasesRecordFromResponse.
  */
-export async function loadRecordedReleases(
+export async function loadReleasesRecord(
   revalidate: number,
   country: MicrocosmCountry,
+): Promise<ReleasesRecord | null> {
+  if (await loadLocalCalibrationRelease(country)) return null;
+  return releasesRecordFromResponse(
+    await hfFetch(hfResolveUrl(RELEASES_RECORD_PATH, country), revalidate),
+  );
+}
+
+/**
+ * The release inventory of a repository with releases.json: every build the
+ * record lists, named by its folder (`<release>/<build>`), dated by the
+ * record's `published_at` and classified by its release's role (the record's
+ * default release is the default dataset). A build is calibrated (selectable
+ * for comparison) once the dashboard manifest holds its tree. Withdrawn
+ * builds are listed with their flag, and the picker labels them. The
+ * dashboard's latest release is listed too while releases.json does not
+ * name it (see dashboardLatestRelease).
+ */
+export function recordedReleaseInventory(
+  record: ReleasesRecord,
+  country: MicrocosmCountry,
   manifest: CalibrationTreeManifest,
-): Promise<ReleaseEntry[]> {
-  if (await loadLocalCalibrationRelease(country)) return loadReleases(revalidate, country);
-  const url = hfResolveUrl(RELEASES_RECORD_PATH, country);
-  const response = await hfFetch(url, revalidate);
-  if (!response.ok) throw new Error(`HF fetch failed ${response.status}: ${url}`);
-  const record = parseReleasesRecordBytes(new Uint8Array(await response.arrayBuffer()));
+): ReleaseEntry[] {
   const published = new Set(
     (manifest.countries[country]?.builds ?? []).flatMap((build) =>
       build.kind === "release" && build.releaseId ? [build.releaseId] : []
@@ -2597,6 +2608,21 @@ export async function loadRecordedReleases(
     ...recorded,
     ...(latest && !recordedIds.has(latest.release_id) ? [latest] : []),
   ].sort((left, right) => releaseSortKey(right.date) - releaseSortKey(left.date));
+}
+
+/**
+ * The release inventory from releases.json (recordedReleaseInventory), or
+ * null when the repository has no releases.json, so the caller lists its
+ * release folders and tagged builds instead. releases.json is the only file
+ * read from the dataset repository.
+ */
+export async function loadRecordedReleases(
+  revalidate: number,
+  country: MicrocosmCountry,
+  manifest: CalibrationTreeManifest,
+): Promise<ReleaseEntry[] | null> {
+  const record = await loadReleasesRecord(revalidate, country);
+  return record ? recordedReleaseInventory(record, country, manifest) : null;
 }
 
 /**

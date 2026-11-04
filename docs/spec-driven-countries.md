@@ -8,11 +8,12 @@ Face commit and reads `releases/<folder>/calibration_diagnostics.json`: the
 release's own folder, or its line's folder for a Microcosm cut tag (see
 [the release lines note](calibration-tree-artifacts.md#microcosm-release-lines)).
 The country's current release comes from `latest.json` unless the registration
-names another pointer file in `pointer_path`. A registration with
-`release_layout: "build_folders"` (the UK) reads neither: each build is in
-`releases/<release>/<build>/`, and `releases.json` alone names the builds and
-the current one (see
+names another pointer file in `pointer_path`. A dataset repository with a root
+`releases.json` reads neither: each build is in `releases/<release>/<build>/`,
+and `releases.json` alone names the builds and the current one (see
 [the build folders note](calibration-tree-artifacts.md#build-folders-and-releasesjson)).
+The readers look for that file in every repository; the registration does not
+name the layout.
 `build_manifest.json`,
 `release_manifest.json`, and `demographics.json` are optional enrichments. The
 diagnostics artifact owns fit values and target metadata; the build manifest owns

@@ -6,6 +6,11 @@
 //   releases/<release>/<build>/release_manifest.json
 //   releases/<release>/<build>/...
 //
+// Every reader finds the layout this way: a repository with releases.json is
+// read from it and its build folders only; a repository without one is read
+// from its tags and pointer files (`latest*.json`). No country registration
+// names the layout, so a repository's switch needs no dashboard change.
+//
 // The record's shape and rules are microcosm-emitter's
 // `microcosm_emitter_interface.releases` (microcosm-emitter#24), whose release
 // writer is the only program that changes the file. This module reads the
@@ -164,6 +169,34 @@ export function parseReleasesRecordBytes(bytes: Uint8Array): ReleasesRecord {
     refuse(`${RELEASES_RECORD_PATH} is not a readable JSON document.`);
   }
   return parseReleasesRecord(parsed);
+}
+
+// Hugging Face's error codes for a 404 that is not about the file: the
+// repository or the revision is missing (or unreadable with this token).
+const MISSING_REPOSITORY_OR_REVISION = new Set(["RepoNotFound", "RevisionNotFound"]);
+
+/**
+ * Read Hugging Face's answer to a request for releases.json: the record,
+ * checked as parseReleasesRecordBytes checks it, or null when the repository
+ * has no releases.json at that revision. Only a 404 means "no record", and
+ * only when Hugging Face's error code (`X-Error-Code`) does not say that the
+ * repository or the revision is missing. Any other failure throws, so a
+ * reader never falls back to tags or pointer files because of it.
+ */
+export async function releasesRecordFromResponse(
+  response: Response,
+): Promise<ReleasesRecord | null> {
+  const errorCode = response.headers.get("x-error-code");
+  if (response.status === 404 && (errorCode == null || !MISSING_REPOSITORY_OR_REVISION.has(errorCode))) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(
+      `Hugging Face returned ${response.status}${errorCode ? ` (${errorCode})` : ""} ` +
+        `for ${RELEASES_RECORD_PATH}.`,
+    );
+  }
+  return parseReleasesRecordBytes(new Uint8Array(await response.arrayBuffer()));
 }
 
 /** A build's folder under `releases/`, which identifies it: `<release>/<build>`. */

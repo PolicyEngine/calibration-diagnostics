@@ -29,10 +29,8 @@ import {
 import type { CalibrationTreeSourceArtifact } from "./calibration-tree-artifact";
 import {
   countryRegistration,
-  countryReleaseLayout,
   resolveRegisteredStagingRepository,
   stagingLocalAreaPipelines,
-  type ReleaseLayout,
   type RepositoryEnvironment,
   type ResolvedRepository,
 } from "./countries";
@@ -1296,9 +1294,10 @@ export async function stagingRunPipelineId(
 
 /**
  * The most recently published release build whose release is local-area, by
- * the dataset roles `releases` carries (read from each release manifest, as
- * the release picker reads them) and the publication time the dashboard
- * manifest records.
+ * the dataset roles `releases` carries (read from releases.json, or from each
+ * release manifest, as the release picker reads them) and the publication
+ * time the dashboard manifest records. A build releases.json marks withdrawn
+ * is never chosen.
  */
 export function newestPublishedLocalAreaRelease(
   manifest: CalibrationTreeManifest,
@@ -1306,7 +1305,9 @@ export function newestPublishedLocalAreaRelease(
   releases: readonly ReleaseEntry[],
 ): CalibrationTreeManifestEntry | null {
   const localAreaReleases = new Set(
-    releases.filter((release) => release.is_local_area).map((release) => release.release_id),
+    releases
+      .filter((release) => release.is_local_area && release.withdrawn !== true)
+      .map((release) => release.release_id),
   );
   const builds = (manifest.countries[country]?.builds ?? []).filter(
     (build) =>
@@ -1319,19 +1320,18 @@ export function newestPublishedLocalAreaRelease(
 
 /**
  * The releases a local-area Staging candidate may be compared with, with
- * their roles. A country publishing build folders lists the builds
- * releases.json names and nothing else; one publishing release folders lists
- * the folders on main and its published tagged builds.
+ * their roles. A repository with releases.json lists the builds it names and
+ * nothing else; one without lists the folders on main and its published
+ * tagged builds. A releases.json that cannot be read or is refused throws,
+ * so the candidate gets no baseline.
  */
 export async function stagingBaselineReleases(
   revalidate: number,
   country: MicrocosmCountry,
   manifest: CalibrationTreeManifest,
-  layout: ReleaseLayout = countryReleaseLayout(country),
 ): Promise<ReleaseEntry[]> {
-  if (layout === "build_folders") {
-    return loadRecordedReleases(revalidate, country, manifest);
-  }
+  const recorded = await loadRecordedReleases(revalidate, country, manifest);
+  if (recorded) return recorded;
   // The published tagged builds are the ones the folder listing cannot name.
   const folders = await loadReleases(revalidate, country);
   const tagged = await loadPublishedCutReleases(revalidate, country, manifest, folders);

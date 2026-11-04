@@ -953,6 +953,12 @@ export function releaseRoleSuffix(entry: MicrocosmReleaseEntry): string {
   return "";
 }
 
+// A build releases.json marks withdrawn stays listed and selectable, labelled
+// so that nobody takes it for a build in use.
+export function releaseWithdrawnSuffix(entry: MicrocosmReleaseEntry): string {
+  return entry.withdrawn ? " · Withdrawn" : "";
+}
+
 // The empty selection follows the dashboard manifest; explicit ids remain
 // historical release selections.
 export function releaseSelectOptions(
@@ -971,7 +977,7 @@ export function releaseSelectOptions(
     },
     ...releases.map((r) => ({
       value: r.release_id,
-      label: `${releaseLabel(r.release_id, r.date)}${releaseRoleSuffix(r)}`,
+      label: `${releaseLabel(r.release_id, r.date)}${releaseRoleSuffix(r)}${releaseWithdrawnSuffix(r)}`,
     })),
   ];
 }

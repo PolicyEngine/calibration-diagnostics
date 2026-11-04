@@ -34,11 +34,9 @@ import {
 import {
   countryPointerPath,
   countryRegistration,
-  countryReleaseLayout,
   isCountry,
   selectableCountries,
   type MicrocosmCountry,
-  type ReleaseLayout,
 } from "./countries";
 import { parseReleaseCutTag } from "./release-cut";
 import {
@@ -47,9 +45,9 @@ import {
   currentDefaultBuild,
   isBuildFolderId,
   isReleaseDirectory,
-  parseReleasesRecordBytes,
   recordedBuilds,
   releaseManifestNamesBuild,
+  releasesRecordFromResponse,
   type RecordedBuild,
   type ReleasesRecord,
 } from "./release-record";
@@ -731,28 +729,42 @@ async function enumerateReleaseCandidates(
 
 // -- Build folders and releases.json ----------------------------------------
 //
-// A country whose registration says `release_layout: "build_folders"`
+// A dataset repository with a root `releases.json` (microcosm-emitter#24)
 // publishes each build in `releases/<release>/<build>/`, never changed after
-// publishing, and lists every build and each release's current build in the
-// root `releases.json` (microcosm-emitter#24). Its builds are read from that
-// record alone: no tags, no pointer files, no listing of `releases/`. A
-// build's release id in the dashboard manifest is its folder,
-// `<release>/<build>`.
+// publishing, and lists every build and each release's current build in that
+// record. Its builds are read from the record alone: no tags, no pointer
+// files, no listing of `releases/`. A repository without `releases.json` is
+// read from its tags and pointer files, as before. Which applies is read
+// from the repository at the commit being published, never from the
+// country's registration. A build's release id in the dashboard manifest is
+// its folder, `<release>/<build>`.
 
-/** `releases.json` at an exact commit, checked as the release writer checks it. */
+/**
+ * `releases.json` at an exact commit, checked as the release writer checks
+ * it, or null when the repository has none there. Hugging Face's 404 for the
+ * file is the only "none"; any other failure, and a record the writer would
+ * refuse, throws (releasesRecordFromResponse).
+ */
 async function readReleasesRecord(
   country: MicrocosmCountry,
   commitSha: string,
-): Promise<ReleasesRecord> {
+): Promise<ReleasesRecord | null> {
   const response = await fetch(sourceUrl(country, commitSha, RELEASES_RECORD_PATH), {
     headers: hfHeaders(),
     cache: "no-store",
     signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) {
-    throw new Error(`Hugging Face returned ${response.status} for ${RELEASES_RECORD_PATH}.`);
+  return releasesRecordFromResponse(response);
+}
+
+function requireReleasesRecord(
+  country: MicrocosmCountry,
+  record: ReleasesRecord | null,
+): ReleasesRecord {
+  if (!record) {
+    throw new Error(`${country}'s dataset repository has no ${RELEASES_RECORD_PATH}.`);
   }
-  return parseReleasesRecordBytes(new Uint8Array(await response.arrayBuffer()));
+  return record;
 }
 
 // The record's `published_at`, as the dashboard manifest's RFC 3339 form.
@@ -825,14 +837,13 @@ function publishedRecordedBuild(
 async function enumerateRecordedBuildCandidates(
   country: MicrocosmCountry,
   manifest: CalibrationTreeManifest,
+  record: ReleasesRecord,
+  headSha: string,
 ): Promise<{
   candidates: ReleaseCandidate[];
   ineligible: ReconciliationOutcome[];
   failed: ReconciliationOutcome[];
-  record: ReleasesRecord;
 }> {
-  const headSha = await resolveHfRevisionSha(country, microcosmRevision(country), 0);
-  const record = await readReleasesRecord(country, headSha);
   const candidates: ReleaseCandidate[] = [];
   const ineligible: ReconciliationOutcome[] = [];
   // A build whose folder or release manifest cannot be read fails on its
@@ -868,7 +879,7 @@ async function enumerateRecordedBuildCandidates(
       });
     }
   }
-  return { candidates, ineligible, failed, record };
+  return { candidates, ineligible, failed };
 }
 
 async function selectRecordedBuild(
@@ -910,10 +921,17 @@ export async function readRecordedCurrentBuild(
   expectedSourceSha?: string,
   manifest?: CalibrationTreeManifest,
 ): Promise<Required<ReleaseCandidate>> {
-  const revisionSha = expectedSourceSha
-    ? exactCommitSha(expectedSourceSha, "Source revision")
-    : await resolveHfRevisionSha(country, microcosmRevision(country), 0);
-  const record = await readReleasesRecord(country, revisionSha);
+  const revisionSha = await publicationRevisionSha(country, expectedSourceSha);
+  const record = requireReleasesRecord(country, await readReleasesRecord(country, revisionSha));
+  return recordedCurrentBuild(country, record, revisionSha, manifest);
+}
+
+function recordedCurrentBuild(
+  country: MicrocosmCountry,
+  record: ReleasesRecord,
+  revisionSha: string,
+  manifest?: CalibrationTreeManifest,
+): Promise<Required<ReleaseCandidate>> {
   return selectRecordedBuild(
     country,
     record,
@@ -921,6 +939,17 @@ export async function readRecordedCurrentBuild(
     revisionSha,
     manifest,
   );
+}
+
+// The exact commit a publication reads: the one given, or the head of the
+// country's configured revision.
+async function publicationRevisionSha(
+  country: MicrocosmCountry,
+  expectedSourceSha?: string,
+): Promise<string> {
+  return expectedSourceSha
+    ? exactCommitSha(expectedSourceSha, "Source revision")
+    : resolveHfRevisionSha(country, microcosmRevision(country), 0);
 }
 
 /** The folder a tag publishes from, for the single-release modes. */
@@ -1154,10 +1183,11 @@ async function promoteIfCurrent(
   candidate: Awaited<ReturnType<typeof publishRelease>>,
   entry: CalibrationTreeManifestEntry,
   blobToken: string,
-  layout: ReleaseLayout,
 ): Promise<boolean> {
-  const latest = layout === "build_folders"
-    ? await readRecordedCurrentBuild(country)
+  const headSha = await publicationRevisionSha(country);
+  const record = await readReleasesRecord(country, headSha);
+  const latest = record
+    ? await recordedCurrentBuild(country, record, headSha)
     : await readUpstreamLatest(country);
   if (
     latest.releaseId !== candidate.bundle.index.build.releaseId ||
@@ -1477,15 +1507,19 @@ export async function reconcileReleaseBuilds(
   blobToken: string,
   dryRun: boolean,
   store: CalibrationManifestStore = blobCalibrationManifestStore(country, blobToken),
-  layout: ReleaseLayout = countryReleaseLayout(country),
 ): Promise<ReconciliationReport> {
   let manifest = await store.readManifest();
-  // Build folders: every build releases.json lists. Entries published from
-  // tags or release folders stay in the manifest as they are, still
-  // readable, and are not reconciled again.
-  const inventory = layout === "build_folders"
-    ? await enumerateRecordedBuildCandidates(country, manifest)
-    : { ...(await enumerateReleaseCandidates(country, manifest)), record: null };
+  // releases.json at main's head decides the inventory. A repository with it
+  // reconciles every build it lists; entries published from tags or release
+  // folders stay in the manifest as they are, still readable, and are not
+  // reconciled again. A repository without it reconciles its release folders
+  // and tags. A record that cannot be read or is refused stops the run here,
+  // before anything is published or the latest release is moved.
+  const headSha = await publicationRevisionSha(country);
+  const record = await readReleasesRecord(country, headSha);
+  const inventory = record
+    ? await enumerateRecordedBuildCandidates(country, manifest, record, headSha)
+    : await enumerateReleaseCandidates(country, manifest);
   let blobs = await store.listBlobs();
   const outcomes = [...inventory.ineligible, ...inventory.failed];
 
@@ -1585,7 +1619,6 @@ export async function reconcileReleaseBuilds(
   const failedReleaseIds = new Set(
     outcomes.filter((outcome) => outcome.status === "failed").map((outcome) => outcome.sourceId),
   );
-  const { record } = inventory;
   const latestReleaseFailure = await selectLatestRelease(
     country,
     manifest,
@@ -1785,35 +1818,28 @@ export function reconciliationFailureMessage(report: ReconciliationReport): stri
 export interface PublisherDependencies {
   /** The manifest and Blob store the reconciliation and migration modes use. */
   store?: CalibrationManifestStore;
-  /** How the country publishes releases; defaults to its registration. */
-  releaseLayout?: ReleaseLayout;
 }
 
-// `--latest` and `--release <release>/<build>` under build folders: the build
-// releases.json at `revisionSha` (or the head of the configured revision)
-// lists, pinned to the commit that wrote its folder.
+// `--latest` and `--release <release>/<build>` for a repository with
+// releases.json: the build the record at `revisionSha` lists, pinned to the
+// commit that wrote its folder.
 async function requestedRecordedBuild(
   country: MicrocosmCountry,
   options: PublisherOptions,
+  record: ReleasesRecord,
+  revisionSha: string,
 ): Promise<Required<ReleaseCandidate>> {
   if (options.mode === "latest") {
-    return readRecordedCurrentBuild(country, options.hfCommitSha);
+    return recordedCurrentBuild(country, record, revisionSha);
   }
   const id = releaseOrBuildFolderId(options.releaseId);
   if (!isBuildFolderId(id)) {
     throw new Error(
-      `${country} publishes build folders; --release takes <release>/<build>, not ${id}.`,
+      `${country}'s dataset repository has ${RELEASES_RECORD_PATH}; --release takes ` +
+        `<release>/<build>, not ${id}.`,
     );
   }
-  const revisionSha = options.hfCommitSha
-    ? exactCommitSha(options.hfCommitSha, "Source revision")
-    : await resolveHfRevisionSha(country, microcosmRevision(country), 0);
-  return selectRecordedBuild(
-    country,
-    await readReleasesRecord(country, revisionSha),
-    id,
-    revisionSha,
-  );
+  return selectRecordedBuild(country, record, id, revisionSha);
 }
 
 export async function runPublisher(
@@ -1823,7 +1849,6 @@ export async function runPublisher(
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (!blobToken) throw new Error("BLOB_READ_WRITE_TOKEN is required.");
   const store = dependencies.store ?? blobCalibrationManifestStore(options.country, blobToken);
-  const layout = dependencies.releaseLayout ?? countryReleaseLayout(options.country);
 
   if (options.mode === "migrate-release-timestamps") {
     const report = await migrateReleaseTimestamps(
@@ -1862,7 +1887,6 @@ export async function runPublisher(
       blobToken,
       options.dryRun === true,
       store,
-      layout,
     );
     console.log(JSON.stringify(report));
     const failure = reconciliationFailureMessage(report);
@@ -1870,18 +1894,20 @@ export async function runPublisher(
     return;
   }
 
-  if (
-    layout === "release_folders" &&
-    options.mode === "release" &&
-    isBuildFolderId(options.releaseId)
-  ) {
+  // releases.json at the commit being published decides how the release is
+  // read: from the record and its build folders, or, where the repository
+  // has none, from its tags and pointer files.
+  const revisionSha = await publicationRevisionSha(options.country, options.hfCommitSha);
+  const record = await readReleasesRecord(options.country, revisionSha);
+  if (!record && options.mode === "release" && isBuildFolderId(options.releaseId)) {
     throw new Error(
-      `${options.country} publishes release folders; ${options.releaseId} names a build folder.`,
+      `${options.country}'s dataset repository has no ${RELEASES_RECORD_PATH}, so ` +
+        `${options.releaseId} cannot name a build folder.`,
     );
   }
   let published: Awaited<ReturnType<typeof publishRelease>>;
-  if (layout === "build_folders") {
-    const selection = await requestedRecordedBuild(options.country, options);
+  if (record) {
+    const selection = await requestedRecordedBuild(options.country, options, record, revisionSha);
     published = await publishRelease({
       country: options.country,
       id: selection.releaseId,
@@ -1914,7 +1940,6 @@ export async function runPublisher(
     published,
     entry,
     blobToken,
-    layout,
   );
   console.log(JSON.stringify({
     country: options.country,

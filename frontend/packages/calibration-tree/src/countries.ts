@@ -31,19 +31,6 @@ export interface ResolvedRepository {
   revision: string;
 }
 
-// How a country's dataset repository publishes its releases.
-// - `release_folders` (the default): one folder per release,
-//   `releases/<release id>/`, rewritten by each publication. Hugging Face
-//   tags name builds, and a root pointer file (`latest.json`, or
-//   `pointer_path`) names the current release.
-// - `build_folders`: one folder per build, `releases/<release>/<build>/`,
-//   never changed after publishing, and the root `releases.json` is the only
-//   record of each release's builds and current build (microcosm-emitter#24).
-//   The dashboard's readers then read nothing else: no tags, no pointer
-//   files and no listing of `releases/`.
-export const RELEASE_LAYOUTS = ["release_folders", "build_folders"] as const;
-export type ReleaseLayout = (typeof RELEASE_LAYOUTS)[number];
-
 export interface CountryRegistration {
   // Default HF dataset repository and revision (the server may override both
   // through the deployment variables named in repo_env / revision_env).
@@ -51,13 +38,13 @@ export interface CountryRegistration {
   revision: string;
   repo_env?: string;
   revision_env?: string;
-  // Omitted for `release_folders`.
-  release_layout?: ReleaseLayout;
   // The repository-root pointer naming the country's current release:
   // `latest.json` unless the country promotes its default line through a
   // per-line pointer (`latest-<line>.json`, microcosm#823) whose payload also
   // names the immutable tag the release is read at (`cut_tag`). Read only
-  // while the country publishes release folders.
+  // while the dataset repository has no `releases.json`; a repository with
+  // one is read from it and its build folders alone, whatever the
+  // registration says (release-record.ts).
   pointer_path?: string;
   // Country display name ("United States").
   label: string;
@@ -131,16 +118,11 @@ export const COUNTRY_REGISTRY = {
     geography_id: null,
     visibility: "private",
     capabilities: [...CALIBRATION_CAPABILITIES, "staging"],
-    // Microcosm's migration (P1) moves the UK repository to one folder per
-    // build, with releases.json as the only record of what is current; the
-    // dashboard's UK readers then read nothing else. Must not be deployed
-    // before that migration has run.
-    release_layout: "build_folders",
     // microcosm#823: the UK default line is the 2024-25 national dataset,
     // promoted through its own pointer; `latest.json` stays on the June 2023
-    // release and is never moved. Unread while release_layout is
-    // build_folders. Kept until Microcosm deletes the pointer files (P5), so
-    // removing release_layout returns the UK to the release-folder readers.
+    // release and is never moved. Unread once the repository has
+    // releases.json: Microcosm's switch writes it and deletes the pointer
+    // files in one commit.
     pointer_path: "latest-national.json",
     staging: {
       repo: "policyengine/populace-uk-staging",
@@ -210,10 +192,6 @@ export function isCountry(value: string | null | undefined): value is MicrocosmC
 
 export function countryRegistration(country: MicrocosmCountry): CountryRegistration {
   return COUNTRY_REGISTRY[country];
-}
-
-export function countryReleaseLayout(country: MicrocosmCountry): ReleaseLayout {
-  return countryRegistration(country).release_layout ?? "release_folders";
 }
 
 // A registered country the dashboard offers: every registration except the
