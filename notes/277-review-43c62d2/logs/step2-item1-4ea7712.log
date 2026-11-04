@@ -1,0 +1,85 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/microcosm/statistic-groups.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './statistic-groups' from '/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/lib/microcosm/statistic-groups.test.ts'
+-------------------------------
+
+
+packages/calibration-tree/src/ed-fsa-family.test.ts:
+459 | 
+460 |       const variable = page.variables.find((candidate) =>
+461 |         candidate.variable_key === variableKey(category)
+462 |       )!;
+463 |       expect(variable.n_targets).toBe(BANDS_PER_MEASURE + STATE_COUNT);
+464 |       expect(variable.levels).toEqual([UNITED_STATES.level, "state"]);
+                                    ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "country",
+-   "state",
+- ]
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:464:31)
+(fail) the ED Federal Student Aid target family > a category at two levels is listed at both [143.38ms]
+693 |     const unchanged = buildComparison(release, release);
+694 |     for (const category of MIXED_CATEGORIES) {
+695 |       const first = unchanged.rows.find((row) => row.variable_key === variableKey(category))!;
+696 |       expect([first.level, first.breakdown]).toEqual([UNITED_STATES.level, AGE.values[0]]);
+697 |     }
+698 |     expect(levelsOf(unchanged)).toEqual(expected);
+                                      ^
+error: expect(received).toEqual(expected)
+
+@@ -2,14 +2,8 @@
+    "ed_fsa / ed_fsa.federal_student_loan_balance · total": [
+-     null,
+-     [
+-       "country",
+-       "state",
+-     ],
++     "country",
++     undefined,
+    ],
+    "ed_fsa / ed_fsa.federal_student_loan_borrowers · count": [
+-     null,
+-     [
+-       "country",
+-       "state",
+-     ],
++     "country",
++     undefined,
+    ],
+@@ -17,5 +11,3 @@
+      "country",
+-     [
+-       "country",
+-     ],
++     undefined,
+    ],
+@@ -23,5 +15,3 @@
+      "country",
+-     [
+-       "country",
+-     ],
++     undefined,
+    ],
+
+- Expected  - 16
++ Received  + 6
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:698:33)
+(fail) the ED Federal Student Aid target family > a compared category at two levels reports both, whichever row's fit changed most [2.85ms]
+
+ 11 pass
+ 3 fail
+ 1 error
+ 305 expect() calls
+Ran 14 tests across 2 files. [361.00ms]

@@ -1,0 +1,29 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/calibration-tree/src/ed-fsa-family.test.ts:
+804 |       universe_constraint_count: 1,
+805 |     });
+806 | 
+807 |     // A single-fact target lists no member facts.
+808 |     const alabamaFields = investigate(`${ALABAMA_BALANCE}@2024`).target.chronicle as unknown as Row;
+809 |     expect([alabamaFields.member_fact_count, alabamaFields.member_fact_keys]).toEqual([null, []]);
+                                                                                    ^
+error: expect(received).toEqual(expected)
+
+  [
+-   null,
+-   [],
++   undefined,
++   undefined,
+  ]
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:809:79)
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [2.37ms]
+
+ 12 pass
+ 1 fail
+ 311 expect() calls
+Ran 13 tests across 1 file. [210.00ms]

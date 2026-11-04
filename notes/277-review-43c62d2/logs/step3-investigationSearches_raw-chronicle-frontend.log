@@ -1,0 +1,45 @@
+bun test v1.4.4 (38afee6c8)
+
+app/api/hf-webhook/route.test.ts:
+Calibration tree workflow dispatch failed: 82 |       signal: AbortSignal.timeout(15_000),
+83 |     },
+84 |   );
+85 |   if (response.status !== 204) {
+86 |     const body = await response.text();
+87 |     throw new Error(
+                   ^
+error: GitHub workflow dispatch returned 403: forbidden
+      at dispatchTreeBuild (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:87:15)
+      at async handleHfWebhook (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:166:15)
+      at async <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/app/api/hf-webhook/route.test.ts:296:78)
+
+
+packages/calibration-tree/src/ed-fsa-family.test.ts:
+872 |     });
+873 |     // Its code searches look for each member fact, not the representative.
+874 |     const searches = (detail as unknown as { repo_searches: { label: string; query: string }[] })
+875 |       .repo_searches;
+876 |     expect(searches.filter((search) => search.label === "Member fact").map((search) => search.query))
+877 |       .toEqual(members.map((key) => `"${key}"`));
+             ^
+error: expect(received).toEqual(expected)
+
+- [
+-   ""ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773"",
+-   ""ledger.aggregate_fact.v2:03542cb6ea94cc4d451dae21"",
+-   ""ledger.aggregate_fact.v2:c74dd5a906d888e92730f481"",
+-   ""ledger.aggregate_fact.v2:afb20adc68e6319988a8cf24"",
+-   ""ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef"",
+- ]
++ []
+
+- Expected  - 7
++ Received  + 1
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:877:8)
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [3.15ms]
+
+ 868 pass
+ 1 fail
+ 21945 expect() calls
+Ran 869 tests across 101 files. [35.62s]

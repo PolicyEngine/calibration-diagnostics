@@ -1,0 +1,46 @@
+== base
+{
+ "target": "ed_fsa.portfolio_by_location.2026_03_31.al.dollars_outstanding",
+ "shown": {
+  "source_record_id": "ed_fsa.portfolio_by_location.2026_03_31.al.dollars_outstanding",
+  "fact_key": "ledger.aggregate_fact.v2:a0011046b3023d61a3b35832",
+  "layout_groupby_value_id": "al",
+  "universe_constraint_set_key": "ledger.universe_constraint_set.v2:8b5d381ca57e5b7d384c8607"
+ },
+ "lookup_by_source_record_id": "found",
+ "lookup_by_fact_key": "found",
+ "searches": [
+  "Source record",
+  "Fact key",
+  "Semantic fact",
+  "Legacy fact",
+  "Record set",
+  "Measure concept",
+  "Source concept",
+  "Source measure",
+  "Variable"
+ ]
+}
+== head
+{
+ "target": "ed_fsa.portfolio_by_location.2026_03_31.al.dollars_outstanding",
+ "shown": {
+  "source_record_id": null,
+  "fact_key": null,
+  "layout_groupby_value_id": null,
+  "universe_constraint_set_key": null,
+  "member_fact_count": 3
+ },
+ "lookup_by_source_record_id": "found",
+ "lookup_by_fact_key": "not found",
+ "searches": [
+  "Member fact",
+  "Member fact",
+  "Member fact",
+  "Record set",
+  "Measure concept",
+  "Source concept",
+  "Source measure",
+  "Variable"
+ ]
+}

@@ -1,0 +1,279 @@
+## FSA-ed-fsa-family-schema-8: 1590 differing values
+      30  calibration_rows.[*].chronicle.universe_constraint_count
+          e.g. [102, "chronicle", "universe_constraint_count"]: null -> 1
+       2  comparison_self.variables.[*].level
+          e.g. ["variables", 0, "level"]: "country" -> null
+       4  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["country", "state"]
+       4  investigations.{key}.available
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "available"]: true -> false
+       4  investigations.{key}.detail
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "detail"]: "<missing>" -> "Target not found: ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding"
+       4  investigations.{key}.limits
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "limits"]: ["The dashboard can prove what is in the release artifacts and Chronicle metadata.", "It cannot prove the generated per-record model filter or expression unless -> "<missing>"
+       4  investigations.{key}.next_steps
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "next_steps"]: ["Verify the Chronicle fact: source period, target period, geography, unit, measure concept, and every filter/group-by value.", "Verify target materialization:  -> "<missing>"
+       6  investigations.{key}.repo_searches
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "repo_searches"]: [{"label": "Source record", "query": "\"ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding\"", "url": "https: -> [{"label": "Member fact", "query": "\"ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773\"", "url": "https://github.com/search?type=code&q=org%3APolicyEngine%20%
+       4  investigations.{key}.signals
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "signals"]: [{"tone": "positive", "label": "Final fit", "detail": "The final estimate is within 10% of the target."}, {"tone": "positive", "label": "Same-side miss remains" -> "<missing>"
+       4  investigations.{key}.source_artifact
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "source_artifact"]: {"hf_repo": "policyengine/populace-us", "hf_revision": "main", "calibration_diagnostics_path": "releases/populace-us-2024/calibration_diagnostics.json", "build_ -> "<missing>"
+       4  investigations.{key}.source_metadata
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "source_metadata"]: {"source_measure_id": "dollars_outstanding", "variable": null, "source_period": "2026-03", "target_period": "2024"} -> "<missing>"
+       4  investigations.{key}.target
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "target"]: {"name": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding@2024", "target": 1564229118532.9485, "initial_es -> "<missing>"
+       2  investigations.{key}.target.chronicle.aggregate_fact_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       2  investigations.{key}.target.chronicle.fact_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       2  investigations.{key}.target.chronicle.layout_groupby_value_id
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "stafford_unsubsidized" -> null
+       2  investigations.{key}.target.chronicle.legacy_fact_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.fact.v1:b85494d1886654886efc27ee" -> null
+       2  investigations.{key}.target.chronicle.member_fact_count
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "<missing>" -> 5
+       2  investigations.{key}.target.chronicle.member_fact_keys
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "<missing>" -> ["ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773", "ledger.aggregate_fact.v2:03542cb6ea94cc4d451dae21", "ledger.aggregate_fact.v2:c74dd5a906d888e92730f481", 
+       2  investigations.{key}.target.chronicle.semantic_fact_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.semantic_fact.v2:a9044a89f255104a18e272a0" -> null
+       2  investigations.{key}.target.chronicle.source_record_id
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding" -> null
+     145  investigations.{key}.target.chronicle.universe_constraint_count
+          e.g. ["ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_24_and_younger.borrowers", "target", "chronicle"]: null -> 1
+       2  investigations.{key}.target.chronicle.universe_constraint_set_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.universe_constraint_set.v2:a48a17c172590a8794ecd3d5" -> null
+       2  page_default.variables.[*].level
+          e.g. ["variables", 0, "level"]: "state" -> null
+       4  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["country", "state"]
+       1  page_default_targets.[*].chronicle.aggregate_fact_key
+          e.g. [51, "chronicle", "aggregate_fact_key"]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       1  page_default_targets.[*].chronicle.fact_key
+          e.g. [51, "chronicle", "fact_key"]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       1  page_default_targets.[*].chronicle.layout_groupby_value_id
+          e.g. [51, "chronicle", "layout_groupby_value_id"]: "stafford_unsubsidized" -> null
+       1  page_default_targets.[*].chronicle.legacy_fact_key
+          e.g. [51, "chronicle", "legacy_fact_key"]: "ledger.fact.v1:b85494d1886654886efc27ee" -> null
+       1  page_default_targets.[*].chronicle.member_fact_count
+          e.g. [51, "chronicle", "member_fact_count"]: "<missing>" -> 5
+       1  page_default_targets.[*].chronicle.member_fact_keys
+          e.g. [51, "chronicle", "member_fact_keys"]: "<missing>" -> ["ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773", "ledger.aggregate_fact.v2:03542cb6ea94cc4d451dae21", "ledger.aggregate_fact.v2:c74dd5a906d888e92730f481", 
+       1  page_default_targets.[*].chronicle.semantic_fact_key
+          e.g. [51, "chronicle", "semantic_fact_key"]: "ledger.semantic_fact.v2:a9044a89f255104a18e272a0" -> null
+       1  page_default_targets.[*].chronicle.source_record_id
+          e.g. [51, "chronicle", "source_record_id"]: "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding" -> null
+      29  page_default_targets.[*].chronicle.universe_constraint_count
+          e.g. [0, "chronicle", "universe_constraint_count"]: null -> 1
+       1  page_default_targets.[*].chronicle.universe_constraint_set_key
+          e.g. [51, "chronicle", "universe_constraint_set_key"]: "ledger.universe_constraint_set.v2:a48a17c172590a8794ecd3d5" -> null
+       4  pages.{key}.dimensions
+          e.g. ["{\"variable\":\"ed_fsa / ed_fsa.federal_student_loan_balance \u00b7 total\",\"level\":\"state\"}", "dimensions"]: [{"key": "geography", "label": "Geography", "values": ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Distric -> [{"key": "geography", "label": "Geography", "values": ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Distric
+       7  pages.{key}.targets.[*].chronicle.aggregate_fact_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       7  pages.{key}.targets.[*].chronicle.fact_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       7  pages.{key}.targets.[*].chronicle.layout_groupby_value_id
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "stafford_unsubsidized" -> null
+       7  pages.{key}.targets.[*].chronicle.legacy_fact_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.fact.v1:b85494d1886654886efc27ee" -> null
+       7  pages.{key}.targets.[*].chronicle.member_fact_count
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "<missing>" -> 5
+       7  pages.{key}.targets.[*].chronicle.member_fact_keys
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "<missing>" -> ["ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773", "ledger.aggregate_fact.v2:03542cb6ea94cc4d451dae21", "ledger.aggregate_fact.v2:c74dd5a906d888e92730f481", 
+       7  pages.{key}.targets.[*].chronicle.semantic_fact_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.semantic_fact.v2:a9044a89f255104a18e272a0" -> null
+       7  pages.{key}.targets.[*].chronicle.source_record_id
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding" -> null
+     204  pages.{key}.targets.[*].chronicle.universe_constraint_count
+          e.g. ["{\"geography\":\"United States\"}", "targets", 0]: null -> 1
+       7  pages.{key}.targets.[*].chronicle.universe_constraint_set_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.universe_constraint_set.v2:a48a17c172590a8794ecd3d5" -> null
+     346  pages.{key}.variables.[*].level
+          e.g. ["{\"geography\":\"Alabama\"}", "variables", 0]: "state" -> null
+     692  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"Alabama\"}", "variables", 0]: "<missing>" -> ["country", "state"]
+## FSA-ed-fsa-family-schema-9: 1590 differing values
+      30  calibration_rows.[*].chronicle.universe_constraint_count
+          e.g. [102, "chronicle", "universe_constraint_count"]: null -> 1
+       2  comparison_self.variables.[*].level
+          e.g. ["variables", 0, "level"]: "country" -> null
+       4  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["country", "state"]
+       4  investigations.{key}.available
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "available"]: true -> false
+       4  investigations.{key}.detail
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "detail"]: "<missing>" -> "Target not found: ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding"
+       4  investigations.{key}.limits
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "limits"]: ["The dashboard can prove what is in the release artifacts and Chronicle metadata.", "It cannot prove the generated per-record model filter or expression unless -> "<missing>"
+       4  investigations.{key}.next_steps
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "next_steps"]: ["Verify the Chronicle fact: source period, target period, geography, unit, measure concept, and every filter/group-by value.", "Verify target materialization:  -> "<missing>"
+       6  investigations.{key}.repo_searches
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "repo_searches"]: [{"label": "Source record", "query": "\"ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding\"", "url": "https: -> [{"label": "Member fact", "query": "\"ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773\"", "url": "https://github.com/search?type=code&q=org%3APolicyEngine%20%
+       4  investigations.{key}.signals
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "signals"]: [{"tone": "positive", "label": "Final fit", "detail": "The final estimate is within 10% of the target."}, {"tone": "positive", "label": "Same-side miss remains" -> "<missing>"
+       4  investigations.{key}.source_artifact
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "source_artifact"]: {"hf_repo": "policyengine/populace-us", "hf_revision": "main", "calibration_diagnostics_path": "releases/populace-us-2024/calibration_diagnostics.json", "build_ -> "<missing>"
+       4  investigations.{key}.source_metadata
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "source_metadata"]: {"source_measure_id": "dollars_outstanding", "variable": null, "source_period": "2026-03", "target_period": "2024"} -> "<missing>"
+       4  investigations.{key}.target
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding", "target"]: {"name": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding@2024", "target": 1564229118532.9485, "initial_es -> "<missing>"
+       2  investigations.{key}.target.chronicle.aggregate_fact_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       2  investigations.{key}.target.chronicle.fact_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       2  investigations.{key}.target.chronicle.layout_groupby_value_id
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "stafford_unsubsidized" -> null
+       2  investigations.{key}.target.chronicle.legacy_fact_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.fact.v1:b85494d1886654886efc27ee" -> null
+       2  investigations.{key}.target.chronicle.member_fact_count
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "<missing>" -> 5
+       2  investigations.{key}.target.chronicle.member_fact_keys
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "<missing>" -> ["ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773", "ledger.aggregate_fact.v2:03542cb6ea94cc4d451dae21", "ledger.aggregate_fact.v2:c74dd5a906d888e92730f481", 
+       2  investigations.{key}.target.chronicle.semantic_fact_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.semantic_fact.v2:a9044a89f255104a18e272a0" -> null
+       2  investigations.{key}.target.chronicle.source_record_id
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding" -> null
+     145  investigations.{key}.target.chronicle.universe_constraint_count
+          e.g. ["ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_24_and_younger.borrowers", "target", "chronicle"]: null -> 1
+       2  investigations.{key}.target.chronicle.universe_constraint_set_key
+          e.g. ["ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding", "target", "chronicle"]: "ledger.universe_constraint_set.v2:a48a17c172590a8794ecd3d5" -> null
+       2  page_default.variables.[*].level
+          e.g. ["variables", 0, "level"]: "state" -> null
+       4  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["country", "state"]
+       1  page_default_targets.[*].chronicle.aggregate_fact_key
+          e.g. [51, "chronicle", "aggregate_fact_key"]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       1  page_default_targets.[*].chronicle.fact_key
+          e.g. [51, "chronicle", "fact_key"]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       1  page_default_targets.[*].chronicle.layout_groupby_value_id
+          e.g. [51, "chronicle", "layout_groupby_value_id"]: "stafford_unsubsidized" -> null
+       1  page_default_targets.[*].chronicle.legacy_fact_key
+          e.g. [51, "chronicle", "legacy_fact_key"]: "ledger.fact.v1:b85494d1886654886efc27ee" -> null
+       1  page_default_targets.[*].chronicle.member_fact_count
+          e.g. [51, "chronicle", "member_fact_count"]: "<missing>" -> 5
+       1  page_default_targets.[*].chronicle.member_fact_keys
+          e.g. [51, "chronicle", "member_fact_keys"]: "<missing>" -> ["ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773", "ledger.aggregate_fact.v2:03542cb6ea94cc4d451dae21", "ledger.aggregate_fact.v2:c74dd5a906d888e92730f481", 
+       1  page_default_targets.[*].chronicle.semantic_fact_key
+          e.g. [51, "chronicle", "semantic_fact_key"]: "ledger.semantic_fact.v2:a9044a89f255104a18e272a0" -> null
+       1  page_default_targets.[*].chronicle.source_record_id
+          e.g. [51, "chronicle", "source_record_id"]: "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding" -> null
+      29  page_default_targets.[*].chronicle.universe_constraint_count
+          e.g. [0, "chronicle", "universe_constraint_count"]: null -> 1
+       1  page_default_targets.[*].chronicle.universe_constraint_set_key
+          e.g. [51, "chronicle", "universe_constraint_set_key"]: "ledger.universe_constraint_set.v2:a48a17c172590a8794ecd3d5" -> null
+       4  pages.{key}.dimensions
+          e.g. ["{\"variable\":\"ed_fsa / ed_fsa.federal_student_loan_balance \u00b7 total\",\"level\":\"state\"}", "dimensions"]: [{"key": "geography", "label": "Geography", "values": ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Distric -> [{"key": "geography", "label": "Geography", "values": ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Distric
+       7  pages.{key}.targets.[*].chronicle.aggregate_fact_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       7  pages.{key}.targets.[*].chronicle.fact_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef" -> null
+       7  pages.{key}.targets.[*].chronicle.layout_groupby_value_id
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "stafford_unsubsidized" -> null
+       7  pages.{key}.targets.[*].chronicle.legacy_fact_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.fact.v1:b85494d1886654886efc27ee" -> null
+       7  pages.{key}.targets.[*].chronicle.member_fact_count
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "<missing>" -> 5
+       7  pages.{key}.targets.[*].chronicle.member_fact_keys
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "<missing>" -> ["ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773", "ledger.aggregate_fact.v2:03542cb6ea94cc4d451dae21", "ledger.aggregate_fact.v2:c74dd5a906d888e92730f481", 
+       7  pages.{key}.targets.[*].chronicle.semantic_fact_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.semantic_fact.v2:a9044a89f255104a18e272a0" -> null
+       7  pages.{key}.targets.[*].chronicle.source_record_id
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding" -> null
+     204  pages.{key}.targets.[*].chronicle.universe_constraint_count
+          e.g. ["{\"geography\":\"United States\"}", "targets", 0]: null -> 1
+       7  pages.{key}.targets.[*].chronicle.universe_constraint_set_key
+          e.g. ["{\"geography\":\"United States\"}", "targets", 11]: "ledger.universe_constraint_set.v2:a48a17c172590a8794ecd3d5" -> null
+     346  pages.{key}.variables.[*].level
+          e.g. ["{\"geography\":\"Alabama\"}", "variables", 0]: "state" -> null
+     692  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"Alabama\"}", "variables", 0]: "<missing>" -> ["country", "state"]
+## be-release-schema2: 60 differing values
+       3  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+       3  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["region"]
+      54  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"Belgium\"}", "variables", 0]: "<missing>" -> ["region"]
+## golden-be-release: 60 differing values
+       3  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+       3  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["region"]
+      54  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"Belgium\"}", "variables", 0]: "<missing>" -> ["region"]
+## golden-uk-release-loss-attribution: 28 differing values
+       2  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+       2  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+      24  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"United Kingdom\"}", "variables", 0]: "<missing>" -> ["national"]
+## golden-uk-release: 46 differing values
+       2  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["country"]
+       2  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["country"]
+      42  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"England\"}", "variables", 0]: "<missing>" -> ["country"]
+## golden-us-release: 483780 differing values
+      58  comparison_self.variables.[*].level
+          e.g. ["variables", 0, "level"]: "national" -> null
+      83  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national", "state"]
+      58  page_default.variables.[*].level
+          e.g. ["variables", 0, "level"]: "national" -> null
+      83  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national", "state"]
+  198885  pages.{key}.variables.[*].level
+          e.g. ["{\"geography\":\"AK\"}", "variables", 0]: "national" -> null
+  284613  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"AK\"}", "variables", 0]: "<missing>" -> ["national", "state"]
+## loss-attribution-malformed-partial: 28 differing values
+       2  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+       2  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+      24  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"United Kingdom\"}", "variables", 0]: "<missing>" -> ["national"]
+## loss-attribution-unavailable-warning: 28 differing values
+       2  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+       2  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+      24  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"United Kingdom\"}", "variables", 0]: "<missing>" -> ["national"]
+## loss-attribution-valid-unequal-custom-scales: 28 differing values
+       2  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+       2  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+      24  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"United Kingdom\"}", "variables", 0]: "<missing>" -> ["national"]
+## loss-attribution-valid-uniform: 28 differing values
+       2  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+       2  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national"]
+      24  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"United Kingdom\"}", "variables", 0]: "<missing>" -> ["national"]
+## us-legacy-target-identities: 483780 differing values
+      58  comparison_self.variables.[*].level
+          e.g. ["variables", 0, "level"]: "national" -> null
+      83  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national", "state"]
+      58  page_default.variables.[*].level
+          e.g. ["variables", 0, "level"]: "national" -> null
+      83  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["national", "state"]
+  198885  pages.{key}.variables.[*].level
+          e.g. ["{\"geography\":\"AK\"}", "variables", 0]: "national" -> null
+  284613  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"AK\"}", "variables", 0]: "<missing>" -> ["national", "state"]
+## zz-release: 34 differing values
+       2  comparison_self.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["region"]
+       2  page_default.variables.[*].levels
+          e.g. ["variables", 0, "levels"]: "<missing>" -> ["region"]
+      30  pages.{key}.variables.[*].levels
+          e.g. ["{\"geography\":\"North\"}", "variables", 0]: "<missing>" -> ["region"]

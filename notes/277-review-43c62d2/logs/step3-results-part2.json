@@ -1,0 +1,320 @@
+{
+ "countOrNull:accept-2.5": {
+  "frontend": {
+   "counts": [
+    [
+     "869",
+     "pass"
+    ],
+    [
+     "0",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": []
+  }
+ },
+ "countOrNull:accept--1": {
+  "frontend": {
+   "counts": [
+    [
+     "869",
+     "pass"
+    ],
+    [
+     "0",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": []
+  }
+ },
+ "countOrNull:accept-space": {
+  "frontend": {
+   "counts": [
+    [
+     "869",
+     "pass"
+    ],
+    [
+     "0",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": []
+  }
+ },
+ "shownChronicle:return-row.chronicle": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "shownChronicle:keep-source_record_id": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "shownChronicle:keep-fact_key": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "shownChronicle:keep-semantic_fact_key": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "shownChronicle:keep-aggregate_fact_key": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "shownChronicle:keep-legacy_fact_key": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "shownChronicle:keep-layout_groupby_value_id": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "shownChronicle:keep-universe_constraint_set_key": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "shownChronicle:keep-universe_constraint_count": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "targetResponseRow:row.chronicle": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "lookup:candidate.chronicle": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "investigationSearches:drop-member-facts": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "investigationSearches:raw-chronicle": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a target's detail shows its Chronicle fact"
+   ]
+  }
+ },
+ "repeatsGeography:false": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "the ED Federal Student Aid target family > a mixed category's facets are its geographies and both bands"
+   ]
+  }
+ },
+ "repeatsGeography:one-value-per-geography": {
+  "frontend": {
+   "counts": [
+    [
+     "868",
+     "pass"
+    ],
+    [
+     "1",
+     "fail"
+    ]
+   ],
+   "errors": [],
+   "fails": [
+    "derives Belgium population region, sex, and age-band browser facets"
+   ]
+  }
+ }
+}

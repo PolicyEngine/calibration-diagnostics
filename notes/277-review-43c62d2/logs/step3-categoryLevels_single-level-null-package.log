@@ -1,0 +1,67 @@
+bun test v1.4.4 (38afee6c8)
+
+src/ed-fsa-family.test.ts:
+425 |     );
+426 |     // A one-target category is at its one target's level.
+427 |     for (const category of ONE_TARGET_CATEGORIES) {
+428 |       expect(
+429 |         variables.find((variable) => variable.variable_key === variableKey(category))?.level,
+430 |       ).toBe(UNITED_STATES.level);
+              ^
+error: expect(received).toBe(expected)
+
+Expected: "country"
+Received: null
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:430:9)
+(fail) the ED Federal Student Aid target family > the targets page lists the family under its provider, at both levels [4.53ms]
+468 |     const levelsOf = (key: string) => {
+469 |       const variable = page.variables.find((candidate) => candidate.variable_key === key)!;
+470 |       return [variable.level, variable.levels];
+471 |     };
+472 |     for (const category of ONE_TARGET_CATEGORIES) {
+473 |       expect(levelsOf(variableKey(category))).toEqual([UNITED_STATES.level, [UNITED_STATES.level]]);
+                                                    ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,3 @@
+  [
+-   "country",
++   null,
+    [
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:473:47)
+(fail) the ED Federal Student Aid target family > a category at two levels is listed at both [1.34ms]
+707 |     const unchanged = buildComparison(release, release);
+708 |     for (const category of MIXED_CATEGORIES) {
+709 |       const first = unchanged.rows.find((row) => row.variable_key === variableKey(category))!;
+710 |       expect([first.level, first.breakdown]).toEqual([UNITED_STATES.level, AGE.values[0]]);
+711 |     }
+712 |     expect(levelsOf(unchanged)).toEqual(expected);
+                                      ^
+error: expect(received).toEqual(expected)
+
+@@ -16,3 +16,3 @@
+    "ed_fsa / ed_fsa.loan_balance_excluding_parent_plus · total": [
+-     "country",
++     null,
+      [
+@@ -22,3 +22,3 @@
+    "ed_fsa / ed_fsa.parent_plus_loan_balance · total": [
+-     "country",
++     null,
+      [
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:712:33)
+(fail) the ED Federal Student Aid target family > a compared category at two levels reports both, whichever row's fit changed most [2.56ms]
+
+ 410 pass
+ 3 fail
+ 8637 expect() calls
+Ran 413 tests across 36 files. [34.27s]

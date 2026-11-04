@@ -1,0 +1,36 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/microcosm/statistic-groups.test.ts:
+20 |   // A category at two levels has no single level: its key holds both, so
+21 |   // its measures share one statistic whatever their first rows' levels.
+22 |   test("a category at two levels keys on both", () => {
+23 |     const total = row("ed_fsa.federal_student_loan_balance", "total", null, ["country", "state"]);
+24 |     const count = row("ed_fsa.federal_student_loan_balance", "count", null, ["country", "state"]);
+25 |     expect(statisticGroupKey(total)).toBe(
+                                          ^
+error: expect(received).toBe(expected)
+
+Expected: "ed_fsa::country+state::ed_fsa.federal_student_loan_balance"
+Received: "ed_fsa::countrystate::ed_fsa.federal_student_loan_balance"
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/statistic-groups.test.ts:25:38)
+(fail) statistic groups > a category at two levels keys on both [0.30ms]
+
+app/api/hf-webhook/route.test.ts:
+Calibration tree workflow dispatch failed: 82 |       signal: AbortSignal.timeout(15_000),
+83 |     },
+84 |   );
+85 |   if (response.status !== 204) {
+86 |     const body = await response.text();
+87 |     throw new Error(
+                   ^
+error: GitHub workflow dispatch returned 403: forbidden
+      at dispatchTreeBuild (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:87:15)
+      at async handleHfWebhook (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:166:15)
+      at async <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/app/api/hf-webhook/route.test.ts:296:78)
+
+
+ 868 pass
+ 1 fail
+ 21962 expect() calls
+Ran 869 tests across 101 files. [37.12s]

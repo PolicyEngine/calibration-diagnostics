@@ -1,0 +1,42 @@
+bun test v1.4.4 (38afee6c8)
+
+app/api/hf-webhook/route.test.ts:
+Calibration tree workflow dispatch failed: 82 |       signal: AbortSignal.timeout(15_000),
+83 |     },
+84 |   );
+85 |   if (response.status !== 204) {
+86 |     const body = await response.text();
+87 |     throw new Error(
+                   ^
+error: GitHub workflow dispatch returned 403: forbidden
+      at dispatchTreeBuild (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:87:15)
+      at async handleHfWebhook (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:166:15)
+      at async <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/app/api/hf-webhook/route.test.ts:296:78)
+
+
+packages/calibration-tree/src/ed-fsa-family.test.ts:
+838 |     expect(excludingMetadata.ledger_source_record_id).toBe(stafford);
+839 |     const members = JSON.parse(excludingMetadata.ledger_member_fact_keys) as string[];
+840 |     expect(members).toHaveLength(5);
+841 |     expect(members).toContain(excludingMetadata.ledger_fact_key);
+842 | 
+843 |     expect(chronicle(EXCLUDING_PARENT_PLUS_TARGET)).toEqual({
+                                                          ^
+error: expect(received).toEqual(expected)
+
+@@ -2,3 +2,3 @@
+    "aggregate_fact_key": null,
+-   "fact_key": null,
++   "fact_key": "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef",
+    "filters": [],
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:843:53)
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [2.94ms]
+
+ 868 pass
+ 1 fail
+ 21975 expect() calls
+Ran 869 tests across 101 files. [37.46s]

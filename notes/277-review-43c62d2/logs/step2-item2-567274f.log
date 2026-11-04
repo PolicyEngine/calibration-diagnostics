@@ -1,0 +1,14 @@
+bun test v1.4.4 (38afee6c8)
+
+components/microcosm/target-filter-options.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './target-filter-options' from '/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/components/microcosm/target-filter-options.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [6.00ms]

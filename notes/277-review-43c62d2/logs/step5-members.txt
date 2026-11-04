@@ -1,0 +1,65 @@
+target: ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding
+row metadata: {
+ "ledger_source": "policyengine-ledger-data",
+ "ledger_fact_key": "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef",
+ "ledger_source_record_id": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding",
+ "ledger_aggregate_fact_key": "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef",
+ "ledger_semantic_fact_key": "ledger.semantic_fact.v2:a9044a89f255104a18e272a0",
+ "ledger_legacy_fact_key": "ledger.fact.v1:b85494d1886654886efc27ee",
+ "ledger_observed_measure_key": "ledger.observed_measure.v2:468875d55feab13aa1328cef",
+ "ledger_dimension_set_key": "ledger.dimension_set.v2:44136fa355b3678a1146ad16",
+ "ledger_universe_constraint_set_key": "ledger.universe_constraint_set.v2:a48a17c172590a8794ecd3d5",
+ "ledger_measure_concept": "ed_fsa.dollars_outstanding",
+ "ledger_measure_unit": "usd",
+ "ledger_source_concept": "Dollars Outstanding (in billions)",
+ "ledger_concept_relation": "source_label",
+ "ledger_concept_authority": "ed_fsa",
+ "ledger_period_type": "month",
+ "ledger_fact_period": "2026-03",
+ "ledger_assertion": "observation",
+ "ledger_geography_level": "country",
+ "ledger_geography_id": "0100000US",
+ "ledger_geography_name": "United States",
+ "ledger_geography_vintage": "current",
+ "ledger_fact_label": "United States 2026-03 month sum ed fsa dollars outstanding for person [ed_fsa FSA Portfolio by Loan Type PortfoliobyLoanType.xls fsa_portfolio_by_loan_type_fy2026_q3]",
+ "ledger_entity_name": "person",
+ "ledger_entity_role": "federal_student_loan_recipient",
+ "ledger_domain": "federal_student_loans",
+ "ledger_layout_record_set_id": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding",
+ "ledger_layout_record_set_spec_id": "ed_fsa.portfolio_by_loan_type.dollars_outstanding.v1",
+ "ledger_layout_groupby_dimension": "ed_fsa.loan_type",
+ "ledger_layout_groupby_value_id": "stafford_unsubsidized",
+ "ledger_layout_groupby_value_label": "Stafford Unsubsidized",
+ "ledger_layout_measure_id": "dollars_outstanding",
+ "ledger_aggregation_method": "sum",
+ "ledger_universe_constraint_count": "1",
+ "ledger_member_fact_count": "5",
+ "ledger_member_aggregate_fact_keys": "[\"ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773\",\"ledger.aggregate_fact.v2:03542cb6ea94cc4d451dae21\",\"ledger.aggregate_fact.v2:c74dd5a906d888e92730f481\",\"ledger.aggregate_fact.v2:afb20adc68e6319988a8cf24\",\"ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef\"]",
+ "ledger_member_fact_keys": "[\"ledger.aggregate_fact.v2:4bcad22c0fcea86d87e6a773\",\"ledger.aggregate_fact.v2:03542cb6ea94cc4d451dae21\",\"ledger.aggregate_fact.v2:c74dd5a906d888e92730f481\",\"ledger.aggregate_fact.v2:afb20adc68e6319988a8cf24\",\"ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef\"]",
+ "ledger_member_fact_digest": "f88c689c63b10221f7b72096f31e53e4091c5f43e899bb4a59c6ff38caeb9dfb",
+ "ledger_resolved_assertion": "observation",
+ "source_measure_id": "dollars_outstanding",
+ "source_period": "2026-03",
+ "ledger_value_operation": "linear_combination",
+ "ledger_assertion_policy": "observed_only",
+ "ledger_period_match_policy": "exact",
+ "ledger_value_formula": "+operand_0 +operand_1 +operand_2 +operand_3 +operand_4",
+ "ledger_selector_source_name": "ed_fsa"
+}
+members found in the Chronicle fixture: 5 of 5
+DIFFER source_record_id: "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.consolidation.dollars_outstan | "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.grad_plus.dollars_outstanding | "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.perkins.dollars_outstanding" | "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_subsidized.dollars_o | "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars
+SAME   dimension_set_key: "ledger.dimension_set.v2:44136fa355b3678a1146ad16"
+SAME   dimensions (filters): {}
+DIFFER universe_constraints: {"constraints": [{"operator": "==", "role": "filter", "value": "consolidation", "variable" | {"constraints": [{"operator": "==", "role": "filter", "value": "grad_plus", "variable": "f | {"constraints": [{"operator": "==", "role": "filter", "value": "perkins", "variable": "fed | {"constraints": [{"operator": "==", "role": "filter", "value": "stafford_subsidized", "var | {"constraints": [{"operator": "==", "role": "filter", "value": "stafford_unsubsidized", "v
+DIFFER universe_constraint_set_key: "ledger.universe_constraint_set.v2:3357b49fdc37c3034168a3d5" | "ledger.universe_constraint_set.v2:471601ad7222d7c21cbe46d4" | "ledger.universe_constraint_set.v2:456fcfffedd956a8c90e2259" | "ledger.universe_constraint_set.v2:0d950df06fa5f9abff5ffdf1" | "ledger.universe_constraint_set.v2:a48a17c172590a8794ecd3d5"
+SAME   layout_record_set_id: "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding"
+SAME   layout_groupby_dimension: "ed_fsa.loan_type"
+DIFFER layout_groupby_value_id: "consolidation" | "grad_plus" | "perkins" | "stafford_subsidized" | "stafford_unsubsidized"
+SAME   layout_measure_id: "dollars_outstanding"
+SAME   measure_concept: "ed_fsa.dollars_outstanding"
+SAME   source_concept: "Dollars Outstanding (in billions)"
+SAME   value_operation: null
+SAME   period: {"type": "month", "value": "2026-03"}
+SAME   geography_id: "0100000US"
+SAME   unit: "usd"
+top-level keys of a fact: ['aggregate_fact_key', 'aggregation', 'assertion', 'concept_alignment', 'dimension_labels', 'dimension_set_key', 'dimension_value_labels', 'dimensions', 'entity', 'geography', 'label', 'layout', 'legacy_fact_key', 'lineage', 'observed_measure', 'observed_measure_key', 'period', 'period_coverage', 'provenance_class', 'schema_version', 'semantic_fact_key', 'source', 'source_release_key', 'source_series_key', 'universe_constraint_set_key', 'universe_constraints', 'value', 'value_type']

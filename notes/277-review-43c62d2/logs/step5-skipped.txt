@@ -1,0 +1,10 @@
+== base
+no skip -> included | null | page: undefined | skipped_target_count (n/a)
+skip the aggregate by name -> skipped | KeyError: x | page: undefined | skipped_target_count (n/a)
+skip the aggregate by name@period -> skipped | KeyError: x | page: undefined | skipped_target_count (n/a)
+skip a target named by the representative's record id -> skipped | KeyError: stafford | page: undefined | skipped_target_count (n/a)
+== head
+no skip -> included | null | page: undefined | skipped_target_count (n/a)
+skip the aggregate by name -> skipped | KeyError: x | page: undefined | skipped_target_count (n/a)
+skip the aggregate by name@period -> skipped | KeyError: x | page: undefined | skipped_target_count (n/a)
+skip a target named by the representative's record id -> skipped | KeyError: stafford | page: undefined | skipped_target_count (n/a)

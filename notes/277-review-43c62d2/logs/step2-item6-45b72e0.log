@@ -1,0 +1,83 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/calibration-tree/src/ed-fsa-family.test.ts:
+486 | 
+487 |     expect(page.filtered_total).toBe(STATE_COUNT + BANDS_PER_MEASURE);
+488 |     // Membership only: the order of facet values is not part of this test.
+489 |     expect(
+490 |       page.dimensions.map((dimension) => ({ ...dimension, values: sorted(dimension.values) })),
+491 |     ).toEqual([
+            ^
+error: expect(received).toEqual(expected)
+
+@@ -60,2 +60,59 @@
+    {
++     "key": "ed_fsa.borrower_location",
++     "label": "Borrower location",
++     "values": [
++       "Alabama",
++       "Alaska",
++       "Arizona",
++       "Arkansas",
++       "California",
++       "Colorado",
++       "Connecticut",
++       "Delaware",
++       "District of Columbia",
++       "Florida",
++       "Georgia",
++       "Hawaii",
++       "Idaho",
++       "Illinois",
++       "Indiana",
++       "Iowa",
++       "Kansas",
++       "Kentucky",
++       "Louisiana",
++       "Maine",
++       "Maryland",
++       "Massachusetts",
++       "Michigan",
++       "Minnesota",
++       "Mississippi",
++       "Missouri",
++       "Montana",
++       "Nebraska",
++       "Nevada",
++       "New Hampshire",
++       "New Jersey",
++       "New Mexico",
++       "New York",
++       "North Carolina",
++       "North Dakota",
++       "Ohio",
++       "Oklahoma",
++       "Oregon",
++       "Pennsylvania",
++       "Rhode Island",
++       "South Carolina",
++       "South Dakota",
++       "Tennessee",
++       "Texas",
++       "Utah",
++       "Vermont",
++       "Virginia",
++       "Washington",
++       "West Virginia",
++       "Wisconsin",
++       "Wyoming",
++     ],
++   },
++   {
+      "key": "ed_fsa.borrower_age_band",
+
+- Expected  - 0
++ Received  + 57
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:491:7)
+(fail) the ED Federal Student Aid target family > a mixed category's facets are its geographies and both bands [3.33ms]
+
+ 12 pass
+ 1 fail
+ 320 expect() calls
+Ran 13 tests across 1 file. [255.00ms]

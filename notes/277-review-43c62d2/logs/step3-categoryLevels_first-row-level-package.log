@@ -1,0 +1,46 @@
+bun test v1.4.4 (38afee6c8)
+
+src/ed-fsa-family.test.ts:
+460 |       const variable = page.variables.find((candidate) =>
+461 |         candidate.variable_key === variableKey(category)
+462 |       )!;
+463 |       expect(variable.n_targets).toBe(BANDS_PER_MEASURE + STATE_COUNT);
+464 |       expect(variable.levels).toEqual([UNITED_STATES.level, "state"]);
+465 |       expect(variable.level).toBeNull();
+                                   ^
+error: expect(received).toBeNull()
+
+Received: "state"
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:465:30)
+(fail) the ED Federal Student Aid target family > a category at two levels is listed at both [2.24ms]
+707 |     const unchanged = buildComparison(release, release);
+708 |     for (const category of MIXED_CATEGORIES) {
+709 |       const first = unchanged.rows.find((row) => row.variable_key === variableKey(category))!;
+710 |       expect([first.level, first.breakdown]).toEqual([UNITED_STATES.level, AGE.values[0]]);
+711 |     }
+712 |     expect(levelsOf(unchanged)).toEqual(expected);
+                                      ^
+error: expect(received).toEqual(expected)
+
+@@ -2,3 +2,3 @@
+    "ed_fsa / ed_fsa.federal_student_loan_balance · total": [
+-     null,
++     "country",
+      [
+@@ -9,3 +9,3 @@
+    "ed_fsa / ed_fsa.federal_student_loan_borrowers · count": [
+-     null,
++     "country",
+      [
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:712:33)
+(fail) the ED Federal Student Aid target family > a compared category at two levels reports both, whichever row's fit changed most [1.84ms]
+
+ 411 pass
+ 2 fail
+ 8622 expect() calls
+Ran 413 tests across 36 files. [34.49s]

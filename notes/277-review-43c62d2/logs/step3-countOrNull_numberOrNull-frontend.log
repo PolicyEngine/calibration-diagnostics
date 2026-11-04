@@ -1,0 +1,82 @@
+bun test v1.4.4 (38afee6c8)
+
+app/api/hf-webhook/route.test.ts:
+Calibration tree workflow dispatch failed: 82 |       signal: AbortSignal.timeout(15_000),
+83 |     },
+84 |   );
+85 |   if (response.status !== 204) {
+86 |     const body = await response.text();
+87 |     throw new Error(
+                   ^
+error: GitHub workflow dispatch returned 403: forbidden
+      at dispatchTreeBuild (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:87:15)
+      at async handleHfWebhook (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:166:15)
+      at async <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/app/api/hf-webhook/route.test.ts:296:78)
+
+
+packages/calibration-tree/src/ed-fsa-family.test.ts:
+777 |       value_operation: "identity",
+778 |       // A state fact has no universe constraint, so the release writes no count.
+779 |       universe_constraint_count: null,
+780 |     });
+781 |     // An age band's edges: "24 and Younger" is age < 25.
+782 |     expect(chronicle(YOUNGEST_BORROWERS)).toEqual({
+                                                ^
+error: expect(received).toEqual(expected)
+
+@@ -14,3 +14,3 @@
+    "source_record_id": "ed_fsa.portfolio_by_age.fy2026_q2.borrowers.age_24_and_younger.borrowers",
+-   "universe_constraint_count": 1,
++   "universe_constraint_count": null,
+    "value_operation": "identity",
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:782:43)
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [2.02ms]
+
+packages/calibration-tree/src/latest-artifact.test.ts:
+1217 |   expect(row.measure).toBe("total");
+1218 |   expect(row.target_dimensions).toEqual([
+1219 |     expect.objectContaining({ label: "Income band", value: "1 to 10k" }),
+1220 |     expect.objectContaining({ label: "Filing status", value: "All" }),
+1221 |   ]);
+1222 |   expect(row.chronicle).toMatchObject({
+                               ^
+error: expect(received).toMatchObject(expected)
+
+@@ -9,3 +9,16 @@
+    "fact_key": "fact-key",
+-   "filters": ExpectArrayContaining {},
++   "filters": [
++     {
++       "key": "ledger_filter_filing_status",
++       "label": "Filing status",
++       "raw_value": "all",
++       "value": "All",
++     },
++     {
++       "key": "ledger_filter_income_range",
++       "label": "Income band",
++       "raw_value": "1_to_10k",
++       "value": "1 to 10k",
++     },
++   ],
+    "geography_id": "0400000US02",
+@@ -26,3 +39,3 @@
+    "target_period": "2024",
+-   "universe_constraint_count": 2,
++   "universe_constraint_count": null,
+    "universe_constraint_set_key": "universe-set",
+
+- Expected  - 2
++ Received  + 15
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/latest-artifact.test.ts:1222:25)
+(fail) legacy Ledger metadata populates the complete Chronicle contract [1.14ms]
+
+ 867 pass
+ 2 fail
+ 21957 expect() calls
+Ran 869 tests across 101 files. [34.62s]

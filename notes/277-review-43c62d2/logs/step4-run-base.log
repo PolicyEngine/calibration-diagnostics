@@ -1,0 +1,67 @@
+{
+ "golden-us-release": {
+  "n_rows": 5659,
+  "pages": 3430,
+  "lookups": 11318
+ },
+ "golden-uk-release": {
+  "n_rows": 12,
+  "pages": 22,
+  "lookups": 24
+ },
+ "golden-uk-release-loss-attribution": {
+  "n_rows": 2,
+  "pages": 13,
+  "lookups": 4
+ },
+ "golden-be-release": {
+  "n_rows": 3,
+  "pages": 19,
+  "lookups": 6
+ },
+ "zz-release": {
+  "n_rows": 4,
+  "pages": 16,
+  "lookups": 8
+ },
+ "us-legacy-target-identities": {
+  "n_rows": 5659,
+  "pages": 3430,
+  "lookups": 11318
+ },
+ "be-release-schema2": {
+  "n_rows": 3,
+  "pages": 19,
+  "lookups": 6
+ },
+ "loss-attribution-valid-uniform": {
+  "n_rows": 2,
+  "pages": 13,
+  "lookups": 4
+ },
+ "loss-attribution-valid-unequal-custom-scales": {
+  "n_rows": 2,
+  "pages": 13,
+  "lookups": 4
+ },
+ "loss-attribution-unavailable-warning": {
+  "n_rows": 2,
+  "pages": 13,
+  "lookups": 4
+ },
+ "loss-attribution-malformed-partial": {
+  "n_rows": 2,
+  "pages": 13,
+  "lookups": 4
+ },
+ "FSA-ed-fsa-family-schema-8": {
+  "n_rows": 132,
+  "pages": 174,
+  "lookups": 661
+ },
+ "FSA-ed-fsa-family-schema-9": {
+  "n_rows": 132,
+  "pages": 174,
+  "lookups": 661
+ }
+}

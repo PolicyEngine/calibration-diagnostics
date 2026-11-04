@@ -1,0 +1,41 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/calibration-tree/src/ed-fsa-family.test.ts:
+824 |     expect(excludingMetadata.ledger_source_record_id).toBe(stafford);
+825 |     const members = JSON.parse(excludingMetadata.ledger_member_fact_keys) as string[];
+826 |     expect(members).toHaveLength(5);
+827 |     expect(members).toContain(excludingMetadata.ledger_fact_key);
+828 | 
+829 |     expect(chronicle(EXCLUDING_PARENT_PLUS_TARGET)).toEqual({
+                                                          ^
+error: expect(received).toEqual(expected)
+
+@@ -1,11 +1,11 @@
+  {
+-   "aggregate_fact_key": null,
+-   "fact_key": null,
++   "aggregate_fact_key": "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef",
++   "fact_key": "ledger.aggregate_fact.v2:bd20dfa6694f6ea4e07d03ef",
+    "filters": [],
+-   "legacy_fact_key": null,
++   "legacy_fact_key": "ledger.fact.v1:b85494d1886654886efc27ee",
+    "measure_concept": "ed_fsa.dollars_outstanding",
+-   "semantic_fact_key": null,
++   "semantic_fact_key": "ledger.semantic_fact.v2:a9044a89f255104a18e272a0",
+    "source_concept": "Dollars Outstanding (in billions)",
+-   "source_record_id": null,
+-   "universe_constraint_count": null,
++   "source_record_id": "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding",
++   "universe_constraint_count": 1,
+    "value_operation": "linear_combination",
+
+- Expected  - 6
++ Received  + 6
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/packages/calibration-tree/src/ed-fsa-family.test.ts:829:53)
+(fail) the ED Federal Student Aid target family > a target's detail shows its Chronicle fact [2.76ms]
+
+ 12 pass
+ 1 fail
+ 318 expect() calls
+Ran 13 tests across 1 file. [231.00ms]

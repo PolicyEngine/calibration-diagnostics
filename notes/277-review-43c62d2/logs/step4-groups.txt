@@ -1,0 +1,13 @@
+FSA-ed-fsa-family-schema-8: categories 4; groups base 4 head 4; groups that differ: base-only 0, head-only 0
+FSA-ed-fsa-family-schema-9: categories 4; groups base 4 head 4; groups that differ: base-only 0, head-only 0
+be-release-schema2: categories 3; groups base 3 head 3; groups that differ: base-only 0, head-only 0
+golden-be-release: categories 3; groups base 3 head 3; groups that differ: base-only 0, head-only 0
+golden-uk-release-loss-attribution: categories 2; groups base 2 head 2; groups that differ: base-only 0, head-only 0
+golden-uk-release: categories 2; groups base 2 head 2; groups that differ: base-only 0, head-only 0
+golden-us-release: categories 83; groups base 53 head 53; groups that differ: base-only 0, head-only 0
+loss-attribution-malformed-partial: categories 2; groups base 2 head 2; groups that differ: base-only 0, head-only 0
+loss-attribution-unavailable-warning: categories 2; groups base 2 head 2; groups that differ: base-only 0, head-only 0
+loss-attribution-valid-unequal-custom-scales: categories 2; groups base 2 head 2; groups that differ: base-only 0, head-only 0
+loss-attribution-valid-uniform: categories 2; groups base 2 head 2; groups that differ: base-only 0, head-only 0
+us-legacy-target-identities: categories 83; groups base 53 head 53; groups that differ: base-only 0, head-only 0
+zz-release: categories 2; groups base 2 head 2; groups that differ: base-only 0, head-only 0

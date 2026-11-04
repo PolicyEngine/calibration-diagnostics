@@ -1,0 +1,57 @@
+bun test v1.4.4 (38afee6c8)
+
+app/api/hf-webhook/route.test.ts:
+Calibration tree workflow dispatch failed: 82 |       signal: AbortSignal.timeout(15_000),
+83 |     },
+84 |   );
+85 |   if (response.status !== 204) {
+86 |     const body = await response.text();
+87 |     throw new Error(
+                   ^
+error: GitHub workflow dispatch returned 403: forbidden
+      at dispatchTreeBuild (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:87:15)
+      at async handleHfWebhook (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:166:15)
+      at async <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/app/api/hf-webhook/route.test.ts:296:78)
+
+
+packages/calibration-tree/src/latest-artifact.test.ts:
+277 |     "http://x/api/microcosm/target-diagnostics?variable=statbel%20%2F%20population",
+278 |     cal,
+279 |   );
+280 | 
+281 |   expect(result.sources).toEqual(["statbel"]);
+282 |   expect(result.dimensions).toEqual([
+                                  ^
+error: expect(received).toEqual(expected)
+
+@@ -10,19 +10,2 @@
+    },
+-   {
+-     "key": "bd_sex",
+-     "label": "Sex",
+-     "values": [
+-       "Female",
+-       "Male",
+-     ],
+-   },
+-   {
+-     "key": "bd_age_band",
+-     "label": "Age band",
+-     "values": [
+-       "0–17",
+-       "18–64",
+-       "65+",
+-     ],
+-   },
+  ]
+
+- Expected  - 17
++ Received  + 0
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/packages/calibration-tree/src/latest-artifact.test.ts:282:29)
+(fail) derives Belgium population region, sex, and age-band browser facets [1.44ms]
+
+ 868 pass
+ 1 fail
+ 21972 expect() calls
+Ran 869 tests across 101 files. [36.67s]

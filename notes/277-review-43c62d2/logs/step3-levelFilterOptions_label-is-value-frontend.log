@@ -1,0 +1,52 @@
+bun test v1.4.4 (38afee6c8)
+
+components/microcosm/target-filter-options.test.ts:
+29 |       { value: "irs_soi", label: "IRS SOI (from the release)" },
+30 |     ]);
+31 |   });
+32 | 
+33 |   test("a level reads as the calibration map's filter names it", () => {
+34 |     expect(levelFilterOptions(["country", "national", "state"])).toEqual([
+                                                                      ^
+error: expect(received).toEqual(expected)
+
+@@ -6,3 +6,3 @@
+    {
+-     "label": "Country",
++     "label": "country",
+      "value": "country",
+@@ -10,3 +10,3 @@
+    {
+-     "label": "National",
++     "label": "national",
+      "value": "national",
+@@ -14,3 +14,3 @@
+    {
+-     "label": "State",
++     "label": "state",
+      "value": "state",
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/components/microcosm/target-filter-options.test.ts:34:66)
+(fail) the targets page's Source and Level filters > a level reads as the calibration map's filter names it [0.35ms]
+
+app/api/hf-webhook/route.test.ts:
+Calibration tree workflow dispatch failed: 82 |       signal: AbortSignal.timeout(15_000),
+83 |     },
+84 |   );
+85 |   if (response.status !== 204) {
+86 |     const body = await response.text();
+87 |     throw new Error(
+                   ^
+error: GitHub workflow dispatch returned 403: forbidden
+      at dispatchTreeBuild (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:87:15)
+      at async handleHfWebhook (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/lib/microcosm/hf-webhook-handler.ts:166:15)
+      at async <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/mut/frontend/app/api/hf-webhook/route.test.ts:296:78)
+
+
+ 868 pass
+ 1 fail
+ 21979 expect() calls
+Ran 869 tests across 101 files. [34.71s]

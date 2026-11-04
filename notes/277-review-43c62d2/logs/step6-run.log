@@ -1,0 +1,59 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/calibration-tree/src/step6-invariants.test.ts:
+2471 | 	return error;
+2472 | }
+2473 | /** @internal */
+2474 | function throwIfFailed(out) {
+2475 | 	if (!out.failed) return;
+2476 | 	throw buildError(defaultReportMessage(out), out);
+                                                       ^
+error: Property failed after 639 tests
+{ seed: 277, path: "638", endOnFailure: true }
+Counterexample: [-0]
+Shrunk 0 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+      at throwIfFailed (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/node_modules/fast-check/lib/fast-check.js:2476:49)
+      at assert (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/node_modules/fast-check/lib/fast-check.js:2662:7)
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/packages/calibration-tree/src/step6-invariants.test.ts:31:6)
+(fail) countOrNull returns null or a safe non-negative integer [39.61ms]
+2471 | 	return error;
+2472 | }
+2473 | /** @internal */
+2474 | function throwIfFailed(out) {
+2475 | 	if (!out.failed) return;
+2476 | 	throw buildError(defaultReportMessage(out), out);
+                                                       ^
+error: Property failed after 6 tests
+{ seed: 277, path: "5", endOnFailure: true }
+Counterexample: [[]]
+Shrunk 0 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+      at throwIfFailed (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/node_modules/fast-check/lib/fast-check.js:2476:49)
+      at assert (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/node_modules/fast-check/lib/fast-check.js:2662:7)
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/packages/calibration-tree/src/step6-invariants.test.ts:51:8)
+(fail) categoryLevels: sorted, unique, non-empty levels; level null exactly when two or more (none = null) [1.99ms]
+2471 | 	return error;
+2472 | }
+2473 | /** @internal */
+2474 | function throwIfFailed(out) {
+2475 | 	if (!out.failed) return;
+2476 | 	throw buildError(defaultReportMessage(out), out);
+                                                       ^
+error: Property failed after 2 tests
+{ seed: 277, path: "4:3:2:2:2", endOnFailure: true }
+Counterexample: [[{"level":null},{"level":"country"}]]
+Shrunk 4 time(s)
+
+Hint: Enable verbose mode in order to have the list of all failing values encountered during the run
+      at throwIfFailed (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/node_modules/fast-check/lib/fast-check.js:2476:49)
+      at assert (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/node_modules/fast-check/lib/fast-check.js:2662:7)
+      at <anonymous> (/tmp/claude-0/-home-user-calibration-diagnostics/e3fd4703-49ed-5a1b-996e-6eb38a998eb6/scratchpad/walk/frontend/packages/calibration-tree/src/step6-invariants.test.ts:80:6)
+(fail) for a category at one level, the new key equals the key base gave it [5.78ms]
+
+ 4 pass
+ 3 fail
+ 167360 expect() calls
+Ran 7 tests across 1 file. [1400.00ms]
