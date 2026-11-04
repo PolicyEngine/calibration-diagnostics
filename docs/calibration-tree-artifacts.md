@@ -181,8 +181,11 @@ one gets none). A Slack failure is logged and never fails the delivery.
 - **`releases.json`:** for an update to the `main` of a release repository
   whose country has a Slack channel, the webhook first reads `releases.json`
   at the commits before and after the update (only after, for a new `main`),
-  with `HF_TOKEN`, or `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset, read when
-  the server starts. A country without a channel (Belgium today) reads none.
+  with `HF_TOKEN`, or `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset. A country
+  without a channel (Belgium today) reads none. Both the token and which
+  countries have a channel are read when the server starts, so a change to
+  `HF_TOKEN` or to a `SLACK_WEBHOOK_POPULACE_*` variable takes effect only
+  with the next `Deploy production` run.
   After dispatching, it posts one message for each change:
   - a newly published build: "New Microcosm UK build `<release>/<build>`: now
     current", or "...: published, not current (current stays `<build>`)";
@@ -535,7 +538,10 @@ Hugging Face Activity page. Prefer a branch update that did not change
 `releases.json`, rather than a release tag or an update that published,
 promoted or withdrew a build, so the verification does not repeat a Slack
 release alert. Require an HTTP 200
-delivery. If the webhook has no prior delivery to replay, send an authenticated
+delivery whose answer has no `release_record_problem`: for a US or UK release
+repository, that shows the token can read its `releases.json` (a 404 for a
+repository without one counts as readable). If the webhook has no prior
+delivery to replay, send an authenticated
 release `main`-update payload containing the repository's current commit SHA.
 Require one `Publish calibration tree` workflow dispatch for the expected
 country and a successful workflow. Then send one authenticated staging
@@ -554,19 +560,36 @@ Failure meanings and recovery:
 - `503` from the application means a release repository's `releases.json`
   could not be read for a reason that may pass (a Hugging Face 5xx or 429, or
   a failed or timed-out request or body). Nothing was dispatched or posted,
-  and Hugging Face retries the delivery. If the webhook is suspended after
-  such failures:
-  1. Re-enable it.
-  2. Replay **every** delivery answered 503, oldest first, from the Activity
-     page. Each covers its own pair of commits, so replaying only the latest
-     would lose the earlier updates' alerts. Never replay a delivery that was
-     answered 200: its alerts were already posted.
-  3. For updates made while the webhook was suspended, which Hugging Face
-     never delivered, send one authenticated release `main`-update payload
-     per affected repository: `oldSha` is the last delivered commit and
-     `newSha` the repository's current head. It announces their net change
-     and dispatches one reconciliation. Send one staging `main`-update
-     payload per staging repository to redo the staging dispatch.
+  and Hugging Face retries the delivery. Hugging Face documents no limit on
+  those retries and no guarantee that the Activity page shows an event's
+  last answer, so follow these steps whenever deliveries were answered 503,
+  whether or not the webhook was suspended. The function logs are the
+  record of each delivery's answer: each 503 logs "could not be read;
+  answering 503", and each delivery answered 200 logs nothing of the kind.
+  1. If the webhook is suspended, re-enable it.
+  2. For each repository, find the deliveries whose latest answer was 503
+     and that were never later answered 200. Replay every one of them,
+     oldest first, from the Activity page. Each covers its own pair of
+     commits, so replaying only the latest would lose the earlier updates'
+     alerts. Don't replay a delivery once it has been answered 200: its
+     alerts were posted.
+  3. The repository's last delivered commit is now the `newSha` of its
+     latest delivery answered 200, counting step 2's replays. For updates
+     made after that commit (while the webhook was suspended, so never
+     delivered), send one authenticated release payload per affected
+     repository. Its `main` entry has that commit as `oldSha` and the
+     repository's current head as `newSha`; it announces their net change
+     once and dispatches one reconciliation. Add one `refs/tags/<tag>` entry,
+     with `oldSha` null and the tag's commit as `newSha`, for each tag created
+     in that time, or those tags get no tag alert. Send one staging
+     `main`-update payload per staging repository to redo the staging
+     dispatch.
+- An answer with `release_record_problem` means `releases.json` could not be
+  read for a lasting reason, such as a token without access or a record the
+  release writer's rules refuse. The dispatch and the tag alerts went ahead,
+  but no record alert was posted. Once the cause is corrected, replay that
+  delivery to post its record alerts. A replay also repeats any tag alert the
+  delivery carried, and runs the reconciliation again, which is idempotent.
 - A failed release workflow either stopped before reconciling any release (for
   example, the manifest, the release listing or the repository's tags could
   not be read, or one tag's folder or one folder's commit could not be

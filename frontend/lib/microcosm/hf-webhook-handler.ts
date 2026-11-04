@@ -54,9 +54,9 @@ const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 /**
  * A failure that a later attempt may not repeat: Hugging Face answered 5xx
- * or 429, or the request failed or timed out. The webhook answers 503 for
- * it, before dispatching or posting anything, so Hugging Face's retry of
- * the delivery does each of them once.
+ * or 429, or the request or a 200's body failed or timed out. The webhook
+ * answers 503 for it, before dispatching or posting anything, so Hugging
+ * Face's retry of the delivery does each of them once.
  */
 class TransientRecordReadError extends Error {}
 
@@ -118,9 +118,10 @@ const errorMessage = (error: unknown) => (error instanceof Error ? error.message
 
 /**
  * What one update of a release repository's main changed in releases.json.
- * A transient read failure asks for a retry. A record that cannot be read
- * for a lasting reason or is refused, before or after the update, is
- * logged and gives no alerts.
+ * Both reads are settled before deciding. A lasting failure on either side
+ * (a record that cannot be read for a lasting reason or is refused) decides:
+ * it is logged, gives no alerts and is named in the answer. Otherwise a
+ * transient failure on either side asks for a retry.
  */
 async function compareReleaseRecords(
   repo: string,

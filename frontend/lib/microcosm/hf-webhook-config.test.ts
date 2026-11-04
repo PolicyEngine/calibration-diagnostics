@@ -65,6 +65,6 @@ test("reads the Hugging Face token for releases.json alerts as the dashboard's o
 
 test("reads releases.json only for the countries whose Slack channel is configured", () => {
   const config = resolveHfWebhookConfig({ SLACK_WEBHOOK_POPULACE_UK: "https://hooks.slack.example/uk" });
-  expect([...(config.releaseAlertCountries ?? [])]).toEqual(["uk"]);
-  expect([...(resolveHfWebhookConfig({}).releaseAlertCountries ?? [])]).toEqual([]);
+  expect([...config.releaseAlertCountries]).toEqual(["uk"]);
+  expect([...resolveHfWebhookConfig({}).releaseAlertCountries]).toEqual([]);
 });

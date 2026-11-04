@@ -27,8 +27,10 @@ export interface HfWebhookConfig {
   huggingFaceToken: string | undefined;
   /**
    * The countries whose Slack channel for release alerts is configured
-   * (lib/slack.ts). Only their release repositories' releases.json is read
-   * for alerts, so only they can be answered 503 when the read fails.
+   * (lib/slack.ts), read once, when the server module starts: a changed
+   * SLACK_WEBHOOK_POPULACE_* variable takes effect with the next deployment.
+   * Only their release repositories' releases.json is read for alerts, so
+   * only they can be answered 503 when the read fails.
    */
   releaseAlertCountries: ReadonlySet<MicrocosmCountry>;
   githubRepository: string;
