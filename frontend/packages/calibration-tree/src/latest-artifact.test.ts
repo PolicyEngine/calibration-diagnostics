@@ -3256,9 +3256,9 @@ test("published cuts take their role from their own release manifest at their co
   }
 });
 
-// Removing a country's `release_layout: "build_folders"` returns it to the
-// release-folder readers, but the dashboard manifest keeps the entries the
-// build-folder readers published, named `<release>/<build>`. Those readers
+// A repository whose releases.json is removed again (a reverted switch) is
+// read from its tags and folders, but the dashboard manifest keeps the entries
+// the build-folder readers published, named `<release>/<build>`. Those readers
 // list only tags and folders, so such an entry must not stop them. Ids and
 // commits are synthetic.
 test("a build-folder entry in the manifest does not stop the tagged builds being listed", async () => {

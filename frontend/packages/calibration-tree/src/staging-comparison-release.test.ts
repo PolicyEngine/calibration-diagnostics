@@ -221,8 +221,8 @@ test("a staging run's pipeline id is read from its run manifest", async () => {
   }
 });
 
-// A country publishing build folders (microcosm-emitter#24): the local-area
-// release is the one releases.json gives a local-area role, and its builds
+// A repository with releases.json (microcosm-emitter#24): the local-area
+// release is the one releases.json gives the role local_area, and its builds
 // are named by their folders. All values are synthetic.
 const DENSE_OLDER_BUILD = `${DENSE_FOLDER}/uk-local-candidate-f100-s42-20261005T101500Z-0d0d0d0d`;
 const DENSE_NEWER_BUILD = `${DENSE_FOLDER}/uk-local-candidate-f100-s42-20261019T000432Z-ee5c2dbe`;

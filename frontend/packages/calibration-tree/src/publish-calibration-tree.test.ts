@@ -475,9 +475,9 @@ test("release reconciliation leaves a complete entry's metadata to the migration
 });
 
 // A Microcosm release (microcosm#823): one constant folder, one immutable tag
-// per build. All values are synthetic. The UK registration now publishes build
-// folders, so these tests name the release-folder layout they cover; its
-// readers stay until Microcosm deletes the pointer files (P5).
+// per build. All values are synthetic. The repository has no releases.json,
+// so it is read from its tags and pointer files, as the UK repository is
+// until Microcosm's switch commit.
 const NATIONAL_LINE = "microcosm-uk-2024-25-national";
 const DENSE_LINE = "microcosm-uk-2024-25-dense";
 const NATIONAL_CUT = `${NATIONAL_LINE}-20261019T083323Z-0a1b2c3d`;
