@@ -164,6 +164,25 @@ export interface MicrocosmTargetRow {
     dimension_set_key?: string | null;
     universe_constraint_set_key?: string | null;
     universe_constraint_count?: number | null;
+    // A target built from several facts lists them here, ratio operands
+    // included. When its identity spans several of them, its record, fact
+    // keys and universe constraint above are null, and so is its group-by
+    // value unless its hierarchy shows that every one of them shares it. A
+    // target whose identity is one fact, such as a ratio-scaled cell, shows
+    // that fact's fields. A single-fact target carries none of these four
+    // fields.
+    member_fact_count?: number | null;
+    member_fact_keys?: string[];
+    // Read in this order: null when it carries no complete group-by pair;
+    // otherwise false when its identity is one fact or its hierarchy lists
+    // the pair; otherwise true when the release has a hierarchy, which leaves
+    // the pair out; otherwise null. A hierarchy that leaves the pair out does
+    // not show that the facts differ in it.
+    layout_groupby_unlisted_across_facts?: boolean | null;
+    // True when its identity spans several facts, false when it is one fact.
+    // Unlike the group-by pair, this reads the same whichever identity fact
+    // Microcosm picks as the representative.
+    identity_spans_several_facts?: boolean;
     filters?: {
       key: string;
       label: string;
@@ -194,7 +213,10 @@ export interface MicrocosmVariableRow {
   variable: string;
   variable_label?: string | null;
   measure: string | null;
-  level: string;
+  // The category's one level, or null when its targets sit at several.
+  level: string | null;
+  // Every level the category's targets sit at.
+  levels: string[];
   policyengine_variables?: string[];
   policyengine_map_to?: string | null;
   policyengine_filter_variable?: string | null;
@@ -514,7 +536,10 @@ export interface MicrocosmComparisonVariableRow {
   source?: string | null;
   variable?: string | null;
   measure?: string | null;
+  // The category's one level, or null when its targets sit at several.
   level?: string | null;
+  // Every level the category's targets sit at.
+  levels: string[];
   common_targets: number;
   relative_targets: number;
   improved: number;

@@ -1198,7 +1198,9 @@ test("legacy Ledger metadata populates the complete Chronicle contract", () => {
         ledger_layout_measure_id: "taxable_interest_amount",
         ledger_dimension_set_key: "dimension-set",
         ledger_universe_constraint_set_key: "universe-set",
-        ledger_universe_constraint_count: 2,
+        // microcosm writes the count as a string (ledger_targets.py:5913) and
+        // TargetSpec turns every metadata value into one (registry.py:149-150).
+        ledger_universe_constraint_count: "2",
         ledger_filter_income_range: "1_to_10k",
         ledger_filter_filing_status: "all",
         source_measure_id: "taxable_interest_amount",
@@ -1250,6 +1252,33 @@ test("legacy Ledger metadata populates the complete Chronicle contract", () => {
       expect.objectContaining({ label: "Filing status", value: "All" }),
     ]),
   });
+});
+
+// A universe constraint count is a whole, non-negative number of constraint
+// rows (ledger_targets.py:5911-5913 at 0ff293b); any other string reads null.
+test("a universe constraint count that is not a whole count reads null", () => {
+  const counts = ["2.5", "-1", " ", ""];
+  const cal = calibration(
+    counts.map((count, index) => ({
+      name: `irs_soi.ty2022.historic_table_2.state_agi.ak.count_${index}.taxable_interest_amount@2024`,
+      target_name: `irs_soi.ty2022.historic_table_2.state_agi.ak.count_${index}.taxable_interest_amount`,
+      target: 100,
+      initial_estimate: 90,
+      final_estimate: 99,
+      metadata: {
+        ledger_source_record_id: `source-record-${index}`,
+        ledger_geography_id: "0400000US02",
+        ledger_universe_constraint_set_key: "universe-set",
+        ledger_universe_constraint_count: count,
+      },
+    })),
+  );
+  expect(
+    cal.rows.map((row) => {
+      const chronicle = row.chronicle as Record<string, unknown>;
+      return [chronicle.source_record_id, chronicle.universe_constraint_count];
+    }),
+  ).toEqual(counts.map((_, index) => [`source-record-${index}`, null]));
 });
 
 test("metadata-free dotted state targets retain geography and measure", () => {

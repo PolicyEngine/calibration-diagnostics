@@ -143,9 +143,13 @@ Where each field comes from, at SOURCE_COMMIT:
     ``refit_l0_selection`` (``us_runtime/exact_k_ladder.py:190-252``).
   - a target whose compile raises ``KeyError`` or ``ValueError`` goes to
     ``skipped`` (``matrix.py:326-334``), and the release drops its row rather
-    than changing it. Any other exception, and any failure of a target with
-    ``monetary_binding`` metadata (no FSA target has it), propagate instead
-    (``:301-306``, ``:327-332``), so no row changes there either.
+    than changing it. The release gate also fails the release when
+    calibration skips a target (``_release_gate_failures``, release tool
+    ``:9398-9399``); it leaves congressional district targets out of that
+    count unless the build gates them (``:9389-9397``). Any other exception,
+    and any failure of a target with ``monetary_binding`` metadata (no FSA
+    target has it), propagate instead (``matrix.py:301-306``, ``:327-332``),
+    so no row changes there either.
   - Apart from aging, nothing on that path changes a target's metadata or
     fields. After ``_target_row``, the diagnostics write still adds fields to
     the row (the attribution merge, below) and orders them (the typed writer,

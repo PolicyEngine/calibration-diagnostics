@@ -216,6 +216,15 @@ function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+// A count a release writes as metadata. Microcosm stores every metadata value
+// as a string (TargetSpec, registry.py:149-150), so "2" reads as 2; a number
+// still reads as itself. Anything but a whole, non-negative count reads null.
+function countOrNull(value: unknown): number | null {
+  const count =
+    typeof value === "string" && /^\s*\d+\s*$/.test(value) ? Number(value) : numberOrNull(value);
+  return count != null && Number.isSafeInteger(count) && count >= 0 ? count : null;
+}
+
 export function calibrationLossKind(
   diag: JsonObject,
   buildManifest: JsonObject,
@@ -479,8 +488,168 @@ function chronicleFactFields(metadata: JsonObject): ChronicleFactFields {
     layout_measure_id: stringValue(metadata.ledger_layout_measure_id),
     dimension_set_key: stringValue(metadata.ledger_dimension_set_key),
     universe_constraint_set_key: stringValue(metadata.ledger_universe_constraint_set_key),
-    universe_constraint_count: numberOrNull(metadata.ledger_universe_constraint_count),
+    universe_constraint_count: countOrNull(metadata.ledger_universe_constraint_count),
     filters: chronicleFilters(metadata),
+  };
+}
+
+// A JSON list of strings, as Microcosm writes ledger_member_fact_keys
+// (ledger_targets.py:1321-1327 at 0ff293b); anything else reads [].
+function stringListOrEmpty(value: unknown): string[] {
+  let list: unknown = value;
+  if (typeof value === "string") {
+    try {
+      list = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(list) && list.every((item) => typeof item === "string") ? list : [];
+}
+
+// How many base cells an allocated_residual_by_ratio receipt lists under
+// fact_keys.base (ledger_targets.py:3069-3071, :3188-3189 at 0ff293b), or
+// null when it cannot be read.
+function allocationBaseCellCount(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  try {
+    const base = asObject(asObject(JSON.parse(value)).fact_keys).base;
+    return Array.isArray(base) ? base.length : null;
+  } catch {
+    return null;
+  }
+}
+
+// Whether a multi-fact target's identity is its representative fact alone,
+// read from the metadata Microcosm writes for its value operation. When the
+// metadata does not say, it is not.
+function identityIsRepresentative(metadata: JsonObject): boolean {
+  switch (stringValue(metadata.ledger_value_operation)) {
+    case "scaled_by_ratio":
+      return true;
+    case "rolled_forward_by_ratio":
+      return countOrNull(metadata.ledger_value_base_cells) === 1;
+    case "allocated_residual_by_ratio":
+      return allocationBaseCellCount(metadata.ledger_allocation_receipt) === 1;
+    default:
+      return false;
+  }
+}
+
+// Whether a target's hierarchy lists the group-by pair its Chronicle fields
+// carry. A listed pair shows that every fact of the target's identity shares
+// it; an omitted pair shows nothing. _calibration_hierarchy builds the
+// hierarchy from the identity facts (ledger_targets.py:1096-1100 at 0ff293b),
+// and _inherited_dimensions (:1578-1611) lists a pair only when every fact's
+// ordinary dimensions share it (_common_dimensions, :1614-1623) or every
+// fact's layout carries the same group-by pair (_constant_text, :1649-1651).
+// The label validator reads a fact's group-by pair as one of its dimensions
+// (:1486-1490), but _inherited_dimensions does not, so two facts that both
+// describe one value, one in its dimensions and one in its layout, leave it
+// out of the hierarchy.
+function hierarchyListsGroupBy(row: TargetRow, chronicle: JsonObject): boolean {
+  const groupBy = stringValue(chronicle.layout_groupby_dimension)?.trim();
+  const value = stringValue(chronicle.layout_groupby_value_id)?.trim();
+  if (row.dimension_adapter !== "hierarchy" || !groupBy || !value) return false;
+  const dimensions = Array.isArray(row.target_dimensions) ? row.target_dimensions : [];
+  return dimensions.some((dimension) => {
+    const listed = asObject(dimension);
+    return listed.key === groupBy && listed.value_id === value;
+  });
+}
+
+// What a multi-fact target's fields establish about the group-by pair its
+// Chronicle fields carry, decided in this order:
+// - no complete pair: null, since the representative carries none;
+// - its identity is one fact, or its hierarchy lists the pair: "shared", since
+//   every identity fact then shares it. A one-fact identity counts whether or
+//   not the release has a hierarchy;
+// - its release has a hierarchy, which leaves the pair out: "unlisted", which
+//   does not show whether the identity facts share it;
+// - otherwise, a several-fact identity with no hierarchy to read: null.
+function groupByAcrossIdentity(
+  row: TargetRow,
+  chronicle: JsonObject,
+  oneFact: boolean,
+): "shared" | "unlisted" | null {
+  if (
+    !stringValue(chronicle.layout_groupby_dimension) ||
+    !stringValue(chronicle.layout_groupby_value_id)
+  ) {
+    return null;
+  }
+  if (oneFact || hierarchyListsGroupBy(row, chronicle)) return "shared";
+  return row.dimension_adapter === "hierarchy" ? "unlisted" : null;
+}
+
+// The Chronicle fields a page shows for a target. Microcosm stamps a target's
+// single-fact fields from one representative fact (ledger_targets.py:1085-1090
+// at 0ff293b). A target built from several facts also lists every one of them,
+// ratio operands included, in ledger_member_fact_count and
+// ledger_member_fact_keys (_multi_fact_reference_metadata, :1318-1341). Its
+// identity depends on its value operation (identity_facts, :1018-1035):
+// - scaled_by_ratio: the representative alone, the base cell that its
+//   numerator and denominator translate;
+// - rolled_forward_by_ratio: its base cells, which ledger_value_base_cells
+//   counts (:1174);
+// - allocated_residual_by_ratio: the cells its selector matches, the base its
+//   ledger_allocation_receipt lists;
+// - calendar_year_window_scaled_by_ratio: its window, two years of each
+//   series (:4270-4272, :4331);
+// - any other operation: every fact.
+// For the first three operations the representative is the first base cell
+// (_value_representative_fact, :1232-1245), so an identity of one fact is the
+// representative. For any other multi-fact operation it is the fact of the
+// latest period, the last in the tuple on a tie, taken from the window for
+// calendar_year_window_scaled_by_ratio (:1012-1016). A sum's tuple comes from
+// its resolver sorted by fact key (:2178-2183), so which identity fact becomes
+// the representative, and so which group-by pair, dimensions and record the
+// target carries, can turn on a fact's key alone.
+//
+// A target whose identity is one fact shows its fields as they are, with
+// member_fact_count, member_fact_keys, layout_groupby_unlisted_across_facts
+// and identity_spans_several_facts (false) added. An identity of several facts
+// has no one record or fact key, so those read null, and
+// identity_spans_several_facts reads true. Like the hierarchy's dimensions,
+// and unlike the representative's group-by pair, it reads the same whichever
+// identity fact is the representative, so the Dimensions column reads it. Its
+// group-by value shows when its hierarchy lists the pair, because every
+// identity fact then shares it, and reads null otherwise. layout_groupby_unlisted_across_facts reads true when its
+// hierarchy leaves out the pair the representative carries, which does not
+// show that the facts differ in it (see hierarchyListsGroupBy and
+// groupByAcrossIdentity for its order). Nothing Microcosm writes says whether
+// the identity facts share a universe constraint, so its set key and count
+// read null. ledger_aggregation_varying_dimensions cannot settle either
+// question: it compares each fact's ordinary dimensions, ratio operands
+// included, and counts a dimension one fact carries and another lacks as
+// varying (:1323, :1626-1646). The row itself keeps every field, so a
+// comparison still matches it by fact key. A single-fact target's fields show
+// as they are, with none of these fields added.
+function shownChronicle(row: TargetRow): unknown {
+  const metadata = asObject(row.metadata);
+  const memberFactCount = countOrNull(metadata.ledger_member_fact_count);
+  if (memberFactCount == null || memberFactCount <= 1) return row.chronicle;
+  const chronicle = asObject(row.chronicle);
+  const oneFact = identityIsRepresentative(metadata);
+  const groupBy = groupByAcrossIdentity(row, chronicle, oneFact);
+  const members = {
+    member_fact_count: memberFactCount,
+    member_fact_keys: stringListOrEmpty(metadata.ledger_member_fact_keys),
+    layout_groupby_unlisted_across_facts: groupBy == null ? null : groupBy === "unlisted",
+    identity_spans_several_facts: !oneFact,
+  };
+  if (oneFact) return { ...chronicle, ...members };
+  return {
+    ...chronicle,
+    ...members,
+    fact_key: null,
+    source_record_id: null,
+    semantic_fact_key: null,
+    aggregate_fact_key: null,
+    legacy_fact_key: null,
+    layout_groupby_value_id: groupBy === "shared" ? chronicle.layout_groupby_value_id : null,
+    universe_constraint_set_key: null,
+    universe_constraint_count: null,
   };
 }
 
@@ -856,6 +1025,23 @@ export interface TargetDimension {
   values: string[];
 }
 
+// A dimension whose value is its row's geography, such as an FSA state
+// target's Borrower location, only repeats the Geography facet: under each
+// geography it holds one value, and the calibration map adds no tier for a
+// dimension with one value under a node (calibration-tree.ts:601-610). A
+// dimension that merely has one value per geography in this page (one
+// target per region, each of a different sex) is a real breakdown and stays.
+function repeatsGeography(rows: TargetRow[], key: string): boolean {
+  let carried = false;
+  for (const row of rows) {
+    const value = rowFacetValue(row, key);
+    if (!value) continue;
+    if (value !== rowFacetValue(row, "geography")) return false;
+    carried = true;
+  }
+  return carried;
+}
+
 function computeDimensions(rows: TargetRow[]): TargetDimension[] {
   const geographyLabel =
     rows.length > 0 && rows.every((row) => row.level === "region")
@@ -881,6 +1067,7 @@ function computeDimensions(rows: TargetRow[]): TargetDimension[] {
       ),
     ];
     if (values.length <= 1) continue;
+    if (candidate.key !== "geography" && repeatsGeography(rows, candidate.key)) continue;
     const label = candidate.label ?? classifyDimension(values);
     const ranks = new Map<string, number>();
     let everyValueRanked = true;
@@ -1477,6 +1664,18 @@ export function microcosmTargetGeographies(rows: TargetRow[]): string[] {
     );
 }
 
+// Every level a category's targets sit at, and its one level when it has
+// just one. A category at two levels (an FSA measure: 14 country and 51 state
+// targets) has no single level, so its level is null. A category with no
+// level takes `none`, which each caller keeps from before.
+function categoryLevels(
+  group: TargetRow[],
+  none: string | null,
+): { level: string | null; levels: string[] } {
+  const levels = microcosmTargetLevels(group);
+  return { level: levels.length > 1 ? null : (levels[0] ?? none), levels };
+}
+
 export function microcosmVariableSummary(rows: TargetRow[]) {
   const groups = new Map<string, TargetRow[]>();
   for (const row of rows) {
@@ -1523,7 +1722,7 @@ export function microcosmVariableSummary(rows: TargetRow[]) {
         variable: String(first.variable ?? ""),
         variable_label: uniqueString("variable_label"),
         measure: first.measure ? String(first.measure) : null,
-        level: String(first.level ?? ""),
+        ...categoryLevels(group, ""),
         policyengine_variables: policyengineVariables,
         policyengine_map_to: uniqueString("policyengine_map_to"),
         policyengine_filter_variable: uniqueString("policyengine_filter_variable"),
@@ -2699,7 +2898,7 @@ function targetResponseRow(row: TargetRow): TargetRow {
     aggregation: row.aggregation,
     measure_name: row.measure_name,
     period: row.period,
-    chronicle: row.chronicle,
+    chronicle: shownChronicle(row),
     estimate_warning: row.estimate_warning,
     calibration_status: row.calibration_status,
     calibration_status_label: row.calibration_status_label,
@@ -2717,14 +2916,18 @@ function githubSearchUrl(query: string): string {
 }
 
 function investigationSearches(row: TargetRow): InvestigationSearch[] {
-  const chronicle = asObject(row.chronicle);
+  const chronicle = asObject(shownChronicle(row));
   const metadata = asObject(row.metadata);
+  const memberFactKeys = Array.isArray(chronicle.member_fact_keys)
+    ? chronicle.member_fact_keys.map(stringValue)
+    : [];
   const terms: [string, string | null][] = [
     ["Source record", stringValue(chronicle.source_record_id)],
     ["Fact key", stringValue(chronicle.fact_key)],
     ["Semantic fact", stringValue(chronicle.semantic_fact_key)],
     ["Aggregate fact", stringValue(chronicle.aggregate_fact_key)],
     ["Legacy fact", stringValue(chronicle.legacy_fact_key)],
+    ...memberFactKeys.map((key): [string, string | null] => ["Member fact", key]),
     ["Record set", stringValue(chronicle.layout_record_set_id)],
     ["Measure concept", stringValue(chronicle.measure_concept)],
     ["Source concept", stringValue(chronicle.source_concept)],
@@ -3144,7 +3347,9 @@ export function latestMicrocosmTargetInvestigation(requestUrl: string, cal: Cali
     };
   }
   const row = cal.rows.find((candidate) => {
-    const chronicle = asObject(candidate.chronicle);
+    // A target is found by the record and keys it shows: a target whose
+    // identity spans several facts by its own name, not by one member's.
+    const chronicle = asObject(shownChronicle(candidate));
     return [
       stringValue(candidate.name),
       stringValue(candidate.base_name),
@@ -3156,16 +3361,49 @@ export function latestMicrocosmTargetInvestigation(requestUrl: string, cal: Cali
     ].some((value) => value === target);
   });
   if (!row) {
+    // A member fact is not the target it belongs to, and one fact can be a
+    // member of many targets: Microcosm restates its twelve CGT Table 5
+    // region cells by one Table 1 share (tools/generate_uk_target_references.py:1117-1119
+    // at 0ff293b). So the answer names each, for the caller to choose.
+    const memberOf = cal.rows
+      .filter((candidate) => listsMemberFact(candidate, target))
+      .map((candidate) => ({
+        name: stringValue(candidate.name),
+        target_label: stringValue(candidate.target_label),
+      }));
+    const targets = `${memberOf.length} target${memberOf.length === 1 ? "" : "s"}`;
     return {
       available: false,
       release_id: cal.release_id,
-      detail: `Target not found: ${target}`,
+      detail: memberOf.length
+        ? `Target not found: ${target}. It is a member fact of ${targets}: ` +
+          `${memberOf.map((candidate) => candidate.name).join(", ")}.`
+        : `Target not found: ${target}`,
+      member_of: memberOf,
     };
   }
   return {
     available: true,
     ...targetInvestigationPacket(row, cal),
   };
+}
+
+// Whether a target built from several facts lists one of them under this
+// key: the key Microcosm lists it under in ledger_member_fact_keys, or any
+// record id or key of its representative, which the row keeps.
+function listsMemberFact(row: TargetRow, key: string): boolean {
+  const shown = asObject(shownChronicle(row));
+  const members = Array.isArray(shown.member_fact_keys) ? shown.member_fact_keys : [];
+  if (!members.length) return false;
+  if (members.includes(key)) return true;
+  const representative = asObject(row.chronicle);
+  return [
+    representative.source_record_id,
+    representative.fact_key,
+    representative.semantic_fact_key,
+    representative.aggregate_fact_key,
+    representative.legacy_fact_key,
+  ].some((value) => stringValue(value) === key);
 }
 
 // --- version-over-version comparison ----------------------------------------
@@ -3217,7 +3455,7 @@ function comparisonVariableRows(rows: TargetRow[]) {
         source: sample.source ?? null,
         variable: sample.variable ?? null,
         measure: sample.measure ?? null,
-        level: sample.level ?? null,
+        ...categoryLevels(group, null),
         common_targets: group.length,
         relative_targets: relativeRows.length,
         improved: relativeRows.filter((row) => (numberOrNull(row.abs_rel_delta) ?? 0) < -1e-9).length,
