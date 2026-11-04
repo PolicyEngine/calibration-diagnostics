@@ -341,6 +341,73 @@ describe("a target built from several facts shows the identity Microcosm gives i
     });
   });
 
+  // A member fact of a target is not the target, and one fact can be a member
+  // of many targets: one CGT Table 1 share is the numerator of every Table 5
+  // region cell it scales. So a lookup by a member fact finds no target, and
+  // names every target that lists it, for the investigation to go on with
+  // the one it means. The investigation packet script prints the detail
+  // (scripts/microcosm-investigation-packet.mjs:85-86).
+  test("a lookup by a member fact names the targets that list it", () => {
+    const parentPlus = fsaRow(PARENT_PLUS).metadata as Record<string, string>;
+    const excluding = fsaRow(EXCLUDING_PARENT_PLUS);
+    const excludingMetadata = excluding.metadata as Record<string, string>;
+    const loanTypes = JSON.parse(excludingMetadata.ledger_member_fact_keys) as string[];
+    const scaledAlabama = ONE_FACT_IDENTITY[0].row();
+    const scaledParentPlus = multiFactRow(
+      PARENT_PLUS,
+      "ed_fsa.test.parent_plus_scaled",
+      "scaled_by_ratio",
+      [parentPlus.ledger_fact_key, NUMERATOR, DENOMINATOR],
+    );
+    const cal = releaseOf([excluding, scaledAlabama, scaledParentPlus]);
+    const RELEASE_ID = "populace-us-2024-multi-fact-test";
+    // The answer as the API sends it.
+    const answer = (key: string) => lookup(cal, key) as unknown as Row;
+    const excludingTarget = {
+      name: `${EXCLUDING_PARENT_PLUS}@2024`,
+      target_label: "Federal student loan balance excluding Parent PLUS",
+    };
+
+    // A loan type of the balance excluding Parent PLUS, by the key Microcosm
+    // lists it under.
+    expect(answer(loanTypes[0])).toEqual({
+      available: false,
+      release_id: RELEASE_ID,
+      detail: `Target not found: ${loanTypes[0]}. It is a member fact of 1 target: ${excludingTarget.name}.`,
+      member_of: [excludingTarget],
+    });
+    // Its representative loan type, by the record id and keys the row keeps.
+    for (const key of [
+      excludingMetadata.ledger_source_record_id,
+      excludingMetadata.ledger_semantic_fact_key,
+      excludingMetadata.ledger_legacy_fact_key,
+    ]) {
+      expect(answer(key)).toMatchObject({ available: false, member_of: [excludingTarget] });
+    }
+    // The numerator both ratio-scaled cells share names both.
+    const numerator = answer(NUMERATOR);
+    expect(numerator).toMatchObject({
+      available: false,
+      member_of: [
+        { name: String(scaledAlabama.name), target_label: "Federal student loan balance, Alabama" },
+        { name: String(scaledParentPlus.name), target_label: "Parent PLUS loan balance" },
+      ],
+    });
+    expect(numerator.detail).toBe(
+      `Target not found: ${NUMERATOR}. It is a member fact of 2 targets: ` +
+        `${scaledAlabama.name}, ${scaledParentPlus.name}.`,
+    );
+    // A cell's own base fact still finds the cell.
+    expect(answer(parentPlus.ledger_fact_key)).toMatchObject({ available: true });
+    // A key that no target lists says nothing more.
+    expect(answer("ledger.aggregate_fact.v2:no_such_fact")).toEqual({
+      available: false,
+      release_id: RELEASE_ID,
+      detail: "Target not found: ledger.aggregate_fact.v2:no_such_fact",
+      member_of: [],
+    });
+  });
+
   // A linear combination's identity is every fact (:1034). The five loan
   // types differ in their record, keys, group-by value and universe
   // constraint, so none shows. This is the result before this test was
