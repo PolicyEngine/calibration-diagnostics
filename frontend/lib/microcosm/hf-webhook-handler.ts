@@ -7,6 +7,7 @@ import { postReleaseAlert, postReleaseRecordAlert } from "@/lib/slack";
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 import {
   RELEASES_RECORD_PATH,
+  parseReleasesRecordBytes,
   releasesRecordFromResponse,
   type ReleasesRecord,
 } from "@policyengine/calibration-tree/release-record";
@@ -77,6 +78,9 @@ async function readReleasesRecordAt(
     throw new Error(`Cannot read ${RELEASES_RECORD_PATH} of ${repo} at ${commitSha}.`);
   }
   let response: Response;
+  let body: ArrayBuffer | null = null;
+  // The request and, for a 200, its body: the 15-second timeout covers both,
+  // and a failure in either may pass.
   try {
     response = await fetchImplementation(
       `https://huggingface.co/datasets/${repo}/resolve/${commitSha}/${RELEASES_RECORD_PATH}`,
@@ -88,6 +92,7 @@ async function readReleasesRecordAt(
         signal: AbortSignal.timeout(15_000),
       },
     );
+    if (response.ok) body = await response.arrayBuffer();
   } catch (error) {
     throw new TransientRecordReadError(
       `Reading ${RELEASES_RECORD_PATH} at ${commitSha} failed: ` +
@@ -99,13 +104,17 @@ async function readReleasesRecordAt(
       `Hugging Face returned ${response.status} for ${RELEASES_RECORD_PATH} at ${commitSha}.`,
     );
   }
-  return releasesRecordFromResponse(response);
+  // A 404 is "no record" or a lasting failure; any other status is lasting.
+  if (!body) return releasesRecordFromResponse(response);
+  return parseReleasesRecordBytes(new Uint8Array(body));
 }
 
 type RecordComparison =
   | { kind: "compared"; alerts: ReleaseRecordAlert[]; unannounced: UnannouncedRecordChange[] }
-  | { kind: "unavailable" }
+  | { kind: "unavailable"; problem: string }
   | { kind: "retry"; reason: string };
+
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
  * What one update of a release repository's main changed in releases.json.
@@ -120,28 +129,34 @@ async function compareReleaseRecords(
   fetchImplementation: FetchImplementation,
 ): Promise<RecordComparison> {
   const span = `${update.oldSha ?? "none"} to ${update.newSha ?? "none"}`;
-  try {
-    const [before, after] = await Promise.all([
-      readReleasesRecordAt(repo, update.oldSha, config, fetchImplementation),
-      readReleasesRecordAt(repo, update.newSha, config, fetchImplementation),
-    ]);
-    return {
-      kind: "compared",
-      alerts: releaseRecordAlerts(before, after),
-      unannounced: unannouncedRecordChanges(before, after),
-    };
-  } catch (error) {
-    if (error instanceof TransientRecordReadError) {
-      console.error(
-        `${RELEASES_RECORD_PATH} of ${repo} (${span}) could not be read; ` +
-          "answering 503 so that Hugging Face retries the delivery:",
-        error.message,
-      );
-      return { kind: "retry", reason: error.message };
-    }
-    console.error(`No ${RELEASES_RECORD_PATH} alerts for ${repo} (${span}):`, error);
-    return { kind: "unavailable" };
+  const [before, after] = await Promise.allSettled([
+    readReleasesRecordAt(repo, update.oldSha, config, fetchImplementation),
+    readReleasesRecordAt(repo, update.newSha, config, fetchImplementation),
+  ]);
+  const failures = [before, after].flatMap((side) => (side.status === "rejected" ? [side.reason] : []));
+  // A lasting failure on either side decides: a retry cannot make that side
+  // readable, so the update gets no record alerts either way.
+  const lasting = failures.find((reason) => !(reason instanceof TransientRecordReadError));
+  if (lasting !== undefined) {
+    console.error(`No ${RELEASES_RECORD_PATH} alerts for ${repo} (${span}):`, lasting);
+    return { kind: "unavailable", problem: errorMessage(lasting) };
   }
+  if (failures.length > 0) {
+    const reason = failures.map(errorMessage).join(" ");
+    console.error(
+      `${RELEASES_RECORD_PATH} of ${repo} (${span}) could not be read; ` +
+        "answering 503 so that Hugging Face retries the delivery:",
+      reason,
+    );
+    return { kind: "retry", reason };
+  }
+  const beforeRecord = before.status === "fulfilled" ? before.value : null;
+  const afterRecord = after.status === "fulfilled" ? after.value : null;
+  return {
+    kind: "compared",
+    alerts: releaseRecordAlerts(beforeRecord, afterRecord),
+    unannounced: unannouncedRecordChanges(beforeRecord, afterRecord),
+  };
 }
 
 function logUnannounced(repo: string, update: UpdatedRef, change: UnannouncedRecordChange) {
@@ -297,10 +312,13 @@ export function createHfWebhookHandler(
     // releases.json is read before anything is dispatched or posted. A
     // transient failure then answers 503 with nothing done, and Hugging
     // Face's retry of the delivery does everything once.
+    // Only a release repository whose country has a Slack channel can get
+    // record alerts, so only its record is read and only it risks a 503.
     const mainUpdate = mainUpdates.at(-1);
-    const comparison = registration.kind === "release" && mainUpdate
-      ? await compareReleaseRecords(repo, mainUpdate, config, fetchImplementation)
-      : null;
+    const comparison =
+      registration.kind === "release" && mainUpdate && config.releaseAlertCountries.has(country)
+        ? await compareReleaseRecords(repo, mainUpdate, config, fetchImplementation)
+        : null;
     if (comparison?.kind === "retry") {
       return NextResponse.json(
         { detail: `Unable to read ${RELEASES_RECORD_PATH}; retry the delivery.` },
@@ -364,6 +382,9 @@ export function createHfWebhookHandler(
       })),
       alerted,
       ...(recordAlerted ? { release_record_alerted: recordAlerted } : {}),
+      // A record that could not be read for a lasting reason, so that the
+      // answer tells it apart from a record that did not change.
+      ...(comparison?.kind === "unavailable" ? { release_record_problem: comparison.problem } : {}),
     });
   };
 }

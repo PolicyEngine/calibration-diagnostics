@@ -85,6 +85,18 @@ function lineSections(lines: string[], maxBlocks: number) {
   return sections.map(section);
 }
 
+/**
+ * Whether the country has a Slack channel for release alerts: its incoming
+ * webhook variable is set in `environment`.
+ */
+export function hasReleaseAlertChannel(
+  country: MicrocosmCountry,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  const webhookEnv = WEBHOOK_ENV[country];
+  return Boolean(webhookEnv && environment[webhookEnv]);
+}
+
 // Post to the country's Slack incoming webhook. No-op (returns false) when
 // that channel's webhook env var is unset.
 async function postToCountryChannel(

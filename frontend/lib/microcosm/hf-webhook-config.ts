@@ -7,6 +7,8 @@ import {
 } from "@policyengine/calibration-tree/countries";
 import { huggingFaceReadToken } from "@policyengine/calibration-tree/latest-artifact";
 
+import { hasReleaseAlertChannel } from "@/lib/slack";
+
 export interface WebhookRepositoryRegistration {
   country: MicrocosmCountry;
   kind: "release" | "staging";
@@ -23,6 +25,12 @@ export interface HfWebhookConfig {
    * redeploy, as a new HF_WEBHOOK_SECRET does.
    */
   huggingFaceToken: string | undefined;
+  /**
+   * The countries whose Slack channel for release alerts is configured
+   * (lib/slack.ts). Only their release repositories' releases.json is read
+   * for alerts, so only they can be answered 503 when the read fails.
+   */
+  releaseAlertCountries: ReadonlySet<MicrocosmCountry>;
   githubRepository: string;
   githubWorkflow: string;
   repositories: ReadonlyMap<string, WebhookRepositoryRegistration>;
@@ -58,6 +66,9 @@ export function resolveHfWebhookConfig(
     secret: environment.HF_WEBHOOK_SECRET,
     githubToken: environment.GITHUB_ACTIONS_DISPATCH_TOKEN?.trim(),
     huggingFaceToken: huggingFaceReadToken(environment),
+    releaseAlertCountries: new Set(
+      selectableCountries().filter((country) => hasReleaseAlertChannel(country, environment)),
+    ),
     githubRepository:
       environment.CALIBRATION_TREE_GITHUB_REPOSITORY?.trim() ||
       "PolicyEngine/calibration-diagnostics",
