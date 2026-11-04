@@ -14,6 +14,12 @@ export interface WebhookRepositoryRegistration {
 export interface HfWebhookConfig {
   secret: string | undefined;
   githubToken: string | undefined;
+  /**
+   * Reads a release repository's releases.json for the Slack release alerts
+   * (the UK repository is private). From HF_TOKEN, or else
+   * HUGGINGFACE_TOKEN, as the dashboard's other Hugging Face reads.
+   */
+  huggingFaceToken?: string | undefined;
   githubRepository: string;
   githubWorkflow: string;
   repositories: ReadonlyMap<string, WebhookRepositoryRegistration>;
@@ -48,6 +54,8 @@ export function resolveHfWebhookConfig(
   return {
     secret: environment.HF_WEBHOOK_SECRET,
     githubToken: environment.GITHUB_ACTIONS_DISPATCH_TOKEN?.trim(),
+    huggingFaceToken:
+      environment.HF_TOKEN?.trim() || environment.HUGGINGFACE_TOKEN?.trim() || undefined,
     githubRepository:
       environment.CALIBRATION_TREE_GITHUB_REPOSITORY?.trim() ||
       "PolicyEngine/calibration-diagnostics",

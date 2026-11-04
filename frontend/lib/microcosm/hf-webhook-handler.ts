@@ -2,10 +2,16 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { postReleaseAlert } from "@/lib/slack";
+import { postReleaseAlert, postReleaseRecordAlert } from "@/lib/slack";
 
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
+import {
+  RELEASES_RECORD_PATH,
+  releasesRecordFromResponse,
+  type ReleasesRecord,
+} from "@policyengine/calibration-tree/release-record";
 import type { HfWebhookConfig } from "./hf-webhook-config";
+import { releaseRecordAlerts, type ReleaseRecordAlert } from "./release-record-alerts";
 
 interface UpdatedRef {
   ref: string;
@@ -31,8 +37,80 @@ type FetchImplementation = (
 ) => Promise<Response>;
 
 export interface HfWebhookHandlerDependencies {
+  /** GitHub dispatches and Hugging Face reads of releases.json. */
   fetch: FetchImplementation;
   postReleaseAlert: typeof postReleaseAlert;
+  postReleaseRecordAlert: typeof postReleaseRecordAlert;
+}
+
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
+const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+/**
+ * The repository's releases.json at a commit, or null when it has none there
+ * (Hugging Face's 404 for the file). Throws when it cannot be read or the
+ * release writer's rules refuse it (releasesRecordFromResponse).
+ */
+async function readReleasesRecordAt(
+  repo: string,
+  commitSha: string | null,
+  config: HfWebhookConfig,
+  fetchImplementation: FetchImplementation,
+): Promise<ReleasesRecord | null> {
+  if (commitSha == null) return null;
+  if (!REPOSITORY_NAME.test(repo) || !COMMIT_SHA.test(commitSha)) {
+    throw new Error(`Cannot read ${RELEASES_RECORD_PATH} of ${repo} at ${commitSha}.`);
+  }
+  const response = await fetchImplementation(
+    `https://huggingface.co/datasets/${repo}/resolve/${commitSha}/${RELEASES_RECORD_PATH}`,
+    {
+      headers: config.huggingFaceToken
+        ? { Authorization: `Bearer ${config.huggingFaceToken}` }
+        : {},
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  return releasesRecordFromResponse(response);
+}
+
+/**
+ * What one update of a release repository's main changed in releases.json.
+ * A record that cannot be read or is refused, before or after the update, is
+ * logged and gives no alerts.
+ */
+async function releaseRecordAlertsForUpdate(
+  repo: string,
+  update: UpdatedRef,
+  config: HfWebhookConfig,
+  fetchImplementation: FetchImplementation,
+): Promise<ReleaseRecordAlert[]> {
+  try {
+    const [before, after] = await Promise.all([
+      readReleasesRecordAt(repo, update.oldSha, config, fetchImplementation),
+      readReleasesRecordAt(repo, update.newSha, config, fetchImplementation),
+    ]);
+    return releaseRecordAlerts(before, after);
+  } catch (error) {
+    console.error(
+      `No ${RELEASES_RECORD_PATH} alerts for ${repo} ` +
+        `(${update.oldSha ?? "none"} to ${update.newSha ?? "none"}):`,
+      error,
+    );
+    return [];
+  }
+}
+
+function describeAlert(alert: ReleaseRecordAlert): string {
+  switch (alert.kind) {
+    case "published":
+    case "withdrawn":
+      return `${alert.kind} ${alert.release}/${alert.build}`;
+    case "current_changed":
+      return `current ${alert.release}: ${alert.from ?? "none"} to ${alert.to ?? "none"}`;
+    case "record_created":
+      return `created ${RELEASES_RECORD_PATH}`;
+  }
 }
 
 const TAG_PREFIX = "refs/tags/";
@@ -100,6 +178,8 @@ export function createHfWebhookHandler(
       globalThis.fetch(input, init));
   const sendReleaseAlert =
     dependencies.postReleaseAlert ?? postReleaseAlert;
+  const sendReleaseRecordAlert =
+    dependencies.postReleaseRecordAlert ?? postReleaseRecordAlert;
 
   return async function handleHfWebhook(request: Request) {
     if (!secretOk(request, config.secret)) {
@@ -183,6 +263,29 @@ export function createHfWebhookHandler(
       }
     }
 
+    // A release repository with releases.json publishes builds without tags:
+    // its alerts come from comparing the record before and after the update.
+    // A repository without releases.json reads as having none on both sides
+    // and gets none, so its tag alerts above are its only ones.
+    const recordAlerted: string[] = [];
+    const mainUpdate = mainUpdates.at(-1);
+    if (registration.kind === "release" && mainUpdate) {
+      const alerts = await releaseRecordAlertsForUpdate(
+        repo,
+        mainUpdate,
+        config,
+        fetchImplementation,
+      );
+      for (const alert of alerts) {
+        try {
+          const sent = await sendReleaseRecordAlert({ country, repo, alert });
+          if (sent) recordAlerted.push(describeAlert(alert));
+        } catch (error) {
+          console.error(`Slack alert failed for ${describeAlert(alert)}:`, error);
+        }
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       country,
@@ -192,6 +295,7 @@ export function createHfWebhookHandler(
         hf_commit_sha: dispatch.hfCommitSha,
       })),
       alerted,
+      release_record_alerted: recordAlerted,
     });
   };
 }

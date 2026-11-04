@@ -170,6 +170,32 @@ the manifest write was stored and only its read-back check failed ("Calibration
 tree manifest verification failed."). The latest-release selection is never
 moved to a failed release.
 
+#### Slack release alerts
+
+After dispatching the reconciliation, the webhook posts release alerts to the
+country's Slack channel (`SLACK_WEBHOOK_POPULACE_US` or
+`SLACK_WEBHOOK_POPULACE_UK`; a country without one gets none). Failures are
+logged and never fail the delivery.
+
+- **New tags:** one "New Microcosm … release" message per new tag, as before.
+- **`releases.json`:** for an update to a release repository's `main`, the
+  webhook reads `releases.json` at the commits before and after the update,
+  with `HF_TOKEN` (or `HUGGINGFACE_TOKEN`), and posts one message for each
+  change:
+  - a newly published build: "New Microcosm UK build `<release>/<build>`: now
+    current", or "...: published, not current (current stays `<build>`)";
+  - a change of current build: "Microcosm UK `<release>`: current build
+    changed from `<old>` to `<new>`";
+  - a withdrawal: "Microcosm UK build `<release>/<build>` withdrawn".
+
+  Each message carries the repository, the publication time when known and the
+  dashboard link. The update that first creates `releases.json` gets one
+  summary message ("Microcosm UK now records its releases in `releases.json`:
+  N builds in M releases", with each release's current build) instead of one
+  per listed build. A repository without `releases.json` on either side gets
+  none of these. A record that cannot be read or that the release writer's
+  rules refuse, before or after the update, is logged and nothing is posted.
+
 #### Microcosm release lines
 
 Microcosm publishes a release line (microcosm#823) under a constant release id:
@@ -475,8 +501,10 @@ the application, then update the Hugging Face setting before re-enabling the
 webhook.
 
 After enabling the webhook, replay a release-repository `main` update from the
-Hugging Face Activity page. Prefer a branch update rather than a release tag so
-the verification does not repeat a Slack release alert. Require an HTTP 200
+Hugging Face Activity page. Prefer a branch update that did not change
+`releases.json`, rather than a release tag or an update that published,
+promoted or withdrew a build, so the verification does not repeat a Slack
+release alert. Require an HTTP 200
 delivery. If the webhook has no prior delivery to replay, send an authenticated
 release `main`-update payload containing the repository's current commit SHA.
 Require one `Publish calibration tree` workflow dispatch for the expected
