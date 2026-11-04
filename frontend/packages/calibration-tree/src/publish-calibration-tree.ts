@@ -1047,7 +1047,7 @@ interface PublishReleaseOptions {
   dryRun?: boolean;
   expectedIndexSha256?: string;
   indexCreatedAt?: string | null;
-  uploadBundle?: CalibrationManifestStore["uploadBundle"];
+  uploadBundle: CalibrationManifestStore["uploadBundle"];
 }
 
 async function publishRelease(options: PublishReleaseOptions) {
@@ -1062,8 +1062,7 @@ async function publishRelease(options: PublishReleaseOptions) {
     dryRun = false,
     expectedIndexSha256,
     indexCreatedAt,
-    uploadBundle = (bundle: CalibrationTreeBundle) =>
-      uploadCalibrationTreeBundle({ bundle, token: blobToken }),
+    uploadBundle,
   } = options;
   // The folder is interpolated into authenticated Hugging Face URLs.
   const releaseDirectory = releaseOrBuildFolderId(options.releaseDirectory ?? id);
@@ -1253,8 +1252,12 @@ export interface CalibrationManifestStore {
     entry: CalibrationTreeManifestEntry,
     makeLatest?: boolean,
   ): Promise<CalibrationTreeManifest>;
-  /** Uploads a built bundle; defaults to the Blob upload. */
-  uploadBundle?(
+  /**
+   * Uploads a built bundle. Required: the store is the only route by which
+   * a publication writes to Blob, so a store in a test never falls back to
+   * the real upload.
+   */
+  uploadBundle(
     bundle: CalibrationTreeBundle,
   ): ReturnType<typeof uploadCalibrationTreeBundle>;
 }
@@ -1299,7 +1302,7 @@ async function publishStagingSource(options: {
   source: ResolvedStagingSource;
   repository: { repo: string };
   revisionSha: string;
-  uploadBundle: NonNullable<CalibrationManifestStore["uploadBundle"]>;
+  uploadBundle: CalibrationManifestStore["uploadBundle"];
   existing: CalibrationTreeManifestEntry | null;
   existingIndex: Awaited<ReturnType<typeof auditCalibrationTreeBuild>>["index"];
   dryRun: boolean;
@@ -1415,8 +1418,7 @@ export async function reconcileStagingBuilds(
   const finalized = runs.runs.filter((run) =>
     FINAL_STAGING_STATUSES.has(run.status ?? ""),
   );
-  const uploadBundle = store.uploadBundle ??
-    ((bundle: CalibrationTreeBundle) => uploadCalibrationTreeBundle({ bundle, token: blobToken }));
+  const uploadBundle = store.uploadBundle;
   let manifest = await store.readManifest();
   let blobs = await store.listBlobs();
   const outcomes: ReconciliationOutcome[] = [];
@@ -1634,7 +1636,8 @@ export async function reconcileReleaseBuilds(
     dryRun,
     store,
     record
-      ? async () => recordedLatest(record, inventory.candidates, inventory.ineligible)
+      ? async () =>
+        recordedLatest(record, inventory.candidates, [...inventory.ineligible, ...inventory.failed])
       : (current) => readUpstreamLatest(country, headSha, current),
   );
   return {
@@ -1694,19 +1697,23 @@ async function selectLatestRelease(
 
 // The latest release for a repository with releases.json: the record's
 // current build of its default release, at the commit reconciliation pinned
-// it to. A current build that could not be published gives its reason.
+// it to. A current build that was not reconciled gives its reason: why it is
+// ineligible, or why its folder or release manifest could not be read.
 function recordedLatest(
   record: ReleasesRecord,
   candidates: readonly ReleaseCandidate[],
-  ineligible: readonly ReconciliationOutcome[],
+  notReconciled: readonly ReconciliationOutcome[],
 ): { releaseId: string; hfCommitSha: string } {
   const current = requireCurrentDefaultBuild(record);
   const candidate = candidates.find((entry) => entry.releaseId === current.id);
   if (!candidate) {
-    const reason = ineligible.find((outcome) => outcome.sourceId === current.id)?.reason;
+    const outcome = notReconciled.find((entry) => entry.sourceId === current.id);
+    const reason = outcome?.reason ?? "releases.json lists it, but reconciliation found no candidate.";
     throw new Error(
-      `Latest release ${current.id} cannot be published: ` +
-        `${reason ?? "releases.json lists it, but reconciliation found no candidate."}`,
+      outcome?.status === "failed"
+        ? `Latest release ${current.id} failed to reconcile, so the latest-release selection ` +
+          `was not changed: ${reason}`
+        : `Latest release ${current.id} cannot be published: ${reason}`,
     );
   }
   return { releaseId: current.id, hfCommitSha: candidate.hfCommitSha };

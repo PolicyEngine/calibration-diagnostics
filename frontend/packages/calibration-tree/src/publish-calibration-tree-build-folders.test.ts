@@ -611,6 +611,20 @@ test("--release of the current build still succeeds when its folder cannot be re
   }
 });
 
+test("when the current build's folder cannot be read, the latest-release failure names the read failure", async () => {
+  const store = memoryStore(manifestWithEarlierEntries());
+  const latestBefore = store.current().countries.uk!.latestReleaseBuildArtifactId;
+  globalThis.fetch = buildFolderRepository([], { unreadableFolder: folder(NATIONAL, NATIONAL_CURRENT) });
+
+  const report = await reconcileReleaseBuilds("uk", "blob-token", false, store);
+
+  expect(report.outcomes.find((outcome) => outcome.sourceId === folder(NATIONAL, NATIONAL_CURRENT))?.status)
+    .toBe("failed");
+  expect(report.latestReleaseFailure ?? "").toContain(`Latest release ${folder(NATIONAL, NATIONAL_CURRENT)}`);
+  expect(report.latestReleaseFailure ?? "").toContain("Hugging Face build folder lookup failed with 503.");
+  expect(store.current().countries.uk!.latestReleaseBuildArtifactId).toBe(latestBefore);
+});
+
 test("when the current build is ineligible, the latest-release failure says why", async () => {
   const record = releasesRecord();
   (record.releases as Record<string, Record<string, unknown>>)[NATIONAL].current = UNCALIBRATED_BUILD;
