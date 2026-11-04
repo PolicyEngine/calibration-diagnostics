@@ -172,6 +172,7 @@ export async function resolveHfBuildFolderSha(
       "?recursive=false&expand=true",
     {
       headers: hfHeaders(),
+      signal: AbortSignal.timeout(30_000),
       ...(revalidate <= 0
         ? { cache: "no-store" as const }
         : { next: { revalidate } }),
