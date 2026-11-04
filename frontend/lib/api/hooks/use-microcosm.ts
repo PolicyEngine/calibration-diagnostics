@@ -169,18 +169,19 @@ export interface MicrocosmTargetRow {
     // keys and universe constraint above are null, and so is its group-by
     // value unless its hierarchy shows that every one of them shares it. A
     // target whose identity is one fact, such as a ratio-scaled cell, shows
-    // that fact's fields. A single-fact target carries none of these three
+    // that fact's fields. A single-fact target carries none of these four
     // fields.
     member_fact_count?: number | null;
     member_fact_keys?: string[];
-    // True when its identity spans several facts and its hierarchy lists no
-    // group-by pair it carries, false when its identity is one fact or its
-    // hierarchy lists the pair, and null when it carries none or the release
-    // has no hierarchy. A hierarchy that leaves the pair out does not show
-    // that the facts differ in it.
+    // Read in this order: null when it carries no complete group-by pair;
+    // otherwise false when its identity is one fact or its hierarchy lists
+    // the pair; otherwise true when the release has a hierarchy, which leaves
+    // the pair out; otherwise null. A hierarchy that leaves the pair out does
+    // not show that the facts differ in it.
     layout_groupby_unlisted_across_facts?: boolean | null;
-    // True when the target's identity spans several facts, false when it is
-    // one fact.
+    // True when its identity spans several facts, false when it is one fact.
+    // Unlike the group-by pair, this reads the same whichever identity fact
+    // Microcosm picks as the representative.
     identity_spans_several_facts?: boolean;
     filters?: {
       key: string;

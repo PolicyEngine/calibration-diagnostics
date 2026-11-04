@@ -559,11 +559,14 @@ function hierarchyListsGroupBy(row: TargetRow, chronicle: JsonObject): boolean {
 }
 
 // What a multi-fact target's fields establish about the group-by pair its
-// Chronicle fields carry: "shared" when its identity is one fact or its
-// hierarchy lists the pair, so every identity fact shares it; "unlisted" when
-// its identity spans several facts and its hierarchy leaves the pair out, which
-// does not show whether the facts share it; null when it carries no pair or
-// has no hierarchy to read.
+// Chronicle fields carry, decided in this order:
+// - no complete pair: null, since the representative carries none;
+// - its identity is one fact, or its hierarchy lists the pair: "shared", since
+//   every identity fact then carries it. A one-fact identity counts whether or
+//   not the release has a hierarchy;
+// - its release has a hierarchy, which leaves the pair out: "unlisted", which
+//   does not show whether the identity facts share it;
+// - otherwise, a several-fact identity with no hierarchy to read: null.
 function groupByAcrossIdentity(
   row: TargetRow,
   chronicle: JsonObject,
@@ -598,21 +601,31 @@ function groupByAcrossIdentity(
 // (_value_representative_fact, :1232-1245), so an identity of one fact is the
 // representative. For any other multi-fact operation it is the fact of the
 // latest period, the last in the tuple on a tie, taken from the window for
-// calendar_year_window_scaled_by_ratio (:1012-1016). A target whose identity
-// is one fact shows its fields as they are, with member_fact_count and
-// member_fact_keys added. An identity of several facts has no one record or
-// fact key, so those read null. Its group-by value shows when its hierarchy
+// calendar_year_window_scaled_by_ratio (:1012-1016). A sum's tuple comes from
+// its resolver sorted by fact key (:2178-2183), so which identity fact becomes
+// the representative, and so which group-by pair, dimensions and record the
+// target carries, can turn on a fact's key alone.
+//
+// A target whose identity is one fact shows its fields as they are, with
+// member_fact_count, member_fact_keys, layout_groupby_unlisted_across_facts
+// and identity_spans_several_facts (false) added. An identity of several facts
+// has no one record or fact key, so those read null, and
+// identity_spans_several_facts reads true: with the hierarchy's dimensions, it
+// is the one field here that reads the same whichever identity fact is the
+// representative, so the Dimensions column reads it rather than the
+// representative's group-by pair. Its group-by value shows when its hierarchy
 // lists the pair, because every identity fact then shares it, and reads null
-// otherwise. layout_groupby_unlisted_across_facts says the second: the
-// identity spans several facts and its hierarchy lists no group-by pair the
-// target carries. That does not show that the facts differ in it (see
-// hierarchyListsGroupBy). Nothing Microcosm writes says whether the identity
-// facts share a universe constraint, so its set key and count read null.
-// ledger_aggregation_varying_dimensions cannot settle either question: it
-// compares each fact's ordinary dimensions, ratio operands included, and
-// counts a dimension one fact carries and another lacks as varying (:1323,
-// :1626-1646). The row itself keeps every field, so a comparison still matches
-// it by fact key. A single-fact target's fields show as they are.
+// otherwise. layout_groupby_unlisted_across_facts reads true when its
+// hierarchy leaves out the pair the representative carries, which does not
+// show that the facts differ in it (see hierarchyListsGroupBy and
+// groupByAcrossIdentity for its order). Nothing Microcosm writes says whether
+// the identity facts share a universe constraint, so its set key and count
+// read null. ledger_aggregation_varying_dimensions cannot settle either
+// question: it compares each fact's ordinary dimensions, ratio operands
+// included, and counts a dimension one fact carries and another lacks as
+// varying (:1323, :1626-1646). The row itself keeps every field, so a
+// comparison still matches it by fact key. A single-fact target's fields show
+// as they are, with none of these fields added.
 function shownChronicle(row: TargetRow): unknown {
   const metadata = asObject(row.metadata);
   const memberFactCount = countOrNull(metadata.ledger_member_fact_count);
@@ -624,6 +637,7 @@ function shownChronicle(row: TargetRow): unknown {
     member_fact_count: memberFactCount,
     member_fact_keys: stringListOrEmpty(metadata.ledger_member_fact_keys),
     layout_groupby_unlisted_across_facts: groupBy == null ? null : groupBy === "unlisted",
+    identity_spans_several_facts: !oneFact,
   };
   if (oneFact) return { ...chronicle, ...members };
   return {
