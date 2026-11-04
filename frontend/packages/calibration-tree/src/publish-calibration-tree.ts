@@ -835,13 +835,28 @@ async function enumerateRecordedBuildCandidates(
   const record = await readReleasesRecord(country, headSha);
   const candidates: ReleaseCandidate[] = [];
   const ineligible: ReconciliationOutcome[] = [];
+  // A build whose folder or release manifest cannot be read fails on its
+  // own, as a release whose commit cannot be read does; the other listed
+  // builds are still reconciled.
+  const failed: ReconciliationOutcome[] = [];
   for (const recorded of recordedBuilds(record)) {
     const published = publishedRecordedBuild(manifest, country, recorded.id);
     if (published) {
       candidates.push(published);
       continue;
     }
-    const resolved = await resolveRecordedBuild(country, recorded, headSha);
+    let resolved: Awaited<ReturnType<typeof resolveRecordedBuild>>;
+    try {
+      resolved = await resolveRecordedBuild(country, recorded, headSha);
+    } catch (error) {
+      failed.push({
+        sourceId: recorded.id,
+        status: "failed",
+        buildArtifactId: null,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
     if (resolved.candidate) {
       candidates.push(resolved.candidate);
     } else {
@@ -853,7 +868,7 @@ async function enumerateRecordedBuildCandidates(
       });
     }
   }
-  return { candidates, ineligible, failed: [], record };
+  return { candidates, ineligible, failed, record };
 }
 
 async function selectRecordedBuild(
