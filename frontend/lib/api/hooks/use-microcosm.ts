@@ -169,12 +169,12 @@ export interface MicrocosmTargetRow {
     // keys and universe constraint above are null, and so is its group-by
     // value unless every one of them shares it. A target whose identity is
     // one fact, such as a ratio-scaled cell, shows that fact's fields. A
-    // single-fact target carries neither field.
+    // single-fact target carries none of these three fields.
     member_fact_count?: number | null;
     member_fact_keys?: string[];
-    // On a target built from several facts: true when its group-by value is
-    // hidden because the facts of its identity differ in it, false when they
-    // share it, and null when the target has none or the release cannot say.
+    // True when its group-by value is hidden because the facts of its
+    // identity differ in it, false when they share it, and null when the
+    // target has none or the release cannot say.
     layout_groupby_value_varies?: boolean | null;
     filters?: {
       key: string;

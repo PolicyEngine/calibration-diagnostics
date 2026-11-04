@@ -342,10 +342,11 @@ describe("a target built from several facts shows the identity Microcosm gives i
   });
 
   // A member fact of a target is not the target, and one fact can be a member
-  // of many targets: one CGT Table 1 share is the numerator of every Table 5
-  // region cell it scales. So a lookup by a member fact finds no target, and
-  // names every target that lists it, for the investigation to go on with
-  // the one it means. The investigation packet script prints the detail
+  // of many targets: Microcosm restates its twelve CGT Table 5 region cells by
+  // one Table 1 share (tools/generate_uk_target_references.py:1117-1119 at
+  // 0ff293b). So a lookup by a member fact finds no target, and names every
+  // target that lists it, for the investigation to go on with the one it
+  // means. The investigation packet script prints the detail
   // (scripts/microcosm-investigation-packet.mjs:85-86).
   test("a lookup by a member fact names the targets that list it", () => {
     const parentPlus = fsaRow(PARENT_PLUS).metadata as Record<string, string>;

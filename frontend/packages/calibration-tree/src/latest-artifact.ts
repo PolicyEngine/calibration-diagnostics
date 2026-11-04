@@ -3338,8 +3338,9 @@ export function latestMicrocosmTargetInvestigation(requestUrl: string, cal: Cali
   });
   if (!row) {
     // A member fact is not the target it belongs to, and one fact can be a
-    // member of many targets (a CGT share scales every region cell it is the
-    // numerator of), so the answer names each, for the caller to choose.
+    // member of many targets: Microcosm restates its twelve CGT Table 5
+    // region cells by one Table 1 share (tools/generate_uk_target_references.py:1117-1119
+    // at 0ff293b). So the answer names each, for the caller to choose.
     const memberOf = cal.rows
       .filter((candidate) => listsMemberFact(candidate, target))
       .map((candidate) => ({
