@@ -113,7 +113,8 @@ describe("the targets page's Dimensions column", () => {
   // A ratio's operands raise a target's member count, but a rolled-forward or
   // allocated residual target with one base cell has that cell as its identity
   // (ledger_targets.py:1024-1031 at 0ff293b), so it names its state as the
-  // cell does.
+  // cell does, even though Microcosm lists the location as varying, since its
+  // other facts differ in it (:1626-1646).
   test("a one-base ratio target reads as its base cell", () => {
     const fixture = edFsaFamily as Record<string, unknown>;
     const alabama = (fixture.targets as Record<string, unknown>[]).find((row) =>
@@ -139,6 +140,7 @@ describe("the targets page's Dimensions column", () => {
       cell("rolled_forward_by_ratio", {
         ledger_value_base_cells: "1",
         ledger_value_base_fact_keys: JSON.stringify([base]),
+        ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
       }),
     ).toBe("Alabama");
     expect(

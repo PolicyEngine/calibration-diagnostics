@@ -131,7 +131,9 @@ describe("a target built from several facts shows the identity Microcosm gives i
   // base is the representative (_value_representative_fact, :1239-1244). A
   // rolled-forward target with one base cell has that cell as its identity
   // (facts[:-2], :1030-1031), which is the representative too, and Microcosm
-  // counts it in ledger_value_base_cells (:1174-1178).
+  // counts it in ledger_value_base_cells (:1174-1178). Microcosm lists the base
+  // cell's location in ledger_aggregation_varying_dimensions on both, since
+  // their national operands lack it (:1090, :1323-1339, :1626-1646).
   const own = (fsaRow(ALABAMA_BALANCE).metadata as Record<string, string>);
   const ONE_FACT_IDENTITY = [
     {
@@ -141,7 +143,10 @@ describe("a target built from several facts shows the identity Microcosm gives i
           own.ledger_fact_key,
           NUMERATOR,
           DENOMINATOR,
-        ], { ledger_value_formula: "base * numerator / denominator" }),
+        ], {
+          ledger_value_formula: "base * numerator / denominator",
+          ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
+        }),
     },
     {
       operation: "rolled_forward_by_ratio, one base cell",
@@ -154,6 +159,7 @@ describe("a target built from several facts shows the identity Microcosm gives i
           {
             ledger_value_base_cells: "1",
             ledger_value_base_fact_keys: JSON.stringify([own.ledger_fact_key]),
+            ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
           },
         ),
     },
