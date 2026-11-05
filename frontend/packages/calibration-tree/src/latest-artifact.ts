@@ -614,17 +614,18 @@ function groupByAcrossIdentity(
 // and unlike the representative's group-by pair, it reads the same whichever
 // identity fact is the representative, so the Dimensions column reads it. Its
 // group-by value shows when its hierarchy lists the pair, because every
-// identity fact then shares it, and reads null otherwise. layout_groupby_unlisted_across_facts reads true when its
-// hierarchy leaves out the pair the representative carries, which does not
-// show that the facts differ in it (see hierarchyListsGroupBy and
-// groupByAcrossIdentity for its order). Nothing Microcosm writes says whether
-// the identity facts share a universe constraint, so its set key and count
-// read null. ledger_aggregation_varying_dimensions cannot settle either
-// question: it compares each fact's ordinary dimensions, ratio operands
-// included, and counts a dimension one fact carries and another lacks as
-// varying (:1323, :1626-1646). The row itself keeps every field, so a
-// comparison still matches it by fact key. A single-fact target's fields show
-// as they are, with none of these fields added.
+// identity fact then shares it, and reads null otherwise.
+// layout_groupby_unlisted_across_facts reads true when its hierarchy leaves
+// out the pair the representative carries, which does not show that the facts
+// differ in it (see hierarchyListsGroupBy and groupByAcrossIdentity for its
+// order). Nothing Microcosm writes says whether the identity facts share a
+// universe constraint, so its set key and count read null.
+// ledger_aggregation_varying_dimensions cannot settle either question: it
+// compares each fact's ordinary dimensions, ratio operands included, and
+// counts a dimension one fact carries and another lacks as varying (:1323,
+// :1626-1646). The row itself keeps every field, so a comparison still matches
+// it by fact key. A single-fact target's fields show as they are, with none of
+// these fields added.
 function shownChronicle(row: TargetRow): unknown {
   const metadata = asObject(row.metadata);
   const memberFactCount = countOrNull(metadata.ledger_member_fact_count);
