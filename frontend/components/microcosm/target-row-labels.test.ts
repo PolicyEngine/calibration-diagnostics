@@ -110,11 +110,12 @@ describe("the targets page's Dimensions column", () => {
     expect(probeCell(conflicting)).toBe("A · Combines several source cells");
   });
 
-  // A ratio's operands raise a target's member count, but a rolled-forward or
-  // allocated residual target with one base cell has that cell as its identity
-  // (ledger_targets.py:1024-1031 at 0ff293b), so it names its state as the
-  // cell does, even though Microcosm lists the location as varying, since its
-  // other facts differ in it (:1626-1646).
+  // A ratio's operands raise a target's member count, but a ratio-scaled target
+  // keeps its base cell's identity, and a rolled-forward or allocated residual
+  // target with one base cell has that cell as its identity
+  // (ledger_targets.py:1018-1031 at 0ff293b). So it names its state as the cell
+  // does, whether the cell keeps its location in its layout alone or among its
+  // ordinary dimensions, which Microcosm then lists as varying (:1626-1646).
   test("a one-base ratio target reads as its base cell", () => {
     const fixture = edFsaFamily as Record<string, unknown>;
     const alabama = (fixture.targets as Record<string, unknown>[]).find((row) =>
@@ -136,23 +137,38 @@ describe("the targets page's Dimensions column", () => {
       const [shown] = pageRows({ ...fixture, targets: [row] });
       return dimensionSummary(shown);
     };
-    expect(
-      cell("rolled_forward_by_ratio", {
-        ledger_value_base_cells: "1",
-        ledger_value_base_fact_keys: JSON.stringify([base]),
-        ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
+    const ordinaryLocation = {
+      "ledger_filter_ed_fsa.borrower_location": "al",
+      ledger_dimension_set_key: "ledger.dimension_set.v2:location_for_this_test",
+      ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
+    };
+    const oneBaseCell = {
+      ledger_value_base_cells: "1",
+      ledger_value_base_fact_keys: JSON.stringify([base]),
+    };
+    expect({
+      ratioScaled: cell("scaled_by_ratio", {}),
+      ratioScaledOrdinaryLocation: cell("scaled_by_ratio", ordinaryLocation),
+      rolledForward: cell("rolled_forward_by_ratio", oneBaseCell),
+      rolledForwardOrdinaryLocation: cell("rolled_forward_by_ratio", {
+        ...oneBaseCell,
+        ...ordinaryLocation,
       }),
-    ).toBe("Alabama");
-    expect(
-      cell("allocated_residual_by_ratio", {
+      allocated: cell("allocated_residual_by_ratio", {
         ledger_allocation_receipt: JSON.stringify({
           operation: "allocated_residual_by_ratio",
           version: 1,
           fact_keys: { base: [base], partition: [base, other], recipients: [other], total: `${other}_2` },
         }),
-        ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
+        ...ordinaryLocation,
       }),
-    ).toBe("Alabama");
+    }).toEqual({
+      ratioScaled: "Alabama",
+      ratioScaledOrdinaryLocation: "Alabama",
+      rolledForward: "Alabama",
+      rolledForwardOrdinaryLocation: "Alabama",
+      allocated: "Alabama",
+    });
   });
 
   // A schema 6 release carries no hierarchy, so a several-fact target's
