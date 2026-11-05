@@ -7,6 +7,7 @@ import { useCountry } from "@/components/layout/country-context";
 import { fmt } from "@/components/shared/format";
 import { useMicrocosmTargetDiagnostics } from "@/lib/api/hooks/use-microcosm";
 import { microcosmTargetsIntro } from "@/lib/microcosm/presentation";
+import { statisticGroupCount } from "@/lib/microcosm/statistic-groups";
 
 type TargetDestination = "explore" | "healthcare" | "everything";
 type CardAccent = "teal" | "slate";
@@ -91,12 +92,7 @@ export function CalibrationTargetNavigationCards({ release }: { release?: string
     limit: 1,
   });
   const variableGroupCount = useMemo(
-    () =>
-      new Set(
-        (data?.variables ?? []).map((variable) =>
-          [variable.source, variable.level, variable.variable].join("::"),
-        ),
-      ).size,
+    () => statisticGroupCount(data?.variables ?? []),
     [data?.variables],
   );
   const hasHealthcareTargets =

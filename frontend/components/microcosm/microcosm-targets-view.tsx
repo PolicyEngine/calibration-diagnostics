@@ -17,6 +17,11 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
+import {
+  levelFilterOptions,
+  sourceFilterOptions,
+} from "@/components/microcosm/target-filter-options";
+import { dimensionSummary, titleFromIdentifier } from "@/components/microcosm/target-row-labels";
 import { sourceLabel } from "@policyengine/calibration-tree/source-label";
 import {
   releaseSelectOptions,
@@ -26,6 +31,7 @@ import {
   type MicrocosmTargetRow,
   type MicrocosmVariableRow,
 } from "@/lib/api/hooks/use-microcosm";
+import { statisticGroupKey } from "@/lib/microcosm/statistic-groups";
 
 const PAGE_SIZE = 50;
 
@@ -54,7 +60,7 @@ interface VariableGroup {
   sourceLabel: string;
   variable: string;
   variableLabel: string | null;
-  level: string;
+  levels: string[];
   options: VariableMeasureOption[];
   defaultKey: string;
   nTargets: number;
@@ -85,12 +91,6 @@ function finalError(row: MicrocosmTargetRow) {
   return fmt(row.final_error, { pct: true, digits: 1 });
 }
 
-function titleFromIdentifier(value: string | null | undefined): string {
-  if (!value) return "";
-  const leaf = value.split(/[.#:]/).filter(Boolean).at(-1) ?? value;
-  return humanizeName(leaf.replace(/[^a-zA-Z0-9]+/g, "_"));
-}
-
 function measureTitle(row: MicrocosmTargetRow): string {
   return (
     titleFromIdentifier(row.chronicle?.measure_concept) ||
@@ -99,14 +99,6 @@ function measureTitle(row: MicrocosmTargetRow): string {
     titleFromIdentifier(row.chronicle?.layout_measure_id) ||
     "—"
   );
-}
-
-function dimensionSummary(row: MicrocosmTargetRow): string {
-  const dims = row.target_dimensions?.map((dim) => dim.value).filter(Boolean) ?? [];
-  if (dims.length) return dims.join(" · ");
-  const group = row.chronicle?.layout_groupby_value_id;
-  if (group && group !== "all") return humanizeName(group);
-  return "All";
 }
 
 function calculationLine(row: {
@@ -259,11 +251,7 @@ function measureRank(measure: string | null | undefined): number {
 function groupVariables(variables: MicrocosmVariableRow[]): VariableGroup[] {
   const groups = new Map<string, MicrocosmVariableRow[]>();
   for (const variable of variables) {
-    const key = [
-      variable.source,
-      variable.level,
-      variable.variable,
-    ].join("::");
+    const key = statisticGroupKey(variable);
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(variable);
   }
 
@@ -290,7 +278,7 @@ function groupVariables(variables: MicrocosmVariableRow[]): VariableGroup[] {
         sourceLabel: first.source_label || sourceLabel(first.source),
         variable: first.variable,
         variableLabel: first.variable_label ?? null,
-        level: first.level,
+        levels: first.levels,
         options,
         defaultKey: defaultOption.key,
         nTargets,
@@ -757,10 +745,7 @@ export function MicrocosmTargetsView({
                   setSelected(null);
                   setPage(0);
                 }}
-                options={[
-                  { value: "", label: "Any" },
-                  ...sources.map((value) => ({ value, label: value })),
-                ]}
+                options={sourceFilterOptions(sources, variables)}
                 className="w-full"
                 layout="stacked"
               />
@@ -772,10 +757,7 @@ export function MicrocosmTargetsView({
                   setSelected(null);
                   setPage(0);
                 }}
-                options={[
-                  { value: "", label: "Any" },
-                  ...levels.map((value) => ({ value, label: value })),
-                ]}
+                options={levelFilterOptions(levels)}
                 className="w-full"
                 layout="stacked"
               />

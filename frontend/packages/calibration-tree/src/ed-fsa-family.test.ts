@@ -443,12 +443,10 @@ describe("the ED Federal Student Aid target family", () => {
     expect(targetsPage({ geography: "Alabama" }).filtered_total).toBe(3);
   });
 
-  // This pins one row's level for a category whose targets sit at two levels.
-  // microcosmVariableSummary gives a category the level of its first row
-  // (latest-artifact.ts:1526), so each measure category, 14 country and 51
-  // state targets, is listed at "state" alone. A reader that reports every
-  // level of a category must change this test.
-  test("a category at two levels is listed at its first row's level", () => {
+  // A category whose targets sit at two levels reports both. Each measure
+  // category holds 14 country and 51 state targets; microcosmVariableSummary
+  // lists its levels and gives it no single level.
+  test("a category at two levels is listed at both", () => {
     const page = targetsPage({});
     for (const category of MIXED_CATEGORIES) {
       const rows = release.rows.filter((row) => row.variable_key === variableKey(category));
@@ -463,13 +461,26 @@ describe("the ED Federal Student Aid target family", () => {
         candidate.variable_key === variableKey(category)
       )!;
       expect(variable.n_targets).toBe(BANDS_PER_MEASURE + STATE_COUNT);
-      expect(variable.level).toBe("state");
-      // The first of the category's rows in the release's own order.
-      expect(variable.level).toBe(String(rows[0].level));
+      expect(variable.levels).toEqual([UNITED_STATES.level, "state"]);
+      expect(variable.level).toBeNull();
     }
+    // A category at one level keeps that level.
+    const levelsOf = (key: string) => {
+      const variable = page.variables.find((candidate) => candidate.variable_key === key)!;
+      return [variable.level, variable.levels];
+    };
+    for (const category of ONE_TARGET_CATEGORIES) {
+      expect(levelsOf(variableKey(category))).toEqual([UNITED_STATES.level, [UNITED_STATES.level]]);
+    }
+    expect(levelsOf(String(release.rows[0].variable_key))).toEqual(["state", ["state"]]);
   });
 
-  test("a mixed category's facets are its geographies, location and both bands", () => {
+  // Each state target's Borrower location is its geography, so the facet
+  // repeats Geography. The page hides it, as the calibration map adds no tier
+  // for a dimension with one value under a geography
+  // (calibration-tree.ts:601-610), and keeps the bands, which the United
+  // States holds several of.
+  test("a mixed category's facets are its geographies and both bands", () => {
     const variable = variableKey(BALANCE);
     const page = targetsPage({ variable });
 
@@ -483,11 +494,20 @@ describe("the ED Federal Student Aid target family", () => {
         label: "Geography",
         values: sorted([UNITED_STATES.label, ...STATES]),
       },
-      { key: LOCATION.id, label: LOCATION.label, values: sorted(STATES) },
       { key: AGE.id, label: AGE.label, values: sorted(AGE.values) },
       { key: DEBT_SIZE.id, label: DEBT_SIZE.label, values: sorted(DEBT_SIZE.values) },
     ]);
     expect(page.dimensions[0].values[0]).toBe(UNITED_STATES.label);
+    // The state targets alone still list no location facet.
+    expect(
+      targetsPage({ variable, level: "state" }).dimensions.map((dimension) => dimension.key),
+    ).toEqual(["geography"]);
+    // The United States alone keeps both bands.
+    expect(
+      targetsPage({ variable, geography: UNITED_STATES.label }).dimensions.map(
+        (dimension) => dimension.key,
+      ),
+    ).toEqual([AGE.id, DEBT_SIZE.id]);
 
     const names = (query: Record<string, string>, facets: string[]) =>
       targetsPage({ variable, ...query }, facets).targets.map((target) => target.name);
@@ -662,33 +682,36 @@ describe("the ED Federal Student Aid target family", () => {
     ]);
   });
 
-  // This pins one row's level for a category whose targets sit at two levels.
-  // comparisonVariableRows gives a compared category the level of its first
-  // row (latest-artifact.ts:3220). buildComparison sorts the common rows by
-  // |abs_rel_delta| (:3304-3308); when every delta is 0 they keep the
-  // matcher's key order, in which a measure category's age bands come first,
-  // so it reads "country". Once one state row's fit changes most, it sorts
-  // first and its category reads "state". A reader that reports every level
-  // of a category must change this test.
-  test("a compared category at two levels takes the level of the row whose fit changed most", () => {
-    const levelOf = (comparison: ReturnType<typeof buildComparison>) =>
+  // A compared category reports every level it holds, whatever order
+  // buildComparison in latest-artifact.ts sorts its rows in (by |abs_rel_delta|).
+  test("a compared category at two levels reports both, whichever row's fit changed most", () => {
+    const levelsOf = (comparison: ReturnType<typeof buildComparison>) =>
       Object.fromEntries(
         comparison.variables
           .filter((variable) => variable.source === PROVIDER.id)
-          .map((variable) => [variable.variable_key, variable.level]),
+          .map((variable) => [variable.variable_key, [variable.level, variable.levels]]),
       );
-    const allCountry = Object.fromEntries(
-      CATEGORIES.map((category) => [variableKey(category), UNITED_STATES.level]),
-    );
+    const expected = Object.fromEntries([
+      ...MIXED_CATEGORIES.map((category) => [
+        variableKey(category),
+        [null, [UNITED_STATES.level, "state"]],
+      ]),
+      ...ONE_TARGET_CATEGORIES.map((category) => [
+        variableKey(category),
+        [UNITED_STATES.level, [UNITED_STATES.level]],
+      ]),
+    ]);
 
+    // Every delta is 0, so the rows keep the matcher's key order, in which a
+    // measure category's age bands come first.
     const unchanged = buildComparison(release, release);
-    expect(levelOf(unchanged)).toEqual(allCountry);
     for (const category of MIXED_CATEGORIES) {
       const first = unchanged.rows.find((row) => row.variable_key === variableKey(category))!;
       expect([first.level, first.breakdown]).toEqual([UNITED_STATES.level, AGE.values[0]]);
     }
+    expect(levelsOf(unchanged)).toEqual(expected);
 
-    // Alabama's balance now misses by 100%, so its row sorts first.
+    // Alabama's balance now misses by 100%, so its state row sorts first.
     const document = schema8();
     const alabama = (document.targets as JsonObject[]).find((row) =>
       row.target_name === ALABAMA_BALANCE
@@ -697,7 +720,7 @@ describe("the ED Federal Student Aid target family", () => {
     alabama.relative_error = 1;
     const refit = buildComparison(release, calibrationOf(document, "populace-us-2024-alabama-miss"));
     expect(refit.rows[0].name).toBe(ALABAMA_BALANCE);
-    expect(levelOf(refit)).toEqual({ ...allCountry, [variableKey(BALANCE)]: "state" });
+    expect(levelsOf(refit)).toEqual(expected);
   });
 
   // The target detail of one row of each kind: the Chronicle fields the
@@ -727,6 +750,7 @@ describe("the ED Federal Student Aid target family", () => {
         legacy_fact_key: fields.legacy_fact_key,
         source_record_id: fields.source_record_id,
         value_operation: fields.value_operation,
+        universe_constraint_count: fields.universe_constraint_count,
       };
     };
     // The fact keys are the ones the fixture carries from the member fact.
@@ -751,6 +775,8 @@ describe("the ED Federal Student Aid target family", () => {
       ...factKeys(ALABAMA_BALANCE),
       source_record_id: ALABAMA_BALANCE,
       value_operation: "identity",
+      // A state fact has no universe constraint, so the release writes no count.
+      universe_constraint_count: null,
     });
     // An age band's edges: "24 and Younger" is age < 25.
     expect(chronicle(YOUNGEST_BORROWERS)).toEqual({
@@ -760,11 +786,15 @@ describe("the ED Federal Student Aid target family", () => {
       ...factKeys(YOUNGEST_BORROWERS),
       source_record_id: YOUNGEST_BORROWERS,
       value_operation: "identity",
+      // The release writes the count as the string "1".
+      universe_constraint_count: 1,
     });
     // A debt-size band's edges: "10K to 20K" is 10000 <= balance < 20000.
     const tenToTwenty = fsaName(
       "portfolio_by_debt_size.fy2026_q2.dollars_outstanding.debt_10k_to_20k.dollars_outstanding",
     );
+    // The fixture, as a release writes it, carries the count as a string.
+    expect(metadataOf(tenToTwenty).ledger_universe_constraint_count).toBe("2");
     expect(chronicle(tenToTwenty)).toEqual({
       measure_concept: BALANCE_CONCEPT,
       source_concept: "Dollars Outstanding (in billions)",
@@ -775,6 +805,7 @@ describe("the ED Federal Student Aid target family", () => {
       ...factKeys(tenToTwenty),
       source_record_id: tenToTwenty,
       value_operation: "identity",
+      universe_constraint_count: 2,
     });
     // Parent PLUS is a loan type, an equality constraint, so it has no edge.
     expect(chronicle(PARENT_PLUS_TARGET)).toEqual({
@@ -784,31 +815,90 @@ describe("the ED Federal Student Aid target family", () => {
       ...factKeys(PARENT_PLUS_TARGET),
       source_record_id: PARENT_PLUS_TARGET,
       value_operation: "identity",
+      universe_constraint_count: 1,
     });
 
-    // This pins a release's behavior, which a follow-up may change. The
-    // balance excluding Parent PLUS sums five member facts, but its Chronicle
-    // fields are its representative's, the last member, stafford_unsubsidized
-    // (microcosm ledger_targets.py:1086-1089, :1232-1245), so its detail names
-    // that one member as its record. A lookup of the member's record id also
-    // finds the aggregate.
+    // A single-fact target lists no member facts.
+    const alabamaFields = investigate(`${ALABAMA_BALANCE}@2024`).target.chronicle as unknown as Row;
+    expect("member_fact_count" in alabamaFields).toBe(false);
+    expect("member_fact_keys" in alabamaFields).toBe(false);
+
+    // The balance excluding Parent PLUS sums five member facts. Microcosm
+    // stamps its single-fact keys from its representative, the last member,
+    // stafford_unsubsidized (ledger_targets.py:1085-1089, :1232-1245 at
+    // 0ff293b). Its detail names none of the five as its record: it lists the
+    // member facts instead, and leaves out the fields that belong to one
+    // member (its record, fact keys, group-by value and universe constraint).
     const stafford =
       "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.stafford_unsubsidized.dollars_outstanding";
+    const excluding = rowNamed(release.rows, EXCLUDING_PARENT_PLUS_TARGET);
+    const excludingMetadata = metadataOf(EXCLUDING_PARENT_PLUS_TARGET);
+    // These read the fixture, not a reader.
+    expect(excludingMetadata.ledger_member_fact_count).toBe("5");
+    expect(excludingMetadata.ledger_source_record_id).toBe(stafford);
+    const members = JSON.parse(excludingMetadata.ledger_member_fact_keys) as string[];
+    expect(members).toHaveLength(5);
+    expect(members).toContain(excludingMetadata.ledger_fact_key);
+
     expect(chronicle(EXCLUDING_PARENT_PLUS_TARGET)).toEqual({
       measure_concept: BALANCE_CONCEPT,
       source_concept: "Dollars Outstanding (in billions)",
       filters: [],
-      ...factKeys(EXCLUDING_PARENT_PLUS_TARGET),
-      source_record_id: stafford,
+      fact_key: null,
+      aggregate_fact_key: null,
+      semantic_fact_key: null,
+      legacy_fact_key: null,
+      source_record_id: null,
       value_operation: "linear_combination",
+      universe_constraint_count: null,
     });
-    // These two read the row's raw metadata, which buildCalibration passes
-    // through from the fixture: they describe the fixture, not a reader.
-    const excluding = rowNamed(release.rows, EXCLUDING_PARENT_PLUS_TARGET);
-    expect((excluding.metadata as Record<string, string>).ledger_member_fact_count).toBe("5");
+    const detail = investigate(`${EXCLUDING_PARENT_PLUS_TARGET}@2024`);
+    const fields = detail.target.chronicle as unknown as Row;
+    expect({
+      member_fact_count: fields.member_fact_count,
+      member_fact_keys: fields.member_fact_keys,
+      layout_record_set_id: fields.layout_record_set_id,
+      layout_groupby_dimension: fields.layout_groupby_dimension,
+      layout_groupby_value_id: fields.layout_groupby_value_id,
+      universe_constraint_set_key: fields.universe_constraint_set_key,
+    }).toEqual({
+      member_fact_count: 5,
+      member_fact_keys: members,
+      // The members share their record set and group-by dimension.
+      layout_record_set_id: excludingMetadata.ledger_layout_record_set_id,
+      layout_groupby_dimension: "ed_fsa.loan_type",
+      layout_groupby_value_id: null,
+      universe_constraint_set_key: null,
+    });
+    // Its code searches look for each member fact, not the representative.
+    const searches = (detail as unknown as { repo_searches: { label: string; query: string }[] })
+      .repo_searches;
+    expect(searches.filter((search) => search.label === "Member fact").map((search) => search.query))
+      .toEqual(members.map((key) => `"${key}"`));
+    expect(searches.some((search) => search.query.includes(stafford))).toBe(false);
+    expect(searches.map((search) => search.label)).not.toContain("Source record");
+    // The targets page row shows the same fields.
+    const listed = targetsPage({ variable: variableKey(EXCLUDING_PARENT_PLUS) }).targets[0];
+    expect(listed.chronicle).toEqual(detail.target.chronicle);
+    // A lookup of the representative's record id finds no target: no target
+    // of the release is that one loan type's balance.
+    const lookup = new URL("https://dashboard.test/api/microcosm/target-investigation");
+    lookup.searchParams.set("target", stafford);
+    expect(latestMicrocosmTargetInvestigation(lookup.toString(), release).available).toBe(false);
+    // The row keeps its keys, so a comparison still matches it by fact key
+    // when its name changes (target-surface-matcher.ts tries the name first).
+    expect((excluding.chronicle as Row).fact_key).toBe(excludingMetadata.ledger_fact_key);
+    const renamed = schema8();
+    const renamedRow = (renamed.targets as JsonObject[]).find((row) =>
+      row.target_name === EXCLUDING_PARENT_PLUS_TARGET
+    )!;
+    renamedRow.target_name = `${EXCLUDING_PARENT_PLUS_TARGET}_renamed`;
+    renamedRow.name = `${EXCLUDING_PARENT_PLUS_TARGET}_renamed@2024`;
+    (renamedRow.hierarchy as { target: { id: string } }).target.id = String(renamedRow.target_name);
+    const afterRename = buildComparison(release, calibrationOf(renamed, "populace-us-2024-renamed"));
+    expect(afterRename.summary).toMatchObject({ added: 0, removed: 0 });
     expect(
-      JSON.parse((excluding.metadata as Record<string, string>).ledger_member_fact_keys),
-    ).toHaveLength(5);
-    expect(investigate(stafford).target.name).toBe(`${EXCLUDING_PARENT_PLUS_TARGET}@2024`);
+      afterRename.rows.find((row) => row.candidate_name === renamedRow.name)?.match_kind,
+    ).toBe("chronicle_fact_key");
   });
 });

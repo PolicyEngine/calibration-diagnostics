@@ -24,12 +24,13 @@ describe("normalizeChronicleMetadata", () => {
       normalizeChronicleMetadata({
         ledger_geography_id: "0400000US02",
         chronicle_geography_id: "0400000US06",
-        ledger_universe_constraint_count: 4,
-        chronicle_universe_constraint_count: 0,
+        // A release writes every metadata value as a string.
+        ledger_universe_constraint_count: "4",
+        chronicle_universe_constraint_count: "0",
       }),
     ).toMatchObject({
       chronicle_geography_id: "0400000US06",
-      chronicle_universe_constraint_count: 0,
+      chronicle_universe_constraint_count: "0",
     });
   });
 

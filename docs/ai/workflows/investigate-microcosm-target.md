@@ -23,6 +23,8 @@ node scripts/microcosm-investigation-packet.mjs \
 
 The release argument may be omitted when the current release is intended. If the command fails, report the API error and stop; do not infer missing target metadata.
 
+One error is not a stopping point. When it says the identifier is a member fact of one or more targets, the identifier names one of the facts those targets are built from, not a target. Run the command again with the name of the target under investigation, taken from that list, and report which target you chose and why.
+
 Read `investigations/latest-target-packet.json` and use it as the primary investigation input.
 
 ## 2. Summarize the initial evidence
