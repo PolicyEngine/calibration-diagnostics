@@ -148,6 +148,7 @@ describe("the targets page's Dimensions column", () => {
           version: 1,
           fact_keys: { base: [base], partition: [base, other], recipients: [other], total: `${other}_2` },
         }),
+        ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
       }),
     ).toBe("Alabama");
   });
@@ -209,9 +210,9 @@ describe("the targets page's Dimensions column", () => {
     ).toBe("All");
   });
 
-  // For a sum, Microcosm picks the representative by period and then by fact
-  // key, so its group-by value, or its lack of one, says nothing about the
-  // others.
+  // Microcosm picks one fact as the representative (for a sum, by period and
+  // then by fact key), and its group-by value, or its lack of one, says
+  // nothing about the others.
   test("a several-fact target with no listed dimension combines several source cells, never All", () => {
     expect(
       dimensionSummary({

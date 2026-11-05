@@ -29,10 +29,12 @@ const PARENT_PLUS =
 const EXCLUDING_PARENT_PLUS =
   "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding";
 
-// Facts a ratio translates its base by, and a second base cell, named here.
+// Facts a ratio translates its base by, a second base cell and an allocated
+// residual's total, named here.
 const NUMERATOR = "ledger.aggregate_fact.v2:numerator_for_this_test";
 const DENOMINATOR = "ledger.aggregate_fact.v2:denominator_for_this_test";
 const SECOND_BASE_CELL = "ledger.aggregate_fact.v2:second_base_cell_for_this_test";
+const TOTAL = "ledger.aggregate_fact.v2:total_for_this_test";
 
 // The fields that name one fact, and the group-by value and universe
 // constraint, as the dashboard shows them.
@@ -264,30 +266,36 @@ describe("a target built from several facts shows the identity Microcosm gives i
     expect(listedChronicle(shared)).toEqual(sharedShown);
   });
 
+  // An allocated residual over the Alabama cell and a second cell, with the
+  // base cells its receipt lists as fact_keys.base (:3188-3189). Its total
+  // leaves out a dimension its partition's cells carry (:2798-2803), so
+  // Microcosm lists that dimension in ledger_aggregation_varying_dimensions
+  // (:1323-1339, :1626-1646).
+  const allocated = (name: string, base: string[]) =>
+    multiFactRow(
+      ALABAMA_BALANCE,
+      name,
+      "allocated_residual_by_ratio",
+      [...new Set([...base, own.ledger_fact_key, SECOND_BASE_CELL]), TOTAL],
+      {
+        ledger_allocation_receipt: JSON.stringify({
+          operation: "allocated_residual_by_ratio",
+          version: 1,
+          fact_keys: {
+            base,
+            partition: [own.ledger_fact_key, SECOND_BASE_CELL],
+            recipients: [SECOND_BASE_CELL],
+            total: TOTAL,
+          },
+        }),
+        ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
+      },
+    );
+
   // An allocated residual's identity is the cells its selector matches
   // (:1024-1029), which its receipt lists as fact_keys.base (:3188-3189);
   // the first of them is the representative (:2993-3011, :1239-1244).
   test("allocated_residual_by_ratio: one base cell names it, two do not", () => {
-    const TOTAL = "ledger.aggregate_fact.v2:total_for_this_test";
-    const allocated = (name: string, base: string[]) =>
-      multiFactRow(
-        ALABAMA_BALANCE,
-        name,
-        "allocated_residual_by_ratio",
-        [...new Set([...base, own.ledger_fact_key, SECOND_BASE_CELL]), TOTAL],
-        {
-          ledger_allocation_receipt: JSON.stringify({
-            operation: "allocated_residual_by_ratio",
-            version: 1,
-            fact_keys: {
-              base,
-              partition: [own.ledger_fact_key, SECOND_BASE_CELL],
-              recipients: [SECOND_BASE_CELL],
-              total: TOTAL,
-            },
-          }),
-        },
-      );
     const one = releaseOf([allocated("ed_fsa.test.alabama_allocated", [own.ledger_fact_key])]);
     const oneShown = detailOf(one, String(one.rows[0].name)).target.chronicle as unknown as Row;
     expect(identityOf(oneShown)).toEqual(identityOf(one.rows[0].chronicle));
@@ -348,26 +356,12 @@ describe("a target built from several facts shows the identity Microcosm gives i
     );
     const withoutHierarchy = fsaRow(EXCLUDING_PARENT_PLUS);
     delete withoutHierarchy.hierarchy;
-    // An allocated residual with one base cell, which its receipt lists as
-    // fact_keys.base (:3188-3189).
-    const oneBaseAllocated = multiFactRow(
-      ALABAMA_BALANCE,
-      "ed_fsa.test.alabama_allocated",
-      "allocated_residual_by_ratio",
-      [own.ledger_fact_key, SECOND_BASE_CELL, NUMERATOR],
-      {
-        ledger_allocation_receipt: JSON.stringify({
-          operation: "allocated_residual_by_ratio",
-          version: 1,
-          fact_keys: {
-            base: [own.ledger_fact_key],
-            partition: [own.ledger_fact_key, SECOND_BASE_CELL],
-            recipients: [SECOND_BASE_CELL],
-            total: NUMERATOR,
-          },
-        }),
-      },
-    );
+    // Allocated residuals with one base cell and with two.
+    const oneBaseAllocated = allocated("ed_fsa.test.alabama_allocated", [own.ledger_fact_key]);
+    const twoBaseAllocated = allocated("ed_fsa.test.alabama_two_cells_allocated", [
+      own.ledger_fact_key,
+      SECOND_BASE_CELL,
+    ]);
     const cases = {
       excludingParentPlus: () => [fsaRow(EXCLUDING_PARENT_PLUS)],
       twoLoanTypes: () => [twoLoanTypes],
@@ -375,6 +369,7 @@ describe("a target built from several facts shows the identity Microcosm gives i
       ratioScaled: () => [ONE_FACT_IDENTITY[0].row()],
       oneBaseRolledForward: () => [ONE_FACT_IDENTITY[1].row()],
       oneBaseAllocated: () => [structuredClone(oneBaseAllocated)],
+      twoBaseAllocated: () => [structuredClone(twoBaseAllocated)],
       singleFact: () => [fsaRow(ALABAMA_BALANCE)],
     };
 
@@ -390,6 +385,7 @@ describe("a target built from several facts shows the identity Microcosm gives i
       ratioScaled: false,
       oneBaseRolledForward: false,
       oneBaseAllocated: false,
+      twoBaseAllocated: false,
       singleFact: "absent",
       withoutHierarchy: null,
     });
@@ -412,6 +408,7 @@ describe("a target built from several facts shows the identity Microcosm gives i
       ratioScaled: false,
       oneBaseRolledForward: false,
       oneBaseAllocated: false,
+      twoBaseAllocated: true,
       singleFact: "absent",
       withoutHierarchy: true,
     });
