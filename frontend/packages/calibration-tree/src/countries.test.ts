@@ -264,3 +264,12 @@ test("only the UK resolves its current release through a line pointer", () => {
     if (pointer != null) expect(pointer).toMatch(/^latest-[a-z]+(-k[1-9][0-9]*)?\.json$/);
   }
 });
+
+test("no registration says how its releases are published: every reader looks for releases.json", () => {
+  // A dataset repository with releases.json is read from it and its build
+  // folders; one without is read from its tags and pointer files. So a
+  // repository's switch to releases.json needs no change to its registration.
+  for (const country of COUNTRIES) {
+    expect(Object.hasOwn(countryRegistration(country), "release_layout"), country).toBe(false);
+  }
+});

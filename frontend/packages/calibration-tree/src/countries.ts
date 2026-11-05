@@ -41,7 +41,10 @@ export interface CountryRegistration {
   // The repository-root pointer naming the country's current release:
   // `latest.json` unless the country promotes its default line through a
   // per-line pointer (`latest-<line>.json`, microcosm#823) whose payload also
-  // names the immutable cut tag the release is read at.
+  // names the immutable tag the release is read at (`cut_tag`). Read only
+  // while the dataset repository has no `releases.json`; a repository with
+  // one is read from it and its build folders alone, whatever the
+  // registration says (release-record.ts).
   pointer_path?: string;
   // Country display name ("United States").
   label: string;
@@ -117,7 +120,9 @@ export const COUNTRY_REGISTRY = {
     capabilities: [...CALIBRATION_CAPABILITIES, "staging"],
     // microcosm#823: the UK default line is the 2024-25 national dataset,
     // promoted through its own pointer; `latest.json` stays on the June 2023
-    // release and is never moved.
+    // release and is never moved. Unread once the repository has
+    // releases.json: Microcosm's switch writes it and deletes the pointer
+    // files in one commit.
     pointer_path: "latest-national.json",
     staging: {
       repo: "policyengine/populace-uk-staging",

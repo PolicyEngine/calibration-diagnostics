@@ -19,6 +19,7 @@ import {
   type CalibrationTreeGoldenRecord,
   type GoldenReleaseInput,
 } from "./test-support/calibration-tree-golden-cases";
+import { missingReleasesRecord } from "./test-support/releases-record-responses";
 import {
   reconcileReleaseBuilds,
   reconcileStagingBuilds,
@@ -27,6 +28,9 @@ import {
   type ReconciliationReport,
 } from "@policyengine/calibration-tree/publish-calibration-tree";
 
+// The recorded releases are release folders: the repositories here have no
+// releases.json, so they are read from their tags and pointer files.
+//
 // A repair rebuilds a published release whose index went missing and refuses
 // any rebuilt index whose digest differs from the manifest entry. Seeding the
 // entry with the recorded build id and index digest therefore proves, through
@@ -79,6 +83,7 @@ function huggingFaceReleaseRepository(release: GoldenReleaseInput): typeof fetch
       }),
     ],
     [`${api}/revision/main`, () => Response.json({ sha: MAIN_REVISION_SHA })],
+    [resolveUrl(MAIN_REVISION_SHA, "releases.json"), missingReleasesRecord],
     [`${api}/revision/${release.releaseId}`, () => Response.json({ sha: release.hfCommitSha })],
   ]);
   const pointerPath = countryPointerPath(release.country);
@@ -169,6 +174,9 @@ function storeMissingIndex(
     }),
     updateManifest: async () => {
       throw new Error("A dry run must not write the manifest.");
+    },
+    uploadBundle: async () => {
+      throw new Error("A dry run must not upload a bundle.");
     },
   };
 }
@@ -280,6 +288,9 @@ function stagingRepositoryWithRefusedRepair(): {
     }),
     updateManifest: async () => {
       throw new Error("A dry run must not write the manifest.");
+    },
+    uploadBundle: async () => {
+      throw new Error("A dry run must not upload a bundle.");
     },
   };
   return { revisionSha, store, staleEntry };

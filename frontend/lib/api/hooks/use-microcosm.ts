@@ -369,6 +369,11 @@ export interface MicrocosmReleaseEntry {
   is_local_area?: boolean;
   // A Microcosm cut's line folder; absent when the folder is release_id.
   release_directory?: string;
+  // A build in its own folder (release_id is `<release>/<build>`): its
+  // release and build, and whether releases.json marks it withdrawn.
+  release?: string;
+  build?: string;
+  withdrawn?: boolean;
 }
 
 export interface MicrocosmReleasesResponse {
@@ -973,6 +978,12 @@ export function releaseRoleSuffix(entry: MicrocosmReleaseEntry): string {
   return "";
 }
 
+// A build releases.json marks withdrawn stays listed and selectable, labelled
+// so that nobody takes it for a build in use.
+export function releaseWithdrawnSuffix(entry: MicrocosmReleaseEntry): string {
+  return entry.withdrawn ? " · Withdrawn" : "";
+}
+
 // The empty selection follows the dashboard manifest; explicit ids remain
 // historical release selections.
 export function releaseSelectOptions(
@@ -986,12 +997,13 @@ export function releaseSelectOptions(
     {
       value: "",
       label: selectedDefault
-        ? `${defaultLabel} · ${releaseLabel(selectedDefault.release_id, selectedDefault.date)}`
+        ? `${defaultLabel} · ${releaseLabel(selectedDefault.release_id, selectedDefault.date)}` +
+          releaseWithdrawnSuffix(selectedDefault)
         : defaultLabel,
     },
     ...releases.map((r) => ({
       value: r.release_id,
-      label: `${releaseLabel(r.release_id, r.date)}${releaseRoleSuffix(r)}`,
+      label: `${releaseLabel(r.release_id, r.date)}${releaseRoleSuffix(r)}${releaseWithdrawnSuffix(r)}`,
     })),
   ];
 }

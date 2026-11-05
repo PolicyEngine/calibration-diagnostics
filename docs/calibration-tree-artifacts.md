@@ -140,12 +140,15 @@ removed targets read only the source side that exists.
 release repository update
   -> POST <basePath>/api/hf-webhook
   -> one GitHub workflow_dispatch per webhook delivery
-  -> enumerate the union of release directories and immutable repository tags
+  -> read releases.json at the head of main; with it, enumerate the builds it
+     lists; without it, the union of release directories and immutable
+     repository tags
   -> resolve every eligible release to an exact Hugging Face commit
   -> audit the existing Blob build for each release
   -> skip complete builds without downloading their diagnostics
   -> build and upload only missing builds or missing files
-  -> update latestReleaseBuildArtifactId from the country's upstream pointer
+  -> update latestReleaseBuildArtifactId from releases.json's current build
+     of its default release, or, without releases.json, the upstream pointer
 ```
 
 A release directory or tag without calibration diagnostics is reported as
@@ -194,6 +197,90 @@ for inspection only, such as the UK dense local-area line, has no copy on
   becomes the country's latest release. Other countries keep `latest.json`.
 - The release picker adds every published cut beside the folders on `main` and
   hides a line folder unless the dashboard's latest release still points at it.
+
+These readers apply to a dataset repository with no `releases.json` (next
+section). The UK repository stays this way until Microcosm's switch commit
+writes `releases.json` and deletes its pointer files; the dashboard then reads
+it from `releases.json` with no change of its own.
+
+#### Build folders and `releases.json`
+
+A dataset repository with a root `releases.json` publishes every build in its
+own folder, never changed after publishing, and that record names every build
+and each release's current build:
+
+```text
+releases.json
+releases/<release>/<build>/release_manifest.json
+releases/<release>/<build>/calibration_diagnostics.json
+releases/<release>/<build>/...
+```
+
+`releases.json` follows microcosm-emitter's
+`microcosm_emitter_interface.releases` (microcosm-emitter#24), whose release
+writer is the only program that changes it. `release-record.ts` reads it with
+the same rules: at most 4 MiB, exact keys, `schema_version` 1, safe release
+and build names, each `current` listed and not withdrawn, and `default`
+listed. (JavaScript reads a `schema_version` of `1.0` as 1, which the writer
+refuses; the writer itself writes `1`.) For such a repository the dashboard
+reads `releases.json` and nothing else: no tags, no `latest*.json` pointer
+files and no listing of `releases/`.
+
+Every reader finds the layout the same way, whatever the country: it asks
+Hugging Face for `releases.json` (the tree publisher at the commit it
+publishes, the release picker and the Staging page at the configured
+revision). No country registration names the layout.
+
+- Only Hugging Face's 404 for the file means the repository has no
+  `releases.json`, and then the tags and pointer files are read. A 404 whose
+  error code (`X-Error-Code`) is `RepoNotFound` or `RevisionNotFound`, any
+  other failure, and a record the writer's rules refuse are errors: the
+  release picker answers 502 for that country, reconciliation publishes
+  nothing and leaves the latest release as it was, and a local-area Staging
+  candidate has no comparison baseline. No reader falls back to tags or
+  pointer files.
+
+- A build's release id is its folder, `<release>/<build>`. Its manifest entry
+  records no separate `releaseDirectory`, and readers fetch
+  `releases/<release>/<build>/` at the entry's commit.
+- Reconciliation reads `releases.json` at the head of `main` and publishes
+  every listed build whose folder holds `calibration_diagnostics.json` and
+  whose `release_manifest.json` names the same `release` and `build` in its
+  top-level fields. The build is pinned to the newest commit behind its
+  folder's files (the commit that wrote the folder) and dated by its
+  `published_at`, so a build copied into its folder later keeps its
+  original date. A build whose folder or release manifest cannot be read is
+  reported as `failed`, and the other builds are still reconciled.
+  A build the manifest already holds is not looked up again.
+- The latest release is the current build of the record's default release.
+  While the record names none, or that build cannot be published,
+  reconciliation publishes the other listed builds and fails without moving
+  the latest release, naming the reason.
+- `--latest` and `--release <release>/<build>` publish one listed build. The
+  promotion check that follows compares the build with the record's current
+  build by name, and reads that build's folder only when they match; if the
+  folder cannot be read then, the build stays published and the next
+  reconciliation moves the latest release.
+- Entries published from tags or release folders stay in the manifest and
+  stay readable by their ids; reconciliation no longer repairs them, and the
+  picker no longer lists them. The one exception is the dashboard's latest
+  release: until reconciliation makes the record's current build the latest
+  release, the latest release is still such an entry, and the picker keeps
+  it listed as the default dataset. The deployment's pre-promotion check
+  requires the latest release to be listed.
+- The release picker lists every build `releases.json` names, dated by
+  `published_at`, with its release's role (the default release is the
+  default dataset; Microcosm's roles are `national` and `local_area`) and its
+  `withdrawn` flag. A build is selectable for comparison once its tree is
+  published. A withdrawn build stays listed and selectable, labelled
+  "Withdrawn".
+- The Staging page compares a local-area candidate with the newest published
+  build of a `local_area` release that is not withdrawn.
+- Every release id the dashboard accepts may be a build folder,
+  `<release>/<build>`, including the Staging target-change view's; the
+  "View on Hugging Face" link opens the folder at the build's pinned commit,
+  since a build folder has no tag.
+- The timestamp migration leaves build-folder entries alone.
 
 ### Finalized staging builds
 

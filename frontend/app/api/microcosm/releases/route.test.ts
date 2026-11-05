@@ -1,7 +1,12 @@
 import { expect, test } from "bun:test";
 
-import { emptyCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-manifest";
+import {
+  emptyCalibrationTreeManifest,
+  withCalibrationTreeManifestEntry,
+  type CalibrationTreeManifest,
+} from "@policyengine/calibration-tree/calibration-tree-manifest";
 import type { ReleaseEntry } from "@policyengine/calibration-tree/latest-artifact";
+import { parseReleasesRecord } from "@policyengine/calibration-tree/release-record";
 import { createMicrocosmReleasesHandler } from "./route";
 
 // Synthetic Microcosm line (microcosm#823): a folder on main and its cuts.
@@ -27,8 +32,10 @@ const FOLDERS = [
   release(LINE, LINE),
 ];
 
+// A repository without releases.json: its folders on main and its tags.
 function handler(options: { manifestFails?: boolean } = {}) {
   return createMicrocosmReleasesHandler({
+    loadReleasesRecord: async () => null,
     loadReleases: async () => FOLDERS,
     loadPointerReleaseId: async () => ({
       release_id: CUT,
@@ -78,6 +85,136 @@ test("without the dashboard manifest the inventory keeps the folder listing", as
   );
 });
 
+// A repository with releases.json (microcosm-emitter#24): it lists every
+// build, named by its folder.
+const CURRENT_BUILD = `${LINE}/uk-frs-calibration-attempt-20261019T083323Z-6cba5d71`;
+const UNPUBLISHED_BUILD = `${LINE}/uk-frs-calibration-attempt-20261020T000000Z-11111111`;
+const DENSE_BUILD = "microcosm-uk-2024-25-dense/uk-local-candidate-f100-s42-20261019T000432Z-ee5c2dbe";
+const RECORD = parseReleasesRecord({
+  schema_version: 1,
+  default: LINE,
+  releases: {
+    [LINE]: {
+      role: "national",
+      current: CURRENT_BUILD.split("/")[1],
+      builds: {
+        [CURRENT_BUILD.split("/")[1]]: { published_at: "2026-10-19T08:33:23+00:00", withdrawn: false },
+        [UNPUBLISHED_BUILD.split("/")[1]]: { published_at: "2026-10-20T00:00:00+00:00", withdrawn: false },
+      },
+    },
+    "microcosm-uk-2024-25-dense": {
+      role: "local_area",
+      current: DENSE_BUILD.split("/")[1],
+      builds: {
+        [DENSE_BUILD.split("/")[1]]: { published_at: "2026-10-19T00:04:32+00:00", withdrawn: false },
+      },
+    },
+  },
+});
+
+// The dashboard manifest holds the trees of the current and dense builds.
+function publishedTrees(): CalibrationTreeManifest {
+  return [CURRENT_BUILD, DENSE_BUILD].reduce(
+    (manifest, releaseId, index) => withCalibrationTreeManifestEntry(manifest, "uk", {
+      buildArtifactId: String(index + 1).repeat(64),
+      kind: "release",
+      sourceId: releaseId,
+      label: releaseId,
+      releaseId,
+      stagingRunId: null,
+      hfRepo: "policyengine/populace-uk-private",
+      hfCommitSha: String(index + 1).repeat(40),
+      treeSchemaVersion: 6,
+      indexSha256: "e".repeat(64),
+      indexBytes: 10,
+      createdAt: null,
+      updatedAt: null,
+    }, releaseId === CURRENT_BUILD),
+    emptyCalibrationTreeManifest(),
+  );
+}
+
+function buildFolderHandler(options: { manifestFails?: boolean } = {}) {
+  const calls: string[] = [];
+  const refuse = (name: string) => async () => {
+    calls.push(name);
+    throw new Error(`${name} is not read for a repository with releases.json`);
+  };
+  return {
+    calls,
+    handle: createMicrocosmReleasesHandler({
+      loadReleasesRecord: async () => {
+        calls.push("loadReleasesRecord");
+        return RECORD;
+      },
+      loadReleases: refuse("loadReleases"),
+      loadPublishedCutReleases: refuse("loadPublishedCutReleases"),
+      loadPointerReleaseId: async () => ({
+        release_id: CURRENT_BUILD,
+        updated_at: "2026-10-19T08:33:23.000Z",
+      }),
+      readManifest: async () => {
+        if (options.manifestFails) throw new Error("Blob unavailable");
+        return { manifest: publishedTrees(), etag: '"manifest"' };
+      },
+    }),
+  };
+}
+
+test("for a repository with releases.json, the inventory is the builds it lists", async () => {
+  const { calls, handle } = buildFolderHandler();
+  const response = await handle(
+    new Request("https://dashboard.example/api/microcosm/releases?country=uk"),
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.default_release_id).toBe(CURRENT_BUILD);
+  expect(body.latest_release_id).toBe(CURRENT_BUILD);
+  expect(body.all_releases.map((entry: ReleaseEntry) => entry.release_id)).toEqual([
+    UNPUBLISHED_BUILD,
+    CURRENT_BUILD,
+    DENSE_BUILD,
+  ]);
+  // Only builds with a published calibration tree can be compared.
+  expect(body.releases.map((entry: ReleaseEntry) => entry.release_id)).toEqual([
+    CURRENT_BUILD,
+    DENSE_BUILD,
+  ]);
+  expect(body.releases[1]).toMatchObject({ dataset_role: "local_area", is_local_area: true });
+  // No release-folder listing, tags or pointer files.
+  expect(calls).toEqual(["loadReleasesRecord"]);
+});
+
+test("for a repository with releases.json, the inventory fails without the dashboard manifest", async () => {
+  const { handle } = buildFolderHandler({ manifestFails: true });
+  const response = await handle(
+    new Request("https://dashboard.example/api/microcosm/releases?country=uk"),
+  );
+  expect(response.status).toBe(502);
+});
+
+test("a releases.json that cannot be read or is refused fails the inventory, with no fallback to tags", async () => {
+  const calls: string[] = [];
+  const response = await createMicrocosmReleasesHandler({
+    loadReleasesRecord: async () => {
+      throw new Error("releases.json is not a readable JSON document.");
+    },
+    loadReleases: async () => {
+      calls.push("loadReleases");
+      return FOLDERS;
+    },
+    loadPublishedCutReleases: async () => {
+      calls.push("loadPublishedCutReleases");
+      return [];
+    },
+    loadPointerReleaseId: async () => ({ release_id: CUT, updated_at: null }),
+    readManifest: async () => ({ manifest: emptyCalibrationTreeManifest(), etag: '"manifest"' }),
+  })(new Request("https://dashboard.example/api/microcosm/releases?country=uk"));
+  expect(response.status).toBe(502);
+  expect((await response.json()).detail).toBe("releases.json is not a readable JSON document.");
+  expect(calls).toEqual([]);
+});
+
 test("the manifest reader receives the folder listing, so releases published only as a tag are listed", async () => {
   const folderRelease = release("populace-us-2024-folder-20260915", "20260915");
   const tagOnlyRelease = release(
@@ -86,6 +223,7 @@ test("the manifest reader receives the folder listing, so releases published onl
   );
   const foldersSeenByManifestReader: unknown[] = [];
   const response = await createMicrocosmReleasesHandler({
+    loadReleasesRecord: async () => null,
     loadReleases: async () => [folderRelease],
     loadPointerReleaseId: async () => ({
       release_id: folderRelease.release_id,

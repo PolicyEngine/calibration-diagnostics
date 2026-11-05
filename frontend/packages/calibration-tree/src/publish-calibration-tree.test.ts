@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 
 import {
   CalibrationTreeArtifactSizeError,
@@ -19,6 +19,7 @@ import {
   type CalibrationTreeManifestEntry,
 } from "./calibration-tree-manifest";
 import type { CalibrationTreeBundle } from "./calibration-tree-bundle";
+import { missingReleasesRecord } from "./test-support/releases-record-responses";
 import { schema9Diagnostics } from "./test-support/schema-9-diagnostics";
 
 const originalFetch = globalThis.fetch;
@@ -442,6 +443,8 @@ test("release reconciliation leaves a complete entry's metadata to the migration
       ]);
     }
     if (url.includes(`/api/datasets/${UK_REPO}/revision/main`)) return Response.json({ sha: UK_SHA });
+    // The repository has no releases.json, so its tags and pointer files are read.
+    if (url.endsWith(`/resolve/${UK_SHA}/releases.json`)) return missingReleasesRecord();
     if (url.includes(`/api/datasets/${UK_REPO}/revision/${UK_RELEASE}`)) {
       return new Response(null, { status: 404 });
     }
@@ -471,8 +474,10 @@ test("release reconciliation leaves a complete entry's metadata to the migration
   }
 });
 
-// A Microcosm line (microcosm#823): one constant folder, one immutable tag per
-// cut. All values are synthetic.
+// A Microcosm release (microcosm#823): one constant folder, one immutable tag
+// per build. All values are synthetic. The repository has no releases.json,
+// so it is read from its tags and pointer files, as the UK repository is
+// until Microcosm's switch commit.
 const NATIONAL_LINE = "microcosm-uk-2024-25-national";
 const DENSE_LINE = "microcosm-uk-2024-25-dense";
 const NATIONAL_CUT = `${NATIONAL_LINE}-20261019T083323Z-0a1b2c3d`;
@@ -647,6 +652,8 @@ function lineRepositoryFetch(
       return Response.json([{ id: commit, date: COMMIT_DATES[commit] }]);
     }
     if (url === `${api}/revision/main`) return Response.json({ sha: MAIN_SHA });
+    // The repository has no releases.json, so its tags and pointer files are read.
+    if (url === `${resolve}/${MAIN_SHA}/releases.json`) return missingReleasesRecord();
     if (url === `${resolve}/${MAIN_SHA}/latest-national.json`) {
       return Response.json({
         schema_version: 1,
@@ -768,6 +775,78 @@ const REFUSED_SCHEMA_8_DIAGNOSTICS = {
 };
 const REFUSED_SCHEMA_8_ERROR =
   "Schema 8 category provider.category references inconsistent providers: provider and other.";
+
+test("a repository without releases.json is reconciled from its tags and pointer files", async () => {
+  const requested: string[] = [];
+  globalThis.fetch = lineRepositoryFetch(requested);
+  const store = lineStoreWithJuneLatest();
+  try {
+    const reconciliation = reconcileReleaseBuilds("uk", "blob-token", false, store);
+    await expect(reconciliation).resolves.toBeDefined();
+    const report = await reconciliation;
+    expect(report.outcomes.find((outcome) => outcome.sourceId === NATIONAL_CUT)?.status).toBe("published");
+    const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
+    const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
+    // releases.json is looked for once, at main's head, and then never again.
+    expect(requested.filter((url) => url.endsWith("/releases.json")))
+      .toEqual([`${resolve}/${MAIN_SHA}/releases.json`]);
+    expect(requested).toContain(`${api}/refs`);
+    expect(requested).toContain(`${resolve}/${MAIN_SHA}/latest-national.json`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a repository without releases.json has main's head resolved once per reconciliation, and its pointer file read at that commit", async () => {
+  const requested: string[] = [];
+  globalThis.fetch = lineRepositoryFetch(requested);
+  try {
+    await reconcileReleaseBuilds("uk", "blob-token", false, lineStoreWithJuneLatest());
+    const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
+    const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
+    expect(requested.filter((url) => url === `${api}/revision/main`)).toHaveLength(1);
+    expect(requested.filter((url) => url.endsWith("/latest-national.json")))
+      .toEqual([`${resolve}/${MAIN_SHA}/latest-national.json`]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("--latest without releases.json reads the pointer file at the commit where releases.json was looked for", async () => {
+  const api = `https://huggingface.co/api/datasets/${UK_REPO}`;
+  const resolve = `https://huggingface.co/datasets/${UK_REPO}/resolve`;
+  const laterSha = "9".repeat(40);
+  const requested: string[] = [];
+  const repository = lineRepositoryFetch([]);
+  let headLookups = 0;
+  // main moves on after the first lookup; the later commit has the same files.
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    requested.push(url);
+    if (url === `${api}/revision/main`) {
+      headLookups += 1;
+      return Response.json({ sha: headLookups === 1 ? MAIN_SHA : laterSha });
+    }
+    return repository(url.replace(`/resolve/${laterSha}/`, `/resolve/${MAIN_SHA}/`));
+  }) as typeof fetch;
+  const store = lineStoreWithJuneLatest();
+  const priorBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  process.env.BLOB_READ_WRITE_TOKEN = "blob-token";
+  const printed = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    await runPublisher({ country: "uk", mode: "latest" }, { store });
+    const firstRecordRead = requested.find((url) => url.endsWith("/releases.json"));
+    const firstPointerRead = requested.find((url) => url.endsWith("/latest-national.json"));
+    expect(firstRecordRead).toBe(`${resolve}/${MAIN_SHA}/releases.json`);
+    expect(firstPointerRead).toBe(`${resolve}/${MAIN_SHA}/latest-national.json`);
+    expect(store.writes.map((write) => write.entry.releaseId)).toContain(NATIONAL_CUT);
+  } finally {
+    printed.mockRestore();
+    globalThis.fetch = originalFetch;
+    if (priorBlobToken == null) delete process.env.BLOB_READ_WRITE_TOKEN;
+    else process.env.BLOB_READ_WRITE_TOKEN = priorBlobToken;
+  }
+});
 
 function lineStoreWithJuneLatest(
   options: { incompleteAfterUpload?: ReadonlySet<string> } = {},

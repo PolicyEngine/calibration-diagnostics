@@ -5,6 +5,7 @@ import {
   type MicrocosmCountry,
   asObject,
   assertSafeReleaseId,
+  assertSafeReleaseOrBuildFolderId,
   buildCalibration,
   buildComparison,
   latestMicrocosmCalibrationSummary,
@@ -12,6 +13,7 @@ import {
   loadCountryRepositoryHashedJson,
   loadPointerReleaseId,
   loadPublishedCutReleases,
+  loadRecordedReleases,
   loadRelease,
   loadReleases,
   microcosmCountryGeography,
@@ -982,7 +984,7 @@ export async function loadStagingTargetChangeDataset(
 ): Promise<TargetChangeDataset | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
-  assertSafeReleaseId(releaseId, "release");
+  assertSafeReleaseOrBuildFolderId(releaseId, "release");
   const progress = await stagingJsonOrNull(
     `runs/${runId}/progress.json`,
     TARGET_CHANGE_MUTABLE_CACHE_SECONDS,
@@ -1292,9 +1294,10 @@ export async function stagingRunPipelineId(
 
 /**
  * The most recently published release build whose release is local-area, by
- * the dataset roles `releases` carries (read from each release manifest, as
- * the release picker reads them) and the publication time the dashboard
- * manifest records.
+ * the dataset roles `releases` carries (read from releases.json, or from each
+ * release manifest, as the release picker reads them) and the publication
+ * time the dashboard manifest records. A build releases.json marks withdrawn
+ * is never chosen.
  */
 export function newestPublishedLocalAreaRelease(
   manifest: CalibrationTreeManifest,
@@ -1302,7 +1305,9 @@ export function newestPublishedLocalAreaRelease(
   releases: readonly ReleaseEntry[],
 ): CalibrationTreeManifestEntry | null {
   const localAreaReleases = new Set(
-    releases.filter((release) => release.is_local_area).map((release) => release.release_id),
+    releases
+      .filter((release) => release.is_local_area && release.withdrawn !== true)
+      .map((release) => release.release_id),
   );
   const builds = (manifest.countries[country]?.builds ?? []).filter(
     (build) =>
@@ -1313,6 +1318,26 @@ export function newestPublishedLocalAreaRelease(
   return calibrationBuildsNewestFirst(builds)[0] ?? null;
 }
 
+/**
+ * The releases a local-area Staging candidate may be compared with, with
+ * their roles. A repository with releases.json lists the builds it names and
+ * nothing else; one without lists the folders on main and its published
+ * tagged builds. A releases.json that cannot be read or is refused throws,
+ * so the candidate gets no baseline.
+ */
+export async function stagingBaselineReleases(
+  revalidate: number,
+  country: MicrocosmCountry,
+  manifest: CalibrationTreeManifest,
+): Promise<ReleaseEntry[]> {
+  const recorded = await loadRecordedReleases(revalidate, country, manifest);
+  if (recorded) return recorded;
+  // The published tagged builds are the ones the folder listing cannot name.
+  const folders = await loadReleases(revalidate, country);
+  const tagged = await loadPublishedCutReleases(revalidate, country, manifest, folders);
+  return [...folders, ...tagged];
+}
+
 function defaultStagingComparisonReleaseDependencies(
   revalidate: number,
 ): StagingComparisonReleaseDependencies {
@@ -1321,13 +1346,9 @@ function defaultStagingComparisonReleaseDependencies(
     currentReleaseId: async (country) =>
       (await loadPointerReleaseId(revalidate, country)).release_id,
     newestLocalAreaReleaseId: async (country) => {
-      const [{ manifest }, folders] = await Promise.all([
-        readCalibrationTreeManifest(),
-        loadReleases(revalidate, country),
-      ]);
-      const tagged = await loadPublishedCutReleases(revalidate, country, manifest, folders);
-      return newestPublishedLocalAreaRelease(manifest, country, [...folders, ...tagged])
-        ?.releaseId ?? null;
+      const { manifest } = await readCalibrationTreeManifest();
+      const releases = await stagingBaselineReleases(revalidate, country, manifest);
+      return newestPublishedLocalAreaRelease(manifest, country, releases)?.releaseId ?? null;
     },
   };
 }
