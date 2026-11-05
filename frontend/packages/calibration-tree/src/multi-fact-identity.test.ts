@@ -29,10 +29,12 @@ const PARENT_PLUS =
 const EXCLUDING_PARENT_PLUS =
   "ed_fsa.portfolio_by_loan_type.fy2026_q2.dollars_outstanding.excluding_parent_plus.dollars_outstanding";
 
-// Facts a ratio translates its base by, and a second base cell, named here.
+// Facts a ratio translates its base by, a second base cell and an allocated
+// residual's total, named here.
 const NUMERATOR = "ledger.aggregate_fact.v2:numerator_for_this_test";
 const DENOMINATOR = "ledger.aggregate_fact.v2:denominator_for_this_test";
 const SECOND_BASE_CELL = "ledger.aggregate_fact.v2:second_base_cell_for_this_test";
+const TOTAL = "ledger.aggregate_fact.v2:total_for_this_test";
 
 // The fields that name one fact, and the group-by value and universe
 // constraint, as the dashboard shows them.
@@ -130,30 +132,46 @@ describe("a target built from several facts shows the identity Microcosm gives i
   // rolled-forward target with one base cell has that cell as its identity
   // (facts[:-2], :1030-1031), which is the representative too, and Microcosm
   // counts it in ledger_value_base_cells (:1174-1178).
+  //
+  // The Alabama cell keeps its location in its layout, and these operands have
+  // no ordinary dimensions, so Microcosm lists no varying dimension on these
+  // targets: it compares ordinary dimensions alone (_varying_dimension_ids,
+  // :1626-1646; _dimensions, :5777-5784). A base cell with its location among
+  // its ordinary dimensions has a ledger_filter_ field for it (:5914-5917), and
+  // Microcosm lists it as varying, since national operands lack it (:1090,
+  // :1323-1339). ORDINARY_LOCATION adds those fields, and each operation
+  // appears both ways.
   const own = (fsaRow(ALABAMA_BALANCE).metadata as Record<string, string>);
+  const ORDINARY_LOCATION = {
+    "ledger_filter_ed_fsa.borrower_location": "al",
+    ledger_dimension_set_key: "ledger.dimension_set.v2:location_for_this_test",
+    ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
+  };
+  const scaled = (metadata: Record<string, string> = {}) =>
+    multiFactRow(ALABAMA_BALANCE, "ed_fsa.test.alabama_balance_scaled", "scaled_by_ratio", [
+      own.ledger_fact_key,
+      NUMERATOR,
+      DENOMINATOR,
+    ], { ledger_value_formula: "base * numerator / denominator", ...metadata });
+  const rolledForward = (metadata: Record<string, string> = {}) =>
+    multiFactRow(
+      ALABAMA_BALANCE,
+      "ed_fsa.test.alabama_balance_rolled_forward",
+      "rolled_forward_by_ratio",
+      [own.ledger_fact_key, NUMERATOR, DENOMINATOR],
+      {
+        ledger_value_base_cells: "1",
+        ledger_value_base_fact_keys: JSON.stringify([own.ledger_fact_key]),
+        ...metadata,
+      },
+    );
   const ONE_FACT_IDENTITY = [
+    { operation: "scaled_by_ratio", row: () => scaled() },
+    { operation: "rolled_forward_by_ratio, one base cell", row: () => rolledForward() },
+    { operation: "scaled_by_ratio, ordinary location", row: () => scaled(ORDINARY_LOCATION) },
     {
-      operation: "scaled_by_ratio",
-      row: () =>
-        multiFactRow(ALABAMA_BALANCE, "ed_fsa.test.alabama_balance_scaled", "scaled_by_ratio", [
-          own.ledger_fact_key,
-          NUMERATOR,
-          DENOMINATOR,
-        ], { ledger_value_formula: "base * numerator / denominator" }),
-    },
-    {
-      operation: "rolled_forward_by_ratio, one base cell",
-      row: () =>
-        multiFactRow(
-          ALABAMA_BALANCE,
-          "ed_fsa.test.alabama_balance_rolled_forward",
-          "rolled_forward_by_ratio",
-          [own.ledger_fact_key, NUMERATOR, DENOMINATOR],
-          {
-            ledger_value_base_cells: "1",
-            ledger_value_base_fact_keys: JSON.stringify([own.ledger_fact_key]),
-          },
-        ),
+      operation: "rolled_forward_by_ratio, one base cell, ordinary location",
+      row: () => rolledForward(ORDINARY_LOCATION),
     },
   ];
 
@@ -264,30 +282,37 @@ describe("a target built from several facts shows the identity Microcosm gives i
     expect(listedChronicle(shared)).toEqual(sharedShown);
   });
 
+  // An allocated residual over the Alabama cell and a second cell, with the
+  // base cells its receipt lists as fact_keys.base (:3188-3189). Its total
+  // leaves out a dimension its partition's cells carry (:2798-2803), so
+  // Microcosm lists that dimension in ledger_aggregation_varying_dimensions
+  // (:1323-1339, :1626-1646). ORDINARY_LOCATION makes that dimension the
+  // location.
+  const allocated = (name: string, base: string[]) =>
+    multiFactRow(
+      ALABAMA_BALANCE,
+      name,
+      "allocated_residual_by_ratio",
+      [...new Set([...base, own.ledger_fact_key, SECOND_BASE_CELL]), TOTAL],
+      {
+        ledger_allocation_receipt: JSON.stringify({
+          operation: "allocated_residual_by_ratio",
+          version: 1,
+          fact_keys: {
+            base,
+            partition: [own.ledger_fact_key, SECOND_BASE_CELL],
+            recipients: [SECOND_BASE_CELL],
+            total: TOTAL,
+          },
+        }),
+        ...ORDINARY_LOCATION,
+      },
+    );
+
   // An allocated residual's identity is the cells its selector matches
   // (:1024-1029), which its receipt lists as fact_keys.base (:3188-3189);
   // the first of them is the representative (:2993-3011, :1239-1244).
   test("allocated_residual_by_ratio: one base cell names it, two do not", () => {
-    const TOTAL = "ledger.aggregate_fact.v2:total_for_this_test";
-    const allocated = (name: string, base: string[]) =>
-      multiFactRow(
-        ALABAMA_BALANCE,
-        name,
-        "allocated_residual_by_ratio",
-        [...new Set([...base, own.ledger_fact_key, SECOND_BASE_CELL]), TOTAL],
-        {
-          ledger_allocation_receipt: JSON.stringify({
-            operation: "allocated_residual_by_ratio",
-            version: 1,
-            fact_keys: {
-              base,
-              partition: [own.ledger_fact_key, SECOND_BASE_CELL],
-              recipients: [SECOND_BASE_CELL],
-              total: TOTAL,
-            },
-          }),
-        },
-      );
     const one = releaseOf([allocated("ed_fsa.test.alabama_allocated", [own.ledger_fact_key])]);
     const oneShown = detailOf(one, String(one.rows[0].name)).target.chronicle as unknown as Row;
     expect(identityOf(oneShown)).toEqual(identityOf(one.rows[0].chronicle));
@@ -348,11 +373,22 @@ describe("a target built from several facts shows the identity Microcosm gives i
     );
     const withoutHierarchy = fsaRow(EXCLUDING_PARENT_PLUS);
     delete withoutHierarchy.hierarchy;
+    // Allocated residuals with one base cell and with two.
+    const oneBaseAllocated = allocated("ed_fsa.test.alabama_allocated", [own.ledger_fact_key]);
+    const twoBaseAllocated = allocated("ed_fsa.test.alabama_two_cells_allocated", [
+      own.ledger_fact_key,
+      SECOND_BASE_CELL,
+    ]);
     const cases = {
       excludingParentPlus: () => [fsaRow(EXCLUDING_PARENT_PLUS)],
       twoLoanTypes: () => [twoLoanTypes],
       twoAgeBands: () => [twoAgeBands],
-      ratioScaled: () => [ONE_FACT_IDENTITY[0].row()],
+      ratioScaled: () => [scaled()],
+      ratioScaledOrdinaryLocation: () => [scaled(ORDINARY_LOCATION)],
+      oneBaseRolledForward: () => [rolledForward()],
+      oneBaseRolledForwardOrdinaryLocation: () => [rolledForward(ORDINARY_LOCATION)],
+      oneBaseAllocated: () => [structuredClone(oneBaseAllocated)],
+      twoBaseAllocated: () => [structuredClone(twoBaseAllocated)],
       singleFact: () => [fsaRow(ALABAMA_BALANCE)],
     };
 
@@ -366,12 +402,18 @@ describe("a target built from several facts shows the identity Microcosm gives i
       twoLoanTypes: true,
       twoAgeBands: false,
       ratioScaled: false,
+      ratioScaledOrdinaryLocation: false,
+      oneBaseRolledForward: false,
+      oneBaseRolledForwardOrdinaryLocation: false,
+      oneBaseAllocated: false,
+      twoBaseAllocated: false,
       singleFact: "absent",
       withoutHierarchy: null,
     });
     // Whether the identity spans several facts, which the Dimensions column
-    // reads: a ratio-scaled cell's operands raise its member count, not its
-    // identity.
+    // reads: a ratio's operands raise its member count, not its identity, and a
+    // one-base rolled-forward or allocated residual target's identity is its
+    // base cell (facts[:-2], :1030-1031; the selector's matches, :1024-1029).
     const spans = (rows: JsonObject[], schemaVersion = 8) => {
       const shown = shownOf(rows, schemaVersion);
       return "identity_spans_several_facts" in shown ? shown.identity_spans_several_facts : "absent";
@@ -385,6 +427,11 @@ describe("a target built from several facts shows the identity Microcosm gives i
       twoLoanTypes: true,
       twoAgeBands: true,
       ratioScaled: false,
+      ratioScaledOrdinaryLocation: false,
+      oneBaseRolledForward: false,
+      oneBaseRolledForwardOrdinaryLocation: false,
+      oneBaseAllocated: false,
+      twoBaseAllocated: true,
       singleFact: "absent",
       withoutHierarchy: true,
     });

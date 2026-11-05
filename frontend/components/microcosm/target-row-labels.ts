@@ -14,17 +14,19 @@ export function titleFromIdentifier(value: string | null | undefined): string {
 // "All".
 //
 // A several-fact target's Chronicle fields come from one representative
-// identity fact, which Microcosm picks by period and then by fact key: a sum's
-// resolver sorts the facts by key, and the compiler takes the last fact of the
-// latest period (ledger_targets.py:2178-2183, :1232-1245 at 0ff293b). So its
+// identity fact. For a sum, Microcosm picks it by period and then by fact key:
+// the resolver sorts the facts by key, and the compiler takes the last fact of
+// the latest period (ledger_targets.py:2178-2183, :1232-1245 at 0ff293b);
+// shownChronicle in latest-artifact.ts covers the other operations. So a sum's
 // group-by value, or its lack of one, can change when a fact is renamed, while
 // the identity's size and the hierarchy's dimensions cannot. A release without
 // a hierarchy has no such dimensions: a schema 6 release's come from the
-// representative's metadata, so they can still name one fact's values. "All"
-// would claim the target covers every value of what it leaves out, as the FSA
-// balance excluding Parent PLUS leaves out Parent PLUS. The phrase names no
-// dimension as varying, since a hierarchy that leaves one out does not show
-// that the facts differ in it.
+// representative's metadata, so they can still name one fact's values, unless
+// a recognized legacy filter supplies them (latest-artifact.ts:1303-1307).
+// "All" would claim the target covers every value of what it leaves out, as
+// the FSA balance excluding Parent PLUS leaves out Parent PLUS. The phrase
+// names no dimension as varying, since a hierarchy that leaves one out does
+// not show that the facts differ in it.
 export function dimensionSummary(row: MicrocosmTargetRow): string {
   const dims = row.target_dimensions?.map((dim) => dim.value).filter(Boolean) ?? [];
   if (row.chronicle?.identity_spans_several_facts) {

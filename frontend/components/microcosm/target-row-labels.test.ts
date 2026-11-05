@@ -110,6 +110,90 @@ describe("the targets page's Dimensions column", () => {
     expect(probeCell(conflicting)).toBe("A · Combines several source cells");
   });
 
+  // A ratio's operands raise a target's member count, but a ratio-scaled target
+  // keeps its base cell's identity, and a rolled-forward or allocated residual
+  // target with one base cell has that cell as its identity
+  // (ledger_targets.py:1018-1031 at 0ff293b). So it names its state as the cell
+  // does, whether the cell keeps its location in its layout alone or among its
+  // ordinary dimensions, which Microcosm then lists as varying (:1626-1646).
+  test("a one-base ratio target reads as its base cell", () => {
+    const fixture = edFsaFamily as Record<string, unknown>;
+    const alabama = (fixture.targets as Record<string, unknown>[]).find((row) =>
+      String(row.target_name).endsWith("portfolio_by_location.2026_03_31.al.dollars_outstanding"),
+    );
+    if (!alabama) throw new Error("No FSA Alabama balance.");
+    const base = String((alabama.metadata as Record<string, unknown>).ledger_fact_key);
+    const other = "ledger.aggregate_fact.v2:other_for_this_test";
+    const cell = (operation: string, metadata: Record<string, string>) => {
+      const row = structuredClone(alabama);
+      const members = JSON.stringify([base, other, `${other}_2`]);
+      Object.assign(row.metadata as Record<string, unknown>, {
+        ledger_value_operation: operation,
+        ledger_member_fact_count: "3",
+        ledger_member_aggregate_fact_keys: members,
+        ledger_member_fact_keys: members,
+        ...metadata,
+      });
+      const [shown] = pageRows({ ...fixture, targets: [row] });
+      return dimensionSummary(shown);
+    };
+    const ordinaryLocation = {
+      "ledger_filter_ed_fsa.borrower_location": "al",
+      ledger_dimension_set_key: "ledger.dimension_set.v2:location_for_this_test",
+      ledger_aggregation_varying_dimensions: JSON.stringify(["ed_fsa.borrower_location"]),
+    };
+    const oneBaseCell = {
+      ledger_value_base_cells: "1",
+      ledger_value_base_fact_keys: JSON.stringify([base]),
+    };
+    expect({
+      ratioScaled: cell("scaled_by_ratio", {}),
+      ratioScaledOrdinaryLocation: cell("scaled_by_ratio", ordinaryLocation),
+      rolledForward: cell("rolled_forward_by_ratio", oneBaseCell),
+      rolledForwardOrdinaryLocation: cell("rolled_forward_by_ratio", {
+        ...oneBaseCell,
+        ...ordinaryLocation,
+      }),
+      allocated: cell("allocated_residual_by_ratio", {
+        ledger_allocation_receipt: JSON.stringify({
+          operation: "allocated_residual_by_ratio",
+          version: 1,
+          fact_keys: { base: [base], partition: [base, other], recipients: [other], total: `${other}_2` },
+        }),
+        ...ordinaryLocation,
+      }),
+    }).toEqual({
+      ratioScaled: "Alabama",
+      ratioScaledOrdinaryLocation: "Alabama",
+      rolledForward: "Alabama",
+      rolledForwardOrdinaryLocation: "Alabama",
+      allocated: "Alabama",
+    });
+  });
+
+  // A schema 6 release carries no hierarchy, so a several-fact target's
+  // dimensions come from a recognized legacy filter when its filter has one,
+  // and otherwise from its representative's metadata.
+  test("a schema 6 several-fact target reads its legacy filter, else its representative's group-by", () => {
+    const fixture = edFsaFamily as Record<string, unknown>;
+    const target = (fixture.targets as Record<string, unknown>[]).find((row) =>
+      String(row.target_name).endsWith("dollars_outstanding.excluding_parent_plus.dollars_outstanding"),
+    );
+    if (!target) throw new Error("No FSA balance excluding Parent PLUS.");
+    const withoutHierarchy = structuredClone(target);
+    delete withoutHierarchy.hierarchy;
+    const cell = (filter: string | null) => {
+      const [shown] = pageRows({
+        ...fixture,
+        schema_version: 6,
+        targets: [{ ...withoutHierarchy, filter }],
+      });
+      return dimensionSummary(shown);
+    };
+    expect(cell("cell_be2_female_18_64")).toBe("Female · 18–64 · Combines several source cells");
+    expect(cell(null)).toBe("stafford unsubsidized · Combines several source cells");
+  });
+
   test("the dimensions its hierarchy lists come first, and no dimension is named as varying", () => {
     expect(
       dimensionSummary({
@@ -144,8 +228,9 @@ describe("the targets page's Dimensions column", () => {
     ).toBe("All");
   });
 
-  // Microcosm picks one identity fact as the representative by fact key, so
-  // its group-by value, or its lack of one, says nothing about the others.
+  // Microcosm picks one fact as the representative (for a sum, by period and
+  // then by fact key), and its group-by value, or its lack of one, says
+  // nothing about the others.
   test("a several-fact target with no listed dimension combines several source cells, never All", () => {
     expect(
       dimensionSummary({
