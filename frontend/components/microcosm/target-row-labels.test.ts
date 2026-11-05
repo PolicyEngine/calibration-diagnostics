@@ -110,6 +110,48 @@ describe("the targets page's Dimensions column", () => {
     expect(probeCell(conflicting)).toBe("A · Combines several source cells");
   });
 
+  // A ratio's operands raise a target's member count, but a rolled-forward or
+  // allocated residual target with one base cell has that cell as its identity
+  // (ledger_targets.py:1024-1031 at 0ff293b), so it names its state as the
+  // cell does.
+  test("a one-base ratio target reads as its base cell", () => {
+    const fixture = edFsaFamily as Record<string, unknown>;
+    const alabama = (fixture.targets as Record<string, unknown>[]).find((row) =>
+      String(row.target_name).endsWith("portfolio_by_location.2026_03_31.al.dollars_outstanding"),
+    );
+    if (!alabama) throw new Error("No FSA Alabama balance.");
+    const base = String((alabama.metadata as Record<string, unknown>).ledger_fact_key);
+    const other = "ledger.aggregate_fact.v2:other_for_this_test";
+    const cell = (operation: string, metadata: Record<string, string>) => {
+      const row = structuredClone(alabama);
+      const members = JSON.stringify([base, other, `${other}_2`]);
+      Object.assign(row.metadata as Record<string, unknown>, {
+        ledger_value_operation: operation,
+        ledger_member_fact_count: "3",
+        ledger_member_aggregate_fact_keys: members,
+        ledger_member_fact_keys: members,
+        ...metadata,
+      });
+      const [shown] = pageRows({ ...fixture, targets: [row] });
+      return dimensionSummary(shown);
+    };
+    expect(
+      cell("rolled_forward_by_ratio", {
+        ledger_value_base_cells: "1",
+        ledger_value_base_fact_keys: JSON.stringify([base]),
+      }),
+    ).toBe("Alabama");
+    expect(
+      cell("allocated_residual_by_ratio", {
+        ledger_allocation_receipt: JSON.stringify({
+          operation: "allocated_residual_by_ratio",
+          version: 1,
+          fact_keys: { base: [base], partition: [base, other], recipients: [other], total: `${other}_2` },
+        }),
+      }),
+    ).toBe("Alabama");
+  });
+
   // A schema 6 release carries no hierarchy, so a several-fact target's
   // dimensions come from a recognized legacy filter when its filter has one,
   // and otherwise from its representative's metadata.

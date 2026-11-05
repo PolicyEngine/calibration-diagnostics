@@ -348,11 +348,33 @@ describe("a target built from several facts shows the identity Microcosm gives i
     );
     const withoutHierarchy = fsaRow(EXCLUDING_PARENT_PLUS);
     delete withoutHierarchy.hierarchy;
+    // An allocated residual with one base cell, which its receipt lists as
+    // fact_keys.base (:3188-3189).
+    const oneBaseAllocated = multiFactRow(
+      ALABAMA_BALANCE,
+      "ed_fsa.test.alabama_allocated",
+      "allocated_residual_by_ratio",
+      [own.ledger_fact_key, SECOND_BASE_CELL, NUMERATOR],
+      {
+        ledger_allocation_receipt: JSON.stringify({
+          operation: "allocated_residual_by_ratio",
+          version: 1,
+          fact_keys: {
+            base: [own.ledger_fact_key],
+            partition: [own.ledger_fact_key, SECOND_BASE_CELL],
+            recipients: [SECOND_BASE_CELL],
+            total: NUMERATOR,
+          },
+        }),
+      },
+    );
     const cases = {
       excludingParentPlus: () => [fsaRow(EXCLUDING_PARENT_PLUS)],
       twoLoanTypes: () => [twoLoanTypes],
       twoAgeBands: () => [twoAgeBands],
       ratioScaled: () => [ONE_FACT_IDENTITY[0].row()],
+      oneBaseRolledForward: () => [ONE_FACT_IDENTITY[1].row()],
+      oneBaseAllocated: () => [structuredClone(oneBaseAllocated)],
       singleFact: () => [fsaRow(ALABAMA_BALANCE)],
     };
 
@@ -366,12 +388,15 @@ describe("a target built from several facts shows the identity Microcosm gives i
       twoLoanTypes: true,
       twoAgeBands: false,
       ratioScaled: false,
+      oneBaseRolledForward: false,
+      oneBaseAllocated: false,
       singleFact: "absent",
       withoutHierarchy: null,
     });
     // Whether the identity spans several facts, which the Dimensions column
-    // reads: a ratio-scaled cell's operands raise its member count, not its
-    // identity.
+    // reads: a ratio's operands raise its member count, not its identity, and a
+    // one-base rolled-forward or allocated residual target's identity is its
+    // base cell (facts[:-2], :1030-1031; the selector's matches, :1024-1029).
     const spans = (rows: JsonObject[], schemaVersion = 8) => {
       const shown = shownOf(rows, schemaVersion);
       return "identity_spans_several_facts" in shown ? shown.identity_spans_several_facts : "absent";
@@ -385,6 +410,8 @@ describe("a target built from several facts shows the identity Microcosm gives i
       twoLoanTypes: true,
       twoAgeBands: true,
       ratioScaled: false,
+      oneBaseRolledForward: false,
+      oneBaseAllocated: false,
       singleFact: "absent",
       withoutHierarchy: true,
     });
