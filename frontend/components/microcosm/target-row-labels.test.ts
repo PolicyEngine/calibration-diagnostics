@@ -110,6 +110,29 @@ describe("the targets page's Dimensions column", () => {
     expect(probeCell(conflicting)).toBe("A · Combines several source cells");
   });
 
+  // A schema 6 release carries no hierarchy, so a several-fact target's
+  // dimensions come from a recognized legacy filter when its filter has one,
+  // and otherwise from its representative's metadata.
+  test("a schema 6 several-fact target reads its legacy filter, else its representative's group-by", () => {
+    const fixture = edFsaFamily as Record<string, unknown>;
+    const target = (fixture.targets as Record<string, unknown>[]).find((row) =>
+      String(row.target_name).endsWith("dollars_outstanding.excluding_parent_plus.dollars_outstanding"),
+    );
+    if (!target) throw new Error("No FSA balance excluding Parent PLUS.");
+    const withoutHierarchy = structuredClone(target);
+    delete withoutHierarchy.hierarchy;
+    const cell = (filter: string | null) => {
+      const [shown] = pageRows({
+        ...fixture,
+        schema_version: 6,
+        targets: [{ ...withoutHierarchy, filter }],
+      });
+      return dimensionSummary(shown);
+    };
+    expect(cell("cell_be2_female_18_64")).toBe("Female · 18–64 · Combines several source cells");
+    expect(cell(null)).toBe("stafford unsubsidized · Combines several source cells");
+  });
+
   test("the dimensions its hierarchy lists come first, and no dimension is named as varying", () => {
     expect(
       dimensionSummary({

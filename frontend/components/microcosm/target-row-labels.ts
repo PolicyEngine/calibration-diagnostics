@@ -21,11 +21,12 @@ export function titleFromIdentifier(value: string | null | undefined): string {
 // group-by value, or its lack of one, can change when a fact is renamed, while
 // the identity's size and the hierarchy's dimensions cannot. A release without
 // a hierarchy has no such dimensions: a schema 6 release's come from the
-// representative's metadata, so they can still name one fact's values. "All"
-// would claim the target covers every value of what it leaves out, as the FSA
-// balance excluding Parent PLUS leaves out Parent PLUS. The phrase names no
-// dimension as varying, since a hierarchy that leaves one out does not show
-// that the facts differ in it.
+// representative's metadata, unless a recognized legacy filter supplies them
+// (latest-artifact.ts:1302-1306), so they can still name one fact's values.
+// "All" would claim the target covers every value of what it leaves out, as
+// the FSA balance excluding Parent PLUS leaves out Parent PLUS. The phrase
+// names no dimension as varying, since a hierarchy that leaves one out does
+// not show that the facts differ in it.
 export function dimensionSummary(row: MicrocosmTargetRow): string {
   const dims = row.target_dimensions?.map((dim) => dim.value).filter(Boolean) ?? [];
   if (row.chronicle?.identity_spans_several_facts) {
