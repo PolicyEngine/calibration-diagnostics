@@ -22,7 +22,7 @@ export function titleFromIdentifier(value: string | null | undefined): string {
 // the identity's size and the hierarchy's dimensions cannot. A release without
 // a hierarchy has no such dimensions: a schema 6 release's come from the
 // representative's metadata, unless a recognized legacy filter supplies them
-// (latest-artifact.ts:1302-1306), so they can still name one fact's values.
+// (latest-artifact.ts:1303-1307), so they can still name one fact's values.
 // "All" would claim the target covers every value of what it leaves out, as
 // the FSA balance excluding Parent PLUS leaves out Parent PLUS. The phrase
 // names no dimension as varying, since a hierarchy that leaves one out does
