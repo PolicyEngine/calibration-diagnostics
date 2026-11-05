@@ -14,9 +14,10 @@ export function titleFromIdentifier(value: string | null | undefined): string {
 // "All".
 //
 // A several-fact target's Chronicle fields come from one representative
-// identity fact, which Microcosm picks by period and then by fact key: a sum's
-// resolver sorts the facts by key, and the compiler takes the last fact of the
-// latest period (ledger_targets.py:2178-2183, :1232-1245 at 0ff293b). So its
+// identity fact. For a sum, Microcosm picks it by period and then by fact key:
+// the resolver sorts the facts by key, and the compiler takes the last fact of
+// the latest period (ledger_targets.py:2178-2183, :1232-1245 at 0ff293b);
+// shownChronicle in latest-artifact.ts covers the other operations. So a sum's
 // group-by value, or its lack of one, can change when a fact is renamed, while
 // the identity's size and the hierarchy's dimensions cannot. A release without
 // a hierarchy has no such dimensions: a schema 6 release's come from the

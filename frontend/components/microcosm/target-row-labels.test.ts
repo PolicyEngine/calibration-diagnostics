@@ -144,8 +144,9 @@ describe("the targets page's Dimensions column", () => {
     ).toBe("All");
   });
 
-  // Microcosm picks one identity fact as the representative by fact key, so
-  // its group-by value, or its lack of one, says nothing about the others.
+  // For a sum, Microcosm picks the representative by period and then by fact
+  // key, so its group-by value, or its lack of one, says nothing about the
+  // others.
   test("a several-fact target with no listed dimension combines several source cells, never All", () => {
     expect(
       dimensionSummary({
