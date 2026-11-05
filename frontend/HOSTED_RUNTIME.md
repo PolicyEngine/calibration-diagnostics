@@ -268,7 +268,9 @@ monitor that shows these runs.
   attached. The repository answered an unauthenticated request on 2026-10-26. If it
   became private, the backend would need a token, which this code does not provide.
 - **The dashboard server** reads calibration releases and staging runs with `HF_TOKEN`,
-  or `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset. UK staging is the exception: it reads
+  or `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset. The Hugging Face webhook uses the
+  same token to read a release repository's `releases.json` before and after each
+  `main` update, for the Slack release alerts. UK staging is the exception: it reads
   only `POPULACE_UK_STAGING_HF_TOKEN`, a Vercel project setting. For production
   deployments the workflow sets `HF_TOKEN` from the repository secret
   `HF_RELEASE_READ_TOKEN`. That must be a dedicated fine-grained read-only token for the
