@@ -23,3 +23,17 @@ export function hostedListRequested(
 ): boolean {
   return source === "staging" && (!localRunsEnabled || !localListLoading);
 }
+
+// Whether the build monitor opens this machine's runs by itself. As before,
+// only when local runs exist and hold the run carried over from the
+// Candidate tab, if any.
+export function opensLocalRuns(
+  _localRunsEnabled: boolean,
+  localListReportsLocalRuns: boolean,
+  localRunIds: readonly string[],
+  preferredRunId: string | undefined,
+): boolean {
+  return (
+    localListReportsLocalRuns && (!preferredRunId || localRunIds.includes(preferredRunId))
+  );
+}
