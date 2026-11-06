@@ -171,7 +171,8 @@ function runWhere(run: BuildTimeline): string | null {
 
 // A run in the run selector: its state, start, length and where it is or
 // stopped. The selector groups runs by pipeline or, ordered by date, puts the
-// pipeline's name first; the overview shows the id.
+// pipeline's name before this label (in `BuildMonitorView`); the overview
+// shows the id.
 function runOptionLabel(run: BuildTimeline, nowMs: number): string {
   const started = run.started_ms
     ? new Date(run.started_ms).toLocaleString(undefined, {

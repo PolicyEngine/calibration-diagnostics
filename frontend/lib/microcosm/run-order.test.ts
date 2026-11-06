@@ -4,10 +4,10 @@ import { orderRunOptions, parseRunOrder, withRunOrder } from "@/lib/microcosm/ru
 
 const PAGE = "https://example.test/calibration/dashboard/microcosm/staging";
 
-// The list in the order the server sends it, which by pipeline the selector
-// shows under each run's group (`<optgroup>`s in the order they first
-// appear). These starts are deliberately out of order, so that by date the
-// selector has to sort them.
+// A list in a given order, which by pipeline the selector shows under each
+// run's group (`<optgroup>`s in the order they first appear). The server sends
+// its list newest first; these starts are out of order on purpose, so that by
+// date the selector has to sort them.
 const RUNS = [
   { run_id: "release-nov-3", started_ms: Date.parse("2026-11-03T11:17:33Z"), pipeline_label: "US release build" },
   { run_id: "release-oct-20", started_ms: Date.parse("2026-10-19T22:23:36Z"), pipeline_label: "US release build" },
@@ -68,17 +68,19 @@ test("choosing an order keeps it in the URL beside the other parameters", () => 
 
 test("by date, runs that start together, or whose starts are unknown, keep the list's order", () => {
   const sameStart = Date.parse("2026-11-03T11:17:33Z");
+  // Within each tied pair the later ID and pipeline name come first, so a
+  // tie-break by either would fail.
   const runs = [
-    { run_id: "unknown-first", started_ms: null, pipeline_label: "A" },
-    { run_id: "same-first", started_ms: sameStart, pipeline_label: "A" },
-    { run_id: "unknown-second", started_ms: null, pipeline_label: "B" },
-    { run_id: "same-second", started_ms: sameStart, pipeline_label: "B" },
+    { run_id: "unknown-z", started_ms: null, pipeline_label: "B" },
+    { run_id: "same-z", started_ms: sameStart, pipeline_label: "B" },
+    { run_id: "unknown-a", started_ms: null, pipeline_label: "A" },
+    { run_id: "same-a", started_ms: sameStart, pipeline_label: "A" },
   ];
 
   expect(orderRunOptions(runs, "date", () => undefined).map((option) => option.run.run_id)).toEqual([
-    "same-first",
-    "same-second",
-    "unknown-first",
-    "unknown-second",
+    "same-z",
+    "same-a",
+    "unknown-z",
+    "unknown-a",
   ]);
 });
