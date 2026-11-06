@@ -50,6 +50,7 @@ import {
 } from "@/lib/microcosm/build-monitor";
 import {
   type RunStage,
+  P90_MIN_RUNS,
   type RunStageTime,
   runStageBreakdown,
   runStageTimes,
@@ -1205,7 +1206,7 @@ export function RunStageCard({
       descriptionClassName="max-w-none"
       description={`How long each of this run's stages took, slowest first, and its share of the run's ${fmtDuration(
         breakdown.total_ms,
-      )}${run.state === "running" ? " so far" : ""}. Typical is the median time of the ${pipelineLabel} runs with this stage sequence that finished the stage, this run included, with their number when fewer than three. A stage still running, or stopped early, is compared only once it has run past typical. A time past their 90th percentile is marked when at least three runs finished the stage.`}
+      )}${run.state === "running" ? " so far" : ""}. Typical is the median time of the ${pipelineLabel} runs with this stage sequence that finished the stage (this run included when it did), with their number when fewer than three. A stage still running, or stopped early, is compared only once it has run past typical. A time beyond "about typical" and past those runs' 90th percentile is shown in red, when at least three runs finished the stage.`}
     >
       <div className="overflow-x-auto">
         <table className="w-full text-xs tabular-nums">
@@ -1262,7 +1263,7 @@ export function RunStageCard({
                   <td className="py-1.5 text-right">
                     {stage.typical_ms != null
                       ? `${fmtDuration(stage.typical_ms)}${
-                          stage.typical_runs < 3
+                          stage.typical_runs < P90_MIN_RUNS
                             ? ` · ${stage.typical_runs} run${stage.typical_runs === 1 ? "" : "s"}`
                             : ""
                         }`
@@ -1270,7 +1271,6 @@ export function RunStageCard({
                   </td>
                   <td
                     className={`py-1.5 text-right ${pastP90 ? "font-medium tone-neg" : "text-muted-foreground"}`}
-                    title={pastP90 ? "Past the 90th percentile of the runs that finished this stage" : undefined}
                   >
                     {againstTypical(stage)}
                     {pastP90 ? <span className="sr-only"> past the 90th percentile</span> : null}

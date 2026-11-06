@@ -204,8 +204,8 @@ with:
   5%, and the ratio from 1.5×.
 
 A stage still running, or stopped early, is compared only once it has run past
-typical. A time past the 90th percentile is marked only when at least three
-runs finished the stage. Time spent in no top-level stage gets a "Between
+typical. A time beyond "about typical" and past the 90th percentile is shown
+in red, only when at least three runs finished the stage. Time spent in no top-level stage gets a "Between
 stages" row from one minute.
 
 The US release reports each engine batch during target compilation and each

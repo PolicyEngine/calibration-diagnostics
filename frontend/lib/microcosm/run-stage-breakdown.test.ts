@@ -176,3 +176,27 @@ test("a stage is marked past the 90th percentile only beyond about typical, and 
   const fewRuns = single(60, 30, 40, 2);
   expect([fewRuns.past_p90, fewRuns.typical_runs]).toEqual([false, 2]);
 });
+
+test("a stage that went silent is compared only past typical, and a stage just past typical reads as about typical", () => {
+  // A stalled run's last stage went silent after 20 minutes of a 30-minute
+  // typical: not comparable yet.
+  const silent = runStageBreakdown(
+    {
+      ...run("stalled", "10:00", null, [
+        { stage: "calibrate", phase: "calibrate", start: "10:00", end: "10:20" },
+      ]),
+      updated_ms: at("10:20"),
+    } as BuildTimeline,
+    [stat("calibrate", 30, 40)],
+    at("12:00"),
+  ).stages[0];
+  expect([silent.status, silent.over_typical_ms, silent.past_p90]).toEqual(["silent", null, false]);
+
+  // Ten minutes past a 4-hour typical is within 5% of it.
+  const justPast = runStageBreakdown(
+    run("running", "10:00", null, [{ stage: "calibrate", phase: "calibrate", start: "10:00", end: null }]),
+    [stat("calibrate", 240, 300)],
+    at("14:10"),
+  ).stages[0];
+  expect([justPast.over_typical_ms, justPast.about_typical, justPast.past_p90]).toEqual([10 * MINUTE, true, false]);
+});

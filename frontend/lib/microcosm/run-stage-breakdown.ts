@@ -41,8 +41,9 @@ export function runStageTimes(run: BuildTimeline, nowMs: number): Map<string, Ru
 // "About typical": within a minute, or 5% of the typical time.
 const ABOUT_TYPICAL_MS = 60_000;
 const ABOUT_TYPICAL_FRACTION = 0.05;
-// Fewer finished runs than this give no 90th percentile worth marking.
-const P90_MIN_RUNS = 3;
+// Fewer finished runs than this give no 90th percentile worth marking; the
+// card names the number of runs below it.
+export const P90_MIN_RUNS = 3;
 
 export interface RunStageTime {
   stage: string;
@@ -58,12 +59,13 @@ export interface RunStageTime {
   // for a stage that is still running, failed or went silent before reaching
   // it: a stage that stopped early is not comparable with finished times.
   over_typical_ms: number | null;
-  // Within a minute or 5% of the typical time.
+  // Within a minute or 5% of the typical time; false whenever there is no
+  // difference to compare, as for an unfinished stage short of typical.
   about_typical: boolean;
   // Past the 90th percentile of the runs that finished the stage, beyond
   // "about typical", with at least three such runs.
   past_p90: boolean;
-  // How many runs finished the stage, this run included.
+  // How many runs finished the stage, this run included when it did.
   typical_runs: number;
 }
 
