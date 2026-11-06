@@ -5,13 +5,15 @@ import type { BuildRunSource } from "@/lib/microcosm/build-monitor";
 // when it was prerendered; the hosted list's answer says whether the server
 // that answers has one.
 
-// Whether to request the local list.
+// Whether to request the local list: when the page knew of a folder, when the
+// hosted list's answer reports one, or when the hosted list failed and so
+// could not say (the local list then answers whether there is one).
 export function localListRequested(
   localRunsEnabled: boolean,
   hostedListReportsLocalRuns: boolean,
-  _hostedListFailed: boolean,
+  hostedListFailed: boolean,
 ): boolean {
-  return localRunsEnabled || hostedListReportsLocalRuns;
+  return localRunsEnabled || hostedListReportsLocalRuns || hostedListFailed;
 }
 
 // Whether to request the hosted list now: at once without a local runs

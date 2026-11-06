@@ -259,8 +259,7 @@ export function BuildMonitorView({
   );
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
-  // Open local runs when this machine has them, unless the run carried over
-  // from the Candidate tab exists only in hosted telemetry.
+  // Whether this machine's runs open by themselves: see `opensLocalRuns`.
   const preferLocal = opensLocalRuns(
     localRunsEnabled,
     localEnabled,
@@ -272,6 +271,9 @@ export function BuildMonitorView({
   useEffect(() => {
     if (staging.data?.local_enabled) setHostedListReportsLocalRuns(true);
   }, [staging.data?.local_enabled]);
+  useEffect(() => {
+    if (staging.isError) setHostedListFailed(true);
+  }, [staging.isError]);
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
   const [selected, setSelected] = useState("");
@@ -353,7 +355,9 @@ export function BuildMonitorView({
         }
       />
 
-      {(list.isLoading || local.isLoading) && !runs.length ? (
+      {/* The local list's first load decides the source only when the page knew
+          of a folder; a folder found later does not bring the loading back. */}
+      {(list.isLoading || (localRunsEnabled && local.isLoading)) && !runs.length ? (
         <LoadingBlock label="Loading build runs…" />
       ) : list.error ? (
         <EmptyState title="Build runs unavailable" description={String(list.error.message)} />
