@@ -8,6 +8,7 @@ import http.server
 import importlib
 import io
 import json
+import re
 import socket
 import ssl
 import sys
@@ -426,6 +427,158 @@ def test_full_check_does_not_retry_an_http_error_with_a_body(
     with pytest.raises(RuntimeError, match="HTTP 502"):
         _run_check(monkeypatch, deployment, backend)
     assert backend.request_kinds == ["full"]
+
+
+# A Modal preemption. In deploy run 42093437237 Modal preempted the container
+# 306 s into the full check and logged that it would run the function again with
+# the same input. The backend's response was an HTTP 500 without a JSON body, so
+# the route answered with this reply.
+
+NON_JSON_BACKEND_DETAIL = "The calculation backend did not return JSON."
+NON_JSON_BACKEND_REPLY = JsonReply(502, {"detail": NON_JSON_BACKEND_DETAIL})
+VARIABLE_BACKEND_SOURCE = (
+    Path(__file__).resolve().parents[1] / "lib" / "api" / "variable-backend.ts"
+)
+
+
+def _full_check_failure(monkeypatch, deployment, backend):
+    """Run the full check; return the error it raised, or None if it passed."""
+    try:
+        _run_check(monkeypatch, deployment, backend)
+    except RuntimeError as failure:
+        return failure
+    return None
+
+
+def test_the_route_answers_502_with_this_detail_when_the_backend_is_not_json():
+    route_source = VARIABLE_BACKEND_SOURCE.read_text()
+
+    assert re.search(
+        r"detail:\s*"
+        + re.escape(json.dumps(NON_JSON_BACKEND_DETAIL))
+        + r"\s*\},\s*502",
+        route_source,
+    )
+
+
+def test_full_check_retries_once_after_the_route_reports_a_non_json_backend_response(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, _calculation_body()),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    # The metadata request waits behind Modal's rerun of the preempted input.
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    assert failure is None
+
+
+def test_full_check_keeps_waiting_after_a_non_json_backend_response_while_probes_close(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        CLOSE_WITHOUT_RESPONSE,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, _warm_container_retry_body()),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata", "metadata", "full"]
+    assert failure is None
+
+
+@pytest.mark.parametrize(
+    ("first_failure", "retry_failure", "message"),
+    [
+        (NON_JSON_BACKEND_REPLY, NON_JSON_BACKEND_REPLY, "did not return JSON"),
+        (NON_JSON_BACKEND_REPLY, CLOSE_WITHOUT_RESPONSE, "Remote end closed"),
+        (CLOSE_WITHOUT_RESPONSE, NON_JSON_BACKEND_REPLY, "did not return JSON"),
+    ],
+    ids=["non-json-twice", "non-json-then-closed", "closed-then-non-json"],
+)
+def test_full_check_retries_at_most_once_after_a_non_json_backend_response(
+    monkeypatch, start_backend, first_failure, retry_failure, message
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        first_failure, JsonReply(200, _metadata_body()), retry_failure
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    assert failure is not None
+    assert "The retried full check failed" in str(failure)
+    assert message in str(failure)
+
+
+def test_full_check_validates_the_retry_after_a_non_json_backend_response(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    retry_body = _calculation_body()
+    retry_body["execution"]["simulation_cache_hits"]["national"] = True
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, retry_body),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    assert failure is not None
+    assert "construct both scopes" in str(failure)
+
+
+@pytest.mark.parametrize(
+    "error_reply",
+    [
+        JsonReply(504, {"detail": "Variable calculation timed out."}),
+        JsonReply(502, {"detail": "The calculation backend request failed."}),
+        JsonReply(500, {"detail": NON_JSON_BACKEND_DETAIL}),
+    ],
+    ids=["route-timeout", "backend-request-failed", "same-detail-other-status"],
+)
+def test_full_check_does_not_retry_other_http_errors(
+    monkeypatch, start_backend, error_reply
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(error_reply)
+
+    with pytest.raises(RuntimeError, match=f"HTTP {error_reply.status_code}"):
+        _run_check(monkeypatch, deployment, backend)
+    assert backend.request_kinds == ["full"]
+
+
+def test_full_check_fails_at_once_when_the_probe_after_a_non_json_response_fails(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        JsonReply(504, {"detail": "Variable calculation timed out."}),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata"]
+    assert failure is not None
+    assert "HTTP 504" in str(failure)
 
 
 def test_metadata_check_retries_a_connection_closed_without_a_response(
