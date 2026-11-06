@@ -1,1 +1,0 @@
-"""Telemetry collector test support."""
