@@ -44,11 +44,11 @@ import {
   sameStageSequence,
   solverPassLabel,
   solverSegments,
-  spanDurationMs,
   stageCores,
   stageMemoryBytes,
   type StageSpan,
 } from "@/lib/microcosm/build-monitor";
+import { type RunStage, runStageTimes } from "@/lib/microcosm/run-stage-breakdown";
 
 const PHASE_COLOR: Record<BuildPhase, string> = {
   setup: "var(--chart-4)",
@@ -1135,35 +1135,6 @@ function PhaseLegend() {
   );
 }
 
-// What one run did in each of its top-level stages: how long it spent there
-// and how the stage ended for it.
-interface RunStage {
-  ms: number;
-  status: "completed" | "running" | "failed" | "silent";
-}
-
-function runStages(run: BuildTimeline, nowMs: number): Map<string, RunStage> {
-  const top = run.spans.filter((span) => span.depth === 0);
-  const last = top[top.length - 1];
-  const stages = new Map<string, RunStage>();
-  for (const span of top) {
-    const status: RunStage["status"] =
-      span.end_ms == null
-        ? "running"
-        : span.status === "failed"
-          ? "failed"
-          : run.state === "stalled" && span === last
-            ? "silent"
-            : "completed";
-    const previous = stages.get(span.stage);
-    stages.set(span.stage, {
-      ms: (previous?.ms ?? 0) + spanDurationMs(span, nowMs),
-      status: previous?.status === "failed" ? "failed" : status,
-    });
-  }
-  return stages;
-}
-
 // A stage this run is in that no compared run has finished yet.
 function emptyStat(span: StageSpan): StageStat {
   return {
@@ -1183,6 +1154,17 @@ function emptyStat(span: StageSpan): StageStat {
     cores_median: null,
     memory_max_bytes: null,
   };
+}
+
+// The selected run's stages, slowest first, beside the pipeline's typical
+// times.
+export function RunStageCard(_props: {
+  run: BuildTimeline;
+  stageStats: StageStat[];
+  nowMs: number;
+  pipelineLabel: string;
+}) {
+  return null;
 }
 
 function ThisRunCell({ stage }: { stage: RunStage | undefined }) {
@@ -1218,7 +1200,7 @@ function TimeBudgetCard({
   totals: PhaseTotals[];
 }) {
   const [expanded, setExpanded] = useState(false);
-  const thisRun = useMemo(() => runStages(run, nowMs), [run, nowMs]);
+  const thisRun = useMemo(() => runStageTimes(run, nowMs), [run, nowMs]);
   // Every stage a compared run reached, plus any this run is in that none
   // has finished yet (its open stage). Longest typical time first; stages
   // without one follow by this run's time in them.
