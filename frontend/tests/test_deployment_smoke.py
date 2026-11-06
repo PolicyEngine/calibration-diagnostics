@@ -195,6 +195,8 @@ class ScriptedBackend:
     def __init__(self, replies):
         self.pending_replies = list(replies)
         self.request_kinds: list[str] = []
+        self.client_addresses: list[tuple[str, int]] = []
+        self.bypass_headers: list[str | None] = []
         self.released = threading.Event()
         backend = self
 
@@ -203,6 +205,10 @@ class ScriptedBackend:
                 query = parse_qs(urlsplit(self.path).query)
                 backend.request_kinds.append(
                     "metadata" if query.get("metadata") == ["1"] else "full"
+                )
+                backend.client_addresses.append(self.client_address)
+                backend.bypass_headers.append(
+                    self.headers.get("x-vercel-protection-bypass")
                 )
                 reply = (
                     backend.pending_replies.pop(0)
@@ -257,7 +263,7 @@ def _skip_pauses(monkeypatch, deployment):
     monkeypatch.setattr(deployment.time, "sleep", lambda seconds: None)
 
 
-def _run_check(monkeypatch, deployment, backend, check="full"):
+def _run_check(monkeypatch, deployment, backend, check="full", extra_arguments=()):
     monkeypatch.setattr(
         sys,
         "argv",
@@ -269,6 +275,7 @@ def _run_check(monkeypatch, deployment, backend, check="full"):
             "abc123",
             "--check",
             check,
+            *extra_arguments,
         ],
     )
     return deployment.main()
@@ -554,3 +561,141 @@ def test_full_check_fails_at_once_when_the_first_request_fails_tls_verification(
     with pytest.raises(RuntimeError, match="CERTIFICATE_VERIFY_FAILED"):
         _run_check(monkeypatch, deployment, UnreachableBackend())
     assert request_kinds == ["full"]
+
+
+# TCP keepalive on every connection. In deploy run 42093437237 the full check's
+# connection carried no data while the calculation ran, and it was closed about
+# 266 s in, twice, while the route and the backend both completed.
+
+EXPECTED_TCP_KEEPALIVE_TIMINGS = {
+    "TCP_KEEPIDLE": 60,
+    "TCP_KEEPINTVL": 30,
+    "TCP_KEEPCNT": 5,
+}
+TEST_BYPASS_VALUE = "test-bypass-value"
+
+
+def _expected_keepalive_settings():
+    """SO_KEEPALIVE on, and each timing this platform defines.
+
+    Linux defines all three timings; macOS has no TCP_KEEPIDLE.
+    """
+    return {
+        "SO_KEEPALIVE": True,
+        **{
+            option_name: option_value
+            for option_name, option_value in EXPECTED_TCP_KEEPALIVE_TIMINGS.items()
+            if hasattr(socket, option_name)
+        },
+    }
+
+
+def _keepalive_settings(connection):
+    # Linux reports SO_KEEPALIVE as 1 and macOS as the option's flag value.
+    settings = {
+        "SO_KEEPALIVE": connection.getsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE)
+        != 0
+    }
+    for option_name in EXPECTED_TCP_KEEPALIVE_TIMINGS:
+        if hasattr(socket, option_name):
+            settings[option_name] = connection.getsockopt(
+                socket.IPPROTO_TCP, getattr(socket, option_name)
+            )
+    return settings
+
+
+@pytest.fixture
+def opened_connections(monkeypatch):
+    """Duplicates of the client sockets that requests open, in order.
+
+    http.client opens each connection with socket.create_connection. A duplicate
+    refers to the same kernel socket, so it reports the options set on that
+    connection after the request has closed its own handle, and after TLS has
+    taken the handle over.
+    """
+    duplicates = []
+    create_connection = socket.create_connection
+
+    def create_and_record_connection(*connection_arguments, **connection_options):
+        connection = create_connection(*connection_arguments, **connection_options)
+        duplicates.append(connection.dup())
+        return connection
+
+    monkeypatch.setattr(socket, "create_connection", create_and_record_connection)
+    yield duplicates
+    for duplicate in duplicates:
+        duplicate.close()
+
+
+@pytest.fixture
+def port_that_closes_its_first_connection():
+    """A port on 127.0.0.1 that accepts one connection and closes it unanswered."""
+    listener = socket.create_server(("127.0.0.1", 0))
+    listener.settimeout(10)
+
+    def close_first_connection():
+        try:
+            connection, _ = listener.accept()
+        except OSError:
+            return
+        connection.close()
+
+    closer = threading.Thread(target=close_first_connection, daemon=True)
+    closer.start()
+    yield listener.getsockname()[1]
+    closer.join(timeout=10)
+    listener.close()
+
+
+def test_every_full_check_request_uses_a_tcp_keepalive_connection(
+    monkeypatch, start_backend, opened_connections
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        CLOSE_WITHOUT_RESPONSE,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, _warm_container_retry_body()),
+    )
+
+    assert (
+        _run_check(
+            monkeypatch,
+            deployment,
+            backend,
+            extra_arguments=["--vercel-bypass-secret", TEST_BYPASS_VALUE],
+        )
+        == 0
+    )
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    # Each recorded socket is the client end of a request the backend received.
+    assert [
+        connection.getsockname() for connection in opened_connections
+    ] == backend.client_addresses
+    assert backend.bypass_headers == [TEST_BYPASS_VALUE] * 3
+    assert [connection.gettimeout() for connection in opened_connections] == [
+        deployment.REQUEST_TIMEOUT_SECONDS
+    ] * 3
+    assert [_keepalive_settings(connection) for connection in opened_connections] == [
+        _expected_keepalive_settings()
+    ] * 3
+
+
+def test_an_https_request_sets_tcp_keepalive_before_the_tls_handshake(
+    monkeypatch, opened_connections, port_that_closes_its_first_connection
+):
+    deployment = _module(monkeypatch)
+    port = port_that_closes_its_first_connection
+
+    # The port closes the connection instead of answering the TLS handshake,
+    # so the request fails after its TCP connection was made.
+    with pytest.raises(RuntimeError):
+        deployment._request_json(
+            f"https://127.0.0.1:{port}/calibration/dashboard/api/microcosm_variable",
+            [("metadata", "1")],
+            {},
+            attempts=1,
+            timeout=10,
+        )
+    assert len(opened_connections) == 1
+    assert _keepalive_settings(opened_connections[0]) == _expected_keepalive_settings()
