@@ -17,7 +17,7 @@ import {
   usRunningCollectorDocuments,
 } from "@/lib/microcosm/test-support/collector-run-fixtures";
 import type { ViewerZone } from "@/lib/microcosm/viewer-time";
-import { CandidateOverview, runLabel } from "./microcosm-staging-view";
+import { CandidateOverview, HuggingFaceCopyNote, runLabel } from "./microcosm-staging-view";
 
 // The failed US run's Hugging Face progress document: its last upload.
 const FAILED_RUN_PROGRESS = {
@@ -156,4 +156,37 @@ test("the candidate's picker label and overview times read in the viewer's zone,
   expect(markup).toContain(">Oct 20, 02:37 AM EDT · ");
   // The Hugging Face copy's last upload, 06:09:35 UTC.
   expect(markup).toContain("epoch 273 of 1500 · updated Oct 20, 02:09 AM EDT · ");
+});
+
+test("the Hugging Face copy's update time has UTC on hover, in the overview and the Run internals note", () => {
+  const state = candidateRunState(
+    FAILED_RUN_PROGRESS,
+    buildTimeline(usFailedCollectorDocuments(), INVESTIGATION_NOW_MS),
+    INVESTIGATION_NOW_MS,
+  );
+  // The copy's last upload, 06:09:35 UTC on October 20.
+  const hoverText = 'title="Tue, Oct 20, 2026, 02:09:35 AM EDT · 2026-10-20 06:09:35 UTC"';
+
+  const overview = plain(
+    renderToStaticMarkup(
+      createElement(CandidateOverview, {
+        candidateReleaseId: US_FAILED_RUN_ID,
+        state,
+        progress: FAILED_RUN_PROGRESS,
+        calibration: null,
+        collectorNote: null,
+        zone: NEW_YORK,
+      }),
+    ),
+  );
+  expect(overview).toContain(hoverText);
+
+  const note = plain(
+    renderToStaticMarkup(
+      createElement(HuggingFaceCopyNote, { state, progress: FAILED_RUN_PROGRESS, zone: NEW_YORK }),
+    ),
+  );
+  expect(note).toContain("These sections read the run&#x27;s Hugging Face copy (");
+  expect(note).toContain("updated Oct 20, 02:09 AM EDT · ");
+  expect(note).toContain(hoverText);
 });

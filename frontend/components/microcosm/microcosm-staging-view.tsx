@@ -321,6 +321,25 @@ function huggingFaceCopyLabel(
   return `${recorded.join(", ")} · updated ${timeWithAgo(state.hugging_face_updated_at, zone)}`;
 }
 
+// The Run internals note when the run's Hugging Face copy, which those
+// sections read, has fallen behind the collector's record.
+export function HuggingFaceCopyNote({
+  state,
+  progress,
+  zone,
+}: {
+  state: CandidateRunState;
+  progress: Record<string, unknown>;
+  zone: ViewerZone | null;
+}) {
+  return (
+    <>
+      These sections read the run&apos;s Hugging Face copy ({huggingFaceCopyLabel(state, progress, zone)}); the
+      status above comes from the telemetry collector.
+    </>
+  );
+}
+
 function OverviewRow({
   label,
   value,
@@ -496,7 +515,7 @@ function RunInternalsPanel({
   stage: string | null;
   // Set when the run's state comes from the collector and its Hugging Face
   // copy, which every section here reads, has fallen behind.
-  huggingFaceCopyNote: string | null;
+  huggingFaceCopyNote: ReactNode;
   buildManifest: Record<string, unknown> | null;
   artifacts: Record<string, { path?: string; staging_path?: string }>;
   open: boolean;
@@ -1035,9 +1054,9 @@ function MicrocosmStagingRunsView({
   const status = candidateState?.status ?? null;
   const stage = candidateState?.stage ?? null;
   // Run internals read the Hugging Face copy; say so when it has fallen behind.
-  const internalsCopyNote = candidateState?.hugging_face_differs
-    ? `These sections read the run's Hugging Face copy (${huggingFaceCopyLabel(candidateState, progress, zone)}); the status above comes from the telemetry collector.`
-    : null;
+  const internalsCopyNote = candidateState?.hugging_face_differs ? (
+    <HuggingFaceCopyNote state={candidateState} progress={progress} zone={zone} />
+  ) : null;
   // The selected run's own note: the collector may have answered for it even
   // when the run list's request failed, or the other way round.
   const collectorNote = runData?.collector_note ?? null;
