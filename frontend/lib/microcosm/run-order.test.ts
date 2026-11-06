@@ -4,8 +4,10 @@ import { orderRunOptions, parseRunOrder, withRunOrder } from "@/lib/microcosm/ru
 
 const PAGE = "https://example.test/calibration/dashboard/microcosm/staging";
 
-// The list's order: grouped by pipeline, newest first within each, as the
-// server sends it with groups that first appear in that order.
+// The list in the order the server sends it, which by pipeline the selector
+// shows under each run's group (`<optgroup>`s in the order they first
+// appear). These starts are deliberately out of order, so that by date the
+// selector has to sort them.
 const RUNS = [
   { run_id: "release-nov-3", started_ms: Date.parse("2026-11-03T11:17:33Z"), pipeline_label: "US release build" },
   { run_id: "release-oct-20", started_ms: Date.parse("2026-10-19T22:23:36Z"), pipeline_label: "US release build" },
@@ -62,4 +64,21 @@ test("choosing an order keeps it in the URL beside the other parameters", () => 
   const byPipeline = new URL(withRunOrder(`${PAGE}?view=progress&order=date`, "pipeline"));
   expect(byPipeline.searchParams.has("order")).toBe(false);
   expect(byPipeline.searchParams.get("view")).toBe("progress");
+});
+
+test("by date, runs that start together, or whose starts are unknown, keep the list's order", () => {
+  const sameStart = Date.parse("2026-11-03T11:17:33Z");
+  const runs = [
+    { run_id: "unknown-first", started_ms: null, pipeline_label: "A" },
+    { run_id: "same-first", started_ms: sameStart, pipeline_label: "A" },
+    { run_id: "unknown-second", started_ms: null, pipeline_label: "B" },
+    { run_id: "same-second", started_ms: sameStart, pipeline_label: "B" },
+  ];
+
+  expect(orderRunOptions(runs, "date", () => undefined).map((option) => option.run.run_id)).toEqual([
+    "same-first",
+    "same-second",
+    "unknown-first",
+    "unknown-second",
+  ]);
 });

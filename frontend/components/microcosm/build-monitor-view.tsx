@@ -296,10 +296,13 @@ export function BuildMonitorView({
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
   const [selected, setSelected] = useState("");
+  // The order is read from the URL on every render, not copied once: a link
+  // to the same page, or the browser's Back button, changes the URL while
+  // this view stays mounted. Next.js updates `useSearchParams` after
+  // `history.replaceState`, so writing the URL is enough to change it.
   const searchParams = useSearchParams();
-  const [runOrder, setRunOrder] = useState<RunOrder>(() => parseRunOrder(searchParams.get(RUN_ORDER_PARAM)));
+  const runOrder = parseRunOrder(searchParams.get(RUN_ORDER_PARAM));
   const chooseRunOrder = (next: RunOrder) => {
-    setRunOrder(next);
     window.history.replaceState(null, "", withRunOrder(window.location.href, next));
   };
   // The selector groups runs by pipeline, and puts runs whose stages differ
