@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 
+import { ApiError } from "@/lib/api/client";
 import { createExplorerState } from "@policyengine/calibration-tree/calibration-explorer";
 
 import {
@@ -9,6 +10,7 @@ import {
   microcosmStagingCalibrationTreeQueryOptions,
   microcosmStagingTargetChangeSourceParameters,
   releaseSelectOptions,
+  retryBuildRun,
 } from "./use-microcosm";
 
 test("calibration tree part requests start without waiting for earlier parts", async () => {
@@ -140,4 +142,13 @@ test("the picker's Latest option is labelled Withdrawn when the latest release i
   expect(latestOption.value).toBe("");
   expect(latestOption.label).toStartWith("Latest · ");
   expect(latestOption.label).toEndWith(" · Withdrawn");
+});
+
+test("a run detail the server did not find is not asked for again", () => {
+  // A link to a run that no source holds says so at once.
+  expect(retryBuildRun(0, new ApiError("Run no-such-run was not found.", 404, null))).toBe(false);
+  // Other failures are retried as every query is: up to twice.
+  expect(retryBuildRun(0, new ApiError("Telemetry collector request failed (503).", 502, null))).toBe(true);
+  expect(retryBuildRun(1, new Error("network"))).toBe(true);
+  expect(retryBuildRun(2, new Error("network"))).toBe(false);
 });

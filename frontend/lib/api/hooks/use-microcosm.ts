@@ -52,7 +52,7 @@ import {
   type CountryCapability,
   type RepositoryVisibility,
 } from "@policyengine/calibration-tree/countries";
-import { apiGet } from "../client";
+import { ApiError, apiGet, countryNotConfiguredError } from "../client";
 
 export interface MicrocosmGates {
   parity_gaps?: number | null;
@@ -1665,6 +1665,12 @@ export function useBuildRuns(source: BuildRunSource, enabled = true) {
   });
 }
 
+// Whether to ask again for a run detail that failed, as for every query: up
+// to twice, never for a country that is not configured.
+export function retryBuildRun(failureCount: number, error: Error): boolean {
+  return countryNotConfiguredError(error) == null && failureCount < 2;
+}
+
 export function useBuildRun(source: BuildRunSource, runId?: string) {
   const { country } = useCountry();
   return useQuery({
@@ -1675,5 +1681,6 @@ export function useBuildRun(source: BuildRunSource, runId?: string) {
     placeholderData: keepPreviousData,
     staleTime: 5 * 1000,
     refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+    retry: retryBuildRun,
   });
 }
