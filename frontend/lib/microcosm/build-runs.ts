@@ -55,9 +55,16 @@ const STAGING_RUN_LIMIT = 60;
 // seconds, as does the Build progress list. On Vercel, `staging/run` (whose
 // `maxDuration` is 300) runs in a different function from `builds`,
 // `builds/run` and `staging/runs` (120), so it keeps its own cache, and a poll
-// makes one list request per country in each of the two functions. Each run's
-// own record is read as before.
+// makes one list request per country in each of the two functions. A run's
+// own record is read again only when its row in the list changes, or, for an
+// unfinished run, once the copy is `UNFINISHED_RECORD_REUSE_MS` old.
 const COLLECTOR_LIST_TTL_MS = 15_000;
+// How long an unfinished collector run's record is reused while its row in
+// the collector's list is unchanged. Some events add to a record without
+// changing its row: an earlier producer's events that reach the collector
+// after a later producer's for the same run, or an active producer's events
+// replayed out of sequence.
+const UNFINISHED_RECORD_REUSE_MS = 5 * 60_000;
 // How long the Candidate tab waits for the collector's run list. Past it, the
 // tab uses the list's latest earlier answer, or shows the Hugging Face states
 // when there is none. The request carries on while the server instance runs,
@@ -106,9 +113,13 @@ interface CachedRun {
   documents: BuildRunDocuments;
   final: boolean;
   collector_version: string | null;
+  // When the record was read, by `Date.now()`.
+  read_at: number;
 }
 
-// Finished staging runs never change, so their telemetry is fetched once.
+// Each run's documents. A finished Hugging Face copy never changes, so it is
+// read once; a collector record is reused while its row in the collector's
+// list is unchanged (see `loadCollectorDocuments`).
 const stagingRunCache = new Map<string, CachedRun>();
 const stagingListCache = new Map<
   string,
@@ -201,6 +212,14 @@ export const collectorRunLists = {
   },
 };
 
+// Empties every cache above, so a test starts from a server instance's
+// first request.
+export function clearBuildRunCaches(): void {
+  stagingRunCache.clear();
+  stagingListCache.clear();
+  collectorRunLists.clear();
+}
+
 const WAIT_OVER = Symbol("wait over");
 
 // `promise`'s value, or `WAIT_OVER` when it has not settled within `waitMs`.
@@ -243,7 +262,7 @@ export interface HostedRunLoaders {
 const hostedRunLoaders: HostedRunLoaders = {
   collectorConfigured,
   hasStagingHistory: (country) => hasCapability(country, "staging"),
-  loadCollector: loadCollectorRun,
+  loadCollector: loadCollectorRecord,
   loadHistory: async (runId, country) => ({
     ...(await loadStagingRunTelemetry(runId, 0, country)),
     source: "staging",
@@ -342,6 +361,7 @@ async function loadHuggingFaceStaging(
           documents: loaded,
           final: isFinal(loaded),
           collector_version: null,
+          read_at: Date.now(),
         });
         documents.push(loaded);
       } catch (error) {
@@ -352,18 +372,40 @@ async function loadHuggingFaceStaging(
   return { available: true, detail: null, documents, problems };
 }
 
-// One collector run's documents. A finished run's documents are reused until
-// the collector reports a newer update for it.
+// What a collector run's row in the collector's run list says about its
+// record. The collector moves `updated_at` on to the latest event time it has
+// accepted, and sets `heartbeat_at` on every heartbeat, so a live run's row
+// changes at least once a heartbeat; a restarted producer can move only
+// `started_at`.
+function collectorRunVersion(summary: CollectorRunSummary): string {
+  return JSON.stringify([
+    summary.updated_at,
+    summary.status,
+    summary.started_at ?? null,
+    summary.current_stage ?? null,
+    summary.ended_at ?? null,
+    summary.heartbeat_at ?? null,
+  ]);
+}
+
+// One collector run's documents. They are reused while the run's row in the
+// collector's list is unchanged: for a finished run until the row changes,
+// and for an unfinished one for at most `UNFINISHED_RECORD_REUSE_MS`, because
+// late events can change its record without changing its row. Before, an
+// unfinished run was read on every list rebuild, and an abandoned run the
+// collector still calls running can hold 10 MB of events.
 async function loadCollectorDocuments(
   summary: CollectorRunSummary,
   country: MicrocosmCountry,
 ): Promise<BuildRunDocuments> {
   const key = `collector:${country}:${summary.run_id}`;
+  const version = collectorRunVersion(summary);
   const cached = stagingRunCache.get(key);
   if (
-    cached?.final &&
-    FINAL_STATUSES.has(summary.status) &&
-    cached.collector_version === summary.updated_at
+    cached &&
+    cached.collector_version === version &&
+    (FINAL_STATUSES.has(summary.status) ||
+      Date.now() - cached.read_at < UNFINISHED_RECORD_REUSE_MS)
   ) {
     return cached.documents;
   }
@@ -371,9 +413,30 @@ async function loadCollectorDocuments(
   stagingRunCache.set(key, {
     documents: loaded,
     final: isFinal(loaded),
-    collector_version: summary.updated_at,
+    collector_version: version,
+    read_at: Date.now(),
   });
   return loaded;
+}
+
+// The collector's record of one run for the run detail: the copy the list
+// read while the run's row in the collector's list is unchanged. A run older
+// than the list, or one whose list cannot be read, is read on its own.
+async function loadCollectorRecord(
+  runId: string,
+  country: MicrocosmCountry,
+): Promise<BuildRunDocuments> {
+  let summary: CollectorRunSummary | undefined;
+  try {
+    summary = (await collectorRunLists.recent(country)).find(
+      (row) => row.run_id === runId,
+    );
+  } catch {
+    summary = undefined;
+  }
+  return summary
+    ? loadCollectorDocuments(summary, country)
+    : loadCollectorRun(runId, country);
 }
 
 async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
@@ -514,27 +577,28 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
   const sourceProblems: BuildRunProblem[] = [];
   let collectorRunDocuments: BuildRunDocuments[] = [];
   let huggingFaceRunDocuments: BuildRunDocuments[] = [];
-  if (collectorConfigured()) {
-    try {
-      const loaded = await loadCollector(country);
-      hosted.push(loaded);
-      collectorRunDocuments = loaded.documents;
-    } catch (error) {
-      sourceProblems.push({
-        run_id: "collector",
-        detail: message(error),
-      });
-    }
+  // The two sources are read at the same time.
+  const [collector, huggingFace] = await Promise.allSettled([
+    collectorConfigured() ? loadCollector(country) : Promise.resolve(null),
+    loadHuggingFaceStaging(country),
+  ]);
+  if (collector.status === "rejected") {
+    sourceProblems.push({
+      run_id: "collector",
+      detail: message(collector.reason),
+    });
+  } else if (collector.value) {
+    hosted.push(collector.value);
+    collectorRunDocuments = collector.value.documents;
   }
-  try {
-    const loaded = await loadHuggingFaceStaging(country);
-    hosted.push(loaded);
-    huggingFaceRunDocuments = loaded.documents;
-  } catch (error) {
+  if (huggingFace.status === "rejected") {
     sourceProblems.push({
       run_id: "hugging-face-history",
-      detail: message(error),
+      detail: message(huggingFace.reason),
     });
+  } else {
+    hosted.push(huggingFace.value);
+    huggingFaceRunDocuments = huggingFace.value.documents;
   }
   const available = hosted.some((source) => source.available);
   return {
@@ -600,8 +664,8 @@ export async function refreshHostedRun(
     }
     if (collectorRun) {
       // The list kept the Hugging Face copy when the collector's record
-      // stopped before an end the copy recorded later; a fresh read of that
-      // record must not hide the end either. Otherwise the fresh record wins,
+      // stopped before an end the copy recorded later; the record read here
+      // must not hide the end either. Otherwise the collector's record wins,
       // with the uploads the list read from the copy.
       return current && collectorMissedTheEnd(collectorRun, current)
         ? current
@@ -648,9 +712,11 @@ export async function loadBuildRun(
   const loaded = await loadRuns(source, country);
   const all = timelines(loaded.documents, nowMs);
   let run = all.find((timeline) => timeline.run_id === runId) ?? null;
-  // A running hosted run may be newer than the cached list. The live
-  // collector's record wins when it responds, unless it stopped before an end
-  // the Hugging Face copy recorded later; staged files are fallback.
+  // A running hosted run may be newer than the cached list. The collector's
+  // record wins when it responds: the copy for its row in a run list at most
+  // 15 seconds old, itself at most 5 minutes old for an unfinished run,
+  // unless it stopped before an end the Hugging Face copy recorded later;
+  // staged files are fallback.
   if (source === "staging")
     run = await refreshHostedRun(run, country, runId, nowMs);
   if (run == null) return null;

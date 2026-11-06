@@ -10,11 +10,17 @@ export const TELEMETRY_COLLECTOR_URL_ENV = "MICROCOSM_TELEMETRY_COLLECTOR_URL";
 export const TELEMETRY_READ_SECRET_VERSION_ENV =
   "MICROCOSM_TELEMETRY_READ_SECRET_VERSION";
 
+// A run's row in the collector's run list (`GET /v1/runs`). The dashboard
+// reuses a run's record while these fields are unchanged.
 export interface CollectorRunSummary extends JsonObject {
   run_id: string;
   country_code: string;
   status: string;
   updated_at: string;
+  started_at?: string | null;
+  current_stage?: string | null;
+  ended_at?: string | null;
+  heartbeat_at?: string | null;
 }
 
 interface CollectorRunPage {
