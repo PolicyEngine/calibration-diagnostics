@@ -9,9 +9,14 @@ export function stagingRunFromSearch(search: URLSearchParams): string {
   return search.get(STAGING_RUN_PARAM)?.trim() ?? "";
 }
 
+// The run a Staging page URL names for `country`.
+export function stagingRunForCountry(search: URLSearchParams, _country: string): string {
+  return stagingRunFromSearch(search);
+}
+
 // `currentUrl` with `runId` as the page's run, keeping every other parameter;
 // an empty `runId` removes the parameter.
-export function withStagingRun(currentUrl: string, runId: string): string {
+export function withStagingRun(currentUrl: string, runId: string, _country: string): string {
   const url = new URL(currentUrl);
   if (runId) url.searchParams.set(STAGING_RUN_PARAM, runId);
   else url.searchParams.delete(STAGING_RUN_PARAM);

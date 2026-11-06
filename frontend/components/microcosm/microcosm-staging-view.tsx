@@ -882,8 +882,8 @@ export function MicrocosmStagingView() {
   const [runId, setRunId] = useState(() => stagingRunFromSearch(searchParams));
   const chooseRun = useCallback((next: string) => {
     setRunId(next);
-    window.history.replaceState(null, "", withStagingRun(window.location.href, next));
-  }, []);
+    window.history.replaceState(null, "", withStagingRun(window.location.href, next, country));
+  }, [country]);
 
   const changeTab = useCallback((next: StagingTab) => {
     setTab(next);
