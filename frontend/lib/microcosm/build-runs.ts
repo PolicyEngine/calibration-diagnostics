@@ -201,6 +201,14 @@ export const collectorRunLists = {
   },
 };
 
+// Empties every cache above, so a test starts from a server instance's
+// first request.
+export function clearBuildRunCaches(): void {
+  stagingRunCache.clear();
+  stagingListCache.clear();
+  collectorRunLists.clear();
+}
+
 const WAIT_OVER = Symbol("wait over");
 
 // `promise`'s value, or `WAIT_OVER` when it has not settled within `waitMs`.

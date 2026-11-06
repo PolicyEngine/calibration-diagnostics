@@ -7,7 +7,9 @@ import {
 } from "@/lib/microcosm/build-monitor";
 import {
   type HostedRunLoaders,
+  clearBuildRunCaches,
   collectorRunLists,
+  loadBuildRun,
   loadBuildRuns,
   loadCollectorTimelines,
   mergeHostedDocuments,
@@ -476,10 +478,11 @@ describe("one collector run list for every Staging route", () => {
     });
 
     expect(collector.listRequests).toHaveLength(1);
-    // A running run's own record is still read for every request.
+    // A running run's record is read again only when its row in the list
+    // changes, so the three requests share one read.
     expect(
       collector.documentRequests.filter((runId) => runId === runningRunId),
-    ).toHaveLength(3);
+    ).toHaveLength(1);
   });
 
   test("the list is read again once it is 15 seconds old", async () => {
@@ -712,5 +715,121 @@ describe("one collector run list for every Staging route", () => {
 
     expect(nextPoll.note).toBeNull();
     expect(nextPoll.timelines.get(runningRunId)?.state).toBe("running");
+  });
+});
+
+describe("how much the build list reads", () => {
+  // Runs `body` with fake timers, so the list caches can be expired.
+  async function withFakeTimers<T>(body: () => Promise<T>): Promise<T> {
+    jest.useFakeTimers();
+    try {
+      return await body();
+    } finally {
+      jest.useRealTimers();
+    }
+  }
+
+  // Past the build list's 30-second and the collector list's 15-second caches.
+  const PAST_THE_LIST_CACHES_MS = 31_000;
+
+  test("the build list reads the collector and the Hugging Face history at the same time", async () => {
+    clearBuildRunCaches();
+    const collector = fakeTelemetryCollector({ countryCode: "US", runCount: 2 });
+    let huggingFaceRequested = false;
+    let huggingFaceRequestedWhileCollectorListPending = false;
+    const bothSources = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.origin === "https://huggingface.co") {
+        huggingFaceRequested = true;
+        // An empty staging repository.
+        return Response.json([]);
+      }
+      if (url.pathname === "/v1/runs") {
+        // Hold the collector's list for up to half a second, or until the
+        // Hugging Face history has been asked for.
+        const deadline = Date.now() + 500;
+        while (!huggingFaceRequested && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+        huggingFaceRequestedWhileCollectorListPending = huggingFaceRequested;
+      }
+      return collector.fetch(input);
+    }) as typeof fetch;
+
+    const response = await withCollector(bothSources, () => loadBuildRuns("staging", "us"));
+
+    expect(response.problems).toEqual([]);
+    expect(response.runs).toHaveLength(2);
+    expect(huggingFaceRequestedWhileCollectorListPending).toBe(true);
+  });
+
+  test("a collector run whose list row is unchanged is read once, even while it runs", async () => {
+    clearBuildRunCaches();
+    const collector = fakeTelemetryCollector({ countryCode: "BE", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+    expect(collector.runs[0].status).toBe("running");
+
+    await withFakeTimers(() =>
+      withCollector(collector.fetch, async () => {
+        await loadBuildRuns("staging", "be");
+        jest.advanceTimersByTime(PAST_THE_LIST_CACHES_MS);
+        await loadBuildRuns("staging", "be");
+      }),
+    );
+
+    expect(collector.listRequests).toHaveLength(2);
+    expect(collector.documentRequests.filter((runId) => runId === runningRunId)).toHaveLength(1);
+  });
+
+  test("a collector run whose list row changed is read again", async () => {
+    clearBuildRunCaches();
+    const collector = fakeTelemetryCollector({ countryCode: "BE", runCount: 3 });
+    const running = collector.runs[0];
+
+    const second = await withFakeTimers(() =>
+      withCollector(collector.fetch, async () => {
+        await loadBuildRuns("staging", "be");
+        jest.advanceTimersByTime(PAST_THE_LIST_CACHES_MS);
+        // A heartbeat moves both times on.
+        running.updated_at = "2026-10-05T10:01:00.000Z";
+        running.heartbeat_at = "2026-10-05T10:01:00.000Z";
+        return loadBuildRuns("staging", "be");
+      }),
+    );
+
+    expect(collector.documentRequests.filter((runId) => runId === running.run_id)).toHaveLength(2);
+    expect(second.runs.find((run) => run.run_id === running.run_id)?.updated_ms).toBe(
+      Date.parse("2026-10-05T10:01:00.000Z"),
+    );
+  });
+
+  test("the selected run's detail reuses the collector copy the list read", async () => {
+    clearBuildRunCaches();
+    const collector = fakeTelemetryCollector({ countryCode: "BE", runCount: 3 });
+    const runningRunId = collector.runs[0].run_id;
+
+    const detail = await withCollector(collector.fetch, async () => {
+      await loadBuildRuns("staging", "be");
+      return loadBuildRun("staging", "be", runningRunId);
+    });
+
+    expect(detail?.run.run_id).toBe(runningRunId);
+    expect(collector.documentRequests.filter((runId) => runId === runningRunId)).toHaveLength(1);
+  });
+
+  test("the detail of a run older than the list still reads that run's record", async () => {
+    clearBuildRunCaches();
+    const collector = fakeTelemetryCollector({ countryCode: "BE", runCount: 70 });
+    // The list holds the 60 most recent runs; this one is the 66th.
+    const olderRunId = collector.runs[65].run_id;
+
+    const detail = await withCollector(collector.fetch, async () => {
+      await loadBuildRuns("staging", "be");
+      return loadBuildRun("staging", "be", olderRunId);
+    });
+
+    expect(detail?.run.run_id).toBe(olderRunId);
+    expect(detail?.run.state).toBe("passed");
+    expect(collector.documentRequests.filter((runId) => runId === olderRunId)).toHaveLength(1);
   });
 });
