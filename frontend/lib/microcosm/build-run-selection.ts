@@ -21,17 +21,18 @@ export function nextBuildRunSelection(
 
 // The run the Candidate tab shows, whenever its list or the page's run
 // changes: the run the page's URL names when it is a staging candidate; else
-// the run shown, while the list still holds it; else the newest. `missing`
-// says that the URL names a run the list does not hold, and the tab says so.
+// the run shown, while the list still holds it and the page's run has not
+// just changed (a list refresh); else the newest. `missing` says that the URL
+// names a run the list does not hold, and the tab says so.
 export function candidateRunSelection(
   runIds: readonly string[],
   selected: string,
   preferredRunId: string | undefined,
-  _pageRunChanged = false,
+  pageRunChanged = false,
 ): { runId: string | null; missing: boolean } {
   const missing = Boolean(preferredRunId) && !runIds.includes(preferredRunId!);
   if (preferredRunId && !missing) return { runId: preferredRunId, missing };
-  if (selected && runIds.includes(selected)) return { runId: selected, missing };
+  if (!pageRunChanged && selected && runIds.includes(selected)) return { runId: selected, missing };
   return { runId: runIds[0] ?? null, missing };
 }
 
@@ -41,8 +42,8 @@ export function candidateRunSelection(
 export function waitsForRunList(
   listLoading: boolean,
   runCount: number,
-  _selected: string,
+  selected: string,
   hasDetail: boolean,
 ): boolean {
-  return listLoading && runCount === 0 && !hasDetail;
+  return listLoading && runCount === 0 && !(selected && hasDetail);
 }

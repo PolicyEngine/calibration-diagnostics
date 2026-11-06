@@ -19,7 +19,7 @@ import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
-import { nextBuildRunSelection } from "@/lib/microcosm/build-run-selection";
+import { nextBuildRunSelection, waitsForRunList } from "@/lib/microcosm/build-run-selection";
 import {
   BUILD_GATE_CATALOG_SOURCE,
   GATE_POSITIONS,
@@ -248,8 +248,8 @@ export function BuildMonitorView({
   const local = useBuildRuns("local");
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
-  // Open local runs when this machine has them, unless the run carried over
-  // from the Candidate tab exists only in hosted telemetry.
+  // Open local runs when this machine has them, unless the page's run (a link,
+  // or a choice on either tab) exists only in hosted telemetry.
   const preferLocal =
     localEnabled &&
     (!preferredRunId || localRuns.some((run) => run.run_id === preferredRunId));
@@ -352,7 +352,7 @@ export function BuildMonitorView({
         }
       />
 
-      {(list.isLoading || local.isLoading) && !runs.length && !data ? (
+      {waitsForRunList(list.isLoading || local.isLoading, runs.length, selected, data != null) ? (
         <LoadingBlock label="Loading build runs…" />
       ) : list.error ? (
         <EmptyState title="Build runs unavailable" description={String(list.error.message)} />
@@ -361,7 +361,7 @@ export function BuildMonitorView({
           title={source === "local" ? "Local runs are off" : "Hosted runs unavailable"}
           description={list.data.detail ?? undefined}
         />
-      ) : !runs.length && !data && !(selected && detail.isLoading) ? (
+      ) : !runs.length && !(selected && (data || detail.isLoading)) ? (
         <EmptyState
           title="No build runs found"
           description={

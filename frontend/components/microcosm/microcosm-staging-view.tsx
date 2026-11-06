@@ -953,10 +953,14 @@ function MicrocosmStagingRunsView({
   const candidateRunIds = useMemo(() => runs.map((run) => run.run_id), [runs]);
   const candidateRunIdsKey = candidateRunIds.join("\n");
   const candidateSelection = candidateRunSelection(candidateRunIds, selectedRun, preferredRunId);
+  // The page's run the last time the rule ran, so a change of it (a link
+  // that removes or replaces the run) is told apart from a list refresh.
+  const lastPreferredRunId = useRef(preferredRunId);
   useEffect(() => {
-    if (candidateSelection.runId && candidateSelection.runId !== selectedRun) {
-      resetRunVisualState(candidateSelection.runId);
-    }
+    const pageRunChanged = lastPreferredRunId.current !== preferredRunId;
+    lastPreferredRunId.current = preferredRunId;
+    const { runId } = candidateRunSelection(candidateRunIds, selectedRun, preferredRunId, pageRunChanged);
+    if (runId && runId !== selectedRun) resetRunVisualState(runId);
   }, [candidateRunIdsKey, preferredRunId]);
   // The named run is not a staging candidate in this repository.
   const preferredRunMissing = candidateRunIds.length > 0 && candidateSelection.missing;
