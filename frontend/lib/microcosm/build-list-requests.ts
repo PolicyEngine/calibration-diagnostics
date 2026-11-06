@@ -1,22 +1,25 @@
 import type { BuildRunSource } from "@/lib/microcosm/build-monitor";
 
-export interface BuildListRequests {
-  local: boolean;
-  staging: boolean;
+// Which build lists the build monitor requests. Local runs need a folder the
+// server names in MICROCOSM_LOCAL_RUNS_DIR. The page knows whether it had one
+// when it was prerendered; the hosted list's answer says whether the server
+// that answers has one.
+
+// Whether to request the local list.
+export function localListRequested(
+  localRunsEnabled: boolean,
+  _hostedListReportsLocalRuns: boolean,
+): boolean {
+  return localRunsEnabled;
 }
 
-// Which build lists the build monitor requests now. Local runs need a folder
-// the server names in MICROCOSM_LOCAL_RUNS_DIR. Without one, as on the hosted
-// dashboard, the hosted list is requested at once and the local list not at
-// all. With one, the hosted list waits for the local list, which says whether
-// this machine's runs are opened instead.
-export function buildListRequests(
+// Whether to request the hosted list now: at once without a local runs
+// folder, as on the hosted dashboard; with one, once the local list, which
+// says whether this machine's runs are opened instead, has answered.
+export function hostedListRequested(
   localRunsEnabled: boolean,
   source: BuildRunSource,
   localListLoading: boolean,
-): BuildListRequests {
-  return {
-    local: localRunsEnabled,
-    staging: source === "staging" && (!localRunsEnabled || !localListLoading),
-  };
+): boolean {
+  return source === "staging" && (!localRunsEnabled || !localListLoading);
 }

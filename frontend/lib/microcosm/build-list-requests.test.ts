@@ -1,15 +1,23 @@
 import { expect, test } from "bun:test";
 
-import { buildListRequests } from "@/lib/microcosm/build-list-requests";
+import { hostedListRequested, localListRequested } from "@/lib/microcosm/build-list-requests";
 
 test("without local runs the hosted list is requested at once and the local list not at all", () => {
   // The hosted dashboard never has a local runs folder.
-  expect(buildListRequests(false, "staging", true)).toEqual({ local: false, staging: true });
-  expect(buildListRequests(false, "staging", false)).toEqual({ local: false, staging: true });
+  expect(localListRequested(false, false)).toBe(false);
+  expect(hostedListRequested(false, "staging", true)).toBe(true);
+  expect(hostedListRequested(false, "staging", false)).toBe(true);
 });
 
 test("with local runs the hosted list waits for the local list, which may be preferred", () => {
-  expect(buildListRequests(true, "staging", true)).toEqual({ local: true, staging: false });
-  expect(buildListRequests(true, "staging", false)).toEqual({ local: true, staging: true });
-  expect(buildListRequests(true, "local", false)).toEqual({ local: true, staging: false });
+  expect(localListRequested(true, false)).toBe(true);
+  expect(hostedListRequested(true, "staging", true)).toBe(false);
+  expect(hostedListRequested(true, "staging", false)).toBe(true);
+  expect(hostedListRequested(true, "local", false)).toBe(false);
+});
+
+test("a local runs folder the server reports at run time turns the local list on", () => {
+  // The page was prerendered without the folder, but the server that answers
+  // the hosted list has one: its answer says so.
+  expect(localListRequested(false, true)).toBe(true);
 });
