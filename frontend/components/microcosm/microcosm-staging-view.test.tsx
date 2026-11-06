@@ -41,6 +41,7 @@ function renderOverview(
       progress,
       calibration: null,
       collectorNote,
+      zone: null,
     }),
   );
 }

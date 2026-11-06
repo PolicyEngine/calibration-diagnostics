@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useCountry } from "@/components/layout/country-context";
 import { CalibrationExplorerDataPrefetch } from "@/components/microcosm/calibration-explorer-map";
 import { BuildMonitorView } from "@/components/microcosm/build-monitor-view";
+import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
 import { StagingCalibrationMapPanel } from "@/components/microcosm/staging-calibration-map-panel";
 import {
   parseStagingTab,
@@ -20,7 +21,6 @@ import {
   fmtDecimal,
   fmtMoney,
   fmtSignedMoney,
-  formatShortDateTime,
   shortReleaseId,
 } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -41,7 +41,12 @@ import {
   type MicrocosmStagingRunSummary,
 } from "@/lib/api/hooks/use-microcosm";
 import type { CandidateRunState } from "@/lib/microcosm/staging-run-state";
-import type { ViewerZone } from "@/lib/microcosm/viewer-time";
+import {
+  shortDateTime,
+  timeTitle,
+  type ViewerZone,
+  zoneNote,
+} from "@/lib/microcosm/viewer-time";
 import { countryRegistration, hasCapability } from "@policyengine/calibration-tree/countries";
 import {
   formatCandidateCurrentStatus,
@@ -124,11 +129,10 @@ function runStartTime(run: MicrocosmStagingRunSummary): string | null | undefine
   );
 }
 
-export function runLabel(
-  run: MicrocosmStagingRunSummary,
-  _zone: ViewerZone | null = null,
-): string {
-  return `${formatShortDateTime(runStartTime(run))} · ${shortReleaseId(
+// A run in the picker: its start in the viewer's zone, which the page names
+// above the picker, and its short identifier.
+export function runLabel(run: MicrocosmStagingRunSummary, zone: ViewerZone | null): string {
+  return `${shortDateTime(runStartTime(run), zone)} · ${shortReleaseId(
     run.candidate_release_id || run.run_id,
   )}`;
 }
@@ -150,11 +154,13 @@ function RunSelect({
   runs,
   selected,
   placeholder,
+  zone,
   onSelect,
 }: {
   runs: MicrocosmStagingRunSummary[];
   selected: string;
   placeholder: string;
+  zone: ViewerZone | null;
   onSelect: (runId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -203,7 +209,7 @@ function RunSelect({
           />
         ) : null}
         <span className="min-w-0 flex-1 truncate font-medium">
-          {selectedRun ? runLabel(selectedRun) : placeholder}
+          {selectedRun ? runLabel(selectedRun, zone) : placeholder}
         </span>
         {selectedRun ? (
           <span
@@ -257,7 +263,7 @@ function RunSelect({
                       aria-hidden="true"
                       className={`h-2 w-2 shrink-0 rounded-full ${STATUS_INDICATOR_CLASS[tone]}`}
                     />
-                    <span className="min-w-0 flex-1 truncate font-medium">{runLabel(run)}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{runLabel(run, zone)}</span>
                     <span
                       className="shrink-0 text-xs text-muted-foreground"
                       title={stateSourceTitle(run)}
@@ -288,9 +294,17 @@ function agoLabel(value: string | null | undefined): string {
   return `${Math.round(mins / 60 / 24)}d ago`;
 }
 
-function timeWithAgo(value: string | null | undefined): string {
+// An overview time in the viewer's zone and named, with how long ago it was:
+// "Nov 3, 09:50 PM GMT+4 · 3d ago".
+function timeWithAgo(value: string | null | undefined, zone: ViewerZone | null): string {
   const ago = agoLabel(value);
-  return `${formatShortDateTime(value)}${ago ? ` · ${ago}` : ""}`;
+  return `${shortDateTime(value, zone, { zoneName: true })}${ago ? ` · ${ago}` : ""}`;
+}
+
+// An overview time's hover text: in full in the viewer's zone and in UTC.
+function timeHoverText(value: string | null | undefined, zone: ViewerZone | null): string | undefined {
+  const ms = value ? Date.parse(value) : NaN;
+  return Number.isNaN(ms) ? undefined : timeTitle(ms, zone);
 }
 
 // What the run's Hugging Face copy last recorded: "Running, Calibration,
@@ -298,21 +312,25 @@ function timeWithAgo(value: string | null | undefined): string {
 function huggingFaceCopyLabel(
   state: CandidateRunState,
   progress: Record<string, unknown>,
+  zone: ViewerZone | null,
 ): string {
   const recorded = [formatStagingStatus(state.hugging_face_status)];
   if (state.hugging_face_stage) {
     recorded.push(formatStagingCurrentStatus({ ...progress, stage: state.hugging_face_stage }));
   }
-  return `${recorded.join(", ")} · updated ${timeWithAgo(state.hugging_face_updated_at)}`;
+  return `${recorded.join(", ")} · updated ${timeWithAgo(state.hugging_face_updated_at, zone)}`;
 }
 
 function OverviewRow({
   label,
   value,
+  title,
   wrap = false,
 }: {
   label: string;
   value: string;
+  // Hover text; the value itself when absent.
+  title?: string;
   // Long text, such as a failure message, wraps to three lines instead of one.
   wrap?: boolean;
 }) {
@@ -325,7 +343,7 @@ function OverviewRow({
       </div>
       <div
         className={`min-w-0 pr-5 text-xs ${wrap ? "line-clamp-3 break-words" : "truncate"} ${overviewMetricValueClassName}`}
-        title={value}
+        title={title ?? value}
       >
         {value}
       </div>
@@ -343,19 +361,20 @@ export function CandidateOverview({
   progress,
   calibration,
   collectorNote,
+  zone,
 }: {
   candidateReleaseId: string;
   state: CandidateRunState | null;
   progress: Record<string, unknown>;
   calibration: MicrocosmStagingRunResponse["calibration"];
   collectorNote: string | null;
-  zone?: ViewerZone | null;
+  zone: ViewerZone | null;
 }) {
   const currentStatus = state
     ? formatCandidateCurrentStatus(state)
     : formatStagingCurrentStatus(progress);
   const huggingFaceCopy = state?.hugging_face_differs
-    ? huggingFaceCopyLabel(state, progress)
+    ? huggingFaceCopyLabel(state, progress, zone)
     : null;
   return (
     <SectionCard title="Candidate overview" className="w-full" padded={false}>
@@ -363,9 +382,17 @@ export function CandidateOverview({
         <OverviewRow label="Candidate" value={candidateReleaseId} />
         <OverviewRow label="Status" value={formatStagingStatus(state?.status ?? null)} />
         {state && <OverviewRow label="Status from" value={formatStateSource(state.state_source)} />}
-        <OverviewRow label="Last update" value={timeWithAgo(state?.updated_at)} />
+        <OverviewRow
+          label="Last update"
+          value={timeWithAgo(state?.updated_at, zone)}
+          title={timeHoverText(state?.updated_at, zone)}
+        />
         {state?.heartbeat_at && (
-          <OverviewRow label="Last heartbeat" value={timeWithAgo(state.heartbeat_at)} />
+          <OverviewRow
+            label="Last heartbeat"
+            value={timeWithAgo(state.heartbeat_at, zone)}
+            title={timeHoverText(state.heartbeat_at, zone)}
+          />
         )}
         <OverviewRow label="Current status" value={currentStatus} />
         {state?.failure?.message && (
@@ -460,6 +487,7 @@ function RunInternalsPanel({
   artifacts,
   open,
   onOpenChange,
+  zone,
   className = "",
 }: {
   runData: MicrocosmStagingRunResponse;
@@ -473,6 +501,7 @@ function RunInternalsPanel({
   artifacts: Record<string, { path?: string; staging_path?: string }>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  zone: ViewerZone | null;
   className?: string;
 }) {
   return (
@@ -625,7 +654,13 @@ function RunInternalsPanel({
                           {blocked && <StatusPill tone="warning">blocked</StatusPill>}
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
-                          {formatShortDateTime(time)}
+                          {time && !Number.isNaN(Date.parse(time)) ? (
+                            <ViewerTime ms={Date.parse(time)} zone={zone}>
+                              {shortDateTime(time, zone)}
+                            </ViewerTime>
+                          ) : (
+                            shortDateTime(time, zone)
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                           {index === all.length - 1 && event.stage !== "complete" && !failed && !blocked
@@ -922,6 +957,7 @@ function MicrocosmStagingRunsView({
   const { data: runsData, isLoading: runsLoading, error: runsError } = useMicrocosmStagingRuns();
   const runs = runsData?.runs ?? [];
   const [selectedRun, setSelectedRun] = useState("");
+  const zone = useViewerZone();
   const [runInternalsOpen, setRunInternalsOpen] = useState(false);
   const [pageIntroHeight, setPageIntroHeight] = useState(0);
 
@@ -1000,7 +1036,7 @@ function MicrocosmStagingRunsView({
   const stage = candidateState?.stage ?? null;
   // Run internals read the Hugging Face copy; say so when it has fallen behind.
   const internalsCopyNote = candidateState?.hugging_face_differs
-    ? `These sections read the run's Hugging Face copy (${huggingFaceCopyLabel(candidateState, progress)}); the status above comes from the telemetry collector.`
+    ? `These sections read the run's Hugging Face copy (${huggingFaceCopyLabel(candidateState, progress, zone)}); the status above comes from the telemetry collector.`
     : null;
   // The selected run's own note: the collector may have answered for it even
   // when the run list's request failed, or the other way round.
@@ -1027,12 +1063,19 @@ function MicrocosmStagingRunsView({
         eyebrow="Microcosm · staging"
         title="Staging candidates"
         status={tabs}
-        description="Monitor Microcosm build candidates before they are promoted to the published Hugging Face release channel."
+        description={
+          <>
+            Monitor Microcosm build candidates before they are promoted to the published Hugging Face release
+            channel.
+            {zone ? ` ${zoneNote(zone, Date.now())}` : null}
+          </>
+        }
         actions={
           <RunSelect
             runs={runs}
             selected={selectedRun}
             placeholder={runSelectPlaceholder}
+            zone={zone}
             onSelect={selectRun}
           />
         }
@@ -1084,6 +1127,7 @@ function MicrocosmStagingRunsView({
                 progress={progress}
                 calibration={runData.calibration ?? null}
                 collectorNote={collectorNote}
+                zone={zone}
               />
 
               {candidateValidationPending && (
@@ -1235,6 +1279,7 @@ function MicrocosmStagingRunsView({
                   artifacts={artifacts}
                   open={runInternalsOpen}
                   onOpenChange={setRunInternalsOpen}
+                  zone={zone}
                 />
               )}
               </div>
@@ -1268,6 +1313,7 @@ function MicrocosmStagingRunsView({
                   artifacts={artifacts}
                   open={runInternalsOpen}
                   onOpenChange={setRunInternalsOpen}
+                  zone={zone}
                 />
               )}
               </div>
