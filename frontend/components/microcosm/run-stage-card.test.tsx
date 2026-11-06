@@ -30,10 +30,11 @@ const RUN = {
   })),
 } as unknown as BuildTimeline;
 
+// Five runs finished calibration, two the inputs stage, none export.
 const STATS = [
-  { stage: "load_inputs", finished_median_ms: 8 * MINUTE, finished_p90_ms: 9 * MINUTE },
-  { stage: "calibrate", finished_median_ms: 30 * MINUTE, finished_p90_ms: 40 * MINUTE },
-  { stage: "export", finished_median_ms: null, finished_p90_ms: null },
+  { stage: "load_inputs", samples: 2, cut_short: 0, finished_median_ms: 8 * MINUTE, finished_p90_ms: 9 * MINUTE },
+  { stage: "calibrate", samples: 5, cut_short: 0, finished_median_ms: 30 * MINUTE, finished_p90_ms: 40 * MINUTE },
+  { stage: "export", samples: 1, cut_short: 1, finished_median_ms: null, finished_p90_ms: null },
 ] as StageStat[];
 
 function rows(markup: string): string[] {
@@ -55,8 +56,9 @@ test("the This run card lists each stage slowest first with its time, share and 
   expect(markup).toContain("This run by stage");
   expect(rows(markup)).toEqual([
     "Stage | This run | Share | Typical | Against typical",
-    "Calibrate | 1 h | 75% | 30 min | +30 min (2.0×)",
-    "Load inputs | 10 min | 13% | 8 min | +2 min",
+    "Calibrate | 1 h | 75% | 30 min | +30 min (2.0×) | past the 90th percentile",
+    // Typical from two runs only: too few to mark a 90th percentile.
+    "Load inputs | 10 min | 13% | 8 min · 2 runs | +2 min",
     "Export | 5 min | 6% | — | —",
     "Between stages | 5 min | 6%",
   ]);

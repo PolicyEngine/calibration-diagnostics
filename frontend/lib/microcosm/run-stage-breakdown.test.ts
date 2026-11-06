@@ -39,9 +39,16 @@ function run(
   } as unknown as BuildTimeline;
 }
 
-function stat(stage: string, typicalMinutes: number | null, p90Minutes: number | null): StageStat {
+function stat(
+  stage: string,
+  typicalMinutes: number | null,
+  p90Minutes: number | null,
+  finishedRuns = 5,
+): StageStat {
   return {
     stage,
+    samples: finishedRuns,
+    cut_short: 0,
     finished_median_ms: typicalMinutes == null ? null : typicalMinutes * MINUTE,
     finished_p90_ms: p90Minutes == null ? null : p90Minutes * MINUTE,
   } as StageStat;
@@ -115,4 +122,57 @@ test("a running run counts its open stage's time so far, against the time so far
     ["calibrate", 30, "running", 0.75],
     ["load_inputs", 10, "completed", 0.25],
   ]);
+});
+
+test("a stage still running, or stopped early, is compared with typical only once it has run past it", () => {
+  const stats = [stat("load_inputs", 8, 9), stat("calibrate", 240, 300)];
+  const running = (now: string) =>
+    runStageBreakdown(
+      run("running", "10:00", null, [
+        { stage: "load_inputs", phase: "setup", start: "10:00", end: "10:10" },
+        { stage: "calibrate", phase: "calibrate", start: "10:10", end: null },
+      ]),
+      stats,
+      at(now),
+    ).stages.find((stage) => stage.stage === "calibrate")!;
+
+  // 30 minutes into a stage that typically takes 4 hours says nothing yet.
+  expect(running("10:40").over_typical_ms).toBeNull();
+  // Past the typical time, the overrun counts.
+  expect(running("14:20").over_typical_ms).toBe(10 * MINUTE);
+
+  const failedEarly = runStageBreakdown(
+    run("failed", "10:00", "10:05", [
+      { stage: "calibrate", phase: "calibrate", start: "10:00", end: "10:05", status: "failed" },
+    ]),
+    [stat("calibrate", 30, 40)],
+    at("12:00"),
+  ).stages[0];
+  expect(failedEarly.over_typical_ms).toBeNull();
+  expect(failedEarly.past_p90).toBe(false);
+});
+
+test("a stage is marked past the 90th percentile only beyond about typical, and with three finished runs", () => {
+  const single = (minutes: number, typical: number, p90: number, finishedRuns: number) =>
+    runStageBreakdown(
+      run("passed", "10:00", "13:00", [
+        {
+          stage: "calibrate",
+          phase: "calibrate",
+          start: "10:00",
+          end: `${String(10 + Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`,
+        },
+      ]),
+      [stat("calibrate", typical, p90, finishedRuns)],
+      at("14:00"),
+    ).stages[0];
+
+  // 31 minutes against a 30.5-minute median and a 30.9-minute 90th percentile.
+  const close = single(31, 30.5, 30.9, 5);
+  expect([close.about_typical, close.past_p90]).toEqual([true, false]);
+  const slow = single(60, 30, 40, 5);
+  expect([slow.about_typical, slow.past_p90, slow.typical_runs]).toEqual([false, true, 5]);
+  // Two finished runs, this one included, are too few for a 90th percentile.
+  const fewRuns = single(60, 30, 40, 2);
+  expect([fewRuns.past_p90, fewRuns.typical_runs]).toEqual([false, 2]);
 });

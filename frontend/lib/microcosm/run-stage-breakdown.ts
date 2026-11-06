@@ -50,6 +50,12 @@ export interface RunStageTime {
   typical_p90_ms: number | null;
   // This run's time minus the typical time.
   over_typical_ms: number | null;
+  // Within a minute or 5% of the typical time.
+  about_typical: boolean;
+  // Past the 90th percentile of the runs that finished the stage.
+  past_p90: boolean;
+  // How many runs finished the stage, this run included.
+  typical_runs: number;
 }
 
 export interface RunStageBreakdown {
@@ -80,6 +86,8 @@ export function runStageBreakdown(
   const stages = [...times].map(([stage, time], firstSeen) => {
     const stat = statByStage.get(stage);
     const typical = stat?.finished_median_ms ?? null;
+    const p90 = stat?.finished_p90_ms ?? null;
+    const over = typical == null ? null : time.ms - typical;
     return {
       firstSeen,
       stage,
@@ -88,8 +96,12 @@ export function runStageBreakdown(
       status: time.status,
       share: total ? time.ms / total : null,
       typical_ms: typical,
-      typical_p90_ms: stat?.finished_p90_ms ?? null,
-      over_typical_ms: typical == null ? null : time.ms - typical,
+      typical_p90_ms: p90,
+      over_typical_ms: over,
+      about_typical:
+        over != null && typical != null && Math.abs(over) < Math.max(60_000, typical * 0.05),
+      past_p90: p90 != null && time.ms > p90,
+      typical_runs: stat ? Math.max(0, stat.samples - stat.cut_short) : 0,
     };
   });
   stages.sort((first, second) => second.ms - first.ms || first.firstSeen - second.firstSeen);

@@ -1173,7 +1173,7 @@ function againstTypical(stage: RunStageTime): string {
   const over = stage.over_typical_ms;
   const typical = stage.typical_ms;
   if (over == null || typical == null) return "—";
-  if (Math.abs(over) < Math.max(60_000, typical * 0.05)) return "about typical";
+  if (stage.about_typical) return "about typical";
   if (over < 0) return `−${fmtDuration(-over)}`;
   const ratio = typical > 0 ? stage.ms / typical : null;
   return `+${fmtDuration(over)}${ratio != null && ratio >= 1.5 ? ` (${ratio.toFixed(1)}×)` : ""}`;
@@ -1220,7 +1220,7 @@ export function RunStageCard({
           </thead>
           <tbody>
             {breakdown.stages.map((stage) => {
-              const pastP90 = stage.typical_p90_ms != null && stage.ms > stage.typical_p90_ms;
+              const pastP90 = stage.past_p90;
               return (
                 <tr key={stage.stage} className="border-b border-border/60 last:border-b-0">
                   <td className="py-1.5 pr-3">
