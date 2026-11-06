@@ -23,10 +23,18 @@ STATE_VARIABLE = "ca_income_tax"
 # error with a body before this timeout.
 REQUEST_TIMEOUT_SECONDS = 790
 # The backend runs one request at a time and finishes a calculation whose
-# client has gone, so a retried full check waits until the backend answers a
-# metadata request. backend/modal_app.py stops a call after 800 s; the other
-# 60 s allow for container start. Counted from the first full-check request.
-BACKEND_FREE_DEADLINE_SECONDS = 860
+# client has gone, or runs a preempted one again, so a retried full check
+# waits until the backend answers a metadata request. Counted from the first
+# full-check request. backend/modal_app.py stops a call after 800 s, so after
+# a lost connection the backend is free within about 860 s, including 60 s for
+# container start. After a preemption about 300 s in (306 s in deploy run
+# 42093437237), Modal's new run can take another 860 s. This limit lets the
+# metadata request sent then wait its full 790 s, so it ends with the route's
+# own answer within 780 s; a new run that takes longer still fails, with the
+# route's 504 for that request. The step's worst case is then 1,100 s plus the
+# retry's 790 s, about 31.5 minutes; the deploy job's other steps took at most
+# about 6.5 minutes in recent deploys, within its 45-minute limit.
+BACKEND_FREE_DEADLINE_SECONDS = 1_100
 BACKEND_PROBE_PAUSE_SECONDS = 10
 # Failures that leave no complete HTTP response: the connection was refused,
 # closed, reset or aborted (RemoteDisconnected is a ConnectionResetError), or
