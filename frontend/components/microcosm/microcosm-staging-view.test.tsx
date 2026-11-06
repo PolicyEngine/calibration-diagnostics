@@ -231,5 +231,8 @@ test("an overview time row keeps its full text on hover, above the time in full 
     // The last update row keeps its "· 17d ago" part.
     const [updateTitle] = rowHoverTexts(markup, "06:37:45 UTC");
     expect(updateTitle).toMatch(/ · \d+d ago\n/);
+    // The last heartbeat row has the heartbeat's own time, 06:37:43 UTC.
+    const [heartbeatTitle] = rowHoverTexts(markup, "06:37:43 UTC");
+    expect(heartbeatTitle).toMatch(/ · \d+d ago\n.*2026-10-20 06:37:43 UTC$/);
   }
 });
