@@ -28,7 +28,7 @@ REQUEST_TIMEOUT_SECONDS = 790
 # full-check request. backend/modal_app.py stops a call after 800 s, so after
 # a lost connection the backend is free within about 860 s, including 60 s for
 # container start. After a preemption about 300 s in (306 s in deploy run
-# 42093437237), Modal's new run can take another 860 s. This limit lets the
+# 42093437237), Modal's new run can take up to 860 s more. This limit lets the
 # metadata request sent then wait its full 790 s, so it ends with the route's
 # own answer within 780 s; a new run that takes longer still fails, with the
 # route's 504 for that request. The step's worst case is then 1,100 s plus the
@@ -90,14 +90,14 @@ class _KeepaliveHTTPSConnection(http.client.HTTPSConnection, _KeepaliveHTTPConne
 
 
 class _KeepaliveHTTPHandler(HTTPHandler):
-    def http_open(self, req: Request) -> http.client.HTTPResponse:
-        return self.do_open(_KeepaliveHTTPConnection, req)
+    def http_open(self, request: Request) -> http.client.HTTPResponse:
+        return self.do_open(_KeepaliveHTTPConnection, request)
 
 
 class _KeepaliveHTTPSHandler(HTTPSHandler):
-    def https_open(self, req: Request) -> http.client.HTTPResponse:
+    def https_open(self, request: Request) -> http.client.HTTPResponse:
         # The same call as HTTPSHandler.https_open, with the keepalive class.
-        return self.do_open(_KeepaliveHTTPSConnection, req, context=self._context)
+        return self.do_open(_KeepaliveHTTPSConnection, request, context=self._context)
 
 
 # build_opener replaces its default HTTP and HTTPS handlers with these
