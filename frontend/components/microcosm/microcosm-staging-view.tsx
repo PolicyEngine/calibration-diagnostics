@@ -51,7 +51,7 @@ import {
 import { formatWeightedTargetError } from "@/lib/microcosm/target-change-visualization";
 import { stagingComparisonBaseline } from "@/lib/microcosm/calibration-selection";
 import { candidateRunSelection } from "@/lib/microcosm/build-run-selection";
-import { stagingRunFromSearch, withStagingRun } from "@/lib/microcosm/staging-run-url";
+import { stagingRunForCountry, withStagingRun } from "@/lib/microcosm/staging-run-url";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
 
@@ -878,12 +878,16 @@ export function MicrocosmStagingView() {
   const [tab, setTab] = useState<StagingTab>(() => parseStagingTab(searchParams.get("view")));
   // The run selected on either tab, so switching tabs keeps the same run. A
   // link names it in the `run` query parameter, and choosing a run writes it
-  // there, so the page's URL opens the same run.
-  const [runId, setRunId] = useState(() => stagingRunFromSearch(searchParams));
-  const chooseRun = useCallback((next: string) => {
-    setRunId(next);
-    window.history.replaceState(null, "", withStagingRun(window.location.href, next, country));
-  }, [country]);
+  // there with the country, so the page's URL opens the same run. It is read
+  // from the URL on every render, so Back and Forward follow it, and a run of
+  // another country is ignored.
+  const runId = stagingRunForCountry(searchParams, country);
+  const chooseRun = useCallback(
+    (next: string) => {
+      window.history.replaceState(null, "", withStagingRun(window.location.href, next, country));
+    },
+    [country],
+  );
 
   const changeTab = useCallback((next: StagingTab) => {
     setTab(next);
@@ -951,6 +955,17 @@ function MicrocosmStagingRunsView({
     );
     if (runId) resetRunVisualState(runId);
   }, [preferredRunId, resetRunVisualState, runs, selectedRun]);
+  // The page's run changed without a choice here, as with a link to the same
+  // page or the browser's Back button: open it when it is a staging
+  // candidate, else the newest. A choice made here has already written the
+  // page's run, so only a change of it moves the selection.
+  useEffect(() => {
+    const { runId } = candidateRunSelection(
+      runs.map((run) => run.run_id),
+      preferredRunId,
+    );
+    if (runId && runId !== selectedRun) resetRunVisualState(runId);
+  }, [preferredRunId]);
   // The named run is not a staging candidate in this repository.
   const preferredRunMissing =
     runs.length > 0 &&
@@ -1054,7 +1069,7 @@ function MicrocosmStagingRunsView({
 
       <div className="flex flex-col gap-5">
         {preferredRunMissing && (
-          <div className="rounded-md border px-3 py-2 text-sm pill-warn">
+          <div role="status" className="rounded-md border px-3 py-2 text-sm pill-warn">
             Run {preferredRunId} is not a staging candidate in this repository, so the newest candidate is shown.
             The Build progress tab may still have it.
           </div>

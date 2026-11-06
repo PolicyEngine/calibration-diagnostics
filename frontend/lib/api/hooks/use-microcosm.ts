@@ -52,7 +52,7 @@ import {
   type CountryCapability,
   type RepositoryVisibility,
 } from "@policyengine/calibration-tree/countries";
-import { ApiError, apiGet, countryNotConfiguredError } from "../client";
+import { ApiError, apiGet, retryFailedQuery } from "../client";
 
 export interface MicrocosmGates {
   parity_gaps?: number | null;
@@ -1667,10 +1667,10 @@ export function useBuildRuns(source: BuildRunSource, enabled = true) {
 
 // Whether to ask again for a run detail that failed: never when the server
 // found no such run (404), so a link to one says so at once; otherwise as
-// every query is, up to twice and never for a country that is not configured.
+// every query is (`retryFailedQuery`).
 export function retryBuildRun(failureCount: number, error: Error): boolean {
   if (error instanceof ApiError && error.status === 404) return false;
-  return countryNotConfiguredError(error) == null && failureCount < 2;
+  return retryFailedQuery(failureCount, error);
 }
 
 export function useBuildRun(source: BuildRunSource, runId?: string) {

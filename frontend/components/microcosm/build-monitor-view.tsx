@@ -259,6 +259,12 @@ export function BuildMonitorView({
   const runs = list.data?.runs ?? [];
   // A run the page's URL names is requested at once, beside the list.
   const [selected, setSelected] = useState(preferredRunId ?? "");
+  // The page's run changed without a choice here, as with a link to the same
+  // page or the browser's Back button: show it, or, when the URL no longer
+  // names one, the default run.
+  useEffect(() => {
+    setSelected(preferredRunId ?? "");
+  }, [preferredRunId]);
   // The selector groups runs by pipeline, and puts runs whose stages differ
   // from the pipeline's newest run (an older build driver) in a group of
   // their own, as the forecast and statistics leave them out.
@@ -355,7 +361,7 @@ export function BuildMonitorView({
           title={source === "local" ? "Local runs are off" : "Hosted runs unavailable"}
           description={list.data.detail ?? undefined}
         />
-      ) : !runs.length && !data ? (
+      ) : !runs.length && !data && !(selected && detail.isLoading) ? (
         <EmptyState
           title="No build runs found"
           description={
@@ -371,7 +377,7 @@ export function BuildMonitorView({
           title={runNotFound ? "Run not found" : "Run unavailable"}
           description={
             runNotFound
-              ? `${detail.error.message} Neither the telemetry collector nor the Hugging Face staging history has a run with this ID for this country. Choose another run above.`
+              ? `${detail.error.message} No hosted run with this ID is recorded for this country. Choose another run from the Run list.`
               : String(detail.error.message)
           }
         />
