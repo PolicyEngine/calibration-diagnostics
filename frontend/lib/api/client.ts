@@ -54,6 +54,12 @@ export function countryNotConfiguredError(error: unknown): CountryNotConfiguredB
   return error instanceof ApiError ? error.notConfigured : null;
 }
 
+// Every query's retry rule: a country without a configured release stays that
+// way on a retry; any other failure is retried twice.
+export function retryFailedQuery(failureCount: number, error: unknown): boolean {
+  return countryNotConfiguredError(error) == null && failureCount < 2;
+}
+
 export async function apiGet<T>(
   path: string,
   params?: Record<string, ParamValue>,

@@ -22,6 +22,7 @@ import {
   FAKE_COLLECTOR_URL,
   fakeTelemetryCollector,
 } from "@/lib/microcosm/test-support/fake-telemetry-collector";
+import { CollectorRequestError } from "@/lib/server/microcosm/telemetry-collector-client";
 import { secretManager } from "@/lib/server/secret-manager";
 
 const NOW = Date.parse("2026-10-05T12:00:00Z");
@@ -201,6 +202,87 @@ describe("refreshHostedRun", () => {
 
     expect(buildTimeline(stoppedEarly, NOW).state).toBe("running");
     expect(run?.state).toBe("passed");
+    expect(run).toBe(current);
+  });
+
+  // What Hugging Face returns for a run it has no files for.
+  const NO_COPY: BuildRunDocuments = {
+    run_id: "run-1",
+    source: "staging",
+    country: "us",
+    progress: null,
+    run_manifest: null,
+    calibration_progress: null,
+    events: [],
+  };
+
+  test("a run no source holds is not found, rather than shown as an empty run", async () => {
+    const run = await refreshHostedRun(
+      null,
+      "us",
+      "run-1",
+      NOW,
+      loaders({
+        loadCollector: async () => {
+          throw new CollectorRequestError(404);
+        },
+        loadHistory: async () => NO_COPY,
+      }),
+    );
+
+    expect(run).toBeNull();
+  });
+
+  test("an unreachable collector is reported, not called not found, when Hugging Face has no copy either", async () => {
+    await expect(
+      refreshHostedRun(
+        null,
+        "us",
+        "run-1",
+        NOW,
+        loaders({
+          loadCollector: async () => {
+            throw new CollectorRequestError(503);
+          },
+          loadHistory: async () => NO_COPY,
+        }),
+      ),
+    ).rejects.toThrow("Telemetry collector request failed (503).");
+  });
+
+  test("a run the collector has no record of is not found in a country without staging history", async () => {
+    const run = await refreshHostedRun(
+      null,
+      "be",
+      "run-1",
+      NOW,
+      loaders({
+        hasStagingHistory: () => false,
+        loadCollector: async () => {
+          throw new CollectorRequestError(404);
+        },
+      }),
+    );
+
+    expect(run).toBeNull();
+  });
+
+  test("a missing Hugging Face copy does not replace the listed run when the collector cannot be read", async () => {
+    const current = buildTimeline(documents("run-1", "completed"), NOW);
+
+    const run = await refreshHostedRun(
+      current,
+      "us",
+      "run-1",
+      NOW,
+      loaders({
+        loadCollector: async () => {
+          throw new Error("Telemetry collector request failed (503).");
+        },
+        loadHistory: async () => NO_COPY,
+      }),
+    );
+
     expect(run).toBe(current);
   });
 
