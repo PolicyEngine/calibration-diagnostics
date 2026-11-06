@@ -49,6 +49,7 @@ import {
   stageMemoryBytes,
   type StageSpan,
 } from "@/lib/microcosm/build-monitor";
+import type { ViewerZone } from "@/lib/microcosm/viewer-time";
 
 const PHASE_COLOR: Record<BuildPhase, string> = {
   setup: "var(--chart-4)",
@@ -163,7 +164,11 @@ function runWhere(run: BuildTimeline): string | null {
 
 // A run in the run selector: its state, start, length and where it is or
 // stopped. The selector groups runs by pipeline; the overview shows the id.
-function runOptionLabel(run: BuildTimeline, nowMs: number): string {
+export function runOptionLabel(
+  run: BuildTimeline,
+  nowMs: number,
+  _zone: ViewerZone | null = null,
+): string {
   const started = run.started_ms
     ? new Date(run.started_ms).toLocaleString(undefined, {
         month: "short",
@@ -359,7 +364,7 @@ export function BuildMonitorView({
       ) : data ? (
         <>
           <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />
-          <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} />
+          <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} zone={null} />
           <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
           <RunHistoryCard runs={runs} selected={data.run} nowMs={nowMs} onSelect={selectRun} />
           <TimeBudgetCard
@@ -421,7 +426,7 @@ function StaleSourceNotice({
   );
 }
 
-function RunOverview({
+export function RunOverview({
   run,
   forecast,
   nowMs,
@@ -429,6 +434,7 @@ function RunOverview({
   run: BuildTimeline;
   forecast: BuildForecast | null;
   nowMs: number;
+  zone: ViewerZone | null;
 }) {
   const running = run.state === "running";
   const elapsed = runDurationMs(run, nowMs);
@@ -1437,6 +1443,7 @@ function RunHistoryCard({
       longest={longest}
       selected={run.run_id === selected.run_id}
       onSelect={onSelect}
+      zone={null}
     />
   );
 
@@ -1480,7 +1487,7 @@ function RunHistoryCard({
   );
 }
 
-function RunHistoryItem({
+export function RunHistoryItem({
   run,
   total,
   longest,
@@ -1492,6 +1499,7 @@ function RunHistoryItem({
   longest: number;
   selected: boolean;
   onSelect: (runId: string) => void;
+  zone: ViewerZone | null;
 }) {
   const ms = total.total_ms ?? 0;
   const running = run.state === "running";

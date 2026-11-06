@@ -41,6 +41,7 @@ import {
   type MicrocosmStagingRunSummary,
 } from "@/lib/api/hooks/use-microcosm";
 import type { CandidateRunState } from "@/lib/microcosm/staging-run-state";
+import type { ViewerZone } from "@/lib/microcosm/viewer-time";
 import { countryRegistration, hasCapability } from "@policyengine/calibration-tree/countries";
 import {
   formatCandidateCurrentStatus,
@@ -123,7 +124,10 @@ function runStartTime(run: MicrocosmStagingRunSummary): string | null | undefine
   );
 }
 
-function runLabel(run: MicrocosmStagingRunSummary): string {
+export function runLabel(
+  run: MicrocosmStagingRunSummary,
+  _zone: ViewerZone | null = null,
+): string {
   return `${formatShortDateTime(runStartTime(run))} · ${shortReleaseId(
     run.candidate_release_id || run.run_id,
   )}`;
@@ -345,6 +349,7 @@ export function CandidateOverview({
   progress: Record<string, unknown>;
   calibration: MicrocosmStagingRunResponse["calibration"];
   collectorNote: string | null;
+  zone?: ViewerZone | null;
 }) {
   const currentStatus = state
     ? formatCandidateCurrentStatus(state)

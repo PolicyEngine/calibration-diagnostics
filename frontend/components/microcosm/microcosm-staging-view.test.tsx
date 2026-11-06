@@ -16,7 +16,8 @@ import {
   usFailedCollectorDocuments,
   usRunningCollectorDocuments,
 } from "@/lib/microcosm/test-support/collector-run-fixtures";
-import { CandidateOverview } from "./microcosm-staging-view";
+import type { ViewerZone } from "@/lib/microcosm/viewer-time";
+import { CandidateOverview, runLabel } from "./microcosm-staging-view";
 
 // The failed US run's Hugging Face progress document: its last upload.
 const FAILED_RUN_PROGRESS = {
@@ -116,4 +117,42 @@ test("a UK run refused by its acceptance checks shows where, without a copy warn
   expect(markup).toContain("Refused at Gate battery");
   expect(markup).toContain("Telemetry collector");
   expect(markup).not.toContain("Hugging Face copy");
+});
+
+const NEW_YORK: ViewerZone = { timeZone: "America/New_York", locale: "en-US" };
+
+// Some versions of the Unicode locale data put a narrow no-break space
+// before "AM" and "PM".
+function plain(text: string): string {
+  return text.replace(/\u202f/g, " ");
+}
+
+test("the candidate's picker label and overview times read in the viewer's zone, named, with UTC on hover", () => {
+  const state = candidateRunState(
+    FAILED_RUN_PROGRESS,
+    buildTimeline(usFailedCollectorDocuments(), INVESTIGATION_NOW_MS),
+    INVESTIGATION_NOW_MS,
+  );
+
+  expect(
+    plain(runLabel({ run_id: US_FAILED_RUN_ID, candidate_release_id: US_FAILED_RUN_ID, ...state }, NEW_YORK)),
+  ).toBe("Oct 19, 06:23 PM · b5db38");
+
+  const markup = plain(
+    renderToStaticMarkup(
+      createElement(CandidateOverview, {
+        candidateReleaseId: US_FAILED_RUN_ID,
+        state,
+        progress: FAILED_RUN_PROGRESS,
+        calibration: null,
+        collectorNote: null,
+        zone: NEW_YORK,
+      }),
+    ),
+  );
+  // The collector's last update, 06:37:45 UTC on October 20.
+  expect(markup).toContain('title="Tue, Oct 20, 2026, 02:37:45 AM EDT · 2026-10-20 06:37:45 UTC"');
+  expect(markup).toContain(">Oct 20, 02:37 AM EDT · ");
+  // The Hugging Face copy's last upload, 06:09:35 UTC.
+  expect(markup).toContain("epoch 273 of 1500 · updated Oct 20, 02:09 AM EDT · ");
 });
