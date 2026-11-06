@@ -124,6 +124,22 @@ function ZoneProbe() {
   return createElement("span", null, useViewerZone()?.timeZone ?? "no zone");
 }
 
-test("the server's render has no zone, so the server's own zone never reaches the page", () => {
+// The zone note is the one zone-dependent text that needs no data, so the
+// server's HTML leaves it out and hydration matches.
+test("the zone is unknown during the server's render", () => {
   expect(renderToStaticMarkup(createElement(ZoneProbe))).toBe("<span>no zone</span>");
+});
+
+test("a run silent for more than a day says when its last telemetry came, in the viewer's zone", () => {
+  // The running US run's last telemetry came at 17:16:47 UTC on October 22.
+  const nowMs = Date.parse("2026-10-24T18:00:00Z");
+  const stalled = buildTimeline(usRunningCollectorDocuments(), nowMs);
+
+  const markup = plain(
+    renderToStaticMarkup(createElement(RunOverview, { run: stalled, forecast: null, nowMs, zone: NEW_YORK })),
+  );
+
+  expect(markup).toContain(
+    'The last telemetry came 25 h 14 min after the run started, on <time dateTime="2026-10-22T17:16:47.000Z" title="Thu, Oct 22, 2026, 01:16:47 PM EDT · 2026-10-22 17:16:47 UTC">Oct 22, 01:16 PM EDT</time>, and the run wrote no final event. The telemetry does not say why it stopped, or whether the process is still working without reporting.',
+  );
 });

@@ -110,6 +110,7 @@ export function shortDateTime(
 // the zone run IDs are stamped in: "Tue, Nov 3, 2026, 03:17:33 PM GMT+4 ·
 // 2026-11-03 11:17:33 UTC".
 export function timeTitle(ms: number, zone: ViewerZone | null): string {
+  if (!Number.isFinite(ms)) return "";
   const date = format(ms, zone, {
     weekday: "short",
     year: "numeric",

@@ -120,7 +120,7 @@ function timestampFromId(value: string | null | undefined): string | null {
   return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
 }
 
-function runStartTime(run: MicrocosmStagingRunSummary): string | null | undefined {
+function runStartTimestamp(run: MicrocosmStagingRunSummary): string | null | undefined {
   return (
     run.started_at ??
     timestampFromId(run.candidate_release_id) ??
@@ -132,7 +132,7 @@ function runStartTime(run: MicrocosmStagingRunSummary): string | null | undefine
 // A run in the picker: its start in the viewer's zone, which the page names
 // above the picker, and its short identifier.
 export function runLabel(run: MicrocosmStagingRunSummary, zone: ViewerZone | null): string {
-  return `${shortDateTime(runStartTime(run), zone)} · ${shortReleaseId(
+  return `${shortDateTime(runStartTimestamp(run), zone)} · ${shortReleaseId(
     run.candidate_release_id || run.run_id,
   )}`;
 }
@@ -333,10 +333,10 @@ export function HuggingFaceCopyNote({
   zone: ViewerZone | null;
 }) {
   return (
-    <>
+    <span title={timeHoverText(state.hugging_face_updated_at, zone)}>
       These sections read the run&apos;s Hugging Face copy ({huggingFaceCopyLabel(state, progress, zone)}); the
       status above comes from the telemetry collector.
-    </>
+    </span>
   );
 }
 
@@ -417,7 +417,13 @@ export function CandidateOverview({
         {state?.failure?.message && (
           <OverviewRow label="Failure" value={state.failure.message} wrap />
         )}
-        {huggingFaceCopy && <OverviewRow label="Hugging Face copy" value={huggingFaceCopy} />}
+        {huggingFaceCopy && (
+          <OverviewRow
+            label="Hugging Face copy"
+            value={huggingFaceCopy}
+            title={timeHoverText(state?.hugging_face_updated_at, zone)}
+          />
+        )}
         {calibration && (
           <>
             <div

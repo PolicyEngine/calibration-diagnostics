@@ -22,9 +22,12 @@ function subscribeToNothing(): () => void {
 }
 
 // The zone the page's times are shown in: the browser's. It is null while
-// the server renders the page and while the browser hydrates it, so a time
-// the server would format in its own zone (UTC on Vercel) never reaches the
-// page or differs from the browser's first render.
+// the server renders the page and while the browser hydrates it, so the zone
+// note (the one zone-dependent text that needs no data) is left out of the
+// server's HTML and hydration matches. A null zone formats times in the
+// runtime's default zone, which on the server is UTC on Vercel; the Staging
+// page shows no time before its data arrives, and its data is fetched in the
+// browser, so no time is formatted on the server today.
 export function useViewerZone(): ViewerZone | null {
   return useSyncExternalStore(subscribeToNothing, browserZoneOnce, noZoneOnServer);
 }
@@ -40,6 +43,7 @@ export function ViewerTime({
   zone: ViewerZone | null;
   children: ReactNode;
 }) {
+  if (!Number.isFinite(ms)) return <>{children}</>;
   return (
     <time dateTime={new Date(ms).toISOString()} title={timeTitle(ms, zone)}>
       {children}
