@@ -24,16 +24,21 @@ export function hostedListRequested(
   return source === "staging" && (!localRunsEnabled || !localListLoading);
 }
 
-// Whether the build monitor opens this machine's runs by itself. As before,
-// only when local runs exist and hold the run carried over from the
-// Candidate tab, if any.
+// Whether the build monitor opens this machine's runs by itself: when the
+// page knew of a local runs folder, so the local list answered before the
+// hosted list was requested, and the local runs hold the run carried over
+// from the Candidate tab, if any. A folder found only through the hosted
+// list's answer comes after the hosted runs are on screen; the source switch
+// offers its runs instead of replacing what is shown.
 export function opensLocalRuns(
-  _localRunsEnabled: boolean,
+  localRunsEnabled: boolean,
   localListReportsLocalRuns: boolean,
   localRunIds: readonly string[],
   preferredRunId: string | undefined,
 ): boolean {
   return (
-    localListReportsLocalRuns && (!preferredRunId || localRunIds.includes(preferredRunId))
+    localRunsEnabled &&
+    localListReportsLocalRuns &&
+    (!preferredRunId || localRunIds.includes(preferredRunId))
   );
 }

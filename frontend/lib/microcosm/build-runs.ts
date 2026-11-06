@@ -60,9 +60,10 @@ const STAGING_RUN_LIMIT = 60;
 // unfinished run, once the copy is `UNFINISHED_RECORD_REUSE_MS` old.
 const COLLECTOR_LIST_TTL_MS = 15_000;
 // How long an unfinished collector run's record is reused while its row in
-// the collector's list is unchanged. Events delivered late, with times older
-// than the run's latest, add to the record without changing the row, as when
-// an emitter delivers its queue after a collector outage.
+// the collector's list is unchanged. Some events add to a record without
+// changing its row: an earlier producer's events that reach the collector
+// after a later producer's for the same run, or an active producer's events
+// replayed out of sequence.
 const UNFINISHED_RECORD_REUSE_MS = 5 * 60_000;
 // How long the Candidate tab waits for the collector's run list. Past it, the
 // tab uses the list's latest earlier answer, or shows the Hugging Face states
@@ -663,8 +664,8 @@ export async function refreshHostedRun(
     }
     if (collectorRun) {
       // The list kept the Hugging Face copy when the collector's record
-      // stopped before an end the copy recorded later; a fresh read of that
-      // record must not hide the end either. Otherwise the fresh record wins,
+      // stopped before an end the copy recorded later; the record read here
+      // must not hide the end either. Otherwise the collector's record wins,
       // with the uploads the list read from the copy.
       return current && collectorMissedTheEnd(collectorRun, current)
         ? current
@@ -712,7 +713,8 @@ export async function loadBuildRun(
   const all = timelines(loaded.documents, nowMs);
   let run = all.find((timeline) => timeline.run_id === runId) ?? null;
   // A running hosted run may be newer than the cached list. The collector's
-  // record, as of its run list at most 15 seconds old, wins when it responds,
+  // record wins when it responds: the copy for its row in a run list at most
+  // 15 seconds old, itself at most 5 minutes old for an unfinished run,
   // unless it stopped before an end the Hugging Face copy recorded later;
   // staged files are fallback.
   if (source === "staging")
