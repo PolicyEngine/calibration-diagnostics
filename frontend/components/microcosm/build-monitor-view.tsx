@@ -231,7 +231,7 @@ function SourceToggle({
 }
 
 // The Build progress tab of the Staging candidates page. `preferredRunId`
-// carries the run selected on the Candidate tab; a run picked here is
+// is the run the page's URL names, chosen on either tab; a run picked here is
 // reported back through `onRunChange` so the other tab opens on it.
 export function BuildMonitorView({
   tabs,
@@ -377,7 +377,11 @@ export function BuildMonitorView({
           title={runNotFound ? "Run not found" : "Run unavailable"}
           description={
             runNotFound
-              ? `${detail.error.message} No hosted run with this ID is recorded for this country. Choose another run from the Run list.`
+              ? `${detail.error.message} ${
+                  source === "local"
+                    ? "No run folder on this machine has this ID."
+                    : "No hosted run with this ID is recorded for this country."
+                } Choose another run from the Run list.`
               : String(detail.error.message)
           }
         />

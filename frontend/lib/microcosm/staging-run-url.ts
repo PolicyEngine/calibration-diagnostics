@@ -1,6 +1,7 @@
 // The Staging page's `run` query parameter: the run a link opens, on either
-// tab. Choosing a run writes it, so the page's URL always names the run shown
-// once someone picks one.
+// tab. Choosing a run writes it, with the country, so the page's URL names the
+// run shown once someone picks one; a page that picks its own default run
+// writes nothing.
 
 export const STAGING_RUN_PARAM = "run";
 

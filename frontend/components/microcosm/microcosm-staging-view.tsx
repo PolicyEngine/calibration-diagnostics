@@ -945,37 +945,21 @@ function MicrocosmStagingRunsView({
     [onRunChange, resetRunVisualState],
   );
 
+  // Whenever the list or the page's run changes, apply one rule: the run a
+  // link names, or the one carried over from the Build progress tab, when it
+  // is a staging candidate; else the run shown while the list holds it; else
+  // the newest. The notice comes from the same answer, so the two agree after
+  // every refresh. A choice made here has already written the page's run.
+  const candidateRunIds = useMemo(() => runs.map((run) => run.run_id), [runs]);
+  const candidateRunIdsKey = candidateRunIds.join("\n");
+  const candidateSelection = candidateRunSelection(candidateRunIds, selectedRun, preferredRunId);
   useEffect(() => {
-    if (selectedRun || !runs[0]) return;
-    // Open the run a link names, or the one carried over from the Build
-    // progress tab, when it is a staging candidate; otherwise the newest.
-    const { runId } = candidateRunSelection(
-      runs.map((run) => run.run_id),
-      selectedRun,
-      preferredRunId,
-    );
-    if (runId) resetRunVisualState(runId);
-  }, [preferredRunId, resetRunVisualState, runs, selectedRun]);
-  // The page's run changed without a choice here, as with a link to the same
-  // page or the browser's Back button: open it when it is a staging
-  // candidate, else the newest. A choice made here has already written the
-  // page's run, so only a change of it moves the selection.
-  useEffect(() => {
-    const { runId } = candidateRunSelection(
-      runs.map((run) => run.run_id),
-      selectedRun,
-      preferredRunId,
-    );
-    if (runId && runId !== selectedRun) resetRunVisualState(runId);
-  }, [preferredRunId]);
+    if (candidateSelection.runId && candidateSelection.runId !== selectedRun) {
+      resetRunVisualState(candidateSelection.runId);
+    }
+  }, [candidateRunIdsKey, preferredRunId]);
   // The named run is not a staging candidate in this repository.
-  const preferredRunMissing =
-    runs.length > 0 &&
-    candidateRunSelection(
-      runs.map((run) => run.run_id),
-      selectedRun,
-      preferredRunId,
-    ).missing;
+  const preferredRunMissing = candidateRunIds.length > 0 && candidateSelection.missing;
 
   const { data: runData, isLoading: runLoading, error: runError } =
     useMicrocosmStagingRun(selectedRun);
@@ -1073,7 +1057,7 @@ function MicrocosmStagingRunsView({
       <div className="flex flex-col gap-5">
         {preferredRunMissing && (
           <div role="status" className="rounded-md border px-3 py-2 text-sm pill-warn">
-            Run {preferredRunId} is not a staging candidate in this repository, so the newest candidate is shown.
+            Run {preferredRunId} is not a staging candidate in this repository, so another candidate is shown.
             The Build progress tab may still have it.
           </div>
         )}

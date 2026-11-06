@@ -19,16 +19,17 @@ export function nextBuildRunSelection(
   return (preferred ?? running ?? ended ?? runs[0]).run_id;
 }
 
-// The run the Candidate tab opens: the preferred run when the list holds it,
-// else the newest. `missing` says that a preferred run was not in the list.
+// The run the Candidate tab shows, whenever its list or the page's run
+// changes: the run the page's URL names when it is a staging candidate; else
+// the run shown, while the list still holds it; else the newest. `missing`
+// says that the URL names a run the list does not hold, and the tab says so.
 export function candidateRunSelection(
   runIds: readonly string[],
-  _selected: string,
+  selected: string,
   preferredRunId: string | undefined,
 ): { runId: string | null; missing: boolean } {
-  const preferred = runIds.find((runId) => runId === preferredRunId);
-  return {
-    runId: preferred ?? runIds[0] ?? null,
-    missing: Boolean(preferredRunId) && preferred == null,
-  };
+  const missing = Boolean(preferredRunId) && !runIds.includes(preferredRunId!);
+  if (preferredRunId && !missing) return { runId: preferredRunId, missing };
+  if (selected && runIds.includes(selected)) return { runId: selected, missing };
+  return { runId: runIds[0] ?? null, missing };
 }
