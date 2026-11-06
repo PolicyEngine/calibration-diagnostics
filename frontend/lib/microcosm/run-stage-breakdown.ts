@@ -2,6 +2,7 @@ import {
   type BuildPhase,
   type BuildTimeline,
   type StageStat,
+  runDurationMs,
   spanDurationMs,
 } from "@/lib/microcosm/build-monitor";
 
@@ -60,10 +61,41 @@ export interface RunStageBreakdown {
   stages: RunStageTime[];
 }
 
+// The selected run's runtime by top-level stage, slowest first, each beside
+// the pipeline's typical time for it. `stageStats` are the statistics of the
+// pipeline's runs with the same stage sequence, this run included.
 export function runStageBreakdown(
-  _run: BuildTimeline,
-  _stageStats: readonly StageStat[],
-  _nowMs: number,
+  run: BuildTimeline,
+  stageStats: readonly StageStat[],
+  nowMs: number,
 ): RunStageBreakdown {
-  return { total_ms: null, between_stages_ms: 0, stages: [] };
+  const times = runStageTimes(run, nowMs);
+  const statByStage = new Map(stageStats.map((stat) => [stat.stage, stat]));
+  const phaseByStage = new Map<string, BuildPhase>();
+  for (const span of run.spans) {
+    if (span.depth === 0 && !phaseByStage.has(span.stage)) phaseByStage.set(span.stage, span.phase);
+  }
+  const total = runDurationMs(run, nowMs);
+  const inStages = [...times.values()].reduce((sum, time) => sum + time.ms, 0);
+  const stages = [...times].map(([stage, time], firstSeen) => {
+    const stat = statByStage.get(stage);
+    const typical = stat?.finished_median_ms ?? null;
+    return {
+      firstSeen,
+      stage,
+      phase: phaseByStage.get(stage)!,
+      ms: time.ms,
+      status: time.status,
+      share: total ? time.ms / total : null,
+      typical_ms: typical,
+      typical_p90_ms: stat?.finished_p90_ms ?? null,
+      over_typical_ms: typical == null ? null : time.ms - typical,
+    };
+  });
+  stages.sort((first, second) => second.ms - first.ms || first.firstSeen - second.firstSeen);
+  return {
+    total_ms: total,
+    between_stages_ms: total == null ? 0 : Math.max(0, total - inStages),
+    stages: stages.map(({ firstSeen: _firstSeen, ...stage }) => stage),
+  };
 }
