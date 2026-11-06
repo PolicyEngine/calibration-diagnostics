@@ -34,6 +34,12 @@ BACKEND_PROBE_PAUSE_SECONDS = 10
 # URLError. A URLError for a DNS, TLS-certificate or URL problem is not one,
 # and HTTPError, a URLError that carries a response, is handled first.
 _CONNECTION_FAILURES = (ConnectionError, TimeoutError)
+# The route's HTTP 502 detail when the backend's response is not JSON
+# (frontend/lib/api/variable-backend.ts). A Modal preemption produces it: in
+# deploy run 42093437237 Modal preempted the container 306 s into the full
+# check, logged that it would run the function again with the same input, and
+# returned an HTTP 500 without a JSON body.
+NON_JSON_BACKEND_DETAIL = "The calculation backend did not return JSON."
 # TCP keepalive on every request's connection. The full check's response comes
 # only after the calculation, 4 to 6 minutes later, and no data flows until
 # then. In deploy run 42093437237 that connection was closed about 266 s in
@@ -100,10 +106,24 @@ class ConnectionFailedError(RuntimeError):
     """The connection was refused, closed, reset or timed out without a response."""
 
 
+class NonJsonBackendResponseError(RuntimeError):
+    """The route answered HTTP 502 because the backend's response was not JSON."""
+
+
 def _is_connection_failure(error: Exception | None) -> bool:
     if isinstance(error, URLError):
         return isinstance(error.reason, _CONNECTION_FAILURES)
     return isinstance(error, _CONNECTION_FAILURES)
+
+
+def _reports_non_json_backend_response(status_code: int, body_text: str) -> bool:
+    if status_code != 502:
+        return False
+    try:
+        body = json.loads(body_text)
+    except ValueError:
+        return False
+    return isinstance(body, dict) and body.get("detail") == NON_JSON_BACKEND_DETAIL
 
 
 def _record(value: Any, name: str) -> dict[str, Any]:
@@ -237,7 +257,12 @@ def _request_json(
                 return _record(json.load(response), "response")
         except HTTPError as exc:
             detail = exc.read(1_000).decode("utf-8", errors="replace")
-            last_error = RuntimeError(f"Deployment returned HTTP {exc.code}: {detail}")
+            message = f"Deployment returned HTTP {exc.code}: {detail}"
+            last_error = (
+                NonJsonBackendResponseError(message)
+                if _reports_non_json_backend_response(exc.code, detail)
+                else RuntimeError(message)
+            )
         except (
             URLError,
             *_CONNECTION_FAILURES,
@@ -251,6 +276,10 @@ def _request_json(
         raise ConnectionFailedError(
             "Deployment check failed: the connection ended before a complete "
             f"response arrived ({type(last_error).__name__}: {last_error})."
+        ) from last_error
+    if isinstance(last_error, NonJsonBackendResponseError):
+        raise NonJsonBackendResponseError(
+            f"Deployment check failed: {last_error}"
         ) from last_error
     raise RuntimeError(f"Deployment check failed: {last_error}") from last_error
 
@@ -294,8 +323,9 @@ def _wait_until_backend_is_free(
     """Return once the backend answers a valid metadata request.
 
     The backend serves one request at a time, so this answer arrives only after
-    the calculation whose connection was lost has finished. Only another lost
-    connection is retried; any HTTP error or invalid metadata fails at once.
+    the calculation whose connection was lost, or Modal's new run of a preempted
+    one, has finished. Only another lost connection is retried; any HTTP error or
+    invalid metadata fails at once.
     """
     last_probe_failure: Exception | None = None
     while (remaining := deadline - time.monotonic()) > 0:
@@ -329,18 +359,27 @@ def _run_full_check(
     validate_calculation_body: Callable[[dict[str, Any]], None],
     validate_metadata_body: Callable[[dict[str, Any]], None],
 ) -> None:
-    """Run the national and state calculation, retrying once after a lost connection.
+    """Run the national and state calculation, and retry it at most once.
 
-    Each response, first or retried, must pass the same validation on its own.
-    A response that fails validation and an HTTP error are never retried.
+    The retry follows a lost connection, or the route's 502 for a backend
+    response that was not JSON, which is how a Modal preemption appears. Each
+    response, first or retried, must pass the same validation on its own. A
+    response that fails validation and any other HTTP error are never retried.
     """
     deadline = time.monotonic() + BACKEND_FREE_DEADLINE_SECONDS
     try:
         body = _request_json(url, query, headers, attempts=1)
-    except ConnectionFailedError as first_failure:
+    except (ConnectionFailedError, NonJsonBackendResponseError) as first_failure:
+        explanation = (
+            "A Modal preemption gives this response, and Modal then runs the "
+            "calculation again with the same input. Waiting for the backend to "
+            "finish it"
+            if isinstance(first_failure, NonJsonBackendResponseError)
+            else "Waiting for the backend to finish that calculation"
+        )
         print(
-            f"::warning::{first_failure} Waiting for the backend to finish that "
-            "calculation, then sending the full check once more.",
+            f"::warning::{first_failure} {explanation}, then sending the full "
+            "check once more.",
             flush=True,
         )
         _wait_until_backend_is_free(url, headers, validate_metadata_body, deadline)
