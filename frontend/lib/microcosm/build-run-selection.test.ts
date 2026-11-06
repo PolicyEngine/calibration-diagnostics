@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import type { BuildRunState, BuildTimeline } from "@/lib/microcosm/build-monitor";
-import { candidateRunSelection, nextBuildRunSelection } from "@/lib/microcosm/build-run-selection";
+import { candidateRunSelection, nextBuildRunSelection, waitsForRunList } from "@/lib/microcosm/build-run-selection";
 
 // Only the fields the selection reads.
 function run(runId: string, state: BuildRunState): BuildTimeline {
@@ -54,4 +54,27 @@ test("after the Candidate list refreshes, the run shown and the notice still agr
   });
   // A linked run on screen that leaves the list gives way to the newest.
   expect(candidateRunSelection(["newest"], "linked", "linked")).toEqual({ runId: "newest", missing: true });
+});
+
+test("when the page's run changes, the Candidate tab drops the run it was showing", () => {
+  // The sidebar link removes the run from the URL: back to the newest.
+  expect(candidateRunSelection(["newest", "linked"], "linked", undefined, true)).toEqual({
+    runId: "newest",
+    missing: false,
+  });
+  // A refresh with the URL's run unchanged keeps the run shown.
+  expect(candidateRunSelection(["newest", "shown"], "shown", undefined, false)).toEqual({
+    runId: "shown",
+    missing: false,
+  });
+});
+
+test("the build monitor shows a run before its list only when that run is selected", () => {
+  // A linked run's detail arrived first: show it.
+  expect(waitsForRunList(true, 0, "linked-run", true)).toBe(false);
+  // After switching source nothing is selected; the previous source's run
+  // detail, kept while the next loads, is not shown.
+  expect(waitsForRunList(true, 0, "", true)).toBe(true);
+  expect(waitsForRunList(true, 0, "", false)).toBe(true);
+  expect(waitsForRunList(false, 0, "", false)).toBe(false);
 });

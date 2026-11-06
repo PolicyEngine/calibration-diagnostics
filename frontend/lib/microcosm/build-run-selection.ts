@@ -27,9 +27,22 @@ export function candidateRunSelection(
   runIds: readonly string[],
   selected: string,
   preferredRunId: string | undefined,
+  _pageRunChanged = false,
 ): { runId: string | null; missing: boolean } {
   const missing = Boolean(preferredRunId) && !runIds.includes(preferredRunId!);
   if (preferredRunId && !missing) return { runId: preferredRunId, missing };
   if (selected && runIds.includes(selected)) return { runId: selected, missing };
   return { runId: runIds[0] ?? null, missing };
+}
+
+// Whether the build monitor waits for its run list instead of showing a run:
+// while the list loads with no runs yet, unless a run is selected and its
+// detail has arrived.
+export function waitsForRunList(
+  listLoading: boolean,
+  runCount: number,
+  _selected: string,
+  hasDetail: boolean,
+): boolean {
+  return listLoading && runCount === 0 && !hasDetail;
 }
