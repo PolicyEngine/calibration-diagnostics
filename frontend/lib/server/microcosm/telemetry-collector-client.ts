@@ -17,6 +17,15 @@ export interface CollectorRunSummary extends JsonObject {
   updated_at: string;
 }
 
+// A collector request that answered with an HTTP error, such as 404 for a
+// run it has no record of.
+export class CollectorRequestError extends Error {
+  constructor(readonly status: number) {
+    super(`Telemetry collector request failed (${status}).`);
+    this.name = "CollectorRequestError";
+  }
+}
+
 interface CollectorRunPage {
   runs: CollectorRunSummary[];
   next_before: string | null;
@@ -88,9 +97,7 @@ async function collectorJson(path: string): Promise<JsonObject> {
     headers: { "X-Telemetry-Read-Token": readToken },
     signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) {
-    throw new Error(`Telemetry collector request failed (${response.status}).`);
-  }
+  if (!response.ok) throw new CollectorRequestError(response.status);
   return objectValue(await response.json(), "response");
 }
 
