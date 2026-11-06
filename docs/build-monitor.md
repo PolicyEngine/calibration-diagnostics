@@ -193,6 +193,20 @@ gate battery's blocking failure count, so it is not counted as a recorded
 failure class. "Run history" lists
 every run of the pipeline, newest first, on one time scale; selecting a row
 opens that run, and runs with a different stage sequence are listed apart.
+"This run by stage" lists the selected run's top-level stages, slowest first,
+with:
+- each stage's time, summed over every attempt;
+- its share of the run's elapsed time (to its end, its last telemetry if it
+  stalled, or now);
+- the typical time from "Where build time goes", with the number of runs that
+  finished the stage when fewer than three;
+- how far over or under typical it ran: "about typical" within a minute or
+  5%, and the ratio from 1.5×.
+
+A stage still running, or stopped early, is compared only once it has run past
+typical. A time past the 90th percentile is marked only when at least three
+runs finished the stage. Time spent in no top-level stage gets a "Between
+stages" row from one minute.
 
 The US release reports each engine batch during target compilation and each
 batch during post-export scoring. UK graph builds report each completed graph

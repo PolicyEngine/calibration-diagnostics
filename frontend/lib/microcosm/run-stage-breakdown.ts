@@ -38,6 +38,12 @@ export function runStageTimes(run: BuildTimeline, nowMs: number): Map<string, Ru
   return stages;
 }
 
+// "About typical": within a minute, or 5% of the typical time.
+const ABOUT_TYPICAL_MS = 60_000;
+const ABOUT_TYPICAL_FRACTION = 0.05;
+// Fewer finished runs than this give no 90th percentile worth marking.
+const P90_MIN_RUNS = 3;
+
 export interface RunStageTime {
   stage: string;
   phase: BuildPhase;
@@ -48,11 +54,14 @@ export interface RunStageTime {
   // The pipeline's median and p90 for runs that finished the stage.
   typical_ms: number | null;
   typical_p90_ms: number | null;
-  // This run's time minus the typical time.
+  // This run's time minus the typical time. Null without a typical time, and
+  // for a stage that is still running, failed or went silent before reaching
+  // it: a stage that stopped early is not comparable with finished times.
   over_typical_ms: number | null;
   // Within a minute or 5% of the typical time.
   about_typical: boolean;
-  // Past the 90th percentile of the runs that finished the stage.
+  // Past the 90th percentile of the runs that finished the stage, beyond
+  // "about typical", with at least three such runs.
   past_p90: boolean;
   // How many runs finished the stage, this run included.
   typical_runs: number;
@@ -87,7 +96,13 @@ export function runStageBreakdown(
     const stat = statByStage.get(stage);
     const typical = stat?.finished_median_ms ?? null;
     const p90 = stat?.finished_p90_ms ?? null;
-    const over = typical == null ? null : time.ms - typical;
+    const comparable =
+      typical != null && (time.status === "completed" || time.ms > typical);
+    const over = comparable ? time.ms - typical : null;
+    const aboutTypical =
+      over != null &&
+      Math.abs(over) < Math.max(ABOUT_TYPICAL_MS, typical! * ABOUT_TYPICAL_FRACTION);
+    const typicalRuns = stat ? Math.max(0, stat.samples - stat.cut_short) : 0;
     return {
       firstSeen,
       stage,
@@ -98,10 +113,10 @@ export function runStageBreakdown(
       typical_ms: typical,
       typical_p90_ms: p90,
       over_typical_ms: over,
-      about_typical:
-        over != null && typical != null && Math.abs(over) < Math.max(60_000, typical * 0.05),
-      past_p90: p90 != null && time.ms > p90,
-      typical_runs: stat ? Math.max(0, stat.samples - stat.cut_short) : 0,
+      about_typical: aboutTypical,
+      past_p90:
+        over != null && !aboutTypical && p90 != null && typicalRuns >= P90_MIN_RUNS && time.ms > p90,
+      typical_runs: typicalRuns,
     };
   });
   stages.sort((first, second) => second.ms - first.ms || first.firstSeen - second.firstSeen);
