@@ -251,7 +251,7 @@ export interface HostedRunLoaders {
 const hostedRunLoaders: HostedRunLoaders = {
   collectorConfigured,
   hasStagingHistory: (country) => hasCapability(country, "staging"),
-  loadCollector: loadCollectorRun,
+  loadCollector: loadCollectorRecord,
   loadHistory: async (runId, country) => ({
     ...(await loadStagingRunTelemetry(runId, 0, country)),
     source: "staging",
@@ -360,28 +360,57 @@ async function loadHuggingFaceStaging(
   return { available: true, detail: null, documents, problems };
 }
 
-// One collector run's documents. A finished run's documents are reused until
-// the collector reports a newer update for it.
+// What a collector run's row in the collector's run list says about its
+// record. The collector moves `updated_at` on with every event it accepts,
+// heartbeats included, so while the row is unchanged so is the record.
+function collectorRunVersion(summary: CollectorRunSummary): string {
+  return JSON.stringify([
+    summary.updated_at,
+    summary.status,
+    summary.current_stage ?? null,
+    summary.ended_at ?? null,
+    summary.heartbeat_at ?? null,
+  ]);
+}
+
+// One collector run's documents. They are reused while the run's row in the
+// collector's list is unchanged, whether or not the run has finished: an
+// abandoned run the collector still calls running can hold 10 MB of events.
 async function loadCollectorDocuments(
   summary: CollectorRunSummary,
   country: MicrocosmCountry,
 ): Promise<BuildRunDocuments> {
   const key = `collector:${country}:${summary.run_id}`;
+  const version = collectorRunVersion(summary);
   const cached = stagingRunCache.get(key);
-  if (
-    cached?.final &&
-    FINAL_STATUSES.has(summary.status) &&
-    cached.collector_version === summary.updated_at
-  ) {
-    return cached.documents;
-  }
+  if (cached && cached.collector_version === version) return cached.documents;
   const loaded = await loadCollectorRun(summary.run_id, country);
   stagingRunCache.set(key, {
     documents: loaded,
     final: isFinal(loaded),
-    collector_version: summary.updated_at,
+    collector_version: version,
   });
   return loaded;
+}
+
+// The collector's record of one run for the run detail: the copy the list
+// read while the run's row in the collector's list is unchanged. A run older
+// than the list, or one whose list cannot be read, is read on its own.
+async function loadCollectorRecord(
+  runId: string,
+  country: MicrocosmCountry,
+): Promise<BuildRunDocuments> {
+  let summary: CollectorRunSummary | undefined;
+  try {
+    summary = (await collectorRunLists.recent(country)).find(
+      (row) => row.run_id === runId,
+    );
+  } catch {
+    summary = undefined;
+  }
+  return summary
+    ? loadCollectorDocuments(summary, country)
+    : loadCollectorRun(runId, country);
 }
 
 async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
@@ -522,27 +551,28 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
   const sourceProblems: BuildRunProblem[] = [];
   let collectorRunDocuments: BuildRunDocuments[] = [];
   let huggingFaceRunDocuments: BuildRunDocuments[] = [];
-  if (collectorConfigured()) {
-    try {
-      const loaded = await loadCollector(country);
-      hosted.push(loaded);
-      collectorRunDocuments = loaded.documents;
-    } catch (error) {
-      sourceProblems.push({
-        run_id: "collector",
-        detail: message(error),
-      });
-    }
+  // The two sources are read at the same time.
+  const [collector, huggingFace] = await Promise.allSettled([
+    collectorConfigured() ? loadCollector(country) : Promise.resolve(null),
+    loadHuggingFaceStaging(country),
+  ]);
+  if (collector.status === "rejected") {
+    sourceProblems.push({
+      run_id: "collector",
+      detail: message(collector.reason),
+    });
+  } else if (collector.value) {
+    hosted.push(collector.value);
+    collectorRunDocuments = collector.value.documents;
   }
-  try {
-    const loaded = await loadHuggingFaceStaging(country);
-    hosted.push(loaded);
-    huggingFaceRunDocuments = loaded.documents;
-  } catch (error) {
+  if (huggingFace.status === "rejected") {
     sourceProblems.push({
       run_id: "hugging-face-history",
-      detail: message(error),
+      detail: message(huggingFace.reason),
     });
+  } else {
+    hosted.push(huggingFace.value);
+    huggingFaceRunDocuments = huggingFace.value.documents;
   }
   const available = hosted.some((source) => source.available);
   return {
@@ -656,9 +686,10 @@ export async function loadBuildRun(
   const loaded = await loadRuns(source, country);
   const all = timelines(loaded.documents, nowMs);
   let run = all.find((timeline) => timeline.run_id === runId) ?? null;
-  // A running hosted run may be newer than the cached list. The live
-  // collector's record wins when it responds, unless it stopped before an end
-  // the Hugging Face copy recorded later; staged files are fallback.
+  // A running hosted run may be newer than the cached list. The collector's
+  // record, as of its run list at most 15 seconds old, wins when it responds,
+  // unless it stopped before an end the Hugging Face copy recorded later;
+  // staged files are fallback.
   if (source === "staging")
     run = await refreshHostedRun(run, country, runId, nowMs);
   if (run == null) return null;

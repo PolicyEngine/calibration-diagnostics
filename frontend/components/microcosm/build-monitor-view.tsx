@@ -18,6 +18,7 @@ import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
+import { buildListRequests } from "@/lib/microcosm/build-list-requests";
 import {
   BUILD_GATE_CATALOG_SOURCE,
   GATE_POSITIONS,
@@ -235,15 +236,20 @@ export function BuildMonitorView({
   tabs,
   preferredRunId,
   onRunChange,
+  localRunsEnabled,
 }: {
   tabs?: ReactNode;
   preferredRunId?: string;
   onRunChange?: (runId: string) => void;
+  // Whether the server names a local runs folder; never on the hosted
+  // dashboard.
+  localRunsEnabled: boolean;
 }) {
   const [chosenSource, setChosenSource] = useState<BuildRunSource | null>(null);
-  // The local listing answers instantly and says whether local runs are on;
-  // hosted telemetry is read only once it is the chosen source.
-  const local = useBuildRuns("local");
+  // With a local runs folder, the local listing answers first and says
+  // whether this machine's runs are opened; hosted telemetry is read only
+  // once it is the chosen source. Without one it is read at once.
+  const local = useBuildRuns("local", localRunsEnabled);
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
   // Open local runs when this machine has them, unless the run carried over
@@ -252,7 +258,10 @@ export function BuildMonitorView({
     localEnabled &&
     (!preferredRunId || localRuns.some((run) => run.run_id === preferredRunId));
   const source: BuildRunSource = chosenSource ?? (preferLocal ? "local" : "staging");
-  const staging = useBuildRuns("staging", source === "staging" && !local.isLoading);
+  const staging = useBuildRuns(
+    "staging",
+    buildListRequests(localRunsEnabled, source, local.isLoading).staging,
+  );
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
   const [selected, setSelected] = useState("");
