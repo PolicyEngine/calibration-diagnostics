@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import math
+import socket
 import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import HTTPHandler, HTTPSHandler, Request, build_opener
 
 RELEASE_PATH = Path(__file__).with_name("hosted_release.json")
 NATIONAL_VARIABLE = "spm_unit_spm_threshold"
@@ -32,6 +34,66 @@ BACKEND_PROBE_PAUSE_SECONDS = 10
 # URLError. A URLError for a DNS, TLS-certificate or URL problem is not one,
 # and HTTPError, a URLError that carries a response, is handled first.
 _CONNECTION_FAILURES = (ConnectionError, TimeoutError)
+# TCP keepalive on every request's connection. The full check's response comes
+# only after the calculation, 4 to 6 minutes later, and no data flows until
+# then. In deploy run 42093437237 that connection was closed about 266 s in
+# while the route and the backend both completed, which fits a limit on idle
+# connections somewhere on the network path. With these timings the kernel
+# sends a probe after 60 s without data and every 30 s after that, so the
+# connection is never idle for longer than 60 s; if 5 probes in a row go
+# unanswered, the request fails with a timeout. Each timing is set only where
+# the platform defines it: Linux, where the deploy runs, defines all three, and
+# macOS has no TCP_KEEPIDLE.
+TCP_KEEPALIVE_TIMINGS = (
+    ("TCP_KEEPIDLE", 60),
+    ("TCP_KEEPINTVL", 30),
+    ("TCP_KEEPCNT", 5),
+)
+
+
+def _enable_tcp_keepalive(connection: socket.socket) -> None:
+    connection.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    for option_name, option_value in TCP_KEEPALIVE_TIMINGS:
+        option = getattr(socket, option_name, None)
+        if option is not None:
+            connection.setsockopt(socket.IPPROTO_TCP, option, option_value)
+
+
+class _KeepaliveHTTPConnection(http.client.HTTPConnection):
+    def connect(self) -> None:
+        super().connect()
+        _enable_tcp_keepalive(self.sock)
+
+
+class _KeepaliveHTTPSConnection(http.client.HTTPSConnection, _KeepaliveHTTPConnection):
+    """An HTTPS connection whose TCP socket has keepalive set before TLS starts.
+
+    HTTPSConnection.connect opens the TCP connection with super().connect() and
+    then wraps it in TLS. This class's method resolution order places
+    _KeepaliveHTTPConnection between HTTPSConnection and HTTPConnection, so that
+    super().connect() call also sets keepalive.
+    """
+
+
+class _KeepaliveHTTPHandler(HTTPHandler):
+    def http_open(self, req: Request) -> http.client.HTTPResponse:
+        return self.do_open(_KeepaliveHTTPConnection, req)
+
+
+class _KeepaliveHTTPSHandler(HTTPSHandler):
+    def https_open(self, req: Request) -> http.client.HTTPResponse:
+        # The same call as HTTPSHandler.https_open, with the keepalive class.
+        return self.do_open(_KeepaliveHTTPSConnection, req, context=self._context)
+
+
+# build_opener replaces its default HTTP and HTTPS handlers with these
+# subclasses and keeps the rest, as urllib.request.urlopen's own opener does.
+_KEEPALIVE_OPENER = build_opener(_KeepaliveHTTPHandler, _KeepaliveHTTPSHandler)
+
+
+def urlopen(request: Request, timeout: float) -> http.client.HTTPResponse:
+    """Open a request as urllib.request.urlopen does, on a keepalive connection."""
+    return _KEEPALIVE_OPENER.open(request, timeout=timeout)
 
 
 class ConnectionFailedError(RuntimeError):
