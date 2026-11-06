@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 
 import { stagingTargetDetailPresentation } from "@/components/microcosm/staging-target-detail-presentation";
-import { formatShortDateTime } from "@/components/shared/format";
 import { microcosmStagingTargetChangeSourceParameters } from "@/lib/api/hooks/use-microcosm";
 import {
   calibrationBuildManifestState,
@@ -11,6 +10,7 @@ import {
   stagingComparisonBaseline,
   type ComparisonMapBuildSources,
 } from "./calibration-selection";
+import { shortDateTime, type ViewerZone } from "./viewer-time";
 import { targetChangeModeHelp } from "./target-change-visualization";
 
 test("recognizes obsolete staging selectors without treating releases as staging", () => {
@@ -232,7 +232,7 @@ const NATIONAL_COMPARISON = {
 // A local-area candidate is compared with the dense release; the user picks
 // the national release build in "From".
 const NATIONAL_BUILD_NAME =
-  `${formatShortDateTime(NATIONAL_BUILD_PUBLISHED_AT)} · ${NATIONAL_CURRENT}`;
+  `${shortDateTime(NATIONAL_BUILD_PUBLISHED_AT, null)} · ${NATIONAL_CURRENT}`;
 
 test("a release build the user picks in From is named by its date and release ID", () => {
   expect(stagingComparisonBaseline(LOCAL_AREA_COMPARISON, NATIONAL_RELEASE_BUILD)).toEqual({
@@ -265,7 +265,7 @@ test("the comparison map's mode help and target detail name the picked From buil
 test("a staging build the user picks in From is named by its date and run ID", () => {
   // A national candidate; the user picks an earlier candidate's published build.
   const candidateBuildName =
-    `${formatShortDateTime(EARLIER_CANDIDATE_PUBLISHED_AT)} · ${EARLIER_CANDIDATE_RUN}`;
+    `${shortDateTime(EARLIER_CANDIDATE_PUBLISHED_AT, null)} · ${EARLIER_CANDIDATE_RUN}`;
   expect(stagingComparisonBaseline(NATIONAL_COMPARISON, EARLIER_CANDIDATE_BUILD)).toEqual({
     releaseLabel: `Build ${candidateBuildName}`,
     tabLabel: `Change from build ${candidateBuildName}`,
@@ -309,6 +309,21 @@ test("a national candidate's pick of its compared release's build keeps the rele
   // Another build is still named by its date and run ID.
   expect(stagingComparisonBaseline(undefined, EARLIER_CANDIDATE_BUILD, NATIONAL_CURRENT)
     .releaseLabel).toBe(
-    `Build ${formatShortDateTime(EARLIER_CANDIDATE_PUBLISHED_AT)} · ${EARLIER_CANDIDATE_RUN}`,
+    `Build ${shortDateTime(EARLIER_CANDIDATE_PUBLISHED_AT, null)} · ${EARLIER_CANDIDATE_RUN}`,
   );
+});
+
+test("a picked From build's date reads in the viewer's zone", () => {
+  const newYork: ViewerZone = { timeZone: "America/New_York", locale: "en-US" };
+  // Published at 13:02:44 UTC on October 17, 09:02 in New York.
+  expect(
+    stagingComparisonBaseline(NATIONAL_COMPARISON, EARLIER_CANDIDATE_BUILD, undefined, newYork)
+      .tabLabel.replace(/\u202f/g, " "),
+  ).toBe(`Change from build Oct 17, 09:02 AM · ${EARLIER_CANDIDATE_RUN}`);
+  // A second zone, so a runtime in New York cannot pass without the zone.
+  const baku: ViewerZone = { timeZone: "Asia/Baku", locale: "en-US" };
+  expect(
+    stagingComparisonBaseline(NATIONAL_COMPARISON, EARLIER_CANDIDATE_BUILD, undefined, baku)
+      .tabLabel.replace(/\u202f/g, " "),
+  ).toBe(`Change from build Oct 17, 05:02 PM · ${EARLIER_CANDIDATE_RUN}`);
 });
