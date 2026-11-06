@@ -252,7 +252,11 @@ export function BuildMonitorView({
   // A server started with a folder the prerendered page did not know of says
   // so in its answer to the hosted list.
   const [hostedListReportsLocalRuns, setHostedListReportsLocalRuns] = useState(false);
-  const local = useBuildRuns("local", localListRequested(localRunsEnabled, hostedListReportsLocalRuns));
+  const [hostedListFailed, setHostedListFailed] = useState(false);
+  const local = useBuildRuns(
+    "local",
+    localListRequested(localRunsEnabled, hostedListReportsLocalRuns, hostedListFailed),
+  );
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
   // Open local runs when this machine has them, unless the run carried over

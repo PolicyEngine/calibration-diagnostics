@@ -4,13 +4,13 @@ import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/m
 
 test("without local runs the hosted list is requested at once and the local list not at all", () => {
   // The hosted dashboard never has a local runs folder.
-  expect(localListRequested(false, false)).toBe(false);
+  expect(localListRequested(false, false, false)).toBe(false);
   expect(hostedListRequested(false, "staging", true)).toBe(true);
   expect(hostedListRequested(false, "staging", false)).toBe(true);
 });
 
 test("with local runs the hosted list waits for the local list, which may be preferred", () => {
-  expect(localListRequested(true, false)).toBe(true);
+  expect(localListRequested(true, false, false)).toBe(true);
   expect(hostedListRequested(true, "staging", true)).toBe(false);
   expect(hostedListRequested(true, "staging", false)).toBe(true);
   expect(hostedListRequested(true, "local", false)).toBe(false);
@@ -19,7 +19,7 @@ test("with local runs the hosted list waits for the local list, which may be pre
 test("a local runs folder the server reports at run time turns the local list on", () => {
   // The page was prerendered without the folder, but the server that answers
   // the hosted list has one: its answer says so.
-  expect(localListRequested(false, true)).toBe(true);
+  expect(localListRequested(false, true, false)).toBe(true);
 });
 
 test("local runs found only through the hosted list's answer are offered, not opened", () => {
@@ -31,4 +31,10 @@ test("local runs found only through the hosted list's answer are offered, not op
   expect(opensLocalRuns(true, true, ["local-run"], undefined)).toBe(true);
   expect(opensLocalRuns(true, true, ["local-run"], "hosted-run")).toBe(false);
   expect(opensLocalRuns(true, false, [], undefined)).toBe(false);
+});
+
+test("a failed hosted list request turns the local list on", () => {
+  // A server with a folder the prerendered page did not know of cannot say
+  // so when its hosted list fails; its local runs must stay reachable.
+  expect(localListRequested(false, false, true)).toBe(true);
 });

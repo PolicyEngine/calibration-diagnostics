@@ -9,6 +9,7 @@ import type { BuildRunSource } from "@/lib/microcosm/build-monitor";
 export function localListRequested(
   localRunsEnabled: boolean,
   hostedListReportsLocalRuns: boolean,
+  _hostedListFailed: boolean,
 ): boolean {
   return localRunsEnabled || hostedListReportsLocalRuns;
 }
