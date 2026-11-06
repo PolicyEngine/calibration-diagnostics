@@ -951,6 +951,7 @@ function MicrocosmStagingRunsView({
     // progress tab, when it is a staging candidate; otherwise the newest.
     const { runId } = candidateRunSelection(
       runs.map((run) => run.run_id),
+      selectedRun,
       preferredRunId,
     );
     if (runId) resetRunVisualState(runId);
@@ -962,6 +963,7 @@ function MicrocosmStagingRunsView({
   useEffect(() => {
     const { runId } = candidateRunSelection(
       runs.map((run) => run.run_id),
+      selectedRun,
       preferredRunId,
     );
     if (runId && runId !== selectedRun) resetRunVisualState(runId);
@@ -971,6 +973,7 @@ function MicrocosmStagingRunsView({
     runs.length > 0 &&
     candidateRunSelection(
       runs.map((run) => run.run_id),
+      selectedRun,
       preferredRunId,
     ).missing;
 

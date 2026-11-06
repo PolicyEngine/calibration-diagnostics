@@ -30,8 +30,28 @@ test("without a named run a running run is selected, else the newest run that en
 });
 
 test("the Candidate tab opens a linked run it holds, and says when it holds none", () => {
-  expect(candidateRunSelection(["newest", "linked"], "linked")).toEqual({ runId: "linked", missing: false });
-  expect(candidateRunSelection(["newest", "other"], "linked")).toEqual({ runId: "newest", missing: true });
-  expect(candidateRunSelection(["newest"], undefined)).toEqual({ runId: "newest", missing: false });
-  expect(candidateRunSelection([], "linked")).toEqual({ runId: null, missing: true });
+  expect(candidateRunSelection(["newest", "linked"], "", "linked")).toEqual({ runId: "linked", missing: false });
+  expect(candidateRunSelection(["newest", "other"], "", "linked")).toEqual({ runId: "newest", missing: true });
+  expect(candidateRunSelection(["newest"], "", undefined)).toEqual({ runId: "newest", missing: false });
+  expect(candidateRunSelection([], "", "linked")).toEqual({ runId: null, missing: true });
+});
+
+test("after the Candidate list refreshes, the run shown and the notice still agree with the link", () => {
+  // No link: a new candidate does not take the place of the run shown.
+  expect(candidateRunSelection(["brand-new", "shown"], "shown", undefined)).toEqual({
+    runId: "shown",
+    missing: false,
+  });
+  // A linked run that has become a candidate opens.
+  expect(candidateRunSelection(["new", "linked", "shown"], "shown", "linked")).toEqual({
+    runId: "linked",
+    missing: false,
+  });
+  // A linked run that is still not a candidate leaves the run shown as it is.
+  expect(candidateRunSelection(["brand-new", "shown"], "shown", "linked")).toEqual({
+    runId: "shown",
+    missing: true,
+  });
+  // A linked run on screen that leaves the list gives way to the newest.
+  expect(candidateRunSelection(["newest"], "linked", "linked")).toEqual({ runId: "newest", missing: true });
 });

@@ -23,6 +23,7 @@ export function nextBuildRunSelection(
 // else the newest. `missing` says that a preferred run was not in the list.
 export function candidateRunSelection(
   runIds: readonly string[],
+  _selected: string,
   preferredRunId: string | undefined,
 ): { runId: string | null; missing: boolean } {
   const preferred = runIds.find((runId) => runId === preferredRunId);
