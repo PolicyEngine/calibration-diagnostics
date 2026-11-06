@@ -55,9 +55,15 @@ const STAGING_RUN_LIMIT = 60;
 // seconds, as does the Build progress list. On Vercel, `staging/run` (whose
 // `maxDuration` is 300) runs in a different function from `builds`,
 // `builds/run` and `staging/runs` (120), so it keeps its own cache, and a poll
-// makes one list request per country in each of the two functions. Each run's
-// own record is read as before.
+// makes one list request per country in each of the two functions. A run's
+// own record is read again only when its row in the list changes, or, for an
+// unfinished run, once the copy is `UNFINISHED_RECORD_REUSE_MS` old.
 const COLLECTOR_LIST_TTL_MS = 15_000;
+// How long an unfinished collector run's record is reused while its row in
+// the collector's list is unchanged. Events delivered late, with times older
+// than the run's latest, add to the record without changing the row, as when
+// an emitter delivers its queue after a collector outage.
+const UNFINISHED_RECORD_REUSE_MS = 5 * 60_000;
 // How long the Candidate tab waits for the collector's run list. Past it, the
 // tab uses the list's latest earlier answer, or shows the Hugging Face states
 // when there is none. The request carries on while the server instance runs,
@@ -106,9 +112,13 @@ interface CachedRun {
   documents: BuildRunDocuments;
   final: boolean;
   collector_version: string | null;
+  // When the record was read, by `Date.now()`.
+  read_at: number;
 }
 
-// Finished staging runs never change, so their telemetry is fetched once.
+// Each run's documents. A finished Hugging Face copy never changes, so it is
+// read once; a collector record is reused while its row in the collector's
+// list is unchanged (see `loadCollectorDocuments`).
 const stagingRunCache = new Map<string, CachedRun>();
 const stagingListCache = new Map<
   string,
@@ -350,6 +360,7 @@ async function loadHuggingFaceStaging(
           documents: loaded,
           final: isFinal(loaded),
           collector_version: null,
+          read_at: Date.now(),
         });
         documents.push(loaded);
       } catch (error) {
@@ -361,12 +372,15 @@ async function loadHuggingFaceStaging(
 }
 
 // What a collector run's row in the collector's run list says about its
-// record. The collector moves `updated_at` on with every event it accepts,
-// heartbeats included, so while the row is unchanged so is the record.
+// record. The collector moves `updated_at` on to the latest event time it has
+// accepted, and sets `heartbeat_at` on every heartbeat, so a live run's row
+// changes at least once a heartbeat; a restarted producer can move only
+// `started_at`.
 function collectorRunVersion(summary: CollectorRunSummary): string {
   return JSON.stringify([
     summary.updated_at,
     summary.status,
+    summary.started_at ?? null,
     summary.current_stage ?? null,
     summary.ended_at ?? null,
     summary.heartbeat_at ?? null,
@@ -374,8 +388,11 @@ function collectorRunVersion(summary: CollectorRunSummary): string {
 }
 
 // One collector run's documents. They are reused while the run's row in the
-// collector's list is unchanged, whether or not the run has finished: an
-// abandoned run the collector still calls running can hold 10 MB of events.
+// collector's list is unchanged: for a finished run until the row changes,
+// and for an unfinished one for at most `UNFINISHED_RECORD_REUSE_MS`, because
+// late events can change its record without changing its row. Before, an
+// unfinished run was read on every list rebuild, and an abandoned run the
+// collector still calls running can hold 10 MB of events.
 async function loadCollectorDocuments(
   summary: CollectorRunSummary,
   country: MicrocosmCountry,
@@ -383,12 +400,20 @@ async function loadCollectorDocuments(
   const key = `collector:${country}:${summary.run_id}`;
   const version = collectorRunVersion(summary);
   const cached = stagingRunCache.get(key);
-  if (cached && cached.collector_version === version) return cached.documents;
+  if (
+    cached &&
+    cached.collector_version === version &&
+    (FINAL_STATUSES.has(summary.status) ||
+      Date.now() - cached.read_at < UNFINISHED_RECORD_REUSE_MS)
+  ) {
+    return cached.documents;
+  }
   const loaded = await loadCollectorRun(summary.run_id, country);
   stagingRunCache.set(key, {
     documents: loaded,
     final: isFinal(loaded),
     collector_version: version,
+    read_at: Date.now(),
   });
   return loaded;
 }

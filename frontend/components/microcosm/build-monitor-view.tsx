@@ -249,7 +249,10 @@ export function BuildMonitorView({
   // With a local runs folder, the local listing answers first and says
   // whether this machine's runs are opened; hosted telemetry is read only
   // once it is the chosen source. Without one it is read at once.
-  const local = useBuildRuns("local", localListRequested(localRunsEnabled, false));
+  // A server started with a folder the prerendered page did not know of says
+  // so in its answer to the hosted list.
+  const [hostedListReportsLocalRuns, setHostedListReportsLocalRuns] = useState(false);
+  const local = useBuildRuns("local", localListRequested(localRunsEnabled, hostedListReportsLocalRuns));
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
   // Open local runs when this machine has them, unless the run carried over
@@ -259,6 +262,9 @@ export function BuildMonitorView({
     (!preferredRunId || localRuns.some((run) => run.run_id === preferredRunId));
   const source: BuildRunSource = chosenSource ?? (preferLocal ? "local" : "staging");
   const staging = useBuildRuns("staging", hostedListRequested(localRunsEnabled, source, local.isLoading));
+  useEffect(() => {
+    if (staging.data?.local_enabled) setHostedListReportsLocalRuns(true);
+  }, [staging.data?.local_enabled]);
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
   const [selected, setSelected] = useState("");
