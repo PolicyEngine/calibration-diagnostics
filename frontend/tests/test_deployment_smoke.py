@@ -13,6 +13,7 @@ import socket
 import ssl
 import sys
 import threading
+import types
 from dataclasses import dataclass
 from email.message import Message
 from pathlib import Path
@@ -579,6 +580,59 @@ def test_full_check_fails_at_once_when_the_probe_after_a_non_json_response_fails
     assert backend.request_kinds == ["full", "metadata"]
     assert failure is not None
     assert "HTTP 504" in str(failure)
+
+
+# Seconds into the full check at which Modal preempted the container in deploy
+# run 42093437237.
+OBSERVED_PREEMPTION_SECONDS = 306
+
+
+class SimulatedClock:
+    """A monotonic clock that moves only when the test advances it."""
+
+    def __init__(self):
+        self.seconds = 0.0
+
+    def __call__(self):
+        return self.seconds
+
+
+def test_the_metadata_request_after_a_preemption_gets_the_full_request_timeout(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    clock = SimulatedClock()
+    monkeypatch.setattr(
+        deployment,
+        "time",
+        types.SimpleNamespace(monotonic=clock, sleep=lambda seconds: None),
+    )
+    open_request = deployment.urlopen
+    request_timeouts = []
+
+    def open_request_and_advance_the_clock(request, timeout):
+        request_timeouts.append(timeout)
+        try:
+            return open_request(request, timeout=timeout)
+        finally:
+            if len(request_timeouts) == 1:
+                clock.seconds += OBSERVED_PREEMPTION_SECONDS
+
+    monkeypatch.setattr(deployment, "urlopen", open_request_and_advance_the_clock)
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, _calculation_body()),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    assert failure is None
+    # Modal runs the preempted input again, and the metadata request waits
+    # behind it. With the full timeout, that request ends with the route's own
+    # answer, which comes within 780 s, instead of timing out first.
+    assert request_timeouts == [deployment.REQUEST_TIMEOUT_SECONDS] * 3
 
 
 def test_metadata_check_retries_a_connection_closed_without_a_response(
