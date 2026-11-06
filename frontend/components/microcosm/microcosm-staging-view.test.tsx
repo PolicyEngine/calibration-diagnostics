@@ -190,3 +190,44 @@ test("the Hugging Face copy's update time has UTC on hover, in the overview and 
   expect(note).toContain("updated Oct 20, 02:09 AM EDT · ");
   expect(note).toContain(hoverText);
 });
+
+// The hover text of each overview row whose value contains `valueText`.
+function rowHoverTexts(markup: string, valueText: string): string[] {
+  return [...markup.matchAll(/title="([^"]*)"/g)]
+    .map((match) => match[1].replace(/&#x27;/g, "'"))
+    .filter((title) => title.includes(valueText));
+}
+
+test("an overview time row keeps its full text on hover, above the time in full and in UTC", () => {
+  const state = candidateRunState(
+    FAILED_RUN_PROGRESS,
+    buildTimeline(usFailedCollectorDocuments(), INVESTIGATION_NOW_MS),
+    INVESTIGATION_NOW_MS,
+  );
+  const baku: ViewerZone = { timeZone: "Asia/Baku", locale: "en-US" };
+
+  for (const [zone, copyUpdated, copyHover] of [
+    [NEW_YORK, "updated Oct 20, 02:09 AM EDT", "Tue, Oct 20, 2026, 02:09:35 AM EDT · 2026-10-20 06:09:35 UTC"],
+    [baku, "updated Oct 20, 10:09 AM GMT+4", "Tue, Oct 20, 2026, 10:09:35 AM GMT+4 · 2026-10-20 06:09:35 UTC"],
+  ] as const) {
+    const markup = plain(
+      renderToStaticMarkup(
+        createElement(CandidateOverview, {
+          candidateReleaseId: US_FAILED_RUN_ID,
+          state,
+          progress: FAILED_RUN_PROGRESS,
+          calibration: null,
+          collectorNote: null,
+          zone,
+        }),
+      ),
+    );
+    // The Hugging Face copy row: what the copy records, then the time.
+    const [copyTitle] = rowHoverTexts(markup, "epoch 273 of 1500");
+    expect(copyTitle).toStartWith(`Running, Calibration, epoch 273 of 1500 · ${copyUpdated} · `);
+    expect(copyTitle).toEndWith(`\n${copyHover}`);
+    // The last update row keeps its "· 17d ago" part.
+    const [updateTitle] = rowHoverTexts(markup, "06:37:45 UTC");
+    expect(updateTitle).toMatch(/ · \d+d ago\n/);
+  }
+});
