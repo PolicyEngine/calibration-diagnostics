@@ -301,10 +301,21 @@ function timeWithAgo(value: string | null | undefined, zone: ViewerZone | null):
   return `${shortDateTime(value, zone, { zoneName: true })}${ago ? ` · ${ago}` : ""}`;
 }
 
-// An overview time's hover text: in full in the viewer's zone and in UTC.
+// A time's hover text: in full in the viewer's zone and in UTC.
 function timeHoverText(value: string | null | undefined, zone: ViewerZone | null): string | undefined {
   const ms = value ? Date.parse(value) : NaN;
   return Number.isNaN(ms) ? undefined : timeTitle(ms, zone);
+}
+
+// An overview row's hover text when it shows a time: the row's own text, which
+// may be truncated, then the time in full and in UTC on a second line.
+function rowTimeHoverText(
+  rowText: string,
+  value: string | null | undefined,
+  zone: ViewerZone | null,
+): string {
+  const hover = timeHoverText(value, zone);
+  return hover ? `${rowText}\n${hover}` : rowText;
 }
 
 // What the run's Hugging Face copy last recorded: "Running, Calibration,
@@ -395,6 +406,8 @@ export function CandidateOverview({
   const huggingFaceCopy = state?.hugging_face_differs
     ? huggingFaceCopyLabel(state, progress, zone)
     : null;
+  const lastUpdate = timeWithAgo(state?.updated_at, zone);
+  const lastHeartbeat = state?.heartbeat_at ? timeWithAgo(state.heartbeat_at, zone) : null;
   return (
     <SectionCard title="Candidate overview" className="w-full" padded={false}>
       <div className="grid grid-cols-[min-content_minmax(0,1fr)] items-baseline gap-y-3 py-3.5">
@@ -403,14 +416,14 @@ export function CandidateOverview({
         {state && <OverviewRow label="Status from" value={formatStateSource(state.state_source)} />}
         <OverviewRow
           label="Last update"
-          value={timeWithAgo(state?.updated_at, zone)}
-          title={timeHoverText(state?.updated_at, zone)}
+          value={lastUpdate}
+          title={rowTimeHoverText(lastUpdate, state?.updated_at, zone)}
         />
-        {state?.heartbeat_at && (
+        {state?.heartbeat_at && lastHeartbeat && (
           <OverviewRow
             label="Last heartbeat"
-            value={timeWithAgo(state.heartbeat_at, zone)}
-            title={timeHoverText(state.heartbeat_at, zone)}
+            value={lastHeartbeat}
+            title={rowTimeHoverText(lastHeartbeat, state.heartbeat_at, zone)}
           />
         )}
         <OverviewRow label="Current status" value={currentStatus} />
@@ -421,7 +434,7 @@ export function CandidateOverview({
           <OverviewRow
             label="Hugging Face copy"
             value={huggingFaceCopy}
-            title={timeHoverText(state?.hugging_face_updated_at, zone)}
+            title={rowTimeHoverText(huggingFaceCopy, state?.hugging_face_updated_at, zone)}
           />
         )}
         {calibration && (

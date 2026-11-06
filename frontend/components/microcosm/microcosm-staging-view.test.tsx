@@ -151,8 +151,9 @@ test("the candidate's picker label and overview times read in the viewer's zone,
       }),
     ),
   );
-  // The collector's last update, 06:37:45 UTC on October 20.
-  expect(markup).toContain('title="Tue, Oct 20, 2026, 02:37:45 AM EDT · 2026-10-20 06:37:45 UTC"');
+  // The collector's last update, 06:37:45 UTC on October 20, on the second
+  // line of the row's hover text.
+  expect(markup).toContain('\nTue, Oct 20, 2026, 02:37:45 AM EDT · 2026-10-20 06:37:45 UTC"');
   expect(markup).toContain(">Oct 20, 02:37 AM EDT · ");
   // The Hugging Face copy's last upload, 06:09:35 UTC.
   expect(markup).toContain("epoch 273 of 1500 · updated Oct 20, 02:09 AM EDT · ");
@@ -179,7 +180,8 @@ test("the Hugging Face copy's update time has UTC on hover, in the overview and 
       }),
     ),
   );
-  expect(overview).toContain(hoverText);
+  // On the second line of the row's hover text, below the row's own text.
+  expect(overview).toContain('\nTue, Oct 20, 2026, 02:09:35 AM EDT · 2026-10-20 06:09:35 UTC"');
 
   const note = plain(
     renderToStaticMarkup(
