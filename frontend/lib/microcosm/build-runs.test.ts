@@ -204,6 +204,53 @@ describe("refreshHostedRun", () => {
     expect(run).toBe(current);
   });
 
+  // What Hugging Face returns for a run it has no files for.
+  const NO_COPY: BuildRunDocuments = {
+    run_id: "run-1",
+    source: "staging",
+    country: "us",
+    progress: null,
+    run_manifest: null,
+    calibration_progress: null,
+    events: [],
+  };
+
+  test("a run no source holds is not found, rather than shown as an empty run", async () => {
+    const run = await refreshHostedRun(
+      null,
+      "us",
+      "run-1",
+      NOW,
+      loaders({
+        loadCollector: async () => {
+          throw new Error("Telemetry collector request failed (404).");
+        },
+        loadHistory: async () => NO_COPY,
+      }),
+    );
+
+    expect(run).toBeNull();
+  });
+
+  test("a missing Hugging Face copy does not replace the listed run when the collector cannot be read", async () => {
+    const current = buildTimeline(documents("run-1", "completed"), NOW);
+
+    const run = await refreshHostedRun(
+      current,
+      "us",
+      "run-1",
+      NOW,
+      loaders({
+        loadCollector: async () => {
+          throw new Error("Telemetry collector request failed (503).");
+        },
+        loadHistory: async () => NO_COPY,
+      }),
+    );
+
+    expect(run).toBe(current);
+  });
+
   test("surfaces collector failure when no staged history exists", async () => {
     await expect(
       refreshHostedRun(
