@@ -17,7 +17,9 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
+import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
+import { nextBuildRunSelection } from "@/lib/microcosm/build-run-selection";
 import {
   BUILD_GATE_CATALOG_SOURCE,
   GATE_POSITIONS,
@@ -255,7 +257,8 @@ export function BuildMonitorView({
   const staging = useBuildRuns("staging", source === "staging" && !local.isLoading);
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
-  const [selected, setSelected] = useState("");
+  // A run the page's URL names is requested at once, beside the list.
+  const [selected, setSelected] = useState(preferredRunId ?? "");
   // The selector groups runs by pipeline, and puts runs whose stages differ
   // from the pipeline's newest run (an older build driver) in a group of
   // their own, as the forecast and statistics leave them out.
@@ -273,15 +276,8 @@ export function BuildMonitorView({
   }, [runs]);
 
   useEffect(() => {
-    if (!runs.length) return;
-    if (!runs.some((run) => run.run_id === selected)) {
-      const preferred = runs.find((run) => run.run_id === preferredRunId);
-      const running = runs.find((run) => run.state === "running");
-      // Otherwise the newest run that ended with a final event (finished,
-      // blocked or failed), whose telemetry says how it ended.
-      const ended = runs.find((run) => run.state !== "stalled");
-      setSelected((preferred ?? running ?? ended ?? runs[0]).run_id);
-    }
+    const next = nextBuildRunSelection(runs, selected, preferredRunId);
+    if (next !== selected) setSelected(next);
   }, [runs, selected, preferredRunId]);
 
   const selectRun = (runId: string) => {
@@ -292,6 +288,26 @@ export function BuildMonitorView({
   const detail = useBuildRun(source, selected || undefined);
   const data = detail.data;
   const nowMs = data?.now_ms ?? Date.now();
+  // A run a link named that the list does not hold, such as one older than
+  // its runs, gets an option of its own.
+  const linkedRunOutsideList = Boolean(selected) && !runs.some((run) => run.run_id === selected);
+  const runOptions = [
+    ...(linkedRunOutsideList
+      ? [
+          {
+            value: selected,
+            label: data?.run.run_id === selected ? runOptionLabel(data.run, nowMs) : selected,
+            group: "Linked run, not in this list",
+          },
+        ]
+      : []),
+    ...runs.map((run) => ({
+      value: run.run_id,
+      label: runOptionLabel(run, list.data?.now_ms ?? Date.now()),
+      group: runGroups.get(run.run_id),
+    })),
+  ];
+  const runNotFound = detail.error instanceof ApiError && detail.error.status === 404;
 
   return (
     <div className="flex flex-col gap-5">
@@ -318,23 +334,19 @@ export function BuildMonitorView({
               label="Run"
               value={selected}
               options={
-                runs.length
-                  ? runs.map((run) => ({
-                      value: run.run_id,
-                      label: runOptionLabel(run, list.data?.now_ms ?? Date.now()),
-                      group: runGroups.get(run.run_id),
-                    }))
+                runOptions.length
+                  ? runOptions
                   : [{ value: "", label: list.isLoading ? "Loading runs…" : "No runs" }]
               }
               onChange={selectRun}
-              disabled={!runs.length}
+              disabled={!runOptions.length}
               className="w-[30rem] max-w-full"
             />
           </div>
         }
       />
 
-      {(list.isLoading || local.isLoading) && !runs.length ? (
+      {(list.isLoading || local.isLoading) && !runs.length && !data ? (
         <LoadingBlock label="Loading build runs…" />
       ) : list.error ? (
         <EmptyState title="Build runs unavailable" description={String(list.error.message)} />
@@ -343,7 +355,7 @@ export function BuildMonitorView({
           title={source === "local" ? "Local runs are off" : "Hosted runs unavailable"}
           description={list.data.detail ?? undefined}
         />
-      ) : !runs.length ? (
+      ) : !runs.length && !data ? (
         <EmptyState
           title="No build runs found"
           description={
@@ -355,7 +367,14 @@ export function BuildMonitorView({
       ) : detail.isLoading && !data ? (
         <LoadingBlock label="Loading run…" />
       ) : detail.error ? (
-        <EmptyState title="Run unavailable" description={String(detail.error.message)} />
+        <EmptyState
+          title={runNotFound ? "Run not found" : "Run unavailable"}
+          description={
+            runNotFound
+              ? `${detail.error.message} Neither the telemetry collector nor the Hugging Face staging history has a run with this ID for this country. Choose another run above.`
+              : String(detail.error.message)
+          }
+        />
       ) : data ? (
         <>
           <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />

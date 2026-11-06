@@ -50,6 +50,8 @@ import {
 } from "@/lib/microcosm/staging-status";
 import { formatWeightedTargetError } from "@/lib/microcosm/target-change-visualization";
 import { stagingComparisonBaseline } from "@/lib/microcosm/calibration-selection";
+import { candidateRunSelection } from "@/lib/microcosm/build-run-selection";
+import { stagingRunFromSearch, withStagingRun } from "@/lib/microcosm/staging-run-url";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
 
@@ -874,8 +876,14 @@ export function MicrocosmStagingView() {
   const { country } = useCountry();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<StagingTab>(() => parseStagingTab(searchParams.get("view")));
-  // The run selected on either tab, so switching tabs keeps the same run.
-  const [runId, setRunId] = useState("");
+  // The run selected on either tab, so switching tabs keeps the same run. A
+  // link names it in the `run` query parameter, and choosing a run writes it
+  // there, so the page's URL opens the same run.
+  const [runId, setRunId] = useState(() => stagingRunFromSearch(searchParams));
+  const chooseRun = useCallback((next: string) => {
+    setRunId(next);
+    window.history.replaceState(null, "", withStagingRun(window.location.href, next));
+  }, []);
 
   const changeTab = useCallback((next: StagingTab) => {
     setTab(next);
@@ -899,9 +907,9 @@ export function MicrocosmStagingView() {
 
   const tabs = <StagingPageTabs value={tab} onChange={changeTab} />;
   return tab === "progress" ? (
-    <BuildMonitorView tabs={tabs} preferredRunId={runId || undefined} onRunChange={setRunId} />
+    <BuildMonitorView tabs={tabs} preferredRunId={runId || undefined} onRunChange={chooseRun} />
   ) : (
-    <MicrocosmStagingRunsView tabs={tabs} preferredRunId={runId || undefined} onRunChange={setRunId} />
+    <MicrocosmStagingRunsView tabs={tabs} preferredRunId={runId || undefined} onRunChange={chooseRun} />
   );
 }
 
@@ -935,11 +943,21 @@ function MicrocosmStagingRunsView({
 
   useEffect(() => {
     if (selectedRun || !runs[0]) return;
-    // Open the run carried over from the Build progress tab when it is a
-    // staging run; otherwise the newest.
-    const preferred = runs.find((run) => run.run_id === preferredRunId);
-    resetRunVisualState((preferred ?? runs[0]).run_id);
+    // Open the run a link names, or the one carried over from the Build
+    // progress tab, when it is a staging candidate; otherwise the newest.
+    const { runId } = candidateRunSelection(
+      runs.map((run) => run.run_id),
+      preferredRunId,
+    );
+    if (runId) resetRunVisualState(runId);
   }, [preferredRunId, resetRunVisualState, runs, selectedRun]);
+  // The named run is not a staging candidate in this repository.
+  const preferredRunMissing =
+    runs.length > 0 &&
+    candidateRunSelection(
+      runs.map((run) => run.run_id),
+      preferredRunId,
+    ).missing;
 
   const { data: runData, isLoading: runLoading, error: runError } =
     useMicrocosmStagingRun(selectedRun);
@@ -1035,6 +1053,12 @@ function MicrocosmStagingRunsView({
       />
 
       <div className="flex flex-col gap-5">
+        {preferredRunMissing && (
+          <div className="rounded-md border px-3 py-2 text-sm pill-warn">
+            Run {preferredRunId} is not a staging candidate in this repository, so the newest candidate is shown.
+            The Build progress tab may still have it.
+          </div>
+        )}
         {runsLoading && !runs.length ? (
             <LoadingBlock label="Loading staging runs…" />
           ) : runsError ? (
