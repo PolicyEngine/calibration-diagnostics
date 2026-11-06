@@ -146,15 +146,28 @@ performs these steps in order:
    for the national `spm_unit_spm_threshold` and the California `ca_income_tax` in 2024.
    Promotion requires the reviewed package and data identities, verified H5 bytes,
    finite weighted results, California input for the state result, and both scopes
-   built fresh, with the national simulation evicted before the state one. If the
+   built fresh, with the national simulation evicted before the state one. No data
+   flows on the calculation request's connection until the result arrives, about 4 to
+   6 minutes later; in deploy run 42093437237 that connection was closed about 266
+   seconds in while the route and the backend both completed. Every deployment check
+   request therefore turns on TCP keepalive, with `TCP_KEEPIDLE` 60 seconds,
+   `TCP_KEEPINTVL` 30 seconds and `TCP_KEEPCNT` 5 where the platform defines them
+   (Linux defines all three). If the
    connection is refused, closes, resets or times out before a complete response
-   arrives, the check waits until the backend answers a metadata request (at most 860
-   seconds after the first request), then sends the calculation once more; the retried
-   response must meet the same requirements. A DNS or TLS-certificate failure, an HTTP
-   error, or a response that fails them is never retried, so a slow calculation still
-   fails: the proxy answers HTTP 504 after waiting 780 seconds. The metadata checks and
-   the post-promotion California checks instead make up to six attempts, pausing 5, 10,
-   15, 20 and 25 seconds between them, and retry any failure.
+   arrives, or the proxy answers HTTP 502 with the detail "The calculation backend did
+   not return JSON.", which is how a Modal preemption appears (Modal then runs the
+   preempted input again), the check waits until the backend answers a metadata
+   request, at most 1,100 seconds after the first request, then sends the calculation
+   once more; the retried response must meet the same requirements, and there is only
+   one retry. The 1,100 seconds let the metadata request sent after a preemption about
+   300 seconds in wait its full 790-second timeout, longer than the proxy's 780
+   seconds; with the retry's 790 seconds, the step takes at most about 31.5 minutes of
+   the job's 45. A DNS or TLS-certificate failure, any other HTTP error, an HTTP error
+   for the metadata request, or a response that fails the requirements is never
+   retried, so a slow calculation still fails: the proxy answers HTTP 504 after
+   waiting 780 seconds. The metadata checks and the post-promotion California checks
+   instead make up to six attempts, pausing 5, 10, 15, 20 and 25 seconds between them,
+   and retry any failure.
 8. Install the frontend workspace (`bun install --frozen-lockfile --ignore-scripts`)
    and run the calibration release check against the candidate
    ([Promotion and rollback](#promotion-and-rollback)).

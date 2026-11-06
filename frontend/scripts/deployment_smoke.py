@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import math
+import socket
 import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import HTTPHandler, HTTPSHandler, Request, build_opener
 
 RELEASE_PATH = Path(__file__).with_name("hosted_release.json")
 NATIONAL_VARIABLE = "spm_unit_spm_threshold"
@@ -21,10 +23,18 @@ STATE_VARIABLE = "ca_income_tax"
 # error with a body before this timeout.
 REQUEST_TIMEOUT_SECONDS = 790
 # The backend runs one request at a time and finishes a calculation whose
-# client has gone, so a retried full check waits until the backend answers a
-# metadata request. backend/modal_app.py stops a call after 800 s; the other
-# 60 s allow for container start. Counted from the first full-check request.
-BACKEND_FREE_DEADLINE_SECONDS = 860
+# client has gone, or runs a preempted one again, so a retried full check
+# waits until the backend answers a metadata request. Counted from the first
+# full-check request. backend/modal_app.py stops a call after 800 s, so after
+# a lost connection the backend is free within about 860 s, including 60 s for
+# container start. After a preemption about 300 s in (306 s in deploy run
+# 42093437237), Modal's new run can take up to 860 s more. This limit lets the
+# metadata request sent then wait its full 790 s, so it ends with the route's
+# own answer within 780 s; a new run that takes longer still fails, with the
+# route's 504 for that request. The step's worst case is then 1,100 s plus the
+# retry's 790 s, about 31.5 minutes; the deploy job's other steps took at most
+# about 6.5 minutes in recent deploys, within its 45-minute limit.
+BACKEND_FREE_DEADLINE_SECONDS = 1_100
 BACKEND_PROBE_PAUSE_SECONDS = 10
 # Failures that leave no complete HTTP response: the connection was refused,
 # closed, reset or aborted (RemoteDisconnected is a ConnectionResetError), or
@@ -32,16 +42,96 @@ BACKEND_PROBE_PAUSE_SECONDS = 10
 # URLError. A URLError for a DNS, TLS-certificate or URL problem is not one,
 # and HTTPError, a URLError that carries a response, is handled first.
 _CONNECTION_FAILURES = (ConnectionError, TimeoutError)
+# The route's HTTP 502 detail when the backend's response is not JSON
+# (frontend/lib/api/variable-backend.ts). A Modal preemption produces it: in
+# deploy run 42093437237 Modal preempted the container 306 s into the full
+# check, logged that it would run the function again with the same input, and
+# returned an HTTP 500 without a JSON body.
+NON_JSON_BACKEND_DETAIL = "The calculation backend did not return JSON."
+# TCP keepalive on every request's connection. The full check's response comes
+# only after the calculation, 4 to 6 minutes later, and no data flows until
+# then. In deploy run 42093437237 that connection was closed about 266 s in
+# while the route and the backend both completed, which fits a limit on idle
+# connections somewhere on the network path. With these timings the kernel
+# sends a probe after 60 s without data and every 30 s after that, so the
+# connection is never idle for longer than 60 s; if 5 probes in a row go
+# unanswered, the request fails with a timeout. Each timing is set only where
+# the platform defines it: Linux, where the deploy runs, defines all three, and
+# macOS has no TCP_KEEPIDLE.
+TCP_KEEPALIVE_TIMINGS = (
+    ("TCP_KEEPIDLE", 60),
+    ("TCP_KEEPINTVL", 30),
+    ("TCP_KEEPCNT", 5),
+)
+
+
+def _enable_tcp_keepalive(connection: socket.socket) -> None:
+    connection.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    for option_name, option_value in TCP_KEEPALIVE_TIMINGS:
+        option = getattr(socket, option_name, None)
+        if option is not None:
+            connection.setsockopt(socket.IPPROTO_TCP, option, option_value)
+
+
+class _KeepaliveHTTPConnection(http.client.HTTPConnection):
+    def connect(self) -> None:
+        super().connect()
+        _enable_tcp_keepalive(self.sock)
+
+
+class _KeepaliveHTTPSConnection(http.client.HTTPSConnection, _KeepaliveHTTPConnection):
+    """An HTTPS connection whose TCP socket has keepalive set before TLS starts.
+
+    HTTPSConnection.connect opens the TCP connection with super().connect() and
+    then wraps it in TLS. This class's method resolution order places
+    _KeepaliveHTTPConnection between HTTPSConnection and HTTPConnection, so that
+    super().connect() call also sets keepalive.
+    """
+
+
+class _KeepaliveHTTPHandler(HTTPHandler):
+    def http_open(self, request: Request) -> http.client.HTTPResponse:
+        return self.do_open(_KeepaliveHTTPConnection, request)
+
+
+class _KeepaliveHTTPSHandler(HTTPSHandler):
+    def https_open(self, request: Request) -> http.client.HTTPResponse:
+        # The same call as HTTPSHandler.https_open, with the keepalive class.
+        return self.do_open(_KeepaliveHTTPSConnection, request, context=self._context)
+
+
+# build_opener replaces its default HTTP and HTTPS handlers with these
+# subclasses and keeps the rest, as urllib.request.urlopen's own opener does.
+_KEEPALIVE_OPENER = build_opener(_KeepaliveHTTPHandler, _KeepaliveHTTPSHandler)
+
+
+def urlopen(request: Request, timeout: float) -> http.client.HTTPResponse:
+    """Open a request as urllib.request.urlopen does, on a keepalive connection."""
+    return _KEEPALIVE_OPENER.open(request, timeout=timeout)
 
 
 class ConnectionFailedError(RuntimeError):
     """The connection was refused, closed, reset or timed out without a response."""
 
 
+class NonJsonBackendResponseError(RuntimeError):
+    """The route answered HTTP 502 because the backend's response was not JSON."""
+
+
 def _is_connection_failure(error: Exception | None) -> bool:
     if isinstance(error, URLError):
         return isinstance(error.reason, _CONNECTION_FAILURES)
     return isinstance(error, _CONNECTION_FAILURES)
+
+
+def _reports_non_json_backend_response(status_code: int, body_text: str) -> bool:
+    if status_code != 502:
+        return False
+    try:
+        body = json.loads(body_text)
+    except ValueError:
+        return False
+    return isinstance(body, dict) and body.get("detail") == NON_JSON_BACKEND_DETAIL
 
 
 def _record(value: Any, name: str) -> dict[str, Any]:
@@ -175,7 +265,12 @@ def _request_json(
                 return _record(json.load(response), "response")
         except HTTPError as exc:
             detail = exc.read(1_000).decode("utf-8", errors="replace")
-            last_error = RuntimeError(f"Deployment returned HTTP {exc.code}: {detail}")
+            message = f"Deployment returned HTTP {exc.code}: {detail}"
+            last_error = (
+                NonJsonBackendResponseError(message)
+                if _reports_non_json_backend_response(exc.code, detail)
+                else RuntimeError(message)
+            )
         except (
             URLError,
             *_CONNECTION_FAILURES,
@@ -189,6 +284,10 @@ def _request_json(
         raise ConnectionFailedError(
             "Deployment check failed: the connection ended before a complete "
             f"response arrived ({type(last_error).__name__}: {last_error})."
+        ) from last_error
+    if isinstance(last_error, NonJsonBackendResponseError):
+        raise NonJsonBackendResponseError(
+            f"Deployment check failed: {last_error}"
         ) from last_error
     raise RuntimeError(f"Deployment check failed: {last_error}") from last_error
 
@@ -232,8 +331,9 @@ def _wait_until_backend_is_free(
     """Return once the backend answers a valid metadata request.
 
     The backend serves one request at a time, so this answer arrives only after
-    the calculation whose connection was lost has finished. Only another lost
-    connection is retried; any HTTP error or invalid metadata fails at once.
+    the calculation whose connection was lost, or Modal's new run of a preempted
+    one, has finished. Only another lost connection is retried; any HTTP error or
+    invalid metadata fails at once.
     """
     last_probe_failure: Exception | None = None
     while (remaining := deadline - time.monotonic()) > 0:
@@ -267,18 +367,27 @@ def _run_full_check(
     validate_calculation_body: Callable[[dict[str, Any]], None],
     validate_metadata_body: Callable[[dict[str, Any]], None],
 ) -> None:
-    """Run the national and state calculation, retrying once after a lost connection.
+    """Run the national and state calculation, and retry it at most once.
 
-    Each response, first or retried, must pass the same validation on its own.
-    A response that fails validation and an HTTP error are never retried.
+    The retry follows a lost connection, or the route's 502 for a backend
+    response that was not JSON, which is how a Modal preemption appears. Each
+    response, first or retried, must pass the same validation on its own. A
+    response that fails validation and any other HTTP error are never retried.
     """
     deadline = time.monotonic() + BACKEND_FREE_DEADLINE_SECONDS
     try:
         body = _request_json(url, query, headers, attempts=1)
-    except ConnectionFailedError as first_failure:
+    except (ConnectionFailedError, NonJsonBackendResponseError) as first_failure:
+        explanation = (
+            "A Modal preemption gives this response, and Modal then runs the "
+            "calculation again with the same input. Waiting for the backend to "
+            "finish it"
+            if isinstance(first_failure, NonJsonBackendResponseError)
+            else "Waiting for the backend to finish that calculation"
+        )
         print(
-            f"::warning::{first_failure} Waiting for the backend to finish that "
-            "calculation, then sending the full check once more.",
+            f"::warning::{first_failure} {explanation}, then sending the full "
+            "check once more.",
             flush=True,
         )
         _wait_until_backend_is_free(url, headers, validate_metadata_body, deadline)

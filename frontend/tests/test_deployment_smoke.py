@@ -8,10 +8,12 @@ import http.server
 import importlib
 import io
 import json
+import re
 import socket
 import ssl
 import sys
 import threading
+import types
 from dataclasses import dataclass
 from email.message import Message
 from pathlib import Path
@@ -195,6 +197,8 @@ class ScriptedBackend:
     def __init__(self, replies):
         self.pending_replies = list(replies)
         self.request_kinds: list[str] = []
+        self.client_addresses: list[tuple[str, int]] = []
+        self.bypass_headers: list[str | None] = []
         self.released = threading.Event()
         backend = self
 
@@ -203,6 +207,10 @@ class ScriptedBackend:
                 query = parse_qs(urlsplit(self.path).query)
                 backend.request_kinds.append(
                     "metadata" if query.get("metadata") == ["1"] else "full"
+                )
+                backend.client_addresses.append(self.client_address)
+                backend.bypass_headers.append(
+                    self.headers.get("x-vercel-protection-bypass")
                 )
                 reply = (
                     backend.pending_replies.pop(0)
@@ -257,7 +265,7 @@ def _skip_pauses(monkeypatch, deployment):
     monkeypatch.setattr(deployment.time, "sleep", lambda seconds: None)
 
 
-def _run_check(monkeypatch, deployment, backend, check="full"):
+def _run_check(monkeypatch, deployment, backend, check="full", extra_arguments=()):
     monkeypatch.setattr(
         sys,
         "argv",
@@ -269,6 +277,7 @@ def _run_check(monkeypatch, deployment, backend, check="full"):
             "abc123",
             "--check",
             check,
+            *extra_arguments,
         ],
     )
     return deployment.main()
@@ -421,6 +430,211 @@ def test_full_check_does_not_retry_an_http_error_with_a_body(
     assert backend.request_kinds == ["full"]
 
 
+# A Modal preemption. In deploy run 42093437237 Modal preempted the container
+# 306 s into the full check and logged that it would run the function again with
+# the same input. The backend's response was an HTTP 500 without a JSON body, so
+# the route answered with this reply.
+
+NON_JSON_BACKEND_DETAIL = "The calculation backend did not return JSON."
+NON_JSON_BACKEND_REPLY = JsonReply(502, {"detail": NON_JSON_BACKEND_DETAIL})
+VARIABLE_BACKEND_SOURCE = (
+    Path(__file__).resolve().parents[1] / "lib" / "api" / "variable-backend.ts"
+)
+
+
+def _full_check_failure(monkeypatch, deployment, backend):
+    """Run the full check; return the error it raised, or None if it passed."""
+    try:
+        _run_check(monkeypatch, deployment, backend)
+    except RuntimeError as failure:
+        return failure
+    return None
+
+
+def test_the_route_answers_502_with_this_detail_when_the_backend_is_not_json():
+    route_source = VARIABLE_BACKEND_SOURCE.read_text()
+
+    assert re.search(
+        r"detail:\s*"
+        + re.escape(json.dumps(NON_JSON_BACKEND_DETAIL))
+        + r"\s*\},\s*502",
+        route_source,
+    )
+
+
+def test_full_check_retries_once_after_the_route_reports_a_non_json_backend_response(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, _calculation_body()),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    # The metadata request waits behind Modal's rerun of the preempted input.
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    assert failure is None
+
+
+def test_full_check_keeps_waiting_after_a_non_json_backend_response_while_probes_close(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        CLOSE_WITHOUT_RESPONSE,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, _warm_container_retry_body()),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata", "metadata", "full"]
+    assert failure is None
+
+
+@pytest.mark.parametrize(
+    ("first_failure", "retry_failure", "message"),
+    [
+        (NON_JSON_BACKEND_REPLY, NON_JSON_BACKEND_REPLY, "did not return JSON"),
+        (NON_JSON_BACKEND_REPLY, CLOSE_WITHOUT_RESPONSE, "Remote end closed"),
+        (CLOSE_WITHOUT_RESPONSE, NON_JSON_BACKEND_REPLY, "did not return JSON"),
+    ],
+    ids=["non-json-twice", "non-json-then-closed", "closed-then-non-json"],
+)
+def test_full_check_retries_at_most_once_after_a_non_json_backend_response(
+    monkeypatch, start_backend, first_failure, retry_failure, message
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        first_failure, JsonReply(200, _metadata_body()), retry_failure
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    assert failure is not None
+    assert "The retried full check failed" in str(failure)
+    assert message in str(failure)
+
+
+def test_full_check_validates_the_retry_after_a_non_json_backend_response(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    retry_body = _calculation_body()
+    retry_body["execution"]["simulation_cache_hits"]["national"] = True
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, retry_body),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    assert failure is not None
+    assert "construct both scopes" in str(failure)
+
+
+@pytest.mark.parametrize(
+    "error_reply",
+    [
+        JsonReply(504, {"detail": "Variable calculation timed out."}),
+        JsonReply(502, {"detail": "The calculation backend request failed."}),
+        JsonReply(500, {"detail": NON_JSON_BACKEND_DETAIL}),
+    ],
+    ids=["route-timeout", "backend-request-failed", "same-detail-other-status"],
+)
+def test_full_check_does_not_retry_other_http_errors(
+    monkeypatch, start_backend, error_reply
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(error_reply)
+
+    with pytest.raises(RuntimeError, match=f"HTTP {error_reply.status_code}"):
+        _run_check(monkeypatch, deployment, backend)
+    assert backend.request_kinds == ["full"]
+
+
+def test_full_check_fails_at_once_when_the_probe_after_a_non_json_response_fails(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        JsonReply(504, {"detail": "Variable calculation timed out."}),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata"]
+    assert failure is not None
+    assert "HTTP 504" in str(failure)
+
+
+# Seconds into the full check at which Modal preempted the container in deploy
+# run 42093437237.
+OBSERVED_PREEMPTION_SECONDS = 306
+
+
+class SimulatedClock:
+    """A monotonic clock that moves only when the test advances it."""
+
+    def __init__(self):
+        self.seconds = 0.0
+
+    def __call__(self):
+        return self.seconds
+
+
+def test_the_metadata_request_after_a_preemption_gets_the_full_request_timeout(
+    monkeypatch, start_backend
+):
+    deployment = _module(monkeypatch)
+    clock = SimulatedClock()
+    monkeypatch.setattr(
+        deployment,
+        "time",
+        types.SimpleNamespace(monotonic=clock, sleep=lambda seconds: None),
+    )
+    open_request = deployment.urlopen
+    request_timeouts = []
+
+    def open_request_and_advance_the_clock(request, timeout):
+        request_timeouts.append(timeout)
+        try:
+            return open_request(request, timeout=timeout)
+        finally:
+            if len(request_timeouts) == 1:
+                clock.seconds += OBSERVED_PREEMPTION_SECONDS
+
+    monkeypatch.setattr(deployment, "urlopen", open_request_and_advance_the_clock)
+    backend = start_backend(
+        NON_JSON_BACKEND_REPLY,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, _calculation_body()),
+    )
+
+    failure = _full_check_failure(monkeypatch, deployment, backend)
+
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    assert failure is None
+    # Modal runs the preempted input again, and the metadata request waits
+    # behind it. With the full timeout, that request ends with the route's own
+    # answer, which comes within 780 s, instead of timing out first.
+    assert request_timeouts == [deployment.REQUEST_TIMEOUT_SECONDS] * 3
+
+
 def test_metadata_check_retries_a_connection_closed_without_a_response(
     monkeypatch, start_backend
 ):
@@ -554,3 +768,141 @@ def test_full_check_fails_at_once_when_the_first_request_fails_tls_verification(
     with pytest.raises(RuntimeError, match="CERTIFICATE_VERIFY_FAILED"):
         _run_check(monkeypatch, deployment, UnreachableBackend())
     assert request_kinds == ["full"]
+
+
+# TCP keepalive on every connection. In deploy run 42093437237 the full check's
+# connection carried no data while the calculation ran, and it was closed about
+# 266 s in, twice, while the route and the backend both completed.
+
+EXPECTED_TCP_KEEPALIVE_TIMINGS = {
+    "TCP_KEEPIDLE": 60,
+    "TCP_KEEPINTVL": 30,
+    "TCP_KEEPCNT": 5,
+}
+TEST_BYPASS_VALUE = "test-bypass-value"
+
+
+def _expected_keepalive_settings():
+    """SO_KEEPALIVE on, and each timing this platform defines.
+
+    Linux defines all three timings; macOS has no TCP_KEEPIDLE.
+    """
+    return {
+        "SO_KEEPALIVE": True,
+        **{
+            option_name: option_value
+            for option_name, option_value in EXPECTED_TCP_KEEPALIVE_TIMINGS.items()
+            if hasattr(socket, option_name)
+        },
+    }
+
+
+def _keepalive_settings(connection):
+    # Linux reports SO_KEEPALIVE as 1 and macOS as the option's flag value.
+    settings = {
+        "SO_KEEPALIVE": connection.getsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE)
+        != 0
+    }
+    for option_name in EXPECTED_TCP_KEEPALIVE_TIMINGS:
+        if hasattr(socket, option_name):
+            settings[option_name] = connection.getsockopt(
+                socket.IPPROTO_TCP, getattr(socket, option_name)
+            )
+    return settings
+
+
+@pytest.fixture
+def opened_connections(monkeypatch):
+    """Duplicates of the client sockets that requests open, in order.
+
+    http.client opens each connection with socket.create_connection. A duplicate
+    refers to the same kernel socket, so it reports the options set on that
+    connection after the request has closed its own handle, and after TLS has
+    taken the handle over.
+    """
+    duplicates = []
+    create_connection = socket.create_connection
+
+    def create_and_record_connection(*connection_arguments, **connection_options):
+        connection = create_connection(*connection_arguments, **connection_options)
+        duplicates.append(connection.dup())
+        return connection
+
+    monkeypatch.setattr(socket, "create_connection", create_and_record_connection)
+    yield duplicates
+    for duplicate in duplicates:
+        duplicate.close()
+
+
+@pytest.fixture
+def port_that_closes_its_first_connection():
+    """A port on 127.0.0.1 that accepts one connection and closes it unanswered."""
+    listener = socket.create_server(("127.0.0.1", 0))
+    listener.settimeout(10)
+
+    def close_first_connection():
+        try:
+            connection, _ = listener.accept()
+        except OSError:
+            return
+        connection.close()
+
+    closer = threading.Thread(target=close_first_connection, daemon=True)
+    closer.start()
+    yield listener.getsockname()[1]
+    closer.join(timeout=10)
+    listener.close()
+
+
+def test_every_full_check_request_uses_a_tcp_keepalive_connection(
+    monkeypatch, start_backend, opened_connections
+):
+    deployment = _module(monkeypatch)
+    _skip_pauses(monkeypatch, deployment)
+    backend = start_backend(
+        CLOSE_WITHOUT_RESPONSE,
+        JsonReply(200, _metadata_body()),
+        JsonReply(200, _warm_container_retry_body()),
+    )
+
+    assert (
+        _run_check(
+            monkeypatch,
+            deployment,
+            backend,
+            extra_arguments=["--vercel-bypass-secret", TEST_BYPASS_VALUE],
+        )
+        == 0
+    )
+    assert backend.request_kinds == ["full", "metadata", "full"]
+    # Each recorded socket is the client end of a request the backend received.
+    assert [
+        connection.getsockname() for connection in opened_connections
+    ] == backend.client_addresses
+    assert backend.bypass_headers == [TEST_BYPASS_VALUE] * 3
+    assert [connection.gettimeout() for connection in opened_connections] == [
+        deployment.REQUEST_TIMEOUT_SECONDS
+    ] * 3
+    assert [_keepalive_settings(connection) for connection in opened_connections] == [
+        _expected_keepalive_settings()
+    ] * 3
+
+
+def test_an_https_request_sets_tcp_keepalive_before_the_tls_handshake(
+    monkeypatch, opened_connections, port_that_closes_its_first_connection
+):
+    deployment = _module(monkeypatch)
+    port = port_that_closes_its_first_connection
+
+    # The port closes the connection instead of answering the TLS handshake,
+    # so the request fails after its TCP connection was made.
+    with pytest.raises(RuntimeError):
+        deployment._request_json(
+            f"https://127.0.0.1:{port}/calibration/dashboard/api/microcosm_variable",
+            [("metadata", "1")],
+            {},
+            attempts=1,
+            timeout=10,
+        )
+    assert len(opened_connections) == 1
+    assert _keepalive_settings(opened_connections[0]) == _expected_keepalive_settings()
