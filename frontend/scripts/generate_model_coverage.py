@@ -289,7 +289,7 @@ reached = root["anchored"] + root["exercised"]
 payload = {
     "identifier_compatibility_note": (
         "Deprecated upstream identifier: Microcosm release IDs still use the "
-        "former populace-us-* prefix."
+        "published prefixes."
     ),
     "source": {"repo": "PolicyEngine/policyengine-us", "version": version, "commit": commit},
     "release_id": release_id,

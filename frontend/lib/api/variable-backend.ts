@@ -47,7 +47,7 @@ function matchesRelease(value: unknown): boolean {
 }
 
 // `data_configuration` is the backend's static reviewed contract, so it matches
-// even when the deployment carries a stale POPULACE_HF_REPO/POPULACE_HF_REVISION
+// even when the deployment carries a stale MICROCOSM_HF_REPO/MICROCOSM_HF_REVISION
 // override that fails every calculation with 503. The deployment's own resolved
 // selection is reported separately, and the metadata gate must check it too.
 function matchesEnvironment(value: unknown): boolean {

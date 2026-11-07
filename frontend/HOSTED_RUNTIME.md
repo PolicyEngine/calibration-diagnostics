@@ -284,7 +284,7 @@ monitor that shows these runs.
   or `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset. The Hugging Face webhook uses the
   same token to read a release repository's `releases.json` before and after each
   `main` update, for the Slack release alerts. UK staging is the exception: it reads
-  only `POPULACE_UK_STAGING_HF_TOKEN`, a Vercel project setting. For production
+  `MICROCOSM_UK_STAGING_HF_TOKEN`, with the legacy staging credential as a fallback. For production
   deployments the workflow sets `HF_TOKEN` from the repository secret
   `HF_RELEASE_READ_TOKEN`. That must be a dedicated fine-grained read-only token for the
   registered private release repositories (`policyengine/populace-uk-private`,
@@ -296,7 +296,7 @@ monitor that shows these runs.
 
 Each registered country's release and staging repositories can be overridden on the
 dashboard server by the settings its registration names (`repo_env` and `revision_env`
-in `frontend/packages/calibration-tree/src/countries.ts`, such as `POPULACE_HF_REPO`
+in `frontend/packages/calibration-tree/src/countries.ts`, such as `MICROCOSM_HF_REPO`
 for the US). None of these overrides was set in the Vercel project on 2026-10-26.
 
 ## Preview deployment
@@ -372,7 +372,7 @@ explicitly. Without a remote URL, and outside Vercel, local calculations run
    a same-origin 307 to the mounted Next route; preserve that redirect in the receipt.
    Metadata is not proof that data loaded or a calculation succeeded. It does refuse a
    conflicting deployment data selection: the backend validates its resolved
-   `POPULACE_HF_REPO`/`POPULACE_HF_REVISION` against the reviewed release and answers 503,
+   `MICROCOSM_HF_REPO`/`MICROCOSM_HF_REVISION` against the reviewed release and answers 503,
    and the proxy compares the response's `environment_configuration` with the reviewed
    selection and answers 409. A 200 metadata receipt therefore also records that this
    deployment is not carrying a stale override.
@@ -406,11 +406,11 @@ setting `autoAssignCustomDomains=false` (it was `false` when read on 2026-10-26)
 additional protection against unintended domain assignment, and read it back when
 changing deployment configuration.
 
-The backend reads `POPULACE_HF_REPO` and `POPULACE_HF_REVISION` from its own Modal
+The backend reads `MICROCOSM_HF_REPO` and `MICROCOSM_HF_REVISION` from its own Modal
 environment. The Modal function has no Modal secret attached and its image sets neither,
 so both are unset and the backend uses the reviewed values; its 503 refusal guards
 against a later change that sets them. The variable proxy on Vercel uses the checked-in
-identity and never forwards either setting to the backend. On Vercel, `POPULACE_HF_REPO`
+identity and never forwards either setting to the backend. On Vercel, `MICROCOSM_HF_REPO`
 changes which repository the dashboard's US release discovery reads, and which
 repository's Hugging Face webhook events start a US calibration tree publication
 (`frontend/lib/microcosm/hf-webhook-config.ts`). Release discovery follows the

@@ -1,5 +1,5 @@
 # Deprecated upstream identifiers: the pinned Microcosm release/file names and
-# Chronicle fact keys in this integration still use `populace`/`ledger` literals.
+# Chronicle fact keys in this integration retain their published literals.
 schema_version: evaluation_harness.integration_overview.v1
 integration_id: microcosm_policyengine_us_2024
 chronicle_snapshot_id: chronicle-7917ea815df710fb20db076b

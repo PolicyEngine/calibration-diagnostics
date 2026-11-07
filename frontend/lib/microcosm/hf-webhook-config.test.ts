@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { resolveHfWebhookConfig } from "./hf-webhook-config";
+import { hasReleaseAlertChannel } from "@/lib/slack";
 
 test("resolves the registered release and staging repositories without ambient state", () => {
   const config = resolveHfWebhookConfig({});
@@ -26,8 +27,8 @@ test("applies repository and GitHub overrides from an explicit environment", () 
     GITHUB_ACTIONS_DISPATCH_TOKEN: "  github-token  ",
     CALIBRATION_TREE_GITHUB_REPOSITORY: "  example/dashboard  ",
     CALIBRATION_TREE_GITHUB_WORKFLOW: "  publish.yml  ",
-    POPULACE_UK_HF_REPO: "example/uk-release",
-    POPULACE_UK_STAGING_HF_REPO: "example/uk-staging",
+    MICROCOSM_UK_HF_REPO: "example/uk-release",
+    MICROCOSM_UK_STAGING_HF_REPO: "example/uk-staging",
   });
 
   expect(config).toMatchObject({
@@ -64,7 +65,17 @@ test("reads the Hugging Face token for releases.json alerts as the dashboard's o
 });
 
 test("reads releases.json only for the countries whose Slack channel is configured", () => {
-  const config = resolveHfWebhookConfig({ SLACK_WEBHOOK_POPULACE_UK: "https://hooks.slack.example/uk" });
+  const config = resolveHfWebhookConfig({ SLACK_WEBHOOK_MICROCOSM_UK: "https://hooks.slack.example/uk" });
   expect([...config.releaseAlertCountries]).toEqual(["uk"]);
   expect([...resolveHfWebhookConfig({}).releaseAlertCountries]).toEqual([]);
+});
+
+test("Slack configuration accepts legacy aliases and prefers Microcosm variables", () => {
+  const legacy = {
+    SLACK_WEBHOOK_POPULACE_US: "https://hooks.slack.example/legacy-us", // compat: populace alias, remove after 0.2.0
+    SLACK_WEBHOOK_POPULACE_UK: "https://hooks.slack.example/legacy-uk", // compat: populace alias, remove after 0.2.0
+  };
+  expect([...resolveHfWebhookConfig(legacy).releaseAlertCountries]).toEqual(["us", "uk"]);
+  expect(hasReleaseAlertChannel("uk", { ...legacy, SLACK_WEBHOOK_MICROCOSM_UK: "" })).toBe(false);
+  expect(hasReleaseAlertChannel("uk", { ...legacy, SLACK_WEBHOOK_MICROCOSM_UK: "https://hooks.slack.example/current" })).toBe(true);
 });

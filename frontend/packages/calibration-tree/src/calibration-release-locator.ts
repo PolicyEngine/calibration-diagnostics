@@ -6,6 +6,7 @@ import {
 import type { CalibrationTreeManifest } from "./calibration-tree-manifest";
 import {
   countryRegistration,
+  repositoryEnvironmentValue,
   type MicrocosmCountry,
 } from "./countries";
 import { isBuildFolderId, parseBuildFolderId } from "./release-record";
@@ -50,7 +51,7 @@ function safeReleaseId(value: string, label = "release"): string {
 function repository(country: MicrocosmCountry): string {
   const registration = countryRegistration(country);
   return (
-    (registration.repo_env ? process.env[registration.repo_env] : undefined) ??
+    repositoryEnvironmentValue(process.env, registration.repo_env) ??
     registration.repo
   );
 }
@@ -58,9 +59,7 @@ function repository(country: MicrocosmCountry): string {
 function repositoryRevision(country: MicrocosmCountry): string {
   const registration = countryRegistration(country);
   return (
-    (registration.revision_env
-      ? process.env[registration.revision_env]
-      : undefined) ?? registration.revision
+    repositoryEnvironmentValue(process.env, registration.revision_env) ?? registration.revision
   );
 }
 

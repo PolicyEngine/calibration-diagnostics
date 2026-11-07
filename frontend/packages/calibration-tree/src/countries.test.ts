@@ -15,6 +15,7 @@ import {
   isCountryCapability,
   isCountryNotConfiguredBody,
   isSelectableCountry,
+  repositoryEnvironmentValue,
   resolveRegisteredRepository,
   resolveRegisteredStagingRepository,
   selectableCountries,
@@ -65,7 +66,7 @@ test("every registration carries the full shape", () => {
 test("keeps the live registrations on their published repositories and labels", () => {
   expect(countryRegistration("us")).toMatchObject({
     repo: "policyengine/populace-us",
-    repo_env: "POPULACE_HF_REPO",
+    repo_env: "MICROCOSM_HF_REPO",
     revision: "main",
     label: "United States",
     dataset_label: "Microcosm US",
@@ -75,28 +76,28 @@ test("keeps the live registrations on their published repositories and labels", 
     capabilities: COUNTRY_CAPABILITIES,
     staging: {
       repo: "policyengine/populace-us-staging",
-      repo_env: "POPULACE_STAGING_HF_REPO",
-      revision_env: "POPULACE_STAGING_HF_REVISION",
+      repo_env: "MICROCOSM_STAGING_HF_REPO",
+      revision_env: "MICROCOSM_STAGING_HF_REVISION",
     },
   });
   expect(countryRegistration("uk")).toMatchObject({
     repo: "policyengine/populace-uk-private",
-    repo_env: "POPULACE_UK_HF_REPO",
+    repo_env: "MICROCOSM_UK_HF_REPO",
     label: "United Kingdom",
     dataset_label: "Microcosm UK",
     visibility: "private",
     capabilities: ["calibration", "targets", "compare", "cross_dataset", "staging"],
     staging: {
       repo: "policyengine/populace-uk-staging",
-      repo_env: "POPULACE_UK_STAGING_HF_REPO",
-      revision_env: "POPULACE_UK_STAGING_HF_REVISION",
-      token_env: "POPULACE_UK_STAGING_HF_TOKEN",
+      repo_env: "MICROCOSM_UK_STAGING_HF_REPO",
+      revision_env: "MICROCOSM_UK_STAGING_HF_REVISION",
+      token_env: "MICROCOSM_UK_STAGING_HF_TOKEN",
     },
     jurisdiction_aliases: ["GB"],
   });
   expect(countryRegistration("be")).toMatchObject({
     repo: "policyengine/populace-be-private",
-    repo_env: "POPULACE_BE_HF_REPO",
+    repo_env: "MICROCOSM_BE_HF_REPO",
     label: "Belgium",
     dataset_label: "Microcosm Belgium",
     geography: "Belgium",
@@ -118,8 +119,8 @@ test("repository resolution applies explicit deployment overrides", () => {
   });
   expect(
     resolveRegisteredRepository("uk", {
-      POPULACE_UK_HF_REPO: "example/uk-release",
-      POPULACE_UK_HF_REVISION: "release-revision",
+      MICROCOSM_UK_HF_REPO: "example/uk-release",
+      MICROCOSM_UK_HF_REVISION: "release-revision",
     }),
   ).toEqual({
     repo: "example/uk-release",
@@ -127,14 +128,46 @@ test("repository resolution applies explicit deployment overrides", () => {
   });
   expect(
     resolveRegisteredStagingRepository("uk", {
-      POPULACE_UK_STAGING_HF_REPO: "example/uk-staging",
-      POPULACE_UK_STAGING_HF_REVISION: "staging-revision",
+      MICROCOSM_UK_STAGING_HF_REPO: "example/uk-staging",
+      MICROCOSM_UK_STAGING_HF_REVISION: "staging-revision",
     }),
   ).toEqual({
     repo: "example/uk-staging",
     revision: "staging-revision",
   });
   expect(resolveRegisteredStagingRepository("be", {})).toBeNull();
+});
+
+test("repository and staging configuration prefers Microcosm names and accepts legacy aliases", () => {
+  for (const country of COUNTRIES) {
+    const registration = countryRegistration(country);
+    for (const [source, resolve] of [
+      [registration, resolveRegisteredRepository],
+      [registration.staging, resolveRegisteredStagingRepository],
+    ] as const) {
+      if (!source) continue;
+      const legacy: Record<string, string> = {};
+      const primary: Record<string, string> = {};
+      for (const name of [source.repo_env, source.revision_env]) {
+        if (!name) continue;
+        legacy[name.replace(/^MICROCOSM_/, "POPULACE_")] = `legacy-${name}`; // compat: populace alias, remove after 0.2.0
+        primary[name] = `current-${name}`;
+      }
+      expect(resolve(country, legacy)).toEqual({
+        repo: source.repo_env ? `legacy-${source.repo_env}` : source.repo,
+        revision: source.revision_env ? `legacy-${source.revision_env}` : source.revision,
+      });
+      expect(resolve(country, { ...legacy, ...primary })).toEqual({
+        repo: source.repo_env ? `current-${source.repo_env}` : source.repo,
+        revision: source.revision_env ? `current-${source.revision_env}` : source.revision,
+      });
+    }
+  }
+  const name = COUNTRY_REGISTRY.uk.staging.token_env;
+  const legacyName = name.replace(/^MICROCOSM_/, "POPULACE_"); // compat: populace alias, remove after 0.2.0
+  expect(repositoryEnvironmentValue({ [legacyName]: "legacy-token" }, name)).toBe("legacy-token");
+  expect(repositoryEnvironmentValue({ [legacyName]: "legacy-token", [name]: "current-token" }, name)).toBe("current-token");
+  expect(repositoryEnvironmentValue({ [legacyName]: "legacy-token", [name]: "" }, name)).toBe("");
 });
 
 test("fixture registrations are valid countries that requests cannot select", () => {

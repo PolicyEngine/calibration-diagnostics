@@ -39,8 +39,8 @@ test("resolves staging repositories from each country registration", () => {
   );
 
   const environment = {
-    POPULACE_STAGING_HF_REPO: "policyengine/us-staging-override",
-    POPULACE_STAGING_HF_REVISION: "test-revision",
+    MICROCOSM_STAGING_HF_REPO: "policyengine/us-staging-override",
+    MICROCOSM_STAGING_HF_REVISION: "test-revision",
   };
   expect(stagingRepository("us", environment)).toEqual({
     repo: "policyengine/us-staging-override",
@@ -104,21 +104,21 @@ test("names the country when staging is unavailable", () => {
 });
 
 const originalFetch = globalThis.fetch;
-const originalUkRepo = process.env.POPULACE_UK_STAGING_HF_REPO;
-const originalUkRevision = process.env.POPULACE_UK_STAGING_HF_REVISION;
-const originalUkToken = process.env.POPULACE_UK_STAGING_HF_TOKEN;
+const originalUkRepo = process.env.MICROCOSM_UK_STAGING_HF_REPO;
+const originalUkRevision = process.env.MICROCOSM_UK_STAGING_HF_REVISION;
+const originalUkToken = process.env.MICROCOSM_UK_STAGING_HF_TOKEN;
 const originalHfToken = process.env.HF_TOKEN;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
   if (originalHfToken == null) delete process.env.HF_TOKEN;
   else process.env.HF_TOKEN = originalHfToken;
-  if (originalUkRepo == null) delete process.env.POPULACE_UK_STAGING_HF_REPO;
-  else process.env.POPULACE_UK_STAGING_HF_REPO = originalUkRepo;
-  if (originalUkRevision == null) delete process.env.POPULACE_UK_STAGING_HF_REVISION;
-  else process.env.POPULACE_UK_STAGING_HF_REVISION = originalUkRevision;
-  if (originalUkToken == null) delete process.env.POPULACE_UK_STAGING_HF_TOKEN;
-  else process.env.POPULACE_UK_STAGING_HF_TOKEN = originalUkToken;
+  if (originalUkRepo == null) delete process.env.MICROCOSM_UK_STAGING_HF_REPO;
+  else process.env.MICROCOSM_UK_STAGING_HF_REPO = originalUkRepo;
+  if (originalUkRevision == null) delete process.env.MICROCOSM_UK_STAGING_HF_REVISION;
+  else process.env.MICROCOSM_UK_STAGING_HF_REVISION = originalUkRevision;
+  if (originalUkToken == null) delete process.env.MICROCOSM_UK_STAGING_HF_TOKEN;
+  else process.env.MICROCOSM_UK_STAGING_HF_TOKEN = originalUkToken;
 });
 
 function v2RunManifest(
@@ -431,9 +431,9 @@ test("UK staging reads use the private repository credential only on server fetc
   const token = "hf_test_server_only_credential";
   const repo = "policyengine/test-uk-staging-private";
   const revision = "test-revision";
-  process.env.POPULACE_UK_STAGING_HF_REPO = repo;
-  process.env.POPULACE_UK_STAGING_HF_REVISION = revision;
-  process.env.POPULACE_UK_STAGING_HF_TOKEN = token;
+  process.env.MICROCOSM_UK_STAGING_HF_REPO = repo;
+  process.env.MICROCOSM_UK_STAGING_HF_REVISION = revision;
+  process.env.MICROCOSM_UK_STAGING_HF_TOKEN = token;
 
   const fixtureRoot = join(
     import.meta.dir,
@@ -535,8 +535,8 @@ test("UK staging reads use the private repository credential only on server fetc
 test("discovers and orders version 2 runs from paginated manifests only", async () => {
   const repo = "policyengine/test-uk-staging-private";
   const revision = "test-revision";
-  process.env.POPULACE_UK_STAGING_HF_REPO = repo;
-  process.env.POPULACE_UK_STAGING_HF_REVISION = revision;
+  process.env.MICROCOSM_UK_STAGING_HF_REPO = repo;
+  process.env.MICROCOSM_UK_STAGING_HF_REVISION = revision;
   const treeUrl =
     `https://huggingface.co/api/datasets/${repo}/tree/${revision}/runs` +
     "?recursive=true";
@@ -963,7 +963,7 @@ function stagedBundleFetch(
 }
 
 test("reads an unreleased candidate's calibration diagnostics from its staged bundle", async () => {
-  process.env.POPULACE_UK_STAGING_HF_TOKEN = "hf_test_staging_token";
+  process.env.MICROCOSM_UK_STAGING_HF_TOKEN = "hf_test_staging_token";
   process.env.HF_TOKEN = "hf_test_release_token";
   const diagnostics = serializedDiagnostics();
   const { manifest, receiptBody } = stagedRun(

@@ -2,8 +2,8 @@
 
 const PRODUCTION_BASE_URL = "https://calibration-diagnostics.vercel.app";
 // Deprecated compatibility identifier: existing callers still configure this
-// repository-owned script with the former Populace environment-variable name.
-const DEFAULT_BASE_URL = process.env.POPULACE_DIAGNOSTICS_BASE_URL ?? PRODUCTION_BASE_URL;
+// repository-owned script with the legacy Microcosm environment-variable name.
+const DEFAULT_BASE_URL = process.env.MICROCOSM_DIAGNOSTICS_BASE_URL ?? process.env.POPULACE_DIAGNOSTICS_BASE_URL ?? PRODUCTION_BASE_URL; // compat: populace alias, remove after 0.2.0
 const LOCAL_FALLBACK_BASE_URLS = [
   "http://localhost:3000",
   "http://localhost:3001",
@@ -90,7 +90,7 @@ async function fetchPacket(baseUrl, release, target) {
 
 async function main() {
   const { release, out, baseUrl, explicitBaseUrl, target } = parseArgs(process.argv.slice(2));
-  const candidates = explicitBaseUrl || process.env.POPULACE_DIAGNOSTICS_BASE_URL
+  const candidates = explicitBaseUrl || process.env.MICROCOSM_DIAGNOSTICS_BASE_URL || process.env.POPULACE_DIAGNOSTICS_BASE_URL // compat: populace alias, remove after 0.2.0
     ? [baseUrl]
     : [baseUrl, ...LOCAL_FALLBACK_BASE_URLS];
   const errors = [];
