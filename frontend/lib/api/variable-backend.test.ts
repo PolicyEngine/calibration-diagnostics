@@ -9,8 +9,8 @@ const config = {
   sourceCommit: "reviewed-sha",
 };
 
-// The backend reports its deployment's own resolution of POPULACE_HF_REPO and
-// POPULACE_HF_REVISION beside the static reviewed configuration.
+// The backend reports its deployment's own resolution of MICROCOSM_HF_REPO and
+// MICROCOSM_HF_REVISION beside the static reviewed configuration.
 const reviewedEnvironment = {
   repo: HOSTED_US_RELEASE.repo,
   revision: HOSTED_US_RELEASE.hf_revision,

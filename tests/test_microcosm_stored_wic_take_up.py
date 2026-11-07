@@ -23,7 +23,7 @@ STORED_WIC_TAKE_UP = {
 }
 
 
-def write_populace_layout_fixture(path: Path) -> None:
+def write_microcosm_layout_fixture(path: Path) -> None:
     """One no-income household: a parent and two WIC-eligible children.
 
     The tables use the pinned release's entity-table layout and store only the
@@ -58,7 +58,7 @@ def write_populace_layout_fixture(path: Path) -> None:
 
 def test_harness_simulation_honours_stored_wic_take_up(tmp_path: Path) -> None:
     dataset_path = tmp_path / "populace_us_2024.h5"
-    write_populace_layout_fixture(dataset_path)
+    write_microcosm_layout_fixture(dataset_path)
 
     simulation = MicrocosmPolicyEngineRunner(dataset_path=dataset_path).simulation
 

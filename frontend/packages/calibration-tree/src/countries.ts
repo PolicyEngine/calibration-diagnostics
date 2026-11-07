@@ -86,12 +86,12 @@ const CALIBRATION_CAPABILITIES: readonly CountryCapability[] = [
 ];
 
 // Deprecated upstream identifiers: Microcosm's published HF repositories and
-// deployment variables still use the former Populace names.
+// deployment variables support Microcosm names and legacy aliases.
 export const COUNTRY_REGISTRY = {
   us: {
     repo: "policyengine/populace-us",
     revision: "main",
-    repo_env: "POPULACE_HF_REPO",
+    repo_env: "MICROCOSM_HF_REPO",
     label: "United States",
     dataset_label: "Microcosm US",
     geography: "United States",
@@ -100,18 +100,18 @@ export const COUNTRY_REGISTRY = {
     capabilities: ALL_CAPABILITIES,
     staging: {
       // Deprecated upstream identifier: the US staging publisher still uses
-      // the former Populace repository and deployment-variable names.
+      // the published repository id and configurable environment names.
       repo: "policyengine/populace-us-staging",
       revision: "main",
-      repo_env: "POPULACE_STAGING_HF_REPO",
-      revision_env: "POPULACE_STAGING_HF_REVISION",
+      repo_env: "MICROCOSM_STAGING_HF_REPO",
+      revision_env: "MICROCOSM_STAGING_HF_REVISION",
     },
   },
   uk: {
     repo: "policyengine/populace-uk-private",
     revision: "main",
-    repo_env: "POPULACE_UK_HF_REPO",
-    revision_env: "POPULACE_UK_HF_REVISION",
+    repo_env: "MICROCOSM_UK_HF_REPO",
+    revision_env: "MICROCOSM_UK_HF_REVISION",
     label: "United Kingdom",
     dataset_label: "Microcosm UK",
     geography: "United Kingdom",
@@ -127,9 +127,9 @@ export const COUNTRY_REGISTRY = {
     staging: {
       repo: "policyengine/populace-uk-staging",
       revision: "main",
-      repo_env: "POPULACE_UK_STAGING_HF_REPO",
-      revision_env: "POPULACE_UK_STAGING_HF_REVISION",
-      token_env: "POPULACE_UK_STAGING_HF_TOKEN",
+      repo_env: "MICROCOSM_UK_STAGING_HF_REPO",
+      revision_env: "MICROCOSM_UK_STAGING_HF_REVISION",
+      token_env: "MICROCOSM_UK_STAGING_HF_TOKEN",
       // Microcosm's rowwise local-area candidates (published as the dense
       // release). National attempts run the uk-frs-calibration pipeline.
       local_area_pipelines: ["uk-local-candidate"],
@@ -139,8 +139,8 @@ export const COUNTRY_REGISTRY = {
   be: {
     repo: "policyengine/populace-be-private",
     revision: "main",
-    repo_env: "POPULACE_BE_HF_REPO",
-    revision_env: "POPULACE_BE_HF_REVISION",
+    repo_env: "MICROCOSM_BE_HF_REPO",
+    revision_env: "MICROCOSM_BE_HF_REVISION",
     label: "Belgium",
     dataset_label: "Microcosm Belgium",
     geography: "Belgium",
@@ -303,12 +303,21 @@ export function hasCapability(country: MicrocosmCountry, capability: CountryCapa
   return countryCapabilities(country).includes(capability);
 }
 
+export function repositoryEnvironmentValue(
+  environment: RepositoryEnvironment,
+  variableName: string | undefined,
+): string | undefined {
+  if (!variableName) return undefined;
+  return environment[variableName] ??
+    environment[variableName.replace(/^MICROCOSM_/, "POPULACE_")]; // compat: populace alias, remove after 0.2.0
+}
+
 function configuredValue(
   environment: RepositoryEnvironment,
   variableName: string | undefined,
   fallback: string,
 ): string {
-  return (variableName ? environment[variableName] : undefined) ?? fallback;
+  return repositoryEnvironmentValue(environment, variableName) ?? fallback;
 }
 
 export function resolveRegisteredRepository(

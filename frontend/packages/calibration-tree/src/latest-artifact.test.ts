@@ -57,7 +57,7 @@ import {
 import { buildCalibrationTree } from "./calibration-tree";
 import { missingReleasesRecord, missingRevision } from "./test-support/releases-record-responses";
 
-test("keeps Microcosm deployment configuration on its published Populace env contract", () => {
+test("exposes Microcosm deployment configuration names", () => {
   expect([
     MICROCOSM_HF_REPO_ENV,
     MICROCOSM_UK_HF_REPO_ENV,
@@ -65,11 +65,11 @@ test("keeps Microcosm deployment configuration on its published Populace env con
     MICROCOSM_BE_HF_REPO_ENV,
     MICROCOSM_BE_HF_REVISION_ENV,
   ]).toEqual([
-    "POPULACE_HF_REPO",
-    "POPULACE_UK_HF_REPO",
-    "POPULACE_UK_HF_REVISION",
-    "POPULACE_BE_HF_REPO",
-    "POPULACE_BE_HF_REVISION",
+    "MICROCOSM_HF_REPO",
+    "MICROCOSM_UK_HF_REPO",
+    "MICROCOSM_UK_HF_REVISION",
+    "MICROCOSM_BE_HF_REPO",
+    "MICROCOSM_BE_HF_REVISION",
   ]);
 });
 

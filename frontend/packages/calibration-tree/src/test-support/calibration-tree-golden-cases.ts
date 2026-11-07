@@ -447,7 +447,10 @@ function repositoryEnvironmentNames(): string[] {
       registration.staging?.repo_env,
       registration.staging?.revision_env,
     ]) {
-      if (name) names.add(name);
+      if (name) {
+        names.add(name);
+        names.add(name.replace(/^MICROCOSM_/, "POPULACE_")); // compat: populace alias, remove after 0.2.0
+      }
     }
   }
   return [...names];

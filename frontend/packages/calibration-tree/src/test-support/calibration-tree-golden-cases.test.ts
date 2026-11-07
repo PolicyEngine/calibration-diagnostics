@@ -14,11 +14,15 @@ import {
 const originalFetch = globalThis.fetch;
 const STAGING_REPOSITORY_VARIABLE = COUNTRY_REGISTRY.uk.staging.repo_env;
 const originalStagingRepository = process.env[STAGING_REPOSITORY_VARIABLE];
+const LEGACY_STAGING_REPOSITORY_VARIABLE = STAGING_REPOSITORY_VARIABLE.replace(/^MICROCOSM_/, "POPULACE_"); // compat: populace alias, remove after 0.2.0
+const originalLegacyStagingRepository = process.env[LEGACY_STAGING_REPOSITORY_VARIABLE];
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
   if (originalStagingRepository == null) delete process.env[STAGING_REPOSITORY_VARIABLE];
   else process.env[STAGING_REPOSITORY_VARIABLE] = originalStagingRepository;
+  if (originalLegacyStagingRepository == null) delete process.env[LEGACY_STAGING_REPOSITORY_VARIABLE];
+  else process.env[LEGACY_STAGING_REPOSITORY_VARIABLE] = originalLegacyStagingRepository;
 });
 
 function signal(): { promise: Promise<void>; send: () => void } {
@@ -31,17 +35,21 @@ function signal(): { promise: Promise<void>; send: () => void } {
 
 test("overlapping repository scopes keep overrides cleared until the last one finishes", async () => {
   process.env[STAGING_REPOSITORY_VARIABLE] = "someone/staging-override";
+  process.env[LEGACY_STAGING_REPOSITORY_VARIABLE] = "someone/legacy-staging-override";
   const firstScopeMayFinish = signal();
   const secondScopeMayFinish = signal();
   const secondScopeReadings: Array<string | undefined> = [];
+  const legacyReadings: Array<string | undefined> = [];
 
   const firstScope = withRegisteredRepositories(async () => {
     await firstScopeMayFinish.promise;
   });
   const secondScope = withRegisteredRepositories(async () => {
     secondScopeReadings.push(process.env[STAGING_REPOSITORY_VARIABLE]);
+    legacyReadings.push(process.env[LEGACY_STAGING_REPOSITORY_VARIABLE]);
     await secondScopeMayFinish.promise;
     secondScopeReadings.push(process.env[STAGING_REPOSITORY_VARIABLE]);
+    legacyReadings.push(process.env[LEGACY_STAGING_REPOSITORY_VARIABLE]);
   });
   firstScopeMayFinish.send();
   await firstScope;
@@ -49,7 +57,9 @@ test("overlapping repository scopes keep overrides cleared until the last one fi
   await secondScope;
 
   expect(secondScopeReadings).toEqual([undefined, undefined]);
+  expect(legacyReadings).toEqual([undefined, undefined]);
   expect(process.env[STAGING_REPOSITORY_VARIABLE]).toBe("someone/staging-override");
+  expect(process.env[LEGACY_STAGING_REPOSITORY_VARIABLE]).toBe("someone/legacy-staging-override");
 });
 
 test("overlapping Hugging Face file scopes each read only their own files", async () => {

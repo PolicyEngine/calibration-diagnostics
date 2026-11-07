@@ -65,7 +65,7 @@ export function releaseLabel(releaseId: string, date?: string | null): string {
   const buildFolder = parseBuildFolderId(releaseId);
   if (buildFolder) {
     // Deprecated upstream identifier: Microcosm release IDs may still use the
-    // former Populace prefix.
+    // published prefix.
     const release = buildFolder.release.replace(/^(?:microcosm|populace)-[a-z]{2}-/, "");
     const formatted = formatReleaseDate(date);
     return [formatted, release, buildFolder.build].filter(Boolean).join(" · ");
@@ -73,18 +73,18 @@ export function releaseLabel(releaseId: string, date?: string | null): string {
   const cut = parseReleaseCutTag(releaseId);
   if (cut) {
     // Deprecated upstream identifier: Microcosm release IDs may still use the
-    // former Populace prefix.
+    // published prefix.
     const line = cut.releaseId.replace(/^(?:microcosm|populace)-[a-z]{2}-/, "");
     return `${formatReleaseDate(date || cut.cutAt)} · ${line} · ${cut.attempt}`;
   }
   // Deprecated upstream identifier: Microcosm release IDs still use the former
-  // Populace prefix.
+  // dataset prefix.
   const belgiumChronicleSha =
     /^(?:microcosm|populace)-be-\d{4}-chronicle-([0-9a-f]{7,40})(?:-|$)/i.exec(
       releaseId,
     )?.[1];
   const sha =
-    belgiumChronicleSha ?? releaseId.replace(/^populace-us-\d{4}-/, "").split("-")[0];
+    belgiumChronicleSha ?? releaseId.replace(/^(?:microcosm|populace)-[a-z]{2}-\d{4}-/, "").split("-")[0];
   const formatted = formatReleaseDate(date || releaseDateFromId(releaseId));
   return formatted ? `${formatted} · ${sha}` : sha;
 }

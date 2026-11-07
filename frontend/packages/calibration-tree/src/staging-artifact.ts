@@ -29,6 +29,7 @@ import {
 import type { CalibrationTreeSourceArtifact } from "./calibration-tree-artifact";
 import {
   countryRegistration,
+  repositoryEnvironmentValue,
   resolveRegisteredStagingRepository,
   stagingLocalAreaPipelines,
   type RepositoryEnvironment,
@@ -75,8 +76,8 @@ const STAGING_CALIBRATION_CACHE_LIMIT = 8;
 const targetChangeCache = new Map<string, TargetChangeCacheEntry>();
 const stagingCalibrationCache = new Map<string, StagingCalibrationCacheEntry>();
 
-export const MICROCOSM_STAGING_HF_REPO_ENV = "POPULACE_STAGING_HF_REPO";
-export const MICROCOSM_STAGING_HF_REVISION_ENV = "POPULACE_STAGING_HF_REVISION";
+export const MICROCOSM_STAGING_HF_REPO_ENV = "MICROCOSM_STAGING_HF_REPO";
+export const MICROCOSM_STAGING_HF_REVISION_ENV = "MICROCOSM_STAGING_HF_REVISION";
 export type StagingRepository = ResolvedRepository;
 
 // Resolve staging telemetry from the country registry. The exported US values
@@ -203,7 +204,7 @@ function stagingFetchMessage(
 
 function stagingToken(country: MicrocosmCountry): string | undefined {
   const tokenEnv = countryRegistration(country).staging?.token_env;
-  if (tokenEnv) return process.env[tokenEnv];
+  if (tokenEnv) return repositoryEnvironmentValue(process.env, tokenEnv);
   return process.env.HF_TOKEN ?? process.env.HUGGINGFACE_TOKEN;
 }
 

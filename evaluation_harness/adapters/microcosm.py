@@ -12,7 +12,7 @@ from ..execution import ArrayBundle, RunGroup
 
 
 # Deprecated upstream identifiers: Microcosm still publishes this release under
-# the former Populace Hugging Face repository, release, and filename literals.
+# its published Hugging Face repository, release, and filename literals.
 MICROCOSM_REPOSITORY = "policyengine/populace-us"
 
 

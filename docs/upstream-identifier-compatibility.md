@@ -2,7 +2,7 @@
 
 Microcosm and Chronicle are the product names used by this repository. Some
 machine-readable interfaces owned by those upstream projects still use the
-former `populace` and `ledger` names. Those literals are deprecated, but they
+upstream identifier spellings. Those literals are deprecated, but they
 must remain exact until the producer publishes and documents a replacement.
 
 Verified against the current upstream repositories and published artifacts on
@@ -13,7 +13,7 @@ Verified against the current upstream repositories and published artifacts on
 | Microcosm | `PolicyEngine/microcosm`, `microcosm.*` Python packages | `policyengine/populace-us`, `policyengine/populace-uk-private`, `policyengine/populace-us-staging` | Hugging Face dataset and staging reads |
 | Microcosm | Microcosm releases | `populace-us-*`, `populace_us_2024.h5`, `populace_uk_2023.h5` | Release IDs and dataset filenames |
 | Microcosm | Historical pinned release manifests | `PolicyEngine/populace`, `populace-build`, `populace-data` | Immutable build provenance recorded before the repository/package rename |
-| Microcosm | Microcosm/dashboard configuration | `POPULACE_HF_*`, `POPULACE_STAGING_HF_*`, `POPULACE_STAGING_REPO_ID`, `SLACK_WEBHOOK_POPULACE_*` | Deployment and build environment variables |
+| Microcosm | Microcosm/dashboard configuration | `MICROCOSM_*` and `SLACK_WEBHOOK_MICROCOSM_*` take priority over legacy `POPULACE_HF_*`, `POPULACE_STAGING_HF_*`, `SLACK_WEBHOOK_POPULACE_*`; upstream-only `POPULACE_STAGING_REPO_ID` stays unchanged | Deployment and build environment variables; existing Actions secret names stay unchanged | <!-- compat: populace alias, remove after 0.2.0 -->
 | Microcosm | Chronicle-backed calibration metadata | `ledger_*` | `calibration_diagnostics.json` metadata fields |
 | Microcosm | Historical pinned calibration provenance | `ledger_artifact`, `policyengine-ledger-data`, `arch.*` fact keys, `arch-us` authorities | Immutable values recorded in the current published US release |
 | Chronicle | `PolicyEngine/chronicle`, `policyengine_chronicle`, `chronicle` CLI | `ledger.consumer_fact.v1`, `policyengine_ledger.*`, `ledger.*` fact-key namespaces | Consumer exports and resolved-target contracts |

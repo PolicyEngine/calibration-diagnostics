@@ -58,8 +58,8 @@ def handle_query(query: str) -> tuple[int, dict]:
     variables = list(dict.fromkeys(variables))
     period = params.get("period", [DEFAULT_PERIOD])[0].strip()
     requested_release = params.get("release", [DEFAULT_RELEASE])[0].strip()
-    repo = os.environ.get("POPULACE_HF_REPO", DEFAULT_REPO)
-    revision = os.environ.get("POPULACE_HF_REVISION", DEFAULT_REVISION)
+    repo = os.environ.get("MICROCOSM_HF_REPO", os.environ.get("POPULACE_HF_REPO", DEFAULT_REPO))  # compat: populace alias, remove after 0.2.0
+    revision = os.environ.get("MICROCOSM_HF_REVISION", os.environ.get("POPULACE_HF_REVISION", DEFAULT_REVISION))  # compat: populace alias, remove after 0.2.0
 
     if params.get("metadata") == ["1"]:
         try:

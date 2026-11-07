@@ -12,10 +12,25 @@ const COUNTRY_LABEL: Partial<Record<MicrocosmCountry, string>> = {
 
 const WEBHOOK_ENV: Partial<Record<MicrocosmCountry, string>> = {
   // Deprecated upstream identifiers: the configured webhook variables still
-  // use the former Populace names.
-  us: "SLACK_WEBHOOK_POPULACE_US",
-  uk: "SLACK_WEBHOOK_POPULACE_UK",
+  // support Microcosm configuration and legacy deployment aliases.
+  us: "SLACK_WEBHOOK_MICROCOSM_US",
+  uk: "SLACK_WEBHOOK_MICROCOSM_UK",
 };
+
+const LEGACY_WEBHOOK_ENV: Partial<Record<MicrocosmCountry, string>> = {
+  us: "SLACK_WEBHOOK_POPULACE_US", // compat: populace alias, remove after 0.2.0
+  uk: "SLACK_WEBHOOK_POPULACE_UK", // compat: populace alias, remove after 0.2.0
+};
+
+function countryWebhook(
+  country: MicrocosmCountry,
+  environment: Readonly<Record<string, string | undefined>>,
+): string | undefined {
+  const webhookEnv = WEBHOOK_ENV[country];
+  const legacyWebhookEnv = LEGACY_WEBHOOK_ENV[country];
+  return (webhookEnv ? environment[webhookEnv] : undefined) ??
+    (legacyWebhookEnv ? environment[legacyWebhookEnv] : undefined);
+}
 
 interface SlackPayload {
   text: string;
@@ -93,8 +108,7 @@ export function hasReleaseAlertChannel(
   country: MicrocosmCountry,
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-  const webhookEnv = WEBHOOK_ENV[country];
-  return Boolean(webhookEnv && environment[webhookEnv]);
+  return Boolean(countryWebhook(country, environment));
 }
 
 // Post to the country's Slack incoming webhook. No-op (returns false) when
@@ -103,9 +117,7 @@ async function postToCountryChannel(
   country: MicrocosmCountry,
   payload: SlackPayload,
 ): Promise<boolean> {
-  const webhookEnv = WEBHOOK_ENV[country];
-  if (!webhookEnv) return false;
-  const webhookUrl = process.env[webhookEnv];
+  const webhookUrl = countryWebhook(country, process.env);
   if (!webhookUrl) return false;
 
   const res = await fetch(webhookUrl, {
