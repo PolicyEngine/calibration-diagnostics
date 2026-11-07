@@ -39,14 +39,16 @@ test("legacy Microcosm API URLs retain redirects at root and mounted paths", asy
         permanent: false,
       });
       for (const suffix of source.includes(":path*") ? ["", "/us/calibration"] : [""]) {
-        const response = await unstable_getResponseFromNextConfig({
-          url: `https://example.com${sourcePrefix}${source.replace("/:path*", suffix)}`,
-          nextConfig: config,
-        });
-        expect(response.status).toBe(307);
-        expect(getRedirectUrl(response)).toBe(
-          `https://example.com${prefix}${target.replace("/:path*", suffix)}`,
-        );
+        for (const query of ["", "?country=uk&release=reviewed"]) {
+          const response = await unstable_getResponseFromNextConfig({
+            url: `https://example.com${sourcePrefix}${source.replace("/:path*", suffix)}${query}`,
+            nextConfig: config,
+          });
+          expect(response.status).toBe(307);
+          expect(getRedirectUrl(response)).toBe(
+            `https://example.com${prefix}${target.replace("/:path*", suffix)}${query}`,
+          );
+        }
       }
     }
   }
@@ -57,14 +59,16 @@ test.skipIf(!config.basePath)("legacy Microcosm UI URLs use the mount once and r
   for (const sourcePrefix of ["", prefix]) {
     for (const suffix of ["", "/us/builds/2026"]) {
       const source = `${sourcePrefix}/populace${suffix}`; // compat: populace alias, remove after 0.2.0
-      const response = await unstable_getResponseFromNextConfig({
-        url: `https://example.com${source}`,
-        nextConfig: config,
-      });
-      expect(response.status).toBe(307);
-      expect(getRedirectUrl(response)).toBe(
-        `https://example.com${prefix}/microcosm${suffix}`,
-      );
+      for (const query of ["", "?country=uk&release=reviewed"]) {
+        const response = await unstable_getResponseFromNextConfig({
+          url: `https://example.com${source}${query}`,
+          nextConfig: config,
+        });
+        expect(response.status).toBe(307);
+        expect(getRedirectUrl(response)).toBe(
+          `https://example.com${prefix}/microcosm${suffix}${query}`,
+        );
+      }
     }
   }
 });
