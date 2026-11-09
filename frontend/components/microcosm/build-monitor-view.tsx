@@ -17,8 +17,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
+import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
 import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
+import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
 import { nextBuildRunSelection, waitsForRunList } from "@/lib/microcosm/build-run-selection";
 import {
   BUILD_GATE_CATALOG_SOURCE,
@@ -51,6 +53,12 @@ import {
   stageMemoryBytes,
   type StageSpan,
 } from "@/lib/microcosm/build-monitor";
+import {
+  clockTime,
+  runStartTime,
+  type ViewerZone,
+  zoneNote,
+} from "@/lib/microcosm/viewer-time";
 
 const PHASE_COLOR: Record<BuildPhase, string> = {
   setup: "var(--chart-4)",
@@ -141,13 +149,23 @@ export function fmtDuration(ms: number | null | undefined): string {
   return rest ? `${hours} h ${rest} min` : `${hours} h`;
 }
 
-function fmtClock(ms: number | null | undefined, nowMs: number): string {
-  if (ms == null || !Number.isFinite(ms)) return "—";
-  const date = new Date(ms);
-  const sameDay = new Date(nowMs).toDateString() === date.toDateString();
-  const time = date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  if (sameDay) return time;
-  return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
+// A time on the run overview, in the viewer's zone and named ("07:56 AM
+// GMT+4"), with UTC on hover.
+function ClockTime({
+  ms,
+  nowMs,
+  zone,
+}: {
+  ms: number | null | undefined;
+  nowMs: number;
+  zone: ViewerZone | null;
+}) {
+  if (ms == null || !Number.isFinite(ms)) return <>—</>;
+  return (
+    <ViewerTime ms={ms} zone={zone}>
+      {clockTime(ms, nowMs, zone, { zoneName: true })}
+    </ViewerTime>
+  );
 }
 
 // The stage a run is in, or stopped in, to follow its state label
@@ -165,15 +183,13 @@ function runWhere(run: BuildTimeline): string | null {
 
 // A run in the run selector: its state, start, length and where it is or
 // stopped. The selector groups runs by pipeline; the overview shows the id.
-function runOptionLabel(run: BuildTimeline, nowMs: number): string {
-  const started = run.started_ms
-    ? new Date(run.started_ms).toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : "unknown start";
+// Its start is in the viewer's zone, which the page names above the selector.
+export function runOptionLabel(
+  run: BuildTimeline,
+  nowMs: number,
+  zone: ViewerZone | null,
+): string {
+  const started = run.started_ms ? runStartTime(run.started_ms, zone) : "unknown start";
   const duration = runDurationMs(run, nowMs);
   return [STATE_LABEL[run.state], started, duration != null ? fmtDuration(duration) : null, runWhere(run)]
     .filter(Boolean)
@@ -237,24 +253,46 @@ export function BuildMonitorView({
   tabs,
   preferredRunId,
   onRunChange,
+  localRunsEnabled,
 }: {
   tabs?: ReactNode;
   preferredRunId?: string;
   onRunChange?: (runId: string) => void;
+  // Whether the server names a local runs folder; never on the hosted
+  // dashboard.
+  localRunsEnabled: boolean;
 }) {
   const [chosenSource, setChosenSource] = useState<BuildRunSource | null>(null);
-  // The local listing answers instantly and says whether local runs are on;
-  // hosted telemetry is read only once it is the chosen source.
-  const local = useBuildRuns("local");
+  // With a local runs folder, the local listing answers first and says
+  // whether this machine's runs are opened; hosted telemetry is read only
+  // once it is the chosen source. Without one it is read at once.
+  // A server started with a folder the prerendered page did not know of says
+  // so in its answer to the hosted list.
+  const [hostedListReportsLocalRuns, setHostedListReportsLocalRuns] = useState(false);
+  const [hostedListFailed, setHostedListFailed] = useState(false);
+  const local = useBuildRuns(
+    "local",
+    localListRequested(localRunsEnabled, hostedListReportsLocalRuns, hostedListFailed),
+  );
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
-  // Open local runs when this machine has them, unless the page's run (a link,
-  // or a choice on either tab) exists only in hosted telemetry.
-  const preferLocal =
-    localEnabled &&
-    (!preferredRunId || localRuns.some((run) => run.run_id === preferredRunId));
+  // Whether this machine's runs open by themselves: see `opensLocalRuns`. The
+  // page's run (a link, or a choice on either tab) counts as the carried-over
+  // run there.
+  const preferLocal = opensLocalRuns(
+    localRunsEnabled,
+    localEnabled,
+    localRuns.map((run) => run.run_id),
+    preferredRunId,
+  );
   const source: BuildRunSource = chosenSource ?? (preferLocal ? "local" : "staging");
-  const staging = useBuildRuns("staging", source === "staging" && !local.isLoading);
+  const staging = useBuildRuns("staging", hostedListRequested(localRunsEnabled, source, local.isLoading));
+  useEffect(() => {
+    if (staging.data?.local_enabled) setHostedListReportsLocalRuns(true);
+  }, [staging.data?.local_enabled]);
+  useEffect(() => {
+    if (staging.isError) setHostedListFailed(true);
+  }, [staging.isError]);
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
   // A run the page's URL names is requested at once, beside the list.
@@ -294,6 +332,7 @@ export function BuildMonitorView({
   const detail = useBuildRun(source, selected || undefined);
   const data = detail.data;
   const nowMs = data?.now_ms ?? Date.now();
+  const zone = useViewerZone();
   // A run a link named that the list does not hold, such as one older than
   // its runs, gets an option of its own.
   const linkedRunOutsideList = Boolean(selected) && !runs.some((run) => run.run_id === selected);
@@ -302,14 +341,14 @@ export function BuildMonitorView({
       ? [
           {
             value: selected,
-            label: data?.run.run_id === selected ? runOptionLabel(data.run, nowMs) : selected,
+            label: data?.run.run_id === selected ? runOptionLabel(data.run, nowMs, zone) : selected,
             group: "Linked run, not in this list",
           },
         ]
       : []),
     ...runs.map((run) => ({
       value: run.run_id,
-      label: runOptionLabel(run, list.data?.now_ms ?? Date.now()),
+      label: runOptionLabel(run, list.data?.now_ms ?? Date.now(), zone),
       group: runGroups.get(run.run_id),
     })),
   ];
@@ -321,7 +360,13 @@ export function BuildMonitorView({
         eyebrow="Microcosm · staging"
         title="Staging candidates"
         status={tabs}
-        description="Follow a build while it runs, see when it should finish, and find where build time goes and which checks fail late."
+        description={
+          <>
+            Follow a build while it runs, see when it should finish, and find where build time goes and which checks
+            fail late.
+            {zone ? ` ${zoneNote(zone, nowMs)}` : null}
+          </>
+        }
         actions={
           <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
             {/* A hosted dashboard never reads local run folders, so it
@@ -352,7 +397,14 @@ export function BuildMonitorView({
         }
       />
 
-      {waitsForRunList(list.isLoading || local.isLoading, runs.length, selected, data != null) ? (
+      {/* The local list's first load decides the source only when the page knew
+          of a folder; a folder found later does not bring the loading back. */}
+      {waitsForRunList(
+        list.isLoading || (localRunsEnabled && local.isLoading),
+        runs.length,
+        selected,
+        data != null,
+      ) ? (
         <LoadingBlock label="Loading build runs…" />
       ) : list.error ? (
         <EmptyState title="Build runs unavailable" description={String(list.error.message)} />
@@ -388,9 +440,9 @@ export function BuildMonitorView({
       ) : data ? (
         <>
           <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />
-          <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} />
+          <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} zone={zone} />
           <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
-          <RunHistoryCard runs={runs} selected={data.run} nowMs={nowMs} onSelect={selectRun} />
+          <RunHistoryCard runs={runs} selected={data.run} nowMs={nowMs} zone={zone} onSelect={selectRun} />
           <TimeBudgetCard
             run={data.run}
             nowMs={nowMs}
@@ -450,14 +502,16 @@ function StaleSourceNotice({
   );
 }
 
-function RunOverview({
+export function RunOverview({
   run,
   forecast,
   nowMs,
+  zone,
 }: {
   run: BuildTimeline;
   forecast: BuildForecast | null;
   nowMs: number;
+  zone: ViewerZone | null;
 }) {
   const running = run.state === "running";
   const elapsed = runDurationMs(run, nowMs);
@@ -473,16 +527,21 @@ function RunOverview({
           <span className="font-mono text-xs font-normal text-muted-foreground">{run.run_id}</span>
         </span>
       }
-      description={[
-        `Started ${fmtClock(run.started_ms, nowMs)}`,
-        running || run.state === "stalled" ? `last telemetry ${fmtDuration(silentFor)} ago` : null,
-        run.heartbeat_ms != null && (running || run.state === "stalled")
-          ? `heartbeat ${fmtDuration(nowMs - run.heartbeat_ms)} ago`
-          : null,
-        run.source === "local" ? "local run folder" : "hosted telemetry",
-      ]
-        .filter(Boolean)
-        .join(" · ")}
+      description={
+        <>
+          Started <ClockTime ms={run.started_ms} nowMs={nowMs} zone={zone} />
+          {[
+            running || run.state === "stalled" ? `last telemetry ${fmtDuration(silentFor)} ago` : null,
+            run.heartbeat_ms != null && (running || run.state === "stalled")
+              ? `heartbeat ${fmtDuration(nowMs - run.heartbeat_ms)} ago`
+              : null,
+            run.source === "local" ? "local run folder" : "hosted telemetry",
+          ]
+            .filter(Boolean)
+            .map((part) => ` · ${part}`)
+            .join("")}
+        </>
+      }
     >
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -490,18 +549,28 @@ function RunOverview({
           {running ? (
             <KpiCard
               label="Expected finish"
-              value={forecast?.finish_p50_ms ? fmtClock(forecast.finish_p50_ms, nowMs) : "Unknown"}
+              value={
+                forecast?.finish_p50_ms ? (
+                  <ClockTime ms={forecast.finish_p50_ms} nowMs={nowMs} zone={zone} />
+                ) : (
+                  "Unknown"
+                )
+              }
               hint={
-                forecast?.finish_p90_ms
-                  ? `90% by ${fmtClock(forecast.finish_p90_ms, nowMs)}`
-                  : "No comparable finished runs"
+                forecast?.finish_p90_ms ? (
+                  <>
+                    90% by <ClockTime ms={forecast.finish_p90_ms} nowMs={nowMs} zone={zone} />
+                  </>
+                ) : (
+                  "No comparable finished runs"
+                )
               }
               size="sm"
             />
           ) : (
             <KpiCard
               label={run.state === "stalled" ? "Last telemetry" : "Finished"}
-              value={fmtClock(run.ended_ms ?? run.updated_ms, nowMs)}
+              value={<ClockTime ms={run.ended_ms ?? run.updated_ms} nowMs={nowMs} zone={zone} />}
               size="sm"
             />
           )}
@@ -614,11 +683,16 @@ function RunOverview({
 
         {run.state === "stalled" ? (
           <div className="rounded-md border px-3 py-2 text-sm pill-warn">
-            {`The last telemetry came ${fmtDuration(elapsed)} after the run started, ${
-              silentFor != null && silentFor > 24 * 3_600_000
-                ? `on ${fmtClock(run.updated_ms, nowMs)}`
-                : `${fmtDuration(silentFor)} ago`
-            }, and the run wrote no final event. The telemetry does not say why it stopped, or whether the process is still working without reporting.`}
+            The last telemetry came {fmtDuration(elapsed)} after the run started,{" "}
+            {silentFor != null && silentFor > 24 * 3_600_000 ? (
+              <>
+                on <ClockTime ms={run.updated_ms} nowMs={nowMs} zone={zone} />
+              </>
+            ) : (
+              `${fmtDuration(silentFor)} ago`
+            )}
+            , and the run wrote no final event. The telemetry does not say why it stopped, or whether the process is
+            still working without reporting.
           </div>
         ) : null}
 
@@ -1435,11 +1509,13 @@ function RunHistoryCard({
   runs,
   selected,
   nowMs,
+  zone,
   onSelect,
 }: {
   runs: BuildTimeline[];
   selected: BuildTimeline;
   nowMs: number;
+  zone: ViewerZone | null;
   onSelect: (runId: string) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
@@ -1466,6 +1542,7 @@ function RunHistoryCard({
       longest={longest}
       selected={run.run_id === selected.run_id}
       onSelect={onSelect}
+      zone={zone}
     />
   );
 
@@ -1509,31 +1586,31 @@ function RunHistoryCard({
   );
 }
 
-function RunHistoryItem({
+export function RunHistoryItem({
   run,
   total,
   longest,
   selected,
   onSelect,
+  zone,
 }: {
   run: BuildTimeline;
   total: PhaseTotals;
   longest: number;
   selected: boolean;
   onSelect: (runId: string) => void;
+  zone: ViewerZone | null;
 }) {
   const ms = total.total_ms ?? 0;
   const running = run.state === "running";
   const where = runWhere(run);
-  const started = run.started_ms
-    ? new Date(run.started_ms).toLocaleString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : "Unknown start";
+  const started = run.started_ms ? (
+    <ViewerTime ms={run.started_ms} zone={zone}>
+      {runStartTime(run.started_ms, zone, { weekday: true })}
+    </ViewerTime>
+  ) : (
+    "Unknown start"
+  );
   return (
     <button
       type="button"

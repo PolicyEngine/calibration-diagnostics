@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { CalibrationExplorerMap } from "@/components/microcosm/calibration-explorer-map";
+import { useViewerZone } from "@/components/microcosm/viewer-time";
 import { StagingTargetChangeMap } from "@/components/microcosm/staging-target-change-map";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
@@ -128,6 +129,7 @@ export function StagingCalibrationMapPanel({
   comparisonDetail?: string | null;
 }) {
   const [view, setView] = useState<CalibrationMapView>("candidate");
+  const zone = useViewerZone();
   const comparisonBaseline = stagingComparisonBaseline(comparisonRelease);
   const {
     data: buildManifest,
@@ -170,6 +172,7 @@ export function StagingCalibrationMapPanel({
     comparisonRelease,
     builds.find((build) => build.buildArtifactId === buildPicks.from),
     comparisonReleaseId,
+    zone,
   );
 
   const immutableComparison = Boolean(
