@@ -9,6 +9,8 @@ export interface TimelineFocus {
   selectedStage: string | null;
   // The selected stage's type, when known.
   selectedPhase?: BuildPhase | null;
+  // The stage under the pointer in the breakdown, by its row key.
+  hoveredStage?: string | null;
 }
 
 export const NO_FOCUS: TimelineFocus = {
@@ -16,6 +18,7 @@ export const NO_FOCUS: TimelineFocus = {
   hoveredPhase: null,
   selectedStage: null,
   selectedPhase: null,
+  hoveredStage: null,
 };
 
 // The Whole run bar's label.

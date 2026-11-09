@@ -60,6 +60,7 @@ function timeline(expanded: boolean, focus: Partial<TimelineFocus> = {}): string
       onHoverPhase: () => {},
       onTogglePhase: () => {},
       onToggleStage: () => {},
+      onHoverStage: () => {},
     }),
   );
 }
@@ -132,4 +133,61 @@ test("each stage type has a colour of its own from the theme's stage-type tokens
   });
   expect(colours.every(Boolean)).toBe(true);
   expect(new Set(colours).size).toBe(BUILD_PHASES.length);
+});
+
+// The labels of the stage-type buttons, in the order they appear.
+function legendLabels(markup: string): string[] {
+  return [...markup.matchAll(/<button[^>]*aria-pressed="(?:true|false)"[^>]*>(?:<[^>]+>)*([^<]+)/g)].map((match) =>
+    match[1].replace(/&amp;/g, "&"),
+  );
+}
+
+// A Whole run segment's left edge and width, in percent of the bar.
+function segmentPlace(markup: string, label: string): { left: number; width: number } {
+  const style = wholeRunSegmentStyle(markup, label) ?? "";
+  return {
+    left: Number(style.match(/left:([\d.]+)%/)?.[1]),
+    width: Number(style.match(/width:([\d.]+)%/)?.[1]),
+  };
+}
+
+test("the stage types are listed in the order the build first reached them", () => {
+  expect(legendLabels(timeline(false))).toEqual([
+    "Setup & inputs",
+    "Calibration",
+    "Export & diagnostics",
+    "Checks & gates",
+    "Target compilation",
+  ]);
+});
+
+test("with types picked, the breakdown shows only their stages, and they fill the Whole run bar", () => {
+  const one = timeline(true, { filter: new Set(["calibrate"]) });
+  expect(one).toContain(">Calibrate</");
+  expect(one).not.toContain(">Load inputs</");
+  expect(one).not.toContain(">Export dataset</");
+  expect(segmentPlace(one, "Calibrate")).toEqual({ left: 0, width: 100 });
+
+  // 60 minutes of calibration and 5 of export, laid end to end.
+  const two = timeline(true, { filter: new Set(["calibrate", "export"]) });
+  const calibrate = segmentPlace(two, "Calibrate");
+  const exported = segmentPlace(two, "Export dataset");
+  expect(calibrate.left).toBe(0);
+  expect(calibrate.width).toBeCloseTo((60 / 65) * 100, 6);
+  expect(exported.left).toBeCloseTo(calibrate.width, 6);
+  expect(calibrate.width + exported.width).toBeCloseTo(100, 6);
+});
+
+test("a stage's name has no hover text with its code name", () => {
+  const markup = timeline(true);
+  for (const code of ["load_inputs", "calibrate", "export_dataset"]) {
+    expect(markup).not.toContain(`title="${code}"`);
+  }
+});
+
+test("hovering a stage in the breakdown highlights it in Whole run and dims the others", () => {
+  const markup = timeline(true, { hoveredStage: "calibrate-1" });
+
+  expect(wholeRunSegmentStyle(markup, "Calibrate")).toContain("opacity:1");
+  expect(wholeRunSegmentStyle(markup, "Load inputs")).toContain("opacity:0.25");
 });

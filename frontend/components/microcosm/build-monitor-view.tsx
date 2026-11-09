@@ -1064,6 +1064,7 @@ function TimelineCard({
       onToggleExpanded={() => setExpanded((open) => !open)}
       onHoverPhase={setHoveredPhase}
       onTogglePhase={(phase) => setFilter((current) => togglePhase(current, phase))}
+      onHoverStage={() => {}}
       onToggleStage={(stageKey, phase) =>
         setSelected((current) => {
           const next = toggleStage(current?.stageKey ?? null, stageKey);
@@ -1085,6 +1086,7 @@ export interface TimelineViewProps {
   onHoverPhase: (phase: BuildPhase | null) => void;
   onTogglePhase: (phase: BuildPhase) => void;
   onToggleStage: (stageKey: string, phase: BuildPhase) => void;
+  onHoverStage: (stageKey: string | null) => void;
 }
 
 // A dimmed stage's opacity, while another stage type is hovered or another

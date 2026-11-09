@@ -66,3 +66,18 @@ test("only a mouse or pen opens a stage type's hover card; a tap does not leave 
   expect(pointerHovers("pen")).toBe(true);
   expect(pointerHovers("touch")).toBe(false);
 });
+
+test("hovering a stage in the breakdown highlights it in Whole run, as clicking it does", () => {
+  const focus = { ...NO_FOCUS, hoveredStage: "calibrate-3" };
+  expect(stageFocus(focus, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: false });
+  expect(stageFocus(focus, "export", "export-6")).toEqual({ visible: true, dimmed: true });
+});
+
+test("a hovered stage type outranks a hovered stage, which outranks a clicked one", () => {
+  const hoveredOverClicked = { ...NO_FOCUS, hoveredStage: "export-6", selectedStage: "calibrate-3" };
+  expect(stageFocus(hoveredOverClicked, "export", "export-6")).toEqual({ visible: true, dimmed: false });
+  expect(stageFocus(hoveredOverClicked, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: true });
+  const typeOverStage = { ...NO_FOCUS, hoveredPhase: "calibrate" as const, hoveredStage: "export-6" };
+  expect(stageFocus(typeOverStage, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: false });
+  expect(stageFocus(typeOverStage, "export", "export-6")).toEqual({ visible: true, dimmed: true });
+});
