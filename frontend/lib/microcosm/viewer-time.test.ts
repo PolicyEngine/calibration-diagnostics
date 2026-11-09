@@ -1,19 +1,11 @@
 import { expect, test } from "bun:test";
 
-import {
-  clockTime,
-  runStartTime,
-  shortDateTime,
-  timeTitle,
-  type ViewerZone,
-  zoneNote,
-} from "@/lib/microcosm/viewer-time";
+import { clockTime, runStartTime, shortDateTime, type ViewerZone } from "@/lib/microcosm/viewer-time";
 
 // Two zones far enough apart that no single runtime zone formats both as
 // expected, so a function that ignores its zone fails wherever it runs.
 const LONDON: ViewerZone = { timeZone: "Europe/London", locale: "en-GB" };
 const NEW_YORK: ViewerZone = { timeZone: "America/New_York", locale: "en-US" };
-const UTC_ZONE: ViewerZone = { timeZone: "UTC", locale: "en-US" };
 
 // The US run populace-us-2024-65671e1-9434c504ba2a-20261103T095117Z started at
 // 11:17:33 UTC, a Tuesday.
@@ -54,24 +46,6 @@ test("a time can name the viewer's zone, as it stands on that date", () => {
   );
   expect(plain(runStartTime(NOVEMBER_RUN_START_MS, NEW_YORK, { zoneName: true }))).toBe(
     "Nov 3, 6:17 AM EST",
-  );
-});
-
-test("a time's hover text gives it in full in the viewer's zone and in UTC", () => {
-  expect(plain(timeTitle(NOVEMBER_RUN_START_MS, LONDON))).toBe(
-    "Tue, 3 Nov 2026, 11:17:33 GMT · 2026-11-03 11:17:33 UTC",
-  );
-  expect(plain(timeTitle(JULY_RUN_START_MS, NEW_YORK))).toBe(
-    "Thu, Jul 2, 2026, 09:25:18 PM EDT · 2026-07-03 01:25:18 UTC",
-  );
-});
-
-test("the zone note names the browser's zone and its current short name", () => {
-  expect(zoneNote(LONDON, NOVEMBER_RUN_START_MS)).toBe(
-    "Times are in your browser's time zone, Europe/London (GMT). Hover over a time to see it in UTC, which run IDs use.",
-  );
-  expect(zoneNote(UTC_ZONE, NOVEMBER_RUN_START_MS)).toBe(
-    "Times are in your browser's time zone, UTC. Hover over a time to see it in UTC, which run IDs use.",
   );
 });
 

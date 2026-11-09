@@ -353,6 +353,17 @@ export function HuggingFaceCopyNote({
   );
 }
 
+// A stage event's start in the Stage timeline table.
+export function StageEventTime({ time, zone }: { time: string | null; zone: ViewerZone | null }) {
+  const ms = time ? Date.parse(time) : NaN;
+  if (Number.isNaN(ms)) return <>{shortDateTime(time, zone)}</>;
+  return (
+    <ViewerTime ms={ms} zone={zone}>
+      {shortDateTime(time, zone)}
+    </ViewerTime>
+  );
+}
+
 function OverviewRow({
   label,
   value,
@@ -694,13 +705,7 @@ function RunInternalsPanel({
                           {blocked && <StatusPill tone="warning">blocked</StatusPill>}
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
-                          {time && !Number.isNaN(Date.parse(time)) ? (
-                            <ViewerTime ms={Date.parse(time)} zone={zone}>
-                              {shortDateTime(time, zone)}
-                            </ViewerTime>
-                          ) : (
-                            shortDateTime(time, zone)
-                          )}
+                          <StageEventTime time={time} zone={zone} />
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                           {index === all.length - 1 && event.stage !== "complete" && !failed && !blocked

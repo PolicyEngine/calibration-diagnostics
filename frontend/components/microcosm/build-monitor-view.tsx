@@ -22,7 +22,7 @@ import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
 import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
 import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
-import { nextBuildRunSelection, waitsForRunList } from "@/lib/microcosm/build-run-selection";
+import { buildRunToShow, waitsForRunList } from "@/lib/microcosm/build-run-selection";
 import {
   orderRunOptions,
   parseRunOrder,
@@ -293,6 +293,17 @@ function RunOrderToggle({ order, onChange }: { order: RunOrder; onChange: (order
   );
 }
 
+// The Run selector's label for a run a link named that the list does not
+// hold.
+export function linkedRunOptionLabel(
+  selected: string,
+  detailRun: BuildTimeline | undefined,
+  nowMs: number,
+  zone: ViewerZone | null,
+): string {
+  return detailRun?.run_id === selected ? runOptionLabel(detailRun, nowMs, zone) : selected;
+}
+
 // The Build progress tab of the Staging candidates page. `preferredRunId`
 // is the run the page's URL names, chosen on either tab; a run picked here is
 // reported back through `onRunChange` so the other tab opens on it.
@@ -376,8 +387,8 @@ export function BuildMonitorView({
   }, [runs]);
 
   useEffect(() => {
-    const next = nextBuildRunSelection(runs, selected, preferredRunId);
-    if (next !== selected) setSelected(next);
+    const { runId } = buildRunToShow(runs, selected, preferredRunId, false);
+    if (runId !== selected) setSelected(runId);
   }, [runs, selected, preferredRunId]);
 
   const selectRun = (runId: string) => {
@@ -397,7 +408,7 @@ export function BuildMonitorView({
       ? [
           {
             value: selected,
-            label: data?.run.run_id === selected ? runOptionLabel(data.run, nowMs, zone) : selected,
+            label: linkedRunOptionLabel(selected, data?.run, nowMs, zone),
             group: "Linked run, not in this list",
           },
         ]

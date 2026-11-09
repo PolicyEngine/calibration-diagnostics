@@ -585,6 +585,17 @@ describe("cross-run statistics", () => {
     expect(compile.finished_median_ms).toBe(min(60));
   });
 
+  test("a stage's longest finished time leaves out runs where it stopped early", () => {
+    const stats = stageStatistics(runs);
+    // The failed run's gates ran for a minute before failing: the stage's
+    // longest time, but not a finished one.
+    const gates = stats.find((stat) => stat.stage === "release_gates")!;
+    expect(gates.max_ms).toBe(min(1));
+    expect(gates.finished_max_ms).toBeNull();
+    const compile = stats.find((stat) => stat.stage === "target_compilation")!;
+    expect(compile.finished_max_ms).toBe(min(60));
+  });
+
   test("gate statistics measure compute lost and group reasons", () => {
     const [gate] = gateStatistics(runs);
     expect(gate.gate).toBe("release_gates");

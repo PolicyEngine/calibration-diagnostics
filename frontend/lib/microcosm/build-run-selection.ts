@@ -19,6 +19,17 @@ export function nextBuildRunSelection(
   return (preferred ?? running ?? ended ?? runs[0]).run_id;
 }
 
+// The run the build monitor shows once its list has loaded, and the run to
+// write into the page's URL (null leaves the URL as it is).
+export function buildRunToShow(
+  runs: readonly BuildTimeline[],
+  selected: string,
+  preferredRunId: string | undefined,
+  _selectedNotFound: boolean,
+): { runId: string; urlRunId: string | null } {
+  return { runId: nextBuildRunSelection(runs, selected, preferredRunId), urlRunId: null };
+}
+
 // The run the Candidate tab shows, whenever its list or the page's run
 // changes: the run the page's URL names when it is a staging candidate; else
 // the run shown, while the list still holds it and the page's run has not
