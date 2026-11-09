@@ -41,12 +41,7 @@ import {
   type MicrocosmStagingRunSummary,
 } from "@/lib/api/hooks/use-microcosm";
 import type { CandidateRunState } from "@/lib/microcosm/staging-run-state";
-import {
-  shortDateTime,
-  timeTitle,
-  type ViewerZone,
-  zoneNote,
-} from "@/lib/microcosm/viewer-time";
+import { shortDateTime, type ViewerZone } from "@/lib/microcosm/viewer-time";
 import { countryRegistration, hasCapability } from "@policyengine/calibration-tree/countries";
 import {
   formatCandidateCurrentStatus,
@@ -131,10 +126,10 @@ function runStartTimestamp(run: MicrocosmStagingRunSummary): string | null | und
   );
 }
 
-// A run in the picker: its start in the viewer's zone, which the page names
-// above the picker, and its short identifier.
+// A run in the picker: its start in the viewer's zone, with the zone's short
+// name, and its short identifier.
 export function runLabel(run: MicrocosmStagingRunSummary, zone: ViewerZone | null): string {
-  return `${shortDateTime(runStartTimestamp(run), zone)} · ${shortReleaseId(
+  return `${shortDateTime(runStartTimestamp(run), zone, { zoneName: true })} · ${shortReleaseId(
     run.candidate_release_id || run.run_id,
   )}`;
 }
@@ -303,23 +298,6 @@ function timeWithAgo(value: string | null | undefined, zone: ViewerZone | null):
   return `${shortDateTime(value, zone, { zoneName: true })}${ago ? ` · ${ago}` : ""}`;
 }
 
-// A time's hover text: in full in the viewer's zone and in UTC.
-function timeHoverText(value: string | null | undefined, zone: ViewerZone | null): string | undefined {
-  const ms = value ? Date.parse(value) : NaN;
-  return Number.isNaN(ms) ? undefined : timeTitle(ms, zone);
-}
-
-// An overview row's hover text when it shows a time: the row's own text, which
-// may be truncated, then the time in full and in UTC on a second line.
-function rowTimeHoverText(
-  rowText: string,
-  value: string | null | undefined,
-  zone: ViewerZone | null,
-): string {
-  const hover = timeHoverText(value, zone);
-  return hover ? `${rowText}\n${hover}` : rowText;
-}
-
 // What the run's Hugging Face copy last recorded: "Running, Calibration,
 // epoch 273 of 1500 · updated Oct 20, 06:09 · 2d ago".
 function huggingFaceCopyLabel(
@@ -346,23 +324,31 @@ export function HuggingFaceCopyNote({
   zone: ViewerZone | null;
 }) {
   return (
-    <span title={timeHoverText(state.hugging_face_updated_at, zone)}>
+    <span>
       These sections read the run&apos;s Hugging Face copy ({huggingFaceCopyLabel(state, progress, zone)}); the
       status above comes from the telemetry collector.
     </span>
   );
 }
 
+// A stage event's start in the Stage timeline table.
+export function StageEventTime({ time, zone }: { time: string | null; zone: ViewerZone | null }) {
+  const ms = time ? Date.parse(time) : NaN;
+  if (Number.isNaN(ms)) return <>{shortDateTime(time, zone)}</>;
+  return (
+    <ViewerTime ms={ms}>{shortDateTime(time, zone, { zoneName: true })}</ViewerTime>
+  );
+}
+
+// An overview row. Hovering over the value shows it in full, as it may be
+// truncated.
 function OverviewRow({
   label,
   value,
-  title,
   wrap = false,
 }: {
   label: string;
   value: string;
-  // Hover text; the value itself when absent.
-  title?: string;
   // Long text, such as a failure message, wraps to three lines instead of one.
   wrap?: boolean;
 }) {
@@ -375,7 +361,7 @@ function OverviewRow({
       </div>
       <div
         className={`min-w-0 pr-5 text-xs ${wrap ? "line-clamp-3 break-words" : "truncate"} ${overviewMetricValueClassName}`}
-        title={title ?? value}
+        title={value}
       >
         {value}
       </div>
@@ -416,28 +402,16 @@ export function CandidateOverview({
         <OverviewRow label="Candidate" value={candidateReleaseId} />
         <OverviewRow label="Status" value={formatStagingStatus(state?.status ?? null)} />
         {state && <OverviewRow label="Status from" value={formatStateSource(state.state_source)} />}
-        <OverviewRow
-          label="Last update"
-          value={lastUpdate}
-          title={rowTimeHoverText(lastUpdate, state?.updated_at, zone)}
-        />
+        <OverviewRow label="Last update" value={lastUpdate} />
         {state?.heartbeat_at && lastHeartbeat && (
-          <OverviewRow
-            label="Last heartbeat"
-            value={lastHeartbeat}
-            title={rowTimeHoverText(lastHeartbeat, state.heartbeat_at, zone)}
-          />
+          <OverviewRow label="Last heartbeat" value={lastHeartbeat} />
         )}
         <OverviewRow label="Current status" value={currentStatus} />
         {state?.failure?.message && (
           <OverviewRow label="Failure" value={state.failure.message} wrap />
         )}
         {huggingFaceCopy && (
-          <OverviewRow
-            label="Hugging Face copy"
-            value={huggingFaceCopy}
-            title={rowTimeHoverText(huggingFaceCopy, state?.hugging_face_updated_at, zone)}
-          />
+          <OverviewRow label="Hugging Face copy" value={huggingFaceCopy} />
         )}
         {calibration && (
           <>
@@ -694,13 +668,7 @@ function RunInternalsPanel({
                           {blocked && <StatusPill tone="warning">blocked</StatusPill>}
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
-                          {time && !Number.isNaN(Date.parse(time)) ? (
-                            <ViewerTime ms={Date.parse(time)} zone={zone}>
-                              {shortDateTime(time, zone)}
-                            </ViewerTime>
-                          ) : (
-                            shortDateTime(time, zone)
-                          )}
+                          <StageEventTime time={time} zone={zone} />
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                           {index === all.length - 1 && event.stage !== "complete" && !failed && !blocked
@@ -1139,7 +1107,6 @@ function MicrocosmStagingRunsView({
           <>
             Monitor Microcosm build candidates before they are promoted to the published Hugging Face release
             channel.
-            {zone ? ` ${zoneNote(zone, Date.now())}` : null}
           </>
         }
         actions={

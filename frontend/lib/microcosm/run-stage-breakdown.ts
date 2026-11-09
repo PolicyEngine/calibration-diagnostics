@@ -52,9 +52,11 @@ export interface RunStageTime {
   status: RunStageStatus;
   // The stage's time over the run's elapsed time; null when that is unknown.
   share: number | null;
-  // The pipeline's median and p90 for runs that finished the stage.
+  // The pipeline's median, p90 and longest time for runs that finished the
+  // stage.
   typical_ms: number | null;
   typical_p90_ms: number | null;
+  typical_max_ms: number | null;
   // This run's time minus the typical time. Null without a typical time, and
   // for a stage that is still running, failed or went silent before reaching
   // it: a stage that stopped early is not comparable with finished times.
@@ -114,6 +116,7 @@ export function runStageBreakdown(
       share: total ? time.ms / total : null,
       typical_ms: typical,
       typical_p90_ms: p90,
+      typical_max_ms: stat?.finished_max_ms ?? null,
       over_typical_ms: over,
       about_typical: aboutTypical,
       past_p90:

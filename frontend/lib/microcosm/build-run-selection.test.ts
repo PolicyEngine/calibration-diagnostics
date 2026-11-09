@@ -1,7 +1,12 @@
 import { expect, test } from "bun:test";
 
 import type { BuildRunState, BuildTimeline } from "@/lib/microcosm/build-monitor";
-import { candidateRunSelection, nextBuildRunSelection, waitsForRunList } from "@/lib/microcosm/build-run-selection";
+import {
+  buildRunToShow,
+  candidateRunSelection,
+  nextBuildRunSelection,
+  waitsForRunList,
+} from "@/lib/microcosm/build-run-selection";
 
 // Only the fields the selection reads.
 function run(runId: string, state: BuildRunState): BuildTimeline {
@@ -27,6 +32,54 @@ test("without a named run a running run is selected, else the newest run that en
   // A run picked earlier that the list no longer holds, after switching
   // source, gives way to the default.
   expect(nextBuildRunSelection(RUNS, "gone", undefined)).toBe("running");
+});
+
+test("the run Build progress opens by default is written into the URL", () => {
+  expect(buildRunToShow(RUNS, "", undefined, false)).toEqual({ runId: "running", urlRunId: "running" });
+  expect(buildRunToShow([RUNS[0], RUNS[2]], "", undefined, false)).toEqual({ runId: "ended", urlRunId: "ended" });
+});
+
+test("a run the URL already names is shown, and the URL is left as it is", () => {
+  expect(buildRunToShow(RUNS, "", "ended", false)).toEqual({ runId: "ended", urlRunId: null });
+  expect(buildRunToShow(RUNS, "ended", "ended", false)).toEqual({ runId: "ended", urlRunId: null });
+  // A run older than the list stays while its detail is read on its own.
+  expect(buildRunToShow(RUNS, "older-run", "older-run", false)).toEqual({ runId: "older-run", urlRunId: null });
+});
+
+// Choosing a run writes it into the URL at once, so the URL is never written
+// with the run already selected: after Back or Forward changes the URL's run,
+// the selected run is the old one for a render, and writing it back would
+// undo the browser's navigation.
+test("the run already selected is never written back into the URL", () => {
+  expect(buildRunToShow(RUNS, "ended", "running", false)).toEqual({ runId: "ended", urlRunId: null });
+  expect(buildRunToShow(RUNS, "ended", undefined, false)).toEqual({ runId: "ended", urlRunId: null });
+});
+
+test("after Back or Forward between two runs outside the list, the run the URL names is kept", () => {
+  // For a render the selected run is the previous entry's; the copy from the
+  // URL then selects the new one, and nothing replaces it with the default.
+  expect(buildRunToShow(RUNS, "older-a", "older-b", false)).toEqual({ runId: "older-a", urlRunId: null });
+});
+
+test("a run the URL names that no source holds gives way to the default run, in the URL too", () => {
+  expect(buildRunToShow(RUNS, "not-a-run", "not-a-run", true)).toEqual({ runId: "running", urlRunId: "running" });
+  // The default never falls back to the run that was not found.
+  expect(buildRunToShow([run("not-a-run", "passed"), RUNS[2]], "not-a-run", "not-a-run", true)).toEqual({
+    runId: "ended",
+    urlRunId: "ended",
+  });
+});
+
+test("a run that is not found stays, and its error shows, when the list holds no other run", () => {
+  expect(buildRunToShow([run("not-a-run", "passed")], "not-a-run", "not-a-run", true)).toEqual({
+    runId: "not-a-run",
+    urlRunId: null,
+  });
+});
+
+test("nothing changes before the run list has loaded", () => {
+  expect(buildRunToShow([], "", undefined, false)).toEqual({ runId: "", urlRunId: null });
+  expect(buildRunToShow([], "not-a-run", "not-a-run", true)).toEqual({ runId: "not-a-run", urlRunId: null });
 });
 
 test("the Candidate tab opens a linked run it holds, and says when it holds none", () => {

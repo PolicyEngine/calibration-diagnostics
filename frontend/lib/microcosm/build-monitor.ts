@@ -1034,11 +1034,12 @@ export interface StageStat {
   median_ms: number;
   p90_ms: number;
   max_ms: number;
-  // Median and p90 of the runs where the stage ran to its end: a stage that
-  // failed, or the last stage of a stalled run, stopped early. Null when no
-  // run finished the stage. Pace and "typical" use these.
+  // Median, p90 and longest time of the runs where the stage ran to its end:
+  // a stage that failed, or the last stage of a stalled run, stopped early.
+  // Null when no run finished the stage. Pace and "typical" use these.
   finished_median_ms: number | null;
   finished_p90_ms: number | null;
+  finished_max_ms: number | null;
   // Runs where the stage stopped early.
   cut_short: number;
   // Median start, measured from the start of the run.
@@ -1131,6 +1132,7 @@ export function stageStatistics(history: BuildTimeline[]): StageStat[] {
     max_ms: Math.max(...entry.durations),
     finished_median_ms: entry.finished.length ? quantile(entry.finished, 0.5) : null,
     finished_p90_ms: entry.finished.length ? quantile(entry.finished, 0.9) : null,
+    finished_max_ms: entry.finished.length ? Math.max(...entry.finished) : null,
     cut_short: entry.durations.length - entry.finished.length,
     median_offset_ms: quantile(entry.offsets, 0.5),
     share: 0,

@@ -14,7 +14,13 @@ import {
   usRunningCollectorDocuments,
 } from "@/lib/microcosm/test-support/collector-run-fixtures";
 import type { ViewerZone } from "@/lib/microcosm/viewer-time";
-import { RunHistoryItem, RunOverview, runOptionLabel } from "./build-monitor-view";
+import {
+  linkedRunFailure,
+  linkedRunOptionLabel,
+  RunHistoryItem,
+  RunOverview,
+  runOptionLabel,
+} from "./build-monitor-view";
 import { useViewerZone } from "./viewer-time";
 
 const LONDON: ViewerZone = { timeZone: "Europe/London", locale: "en-GB" };
@@ -69,16 +75,13 @@ function overview(
   );
 }
 
-test("the run overview names the viewer's zone on the run's start and end, with UTC on hover", () => {
+test("the run overview names the viewer's zone on the run's start and end, with no UTC hover text", () => {
   // In October London keeps summer time (BST, UTC+1).
   const markup = overview(failedRun(), null, LONDON);
 
-  expect(markup).toContain(
-    'Started <time dateTime="2026-10-19T22:23:36.000Z" title="Mon, 19 Oct 2026, 23:23:36 BST · 2026-10-19 22:23:36 UTC">19 Oct, 23:23 BST</time>',
-  );
-  expect(markup).toContain(
-    '<time dateTime="2026-10-20T06:37:45.000Z" title="Tue, 20 Oct 2026, 07:37:45 BST · 2026-10-20 06:37:45 UTC">20 Oct, 07:37 BST</time>',
-  );
+  expect(markup).toContain('Started <time dateTime="2026-10-19T22:23:36.000Z">19 Oct, 23:23 BST</time>');
+  expect(markup).toContain('<time dateTime="2026-10-20T06:37:45.000Z">20 Oct, 07:37 BST</time>');
+  expect(markup).not.toContain("UTC");
 });
 
 test("a running run's expected finish reads in the viewer's zone, named", () => {
@@ -90,18 +93,16 @@ test("a running run's expected finish reads in the viewer's zone, named", () => 
   expect(markup).toContain(">Oct 21, 12:02 PM EDT</time>");
   // 01:30 UTC on October 23 is still October 22 in New York, the viewer's
   // today, so the date is left out.
-  expect(markup).toContain(
-    '<time dateTime="2026-10-23T01:30:00.000Z" title="Thu, Oct 22, 2026, 09:30:00 PM EDT · 2026-10-23 01:30:00 UTC">09:30 PM EDT</time>',
-  );
+  expect(markup).toContain('<time dateTime="2026-10-23T01:30:00.000Z">09:30 PM EDT</time>');
   expect(markup).toContain("90% by <time");
   expect(markup).toContain(">Oct 23, 12:45 AM EDT</time>");
 });
 
-test("the run selector and run history give each run's start in the viewer's zone", () => {
+test("the run selector and run history give each run's start in the viewer's zone, named", () => {
   const run = failedRun();
 
   expect(plain(runOptionLabel(run, INVESTIGATION_NOW_MS, NEW_YORK))).toStartWith(
-    "Failed · Oct 19, 6:23 PM · ",
+    "Failed · Oct 19, 6:23 PM EDT · ",
   );
 
   const markup = plain(
@@ -116,8 +117,17 @@ test("the run selector and run history give each run's start in the viewer's zon
       }),
     ),
   );
-  expect(markup).toContain(
-    '<time dateTime="2026-10-19T22:23:36.000Z" title="Mon, Oct 19, 2026, 06:23:36 PM EDT · 2026-10-19 22:23:36 UTC">Mon, Oct 19, 6:23 PM</time>',
+  expect(markup).toContain('<time dateTime="2026-10-19T22:23:36.000Z">Mon, Oct 19, 6:23 PM EDT</time>');
+});
+
+test("a linked run the list does not hold is named in the Run selector only once its detail arrives", () => {
+  const run = failedRun();
+
+  // Never the ID from the URL, which may name no run at all.
+  expect(linkedRunOptionLabel("not-a-run", undefined, INVESTIGATION_NOW_MS, NEW_YORK)).toBe("Loading run…");
+  expect(linkedRunOptionLabel(run.run_id, undefined, INVESTIGATION_NOW_MS, NEW_YORK)).toBe("Loading run…");
+  expect(linkedRunOptionLabel(run.run_id, run, INVESTIGATION_NOW_MS, NEW_YORK)).toBe(
+    runOptionLabel(run, INVESTIGATION_NOW_MS, NEW_YORK),
   );
 });
 
@@ -125,8 +135,26 @@ function ZoneProbe() {
   return createElement("span", null, useViewerZone()?.timeZone ?? "no zone");
 }
 
-// The zone note is the one zone-dependent text that needs no data, so the
-// server's HTML leaves it out and hydration matches.
+test("a linked run whose detail failed is named by the failure, not left loading", () => {
+  expect(linkedRunOptionLabel("not-a-run", undefined, INVESTIGATION_NOW_MS, NEW_YORK, "not_found")).toBe(
+    "Run not found",
+  );
+  expect(linkedRunOptionLabel("some-run", undefined, INVESTIGATION_NOW_MS, NEW_YORK, "unavailable")).toBe(
+    "Run unavailable",
+  );
+});
+
+test("a linked run not found before the run list arrives still reads as loading, as it will give way", () => {
+  expect(linkedRunFailure({ notFound: true, failed: true, replacing: false, listLoading: true })).toBeNull();
+  expect(linkedRunFailure({ notFound: true, failed: true, replacing: true, listLoading: false })).toBeNull();
+  // With the list loaded and no other run to give way to, the failure shows.
+  expect(linkedRunFailure({ notFound: true, failed: true, replacing: false, listLoading: false })).toBe("not_found");
+  expect(linkedRunFailure({ notFound: false, failed: true, replacing: false, listLoading: false })).toBe(
+    "unavailable",
+  );
+});
+
+// The server cannot know the browser's zone, so it formats no time in one.
 test("the zone is unknown during the server's render", () => {
   expect(renderToStaticMarkup(createElement(ZoneProbe))).toBe("<span>no zone</span>");
 });
@@ -141,6 +169,6 @@ test("a run silent for more than a day says when its last telemetry came, in the
   );
 
   expect(markup).toContain(
-    'The last telemetry came 25 h 14 min after the run started, on <time dateTime="2026-10-22T17:16:47.000Z" title="Thu, Oct 22, 2026, 01:16:47 PM EDT · 2026-10-22 17:16:47 UTC">Oct 22, 01:16 PM EDT</time>, and the run wrote no final event. The telemetry does not say why it stopped, or whether the process is still working without reporting.',
+    'The last telemetry came 25 h 14 min after the run started, on <time dateTime="2026-10-22T17:16:47.000Z">Oct 22, 01:16 PM EDT</time>, and the run wrote no final event. The telemetry does not say why it stopped, or whether the process is still working without reporting.',
   );
 });

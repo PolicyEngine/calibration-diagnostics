@@ -44,6 +44,7 @@ function stat(
   typicalMinutes: number | null,
   p90Minutes: number | null,
   finishedRuns = 5,
+  maxMinutes: number | null = null,
 ): StageStat {
   return {
     stage,
@@ -51,6 +52,7 @@ function stat(
     cut_short: 0,
     finished_median_ms: typicalMinutes == null ? null : typicalMinutes * MINUTE,
     finished_p90_ms: p90Minutes == null ? null : p90Minutes * MINUTE,
+    finished_max_ms: maxMinutes == null ? null : maxMinutes * MINUTE,
   } as StageStat;
 }
 
@@ -61,7 +63,7 @@ const FINISHED = run("passed", "10:00", "11:20", [
   { stage: "calibrate", phase: "calibrate", start: "10:12", end: "11:12" },
   { stage: "export", phase: "export", start: "11:12", end: "11:17" },
 ]);
-const STATS = [stat("load_inputs", 8, 9), stat("calibrate", 30, 40), stat("export", null, null)];
+const STATS = [stat("load_inputs", 8, 9, 5, 12), stat("calibrate", 30, 40, 5, 55), stat("export", null, null)];
 
 test("a run's stages are listed slowest first with their share of the run", () => {
   const breakdown = runStageBreakdown(FINISHED, STATS, at("12:00"));
@@ -75,21 +77,23 @@ test("a run's stages are listed slowest first with their share of the run", () =
   ]);
 });
 
-test("each stage sits beside the pipeline's typical time and how far it ran over it", () => {
+test("each stage sits beside the pipeline's p50, p90 and longest time, and how far it ran over p50", () => {
   const breakdown = runStageBreakdown(FINISHED, STATS, at("12:00"));
 
+  const minutes = (ms: number | null) => (ms == null ? null : ms / MINUTE);
   expect(
     breakdown.stages.map((stage) => [
       stage.stage,
-      stage.typical_ms == null ? null : stage.typical_ms / MINUTE,
-      stage.typical_p90_ms == null ? null : stage.typical_p90_ms / MINUTE,
-      stage.over_typical_ms == null ? null : stage.over_typical_ms / MINUTE,
+      minutes(stage.typical_ms),
+      minutes(stage.typical_p90_ms),
+      minutes(stage.typical_max_ms),
+      minutes(stage.over_typical_ms),
     ]),
   ).toEqual([
-    ["calibrate", 30, 40, 30],
-    ["load_inputs", 8, 9, 2],
+    ["calibrate", 30, 40, 55, 30],
+    ["load_inputs", 8, 9, 12, 2],
     // No run has finished export yet, so there is no typical time.
-    ["export", null, null, null],
+    ["export", null, null, null, null],
   ]);
 });
 

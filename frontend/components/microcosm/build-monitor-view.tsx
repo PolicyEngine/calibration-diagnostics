@@ -22,7 +22,7 @@ import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
 import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
 import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
-import { nextBuildRunSelection, waitsForRunList } from "@/lib/microcosm/build-run-selection";
+import { buildRunToShow, waitsForRunList } from "@/lib/microcosm/build-run-selection";
 import {
   orderRunOptions,
   parseRunOrder,
@@ -71,7 +71,6 @@ import {
   clockTime,
   runStartTime,
   type ViewerZone,
-  zoneNote,
 } from "@/lib/microcosm/viewer-time";
 
 const PHASE_COLOR: Record<BuildPhase, string> = {
@@ -164,7 +163,7 @@ export function fmtDuration(ms: number | null | undefined): string {
 }
 
 // A time on the run overview, in the viewer's zone and named ("07:56 AM
-// GMT+4"), with UTC on hover.
+// GMT+4").
 function ClockTime({
   ms,
   nowMs,
@@ -176,9 +175,7 @@ function ClockTime({
 }) {
   if (ms == null || !Number.isFinite(ms)) return <>—</>;
   return (
-    <ViewerTime ms={ms} zone={zone}>
-      {clockTime(ms, nowMs, zone, { zoneName: true })}
-    </ViewerTime>
+    <ViewerTime ms={ms}>{clockTime(ms, nowMs, zone, { zoneName: true })}</ViewerTime>
   );
 }
 
@@ -205,7 +202,7 @@ export function runOptionLabel(
   nowMs: number,
   zone: ViewerZone | null,
 ): string {
-  const started = run.started_ms ? runStartTime(run.started_ms, zone) : "unknown start";
+  const started = run.started_ms ? runStartTime(run.started_ms, zone, { zoneName: true }) : "unknown start";
   const duration = runDurationMs(run, nowMs);
   return [STATE_LABEL[run.state], started, duration != null ? fmtDuration(duration) : null, runWhere(run)]
     .filter(Boolean)
@@ -293,6 +290,42 @@ function RunOrderToggle({ order, onChange }: { order: RunOrder; onChange: (order
   );
 }
 
+// The Run selector's label for a run a link named that the list does not
+// hold: the run's own label once its detail arrives, what went wrong when
+// its detail failed, and never the ID from the URL, which may name no run at
+// all.
+export function linkedRunOptionLabel(
+  selected: string,
+  detailRun: BuildTimeline | undefined,
+  nowMs: number,
+  zone: ViewerZone | null,
+  failure: "not_found" | "unavailable" | null = null,
+): string {
+  if (detailRun?.run_id === selected) return runOptionLabel(detailRun, nowMs, zone);
+  if (failure === "not_found") return "Run not found";
+  if (failure === "unavailable") return "Run unavailable";
+  return "Loading run…";
+}
+
+// What the Run selector says went wrong with a linked run's detail, if
+// anything. A run about to give way to the default run is still loading, and
+// so is one not found before the run list arrives, as it gives way then.
+export function linkedRunFailure({
+  notFound,
+  failed,
+  replacing,
+  listLoading,
+}: {
+  notFound: boolean;
+  failed: boolean;
+  replacing: boolean;
+  listLoading: boolean;
+}): "not_found" | "unavailable" | null {
+  if (replacing || (notFound && listLoading)) return null;
+  if (notFound) return "not_found";
+  return failed ? "unavailable" : null;
+}
+
 // The Build progress tab of the Staging candidates page. `preferredRunId`
 // is the run the page's URL names, chosen on either tab; a run picked here is
 // reported back through `onRunChange` so the other tab opens on it.
@@ -375,11 +408,6 @@ export function BuildMonitorView({
     );
   }, [runs]);
 
-  useEffect(() => {
-    const next = nextBuildRunSelection(runs, selected, preferredRunId);
-    if (next !== selected) setSelected(next);
-  }, [runs, selected, preferredRunId]);
-
   const selectRun = (runId: string) => {
     setSelected(runId);
     onRunChange?.(runId);
@@ -387,6 +415,16 @@ export function BuildMonitorView({
 
   const detail = useBuildRun(source, selected || undefined);
   const data = detail.data;
+  const runNotFound = detail.error instanceof ApiError && detail.error.status === 404;
+  // The page's URL names the run shown: the default run is written there, and
+  // a run no source holds gives way to the default run.
+  useEffect(() => {
+    const { runId, urlRunId } = buildRunToShow(runs, selected, preferredRunId, runNotFound);
+    if (runId !== selected) setSelected(runId);
+    if (urlRunId) onRunChange?.(urlRunId);
+  }, [runs, selected, preferredRunId, runNotFound, onRunChange]);
+  // A run that was not found is about to give way to the default run.
+  const replacingRun = runNotFound && runs.some((run) => run.run_id !== selected);
   const nowMs = data?.now_ms ?? Date.now();
   const zone = useViewerZone();
   // A run a link named that the list does not hold, such as one older than
@@ -397,7 +435,20 @@ export function BuildMonitorView({
       ? [
           {
             value: selected,
-            label: data?.run.run_id === selected ? runOptionLabel(data.run, nowMs, zone) : selected,
+            label: linkedRunOptionLabel(
+              selected,
+              data?.run,
+              nowMs,
+              zone,
+              linkedRunFailure({
+                notFound: runNotFound,
+                failed: Boolean(detail.error),
+                replacing: replacingRun,
+                // As for the wait for the run list below: with a local runs
+                // folder, the hosted list waits for the local one.
+                listLoading: list.isLoading || (localRunsEnabled && local.isLoading),
+              }),
+            ),
             group: "Linked run, not in this list",
           },
         ]
@@ -413,8 +464,6 @@ export function BuildMonitorView({
       };
     }),
   ];
-  const runNotFound = detail.error instanceof ApiError && detail.error.status === 404;
-
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -425,7 +474,6 @@ export function BuildMonitorView({
           <>
             Follow a build while it runs, see when it should finish, and find where build time goes and which checks
             fail late.
-            {zone ? ` ${zoneNote(zone, nowMs)}` : null}
           </>
         }
         actions={
@@ -484,7 +532,7 @@ export function BuildMonitorView({
               : "The collector and historical staging repository have no runs for this country."
           }
         />
-      ) : detail.isLoading && !data ? (
+      ) : (detail.isLoading && !data) || replacingRun ? (
         <LoadingBlock label="Loading run…" />
       ) : detail.error ? (
         <EmptyState
@@ -1319,6 +1367,7 @@ function emptyStat(span: StageSpan): StageStat {
     max_ms: 0,
     finished_median_ms: null,
     finished_p90_ms: null,
+    finished_max_ms: null,
     cut_short: 0,
     median_offset_ms: 0,
     share: 0,
@@ -1327,7 +1376,7 @@ function emptyStat(span: StageSpan): StageStat {
   };
 }
 
-// How a stage's time compares with the typical time: "+30 min (2.0×)",
+// How a stage's time compares with its p50 (typical) time: "+30 min (2.0×)",
 // "−4 min", "about typical" within a minute or 5%, or "—" without one.
 function againstTypical(stage: RunStageTime): string {
   const over = stage.over_typical_ms;
@@ -1339,8 +1388,9 @@ function againstTypical(stage: RunStageTime): string {
   return `+${fmtDuration(over)}${ratio != null && ratio >= 1.5 ? ` (${ratio.toFixed(1)}×)` : ""}`;
 }
 
-// The selected run's stages, slowest first, beside the pipeline's typical
-// times, so the stages that took this run longest are plain to see.
+// The selected run's stages, slowest first, beside the pipeline's p50, p90
+// and longest times, so the stages that took this run longest are plain to
+// see.
 export function RunStageCard({
   run,
   stageStats,
@@ -1365,17 +1415,21 @@ export function RunStageCard({
       descriptionClassName="max-w-none"
       description={`How long each of this run's stages took, slowest first, and its share of the run's ${fmtDuration(
         breakdown.total_ms,
-      )}${run.state === "running" ? " so far" : ""}. Typical is the median time of the ${pipelineLabel} runs with this stage sequence that finished the stage (this run included when it did), with their number when fewer than three. A stage still running, or stopped early, is compared only once it has run past typical. A time beyond "about typical" and past those runs' 90th percentile is shown in red, when at least three runs finished the stage.`}
+      )}${run.state === "running" ? " so far" : ""}. p50, p90 and Max are the median, 90th percentile and longest time of the ${pipelineLabel} runs with this stage sequence that finished the stage (this run included when it did); p50 gives their number when fewer than three, and p90 needs at least three. The mark on each bar is p50. A stage still running, or stopped early, is compared only once it has run past p50. A time beyond "about typical" and past p90 is shown in red.`}
     >
       <div className="overflow-x-auto">
         <table className="w-full text-xs tabular-nums">
           <thead className="text-left text-muted-foreground">
             <tr className="border-b border-border">
               <th className="pb-1.5 font-medium">Stage</th>
-              <th className="pb-1.5 font-medium">This run</th>
+              <th className="pb-1.5 font-medium" colSpan={2}>
+                This run
+              </th>
               <th className="pb-1.5 text-right font-medium">Share</th>
-              <th className="pb-1.5 text-right font-medium">Typical</th>
-              <th className="pb-1.5 text-right font-medium">Against typical</th>
+              <th className="pb-1.5 text-right font-medium">p50</th>
+              <th className="pb-1.5 text-right font-medium">p90</th>
+              <th className="pb-1.5 text-right font-medium">Max</th>
+              <th className="pb-1.5 text-right font-medium">Against p50</th>
             </tr>
           </thead>
           <tbody>
@@ -1393,33 +1447,34 @@ export function RunStageCard({
                       {formatStageName(stage.stage)}
                     </span>
                   </td>
-                  <td className="w-[40%] py-1.5 pr-3">
-                    <div className="flex items-center gap-2">
-                      <span className="relative h-2 flex-1 rounded-sm bg-muted/40">
+                  {/* The bar and the time sit in cells of their own: the
+                      table gives the time column its longest time's width,
+                      so every bar has the same width and bars compare. */}
+                  <td className="w-[40%] py-1.5 pr-2">
+                    <span className="relative h-2 block rounded-sm bg-muted/40">
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-y-0 left-0 rounded-sm"
+                        style={{
+                          width: `${Math.max(1, (stage.ms / longest) * 100)}%`,
+                          background: stage.status === "failed" ? FAILED_COLOR : PHASE_COLOR[stage.phase],
+                        }}
+                      />
+                      {stage.typical_ms != null ? (
                         <span
                           aria-hidden="true"
-                          className="absolute inset-y-0 left-0 rounded-sm"
-                          style={{
-                            width: `${Math.max(1, (stage.ms / longest) * 100)}%`,
-                            background: stage.status === "failed" ? FAILED_COLOR : PHASE_COLOR[stage.phase],
-                          }}
+                          title={`p50: ${fmtDuration(stage.typical_ms)}`}
+                          className="absolute -inset-y-0.5 w-0.5 bg-foreground/70"
+                          style={{ left: `${(stage.typical_ms / longest) * 100}%` }}
                         />
-                        {stage.typical_ms != null ? (
-                          <span
-                            aria-hidden="true"
-                            title={`Typical: ${fmtDuration(stage.typical_ms)}`}
-                            className="absolute -inset-y-0.5 w-0.5 bg-foreground/70"
-                            style={{ left: `${(stage.typical_ms / longest) * 100}%` }}
-                          />
-                        ) : null}
-                      </span>
-                      <span className="shrink-0 whitespace-nowrap">
-                        <ThisRunCell stage={stage} />
-                      </span>
-                    </div>
+                      ) : null}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap py-1.5 pr-3">
+                    <ThisRunCell stage={stage} />
                   </td>
                   <td className="py-1.5 text-right">{share(stage.share)}</td>
-                  <td className="py-1.5 text-right">
+                  <td className="whitespace-nowrap py-1.5 pl-3 text-right">
                     {stage.typical_ms != null
                       ? `${fmtDuration(stage.typical_ms)}${
                           stage.typical_runs < P90_MIN_RUNS
@@ -1428,8 +1483,16 @@ export function RunStageCard({
                         }`
                       : "—"}
                   </td>
+                  <td className="whitespace-nowrap py-1.5 pl-3 text-right">
+                    {stage.typical_p90_ms != null && stage.typical_runs >= P90_MIN_RUNS
+                      ? fmtDuration(stage.typical_p90_ms)
+                      : "—"}
+                  </td>
+                  <td className="whitespace-nowrap py-1.5 pl-3 text-right">
+                    {stage.typical_max_ms != null ? fmtDuration(stage.typical_max_ms) : "—"}
+                  </td>
                   <td
-                    className={`py-1.5 text-right ${pastP90 ? "font-medium tone-neg" : "text-muted-foreground"}`}
+                    className={`whitespace-nowrap py-1.5 pl-3 text-right ${pastP90 ? "font-medium tone-neg" : "text-muted-foreground"}`}
                   >
                     {againstTypical(stage)}
                     {pastP90 ? <span className="sr-only"> past the 90th percentile</span> : null}
@@ -1440,10 +1503,13 @@ export function RunStageCard({
             {breakdown.between_stages_ms >= 60_000 ? (
               <tr className="text-muted-foreground">
                 <td className="py-1.5 pr-3">Between stages</td>
-                <td className="py-1.5 pr-3">{fmtDuration(breakdown.between_stages_ms)}</td>
+                <td />
+                <td className="whitespace-nowrap py-1.5 pr-3">{fmtDuration(breakdown.between_stages_ms)}</td>
                 <td className="py-1.5 text-right">
                   {share(breakdown.total_ms ? breakdown.between_stages_ms / breakdown.total_ms : null)}
                 </td>
+                <td />
+                <td />
                 <td />
                 <td />
               </tr>
@@ -1772,9 +1838,7 @@ export function RunHistoryItem({
   const running = run.state === "running";
   const where = runWhere(run);
   const started = run.started_ms ? (
-    <ViewerTime ms={run.started_ms} zone={zone}>
-      {runStartTime(run.started_ms, zone, { weekday: true })}
-    </ViewerTime>
+    <ViewerTime ms={run.started_ms}>{runStartTime(run.started_ms, zone, { weekday: true, zoneName: true })}</ViewerTime>
   ) : (
     "Unknown start"
   );
