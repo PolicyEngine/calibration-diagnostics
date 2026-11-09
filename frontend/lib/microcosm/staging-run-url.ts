@@ -1,6 +1,7 @@
 // The Staging page's `run` query parameter: the run a link opens, on either
 // tab. Choosing a run writes it, with the country, so a link opens the run
-// chosen; a page that picks its own default run writes nothing.
+// chosen. Build progress also writes the run it opens by default; the
+// Candidate tab writes nothing until a run is chosen.
 
 export const STAGING_RUN_PARAM = "run";
 

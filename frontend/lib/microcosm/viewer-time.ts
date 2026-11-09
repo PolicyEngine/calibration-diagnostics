@@ -1,5 +1,5 @@
 // Times on the Staging page are shown in the viewer's own time zone, the one
-// their browser reports, and the page names that zone. Every function here
+// their browser reports, each followed by that zone's short name. Every function here
 // takes the zone, so the page and its tests choose it. `null` stands for the
 // runtime's default zone and locale, as on the server before the page knows
 // the browser's zone.
@@ -104,33 +104,4 @@ export function shortDateTime(
   const date = format(ms, zone, { month: "short", day: "numeric" });
   const time = format(ms, zone, { hour: "2-digit", minute: "2-digit" });
   return withZoneName(`${date}, ${time}`, ms, zone, options);
-}
-
-// A time's hover text: the time in full in the viewer's zone, then in UTC,
-// the zone run IDs are stamped in: "Tue, Nov 3, 2026, 03:17:33 PM GMT+4 ·
-// 2026-11-03 11:17:33 UTC".
-export function timeTitle(ms: number, zone: ViewerZone | null): string {
-  if (!Number.isFinite(ms)) return "";
-  const date = format(ms, zone, {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-  const time = format(ms, zone, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZoneName: "short",
-  });
-  const utc = new Date(ms).toISOString();
-  return `${date}, ${time} · ${utc.slice(0, 10)} ${utc.slice(11, 19)} UTC`;
-}
-
-// The sentence that names the zone the page's times are in.
-export function zoneNote(zone: ViewerZone, nowMs: number): string {
-  const abbreviation = zoneAbbreviation(nowMs, zone);
-  const name =
-    abbreviation === zone.timeZone ? zone.timeZone : `${zone.timeZone} (${abbreviation})`;
-  return `Times are in your browser's time zone, ${name}. Hover over a time to see it in UTC, which run IDs use.`;
 }

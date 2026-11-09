@@ -59,6 +59,13 @@ test("a run the URL names that no source holds gives way to the default run, in 
   });
 });
 
+test("a run that is not found stays, and its error shows, when the list holds no other run", () => {
+  expect(buildRunToShow([run("not-a-run", "passed")], "not-a-run", "not-a-run", true)).toEqual({
+    runId: "not-a-run",
+    urlRunId: null,
+  });
+});
+
 test("nothing changes before the run list has loaded", () => {
   expect(buildRunToShow([], "", undefined, false)).toEqual({ runId: "", urlRunId: null });
   expect(buildRunToShow([], "not-a-run", "not-a-run", true)).toEqual({ runId: "not-a-run", urlRunId: null });

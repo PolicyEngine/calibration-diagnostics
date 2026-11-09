@@ -4,10 +4,14 @@ The **Build progress** tab of Staging candidates
 (`/microcosm/staging?view=progress`) shows a Microcosm build as it runs,
 predicts when it will finish, and summarizes where build time goes and which
 checks stop builds. The run selected on either tab carries over to the other.
-Choosing a run writes it into the URL with the country
-(`?view=progress&country=uk&run=<run id>`), so the address opens that run;
-a run that neither the collector nor the Hugging Face history holds for that
-country shows "Run not found".
+The URL always names the run shown, with the country
+(`?view=progress&country=uk&run=<run id>`), so the address opens that run:
+opening the tab writes the run it opens by default (a running run, else the
+newest run that ended), and choosing a run writes that one. A run that
+neither the collector nor the Hugging Face history holds for that country
+gives way to the default run, in the URL too. Times are shown in the
+browser's time zone, each with the zone's short name (such as "GMT+4" or
+"EST").
 
 ## Sources
 
@@ -208,14 +212,18 @@ with:
 - each stage's time, summed over every attempt;
 - its share of the run's elapsed time (to its end, its last telemetry if it
   stalled, or now);
-- the typical time from "Where build time goes", with the number of runs that
-  finished the stage when fewer than three;
-- how far over or under typical it ran: "about typical" within a minute or
-  5%, and the ratio from 1.5×.
+- the median (p50), 90th percentile (p90) and longest (Max) time of the runs
+  with the same stage sequence that finished the stage; p50 is the typical
+  time from "Where build time goes", with the number of runs when fewer than
+  three, and p90 is shown only from three runs;
+- how far over or under p50 it ran: "about typical" within a minute or 5%,
+  and the ratio from 1.5×.
 
-A stage still running, or stopped early, is compared only once it has run past
-typical. A time beyond "about typical" and past the 90th percentile is shown
-in red, only when at least three runs finished the stage. Time spent in no top-level stage gets a "Between
+Each stage's bar has a cell of its own, apart from its time, so every bar has
+the same width and bars of equal length mean equal times; the mark on a bar
+is p50. A stage still running, or stopped early, is compared only once it has
+run past p50. A time beyond "about typical" and past p90 is shown in red,
+only when at least three runs finished the stage. Time spent in no top-level stage gets a "Between
 stages" row from one minute.
 
 The US release reports each engine batch during target compilation and each

@@ -2,9 +2,9 @@ import type { BuildTimeline } from "@/lib/microcosm/build-monitor";
 
 // The run the build monitor shows once its list has loaded: the selected run
 // while the list holds it, or when a link named it (a run older than the list
-// is read on its own, and one that does not exist is reported as not found);
-// otherwise the preferred run if the list holds it, else a running run, else
-// the newest run that ended with a final event, else the newest run.
+// is read on its own); otherwise the preferred run if the list holds it, else
+// a running run, else the newest run that ended with a final event, else the
+// newest run.
 export function nextBuildRunSelection(
   runs: readonly BuildTimeline[],
   selected: string,
@@ -20,14 +20,27 @@ export function nextBuildRunSelection(
 }
 
 // The run the build monitor shows once its list has loaded, and the run to
-// write into the page's URL (null leaves the URL as it is).
+// write into the page's URL (null leaves the URL as it is), so the URL always
+// names the run shown: the run the tab opens by default is written there, and
+// so is a run chosen on the tab until the URL names it. A selected run that no
+// source holds (`selectedNotFound`), such as one a link names that does not
+// exist, gives way to the default run, in the URL too; when the list holds no
+// other run it stays, and the tab shows its error.
 export function buildRunToShow(
   runs: readonly BuildTimeline[],
   selected: string,
   preferredRunId: string | undefined,
-  _selectedNotFound: boolean,
+  selectedNotFound: boolean,
 ): { runId: string; urlRunId: string | null } {
-  return { runId: nextBuildRunSelection(runs, selected, preferredRunId), urlRunId: null };
+  if (!runs.length) return { runId: selected, urlRunId: null };
+  if (selectedNotFound && selected) {
+    const others = runs.filter((run) => run.run_id !== selected);
+    if (!others.length) return { runId: selected, urlRunId: null };
+    const runId = nextBuildRunSelection(others, "", undefined);
+    return { runId, urlRunId: runId };
+  }
+  const runId = nextBuildRunSelection(runs, selected, preferredRunId);
+  return { runId, urlRunId: runId && runId !== preferredRunId ? runId : null };
 }
 
 // The run the Candidate tab shows, whenever its list or the page's run
