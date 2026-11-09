@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { buildListRefetchInterval, buildRunRefetchInterval } from "@/lib/microcosm/build-refresh";
 import { releaseLabel } from "@/components/shared/format";
 import {
   useCountry,
@@ -1661,7 +1662,7 @@ export function useBuildRuns(source: BuildRunSource, enabled = true) {
     enabled,
     placeholderData: keepPreviousData,
     staleTime: 5 * 1000,
-    refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+    refetchInterval: buildListRefetchInterval(source),
   });
 }
 
@@ -1682,7 +1683,7 @@ export function useBuildRun(source: BuildRunSource, runId?: string) {
     enabled: Boolean(runId),
     placeholderData: keepPreviousData,
     staleTime: 5 * 1000,
-    refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+    refetchInterval: (query) => buildRunRefetchInterval(source, query.state.data?.run.state),
     retry: retryBuildRun,
   });
 }

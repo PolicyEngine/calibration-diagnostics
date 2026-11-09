@@ -23,6 +23,7 @@ import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
 import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
 import { buildRunToShow, waitsForRunList } from "@/lib/microcosm/build-run-selection";
+import { NO_FOCUS, type TimelineFocus } from "@/lib/microcosm/timeline-focus";
 import {
   orderRunOptions,
   parseRunOrder,
@@ -73,7 +74,7 @@ import {
   type ViewerZone,
 } from "@/lib/microcosm/viewer-time";
 
-const PHASE_COLOR: Record<BuildPhase, string> = {
+export const PHASE_COLOR: Record<BuildPhase, string> = {
   setup: "var(--chart-4)",
   checks: "var(--chart-2)",
   compile: "var(--chart-1)",
@@ -1072,6 +1073,37 @@ function TimelineCard({
   forecast: BuildForecast | null;
   nowMs: number;
 }) {
+  return (
+    <TimelineView
+      run={run}
+      forecast={forecast}
+      nowMs={nowMs}
+      expanded
+      focus={NO_FOCUS}
+      onToggleExpanded={() => {}}
+      onHoverPhase={() => {}}
+      onTogglePhase={() => {}}
+      onToggleStage={() => {}}
+    />
+  );
+}
+
+export interface TimelineViewProps {
+  run: BuildTimeline;
+  forecast: BuildForecast | null;
+  nowMs: number;
+  // Whether the per-stage breakdown is open.
+  expanded: boolean;
+  focus: TimelineFocus;
+  onToggleExpanded: () => void;
+  onHoverPhase: (phase: BuildPhase | null) => void;
+  onTogglePhase: (phase: BuildPhase) => void;
+  onToggleStage: (stageKey: string) => void;
+}
+
+// The Timeline card's drawing, given what is open and focused; the card keeps
+// that state.
+export function TimelineView({ run, forecast, nowMs }: TimelineViewProps) {
   const [measureArea, areaWidth] = useElementWidth();
   const failedStages = new Set(
     run.spans.filter((span) => span.depth === 0 && span.status === "failed").map((span) => span.start_ms),
