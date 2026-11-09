@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -22,6 +23,13 @@ import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
 import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
 import { nextBuildRunSelection, waitsForRunList } from "@/lib/microcosm/build-run-selection";
+import {
+  orderRunOptions,
+  parseRunOrder,
+  RUN_ORDER_PARAM,
+  type RunOrder,
+  withRunOrder,
+} from "@/lib/microcosm/run-order";
 import {
   BUILD_GATE_CATALOG_SOURCE,
   GATE_POSITIONS,
@@ -182,8 +190,10 @@ function runWhere(run: BuildTimeline): string | null {
 }
 
 // A run in the run selector: its state, start, length and where it is or
-// stopped. The selector groups runs by pipeline; the overview shows the id.
-// Its start is in the viewer's zone, which the page names above the selector.
+// stopped. The selector groups runs by pipeline or, ordered by date, puts the
+// pipeline's name before this label (in `BuildMonitorView`); the overview
+// shows the id. Its start is in the viewer's zone, which the page names above
+// the selector.
 export function runOptionLabel(
   run: BuildTimeline,
   nowMs: number,
@@ -235,6 +245,37 @@ function SourceToggle({
             title={option.hint}
             onClick={() => onChange(option.id)}
             className={`h-8 rounded px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// How the run selector orders runs; the choice is kept in the URL.
+function RunOrderToggle({ order, onChange }: { order: RunOrder; onChange: (order: RunOrder) => void }) {
+  const options: { id: RunOrder; label: string; hint: string }[] = [
+    { id: "pipeline", label: "By pipeline", hint: "Runs grouped by pipeline, newest first in each" },
+    { id: "date", label: "By date", hint: "Every run in one list by start, newest first" },
+  ];
+  return (
+    <div role="radiogroup" aria-label="Run order" className="inline-flex rounded-md border border-border p-0.5">
+      {options.map((option) => {
+        const active = option.id === order;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={option.label}
+            title={option.hint}
+            onClick={() => onChange(option.id)}
+            className={`h-8 rounded px-3 text-sm font-medium transition-colors ${
               active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
             }`}
           >
@@ -303,6 +344,15 @@ export function BuildMonitorView({
   useEffect(() => {
     setSelected(preferredRunId ?? "");
   }, [preferredRunId]);
+  // The order is read from the URL on every render, not copied once: a link
+  // to the same page, or the browser's Back button, changes the URL while
+  // this view stays mounted. Next.js updates `useSearchParams` after
+  // `history.replaceState`, so writing the URL is enough to change it.
+  const searchParams = useSearchParams();
+  const runOrder = parseRunOrder(searchParams.get(RUN_ORDER_PARAM));
+  const chooseRunOrder = (next: RunOrder) => {
+    window.history.replaceState(null, "", withRunOrder(window.location.href, next));
+  };
   // The selector groups runs by pipeline, and puts runs whose stages differ
   // from the pipeline's newest run (an older build driver) in a group of
   // their own, as the forecast and statistics leave them out.
@@ -334,7 +384,7 @@ export function BuildMonitorView({
   const nowMs = data?.now_ms ?? Date.now();
   const zone = useViewerZone();
   // A run a link named that the list does not hold, such as one older than
-  // its runs, gets an option of its own.
+  // its runs, gets an option of its own, first in either order.
   const linkedRunOutsideList = Boolean(selected) && !runs.some((run) => run.run_id === selected);
   const runOptions = [
     ...(linkedRunOutsideList
@@ -346,11 +396,16 @@ export function BuildMonitorView({
           },
         ]
       : []),
-    ...runs.map((run) => ({
-      value: run.run_id,
-      label: runOptionLabel(run, list.data?.now_ms ?? Date.now(), zone),
-      group: runGroups.get(run.run_id),
-    })),
+    // The list's runs in the chosen order: under their pipeline groups, or by
+    // start with each run naming its pipeline.
+    ...orderRunOptions(runs, runOrder, (run) => runGroups.get(run.run_id)).map(({ run, group }) => {
+      const label = runOptionLabel(run, list.data?.now_ms ?? Date.now(), zone);
+      return {
+        value: run.run_id,
+        label: runOrder === "date" ? `${run.pipeline_label} · ${label}` : label,
+        group,
+      };
+    }),
   ];
   const runNotFound = detail.error instanceof ApiError && detail.error.status === 404;
 
@@ -381,6 +436,7 @@ export function BuildMonitorView({
                 }}
               />
             ) : null}
+            <RunOrderToggle order={runOrder} onChange={chooseRunOrder} />
             <ToolbarSelect
               label="Run"
               value={selected}
