@@ -68,6 +68,16 @@ export function pointerHovers(pointerType: string): boolean {
 }
 
 // The focus with a hovered or clicked stage that no drawn row has left out.
-export function focusOnDrawnStages(focus: TimelineFocus, _drawnStageKeys: ReadonlySet<string>): TimelineFocus {
-  return focus;
+// A refresh can drop a running run's expected stages, or renumber them, under
+// a resting pointer, which then never reports leaving; a key that matches no
+// row would otherwise dim every stage.
+export function focusOnDrawnStages(focus: TimelineFocus, drawnStageKeys: ReadonlySet<string>): TimelineFocus {
+  const hoveredDrawn = focus.hoveredStage != null && drawnStageKeys.has(focus.hoveredStage);
+  const selectedDrawn = focus.selectedStage != null && drawnStageKeys.has(focus.selectedStage);
+  return {
+    ...focus,
+    hoveredStage: hoveredDrawn ? focus.hoveredStage : null,
+    selectedStage: selectedDrawn ? focus.selectedStage : null,
+    selectedPhase: selectedDrawn ? focus.selectedPhase : null,
+  };
 }
