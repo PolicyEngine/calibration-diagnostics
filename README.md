@@ -260,4 +260,6 @@ byte-identical copies of Microcosm's canonical producer fixtures. The package's
 consumer tests pin each version's `SHA256SUMS` digest and verify every listed
 file. A contract change must update the canonical Microcosm fixture, its digest
 manifest, the collector's copy and both repositories' contract tests, then
-release a new package version and raise the dashboard's pinned version.
+release a new package version and raise the dashboard's pinned version. The
+build monitor's tests read copies of three version 3 runs, in
+`frontend/lib/microcosm/fixtures/staging-contract/`; update those too.
