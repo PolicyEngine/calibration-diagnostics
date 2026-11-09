@@ -14,7 +14,13 @@ import {
   usRunningCollectorDocuments,
 } from "@/lib/microcosm/test-support/collector-run-fixtures";
 import type { ViewerZone } from "@/lib/microcosm/viewer-time";
-import { linkedRunOptionLabel, RunHistoryItem, RunOverview, runOptionLabel } from "./build-monitor-view";
+import {
+  linkedRunFailure,
+  linkedRunOptionLabel,
+  RunHistoryItem,
+  RunOverview,
+  runOptionLabel,
+} from "./build-monitor-view";
 import { useViewerZone } from "./viewer-time";
 
 const LONDON: ViewerZone = { timeZone: "Europe/London", locale: "en-GB" };
@@ -135,6 +141,16 @@ test("a linked run whose detail failed is named by the failure, not left loading
   );
   expect(linkedRunOptionLabel("some-run", undefined, INVESTIGATION_NOW_MS, NEW_YORK, "unavailable")).toBe(
     "Run unavailable",
+  );
+});
+
+test("a linked run not found before the run list arrives still reads as loading, as it will give way", () => {
+  expect(linkedRunFailure({ notFound: true, failed: true, replacing: false, listLoading: true })).toBeNull();
+  expect(linkedRunFailure({ notFound: true, failed: true, replacing: true, listLoading: false })).toBeNull();
+  // With the list loaded and no other run to give way to, the failure shows.
+  expect(linkedRunFailure({ notFound: true, failed: true, replacing: false, listLoading: false })).toBe("not_found");
+  expect(linkedRunFailure({ notFound: false, failed: true, replacing: false, listLoading: false })).toBe(
+    "unavailable",
   );
 });
 

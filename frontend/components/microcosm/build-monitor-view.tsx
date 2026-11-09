@@ -307,6 +307,25 @@ export function linkedRunOptionLabel(
   return "Loading run…";
 }
 
+// What the Run selector says went wrong with a linked run's detail, if
+// anything. A run about to give way to the default run is still loading, and
+// so is one not found before the run list arrives, as it gives way then.
+export function linkedRunFailure({
+  notFound,
+  failed,
+  replacing,
+  listLoading,
+}: {
+  notFound: boolean;
+  failed: boolean;
+  replacing: boolean;
+  listLoading: boolean;
+}): "not_found" | "unavailable" | null {
+  if (replacing || (notFound && listLoading)) return null;
+  if (notFound) return "not_found";
+  return failed ? "unavailable" : null;
+}
+
 // The Build progress tab of the Staging candidates page. `preferredRunId`
 // is the run the page's URL names, chosen on either tab; a run picked here is
 // reported back through `onRunChange` so the other tab opens on it.
@@ -421,8 +440,12 @@ export function BuildMonitorView({
               data?.run,
               nowMs,
               zone,
-              // A run about to give way to the default run is still loading.
-              replacingRun ? null : runNotFound ? "not_found" : detail.error ? "unavailable" : null,
+              linkedRunFailure({
+                notFound: runNotFound,
+                failed: Boolean(detail.error),
+                replacing: replacingRun,
+                listLoading: list.isLoading,
+              }),
             ),
             group: "Linked run, not in this list",
           },

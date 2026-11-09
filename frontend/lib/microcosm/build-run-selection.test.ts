@@ -55,6 +55,12 @@ test("the run already selected is never written back into the URL", () => {
   expect(buildRunToShow(RUNS, "ended", undefined, false)).toEqual({ runId: "ended", urlRunId: null });
 });
 
+test("after Back or Forward between two runs outside the list, the run the URL names is kept", () => {
+  // For a render the selected run is the previous entry's; the copy from the
+  // URL then selects the new one, and nothing replaces it with the default.
+  expect(buildRunToShow(RUNS, "older-a", "older-b", false)).toEqual({ runId: "older-a", urlRunId: null });
+});
+
 test("a run the URL names that no source holds gives way to the default run, in the URL too", () => {
   expect(buildRunToShow(RUNS, "not-a-run", "not-a-run", true)).toEqual({ runId: "running", urlRunId: "running" });
   // The default never falls back to the run that was not found.

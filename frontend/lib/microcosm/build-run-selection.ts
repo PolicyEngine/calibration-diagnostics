@@ -28,6 +28,9 @@ export function nextBuildRunSelection(
 // Only a run this rule switches to is written: choosing a run writes it at
 // once, and after Back or Forward changes the URL's run, the selected run is
 // the old one for a render, so writing it back would undo the navigation.
+// While a selected run and the URL's run differ, nothing changes: either the
+// URL changed and the view copies its run next, or a choice is on its way
+// into the URL.
 export function buildRunToShow(
   runs: readonly BuildTimeline[],
   selected: string,
@@ -35,6 +38,7 @@ export function buildRunToShow(
   selectedNotFound: boolean,
 ): { runId: string; urlRunId: string | null } {
   if (!runs.length) return { runId: selected, urlRunId: null };
+  if (selected && preferredRunId && selected !== preferredRunId) return { runId: selected, urlRunId: null };
   if (selectedNotFound && selected) {
     const others = runs.filter((run) => run.run_id !== selected);
     if (!others.length) return { runId: selected, urlRunId: null };

@@ -30,9 +30,10 @@ const RUN = {
   })),
 } as unknown as BuildTimeline;
 
-// Five runs finished calibration, two the inputs stage, none export. The
-// statistics include this run, as the build monitor's do: the inputs stage
-// took 6 and 10 minutes, and calibration 20, 25, 30, 30 and 60.
+// Five runs finished calibration, two the inputs stage, and only this run
+// export. The statistics include this run, as the build monitor's do: the
+// inputs stage took 6 and 10 minutes, calibration 20, 25, 30, 30 and 60, and
+// export 5.
 const STATS = [
   {
     stage: "load_inputs",
@@ -53,10 +54,10 @@ const STATS = [
   {
     stage: "export",
     samples: 1,
-    cut_short: 1,
-    finished_median_ms: null,
-    finished_p90_ms: null,
-    finished_max_ms: null,
+    cut_short: 0,
+    finished_median_ms: 5 * MINUTE,
+    finished_p90_ms: 5 * MINUTE,
+    finished_max_ms: 5 * MINUTE,
   },
 ] as StageStat[];
 
@@ -84,7 +85,7 @@ test("the This run card lists each stage slowest first with its time, share, and
     ["Calibrate", "", "1 h", "75%", "30 min", "48 min", "1 h", "+30 min (2.0×) past the 90th percentile"],
     // Two runs only: too few for a 90th percentile.
     ["Load inputs", "", "10 min", "13%", "8 min · 2 runs", "—", "10 min", "+2 min"],
-    ["Export", "", "5 min", "6%", "—", "—", "—", "—"],
+    ["Export", "", "5 min", "6%", "5 min · 1 run", "—", "5 min", "about typical"],
     ["Between stages", "", "5 min", "6%", "", "", "", ""],
   ]);
 });
