@@ -4,6 +4,10 @@ The **Build progress** tab of Staging candidates
 (`/microcosm/staging?view=progress`) shows a Microcosm build as it runs,
 predicts when it will finish, and summarizes where build time goes and which
 checks stop builds. The run selected on either tab carries over to the other.
+Choosing a run writes it into the URL with the country
+(`?view=progress&country=uk&run=<run id>`), so the address opens that run;
+a run that neither the collector nor the Hugging Face history holds for that
+country shows "Run not found".
 
 ## Sources
 
@@ -56,8 +60,14 @@ checks stop builds. The run selected on either tab carries over to the other.
   with it in flight. Every collector request needs the collector's read
   credential from Google Secret Manager, and that read follows the same
   rule: a read still in flight is shared for 5 seconds after it began, and a
-  read that answered is reused for 60 seconds after it began. Each run's own
-  record is read on every request, as before.
+  read that answered is reused for 60 seconds after it began. A run's own
+  record is read again only when its row in the collector's list changes
+  (`updated_at`, `status`, `started_at`, `current_stage`, `ended_at` or
+  `heartbeat_at`); an unfinished run's record is also read again once the
+  copy is 5 minutes old, because events delivered late can change it without
+  changing its row. The run detail reads through the same list and copy, and
+  reads a run on its own only when it is older than the list's 60 runs or the
+  list cannot be read.
 - **Local run folders.** The dashboard can still inspect legacy or diagnostic
   run folders on the same machine. Point it at the directory that holds them:
 
@@ -193,6 +203,20 @@ gate battery's blocking failure count, so it is not counted as a recorded
 failure class. "Run history" lists
 every run of the pipeline, newest first, on one time scale; selecting a row
 opens that run, and runs with a different stage sequence are listed apart.
+"This run by stage" lists the selected run's top-level stages, slowest first,
+with:
+- each stage's time, summed over every attempt;
+- its share of the run's elapsed time (to its end, its last telemetry if it
+  stalled, or now);
+- the typical time from "Where build time goes", with the number of runs that
+  finished the stage when fewer than three;
+- how far over or under typical it ran: "about typical" within a minute or
+  5%, and the ratio from 1.5×.
+
+A stage still running, or stopped early, is compared only once it has run past
+typical. A time beyond "about typical" and past the 90th percentile is shown
+in red, only when at least three runs finished the stage. Time spent in no top-level stage gets a "Between
+stages" row from one minute.
 
 The US release reports each engine batch during target compilation and each
 batch during post-export scoring. UK graph builds report each completed graph

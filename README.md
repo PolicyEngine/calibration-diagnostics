@@ -51,7 +51,7 @@ dashboard API layer.
   Face copy that recorded the end later. Runs only the
   collector knows have no candidate files and appear on Build progress only.
 - **Build progress** (the second tab of Staging candidates,
-  `/microcosm/staging?view=progress`) — follow a build run while it runs,
+  `/microcosm/staging?view=progress`, with `&run=<run id>` for one run) — follow a build run while it runs,
   from the staging repository or from the `runs/<run_id>/` telemetry folders a
   Microcosm build writes on the machine it runs on: a stage timeline, an
   expected finish time with a 90% range, calibration speed, where build time

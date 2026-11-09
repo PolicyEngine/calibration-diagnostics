@@ -87,3 +87,15 @@ test("property: a present URL country is shown as itself or as not configured", 
     { numRuns: 1_000 },
   );
 });
+
+test("country switching clears the Staging page's selected run", () => {
+  // Run identifiers belong to one country's builds.
+  const switched = new URL(
+    countrySwitchUrl(
+      "https://example.test/microcosm/staging?country=us&view=progress&run=populace-us-2024-65671e1-9434c504ba2a-20261103T095117Z",
+      "uk",
+    ),
+  );
+
+  expect(switched.searchParams.toString()).toBe("country=uk&view=progress");
+});
