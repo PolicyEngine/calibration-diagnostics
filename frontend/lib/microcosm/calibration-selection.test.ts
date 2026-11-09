@@ -321,9 +321,9 @@ test("a picked From build's date reads in the viewer's zone", () => {
       .tabLabel.replace(/\u202f/g, " "),
   ).toBe(`Change from build Oct 17, 09:02 AM · ${EARLIER_CANDIDATE_RUN}`);
   // A second zone, so a runtime in New York cannot pass without the zone.
-  const baku: ViewerZone = { timeZone: "Asia/Baku", locale: "en-US" };
+  const london: ViewerZone = { timeZone: "Europe/London", locale: "en-GB" };
   expect(
-    stagingComparisonBaseline(NATIONAL_COMPARISON, EARLIER_CANDIDATE_BUILD, undefined, baku)
+    stagingComparisonBaseline(NATIONAL_COMPARISON, EARLIER_CANDIDATE_BUILD, undefined, london)
       .tabLabel.replace(/\u202f/g, " "),
-  ).toBe(`Change from build Oct 17, 05:02 PM · ${EARLIER_CANDIDATE_RUN}`);
+  ).toBe(`Change from build 17 Oct, 14:02 · ${EARLIER_CANDIDATE_RUN}`);
 });

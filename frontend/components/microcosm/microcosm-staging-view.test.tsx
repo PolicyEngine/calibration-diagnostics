@@ -206,11 +206,11 @@ test("an overview time row keeps its full text on hover, above the time in full 
     buildTimeline(usFailedCollectorDocuments(), INVESTIGATION_NOW_MS),
     INVESTIGATION_NOW_MS,
   );
-  const baku: ViewerZone = { timeZone: "Asia/Baku", locale: "en-US" };
+  const london: ViewerZone = { timeZone: "Europe/London", locale: "en-GB" };
 
   for (const [zone, copyUpdated, copyHover] of [
     [NEW_YORK, "updated Oct 20, 02:09 AM EDT", "Tue, Oct 20, 2026, 02:09:35 AM EDT · 2026-10-20 06:09:35 UTC"],
-    [baku, "updated Oct 20, 10:09 AM GMT+4", "Tue, Oct 20, 2026, 10:09:35 AM GMT+4 · 2026-10-20 06:09:35 UTC"],
+    [london, "updated 20 Oct, 07:09 BST", "Tue, 20 Oct 2026, 07:09:35 BST · 2026-10-20 06:09:35 UTC"],
   ] as const) {
     const markup = plain(
       renderToStaticMarkup(

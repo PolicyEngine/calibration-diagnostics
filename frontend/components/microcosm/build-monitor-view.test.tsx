@@ -17,7 +17,7 @@ import type { ViewerZone } from "@/lib/microcosm/viewer-time";
 import { RunHistoryItem, RunOverview, runOptionLabel } from "./build-monitor-view";
 import { useViewerZone } from "./viewer-time";
 
-const BAKU: ViewerZone = { timeZone: "Asia/Baku", locale: "en-US" };
+const LONDON: ViewerZone = { timeZone: "Europe/London", locale: "en-GB" };
 const NEW_YORK: ViewerZone = { timeZone: "America/New_York", locale: "en-US" };
 
 // Some versions of the Unicode locale data put a narrow no-break space
@@ -70,13 +70,14 @@ function overview(
 }
 
 test("the run overview names the viewer's zone on the run's start and end, with UTC on hover", () => {
-  const markup = overview(failedRun(), null, BAKU);
+  // In October London keeps summer time (BST, UTC+1).
+  const markup = overview(failedRun(), null, LONDON);
 
   expect(markup).toContain(
-    'Started <time dateTime="2026-10-19T22:23:36.000Z" title="Tue, Oct 20, 2026, 02:23:36 AM GMT+4 · 2026-10-19 22:23:36 UTC">Oct 20, 02:23 AM GMT+4</time>',
+    'Started <time dateTime="2026-10-19T22:23:36.000Z" title="Mon, 19 Oct 2026, 23:23:36 BST · 2026-10-19 22:23:36 UTC">19 Oct, 23:23 BST</time>',
   );
   expect(markup).toContain(
-    '<time dateTime="2026-10-20T06:37:45.000Z" title="Tue, Oct 20, 2026, 10:37:45 AM GMT+4 · 2026-10-20 06:37:45 UTC">Oct 20, 10:37 AM GMT+4</time>',
+    '<time dateTime="2026-10-20T06:37:45.000Z" title="Tue, 20 Oct 2026, 07:37:45 BST · 2026-10-20 06:37:45 UTC">20 Oct, 07:37 BST</time>',
   );
 });
 
