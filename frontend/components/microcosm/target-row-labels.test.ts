@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
-import edFsaFamily from "@/packages/calibration-tree/src/fixtures/ed-fsa-family/ed-fsa-family-schema-8.json";
-import hierarchyProbeTargets from "@/packages/calibration-tree/src/fixtures/mixed-groupby-storage/hierarchy-probe-targets.json";
-import listedDimensionTargets from "@/packages/calibration-tree/src/fixtures/mixed-groupby-storage/listed-dimension-targets.json";
+import edFsaFamily from "./fixtures/ed-fsa-family/ed-fsa-family-schema-8.json";
+import hierarchyProbeTargets from "./fixtures/mixed-groupby-storage/hierarchy-probe-targets.json";
+import listedDimensionTargets from "./fixtures/mixed-groupby-storage/listed-dimension-targets.json";
 import type { MicrocosmTargetRow } from "@/lib/api/hooks/use-microcosm";
 import {
   buildCalibration,

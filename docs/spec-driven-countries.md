@@ -33,7 +33,7 @@ contract: they are served only by `/microcosm/datasets` from
 
 ## Code-owned metadata that remains
 
-`COUNTRY_REGISTRY` in `frontend/packages/calibration-tree/src/countries.ts` is the only required
+`COUNTRY_REGISTRY` in the calibration tree package's `src/countries.ts` is the only required
 registration point: country unions and parsers, selector lists, dataset and
 national-geography labels, public/private link behavior, and page gating read
 the registration or the artifact `country` block. Overview and target-browser
@@ -81,11 +81,17 @@ production tables.
 
 ### Country
 
-`release_manifest.country` is read by `releaseCountry` in
-`frontend/packages/calibration-tree/src/latest-artifact.ts` and served as `country` on the
+`release_manifest.country` is read by `releaseCountry` in the calibration tree
+package's `src/latest-artifact.ts` and served as `country` on the
 overview summary and the target-diagnostics page (client type
 `MicrocosmArtifactCountry`). Registration lives in
-`frontend/packages/calibration-tree/src/countries.ts`; adding a country is one entry there.
+the package's `src/countries.ts`; adding a country is one entry there.
+
+The package is `@policyengine/calibration-tree`. Its source is
+`packages/calibration-tree` in PolicyEngine/microcosm-collector, which publishes it
+to npm; the dashboard installs one pinned version (`frontend/package.json`). So a
+new registration is a collector pull request that adds the entry and raises the
+package's version, then a pull request here that raises the pinned version.
 
 ```json
 {
@@ -126,7 +132,7 @@ one reader for the complete file, never by country or individual row shape. See
 ### Requests for a country
 
 Every API route and page that takes `?country=` resolves it with
-`countryParam` in `frontend/packages/calibration-tree/src/countries.ts`:
+`countryParam` in the calibration tree package's `src/countries.ts`:
 
 - absent (or empty): the registry default, `us`;
 - a selectable registration key, exactly: that country;
@@ -160,8 +166,9 @@ refused this way.
 Registering a country before its first release fails the deployment smoke
 check, which requires every selectable `calibration` country to serve a
 release, until `publish-calibration-tree.yml` has written that country's
-manifest entry. Merge the registration, dispatch the publisher for the
-country from `main`, then re-run the deployment.
+manifest entry. Merge the pull request that raises the package to the version
+with the registration, dispatch the publisher for the country from `main`, then
+re-run the deployment.
 
 ### Presentation
 

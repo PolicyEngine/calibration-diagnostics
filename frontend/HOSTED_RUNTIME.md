@@ -168,7 +168,7 @@ performs these steps in order:
    waiting 780 seconds. The metadata checks and the post-promotion California checks
    instead make up to six attempts, pausing 5, 10, 15, 20 and 25 seconds between them,
    and retry any failure.
-8. Install the frontend workspace (`bun install --frozen-lockfile --ignore-scripts`)
+8. Install the frontend's dependencies (`bun install --frozen-lockfile --ignore-scripts`)
    and run the calibration release check against the candidate
    ([Promotion and rollback](#promotion-and-rollback)).
 9. Promote the Vercel deployment with `vercel promote`.
@@ -296,7 +296,7 @@ monitor that shows these runs.
 
 Each registered country's release and staging repositories can be overridden on the
 dashboard server by the settings its registration names (`repo_env` and `revision_env`
-in `frontend/packages/calibration-tree/src/countries.ts`, such as `POPULACE_HF_REPO`
+in the calibration tree package's `src/countries.ts`, such as `POPULACE_HF_REPO`
 for the US). None of these overrides was set in the Vercel project on 2026-10-26.
 
 ## Preview deployment
@@ -439,13 +439,13 @@ unregistered two-letter country code to be refused as not configured (HTTP 404),
 answered with another country's release. Public US calculations alone do not qualify
 private release access.
 
-The script imports the `@policyengine/calibration-tree` workspace package, so the
+The script imports the `@policyengine/calibration-tree` npm package, so the
 workflow runs `bun install --frozen-lockfile --ignore-scripts` in `frontend` before the
 first check. It installs after the Vercel upload, which sends the repository root, so the
 uploaded files never include `node_modules`. Lifecycle scripts are skipped because the
 job holds Google Cloud credentials and can request GitHub OIDC tokens. Both checks run
 `bun run --no-install`, so Bun never installs a missing package from npm by itself;
-without the workspace install, a check fails.
+without the job's install, a check fails.
 
 The calibration release check retries network failures and HTTP 5xx twice, after one
 and then two seconds, with a 60-second timeout per attempt. It never follows a
