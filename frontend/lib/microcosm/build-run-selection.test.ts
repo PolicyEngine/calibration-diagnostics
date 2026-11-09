@@ -6,6 +6,7 @@ import {
   candidateRunSelection,
   nextBuildRunSelection,
   placeholderHidesFailure,
+  runDetailLoading,
   waitsForRunList,
 } from "@/lib/microcosm/build-run-selection";
 
@@ -142,4 +143,15 @@ test("a run whose detail failed is never drawn with the previous run's detail wh
   // while the new one loads.
   expect(placeholderHidesFailure(true, 0)).toBe(false);
   expect(placeholderHidesFailure(false, 2)).toBe(false);
+});
+
+test("a run being asked for again, with no detail to draw, shows as loading", () => {
+  // A retry with the previous run's placeholder hidden: TanStack Query
+  // reports placeholder data as loaded, not loading.
+  expect(runDetailLoading({ isLoading: false, isFetching: true }, false)).toBe(true);
+  expect(runDetailLoading({ isLoading: true, isFetching: true }, false)).toBe(true);
+  // A refresh of a run on screen is not shown as loading.
+  expect(runDetailLoading({ isLoading: false, isFetching: true }, true)).toBe(false);
+  // A run that failed and is not being asked for shows its error.
+  expect(runDetailLoading({ isLoading: false, isFetching: false }, false)).toBe(false);
 });

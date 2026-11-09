@@ -24,7 +24,12 @@ import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
 import { detailBehindList } from "@/lib/microcosm/build-refresh";
 import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
-import { buildRunToShow, placeholderHidesFailure, waitsForRunList } from "@/lib/microcosm/build-run-selection";
+import {
+  buildRunToShow,
+  placeholderHidesFailure,
+  runDetailLoading,
+  waitsForRunList,
+} from "@/lib/microcosm/build-run-selection";
 import {
   NO_FOCUS,
   pointerHovers,
@@ -516,7 +521,7 @@ export function BuildMonitorView({
           title={source === "local" ? "Local runs are off" : "Hosted runs unavailable"}
           description={list.data.detail ?? undefined}
         />
-      ) : !runs.length && !(selected && (data || detail.isLoading)) ? (
+      ) : !runs.length && !(selected && (data || runDetailLoading(detail, false))) ? (
         <EmptyState
           title="No build runs found"
           description={
@@ -525,7 +530,7 @@ export function BuildMonitorView({
               : "The collector and historical staging repository have no runs for this country."
           }
         />
-      ) : (detail.isLoading && !data) || replacingRun ? (
+      ) : runDetailLoading(detail, data != null) || replacingRun ? (
         <LoadingBlock label="Loading run…" />
       ) : detail.error ? (
         <EmptyState

@@ -83,3 +83,12 @@ export function waitsForRunList(
 export function placeholderHidesFailure(isPlaceholderData: boolean, errorUpdateCount: number): boolean {
   return isPlaceholderData && errorUpdateCount > 0;
 }
+
+// Whether the build monitor shows the selected run as loading: its detail is
+// being asked for and there is no detail to draw.
+export function runDetailLoading(
+  detail: { isLoading: boolean; isFetching: boolean },
+  hasDetailToDraw: boolean,
+): boolean {
+  return detail.isLoading && !hasDetailToDraw;
+}
