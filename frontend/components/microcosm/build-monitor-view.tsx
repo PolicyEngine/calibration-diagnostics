@@ -24,7 +24,7 @@ import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
 import { detailBehindList } from "@/lib/microcosm/build-refresh";
 import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
-import { buildRunToShow, waitsForRunList } from "@/lib/microcosm/build-run-selection";
+import { buildRunToShow, placeholderHidesFailure, waitsForRunList } from "@/lib/microcosm/build-run-selection";
 import {
   NO_FOCUS,
   pointerHovers,
@@ -400,7 +400,11 @@ export function BuildMonitorView({
   };
 
   const detail = useBuildRun(source, selected || undefined);
-  const data = detail.data;
+  // While a run that failed is asked for again, the previous run's detail
+  // stands in as a placeholder; the tab shows it loading instead.
+  const data = placeholderHidesFailure(detail.isPlaceholderData, detail.errorUpdateCount)
+    ? undefined
+    : detail.data;
   const runNotFound = detail.error instanceof ApiError && detail.error.status === 404;
   // The page's URL names the run shown: the default run is written there, and
   // a run no source holds gives way to the default run.

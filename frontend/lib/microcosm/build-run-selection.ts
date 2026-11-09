@@ -80,6 +80,6 @@ export function waitsForRunList(
 
 // Whether the run detail on screen is the previous run's, kept while the
 // selected run is asked for, after the selected run has already failed.
-export function placeholderHidesFailure(_isPlaceholderData: boolean, _errorUpdateCount: number): boolean {
-  return false;
+export function placeholderHidesFailure(isPlaceholderData: boolean, errorUpdateCount: number): boolean {
+  return isPlaceholderData && errorUpdateCount > 0;
 }

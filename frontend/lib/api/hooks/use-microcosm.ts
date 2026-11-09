@@ -1683,8 +1683,8 @@ export function useBuildRun(source: BuildRunSource, runId?: string) {
       apiGet<BuildRunResponse>("/microcosm/builds/run", { source, country, id: runId }),
     enabled: Boolean(runId),
     placeholderData: keepPreviousData,
-    // A run that is not running does not change, so switching tabs does not
-    // ask for it again.
+    // A run that is not running is not asked for again when switching tabs;
+    // the build monitor asks again when the run list shows it changed.
     staleTime: (query) => (query.state.data?.run.state === "running" ? 30 * 1000 : Infinity),
     // A run that is not found gives way to the default run instead.
     refetchInterval: (query) =>
