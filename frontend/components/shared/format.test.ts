@@ -65,7 +65,7 @@ test("Microcosm cut labels name their line and attempt", () => {
   );
   expect(
     releaseLabel("populace-uk-2023-dd68c73-4aa4b14-20260619T023711Z", "20260619T023711Z"),
-  ).toBe("2026-06-19 02:37Z · dd68c73");
+  ).toBe("2026-06-19 02:37Z · populace");
 });
 
 test("build-folder labels name the release and the build", () => {

@@ -224,24 +224,24 @@ publication, Vercel Blob authentication, one-time historical publication, and
 cache behavior.
 
 The US variable-calculation service uses its reviewed immutable release. Leave
-`MICROCOSM_HF_REPO` and `MICROCOSM_HF_REVISION` unset for that service; conflicting
+`POPULACE_HF_REPO` and `POPULACE_HF_REVISION` unset for that service; conflicting
 overrides fail validation. Dashboard release discovery is separate: automated
 publication resolves Hugging Face sources to exact commits and records every
 immutable build in the dashboard's Vercel Blob manifest. The dashboard resolves
 both current and historical calibration maps through that manifest and uses a
 content-derived build artifact ID as the CDN path. Optional
-`MICROCOSM_UK_HF_REPO`, `MICROCOSM_UK_HF_REVISION` configure the UK;
-and `MICROCOSM_BE_HF_REPO`, `MICROCOSM_BE_HF_REVISION` for Belgium. The Belgium
+`POPULACE_UK_HF_REPO`, `POPULACE_UK_HF_REVISION` configure the UK;
+and `POPULACE_BE_HF_REPO`, `POPULACE_BE_HF_REVISION` for Belgium. The Belgium
 repository defaults in code to `policyengine/populace-be-private`. Set `HF_TOKEN`
 or `HUGGINGFACE_TOKEN` to read private datasets. Each country with the
 `staging` capability declares its own staging repository in the country
 registry; it never falls back to another country's repository. US staging
 defaults to `policyengine/populace-us-staging`; override it with the
-`MICROCOSM_STAGING_HF_REPO` and
-`MICROCOSM_STAGING_HF_REVISION` variables. UK staging defaults to the private dataset
+backward-compatible `POPULACE_STAGING_HF_REPO` and
+`POPULACE_STAGING_HF_REVISION` variables. UK staging defaults to the private dataset
 `policyengine/populace-uk-staging`; configure its server-only read credential as
-`MICROCOSM_UK_STAGING_HF_TOKEN`, and optionally override the dataset or revision
-with `MICROCOSM_UK_STAGING_HF_REPO` or `MICROCOSM_UK_STAGING_HF_REVISION`. Never
+`POPULACE_UK_STAGING_HF_TOKEN`, and optionally override the dataset or revision
+with `POPULACE_UK_STAGING_HF_REPO` or `POPULACE_UK_STAGING_HF_REVISION`. Never
 use a `NEXT_PUBLIC_` variable for a private-repository credential.
 
 A staging registration may also list `local_area_pipelines`: the

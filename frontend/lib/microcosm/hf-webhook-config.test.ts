@@ -27,8 +27,8 @@ test("applies repository and GitHub overrides from an explicit environment", () 
     GITHUB_ACTIONS_DISPATCH_TOKEN: "  github-token  ",
     CALIBRATION_TREE_GITHUB_REPOSITORY: "  example/dashboard  ",
     CALIBRATION_TREE_GITHUB_WORKFLOW: "  publish.yml  ",
-    MICROCOSM_UK_HF_REPO: "example/uk-release",
-    MICROCOSM_UK_STAGING_HF_REPO: "example/uk-staging",
+    POPULACE_UK_HF_REPO: "example/uk-release",
+    POPULACE_UK_STAGING_HF_REPO: "example/uk-staging",
   });
 
   expect(config).toMatchObject({

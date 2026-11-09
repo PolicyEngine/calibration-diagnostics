@@ -374,7 +374,7 @@ stem. A receipt recording several stem files has no target view.
 US and UK staging use the same inventory, source-normalization, build,
 validation, and Blob publication functions. Country registration supplies the
 repository and credential name. UK staging reads use
-`MICROCOSM_UK_STAGING_HF_TOKEN`; if a UK run points to a staged dataset in the UK
+`POPULACE_UK_STAGING_HF_TOKEN`; if a UK run points to a staged dataset in the UK
 release repository, that second read uses `HF_TOKEN`.
 
 For an existing manifest entry, the audit decompresses `index.json.gz`, checks
@@ -497,7 +497,7 @@ Never use a `NEXT_PUBLIC_` prefix for these values.
    is private.
 3. Store any country-specific staging credential under the registration's
    `token_env` name in both GitHub Actions and Vercel. The UK registration uses
-   `MICROCOSM_UK_STAGING_HF_TOKEN` in Vercel; keep the existing Actions secret name.
+   `POPULACE_UK_STAGING_HF_TOKEN`.
 4. Store `GITHUB_ACTIONS_DISPATCH_TOKEN` and `HF_WEBHOOK_SECRET` only in Vercel.
 
 To correct legacy release timestamps after PR #200, dispatch **Publish
