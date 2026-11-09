@@ -5,9 +5,9 @@ machine-readable interfaces owned by those upstream projects still use the
 older spellings listed below. Those literals are deprecated, but they
 must remain exact until the producer publishes and documents a replacement.
 
-Verified against the current upstream repositories and published artifacts on
-2026-08-12, and the two configuration rows on 2026-11-09, against
-`@policyengine/calibration-tree` 0.1.0 and this repository's code:
+These rows match the upstream repositories and published artifacts as of
+2026-08-12. The two configuration rows match `@policyengine/calibration-tree`
+0.1.0, this repository's code and Microcosm's US build tools as of 2026-11-09:
 
 | Owner | Current product name | Deprecated identifier retained here | Where it is consumed |
 |---|---|---|---|

@@ -20,7 +20,7 @@ const WEBHOOK_ENV: Partial<Record<MicrocosmCountry, string>> = {
 const LEGACY_WEBHOOK_ENV: Partial<Record<MicrocosmCountry, string>> = { // compat: populace alias, remove after 0.2.0
   us: "SLACK_WEBHOOK_POPULACE_US", // compat: populace alias, remove after 0.2.0
   uk: "SLACK_WEBHOOK_POPULACE_UK", // compat: populace alias, remove after 0.2.0
-};
+}; // compat: populace alias, remove after 0.2.0
 
 function countryWebhook(
   country: MicrocosmCountry,
@@ -28,7 +28,7 @@ function countryWebhook(
 ): string | undefined {
   const webhookEnv = WEBHOOK_ENV[country];
   const legacyWebhookEnv = LEGACY_WEBHOOK_ENV[country]; // compat: populace alias, remove after 0.2.0
-  return (webhookEnv ? environment[webhookEnv] : undefined) ??
+  return (webhookEnv ? environment[webhookEnv] : undefined) ?? // compat: populace alias, remove after 0.2.0
     (legacyWebhookEnv ? environment[legacyWebhookEnv] : undefined); // compat: populace alias, remove after 0.2.0
 }
 
