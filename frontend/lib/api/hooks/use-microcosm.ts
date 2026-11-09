@@ -52,7 +52,7 @@ import {
   type CountryCapability,
   type RepositoryVisibility,
 } from "@policyengine/calibration-tree/countries";
-import { apiGet } from "../client";
+import { ApiError, apiGet, retryFailedQuery } from "../client";
 
 export interface MicrocosmGates {
   parity_gaps?: number | null;
@@ -1665,6 +1665,14 @@ export function useBuildRuns(source: BuildRunSource, enabled = true) {
   });
 }
 
+// Whether to ask again for a run detail that failed: never when the server
+// found no such run (404), so a link to one says so at once; otherwise as
+// every query is (`retryFailedQuery`).
+export function retryBuildRun(failureCount: number, error: Error): boolean {
+  if (error instanceof ApiError && error.status === 404) return false;
+  return retryFailedQuery(failureCount, error);
+}
+
 export function useBuildRun(source: BuildRunSource, runId?: string) {
   const { country } = useCountry();
   return useQuery({
@@ -1675,5 +1683,6 @@ export function useBuildRun(source: BuildRunSource, runId?: string) {
     placeholderData: keepPreviousData,
     staleTime: 5 * 1000,
     refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+    retry: retryBuildRun,
   });
 }

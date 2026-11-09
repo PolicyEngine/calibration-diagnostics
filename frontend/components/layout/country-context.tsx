@@ -18,6 +18,7 @@ import {
   isSelectableCountry,
   type MicrocosmCountry,
 } from "@policyengine/calibration-tree/countries";
+import { STAGING_RUN_PARAM } from "@/lib/microcosm/staging-run-url";
 
 export type Country = MicrocosmCountry;
 
@@ -36,8 +37,10 @@ export function countrySwitchUrl(currentUrl: string, next: Country): string {
     url.search = "";
   } else {
     // Release identifiers are repository-specific. A release selected for one
-    // country must never be requested from another country's repository.
+    // country must never be requested from another country's repository, and
+    // a Staging page run belongs to one country's builds.
     url.searchParams.delete("release");
+    url.searchParams.delete(STAGING_RUN_PARAM);
   }
   url.searchParams.set("country", next);
   return url.toString();

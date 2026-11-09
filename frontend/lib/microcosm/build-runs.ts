@@ -38,6 +38,7 @@ import {
   loadStagingRunTelemetry,
 } from "@policyengine/calibration-tree/staging-artifact";
 import {
+  CollectorRequestError,
   type CollectorRunSummary,
   collectorConfigured,
   loadCollectorRun,
@@ -647,6 +648,33 @@ function timelines(
     .sort((a, b) => (b.started_ms ?? 0) - (a.started_ms ?? 0));
 }
 
+// Whether a run's documents record anything: Hugging Face answers a run it
+// has no files for with all of them empty.
+function recordsAnything(documents: BuildRunDocuments): boolean {
+  return (
+    documents.progress != null ||
+    documents.run_manifest != null ||
+    documents.calibration_progress != null ||
+    documents.events.length > 0
+  );
+}
+
+// What a run detail falls back to when neither source has a usable record:
+// the listed run; else, when the collector said it has no record of the run
+// (404) or was not asked, nothing, so the route answers "not found"; else the
+// collector's failure, which a missing Hugging Face copy does not explain.
+function withoutAnyRecord(
+  current: BuildTimeline | null,
+  collectorError: unknown,
+): BuildTimeline | null {
+  if (current != null) return current;
+  if (collectorError == null) return null;
+  if (collectorError instanceof CollectorRequestError && collectorError.status === 404) {
+    return null;
+  }
+  throw collectorError;
+}
+
 export async function refreshHostedRun(
   current: BuildTimeline | null,
   country: MicrocosmCountry,
@@ -673,11 +701,12 @@ export async function refreshHostedRun(
     }
   }
   if (!loaders.hasStagingHistory(country)) {
-    if (current == null && collectorError != null) throw collectorError;
-    return current;
+    return withoutAnyRecord(current, collectorError);
   }
   try {
-    return buildTimeline(await loaders.loadHistory(runId, country), nowMs);
+    const history = await loaders.loadHistory(runId, country);
+    if (!recordsAnything(history)) return withoutAnyRecord(current, collectorError);
+    return buildTimeline(history, nowMs);
   } catch (error) {
     if (current == null) throw error;
     return current;
