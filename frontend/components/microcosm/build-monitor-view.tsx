@@ -56,11 +56,17 @@ import {
   sameStageSequence,
   solverPassLabel,
   solverSegments,
-  spanDurationMs,
   stageCores,
   stageMemoryBytes,
   type StageSpan,
 } from "@/lib/microcosm/build-monitor";
+import {
+  type RunStage,
+  P90_MIN_RUNS,
+  type RunStageTime,
+  runStageBreakdown,
+  runStageTimes,
+} from "@/lib/microcosm/run-stage-breakdown";
 import {
   clockTime,
   runStartTime,
@@ -499,6 +505,12 @@ export function BuildMonitorView({
           <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} zone={zone} />
           <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
           <RunHistoryCard runs={runs} selected={data.run} nowMs={nowMs} zone={zone} onSelect={selectRun} />
+          <RunStageCard
+            run={data.run}
+            stageStats={data.stage_stats}
+            nowMs={nowMs}
+            pipelineLabel={data.run.pipeline_label}
+          />
           <TimeBudgetCard
             run={data.run}
             nowMs={nowMs}
@@ -1294,35 +1306,6 @@ function PhaseLegend() {
   );
 }
 
-// What one run did in each of its top-level stages: how long it spent there
-// and how the stage ended for it.
-interface RunStage {
-  ms: number;
-  status: "completed" | "running" | "failed" | "silent";
-}
-
-function runStages(run: BuildTimeline, nowMs: number): Map<string, RunStage> {
-  const top = run.spans.filter((span) => span.depth === 0);
-  const last = top[top.length - 1];
-  const stages = new Map<string, RunStage>();
-  for (const span of top) {
-    const status: RunStage["status"] =
-      span.end_ms == null
-        ? "running"
-        : span.status === "failed"
-          ? "failed"
-          : run.state === "stalled" && span === last
-            ? "silent"
-            : "completed";
-    const previous = stages.get(span.stage);
-    stages.set(span.stage, {
-      ms: (previous?.ms ?? 0) + spanDurationMs(span, nowMs),
-      status: previous?.status === "failed" ? "failed" : status,
-    });
-  }
-  return stages;
-}
-
 // A stage this run is in that no compared run has finished yet.
 function emptyStat(span: StageSpan): StageStat {
   return {
@@ -1342,6 +1325,134 @@ function emptyStat(span: StageSpan): StageStat {
     cores_median: null,
     memory_max_bytes: null,
   };
+}
+
+// How a stage's time compares with the typical time: "+30 min (2.0×)",
+// "−4 min", "about typical" within a minute or 5%, or "—" without one.
+function againstTypical(stage: RunStageTime): string {
+  const over = stage.over_typical_ms;
+  const typical = stage.typical_ms;
+  if (over == null || typical == null) return "—";
+  if (stage.about_typical) return "about typical";
+  if (over < 0) return `−${fmtDuration(-over)}`;
+  const ratio = typical > 0 ? stage.ms / typical : null;
+  return `+${fmtDuration(over)}${ratio != null && ratio >= 1.5 ? ` (${ratio.toFixed(1)}×)` : ""}`;
+}
+
+// The selected run's stages, slowest first, beside the pipeline's typical
+// times, so the stages that took this run longest are plain to see.
+export function RunStageCard({
+  run,
+  stageStats,
+  nowMs,
+  pipelineLabel,
+}: {
+  run: BuildTimeline;
+  stageStats: StageStat[];
+  nowMs: number;
+  pipelineLabel: string;
+}) {
+  const breakdown = useMemo(() => runStageBreakdown(run, stageStats, nowMs), [run, stageStats, nowMs]);
+  if (!breakdown.stages.length) return null;
+  const longest = Math.max(
+    1,
+    ...breakdown.stages.map((stage) => Math.max(stage.ms, stage.typical_ms ?? 0)),
+  );
+  const share = (value: number | null) => (value == null ? "—" : `${Math.round(value * 100)}%`);
+  return (
+    <SectionCard
+      title="This run by stage"
+      descriptionClassName="max-w-none"
+      description={`How long each of this run's stages took, slowest first, and its share of the run's ${fmtDuration(
+        breakdown.total_ms,
+      )}${run.state === "running" ? " so far" : ""}. Typical is the median time of the ${pipelineLabel} runs with this stage sequence that finished the stage (this run included when it did), with their number when fewer than three. A stage still running, or stopped early, is compared only once it has run past typical. A time beyond "about typical" and past those runs' 90th percentile is shown in red, when at least three runs finished the stage.`}
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs tabular-nums">
+          <thead className="text-left text-muted-foreground">
+            <tr className="border-b border-border">
+              <th className="pb-1.5 font-medium">Stage</th>
+              <th className="pb-1.5 font-medium">This run</th>
+              <th className="pb-1.5 text-right font-medium">Share</th>
+              <th className="pb-1.5 text-right font-medium">Typical</th>
+              <th className="pb-1.5 text-right font-medium">Against typical</th>
+            </tr>
+          </thead>
+          <tbody>
+            {breakdown.stages.map((stage) => {
+              const pastP90 = stage.past_p90;
+              return (
+                <tr key={stage.stage} className="border-b border-border/60 last:border-b-0">
+                  <td className="py-1.5 pr-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        aria-hidden="true"
+                        className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                        style={{ background: PHASE_COLOR[stage.phase] }}
+                      />
+                      {formatStageName(stage.stage)}
+                    </span>
+                  </td>
+                  <td className="w-[40%] py-1.5 pr-3">
+                    <div className="flex items-center gap-2">
+                      <span className="relative h-2 flex-1 rounded-sm bg-muted/40">
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-y-0 left-0 rounded-sm"
+                          style={{
+                            width: `${Math.max(1, (stage.ms / longest) * 100)}%`,
+                            background: stage.status === "failed" ? FAILED_COLOR : PHASE_COLOR[stage.phase],
+                          }}
+                        />
+                        {stage.typical_ms != null ? (
+                          <span
+                            aria-hidden="true"
+                            title={`Typical: ${fmtDuration(stage.typical_ms)}`}
+                            className="absolute -inset-y-0.5 w-0.5 bg-foreground/70"
+                            style={{ left: `${(stage.typical_ms / longest) * 100}%` }}
+                          />
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 whitespace-nowrap">
+                        <ThisRunCell stage={stage} />
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-1.5 text-right">{share(stage.share)}</td>
+                  <td className="py-1.5 text-right">
+                    {stage.typical_ms != null
+                      ? `${fmtDuration(stage.typical_ms)}${
+                          stage.typical_runs < P90_MIN_RUNS
+                            ? ` · ${stage.typical_runs} run${stage.typical_runs === 1 ? "" : "s"}`
+                            : ""
+                        }`
+                      : "—"}
+                  </td>
+                  <td
+                    className={`py-1.5 text-right ${pastP90 ? "font-medium tone-neg" : "text-muted-foreground"}`}
+                  >
+                    {againstTypical(stage)}
+                    {pastP90 ? <span className="sr-only"> past the 90th percentile</span> : null}
+                  </td>
+                </tr>
+              );
+            })}
+            {breakdown.between_stages_ms >= 60_000 ? (
+              <tr className="text-muted-foreground">
+                <td className="py-1.5 pr-3">Between stages</td>
+                <td className="py-1.5 pr-3">{fmtDuration(breakdown.between_stages_ms)}</td>
+                <td className="py-1.5 text-right">
+                  {share(breakdown.total_ms ? breakdown.between_stages_ms / breakdown.total_ms : null)}
+                </td>
+                <td />
+                <td />
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
 }
 
 function ThisRunCell({ stage }: { stage: RunStage | undefined }) {
@@ -1377,7 +1488,7 @@ function TimeBudgetCard({
   totals: PhaseTotals[];
 }) {
   const [expanded, setExpanded] = useState(false);
-  const thisRun = useMemo(() => runStages(run, nowMs), [run, nowMs]);
+  const thisRun = useMemo(() => runStageTimes(run, nowMs), [run, nowMs]);
   // Every stage a compared run reached, plus any this run is in that none
   // has finished yet (its open stage). Longest typical time first; stages
   // without one follow by this run's time in them.
