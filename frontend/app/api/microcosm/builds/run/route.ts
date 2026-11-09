@@ -3,11 +3,7 @@ import { NextResponse } from "next/server";
 import { requestedCountry } from "@/lib/api/request-country";
 import { parseBuildSource } from "@/lib/microcosm/build-source";
 import { loadBuildRun } from "@/lib/microcosm/build-runs";
-import {
-  assertSafeReleaseId,
-  InvalidReleaseIdError,
-  scrub,
-} from "@policyengine/calibration-tree/latest-artifact";
+import { InvalidReleaseIdError, scrub } from "@policyengine/calibration-tree/latest-artifact";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,19 +23,16 @@ export function createBuildRunHandler(loadRun: typeof loadBuildRun = loadBuildRu
     }
     const notFound = () =>
       NextResponse.json({ detail: `Run ${runId} was not found.` }, { status: 404 });
-    // An ID outside the run ID allowlist can name no run: not found, so the
-    // page gives way to its default run, as for any other missing run.
-    try {
-      assertSafeReleaseId(runId, "run");
-    } catch (error) {
-      if (error instanceof InvalidReleaseIdError) return notFound();
-      throw error;
-    }
     try {
       const run = await loadRun(source, country, runId);
       if (!run) return notFound();
       return NextResponse.json(scrub(run), { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
+      // The loader rejects an ID that no source it reads could hold (the
+      // Hugging Face history's allowlist is narrower than the collector's,
+      // and is checked only when no listed run matched): not found, so the
+      // page gives way to its default run, as for any other missing run.
+      if (error instanceof InvalidReleaseIdError) return notFound();
       return NextResponse.json(
         { detail: error instanceof Error ? error.message : String(error) },
         { status: 502 },

@@ -444,7 +444,9 @@ export function BuildMonitorView({
                 notFound: runNotFound,
                 failed: Boolean(detail.error),
                 replacing: replacingRun,
-                listLoading: list.isLoading,
+                // As for the wait for the run list below: with a local runs
+                // folder, the hosted list waits for the local one.
+                listLoading: list.isLoading || (localRunsEnabled && local.isLoading),
               }),
             ),
             group: "Linked run, not in this list",

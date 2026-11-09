@@ -24,3 +24,20 @@ test("a run ID that cannot name any run is not found, so the page gives way to t
     expect(await response.json()).toEqual({ detail: `Run ${runId} was not found.` });
   }
 });
+
+test("a run ID only the collector's wider ID rule allows still opens", async () => {
+  // The collector accepts colons and IDs up to 192 characters, which the
+  // Hugging Face allowlist does not; the loader finds such a run in the
+  // collector's list.
+  const runId = "populace-us-2024:smoke-20261109T120000Z";
+  const requested: string[] = [];
+  const loadRunFromCollector = (async (_source, _country, id) => {
+    requested.push(id);
+    return { run: { run_id: id } };
+  }) as typeof loadBuildRun;
+  const handler = createBuildRunHandler(loadRunFromCollector);
+
+  const response = await handler(new Request(runDetailUrl(runId)));
+  expect(response.status).toBe(200);
+  expect(requested).toEqual([runId]);
+});
