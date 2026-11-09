@@ -129,6 +129,15 @@ function ZoneProbe() {
   return createElement("span", null, useViewerZone()?.timeZone ?? "no zone");
 }
 
+test("a linked run whose detail failed is named by the failure, not left loading", () => {
+  expect(linkedRunOptionLabel("not-a-run", undefined, INVESTIGATION_NOW_MS, NEW_YORK, "not_found")).toBe(
+    "Run not found",
+  );
+  expect(linkedRunOptionLabel("some-run", undefined, INVESTIGATION_NOW_MS, NEW_YORK, "unavailable")).toBe(
+    "Run unavailable",
+  );
+});
+
 // The server cannot know the browser's zone, so it formats no time in one.
 test("the zone is unknown during the server's render", () => {
   expect(renderToStaticMarkup(createElement(ZoneProbe))).toBe("<span>no zone</span>");

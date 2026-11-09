@@ -30,23 +30,25 @@ const RUN = {
   })),
 } as unknown as BuildTimeline;
 
-// Five runs finished calibration, two the inputs stage, none export.
+// Five runs finished calibration, two the inputs stage, none export. The
+// statistics include this run, as the build monitor's do: the inputs stage
+// took 6 and 10 minutes, and calibration 20, 25, 30, 30 and 60.
 const STATS = [
   {
     stage: "load_inputs",
     samples: 2,
     cut_short: 0,
     finished_median_ms: 8 * MINUTE,
-    finished_p90_ms: 9 * MINUTE,
-    finished_max_ms: 9 * MINUTE,
+    finished_p90_ms: 9.6 * MINUTE,
+    finished_max_ms: 10 * MINUTE,
   },
   {
     stage: "calibrate",
     samples: 5,
     cut_short: 0,
     finished_median_ms: 30 * MINUTE,
-    finished_p90_ms: 40 * MINUTE,
-    finished_max_ms: 55 * MINUTE,
+    finished_p90_ms: 48 * MINUTE,
+    finished_max_ms: 60 * MINUTE,
   },
   {
     stage: "export",
@@ -79,9 +81,9 @@ test("the This run card lists each stage slowest first with its time, share, and
   expect(markup).toContain("This run by stage");
   expect(cells(markup)).toEqual([
     ["Stage", "This run", "Share", "p50", "p90", "Max", "Against p50"],
-    ["Calibrate", "", "1 h", "75%", "30 min", "40 min", "55 min", "+30 min (2.0×) past the 90th percentile"],
+    ["Calibrate", "", "1 h", "75%", "30 min", "48 min", "1 h", "+30 min (2.0×) past the 90th percentile"],
     // Two runs only: too few for a 90th percentile.
-    ["Load inputs", "", "10 min", "13%", "8 min · 2 runs", "—", "9 min", "+2 min"],
+    ["Load inputs", "", "10 min", "13%", "8 min · 2 runs", "—", "10 min", "+2 min"],
     ["Export", "", "5 min", "6%", "—", "—", "—", "—"],
     ["Between stages", "", "5 min", "6%", "", "", "", ""],
   ]);

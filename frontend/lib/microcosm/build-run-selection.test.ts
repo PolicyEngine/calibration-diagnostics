@@ -46,8 +46,13 @@ test("a run the URL already names is shown, and the URL is left as it is", () =>
   expect(buildRunToShow(RUNS, "older-run", "older-run", false)).toEqual({ runId: "older-run", urlRunId: null });
 });
 
-test("a run chosen on the tab is written into the URL until the URL names it", () => {
-  expect(buildRunToShow(RUNS, "ended", "running", false)).toEqual({ runId: "ended", urlRunId: "ended" });
+// Choosing a run writes it into the URL at once, so the URL is never written
+// with the run already selected: after Back or Forward changes the URL's run,
+// the selected run is the old one for a render, and writing it back would
+// undo the browser's navigation.
+test("the run already selected is never written back into the URL", () => {
+  expect(buildRunToShow(RUNS, "ended", "running", false)).toEqual({ runId: "ended", urlRunId: null });
+  expect(buildRunToShow(RUNS, "ended", undefined, false)).toEqual({ runId: "ended", urlRunId: null });
 });
 
 test("a run the URL names that no source holds gives way to the default run, in the URL too", () => {

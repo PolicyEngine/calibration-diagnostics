@@ -21,11 +21,13 @@ export function nextBuildRunSelection(
 
 // The run the build monitor shows once its list has loaded, and the run to
 // write into the page's URL (null leaves the URL as it is), so the URL always
-// names the run shown: the run the tab opens by default is written there, and
-// so is a run chosen on the tab until the URL names it. A selected run that no
-// source holds (`selectedNotFound`), such as one a link names that does not
-// exist, gives way to the default run, in the URL too; when the list holds no
-// other run it stays, and the tab shows its error.
+// names the run shown: the run the tab opens by default is written there. A
+// selected run that no source holds (`selectedNotFound`), such as one a link
+// names that does not exist, gives way to the default run, in the URL too;
+// when the list holds no other run it stays, and the tab shows its error.
+// Only a run this rule switches to is written: choosing a run writes it at
+// once, and after Back or Forward changes the URL's run, the selected run is
+// the old one for a render, so writing it back would undo the navigation.
 export function buildRunToShow(
   runs: readonly BuildTimeline[],
   selected: string,
@@ -40,7 +42,7 @@ export function buildRunToShow(
     return { runId, urlRunId: runId };
   }
   const runId = nextBuildRunSelection(runs, selected, preferredRunId);
-  return { runId, urlRunId: runId && runId !== preferredRunId ? runId : null };
+  return { runId, urlRunId: runId && runId !== selected && runId !== preferredRunId ? runId : null };
 }
 
 // The run the Candidate tab shows, whenever its list or the page's run

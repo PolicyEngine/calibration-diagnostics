@@ -163,7 +163,7 @@ export function fmtDuration(ms: number | null | undefined): string {
 }
 
 // A time on the run overview, in the viewer's zone and named ("07:56 AM
-// GMT+4"), with UTC on hover.
+// GMT+4").
 function ClockTime({
   ms,
   nowMs,
@@ -291,15 +291,20 @@ function RunOrderToggle({ order, onChange }: { order: RunOrder; onChange: (order
 }
 
 // The Run selector's label for a run a link named that the list does not
-// hold: the run's own label once its detail arrives, and never the ID from
-// the URL, which may name no run at all.
+// hold: the run's own label once its detail arrives, what went wrong when
+// its detail failed, and never the ID from the URL, which may name no run at
+// all.
 export function linkedRunOptionLabel(
   selected: string,
   detailRun: BuildTimeline | undefined,
   nowMs: number,
   zone: ViewerZone | null,
+  failure: "not_found" | "unavailable" | null = null,
 ): string {
-  return detailRun?.run_id === selected ? runOptionLabel(detailRun, nowMs, zone) : "Loading run…";
+  if (detailRun?.run_id === selected) return runOptionLabel(detailRun, nowMs, zone);
+  if (failure === "not_found") return "Run not found";
+  if (failure === "unavailable") return "Run unavailable";
+  return "Loading run…";
 }
 
 // The Build progress tab of the Staging candidates page. `preferredRunId`
@@ -411,7 +416,14 @@ export function BuildMonitorView({
       ? [
           {
             value: selected,
-            label: linkedRunOptionLabel(selected, data?.run, nowMs, zone),
+            label: linkedRunOptionLabel(
+              selected,
+              data?.run,
+              nowMs,
+              zone,
+              // A run about to give way to the default run is still loading.
+              replacingRun ? null : runNotFound ? "not_found" : detail.error ? "unavailable" : null,
+            ),
             group: "Linked run, not in this list",
           },
         ]
