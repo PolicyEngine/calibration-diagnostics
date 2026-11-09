@@ -30,6 +30,7 @@ import {
   runDetailLoading,
   waitsForRunList,
 } from "@/lib/microcosm/build-run-selection";
+import { filteredAxis, phasesByFirstAppearance } from "@/lib/microcosm/timeline-layout";
 import {
   NO_FOCUS,
   pointerHovers,
@@ -72,6 +73,10 @@ import {
   type ViewerZone,
 } from "@/lib/microcosm/viewer-time";
 
+const BUILD_PHASE_LABEL = Object.fromEntries(BUILD_PHASES.map((phase) => [phase.id, phase.label])) as Record<
+  BuildPhase,
+  string
+>;
 export const PHASE_COLOR: Record<BuildPhase, string> = {
   setup: "var(--phase-setup)",
   checks: "var(--phase-checks)",
@@ -1042,12 +1047,14 @@ function TimelineCard({
   const [filter, setFilter] = useState<ReadonlySet<BuildPhase>>(NO_FOCUS.filter);
   const [hoveredPhase, setHoveredPhase] = useState<BuildPhase | null>(null);
   const [selected, setSelected] = useState<{ stageKey: string; phase: BuildPhase } | null>(null);
+  const [hoveredStage, setHoveredStage] = useState<string | null>(null);
   // Another run starts with nothing filtered or selected; the breakdown stays
   // open or closed.
   useEffect(() => {
     setFilter(NO_FOCUS.filter);
     setHoveredPhase(null);
     setSelected(null);
+    setHoveredStage(null);
   }, [run.run_id]);
   return (
     <TimelineView
@@ -1060,11 +1067,20 @@ function TimelineCard({
         hoveredPhase,
         selectedStage: selected?.stageKey ?? null,
         selectedPhase: selected?.phase ?? null,
+        hoveredStage,
       }}
-      onToggleExpanded={() => setExpanded((open) => !open)}
+      // A row that closes or is filtered out under the pointer never reports
+      // the pointer leaving it.
+      onToggleExpanded={() => {
+        setExpanded((open) => !open);
+        setHoveredStage(null);
+      }}
       onHoverPhase={setHoveredPhase}
-      onTogglePhase={(phase) => setFilter((current) => togglePhase(current, phase))}
-      onHoverStage={() => {}}
+      onTogglePhase={(phase) => {
+        setFilter((current) => togglePhase(current, phase));
+        setHoveredStage(null);
+      }}
+      onHoverStage={setHoveredStage}
       onToggleStage={(stageKey, phase) =>
         setSelected((current) => {
           const next = toggleStage(current?.stageKey ?? null, stageKey);
@@ -1105,6 +1121,7 @@ export function TimelineView({
   onHoverPhase,
   onTogglePhase,
   onToggleStage,
+  onHoverStage,
 }: TimelineViewProps) {
   const [measureArea, areaWidth] = useElementWidth();
   const failedStages = new Set(
@@ -1141,15 +1158,32 @@ export function TimelineView({
     forecast?.finish_p50_ms != null && run.started_ms != null && run.state === "running"
       ? forecast.finish_p50_ms - run.started_ms
       : null;
-  const domain = Math.max(1, elapsed, p90Offset ?? 0, ...rows.map((row) => row.end)) * 1.02;
+  // Under a stage-type filter the picked types' stages are laid end to end
+  // and fill the bar, so the axis counts time in those types, not time since
+  // the start; the forecast band and the present are left off it.
+  const filtered = focus.filter.size > 0;
+  const extents = rows.map((row) => ({ key: row.stageKey, phase: row.phase, start: row.start, end: row.end }));
+  const axis = filtered ? filteredAxis(extents, focus.filter) : null;
+  const stageStart = new Map(rows.map((row) => [row.stageKey, row.start]));
+  // Where a row sits on the bar's axis; null when the filter hides it.
+  const place = (row: TimelineRow): { start: number; end: number } | null => {
+    if (!axis) return { start: row.start, end: row.end };
+    const base = axis.starts.get(row.stageKey);
+    if (base == null) return null;
+    const start = base + (row.start - (stageStart.get(row.stageKey) ?? row.start));
+    return { start, end: start + (row.end - row.start) };
+  };
+  const domain = axis
+    ? Math.max(1, axis.length)
+    : Math.max(1, elapsed, p90Offset ?? 0, ...rows.map((row) => row.end)) * 1.02;
   const pct = (ms: number) => `${Math.min(100, Math.max(0, (ms / domain) * 100))}%`;
   const width = (start: number, end: number) => `${Math.max(0.25, ((end - start) / domain) * 100)}%`;
   // Every stage gets a row, however short: a seconds-long stage is still a
   // step the build went through. A stage that ran the solver is followed by
   // its passes and the stretches between them.
-  const visible = rows.flatMap((row) =>
-    run.started_ms == null ? [row] : [row, ...solverRows(row, run, run.started_ms, elapsed)],
-  );
+  const visible = rows
+    .flatMap((row) => (run.started_ms == null ? [row] : [row, ...solverRows(row, run, run.started_ms, elapsed)]))
+    .filter((row) => place(row) != null);
   const ticks = axisTicks(domain);
 
   if (!rows.length) {
@@ -1163,9 +1197,10 @@ export function TimelineView({
   const focusOf = (row: TimelineRow) => stageFocus(focus, row.phase, row.stageKey);
 
   const barStyle = (row: TimelineRow): CSSProperties => {
-    const place = {
-      left: pct(row.start),
-      width: width(row.start, row.end),
+    const onAxis = place(row) ?? { start: row.start, end: row.end };
+    const placement = {
+      left: pct(onAxis.start),
+      width: width(onAxis.start, onAxis.end),
       // Stretches without epochs are drawn faint, passes at full strength.
       opacity: row.segment && !row.segment.pass ? 0.35 : 1,
     };
@@ -1176,13 +1211,13 @@ export function TimelineView({
       const done =
         row.end > row.start ? Math.min(100, Math.max(0, ((elapsed - row.start) / (row.end - row.start)) * 100)) : 100;
       return {
-        ...place,
+        ...placement,
         backgroundImage: `${RUNNING_STRIPES}, linear-gradient(to right, ${color} ${done}%, color-mix(in srgb, ${color} 35%, transparent) ${done}%)`,
         backgroundSize: "16px 16px, 100% 100%",
       };
     }
     return {
-      ...place,
+      ...placement,
       background:
         row.status === "pending" ? PENDING_FILL : row.status === "failed" ? FAILED_COLOR : PHASE_COLOR[row.phase],
     };
@@ -1222,32 +1257,36 @@ export function TimelineView({
                 />
               );
             })}
-            {p50Offset != null && p90Offset != null ? (
+            {!filtered && p50Offset != null && p90Offset != null ? (
               <div
                 className="absolute -top-1 h-8 border-x border-dashed border-foreground/40 bg-foreground/5"
                 style={{ left: pct(p50Offset), width: width(p50Offset, p90Offset) }}
                 title={`Finish between ${fmtDuration(p50Offset)} and ${fmtDuration(p90Offset)} after start`}
               />
             ) : null}
-            {run.state === "running" ? <NowLine left={pct(elapsed)} /> : null}
+            {!filtered && run.state === "running" ? <NowLine left={pct(elapsed)} /> : null}
           </div>
 
           {expanded
-            ? visible.map((row) => (
-                <TimelineStageRow
-                  key={row.key}
-                  row={row}
-                  barStyle={barStyle(row)}
-                  dimmed={focusOf(row).dimmed}
-                  selected={focus.selectedStage === row.stageKey}
-                  onSelect={() => onToggleStage(row.stageKey, row.phase)}
-                  nowLeft={run.state === "running" ? pct(elapsed) : null}
-                  nowOffset={run.state === "running" ? elapsed : null}
-                  areaWidth={areaWidth}
-                  startFraction={Math.min(1, row.start / domain)}
-                  endFraction={Math.min(1, Math.max(row.end, row.start + 0.0025 * domain) / domain)}
-                />
-              ))
+            ? visible.map((row) => {
+                const onAxis = place(row) ?? { start: row.start, end: row.end };
+                return (
+                  <TimelineStageRow
+                    key={row.key}
+                    row={row}
+                    barStyle={barStyle(row)}
+                    dimmed={focusOf(row).dimmed}
+                    selected={focus.selectedStage === row.stageKey}
+                    onSelect={() => onToggleStage(row.stageKey, row.phase)}
+                    onHover={(hovering) => onHoverStage(hovering ? row.stageKey : null)}
+                    nowLeft={!filtered && run.state === "running" ? pct(elapsed) : null}
+                    nowOffset={run.state === "running" ? elapsed : null}
+                    areaWidth={areaWidth}
+                    startFraction={Math.min(1, onAxis.start / domain)}
+                    endFraction={Math.min(1, Math.max(onAxis.end, onAxis.start + 0.0025 * domain) / domain)}
+                  />
+                );
+              })
             : null}
 
           <div />
@@ -1260,7 +1299,13 @@ export function TimelineView({
           </div>
         </div>
         <div className="mt-3">
-          <PhaseLegend totals={totals} focus={focus} onHoverPhase={onHoverPhase} onTogglePhase={onTogglePhase} />
+          <PhaseLegend
+            order={phasesByFirstAppearance(extents)}
+            totals={totals}
+            focus={focus}
+            onHoverPhase={onHoverPhase}
+            onTogglePhase={onTogglePhase}
+          />
         </div>
       </div>
     </SectionCard>
@@ -1281,6 +1326,7 @@ function TimelineStageRow({
   dimmed,
   selected,
   onSelect,
+  onHover,
   nowLeft,
   nowOffset,
   areaWidth,
@@ -1296,6 +1342,8 @@ function TimelineStageRow({
   // the selection.
   selected: boolean;
   onSelect: () => void;
+  // The pointer, or keyboard focus, entering (true) or leaving (false) the row.
+  onHover: (hovering: boolean) => void;
   nowLeft: string | null;
   nowOffset: number | null;
   // The bar area's width in pixels (null before it is measured), and the
@@ -1336,10 +1384,17 @@ function TimelineStageRow({
         type="button"
         aria-pressed={selected}
         onClick={onSelect}
+        onPointerEnter={(event) => {
+          if (pointerHovers(event.pointerType)) onHover(true);
+        }}
+        onPointerLeave={() => onHover(false)}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(":focus-visible")) onHover(true);
+        }}
+        onBlur={() => onHover(false)}
         className={`flex min-w-0 items-center gap-1.5 rounded text-left hover:bg-muted/60 ${
           selected && !row.segment ? "bg-muted font-medium" : ""
         } ${row.segment ? "pl-3.5 text-muted-foreground" : ""}`}
-        title={row.segment ? row.label : row.stage}
       >
         {running ? (
           // A pulsing dot marks what is running now.
@@ -1366,7 +1421,14 @@ function TimelineStageRow({
         </span>
       </button>
       {/* Labels that do not fit are clipped; the tooltip has the full text. */}
-      <div className="relative h-5 overflow-hidden" title={`${row.label}: ${full}`}>
+      <div
+        className="relative h-5 overflow-hidden"
+        title={`${row.label}: ${full}`}
+        onPointerEnter={(event) => {
+          if (pointerHovers(event.pointerType)) onHover(true);
+        }}
+        onPointerLeave={() => onHover(false)}
+      >
         <div
           className={`absolute top-0.5 h-4 rounded-sm transition-opacity ${running ? "bar-running" : ""}`}
           style={rowBarStyle}
@@ -1408,11 +1470,14 @@ function TimelineStageRow({
 // run and dims the other types; clicking adds it to, or removes it from, the
 // Whole run filter. Failed and expected stages are drawn apart from type.
 function PhaseLegend({
+  order,
   totals,
   focus,
   onHoverPhase,
   onTogglePhase,
 }: {
+  // The stage types in the order the build first reached them.
+  order: BuildPhase[];
   totals: Record<BuildPhase, number>;
   focus: TimelineFocus;
   onHoverPhase: (phase: BuildPhase | null) => void;
@@ -1421,7 +1486,8 @@ function PhaseLegend({
   const tooltipIdPrefix = useId();
   return (
     <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
-      {BUILD_PHASES.map((phase) => {
+      {order.map((id) => {
+        const phase = { id, label: BUILD_PHASE_LABEL[id] };
         const picked = focus.filter.has(phase.id);
         const hovered = focus.hoveredPhase === phase.id;
         const tooltipId = `${tooltipIdPrefix}-${phase.id}`;

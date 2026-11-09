@@ -26,10 +26,10 @@ export function wholeRunLabel(filter: ReadonlySet<BuildPhase>): string {
   return filter.size ? "Whole run (filtered)" : "Whole run";
 }
 
-// How one stage is drawn: in Whole run, hidden when a filter leaves its type
-// out; there and in the breakdown, which is never filtered, dimmed while
-// another type is hovered, or, with no type hovered, while another stage is
-// clicked. A clicked stage whose type the filter hides dims nothing.
+// How one stage is drawn: hidden when a filter leaves its type out; dimmed
+// while another type is hovered, else while another stage is hovered in the
+// breakdown, else while another stage is clicked. A clicked stage whose type
+// the filter hides dims nothing.
 export function stageFocus(
   focus: TimelineFocus,
   phase: BuildPhase,
@@ -41,7 +41,9 @@ export function stageFocus(
   const selectionShown = focus.selectedStage != null && passesFilter(focus.selectedPhase);
   const dimmed = focus.hoveredPhase
     ? phase !== focus.hoveredPhase
-    : selectionShown && stageKey !== focus.selectedStage;
+    : focus.hoveredStage
+      ? stageKey !== focus.hoveredStage
+      : selectionShown && stageKey !== focus.selectedStage;
   return { visible, dimmed };
 }
 

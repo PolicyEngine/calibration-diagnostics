@@ -8,19 +8,34 @@ export interface StageExtent {
   end: number;
 }
 
-// The stage types in the order the legend lists them.
-export function phasesByFirstAppearance(_stages: readonly StageExtent[]): BuildPhase[] {
-  return BUILD_PHASES.map((phase) => phase.id);
+function inRunOrder(stages: readonly StageExtent[]): StageExtent[] {
+  return [...stages].sort((first, second) => first.start - second.start || first.end - second.end);
 }
 
-// The Whole run bar's time axis under a stage-type filter: where each shown
-// stage starts on it, and its length.
+// The stage types in the order the build first reached them, then the types
+// it never reached in their usual order.
+export function phasesByFirstAppearance(stages: readonly StageExtent[]): BuildPhase[] {
+  const reached: BuildPhase[] = [];
+  for (const stage of inRunOrder(stages)) {
+    if (!reached.includes(stage.phase)) reached.push(stage.phase);
+  }
+  return [...reached, ...BUILD_PHASES.map((phase) => phase.id).filter((phase) => !reached.includes(phase))];
+}
+
+// The Whole run bar's time axis under a stage-type filter: the picked types'
+// stages laid end to end in the order they ran, with the time between and
+// around them left out, so together they fill the bar. Gives where each shown
+// stage starts on that axis, and its length.
 export function filteredAxis(
   stages: readonly StageExtent[],
-  _filter: ReadonlySet<BuildPhase>,
+  filter: ReadonlySet<BuildPhase>,
 ): { starts: Map<string, number>; length: number } {
-  return {
-    starts: new Map(stages.map((stage) => [stage.key, stage.start])),
-    length: Math.max(0, ...stages.map((stage) => stage.end)),
-  };
+  const starts = new Map<string, number>();
+  let length = 0;
+  for (const stage of inRunOrder(stages)) {
+    if (!filter.has(stage.phase)) continue;
+    starts.set(stage.key, length);
+    length += Math.max(0, stage.end - stage.start);
+  }
+  return { starts, length };
 }

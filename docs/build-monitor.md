@@ -181,10 +181,14 @@ The Timeline opens with the Whole run bar and the stage types. The caret
 beside Whole run opens one row per stage, and splits a calibration stage into
 its solver passes, each with its epochs and seconds per epoch, with time with
 no epochs logged (before the first epoch, between passes, after the last) as
-faint bars. Hovering a stage type shows its total time in the run and dims the
-other types; clicking one or more types leaves only those in the bar, renamed
-"Whole run (filtered)"; clicking a stage's name in the breakdown dims every
-other stage until it is clicked again. Each stage type has its own colour
+faint bars. The stage types are listed in the order the build first reached
+them. Hovering a type shows its total time in the run and dims the other
+types. Clicking one or more types leaves only their stages, in the bar
+(renamed "Whole run (filtered)") and in the breakdown, laid end to end in the
+order they ran so together they fill the bar; its axis then counts time in
+those types, and the forecast band and the present are left off. Hovering a
+stage in the breakdown dims every other stage in the bar, and clicking it
+keeps that until it is clicked again. Each stage type has its own colour
 (`--phase-*` in `app/globals.css`), and red marks a failed stage. In the UK candidate
 run of 2026-10-05, that showed a 41-minute setup, a 2-hour stretch with no
 epochs after the first pass, and passes at 4.1–5.1 s per epoch against 1.8 in
