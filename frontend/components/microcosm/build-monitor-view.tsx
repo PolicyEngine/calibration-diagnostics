@@ -19,8 +19,10 @@ import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
+import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
 import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
+import { nextBuildRunSelection, waitsForRunList } from "@/lib/microcosm/build-run-selection";
 import {
   orderRunOptions,
   parseRunOrder,
@@ -286,7 +288,7 @@ function RunOrderToggle({ order, onChange }: { order: RunOrder; onChange: (order
 }
 
 // The Build progress tab of the Staging candidates page. `preferredRunId`
-// carries the run selected on the Candidate tab; a run picked here is
+// is the run the page's URL names, chosen on either tab; a run picked here is
 // reported back through `onRunChange` so the other tab opens on it.
 export function BuildMonitorView({
   tabs,
@@ -315,7 +317,9 @@ export function BuildMonitorView({
   );
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
-  // Whether this machine's runs open by themselves: see `opensLocalRuns`.
+  // Whether this machine's runs open by themselves: see `opensLocalRuns`. The
+  // page's run (a link, or a choice on either tab) counts as the carried-over
+  // run there.
   const preferLocal = opensLocalRuns(
     localRunsEnabled,
     localEnabled,
@@ -332,7 +336,14 @@ export function BuildMonitorView({
   }, [staging.isError]);
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
-  const [selected, setSelected] = useState("");
+  // A run the page's URL names is requested at once, beside the list.
+  const [selected, setSelected] = useState(preferredRunId ?? "");
+  // The page's run changed without a choice here, as with a link to the same
+  // page or the browser's Back button: show it, or, when the URL no longer
+  // names one, the default run.
+  useEffect(() => {
+    setSelected(preferredRunId ?? "");
+  }, [preferredRunId]);
   // The order is read from the URL on every render, not copied once: a link
   // to the same page, or the browser's Back button, changes the URL while
   // this view stays mounted. Next.js updates `useSearchParams` after
@@ -359,15 +370,8 @@ export function BuildMonitorView({
   }, [runs]);
 
   useEffect(() => {
-    if (!runs.length) return;
-    if (!runs.some((run) => run.run_id === selected)) {
-      const preferred = runs.find((run) => run.run_id === preferredRunId);
-      const running = runs.find((run) => run.state === "running");
-      // Otherwise the newest run that ended with a final event (finished,
-      // blocked or failed), whose telemetry says how it ended.
-      const ended = runs.find((run) => run.state !== "stalled");
-      setSelected((preferred ?? running ?? ended ?? runs[0]).run_id);
-    }
+    const next = nextBuildRunSelection(runs, selected, preferredRunId);
+    if (next !== selected) setSelected(next);
   }, [runs, selected, preferredRunId]);
 
   const selectRun = (runId: string) => {
@@ -379,6 +383,31 @@ export function BuildMonitorView({
   const data = detail.data;
   const nowMs = data?.now_ms ?? Date.now();
   const zone = useViewerZone();
+  // A run a link named that the list does not hold, such as one older than
+  // its runs, gets an option of its own, first in either order.
+  const linkedRunOutsideList = Boolean(selected) && !runs.some((run) => run.run_id === selected);
+  const runOptions = [
+    ...(linkedRunOutsideList
+      ? [
+          {
+            value: selected,
+            label: data?.run.run_id === selected ? runOptionLabel(data.run, nowMs, zone) : selected,
+            group: "Linked run, not in this list",
+          },
+        ]
+      : []),
+    // The list's runs in the chosen order: under their pipeline groups, or by
+    // start with each run naming its pipeline.
+    ...orderRunOptions(runs, runOrder, (run) => runGroups.get(run.run_id)).map(({ run, group }) => {
+      const label = runOptionLabel(run, list.data?.now_ms ?? Date.now(), zone);
+      return {
+        value: run.run_id,
+        label: runOrder === "date" ? `${run.pipeline_label} · ${label}` : label,
+        group,
+      };
+    }),
+  ];
+  const runNotFound = detail.error instanceof ApiError && detail.error.status === 404;
 
   return (
     <div className="flex flex-col gap-5">
@@ -412,20 +441,12 @@ export function BuildMonitorView({
               label="Run"
               value={selected}
               options={
-                runs.length
-                  ? orderRunOptions(runs, runOrder, (run) => runGroups.get(run.run_id)).map(({ run, group }) => {
-                      const label = runOptionLabel(run, list.data?.now_ms ?? Date.now(), zone);
-                      return {
-                        value: run.run_id,
-                        // Without group headings, each run names its pipeline.
-                        label: runOrder === "date" ? `${run.pipeline_label} · ${label}` : label,
-                        group,
-                      };
-                    })
+                runOptions.length
+                  ? runOptions
                   : [{ value: "", label: list.isLoading ? "Loading runs…" : "No runs" }]
               }
               onChange={selectRun}
-              disabled={!runs.length}
+              disabled={!runOptions.length}
               className="w-[30rem] max-w-full"
             />
           </div>
@@ -434,7 +455,12 @@ export function BuildMonitorView({
 
       {/* The local list's first load decides the source only when the page knew
           of a folder; a folder found later does not bring the loading back. */}
-      {(list.isLoading || (localRunsEnabled && local.isLoading)) && !runs.length ? (
+      {waitsForRunList(
+        list.isLoading || (localRunsEnabled && local.isLoading),
+        runs.length,
+        selected,
+        data != null,
+      ) ? (
         <LoadingBlock label="Loading build runs…" />
       ) : list.error ? (
         <EmptyState title="Build runs unavailable" description={String(list.error.message)} />
@@ -443,7 +469,7 @@ export function BuildMonitorView({
           title={source === "local" ? "Local runs are off" : "Hosted runs unavailable"}
           description={list.data.detail ?? undefined}
         />
-      ) : !runs.length ? (
+      ) : !runs.length && !(selected && (data || detail.isLoading)) ? (
         <EmptyState
           title="No build runs found"
           description={
@@ -455,7 +481,18 @@ export function BuildMonitorView({
       ) : detail.isLoading && !data ? (
         <LoadingBlock label="Loading run…" />
       ) : detail.error ? (
-        <EmptyState title="Run unavailable" description={String(detail.error.message)} />
+        <EmptyState
+          title={runNotFound ? "Run not found" : "Run unavailable"}
+          description={
+            runNotFound
+              ? `${detail.error.message} ${
+                  source === "local"
+                    ? "No run folder on this machine has this ID."
+                    : "No hosted run with this ID is recorded for this country."
+                } Choose another run from the Run list.`
+              : String(detail.error.message)
+          }
+        />
       ) : data ? (
         <>
           <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />

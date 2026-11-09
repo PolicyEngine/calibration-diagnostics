@@ -4,6 +4,10 @@ The **Build progress** tab of Staging candidates
 (`/microcosm/staging?view=progress`) shows a Microcosm build as it runs,
 predicts when it will finish, and summarizes where build time goes and which
 checks stop builds. The run selected on either tab carries over to the other.
+Choosing a run writes it into the URL with the country
+(`?view=progress&country=uk&run=<run id>`), so the address opens that run;
+a run that neither the collector nor the Hugging Face history holds for that
+country shows "Run not found".
 
 ## Sources
 
