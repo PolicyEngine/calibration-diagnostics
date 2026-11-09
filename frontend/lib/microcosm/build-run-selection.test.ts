@@ -5,6 +5,7 @@ import {
   buildRunToShow,
   candidateRunSelection,
   nextBuildRunSelection,
+  placeholderHidesFailure,
   waitsForRunList,
 } from "@/lib/microcosm/build-run-selection";
 
@@ -130,4 +131,15 @@ test("the build monitor shows a run before its list only when that run is select
   expect(waitsForRunList(true, 0, "", true)).toBe(true);
   expect(waitsForRunList(true, 0, "", false)).toBe(true);
   expect(waitsForRunList(false, 0, "", false)).toBe(false);
+});
+
+// Each new attempt for a run whose detail failed starts with the previous
+// run's detail as a placeholder; showing it would put another run under the
+// Run selector for the length of every attempt.
+test("a run whose detail failed is never drawn with the previous run's detail while it is asked for again", () => {
+  expect(placeholderHidesFailure(true, 1)).toBe(true);
+  // Switching to a run that has not failed keeps the previous run on screen
+  // while the new one loads.
+  expect(placeholderHidesFailure(true, 0)).toBe(false);
+  expect(placeholderHidesFailure(false, 2)).toBe(false);
 });
