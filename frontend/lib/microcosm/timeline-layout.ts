@@ -29,7 +29,7 @@ export function phasesByFirstAppearance(stages: readonly StageExtent[]): BuildPh
 export function filteredAxis(
   stages: readonly StageExtent[],
   filter: ReadonlySet<BuildPhase>,
-): { starts: Map<string, number>; length: number } {
+): { starts: Map<string, number>; length: number; collapsed: Map<string, number> } {
   const starts = new Map<string, number>();
   let length = 0;
   for (const stage of inRunOrder(stages)) {
@@ -37,5 +37,5 @@ export function filteredAxis(
     starts.set(stage.key, length);
     length += Math.max(0, stage.end - stage.start);
   }
-  return { starts, length };
+  return { starts, length, collapsed: new Map() };
 }

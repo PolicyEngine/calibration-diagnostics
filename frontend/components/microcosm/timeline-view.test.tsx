@@ -100,7 +100,8 @@ test("picked stage types are all Whole run shows, and it is renamed Whole run (f
   expect(markup).toContain(">Whole run (filtered)<");
   expect(wholeRunSegmentStyle(markup, "Calibrate")).not.toBeNull();
   expect(wholeRunSegmentStyle(markup, "Export dataset")).not.toBeNull();
-  expect(wholeRunSegmentStyle(markup, "Load inputs")).toBeNull();
+  // Hidden types shrink to no width, so the change can be animated.
+  expect(wholeRunSegmentStyle(markup, "Load inputs")).toContain("width:0%");
   expect(markup).toMatch(/<button[^>]*aria-pressed="true"[^>]*>(?:<[^>]+>)*[^<]*Calibration/);
 });
 
@@ -190,4 +191,18 @@ test("hovering a stage in the breakdown highlights it in Whole run and dims the 
 
   expect(wholeRunSegmentStyle(markup, "Calibrate")).toContain("opacity:1");
   expect(wholeRunSegmentStyle(markup, "Load inputs")).toContain("opacity:0.25");
+});
+
+test("Whole run segments move and resize over 0.2 seconds, unless the viewer asks for less motion", () => {
+  const markup = timeline(false, { filter: new Set(["calibrate"]) });
+  const classes = [...markup.matchAll(/<div class="([^"]*)" style="[^"]*" title="(?:Load inputs|Calibrate|Export dataset): /g)].map(
+    (match) => match[1],
+  );
+
+  expect(classes).toHaveLength(3);
+  for (const segmentClass of classes) {
+    expect(segmentClass).toContain("transition-[left,width,opacity]");
+    expect(segmentClass).toContain("duration-200");
+    expect(segmentClass).toContain("motion-reduce:transition-none");
+  }
 });

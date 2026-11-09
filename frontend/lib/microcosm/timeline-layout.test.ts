@@ -43,3 +43,18 @@ test("under a filter the picked types' stages are laid end to end, in the order 
     length: 75,
   });
 });
+
+test("a stage the filter hides sits, with no length, where it falls between the shown stages", () => {
+  const stages = [
+    stage("load-0", "setup", 0, 10),
+    stage("calibrate-1", "calibrate", 12, 72),
+    stage("export-2", "export", 72, 77),
+    stage("calibrate-3", "calibrate", 80, 90),
+  ];
+  const collapsed = filteredAxis(stages, new Set(["calibrate"])).collapsed;
+
+  expect(Object.fromEntries([...collapsed].map(([key, at]) => [key, at / MINUTE]))).toEqual({
+    "load-0": 0,
+    "export-2": 60,
+  });
+});
