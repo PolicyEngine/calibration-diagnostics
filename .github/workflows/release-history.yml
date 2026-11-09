@@ -1,0 +1,165 @@
+name: Release history
+
+# Measures each published national Microcosm release of one country on that
+# country's pinned reference engine (calibration-diagnostics#224). See
+# docs/release-history.md.
+#
+# - Weekly (Mondays): a top-up run for each country whose spec says
+#   `schedule: weekly`. It measures only builds the country's complete panel
+#   lacks, and waits while a new panel awaits its backfill.
+# - Manual: `topup`, `backfill` (builds a new panel after an engine, spec or
+#   producer bump) or `release` (one build).
+#
+# The repository is public and the UK data are licensed: logs carry ids,
+# statuses and timings only, library output goes to a private file that is
+# never printed or uploaded, and nothing is stored as an Actions artifact or
+# cache. Points go straight to private Blob.
+
+on:
+  workflow_dispatch:
+    inputs:
+      country:
+        description: Country with a release_history/countries/<code>/ folder
+        required: true
+        type: string
+      mode:
+        description: topup (new builds on a complete panel), backfill (a new panel) or release (one build)
+        required: true
+        default: topup
+        type: choice
+        options: [topup, backfill, release]
+      release_id:
+        description: For mode release, the build as the release picker names it
+        required: false
+        type: string
+  schedule:
+    - cron: "0 5 * * 1"
+
+permissions:
+  contents: read
+
+# One run at a time per country; the weekly dispatcher has its own slot.
+concurrency:
+  group: release-history-${{ inputs.country || 'weekly' }}
+  cancel-in-progress: false
+
+jobs:
+  weekly:
+    if: ${{ github.event_name == 'schedule' && vars.RELEASE_HISTORY_ENABLED != 'FALSE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dispatch a top-up for each weekly country
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for spec in release_history/countries/*/spec.yaml; do
+            country="$(basename "$(dirname "$spec")")"
+            if grep -qE '^schedule:[[:space:]]*weekly' "$spec"; then
+              gh workflow run release-history.yml --ref "$GITHUB_REF_NAME" -f country="$country" -f mode=topup
+              echo "Dispatched a top-up for $country." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+  plan:
+    if: ${{ github.event_name == 'workflow_dispatch' && vars.RELEASE_HISTORY_ENABLED != 'FALSE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      action: ${{ steps.plan.outputs.action }}
+      count: ${{ steps.plan.outputs.count }}
+      panel_id: ${{ steps.plan.outputs.panel_id }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      plan: ${{ steps.plan.outputs.plan }}
+    env:
+      COUNTRY: ${{ inputs.country }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: oven-sh/setup-bun@v2
+      - name: Install the country's reference engine
+        run: uv sync --frozen --project "release_history/countries/$COUNTRY"
+      - name: Validate the spec and name the pinned panel
+        run: |
+          set -euo pipefail
+          project="release_history/countries/$COUNTRY"
+          uv run --frozen --project "$project" release-history validate-spec --country "$COUNTRY"
+          uv run --frozen --project "$project" release-history identity --country "$COUNTRY" --out "$RUNNER_TEMP/out"
+      - run: bun install --frozen-lockfile
+        working-directory: frontend
+      - name: Publish the panel and its references, then plan
+        id: plan
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          bun run scripts/release-history.ts upload --root "$RUNNER_TEMP/out"
+          bun run scripts/release-history.ts plan --country "$COUNTRY" --root "$RUNNER_TEMP/out" \
+            --mode "${{ inputs.mode }}" --release-id "${{ inputs.release_id }}"
+
+  measure:
+    needs: plan
+    if: ${{ needs.plan.outputs.action == 'measure' }}
+    runs-on: ubuntu-latest
+    # One point is about 25 minutes for the UK on a standard runner.
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    env:
+      COUNTRY: ${{ inputs.country }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_HUB_DISABLE_XET: "1"
+      HDF5_USE_FILE_LOCKING: "FALSE"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: oven-sh/setup-bun@v2
+      - name: Install the country's reference engine
+        run: uv sync --frozen --project "release_history/countries/$COUNTRY"
+      - name: Measure one release build
+        env:
+          POINT: ${{ toJson(matrix.point) }}
+        run: |
+          set -euo pipefail
+          uv run --frozen --project "release_history/countries/$COUNTRY" release-history measure \
+            --country "$COUNTRY" --point "$POINT" --out "$RUNNER_TEMP/out" \
+            --log "$RUNNER_TEMP/private/measure.log"
+      - run: bun install --frozen-lockfile
+        working-directory: frontend
+      - name: Upload the point
+        working-directory: frontend
+        run: bun run scripts/release-history.ts upload --root "$RUNNER_TEMP/out"
+
+  finalize:
+    needs: [plan, measure]
+    # Also after a skipped plan, so a references update reaches the timeline.
+    if: ${{ always() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COUNTRY: ${{ inputs.country }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      PLAN: ${{ needs.plan.outputs.plan }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Update the manifest and rebuild the timeline
+        run: |
+          set -euo pipefail
+          printf '%s' "$PLAN" > "$RUNNER_TEMP/plan.json"
+          bun run scripts/release-history.ts finalize --country "$COUNTRY" \
+            --panel-id "${{ needs.plan.outputs.panel_id }}" --plan "$RUNNER_TEMP/plan.json"
