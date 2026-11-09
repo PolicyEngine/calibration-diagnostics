@@ -1,11 +1,11 @@
 // The calibration tree package (the tree builder, its schema-6 types and
-// readers, the Blob I/O and the publisher) has one source:
-// PolicyEngine/microcosm-collector's packages/calibration-tree, published to
-// npm as @policyengine/calibration-tree. The dashboard installs one published
+// readers, the Blob I/O and the publisher) has one source, in
+// PolicyEngine/microcosm-collector, published to npm as
+// @policyengine/calibration-tree. The dashboard installs one published
 // version from npm, keeps no copy of its own, and runs the installed
 // package's publisher.
 import { expect, test } from "bun:test";
-import { readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const FRONTEND_ROOT = import.meta.dir;
@@ -14,6 +14,12 @@ const INSTALLED_PACKAGE = join("node_modules", "@policyengine", "calibration-tre
 const PUBLISHER_MODULE = join(INSTALLED_PACKAGE, "src", "publish-calibration-tree.ts");
 // An exact release, such as 0.1.0: no range, tag, path or workspace protocol.
 const EXACT_RELEASE = /^\d+\.\d+\.\d+$/;
+// Code and tests, whose paths are read when they run.
+const SOURCE_FILE = /\.([cm]?[jt]sx?|py)$/;
+// A path into the dashboard's former copy of the package (its packages
+// folder, then calibration-tree), written as one string with a slash or built
+// from separate segments passed to join().
+const REMOVED_PACKAGE_PATH = /packages["'`]?\s*[,/\\]\s*["'`]?calibration-tree/;
 
 interface FrontendManifest {
   dependencies: Record<string, string>;
@@ -104,4 +110,14 @@ test("the publisher script runs the installed package's publisher module", () =>
 
 test("lint typechecks the dashboard alone; the collector typechecks the package", () => {
   expect(frontendManifest().scripts.lint).toBe("tsc --noEmit");
+});
+
+test("no dashboard code or test reads files from the removed package folder", () => {
+  const filesReferringToIt = checkoutFiles(".")
+    .filter((relativePath) => SOURCE_FILE.test(relativePath))
+    .filter((relativePath) => existsSync(join(FRONTEND_ROOT, relativePath)))
+    .filter((relativePath) =>
+      REMOVED_PACKAGE_PATH.test(readFileSync(join(FRONTEND_ROOT, relativePath), "utf8")),
+    );
+  expect(filesReferringToIt).toEqual([]);
 });
