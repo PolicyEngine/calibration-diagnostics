@@ -85,10 +85,12 @@ export function placeholderHidesFailure(isPlaceholderData: boolean, errorUpdateC
 }
 
 // Whether the build monitor shows the selected run as loading: its detail is
-// being asked for and there is no detail to draw.
+// being asked for and there is no detail to draw. A retry whose placeholder
+// is hidden (see placeholderHidesFailure) counts: TanStack Query reports
+// placeholder data as loaded, not loading.
 export function runDetailLoading(
   detail: { isLoading: boolean; isFetching: boolean },
   hasDetailToDraw: boolean,
 ): boolean {
-  return detail.isLoading && !hasDetailToDraw;
+  return (detail.isLoading || detail.isFetching) && !hasDetailToDraw;
 }
