@@ -7,28 +7,39 @@ export interface TimelineFocus {
   filter: ReadonlySet<BuildPhase>;
   hoveredPhase: BuildPhase | null;
   selectedStage: string | null;
+  // The selected stage's type, when known.
+  selectedPhase?: BuildPhase | null;
 }
 
-export const NO_FOCUS: TimelineFocus = { filter: new Set(), hoveredPhase: null, selectedStage: null };
+export const NO_FOCUS: TimelineFocus = {
+  filter: new Set(),
+  hoveredPhase: null,
+  selectedStage: null,
+  selectedPhase: null,
+};
 
 // The Whole run bar's label.
 export function wholeRunLabel(filter: ReadonlySet<BuildPhase>): string {
   return filter.size ? "Whole run (filtered)" : "Whole run";
 }
 
-// How one stage's segment is drawn: hidden when a filter leaves its type
-// out; dimmed while another type is hovered, or, with no type hovered, while
-// another stage is clicked.
+// How one stage is drawn: in Whole run, hidden when a filter leaves its type
+// out; there and in the breakdown, which is never filtered, dimmed while
+// another type is hovered, or, with no type hovered, while another stage is
+// clicked. A clicked stage whose type the filter hides dims nothing.
 export function stageFocus(
   focus: TimelineFocus,
   phase: BuildPhase,
   stageKey: string,
 ): { visible: boolean; dimmed: boolean } {
+  const passesFilter = (candidate: BuildPhase | null | undefined) =>
+    !focus.filter.size || candidate == null || focus.filter.has(candidate);
   const visible = !focus.filter.size || focus.filter.has(phase);
+  const selectionShown = focus.selectedStage != null && passesFilter(focus.selectedPhase);
   const dimmed = focus.hoveredPhase
     ? phase !== focus.hoveredPhase
-    : focus.selectedStage != null && stageKey !== focus.selectedStage;
-  return { visible, dimmed: visible && dimmed };
+    : selectionShown && stageKey !== focus.selectedStage;
+  return { visible, dimmed };
 }
 
 // The filter after clicking a stage type: added, or removed when it was on.
@@ -42,4 +53,11 @@ export function togglePhase(filter: ReadonlySet<BuildPhase>, phase: BuildPhase):
 // The selected stage after clicking a stage: it, or none when it was selected.
 export function toggleStage(selected: string | null, stageKey: string): string | null {
   return selected === stageKey ? null : stageKey;
+}
+
+// Whether a pointer entering a stage-type label shows its hover card: a
+// mouse or a pen. A tap would leave the card open, and its type hovered,
+// until the next tap elsewhere.
+export function pointerHovers(pointerType: string): boolean {
+  return pointerType === "mouse" || pointerType === "pen";
 }

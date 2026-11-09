@@ -4,6 +4,7 @@ import {
   type CSSProperties,
   type ReactNode,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useState,
@@ -21,10 +22,12 @@ import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
 import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
+import { detailBehindList } from "@/lib/microcosm/build-refresh";
 import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
 import { buildRunToShow, waitsForRunList } from "@/lib/microcosm/build-run-selection";
 import {
   NO_FOCUS,
+  pointerHovers,
   stageFocus,
   type TimelineFocus,
   togglePhase,
@@ -408,6 +411,15 @@ export function BuildMonitorView({
   }, [runs, selected, preferredRunId, runNotFound, onRunChange]);
   // A run that was not found is about to give way to the default run.
   const replacingRun = runNotFound && runs.some((run) => run.run_id !== selected);
+  // The run list is asked for every five minutes and the run only while it
+  // runs, so a run that went silent and came back shows as running in the
+  // list first: ask for the run again, once per list answer.
+  const listRunState = runs.find((run) => run.run_id === selected)?.state;
+  const detailRunState = data?.run.run_id === selected ? data.run.state : undefined;
+  useEffect(() => {
+    if (detailBehindList(listRunState, detailRunState)) void detail.refetch();
+    // Only a new list answer prompts this; the run's own answers do not.
+  }, [list.dataUpdatedAt]);
   const nowMs = data?.now_ms ?? Date.now();
   const zone = useViewerZone();
   // A run a link named that the list does not hold, such as one older than
@@ -1020,13 +1032,13 @@ function TimelineCard({
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState<ReadonlySet<BuildPhase>>(NO_FOCUS.filter);
   const [hoveredPhase, setHoveredPhase] = useState<BuildPhase | null>(null);
-  const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  const [selected, setSelected] = useState<{ stageKey: string; phase: BuildPhase } | null>(null);
   // Another run starts with nothing filtered or selected; the breakdown stays
   // open or closed.
   useEffect(() => {
     setFilter(NO_FOCUS.filter);
     setHoveredPhase(null);
-    setSelectedStage(null);
+    setSelected(null);
   }, [run.run_id]);
   return (
     <TimelineView
@@ -1034,11 +1046,21 @@ function TimelineCard({
       forecast={forecast}
       nowMs={nowMs}
       expanded={expanded}
-      focus={{ filter, hoveredPhase, selectedStage }}
+      focus={{
+        filter,
+        hoveredPhase,
+        selectedStage: selected?.stageKey ?? null,
+        selectedPhase: selected?.phase ?? null,
+      }}
       onToggleExpanded={() => setExpanded((open) => !open)}
       onHoverPhase={setHoveredPhase}
       onTogglePhase={(phase) => setFilter((current) => togglePhase(current, phase))}
-      onToggleStage={(stageKey) => setSelectedStage((current) => toggleStage(current, stageKey))}
+      onToggleStage={(stageKey, phase) =>
+        setSelected((current) => {
+          const next = toggleStage(current?.stageKey ?? null, stageKey);
+          return next ? { stageKey: next, phase } : null;
+        })
+      }
     />
   );
 }
@@ -1053,7 +1075,7 @@ export interface TimelineViewProps {
   onToggleExpanded: () => void;
   onHoverPhase: (phase: BuildPhase | null) => void;
   onTogglePhase: (phase: BuildPhase) => void;
-  onToggleStage: (stageKey: string) => void;
+  onToggleStage: (stageKey: string, phase: BuildPhase) => void;
 }
 
 // A dimmed stage's opacity, while another stage type is hovered or another
@@ -1206,8 +1228,8 @@ export function TimelineView({
                   row={row}
                   barStyle={barStyle(row)}
                   dimmed={focusOf(row).dimmed}
-                  selected={!row.segment && focus.selectedStage === row.stageKey}
-                  onSelect={() => onToggleStage(row.stageKey)}
+                  selected={focus.selectedStage === row.stageKey}
+                  onSelect={() => onToggleStage(row.stageKey, row.phase)}
                   nowLeft={run.state === "running" ? pct(elapsed) : null}
                   nowOffset={run.state === "running" ? elapsed : null}
                   areaWidth={areaWidth}
@@ -1304,7 +1326,7 @@ function TimelineStageRow({
         aria-pressed={selected}
         onClick={onSelect}
         className={`flex min-w-0 items-center gap-1.5 rounded text-left hover:bg-muted/60 ${
-          selected ? "bg-muted font-medium" : ""
+          selected && !row.segment ? "bg-muted font-medium" : ""
         } ${row.segment ? "pl-3.5 text-muted-foreground" : ""}`}
         title={row.segment ? row.label : row.stage}
       >
@@ -1385,20 +1407,33 @@ function PhaseLegend({
   onHoverPhase: (phase: BuildPhase | null) => void;
   onTogglePhase: (phase: BuildPhase) => void;
 }) {
+  const tooltipIdPrefix = useId();
   return (
     <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
       {BUILD_PHASES.map((phase) => {
         const picked = focus.filter.has(phase.id);
+        const hovered = focus.hoveredPhase === phase.id;
+        const tooltipId = `${tooltipIdPrefix}-${phase.id}`;
         return (
           <span key={phase.id} className="relative">
             <button
               type="button"
               aria-pressed={picked}
+              aria-describedby={hovered ? tooltipId : undefined}
               onClick={() => onTogglePhase(phase.id)}
-              onMouseEnter={() => onHoverPhase(phase.id)}
-              onMouseLeave={() => onHoverPhase(null)}
-              onFocus={() => onHoverPhase(phase.id)}
+              // A mouse or pen, or keyboard focus, opens the hover card; a
+              // tap, or the focus a click leaves behind, does not.
+              onPointerEnter={(event) => {
+                if (pointerHovers(event.pointerType)) onHoverPhase(phase.id);
+              }}
+              onPointerLeave={() => onHoverPhase(null)}
+              onFocus={(event) => {
+                if (event.currentTarget.matches(":focus-visible")) onHoverPhase(phase.id);
+              }}
               onBlur={() => onHoverPhase(null)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") onHoverPhase(null);
+              }}
               className={`inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 ${
                 picked ? "border-border-strong bg-muted font-medium text-foreground" : "border-transparent hover:bg-muted/60"
               }`}
@@ -1406,8 +1441,9 @@ function PhaseLegend({
               <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: PHASE_COLOR[phase.id] }} />
               {phase.label}
             </button>
-            {focus.hoveredPhase === phase.id ? (
+            {hovered ? (
               <span
+                id={tooltipId}
                 role="tooltip"
                 className="absolute bottom-full left-0 z-10 mb-1 flex items-center gap-2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-foreground shadow-[var(--elev-1)]"
               >

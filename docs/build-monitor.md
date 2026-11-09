@@ -13,10 +13,12 @@ gives way to the default run, in the URL too. Times are shown in the
 browser's time zone, each with the zone's short name (such as "GMT+4" or
 "EST").
 
-The selected run is asked for again every minute while it runs (every 10
-seconds from a local runs folder), and not at all once it has finished,
-failed or gone silent. The run list, which is how a new run appears, is asked
-for again every five minutes (every 10 seconds for local run folders).
+The selected run is asked for again every minute while it runs, or while
+asking for it fails (every 10 seconds from a local runs folder), and not on a
+timer once it has finished, failed or gone silent. The run list, which is how a
+new run appears, is asked for again every five minutes (every 10 seconds for
+local run folders); when it gives the selected run another state, such as a
+silent run that resumed, the run is asked for again.
 
 ## Sources
 
@@ -232,8 +234,9 @@ performed by the build process.
   the run stalled after its heartbeat expires.
 - Some passing validation checks do not produce individual events. The US
   validation catalog in `frontend/lib/microcosm/build-gate-catalog.ts` lists
-  every check the release runs and where it sits; it is pinned to the
-  Microcosm commit it was read from.
+  every check the release runs and where it sits, pinned to the Microcosm
+  commit it was read from; the run detail returns it as `gate_catalog`, which
+  the tab does not show at present.
 - The base population build (`build_us_puf_support_base.py`) writes only
   `stage_profile.json`, not run telemetry, so it does not appear here.
 - The staging source shows a notice when its newest run is more than 14 days

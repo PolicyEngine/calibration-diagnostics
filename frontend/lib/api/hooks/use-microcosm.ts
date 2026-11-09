@@ -1686,7 +1686,14 @@ export function useBuildRun(source: BuildRunSource, runId?: string) {
     // A run that is not running does not change, so switching tabs does not
     // ask for it again.
     staleTime: (query) => (query.state.data?.run.state === "running" ? 30 * 1000 : Infinity),
-    refetchInterval: (query) => buildRunRefetchInterval(source, query.state.data?.run.state),
+    // A run that is not found gives way to the default run instead.
+    refetchInterval: (query) =>
+      buildRunRefetchInterval(
+        source,
+        query.state.data?.run.state,
+        query.state.status === "error" &&
+          !(query.state.error instanceof ApiError && query.state.error.status === 404),
+      ),
     retry: retryBuildRun,
   });
 }

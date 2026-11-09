@@ -107,6 +107,10 @@ test("hovering a stage type shows its total time and dims the other types", () =
   const markup = timeline(false, { hoveredPhase: "calibrate" });
 
   expect(markup).toMatch(/role="tooltip"[^>]*>(?:<[^>]+>)*Calibration(?:<[^>]+>)*\s*(?:<[^>]+>)*1 h</);
+  // The hover card describes the label it belongs to.
+  const describedBy = markup.match(/<button[^>]*aria-describedby="([^"]+)"[^>]*>(?:<[^>]+>)*[^<]*Calibration/)?.[1];
+  expect(describedBy).toBeTruthy();
+  expect(markup).toContain(`id="${describedBy}" role="tooltip"`);
   expect(wholeRunSegmentStyle(markup, "Calibrate")).toContain("opacity:1");
   expect(wholeRunSegmentStyle(markup, "Load inputs")).toContain("opacity:0.25");
 });

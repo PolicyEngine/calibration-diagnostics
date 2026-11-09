@@ -1,7 +1,14 @@
 import { expect, test } from "bun:test";
 
 import type { BuildPhase } from "@/lib/microcosm/build-monitor";
-import { NO_FOCUS, stageFocus, togglePhase, toggleStage, wholeRunLabel } from "@/lib/microcosm/timeline-focus";
+import {
+  NO_FOCUS,
+  pointerHovers,
+  stageFocus,
+  togglePhase,
+  toggleStage,
+  wholeRunLabel,
+} from "@/lib/microcosm/timeline-focus";
 
 const phases = (...ids: BuildPhase[]): ReadonlySet<BuildPhase> => new Set(ids);
 
@@ -40,4 +47,22 @@ test("stage types add up in the filter, and clicking a type or a stage again tur
   expect(toggleStage(null, "calibrate-3")).toBe("calibrate-3");
   expect(toggleStage("calibrate-3", "calibrate-3")).toBeNull();
   expect(toggleStage("calibrate-3", "export-6")).toBe("export-6");
+});
+
+test("with a filter on, hovering a type or clicking a stage still dims breakdown rows of hidden types", () => {
+  const hovered = { ...NO_FOCUS, filter: phases("calibrate"), hoveredPhase: "calibrate" as const };
+  expect(stageFocus(hovered, "setup", "load_inputs-0")).toEqual({ visible: false, dimmed: true });
+  const clicked = { ...NO_FOCUS, filter: phases("calibrate"), selectedStage: "calibrate-3", selectedPhase: "calibrate" as const };
+  expect(stageFocus(clicked, "setup", "load_inputs-0")).toEqual({ visible: false, dimmed: true });
+});
+
+test("a clicked stage whose type the filter hides dims nothing", () => {
+  const focus = { ...NO_FOCUS, filter: phases("calibrate"), selectedStage: "load_inputs-0", selectedPhase: "setup" as const };
+  expect(stageFocus(focus, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: false });
+});
+
+test("only a mouse or pen opens a stage type's hover card; a tap does not leave it open", () => {
+  expect(pointerHovers("mouse")).toBe(true);
+  expect(pointerHovers("pen")).toBe(true);
+  expect(pointerHovers("touch")).toBe(false);
 });
