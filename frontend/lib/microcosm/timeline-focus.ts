@@ -12,26 +12,34 @@ export interface TimelineFocus {
 export const NO_FOCUS: TimelineFocus = { filter: new Set(), hoveredPhase: null, selectedStage: null };
 
 // The Whole run bar's label.
-export function wholeRunLabel(_filter: ReadonlySet<BuildPhase>): string {
-  return "Whole run";
+export function wholeRunLabel(filter: ReadonlySet<BuildPhase>): string {
+  return filter.size ? "Whole run (filtered)" : "Whole run";
 }
 
-// How one stage's segment is drawn: whether it shows at all, and whether it
-// is dimmed.
+// How one stage's segment is drawn: hidden when a filter leaves its type
+// out; dimmed while another type is hovered, or, with no type hovered, while
+// another stage is clicked.
 export function stageFocus(
-  _focus: TimelineFocus,
-  _phase: BuildPhase,
-  _stageKey: string,
+  focus: TimelineFocus,
+  phase: BuildPhase,
+  stageKey: string,
 ): { visible: boolean; dimmed: boolean } {
-  return { visible: true, dimmed: false };
+  const visible = !focus.filter.size || focus.filter.has(phase);
+  const dimmed = focus.hoveredPhase
+    ? phase !== focus.hoveredPhase
+    : focus.selectedStage != null && stageKey !== focus.selectedStage;
+  return { visible, dimmed: visible && dimmed };
 }
 
-// The filter after clicking a stage type.
-export function togglePhase(filter: ReadonlySet<BuildPhase>, _phase: BuildPhase): ReadonlySet<BuildPhase> {
-  return filter;
+// The filter after clicking a stage type: added, or removed when it was on.
+export function togglePhase(filter: ReadonlySet<BuildPhase>, phase: BuildPhase): ReadonlySet<BuildPhase> {
+  const next = new Set(filter);
+  if (next.has(phase)) next.delete(phase);
+  else next.add(phase);
+  return next;
 }
 
-// The selected stage after clicking a stage.
-export function toggleStage(selected: string | null, _stageKey: string): string | null {
-  return selected;
+// The selected stage after clicking a stage: it, or none when it was selected.
+export function toggleStage(selected: string | null, stageKey: string): string | null {
+  return selected === stageKey ? null : stageKey;
 }

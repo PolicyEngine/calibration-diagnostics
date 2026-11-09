@@ -1,9 +1,9 @@
 # Build progress
 
 The **Build progress** tab of Staging candidates
-(`/microcosm/staging?view=progress`) shows a Microcosm build as it runs,
-predicts when it will finish, and summarizes where build time goes and which
-checks stop builds. The run selected on either tab carries over to the other.
+(`/microcosm/staging?view=progress`) shows a Microcosm build as it runs and
+predicts when it will finish. The run selected on either tab carries over to
+the other.
 The URL always names the run shown, with the country
 (`?view=progress&country=uk&run=<run id>`), so the address opens that run:
 opening the tab writes the run it opens by default (a running run, else the
@@ -12,6 +12,11 @@ neither the collector nor the Hugging Face history holds for that country
 gives way to the default run, in the URL too. Times are shown in the
 browser's time zone, each with the zone's short name (such as "GMT+4" or
 "EST").
+
+The selected run is asked for again every minute while it runs (every 10
+seconds from a local runs folder), and not at all once it has finished,
+failed or gone silent. The run list, which is how a new run appears, is asked
+for again every five minutes (every 10 seconds for local run folders).
 
 ## Sources
 
@@ -138,8 +143,8 @@ moved into target compilation (September against October 2026). So a past run
 counts only when it went through the same stages as this run over the stretch
 both reached; more than one stage, and more than a fifth of the stages, found in
 only one of them mark a different stage sequence. Those runs are left out of the
-forecast and the "Where build time goes" and "Checks and gates" statistics, and
-the time budget says how many were left out. A stage added to a long pipeline
+forecast and of the stage and gate statistics the run detail returns. A stage
+added to a long pipeline
 (the FRS spine gains one every few weeks) does not split its history. Until a
 run reaches the stage where the sequences part, older runs still count; a new
 pipeline version from the producer is the reliable fix.
@@ -153,9 +158,7 @@ pipeline version from the producer is the reliable fix.
 - Both scale by the run's pace: how long its finished stages took against
   their typical durations. Typical durations come only from runs that finished
   the stage; a stage that failed, or the last stage of a stalled run, stopped
-  early and does not count. "Where build time goes" uses the same rule, counts
-  the stages a running run has finished, shows "stopped early in N runs" for
-  the rest, and splits a typical run by phase only once a run has finished.
+  early and does not count.
 - During calibration, the solver passes come from the epoch counter: it
   restarts at each pass, and each row names its phase (`size_search`,
   `size_refit`). The remaining solve is the rest of the current pass at its
@@ -172,9 +175,15 @@ calibration (20 checkpoints, 80% inside the 90% bound) and 17% for UK FRS
 spine builds (12 checkpoints, 67% inside). UK local candidates vary in how many solver passes they run, so
 their forecasts are poor until a pipeline has more runs.
 
-The timeline splits a calibration stage into its solver passes, each with its
-epochs and seconds per epoch, and shows time with no epochs logged (before the
-first epoch, between passes, after the last) as faint bars. In the UK candidate
+The Timeline opens with the Whole run bar and the stage types. The caret
+beside Whole run opens one row per stage, and splits a calibration stage into
+its solver passes, each with its epochs and seconds per epoch, with time with
+no epochs logged (before the first epoch, between passes, after the last) as
+faint bars. Hovering a stage type shows its total time in the run and dims the
+other types; clicking one or more types leaves only those in the bar, renamed
+"Whole run (filtered)"; clicking a stage's name in the breakdown dims every
+other stage until it is clicked again. Each stage type has its own colour
+(`--phase-*` in `app/globals.css`), and red marks a failed stage. In the UK candidate
 run of 2026-10-05, that showed a 41-minute setup, a 2-hour stretch with no
 epochs after the first pass, and passes at 4.1–5.1 s per epoch against 1.8 in
 September.
@@ -185,7 +194,7 @@ The local telemetry emitter service reports:
 
 - `resources` on each stage event and in the progress document: cores a stage
   kept busy (CPU seconds over wall seconds) and memory at its start and end,
-  shown per stage and as medians across runs;
+  shown per stage in the Timeline's breakdown;
 - `heartbeat_at`: a run that sends heartbeats is marked stalled after five
   minutes without one, instead of six hours;
 - `work` in the progress document (batches done of the stage's total, with the
@@ -194,37 +203,19 @@ The local telemetry emitter service reports:
 - `failure_class`, `failed_during` and `elapsed_seconds` on a failed run, and
   the run manifest's `identity` (commit, runtime, CPU count, memory).
 
-"Why runs stop" groups the runs that did not finish by how they ended
-(failed, refused by gates, went silent) and the stage they stopped in, with
-the median run time spent by then and what the runs recorded: error types and
-codes, failure classes, and messages or gate failure lines. It shows recorded
-values only. A run that recorded nothing says so, and a run that went silent
-wrote no final event, so it has nothing about the cause. A version 3 run records
-a refusal itself: status `blocked`, with the gate phase (`preflight`,
+The run detail also returns statistics for the run's pipeline and stage
+sequence that the tab does not show at present: stage times (`stage_stats`),
+each run's time by stage type (`phase_totals`), gate failures (`gate_stats`)
+and how unfinished runs stopped (`stop_stats`). Stops are grouped by how the
+run ended (failed, refused by gates, went silent) and the stage it stopped in,
+with the median run time spent by then and what the runs recorded: error types
+and codes, failure classes, and messages or gate failure lines. A run that went
+silent wrote no final event, so it has nothing about the cause. A version 3 run
+records a refusal itself: status `blocked`, with the gate phase (`preflight`,
 `terminal`, ...) and the gates that refused, which may be none by name. A
 version 2 run closed a refusal as `completed`; the monitor reads it from the
 gate battery's blocking failure count, so it is not counted as a recorded
-failure class. "Run history" lists
-every run of the pipeline, newest first, on one time scale; selecting a row
-opens that run, and runs with a different stage sequence are listed apart.
-"This run by stage" lists the selected run's top-level stages, slowest first,
-with:
-- each stage's time, summed over every attempt;
-- its share of the run's elapsed time (to its end, its last telemetry if it
-  stalled, or now);
-- the median (p50), 90th percentile (p90) and longest (Max) time of the runs
-  with the same stage sequence that finished the stage; p50 is the typical
-  time from "Where build time goes", with the number of runs when fewer than
-  three, and p90 is shown only from three runs;
-- how far over or under p50 it ran: "about typical" within a minute or 5%,
-  and the ratio from 1.5×.
-
-Each stage's bar has a cell of its own, apart from its time, so every bar has
-the same width and bars of equal length mean equal times; the mark on a bar
-is p50. A stage still running, or stopped early, is compared only once it has
-run past p50. A time beyond "about typical" and past p90 is shown in red,
-only when at least three runs finished the stage. Time spent in no top-level stage gets a "Between
-stages" row from one minute.
+failure class.
 
 The US release reports each engine batch during target compilation and each
 batch during post-export scoring. UK graph builds report each completed graph

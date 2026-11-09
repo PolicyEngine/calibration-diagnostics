@@ -1653,7 +1653,7 @@ export function useMicrocosmTargetDiagnostics(params: {
 }
 
 // Build monitor: local run folders (when the server enables them) or the
-// staging repository. Local runs refresh faster because reading them is free.
+// staging repository. See `build-refresh` for how often each is asked again.
 export function useBuildRuns(source: BuildRunSource, enabled = true) {
   const { country } = useCountry();
   return useQuery({
@@ -1661,7 +1661,8 @@ export function useBuildRuns(source: BuildRunSource, enabled = true) {
     queryFn: () => apiGet<BuildRunsResponse>("/microcosm/builds", { source, country }),
     enabled,
     placeholderData: keepPreviousData,
-    staleTime: 5 * 1000,
+    // Switching tabs does not ask again within a minute.
+    staleTime: 60 * 1000,
     refetchInterval: buildListRefetchInterval(source),
   });
 }
@@ -1682,7 +1683,9 @@ export function useBuildRun(source: BuildRunSource, runId?: string) {
       apiGet<BuildRunResponse>("/microcosm/builds/run", { source, country, id: runId }),
     enabled: Boolean(runId),
     placeholderData: keepPreviousData,
-    staleTime: 5 * 1000,
+    // A run that is not running does not change, so switching tabs does not
+    // ask for it again.
+    staleTime: (query) => (query.state.data?.run.state === "running" ? 30 * 1000 : Infinity),
     refetchInterval: (query) => buildRunRefetchInterval(source, query.state.data?.run.state),
     retry: retryBuildRun,
   });
