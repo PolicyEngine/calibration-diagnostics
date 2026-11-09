@@ -49,21 +49,22 @@ export function shortReleaseId(releaseId: string, length = 6): string {
 export function releaseLabel(releaseId: string, date?: string | null): string {
   const buildFolder = parseBuildFolderId(releaseId);
   if (buildFolder) {
-    // Deprecated upstream identifier: Microcosm release IDs may still use the
-    // published prefix.
+    // Deprecated upstream identifier: strip the `<product>-<country>-` prefix in
+    // either of its published spellings.
     const release = buildFolder.release.replace(/^(?:microcosm|populace)-[a-z]{2}-/, "");
     const formatted = formatReleaseDate(date);
     return [formatted, release, buildFolder.build].filter(Boolean).join(" · ");
   }
   const cut = parseReleaseCutTag(releaseId);
   if (cut) {
-    // Deprecated upstream identifier: Microcosm release IDs may still use the
-    // published prefix.
+    // Deprecated upstream identifier: strip the `<product>-<country>-` prefix in
+    // either of its published spellings.
     const line = cut.releaseId.replace(/^(?:microcosm|populace)-[a-z]{2}-/, "");
     return `${formatReleaseDate(date || cut.cutAt)} · ${line} · ${cut.attempt}`;
   }
-  // Deprecated upstream identifier: Microcosm release IDs still use the
-  // published prefix.
+  // Deprecated upstream identifier: a Belgian release ID names its Chronicle
+  // commit after the prefix in either published spelling; a US release ID
+  // still carries the original spelling.
   const belgiumChronicleSha =
     /^(?:microcosm|populace)-be-\d{4}-chronicle-([0-9a-f]{7,40})(?:-|$)/i.exec(
       releaseId,

@@ -11,8 +11,9 @@ import numpy as np
 from ..execution import ArrayBundle, RunGroup
 
 
-# Deprecated upstream identifiers: Microcosm still publishes this release under
-# its published Hugging Face repository, release, and filename literals.
+# Deprecated upstream identifiers: Microcosm publishes this release under the
+# Hugging Face repository below and the release ID and filename further down;
+# keep them exact.
 MICROCOSM_REPOSITORY = "policyengine/populace-us"
 
 

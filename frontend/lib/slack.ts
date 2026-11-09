@@ -11,13 +11,13 @@ const COUNTRY_LABEL: Partial<Record<MicrocosmCountry, string>> = {
 };
 
 const WEBHOOK_ENV: Partial<Record<MicrocosmCountry, string>> = {
-  // Deprecated upstream identifiers: the configured webhook variables still
-  // support Microcosm configuration and legacy deployment aliases.
+  // Each country's webhook variable. LEGACY_WEBHOOK_ENV holds the former names,
+  // which the Vercel project's Production environment held on 2026-10-26.
   us: "SLACK_WEBHOOK_MICROCOSM_US",
   uk: "SLACK_WEBHOOK_MICROCOSM_UK",
 };
 
-const LEGACY_WEBHOOK_ENV: Partial<Record<MicrocosmCountry, string>> = {
+const LEGACY_WEBHOOK_ENV: Partial<Record<MicrocosmCountry, string>> = { // compat: populace alias, remove after 0.2.0
   us: "SLACK_WEBHOOK_POPULACE_US", // compat: populace alias, remove after 0.2.0
   uk: "SLACK_WEBHOOK_POPULACE_UK", // compat: populace alias, remove after 0.2.0
 };
@@ -27,9 +27,9 @@ function countryWebhook(
   environment: Readonly<Record<string, string | undefined>>,
 ): string | undefined {
   const webhookEnv = WEBHOOK_ENV[country];
-  const legacyWebhookEnv = LEGACY_WEBHOOK_ENV[country];
+  const legacyWebhookEnv = LEGACY_WEBHOOK_ENV[country]; // compat: populace alias, remove after 0.2.0
   return (webhookEnv ? environment[webhookEnv] : undefined) ??
-    (legacyWebhookEnv ? environment[legacyWebhookEnv] : undefined);
+    (legacyWebhookEnv ? environment[legacyWebhookEnv] : undefined); // compat: populace alias, remove after 0.2.0
 }
 
 interface SlackPayload {
