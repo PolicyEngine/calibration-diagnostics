@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { buildListRefetchInterval, buildRunRefetchInterval } from "@/lib/microcosm/build-refresh";
 import { releaseLabel } from "@/components/shared/format";
 import {
   useCountry,
@@ -1652,7 +1653,7 @@ export function useMicrocosmTargetDiagnostics(params: {
 }
 
 // Build monitor: local run folders (when the server enables them) or the
-// staging repository. Local runs refresh faster because reading them is free.
+// staging repository. See `build-refresh` for how often each is asked again.
 export function useBuildRuns(source: BuildRunSource, enabled = true) {
   const { country } = useCountry();
   return useQuery({
@@ -1660,8 +1661,9 @@ export function useBuildRuns(source: BuildRunSource, enabled = true) {
     queryFn: () => apiGet<BuildRunsResponse>("/microcosm/builds", { source, country }),
     enabled,
     placeholderData: keepPreviousData,
-    staleTime: 5 * 1000,
-    refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+    // Switching tabs does not ask again within a minute.
+    staleTime: 60 * 1000,
+    refetchInterval: buildListRefetchInterval(source),
   });
 }
 
@@ -1681,8 +1683,17 @@ export function useBuildRun(source: BuildRunSource, runId?: string) {
       apiGet<BuildRunResponse>("/microcosm/builds/run", { source, country, id: runId }),
     enabled: Boolean(runId),
     placeholderData: keepPreviousData,
-    staleTime: 5 * 1000,
-    refetchInterval: source === "local" ? 10 * 1000 : 30 * 1000,
+    // A run that is not running is not asked for again when switching tabs;
+    // the build monitor asks again when the run list shows it changed.
+    staleTime: (query) => (query.state.data?.run.state === "running" ? 30 * 1000 : Infinity),
+    // A run that is not found gives way to the default run instead.
+    refetchInterval: (query) =>
+      buildRunRefetchInterval(
+        source,
+        query.state.data?.run.state,
+        query.state.status === "error" &&
+          !(query.state.error instanceof ApiError && query.state.error.status === 404),
+      ),
     retry: retryBuildRun,
   });
 }

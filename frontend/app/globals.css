@@ -68,6 +68,14 @@
   --chart-3: #6fa58c;
   --chart-4: #98c0ac;
   --chart-5: #6e7f74;
+  /* Build stage types on the Staging page's Build progress tab: five hues
+     checked as a categorical set on the card surface, including against
+     --destructive, which marks a failed stage. */
+  --phase-setup: #2f6db5;
+  --phase-checks: #d08a00;
+  --phase-compile: #2e8b57;
+  --phase-calibrate: #9b6fd6;
+  --phase-export: #e17fa8;
   --text-error: #b91c1c; /* functional */
   --text-success: #2c5a45;
   --text-warning: #c2410c; /* functional */

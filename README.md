@@ -53,10 +53,8 @@ dashboard API layer.
 - **Build progress** (the second tab of Staging candidates,
   `/microcosm/staging?view=progress`, with `&run=<run id>` for one run) — follow a build run while it runs,
   from the staging repository or from the `runs/<run_id>/` telemetry folders a
-  Microcosm build writes on the machine it runs on: a stage timeline, an
-  expected finish time with a 90% range, calibration speed, where build time
-  goes across past runs of the same pipeline, and which checks fail and how
-  much compute had run when they did. See
+  Microcosm build writes on the machine it runs on: a stage timeline and an
+  expected finish time with a 90% range. See
   [the build progress notes](docs/build-monitor.md).
 - **Calibration target investigations** (`docs/ai/`) — tool-independent procedures,
   specialist review responsibilities, and a reusable checklist for identifying

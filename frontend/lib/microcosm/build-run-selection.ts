@@ -77,3 +77,20 @@ export function waitsForRunList(
 ): boolean {
   return listLoading && runCount === 0 && !(selected && hasDetail);
 }
+
+// Whether the run detail on screen is the previous run's, kept while the
+// selected run is asked for, after the selected run has already failed.
+export function placeholderHidesFailure(isPlaceholderData: boolean, errorUpdateCount: number): boolean {
+  return isPlaceholderData && errorUpdateCount > 0;
+}
+
+// Whether the build monitor shows the selected run as loading: its detail is
+// being asked for and there is no detail to draw. A retry whose placeholder
+// is hidden (see placeholderHidesFailure) counts: TanStack Query reports
+// placeholder data as loaded, not loading.
+export function runDetailLoading(
+  detail: { isLoading: boolean; isFetching: boolean },
+  hasDetailToDraw: boolean,
+): boolean {
+  return (detail.isLoading || detail.isFetching) && !hasDetailToDraw;
+}
