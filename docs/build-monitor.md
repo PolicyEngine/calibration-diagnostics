@@ -185,8 +185,10 @@ faint bars. The stage types are listed in the order the build first reached
 them. Hovering a type shows its total time in the run and dims the other
 types. Clicking one or more types leaves only their stages, in the bar
 (renamed "Whole run (filtered)") and in the breakdown, laid end to end in the
-order they ran so together they fill the bar; its axis then counts time in
-those types, and the forecast band and the present are left off. Hovering a
+order they ran so together they fill the bar (the other stages shrink to no
+width, over 0.2 seconds unless the viewer asks for less motion); its axis then
+counts time in those types, and the forecast band and the present are left
+off. Hovering a
 stage in the breakdown dims every other stage in the bar, and clicking it
 keeps that until it is clicked again. Each stage type has its own colour
 (`--phase-*` in `app/globals.css`), and red marks a failed stage. In the UK candidate

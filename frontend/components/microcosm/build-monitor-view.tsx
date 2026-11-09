@@ -1109,6 +1109,9 @@ export interface TimelineViewProps {
 // A dimmed stage's opacity, while another stage type is hovered or another
 // stage is selected.
 const DIMMED_OPACITY = 0.25;
+// Bars move, resize and fade over 0.2 seconds when the focus or the filter
+// changes; not at all for viewers who ask for less motion.
+const SEGMENT_MOTION = "transition-[left,width,opacity] duration-200 ease-out motion-reduce:transition-none";
 
 // The Timeline card's drawing, given what is open and focused; the card keeps
 // that state.
@@ -1250,12 +1253,19 @@ export function TimelineView({
           <div ref={measureArea} className="relative h-6 rounded bg-muted/40">
             {rows.map((row) => {
               const { visible, dimmed } = focusOf(row);
-              if (!visible) return null;
+              // A stage the filter hides stays drawn with no width where it
+              // falls between the shown stages, so changing the filter
+              // animates hidden stages shrinking and shown ones growing.
+              const collapsedAt = visible ? null : (axis?.collapsed.get(row.stageKey) ?? 0);
+              const style: CSSProperties =
+                collapsedAt == null
+                  ? { ...barStyle(row), opacity: dimmed ? DIMMED_OPACITY : 1 }
+                  : { ...barStyle(row), left: pct(collapsedAt), width: "0%" };
               return (
                 <div
                   key={`whole-${row.key}`}
-                  className={`absolute top-0 h-full transition-opacity ${row.status === "running" ? "bar-running" : ""}`}
-                  style={{ ...barStyle(row), opacity: dimmed ? DIMMED_OPACITY : 1 }}
+                  className={`absolute top-0 h-full ${SEGMENT_MOTION} ${row.status === "running" ? "bar-running" : ""}`}
+                  style={style}
                   title={`${row.label}: ${fmtDuration(row.end - row.start)}`}
                 />
               );
@@ -1433,7 +1443,7 @@ function TimelineStageRow({
         onPointerLeave={() => onHover(false)}
       >
         <div
-          className={`absolute top-0.5 h-4 rounded-sm transition-opacity ${running ? "bar-running" : ""}`}
+          className={`absolute top-0.5 h-4 rounded-sm ${SEGMENT_MOTION} ${running ? "bar-running" : ""}`}
           style={rowBarStyle}
         />
         <span

@@ -25,17 +25,23 @@ export function phasesByFirstAppearance(stages: readonly StageExtent[]): BuildPh
 // The Whole run bar's time axis under a stage-type filter: the picked types'
 // stages laid end to end in the order they ran, with the time between and
 // around them left out, so together they fill the bar. Gives where each shown
-// stage starts on that axis, and its length.
+// stage starts on that axis and its length, and where each hidden stage sits
+// with no length (between the shown stages it ran between), so a change of
+// filter can animate the hidden stages shrinking and the shown ones growing.
 export function filteredAxis(
   stages: readonly StageExtent[],
   filter: ReadonlySet<BuildPhase>,
 ): { starts: Map<string, number>; length: number; collapsed: Map<string, number> } {
   const starts = new Map<string, number>();
+  const collapsed = new Map<string, number>();
   let length = 0;
   for (const stage of inRunOrder(stages)) {
-    if (!filter.has(stage.phase)) continue;
+    if (!filter.has(stage.phase)) {
+      collapsed.set(stage.key, length);
+      continue;
+    }
     starts.set(stage.key, length);
     length += Math.max(0, stage.end - stage.start);
   }
-  return { starts, length, collapsed: new Map() };
+  return { starts, length, collapsed };
 }
