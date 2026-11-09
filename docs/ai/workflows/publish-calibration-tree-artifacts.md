@@ -44,7 +44,11 @@ before modifying code or external storage.
    size matches `index.json.gz`, and confirm the stored bytes are valid gzip.
 6. Confirm each target-summary record contains the three comparison keys,
    hierarchy metadata, and weighted-error inputs.
-7. Run `bun test`, `bun run lint`, and `bun run build` from `frontend/`.
+7. Run `bun test`, `bun run lint`, and `bun run build` from `frontend/`. The
+   builder, the readers and the publisher are the npm package
+   `@policyengine/calibration-tree`: change and test them in
+   PolicyEngine/microcosm-collector's `packages/calibration-tree`, release a new
+   version there, then raise the version `frontend/package.json` pins.
 
 Do not change the shard size through an environment variable. A different size
 would assign different immutable paths to the same release.

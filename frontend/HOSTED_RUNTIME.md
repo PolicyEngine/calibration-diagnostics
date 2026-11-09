@@ -168,7 +168,7 @@ performs these steps in order:
    waiting 780 seconds. The metadata checks and the post-promotion California checks
    instead make up to six attempts, pausing 5, 10, 15, 20 and 25 seconds between them,
    and retry any failure.
-8. Install the frontend workspace (`bun install --frozen-lockfile --ignore-scripts`)
+8. Install the frontend's dependencies (`bun install --frozen-lockfile --ignore-scripts`)
    and run the calibration release check against the candidate
    ([Promotion and rollback](#promotion-and-rollback)).
 9. Promote the Vercel deployment with `vercel promote`.

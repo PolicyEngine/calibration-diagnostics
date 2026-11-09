@@ -28,7 +28,11 @@ change to reproduce it. Regenerate it only for an intended output change, as
 the package's `src/test-support/calibration-tree-golden-cases.ts` describes.
 
 To change the builder, the readers or the publisher, change the package in the
-collector and raise its version, then raise the pinned version here.
+collector and raise its version, then raise the pinned version here. The
+dashboard's `bun run lint` typechecks the package modules it imports with the
+dashboard's own `tsconfig.json` (`target` ES2017), which can refuse syntax the
+collector's typecheck (`target` ES2022) accepts, such as regular-expression
+features from ES2018 or later, so run it on the raised version before merging.
 
 ## Required Blob folder schema
 
