@@ -11,10 +11,8 @@ def endpoint(monkeypatch):
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1]))
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2]))
     module = importlib.import_module("backend.variable_endpoint")
-    monkeypatch.delenv("MICROCOSM_HF_REPO", raising=False)
-    monkeypatch.delenv("MICROCOSM_HF_REVISION", raising=False)
-    monkeypatch.delenv("POPULACE_HF_REPO", raising=False)  # compat: populace alias, remove after 0.2.0
-    monkeypatch.delenv("POPULACE_HF_REVISION", raising=False)  # compat: populace alias, remove after 0.2.0
+    monkeypatch.delenv("POPULACE_HF_REPO", raising=False)
+    monkeypatch.delenv("POPULACE_HF_REVISION", raising=False)
     return module
 
 
@@ -68,8 +66,8 @@ def test_metadata_validates_the_deployment_data_configuration(endpoint, monkeypa
         "filename": reviewed["filename"],
     }
     for variable, value in (
-        ("MICROCOSM_HF_REPO", "policyengine/unreviewed-override-fixture"),
-        ("MICROCOSM_HF_REVISION", "main"),
+        ("POPULACE_HF_REPO", "policyengine/unreviewed-override-fixture"),
+        ("POPULACE_HF_REVISION", "main"),
     ):
         monkeypatch.setenv(variable, value)
         stale_status, stale_body = endpoint.handle_query("metadata=1")
@@ -77,27 +75,6 @@ def test_metadata_validates_the_deployment_data_configuration(endpoint, monkeypa
         assert stale_status == 503
         assert "conflicts with the reviewed value" in stale_body["detail"]
         monkeypatch.delenv(variable)
-
-
-@pytest.mark.parametrize(
-    ("primary", "field", "conflicting"),
-    [
-        ("MICROCOSM_HF_REPO", "repo", "policyengine/unreviewed-override-fixture"),
-        ("MICROCOSM_HF_REVISION", "hf_revision", "main"),
-    ],
-)
-def test_configuration_accepts_legacy_fallback_and_prefers_new_name(
-    endpoint, monkeypatch, primary, field, conflicting
-):
-    legacy = primary.replace("MICROCOSM", "POPULACE")  # compat: populace alias, remove after 0.2.0
-    reviewed = endpoint.reviewed_release()[field]
-    monkeypatch.setenv(legacy, conflicting)
-    assert endpoint.handle_query("metadata=1")[0] == 503
-    monkeypatch.setenv(primary, reviewed)
-    assert endpoint.handle_query("metadata=1")[0] == 200
-    monkeypatch.setenv(legacy, reviewed)
-    monkeypatch.setenv(primary, conflicting)
-    assert endpoint.handle_query("metadata=1")[0] == 503
 
 
 def test_calculation_uses_immutable_revision_and_preserves_response(

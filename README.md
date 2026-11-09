@@ -51,7 +51,7 @@ dashboard API layer.
   Face copy that recorded the end later. Runs only the
   collector knows have no candidate files and appear on Build progress only.
 - **Build progress** (the second tab of Staging candidates,
-  `/microcosm/staging?view=progress`) — follow a build run while it runs,
+  `/microcosm/staging?view=progress`, with `&run=<run id>` for one run) — follow a build run while it runs,
   from the staging repository or from the `runs/<run_id>/` telemetry folders a
   Microcosm build writes on the machine it runs on: a stage timeline, an
   expected finish time with a 90% range, calibration speed, where build time
@@ -254,8 +254,12 @@ that release in its validation table and calibration map. The UK lists
 attempts run `uk-frs-calibration`. A country that lists none is unaffected.
 
 The staging contract fixtures under
-`frontend/packages/calibration-tree/src/fixtures/staging-contract/` are byte-identical copies
-of Microcosm's canonical producer fixtures. The consumer tests pin each
-version's `SHA256SUMS` digest and verify every listed file. A contract change
-must update the canonical Microcosm fixture, its digest manifest, this copy,
-and both repositories' contract tests in their respective feature branches.
+`packages/calibration-tree/src/fixtures/staging-contract/` in
+PolicyEngine/microcosm-collector, the calibration tree package's source, are
+byte-identical copies of Microcosm's canonical producer fixtures. The package's
+consumer tests pin each version's `SHA256SUMS` digest and verify every listed
+file. A contract change must update the canonical Microcosm fixture, its digest
+manifest, the collector's copy and both repositories' contract tests, then
+release a new package version and raise the dashboard's pinned version. The
+build monitor's tests read copies of three version 3 runs, in
+`frontend/lib/microcosm/fixtures/staging-contract/`; update those too.

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useCountry } from "@/components/layout/country-context";
 import { CalibrationExplorerDataPrefetch } from "@/components/microcosm/calibration-explorer-map";
 import { BuildMonitorView } from "@/components/microcosm/build-monitor-view";
+import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
 import { StagingCalibrationMapPanel } from "@/components/microcosm/staging-calibration-map-panel";
 import {
   parseStagingTab,
@@ -20,7 +21,6 @@ import {
   fmtDecimal,
   fmtMoney,
   fmtSignedMoney,
-  formatShortDateTime,
   shortReleaseId,
 } from "@/components/shared/format";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -41,6 +41,7 @@ import {
   type MicrocosmStagingRunSummary,
 } from "@/lib/api/hooks/use-microcosm";
 import type { CandidateRunState } from "@/lib/microcosm/staging-run-state";
+import { shortDateTime, type ViewerZone } from "@/lib/microcosm/viewer-time";
 import { countryRegistration, hasCapability } from "@policyengine/calibration-tree/countries";
 import {
   formatCandidateCurrentStatus,
@@ -50,6 +51,8 @@ import {
 } from "@/lib/microcosm/staging-status";
 import { formatWeightedTargetError } from "@/lib/microcosm/target-change-visualization";
 import { stagingComparisonBaseline } from "@/lib/microcosm/calibration-selection";
+import { candidateRunSelection } from "@/lib/microcosm/build-run-selection";
+import { stagingRunForCountry, withStagingRun } from "@/lib/microcosm/staging-run-url";
 
 type LossKind = "normalized_target_loss" | "raw_optimizer_objective" | undefined;
 
@@ -114,7 +117,7 @@ function timestampFromId(value: string | null | undefined): string | null {
   return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
 }
 
-function runStartTime(run: MicrocosmStagingRunSummary): string | null | undefined {
+function runStartTimestamp(run: MicrocosmStagingRunSummary): string | null | undefined {
   return (
     run.started_at ??
     timestampFromId(run.candidate_release_id) ??
@@ -123,8 +126,10 @@ function runStartTime(run: MicrocosmStagingRunSummary): string | null | undefine
   );
 }
 
-function runLabel(run: MicrocosmStagingRunSummary): string {
-  return `${formatShortDateTime(runStartTime(run))} · ${shortReleaseId(
+// A run in the picker: its start in the viewer's zone, with the zone's short
+// name, and its short identifier.
+export function runLabel(run: MicrocosmStagingRunSummary, zone: ViewerZone | null): string {
+  return `${shortDateTime(runStartTimestamp(run), zone, { zoneName: true })} · ${shortReleaseId(
     run.candidate_release_id || run.run_id,
   )}`;
 }
@@ -146,11 +151,13 @@ function RunSelect({
   runs,
   selected,
   placeholder,
+  zone,
   onSelect,
 }: {
   runs: MicrocosmStagingRunSummary[];
   selected: string;
   placeholder: string;
+  zone: ViewerZone | null;
   onSelect: (runId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -199,7 +206,7 @@ function RunSelect({
           />
         ) : null}
         <span className="min-w-0 flex-1 truncate font-medium">
-          {selectedRun ? runLabel(selectedRun) : placeholder}
+          {selectedRun ? runLabel(selectedRun, zone) : placeholder}
         </span>
         {selectedRun ? (
           <span
@@ -253,7 +260,7 @@ function RunSelect({
                       aria-hidden="true"
                       className={`h-2 w-2 shrink-0 rounded-full ${STATUS_INDICATOR_CLASS[tone]}`}
                     />
-                    <span className="min-w-0 flex-1 truncate font-medium">{runLabel(run)}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{runLabel(run, zone)}</span>
                     <span
                       className="shrink-0 text-xs text-muted-foreground"
                       title={stateSourceTitle(run)}
@@ -284,9 +291,11 @@ function agoLabel(value: string | null | undefined): string {
   return `${Math.round(mins / 60 / 24)}d ago`;
 }
 
-function timeWithAgo(value: string | null | undefined): string {
+// An overview time in the viewer's zone and named, with how long ago it was:
+// "Nov 3, 09:50 PM GMT+4 · 3d ago".
+function timeWithAgo(value: string | null | undefined, zone: ViewerZone | null): string {
   const ago = agoLabel(value);
-  return `${formatShortDateTime(value)}${ago ? ` · ${ago}` : ""}`;
+  return `${shortDateTime(value, zone, { zoneName: true })}${ago ? ` · ${ago}` : ""}`;
 }
 
 // What the run's Hugging Face copy last recorded: "Running, Calibration,
@@ -294,14 +303,45 @@ function timeWithAgo(value: string | null | undefined): string {
 function huggingFaceCopyLabel(
   state: CandidateRunState,
   progress: Record<string, unknown>,
+  zone: ViewerZone | null,
 ): string {
   const recorded = [formatStagingStatus(state.hugging_face_status)];
   if (state.hugging_face_stage) {
     recorded.push(formatStagingCurrentStatus({ ...progress, stage: state.hugging_face_stage }));
   }
-  return `${recorded.join(", ")} · updated ${timeWithAgo(state.hugging_face_updated_at)}`;
+  return `${recorded.join(", ")} · updated ${timeWithAgo(state.hugging_face_updated_at, zone)}`;
 }
 
+// The Run internals note when the run's Hugging Face copy, which those
+// sections read, has fallen behind the collector's record.
+export function HuggingFaceCopyNote({
+  state,
+  progress,
+  zone,
+}: {
+  state: CandidateRunState;
+  progress: Record<string, unknown>;
+  zone: ViewerZone | null;
+}) {
+  return (
+    <span>
+      These sections read the run&apos;s Hugging Face copy ({huggingFaceCopyLabel(state, progress, zone)}); the
+      status above comes from the telemetry collector.
+    </span>
+  );
+}
+
+// A stage event's start in the Stage timeline table.
+export function StageEventTime({ time, zone }: { time: string | null; zone: ViewerZone | null }) {
+  const ms = time ? Date.parse(time) : NaN;
+  if (Number.isNaN(ms)) return <>{shortDateTime(time, zone)}</>;
+  return (
+    <ViewerTime ms={ms}>{shortDateTime(time, zone, { zoneName: true })}</ViewerTime>
+  );
+}
+
+// An overview row. Hovering over the value shows it in full, as it may be
+// truncated.
 function OverviewRow({
   label,
   value,
@@ -339,34 +379,40 @@ export function CandidateOverview({
   progress,
   calibration,
   collectorNote,
+  zone,
 }: {
   candidateReleaseId: string;
   state: CandidateRunState | null;
   progress: Record<string, unknown>;
   calibration: MicrocosmStagingRunResponse["calibration"];
   collectorNote: string | null;
+  zone: ViewerZone | null;
 }) {
   const currentStatus = state
     ? formatCandidateCurrentStatus(state)
     : formatStagingCurrentStatus(progress);
   const huggingFaceCopy = state?.hugging_face_differs
-    ? huggingFaceCopyLabel(state, progress)
+    ? huggingFaceCopyLabel(state, progress, zone)
     : null;
+  const lastUpdate = timeWithAgo(state?.updated_at, zone);
+  const lastHeartbeat = state?.heartbeat_at ? timeWithAgo(state.heartbeat_at, zone) : null;
   return (
     <SectionCard title="Candidate overview" className="w-full" padded={false}>
       <div className="grid grid-cols-[min-content_minmax(0,1fr)] items-baseline gap-y-3 py-3.5">
         <OverviewRow label="Candidate" value={candidateReleaseId} />
         <OverviewRow label="Status" value={formatStagingStatus(state?.status ?? null)} />
         {state && <OverviewRow label="Status from" value={formatStateSource(state.state_source)} />}
-        <OverviewRow label="Last update" value={timeWithAgo(state?.updated_at)} />
-        {state?.heartbeat_at && (
-          <OverviewRow label="Last heartbeat" value={timeWithAgo(state.heartbeat_at)} />
+        <OverviewRow label="Last update" value={lastUpdate} />
+        {state?.heartbeat_at && lastHeartbeat && (
+          <OverviewRow label="Last heartbeat" value={lastHeartbeat} />
         )}
         <OverviewRow label="Current status" value={currentStatus} />
         {state?.failure?.message && (
           <OverviewRow label="Failure" value={state.failure.message} wrap />
         )}
-        {huggingFaceCopy && <OverviewRow label="Hugging Face copy" value={huggingFaceCopy} />}
+        {huggingFaceCopy && (
+          <OverviewRow label="Hugging Face copy" value={huggingFaceCopy} />
+        )}
         {calibration && (
           <>
             <div
@@ -455,6 +501,7 @@ function RunInternalsPanel({
   artifacts,
   open,
   onOpenChange,
+  zone,
   className = "",
 }: {
   runData: MicrocosmStagingRunResponse;
@@ -463,11 +510,12 @@ function RunInternalsPanel({
   stage: string | null;
   // Set when the run's state comes from the collector and its Hugging Face
   // copy, which every section here reads, has fallen behind.
-  huggingFaceCopyNote: string | null;
+  huggingFaceCopyNote: ReactNode;
   buildManifest: Record<string, unknown> | null;
   artifacts: Record<string, { path?: string; staging_path?: string }>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  zone: ViewerZone | null;
   className?: string;
 }) {
   return (
@@ -620,7 +668,7 @@ function RunInternalsPanel({
                           {blocked && <StatusPill tone="warning">blocked</StatusPill>}
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
-                          {formatShortDateTime(time)}
+                          <StageEventTime time={time} zone={zone} />
                         </td>
                         <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted-foreground">
                           {index === all.length - 1 && event.stage !== "complete" && !failed && !blocked
@@ -870,12 +918,27 @@ function ScoreRow({
   );
 }
 
-export function MicrocosmStagingView() {
+export function MicrocosmStagingView({
+  localRunsEnabled,
+}: {
+  // Whether the server names a local runs folder for the build monitor.
+  localRunsEnabled: boolean;
+}) {
   const { country } = useCountry();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<StagingTab>(() => parseStagingTab(searchParams.get("view")));
-  // The run selected on either tab, so switching tabs keeps the same run.
-  const [runId, setRunId] = useState("");
+  // The run selected on either tab, so switching tabs keeps the same run. A
+  // link names it in the `run` query parameter, and choosing a run writes it
+  // there with the country, so the page's URL opens the same run. It is read
+  // from the URL on every render, so Back and Forward follow it, and a run of
+  // another country is ignored.
+  const runId = stagingRunForCountry(searchParams, country);
+  const chooseRun = useCallback(
+    (next: string) => {
+      window.history.replaceState(null, "", withStagingRun(window.location.href, next, country));
+    },
+    [country],
+  );
 
   const changeTab = useCallback((next: StagingTab) => {
     setTab(next);
@@ -899,9 +962,14 @@ export function MicrocosmStagingView() {
 
   const tabs = <StagingPageTabs value={tab} onChange={changeTab} />;
   return tab === "progress" ? (
-    <BuildMonitorView tabs={tabs} preferredRunId={runId || undefined} onRunChange={setRunId} />
+    <BuildMonitorView
+      tabs={tabs}
+      preferredRunId={runId || undefined}
+      onRunChange={chooseRun}
+      localRunsEnabled={localRunsEnabled}
+    />
   ) : (
-    <MicrocosmStagingRunsView tabs={tabs} preferredRunId={runId || undefined} onRunChange={setRunId} />
+    <MicrocosmStagingRunsView tabs={tabs} preferredRunId={runId || undefined} onRunChange={chooseRun} />
   );
 }
 
@@ -917,6 +985,7 @@ function MicrocosmStagingRunsView({
   const { data: runsData, isLoading: runsLoading, error: runsError } = useMicrocosmStagingRuns();
   const runs = runsData?.runs ?? [];
   const [selectedRun, setSelectedRun] = useState("");
+  const zone = useViewerZone();
   const [runInternalsOpen, setRunInternalsOpen] = useState(false);
   const [pageIntroHeight, setPageIntroHeight] = useState(0);
 
@@ -933,13 +1002,25 @@ function MicrocosmStagingRunsView({
     [onRunChange, resetRunVisualState],
   );
 
+  // Whenever the list or the page's run changes, apply one rule: the run a
+  // link names, or the one carried over from the Build progress tab, when it
+  // is a staging candidate; else the run shown while the list holds it; else
+  // the newest. The notice comes from the same answer, so the two agree after
+  // every refresh. A choice made here has already written the page's run.
+  const candidateRunIds = useMemo(() => runs.map((run) => run.run_id), [runs]);
+  const candidateRunIdsKey = candidateRunIds.join("\n");
+  const candidateSelection = candidateRunSelection(candidateRunIds, selectedRun, preferredRunId);
+  // The page's run the last time the rule ran, so a change of it (a link
+  // that removes or replaces the run) is told apart from a list refresh.
+  const lastPreferredRunId = useRef(preferredRunId);
   useEffect(() => {
-    if (selectedRun || !runs[0]) return;
-    // Open the run carried over from the Build progress tab when it is a
-    // staging run; otherwise the newest.
-    const preferred = runs.find((run) => run.run_id === preferredRunId);
-    resetRunVisualState((preferred ?? runs[0]).run_id);
-  }, [preferredRunId, resetRunVisualState, runs, selectedRun]);
+    const pageRunChanged = lastPreferredRunId.current !== preferredRunId;
+    lastPreferredRunId.current = preferredRunId;
+    const { runId } = candidateRunSelection(candidateRunIds, selectedRun, preferredRunId, pageRunChanged);
+    if (runId && runId !== selectedRun) resetRunVisualState(runId);
+  }, [candidateRunIdsKey, preferredRunId]);
+  // The named run is not a staging candidate in this repository.
+  const preferredRunMissing = candidateRunIds.length > 0 && candidateSelection.missing;
 
   const { data: runData, isLoading: runLoading, error: runError } =
     useMicrocosmStagingRun(selectedRun);
@@ -994,9 +1075,9 @@ function MicrocosmStagingRunsView({
   const status = candidateState?.status ?? null;
   const stage = candidateState?.stage ?? null;
   // Run internals read the Hugging Face copy; say so when it has fallen behind.
-  const internalsCopyNote = candidateState?.hugging_face_differs
-    ? `These sections read the run's Hugging Face copy (${huggingFaceCopyLabel(candidateState, progress)}); the status above comes from the telemetry collector.`
-    : null;
+  const internalsCopyNote = candidateState?.hugging_face_differs ? (
+    <HuggingFaceCopyNote state={candidateState} progress={progress} zone={zone} />
+  ) : null;
   // The selected run's own note: the collector may have answered for it even
   // when the run list's request failed, or the other way round.
   const collectorNote = runData?.collector_note ?? null;
@@ -1022,12 +1103,18 @@ function MicrocosmStagingRunsView({
         eyebrow="Microcosm · staging"
         title="Staging candidates"
         status={tabs}
-        description="Monitor Microcosm build candidates before they are promoted to the published Hugging Face release channel."
+        description={
+          <>
+            Monitor Microcosm build candidates before they are promoted to the published Hugging Face release
+            channel.
+          </>
+        }
         actions={
           <RunSelect
             runs={runs}
             selected={selectedRun}
             placeholder={runSelectPlaceholder}
+            zone={zone}
             onSelect={selectRun}
           />
         }
@@ -1035,6 +1122,12 @@ function MicrocosmStagingRunsView({
       />
 
       <div className="flex flex-col gap-5">
+        {preferredRunMissing && (
+          <div role="status" className="rounded-md border px-3 py-2 text-sm pill-warn">
+            Run {preferredRunId} is not a staging candidate in this repository, so another candidate is shown.
+            The Build progress tab may still have it.
+          </div>
+        )}
         {runsLoading && !runs.length ? (
             <LoadingBlock label="Loading staging runs…" />
           ) : runsError ? (
@@ -1079,6 +1172,7 @@ function MicrocosmStagingRunsView({
                 progress={progress}
                 calibration={runData.calibration ?? null}
                 collectorNote={collectorNote}
+                zone={zone}
               />
 
               {candidateValidationPending && (
@@ -1230,6 +1324,7 @@ function MicrocosmStagingRunsView({
                   artifacts={artifacts}
                   open={runInternalsOpen}
                   onOpenChange={setRunInternalsOpen}
+                  zone={zone}
                 />
               )}
               </div>
@@ -1263,6 +1358,7 @@ function MicrocosmStagingRunsView({
                   artifacts={artifacts}
                   open={runInternalsOpen}
                   onOpenChange={setRunInternalsOpen}
+                  zone={zone}
                 />
               )}
               </div>

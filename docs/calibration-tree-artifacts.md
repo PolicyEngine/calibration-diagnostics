@@ -8,19 +8,31 @@ the hierarchy. Schemas 1 through 5 are unsupported.
 
 The builder, the schema-6 types, parsers and serializers, the Blob I/O, the
 release and staging readers the builder reads from, and the publisher
-(`src/publish-calibration-tree.ts`, run by `bun run publish:calibration-tree`)
-live in the `@policyengine/calibration-tree` workspace package at
-`frontend/packages/calibration-tree/`. The dashboard imports it through its
-subpath exports, such as `@policyengine/calibration-tree/calibration-tree-bundle`.
-The package imports only its own modules, Node built-ins and `@vercel/blob`,
-and its boundary test enforces that.
+(`src/publish-calibration-tree.ts`) are the npm package
+`@policyengine/calibration-tree`. Its source is `packages/calibration-tree` in
+[PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector),
+which publishes a new version whenever a merged change raises the package's
+version. The dashboard pins one published version in `frontend/package.json`,
+imports it through its subpath exports, such as
+`@policyengine/calibration-tree/calibration-tree-bundle`, and runs the
+installed publisher, `node_modules/@policyengine/calibration-tree/src/publish-calibration-tree.ts`,
+with `bun run publish:calibration-tree`. The package ships TypeScript source,
+which Next.js compiles through `transpilePackages`. It imports only its own
+modules, Node built-ins and `@vercel/blob`, and its boundary test enforces that.
 
-`src/fixtures/calibration-tree-golden.json` records the exact bytes the builder
-writes for representative inputs: US, UK and Belgium releases, US and UK
-staging runs, a US and a UK release-to-staging comparison, and the manifest
-holding every recorded build. The golden tests require every change to
-reproduce it. Regenerate it only for an intended output change, as
-`src/test-support/calibration-tree-golden-cases.ts` describes.
+The package's `src/fixtures/calibration-tree-golden.json` records the exact
+bytes the builder writes for representative inputs: US, UK and Belgium
+releases, US and UK staging runs, a US and a UK release-to-staging comparison,
+and the manifest holding every recorded build. The golden tests require every
+change to reproduce it. Regenerate it only for an intended output change, as
+the package's `src/test-support/calibration-tree-golden-cases.ts` describes.
+
+To change the builder, the readers or the publisher, change the package in the
+collector and raise its version, then raise the pinned version here. The
+dashboard's `bun run lint` typechecks the package modules it imports with the
+dashboard's own `tsconfig.json` (`target` ES2017), which can refuse syntax the
+collector's typecheck (`target` ES2022) accepts, such as regular-expression
+features from ES2018 or later, so run it on the raised version before merging.
 
 ## Required Blob folder schema
 
@@ -692,8 +704,8 @@ fails publication and therefore fails the GitHub Actions job.
 
 ## Verification
 
-Run from `frontend/`; `bun test` includes the package's tests and
-`bun run lint` also typechecks the package:
+Run from `frontend/`; `bun run lint` typechecks the dashboard, including the
+package modules it imports:
 
 ```sh
 bun test
@@ -701,8 +713,8 @@ bun run lint
 bun run build
 ```
 
-To check the package on its own, run `bun test` and `bun run typecheck` from
-`frontend/packages/calibration-tree/`.
+The package's own tests and typecheck run in the collector, from
+`packages/calibration-tree/` (`bun test`, `bun run typecheck`).
 
 Then verify that:
 

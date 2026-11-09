@@ -1,4 +1,4 @@
-import { formatShortDateTime } from "@/components/shared/format";
+import { shortDateTime, type ViewerZone } from "@/lib/microcosm/viewer-time";
 import type { StagingComparisonRelease } from "@policyengine/calibration-tree/staging-artifact";
 
 // Older dashboard links used `staging:<run_id>` on published-release pages.
@@ -114,13 +114,17 @@ export interface ComparisonFromBuild {
  * A From build the user picked, named by its date and run ID: "Build Oct 17,
  * 01:02 PM · uk-frs-calibration-attempt-…". A release build has no staging
  * run, so its release ID stands in. The date is when the build was published
- * (createdAt, else updatedAt), in the format the Staging page dates its runs
- * with, and is left out when the publisher could not date the build.
+ * (createdAt, else updatedAt), in the viewer's zone and the format the Staging
+ * page dates its runs with, and is left out when the publisher could not date
+ * the build.
  */
-function pickedFromBuildBaseline(build: ComparisonFromBuild): StagingComparisonBaseline {
+function pickedFromBuildBaseline(
+  build: ComparisonFromBuild,
+  zone: ViewerZone | null,
+): StagingComparisonBaseline {
   const buildId = build.kind === "staging" ? build.stagingRunId : build.releaseId;
   const publishedAt = build.createdAt ?? build.updatedAt;
-  const name = [publishedAt ? formatShortDateTime(publishedAt) : null, buildId]
+  const name = [publishedAt ? shortDateTime(publishedAt, zone) : null, buildId]
     .filter((part) => part)
     .join(" · ");
   return {
@@ -147,6 +151,7 @@ export function stagingComparisonBaseline(
   comparisonRelease: StagingComparisonRelease | undefined,
   pickedFromBuild?: ComparisonFromBuild | null,
   comparedReleaseId?: string,
+  zone: ViewerZone | null = null,
 ): StagingComparisonBaseline {
   const defaultReleaseId = comparedReleaseId ?? comparisonRelease?.release_id;
   if (
@@ -154,7 +159,7 @@ export function stagingComparisonBaseline(
     !(pickedFromBuild.kind === "release" &&
       pickedFromBuild.releaseId === defaultReleaseId)
   ) {
-    return pickedFromBuildBaseline(pickedFromBuild);
+    return pickedFromBuildBaseline(pickedFromBuild, zone);
   }
   if (comparisonRelease?.basis === "newest_local_area_release") {
     return {

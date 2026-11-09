@@ -24,6 +24,10 @@ test("the bare domain root redirects to the mounted dashboard", async () => {
   }
 });
 
+test("Next.js compiles the calibration tree package, which ships TypeScript source", () => {
+  expect(config.transpilePackages ?? []).toContain("@policyengine/calibration-tree");
+});
+
 test("legacy Microcosm API URLs retain redirects at root and mounted paths", async () => {
   const prefix = config.basePath ?? "";
   const redirects = await config.redirects!();

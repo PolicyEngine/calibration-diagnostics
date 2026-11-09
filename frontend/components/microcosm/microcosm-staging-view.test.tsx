@@ -16,7 +16,8 @@ import {
   usFailedCollectorDocuments,
   usRunningCollectorDocuments,
 } from "@/lib/microcosm/test-support/collector-run-fixtures";
-import { CandidateOverview } from "./microcosm-staging-view";
+import type { ViewerZone } from "@/lib/microcosm/viewer-time";
+import { CandidateOverview, HuggingFaceCopyNote, runLabel, StageEventTime } from "./microcosm-staging-view";
 
 // The failed US run's Hugging Face progress document: its last upload.
 const FAILED_RUN_PROGRESS = {
@@ -40,6 +41,7 @@ function renderOverview(
       progress,
       calibration: null,
       collectorNote,
+      zone: null,
     }),
   );
 }
@@ -116,4 +118,112 @@ test("a UK run refused by its acceptance checks shows where, without a copy warn
   expect(markup).toContain("Refused at Gate battery");
   expect(markup).toContain("Telemetry collector");
   expect(markup).not.toContain("Hugging Face copy");
+});
+
+const NEW_YORK: ViewerZone = { timeZone: "America/New_York", locale: "en-US" };
+
+// Some versions of the Unicode locale data put a narrow no-break space
+// before "AM" and "PM".
+function plain(text: string): string {
+  return text.replace(/\u202f/g, " ");
+}
+
+test("the candidate's picker label and overview times read in the viewer's zone, named, with no UTC time", () => {
+  const state = candidateRunState(
+    FAILED_RUN_PROGRESS,
+    buildTimeline(usFailedCollectorDocuments(), INVESTIGATION_NOW_MS),
+    INVESTIGATION_NOW_MS,
+  );
+
+  expect(
+    plain(runLabel({ run_id: US_FAILED_RUN_ID, candidate_release_id: US_FAILED_RUN_ID, ...state }, NEW_YORK)),
+  ).toBe("Oct 19, 06:23 PM EDT · b5db38");
+
+  const markup = plain(
+    renderToStaticMarkup(
+      createElement(CandidateOverview, {
+        candidateReleaseId: US_FAILED_RUN_ID,
+        state,
+        progress: FAILED_RUN_PROGRESS,
+        calibration: null,
+        collectorNote: null,
+        zone: NEW_YORK,
+      }),
+    ),
+  );
+  // The collector's last update, 06:37:45 UTC on October 20.
+  expect(markup).toContain(">Oct 20, 02:37 AM EDT · ");
+  // The Hugging Face copy's last upload, 06:09:35 UTC.
+  expect(markup).toContain("epoch 273 of 1500 · updated Oct 20, 02:09 AM EDT · ");
+  expect(markup).not.toContain("UTC");
+});
+
+test("the Run internals note names the copy's update time in the viewer's zone, with no hover text", () => {
+  const state = candidateRunState(
+    FAILED_RUN_PROGRESS,
+    buildTimeline(usFailedCollectorDocuments(), INVESTIGATION_NOW_MS),
+    INVESTIGATION_NOW_MS,
+  );
+
+  const note = plain(
+    renderToStaticMarkup(
+      createElement(HuggingFaceCopyNote, { state, progress: FAILED_RUN_PROGRESS, zone: NEW_YORK }),
+    ),
+  );
+  expect(note).toContain("These sections read the run&#x27;s Hugging Face copy (");
+  expect(note).toContain("updated Oct 20, 02:09 AM EDT · ");
+  expect(note).not.toContain("title=");
+});
+
+// The hover text of every overview row.
+function rowHoverTexts(markup: string): string[] {
+  return [...markup.matchAll(/title="([^"]*)"/g)].map((match) => match[1].replace(/&#x27;/g, "'"));
+}
+
+test("an overview time row's hover text is the row's own full text, with no UTC time", () => {
+  const state = candidateRunState(
+    FAILED_RUN_PROGRESS,
+    buildTimeline(usFailedCollectorDocuments(), INVESTIGATION_NOW_MS),
+    INVESTIGATION_NOW_MS,
+  );
+  const london: ViewerZone = { timeZone: "Europe/London", locale: "en-GB" };
+
+  for (const [zone, copyUpdated] of [
+    [NEW_YORK, "updated Oct 20, 02:09 AM EDT"],
+    [london, "updated 20 Oct, 07:09 BST"],
+  ] as const) {
+    const titles = rowHoverTexts(
+      plain(
+        renderToStaticMarkup(
+          createElement(CandidateOverview, {
+            candidateReleaseId: US_FAILED_RUN_ID,
+            state,
+            progress: FAILED_RUN_PROGRESS,
+            calibration: null,
+            collectorNote: null,
+            zone,
+          }),
+        ),
+      ),
+    );
+    // The Hugging Face copy row: what the copy records, then the time.
+    expect(titles.find((title) => title.includes("epoch 273 of 1500"))).toMatch(
+      new RegExp(`^Running, Calibration, epoch 273 of 1500 · ${copyUpdated} · \\d+d ago$`),
+    );
+    for (const title of titles) {
+      expect(title).not.toContain("UTC");
+      expect(title).not.toContain("\n");
+    }
+  }
+});
+
+test("a stage event's start reads in the viewer's zone, named", () => {
+  const eventTime = (time: string | null) =>
+    plain(renderToStaticMarkup(createElement(StageEventTime, { time, zone: NEW_YORK })));
+
+  expect(eventTime("2026-10-20T06:09:35+00:00")).toBe(
+    '<time dateTime="2026-10-20T06:09:35.000Z">Oct 20, 02:09 AM EDT</time>',
+  );
+  expect(eventTime("not a time")).toBe("not a time");
+  expect(eventTime(null)).toBe("—");
 });

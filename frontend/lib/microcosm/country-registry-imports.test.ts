@@ -1,4 +1,4 @@
-// The country registry lives in the calibration-tree package. The dashboard
+// The country registry lives in the calibration-tree npm package. The dashboard
 // once kept it at lib/microcosm/countries and then a re-export there; neither
 // may come back, and no dashboard module may name that location, so the
 // registry has one import path: @policyengine/calibration-tree/countries.
@@ -15,7 +15,7 @@ const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const MODULE_LOADING_CALLS = new Set(["require", "require.resolve", "import.meta.resolve", "mock.module"]);
 
 // Dashboard sources a checkout contains, relative to frontend/: tracked files
-// and new files that are not ignored, without the package's own sources.
+// and new files that are not ignored.
 function dashboardSourceFiles(): string[] {
   const listing = Bun.spawnSync(
     ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "."],
@@ -28,7 +28,6 @@ function dashboardSourceFiles(): string[] {
     .toString()
     .split("\0")
     .filter((relativePath) => SOURCE_FILE.test(relativePath))
-    .filter((relativePath) => !relativePath.startsWith("packages/"))
     .filter((relativePath) => existsSync(join(FRONTEND_ROOT, relativePath)))
     .sort();
 }

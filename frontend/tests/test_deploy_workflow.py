@@ -266,7 +266,7 @@ def test_deployment_supplies_private_release_secret_and_checks_views_before_prom
 
 
 def test_every_bun_script_step_runs_after_its_job_installs_locked_frontend_dependencies():
-    # Bun resolves the frontend's workspace packages, such as
+    # Bun resolves the frontend's packages, such as the npm package
     # @policyengine/calibration-tree, only through frontend/node_modules, so a
     # job must install before it runs repository code with Bun.
     uninstalled_steps = []
@@ -340,7 +340,7 @@ def test_deploy_dependency_install_skips_lifecycle_scripts():
 def test_every_calibration_check_turns_off_bun_auto_install():
     # In a directory tree without node_modules, Bun installs a missing package
     # from npm when a script imports it. A check must instead fail when the
-    # workspace install is missing. Bun reads --no-install only before the
+    # job's dependency install is missing. Bun reads --no-install only before the
     # script path; after it, the flag is passed to the script.
     steps = _workflow()["jobs"]["deploy"]["steps"]
     bun_words_by_step = {}

@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { HelpHint } from "@/components/shared/help-hint";
@@ -17,7 +18,18 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
+import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
+import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
+import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
+import { buildRunToShow, waitsForRunList } from "@/lib/microcosm/build-run-selection";
+import {
+  orderRunOptions,
+  parseRunOrder,
+  RUN_ORDER_PARAM,
+  type RunOrder,
+  withRunOrder,
+} from "@/lib/microcosm/run-order";
 import {
   BUILD_GATE_CATALOG_SOURCE,
   GATE_POSITIONS,
@@ -44,11 +56,22 @@ import {
   sameStageSequence,
   solverPassLabel,
   solverSegments,
-  spanDurationMs,
   stageCores,
   stageMemoryBytes,
   type StageSpan,
 } from "@/lib/microcosm/build-monitor";
+import {
+  type RunStage,
+  P90_MIN_RUNS,
+  type RunStageTime,
+  runStageBreakdown,
+  runStageTimes,
+} from "@/lib/microcosm/run-stage-breakdown";
+import {
+  clockTime,
+  runStartTime,
+  type ViewerZone,
+} from "@/lib/microcosm/viewer-time";
 
 const PHASE_COLOR: Record<BuildPhase, string> = {
   setup: "var(--chart-4)",
@@ -139,13 +162,21 @@ export function fmtDuration(ms: number | null | undefined): string {
   return rest ? `${hours} h ${rest} min` : `${hours} h`;
 }
 
-function fmtClock(ms: number | null | undefined, nowMs: number): string {
-  if (ms == null || !Number.isFinite(ms)) return "—";
-  const date = new Date(ms);
-  const sameDay = new Date(nowMs).toDateString() === date.toDateString();
-  const time = date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  if (sameDay) return time;
-  return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
+// A time on the run overview, in the viewer's zone and named ("07:56 AM
+// GMT+4").
+function ClockTime({
+  ms,
+  nowMs,
+  zone,
+}: {
+  ms: number | null | undefined;
+  nowMs: number;
+  zone: ViewerZone | null;
+}) {
+  if (ms == null || !Number.isFinite(ms)) return <>—</>;
+  return (
+    <ViewerTime ms={ms}>{clockTime(ms, nowMs, zone, { zoneName: true })}</ViewerTime>
+  );
 }
 
 // The stage a run is in, or stopped in, to follow its state label
@@ -162,16 +193,16 @@ function runWhere(run: BuildTimeline): string | null {
 }
 
 // A run in the run selector: its state, start, length and where it is or
-// stopped. The selector groups runs by pipeline; the overview shows the id.
-function runOptionLabel(run: BuildTimeline, nowMs: number): string {
-  const started = run.started_ms
-    ? new Date(run.started_ms).toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : "unknown start";
+// stopped. The selector groups runs by pipeline or, ordered by date, puts the
+// pipeline's name before this label (in `BuildMonitorView`); the overview
+// shows the id. Its start is in the viewer's zone, which the page names above
+// the selector.
+export function runOptionLabel(
+  run: BuildTimeline,
+  nowMs: number,
+  zone: ViewerZone | null,
+): string {
+  const started = run.started_ms ? runStartTime(run.started_ms, zone, { zoneName: true }) : "unknown start";
   const duration = runDurationMs(run, nowMs);
   return [STATE_LABEL[run.state], started, duration != null ? fmtDuration(duration) : null, runWhere(run)]
     .filter(Boolean)
@@ -228,34 +259,139 @@ function SourceToggle({
   );
 }
 
+// How the run selector orders runs; the choice is kept in the URL.
+function RunOrderToggle({ order, onChange }: { order: RunOrder; onChange: (order: RunOrder) => void }) {
+  const options: { id: RunOrder; label: string; hint: string }[] = [
+    { id: "pipeline", label: "By pipeline", hint: "Runs grouped by pipeline, newest first in each" },
+    { id: "date", label: "By date", hint: "Every run in one list by start, newest first" },
+  ];
+  return (
+    <div role="radiogroup" aria-label="Run order" className="inline-flex rounded-md border border-border p-0.5">
+      {options.map((option) => {
+        const active = option.id === order;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={option.label}
+            title={option.hint}
+            onClick={() => onChange(option.id)}
+            className={`h-8 rounded px-3 text-sm font-medium transition-colors ${
+              active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// The Run selector's label for a run a link named that the list does not
+// hold: the run's own label once its detail arrives, what went wrong when
+// its detail failed, and never the ID from the URL, which may name no run at
+// all.
+export function linkedRunOptionLabel(
+  selected: string,
+  detailRun: BuildTimeline | undefined,
+  nowMs: number,
+  zone: ViewerZone | null,
+  failure: "not_found" | "unavailable" | null = null,
+): string {
+  if (detailRun?.run_id === selected) return runOptionLabel(detailRun, nowMs, zone);
+  if (failure === "not_found") return "Run not found";
+  if (failure === "unavailable") return "Run unavailable";
+  return "Loading run…";
+}
+
+// What the Run selector says went wrong with a linked run's detail, if
+// anything. A run about to give way to the default run is still loading, and
+// so is one not found before the run list arrives, as it gives way then.
+export function linkedRunFailure({
+  notFound,
+  failed,
+  replacing,
+  listLoading,
+}: {
+  notFound: boolean;
+  failed: boolean;
+  replacing: boolean;
+  listLoading: boolean;
+}): "not_found" | "unavailable" | null {
+  if (replacing || (notFound && listLoading)) return null;
+  if (notFound) return "not_found";
+  return failed ? "unavailable" : null;
+}
+
 // The Build progress tab of the Staging candidates page. `preferredRunId`
-// carries the run selected on the Candidate tab; a run picked here is
+// is the run the page's URL names, chosen on either tab; a run picked here is
 // reported back through `onRunChange` so the other tab opens on it.
 export function BuildMonitorView({
   tabs,
   preferredRunId,
   onRunChange,
+  localRunsEnabled,
 }: {
   tabs?: ReactNode;
   preferredRunId?: string;
   onRunChange?: (runId: string) => void;
+  // Whether the server names a local runs folder; never on the hosted
+  // dashboard.
+  localRunsEnabled: boolean;
 }) {
   const [chosenSource, setChosenSource] = useState<BuildRunSource | null>(null);
-  // The local listing answers instantly and says whether local runs are on;
-  // hosted telemetry is read only once it is the chosen source.
-  const local = useBuildRuns("local");
+  // With a local runs folder, the local listing answers first and says
+  // whether this machine's runs are opened; hosted telemetry is read only
+  // once it is the chosen source. Without one it is read at once.
+  // A server started with a folder the prerendered page did not know of says
+  // so in its answer to the hosted list.
+  const [hostedListReportsLocalRuns, setHostedListReportsLocalRuns] = useState(false);
+  const [hostedListFailed, setHostedListFailed] = useState(false);
+  const local = useBuildRuns(
+    "local",
+    localListRequested(localRunsEnabled, hostedListReportsLocalRuns, hostedListFailed),
+  );
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
-  // Open local runs when this machine has them, unless the run carried over
-  // from the Candidate tab exists only in hosted telemetry.
-  const preferLocal =
-    localEnabled &&
-    (!preferredRunId || localRuns.some((run) => run.run_id === preferredRunId));
+  // Whether this machine's runs open by themselves: see `opensLocalRuns`. The
+  // page's run (a link, or a choice on either tab) counts as the carried-over
+  // run there.
+  const preferLocal = opensLocalRuns(
+    localRunsEnabled,
+    localEnabled,
+    localRuns.map((run) => run.run_id),
+    preferredRunId,
+  );
   const source: BuildRunSource = chosenSource ?? (preferLocal ? "local" : "staging");
-  const staging = useBuildRuns("staging", source === "staging" && !local.isLoading);
+  const staging = useBuildRuns("staging", hostedListRequested(localRunsEnabled, source, local.isLoading));
+  useEffect(() => {
+    if (staging.data?.local_enabled) setHostedListReportsLocalRuns(true);
+  }, [staging.data?.local_enabled]);
+  useEffect(() => {
+    if (staging.isError) setHostedListFailed(true);
+  }, [staging.isError]);
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
-  const [selected, setSelected] = useState("");
+  // A run the page's URL names is requested at once, beside the list.
+  const [selected, setSelected] = useState(preferredRunId ?? "");
+  // The page's run changed without a choice here, as with a link to the same
+  // page or the browser's Back button: show it, or, when the URL no longer
+  // names one, the default run.
+  useEffect(() => {
+    setSelected(preferredRunId ?? "");
+  }, [preferredRunId]);
+  // The order is read from the URL on every render, not copied once: a link
+  // to the same page, or the browser's Back button, changes the URL while
+  // this view stays mounted. Next.js updates `useSearchParams` after
+  // `history.replaceState`, so writing the URL is enough to change it.
+  const searchParams = useSearchParams();
+  const runOrder = parseRunOrder(searchParams.get(RUN_ORDER_PARAM));
+  const chooseRunOrder = (next: RunOrder) => {
+    window.history.replaceState(null, "", withRunOrder(window.location.href, next));
+  };
   // The selector groups runs by pipeline, and puts runs whose stages differ
   // from the pipeline's newest run (an older build driver) in a group of
   // their own, as the forecast and statistics leave them out.
@@ -272,18 +408,6 @@ export function BuildMonitorView({
     );
   }, [runs]);
 
-  useEffect(() => {
-    if (!runs.length) return;
-    if (!runs.some((run) => run.run_id === selected)) {
-      const preferred = runs.find((run) => run.run_id === preferredRunId);
-      const running = runs.find((run) => run.state === "running");
-      // Otherwise the newest run that ended with a final event (finished,
-      // blocked or failed), whose telemetry says how it ended.
-      const ended = runs.find((run) => run.state !== "stalled");
-      setSelected((preferred ?? running ?? ended ?? runs[0]).run_id);
-    }
-  }, [runs, selected, preferredRunId]);
-
   const selectRun = (runId: string) => {
     setSelected(runId);
     onRunChange?.(runId);
@@ -291,15 +415,67 @@ export function BuildMonitorView({
 
   const detail = useBuildRun(source, selected || undefined);
   const data = detail.data;
+  const runNotFound = detail.error instanceof ApiError && detail.error.status === 404;
+  // The page's URL names the run shown: the default run is written there, and
+  // a run no source holds gives way to the default run.
+  useEffect(() => {
+    const { runId, urlRunId } = buildRunToShow(runs, selected, preferredRunId, runNotFound);
+    if (runId !== selected) setSelected(runId);
+    if (urlRunId) onRunChange?.(urlRunId);
+  }, [runs, selected, preferredRunId, runNotFound, onRunChange]);
+  // A run that was not found is about to give way to the default run.
+  const replacingRun = runNotFound && runs.some((run) => run.run_id !== selected);
   const nowMs = data?.now_ms ?? Date.now();
-
+  const zone = useViewerZone();
+  // A run a link named that the list does not hold, such as one older than
+  // its runs, gets an option of its own, first in either order.
+  const linkedRunOutsideList = Boolean(selected) && !runs.some((run) => run.run_id === selected);
+  const runOptions = [
+    ...(linkedRunOutsideList
+      ? [
+          {
+            value: selected,
+            label: linkedRunOptionLabel(
+              selected,
+              data?.run,
+              nowMs,
+              zone,
+              linkedRunFailure({
+                notFound: runNotFound,
+                failed: Boolean(detail.error),
+                replacing: replacingRun,
+                // As for the wait for the run list below: with a local runs
+                // folder, the hosted list waits for the local one.
+                listLoading: list.isLoading || (localRunsEnabled && local.isLoading),
+              }),
+            ),
+            group: "Linked run, not in this list",
+          },
+        ]
+      : []),
+    // The list's runs in the chosen order: under their pipeline groups, or by
+    // start with each run naming its pipeline.
+    ...orderRunOptions(runs, runOrder, (run) => runGroups.get(run.run_id)).map(({ run, group }) => {
+      const label = runOptionLabel(run, list.data?.now_ms ?? Date.now(), zone);
+      return {
+        value: run.run_id,
+        label: runOrder === "date" ? `${run.pipeline_label} · ${label}` : label,
+        group,
+      };
+    }),
+  ];
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Microcosm · staging"
         title="Staging candidates"
         status={tabs}
-        description="Follow a build while it runs, see when it should finish, and find where build time goes and which checks fail late."
+        description={
+          <>
+            Follow a build while it runs, see when it should finish, and find where build time goes and which checks
+            fail late.
+          </>
+        }
         actions={
           <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
             {/* A hosted dashboard never reads local run folders, so it
@@ -314,27 +490,31 @@ export function BuildMonitorView({
                 }}
               />
             ) : null}
+            <RunOrderToggle order={runOrder} onChange={chooseRunOrder} />
             <ToolbarSelect
               label="Run"
               value={selected}
               options={
-                runs.length
-                  ? runs.map((run) => ({
-                      value: run.run_id,
-                      label: runOptionLabel(run, list.data?.now_ms ?? Date.now()),
-                      group: runGroups.get(run.run_id),
-                    }))
+                runOptions.length
+                  ? runOptions
                   : [{ value: "", label: list.isLoading ? "Loading runs…" : "No runs" }]
               }
               onChange={selectRun}
-              disabled={!runs.length}
+              disabled={!runOptions.length}
               className="w-[30rem] max-w-full"
             />
           </div>
         }
       />
 
-      {(list.isLoading || local.isLoading) && !runs.length ? (
+      {/* The local list's first load decides the source only when the page knew
+          of a folder; a folder found later does not bring the loading back. */}
+      {waitsForRunList(
+        list.isLoading || (localRunsEnabled && local.isLoading),
+        runs.length,
+        selected,
+        data != null,
+      ) ? (
         <LoadingBlock label="Loading build runs…" />
       ) : list.error ? (
         <EmptyState title="Build runs unavailable" description={String(list.error.message)} />
@@ -343,7 +523,7 @@ export function BuildMonitorView({
           title={source === "local" ? "Local runs are off" : "Hosted runs unavailable"}
           description={list.data.detail ?? undefined}
         />
-      ) : !runs.length ? (
+      ) : !runs.length && !(selected && (data || detail.isLoading)) ? (
         <EmptyState
           title="No build runs found"
           description={
@@ -352,16 +532,33 @@ export function BuildMonitorView({
               : "The collector and historical staging repository have no runs for this country."
           }
         />
-      ) : detail.isLoading && !data ? (
+      ) : (detail.isLoading && !data) || replacingRun ? (
         <LoadingBlock label="Loading run…" />
       ) : detail.error ? (
-        <EmptyState title="Run unavailable" description={String(detail.error.message)} />
+        <EmptyState
+          title={runNotFound ? "Run not found" : "Run unavailable"}
+          description={
+            runNotFound
+              ? `${detail.error.message} ${
+                  source === "local"
+                    ? "No run folder on this machine has this ID."
+                    : "No hosted run with this ID is recorded for this country."
+                } Choose another run from the Run list.`
+              : String(detail.error.message)
+          }
+        />
       ) : data ? (
         <>
           <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />
-          <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} />
+          <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} zone={zone} />
           <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
-          <RunHistoryCard runs={runs} selected={data.run} nowMs={nowMs} onSelect={selectRun} />
+          <RunHistoryCard runs={runs} selected={data.run} nowMs={nowMs} zone={zone} onSelect={selectRun} />
+          <RunStageCard
+            run={data.run}
+            stageStats={data.stage_stats}
+            nowMs={nowMs}
+            pipelineLabel={data.run.pipeline_label}
+          />
           <TimeBudgetCard
             run={data.run}
             nowMs={nowMs}
@@ -421,14 +618,16 @@ function StaleSourceNotice({
   );
 }
 
-function RunOverview({
+export function RunOverview({
   run,
   forecast,
   nowMs,
+  zone,
 }: {
   run: BuildTimeline;
   forecast: BuildForecast | null;
   nowMs: number;
+  zone: ViewerZone | null;
 }) {
   const running = run.state === "running";
   const elapsed = runDurationMs(run, nowMs);
@@ -444,16 +643,21 @@ function RunOverview({
           <span className="font-mono text-xs font-normal text-muted-foreground">{run.run_id}</span>
         </span>
       }
-      description={[
-        `Started ${fmtClock(run.started_ms, nowMs)}`,
-        running || run.state === "stalled" ? `last telemetry ${fmtDuration(silentFor)} ago` : null,
-        run.heartbeat_ms != null && (running || run.state === "stalled")
-          ? `heartbeat ${fmtDuration(nowMs - run.heartbeat_ms)} ago`
-          : null,
-        run.source === "local" ? "local run folder" : "hosted telemetry",
-      ]
-        .filter(Boolean)
-        .join(" · ")}
+      description={
+        <>
+          Started <ClockTime ms={run.started_ms} nowMs={nowMs} zone={zone} />
+          {[
+            running || run.state === "stalled" ? `last telemetry ${fmtDuration(silentFor)} ago` : null,
+            run.heartbeat_ms != null && (running || run.state === "stalled")
+              ? `heartbeat ${fmtDuration(nowMs - run.heartbeat_ms)} ago`
+              : null,
+            run.source === "local" ? "local run folder" : "hosted telemetry",
+          ]
+            .filter(Boolean)
+            .map((part) => ` · ${part}`)
+            .join("")}
+        </>
+      }
     >
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -461,18 +665,28 @@ function RunOverview({
           {running ? (
             <KpiCard
               label="Expected finish"
-              value={forecast?.finish_p50_ms ? fmtClock(forecast.finish_p50_ms, nowMs) : "Unknown"}
+              value={
+                forecast?.finish_p50_ms ? (
+                  <ClockTime ms={forecast.finish_p50_ms} nowMs={nowMs} zone={zone} />
+                ) : (
+                  "Unknown"
+                )
+              }
               hint={
-                forecast?.finish_p90_ms
-                  ? `90% by ${fmtClock(forecast.finish_p90_ms, nowMs)}`
-                  : "No comparable finished runs"
+                forecast?.finish_p90_ms ? (
+                  <>
+                    90% by <ClockTime ms={forecast.finish_p90_ms} nowMs={nowMs} zone={zone} />
+                  </>
+                ) : (
+                  "No comparable finished runs"
+                )
               }
               size="sm"
             />
           ) : (
             <KpiCard
               label={run.state === "stalled" ? "Last telemetry" : "Finished"}
-              value={fmtClock(run.ended_ms ?? run.updated_ms, nowMs)}
+              value={<ClockTime ms={run.ended_ms ?? run.updated_ms} nowMs={nowMs} zone={zone} />}
               size="sm"
             />
           )}
@@ -585,11 +799,16 @@ function RunOverview({
 
         {run.state === "stalled" ? (
           <div className="rounded-md border px-3 py-2 text-sm pill-warn">
-            {`The last telemetry came ${fmtDuration(elapsed)} after the run started, ${
-              silentFor != null && silentFor > 24 * 3_600_000
-                ? `on ${fmtClock(run.updated_ms, nowMs)}`
-                : `${fmtDuration(silentFor)} ago`
-            }, and the run wrote no final event. The telemetry does not say why it stopped, or whether the process is still working without reporting.`}
+            The last telemetry came {fmtDuration(elapsed)} after the run started,{" "}
+            {silentFor != null && silentFor > 24 * 3_600_000 ? (
+              <>
+                on <ClockTime ms={run.updated_ms} nowMs={nowMs} zone={zone} />
+              </>
+            ) : (
+              `${fmtDuration(silentFor)} ago`
+            )}
+            , and the run wrote no final event. The telemetry does not say why it stopped, or whether the process is
+            still working without reporting.
           </div>
         ) : null}
 
@@ -1135,35 +1354,6 @@ function PhaseLegend() {
   );
 }
 
-// What one run did in each of its top-level stages: how long it spent there
-// and how the stage ended for it.
-interface RunStage {
-  ms: number;
-  status: "completed" | "running" | "failed" | "silent";
-}
-
-function runStages(run: BuildTimeline, nowMs: number): Map<string, RunStage> {
-  const top = run.spans.filter((span) => span.depth === 0);
-  const last = top[top.length - 1];
-  const stages = new Map<string, RunStage>();
-  for (const span of top) {
-    const status: RunStage["status"] =
-      span.end_ms == null
-        ? "running"
-        : span.status === "failed"
-          ? "failed"
-          : run.state === "stalled" && span === last
-            ? "silent"
-            : "completed";
-    const previous = stages.get(span.stage);
-    stages.set(span.stage, {
-      ms: (previous?.ms ?? 0) + spanDurationMs(span, nowMs),
-      status: previous?.status === "failed" ? "failed" : status,
-    });
-  }
-  return stages;
-}
-
 // A stage this run is in that no compared run has finished yet.
 function emptyStat(span: StageSpan): StageStat {
   return {
@@ -1177,12 +1367,158 @@ function emptyStat(span: StageSpan): StageStat {
     max_ms: 0,
     finished_median_ms: null,
     finished_p90_ms: null,
+    finished_max_ms: null,
     cut_short: 0,
     median_offset_ms: 0,
     share: 0,
     cores_median: null,
     memory_max_bytes: null,
   };
+}
+
+// How a stage's time compares with its p50 (typical) time: "+30 min (2.0×)",
+// "−4 min", "about typical" within a minute or 5%, or "—" without one.
+function againstTypical(stage: RunStageTime): string {
+  const over = stage.over_typical_ms;
+  const typical = stage.typical_ms;
+  if (over == null || typical == null) return "—";
+  if (stage.about_typical) return "about typical";
+  if (over < 0) return `−${fmtDuration(-over)}`;
+  const ratio = typical > 0 ? stage.ms / typical : null;
+  return `+${fmtDuration(over)}${ratio != null && ratio >= 1.5 ? ` (${ratio.toFixed(1)}×)` : ""}`;
+}
+
+// The selected run's stages, slowest first, beside the pipeline's p50, p90
+// and longest times, so the stages that took this run longest are plain to
+// see.
+export function RunStageCard({
+  run,
+  stageStats,
+  nowMs,
+  pipelineLabel,
+}: {
+  run: BuildTimeline;
+  stageStats: StageStat[];
+  nowMs: number;
+  pipelineLabel: string;
+}) {
+  const breakdown = useMemo(() => runStageBreakdown(run, stageStats, nowMs), [run, stageStats, nowMs]);
+  if (!breakdown.stages.length) return null;
+  const longest = Math.max(
+    1,
+    ...breakdown.stages.map((stage) => Math.max(stage.ms, stage.typical_ms ?? 0)),
+  );
+  const share = (value: number | null) => (value == null ? "—" : `${Math.round(value * 100)}%`);
+  return (
+    <SectionCard
+      title="This run by stage"
+      descriptionClassName="max-w-none"
+      description={`How long each of this run's stages took, slowest first, and its share of the run's ${fmtDuration(
+        breakdown.total_ms,
+      )}${run.state === "running" ? " so far" : ""}. p50, p90 and Max are the median, 90th percentile and longest time of the ${pipelineLabel} runs with this stage sequence that finished the stage (this run included when it did); p50 gives their number when fewer than three, and p90 needs at least three. The mark on each bar is p50. A stage still running, or stopped early, is compared only once it has run past p50. A time beyond "about typical" and past p90 is shown in red.`}
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs tabular-nums">
+          <thead className="text-left text-muted-foreground">
+            <tr className="border-b border-border">
+              <th className="pb-1.5 font-medium">Stage</th>
+              <th className="pb-1.5 font-medium" colSpan={2}>
+                This run
+              </th>
+              <th className="pb-1.5 text-right font-medium">Share</th>
+              <th className="pb-1.5 text-right font-medium">p50</th>
+              <th className="pb-1.5 text-right font-medium">p90</th>
+              <th className="pb-1.5 text-right font-medium">Max</th>
+              <th className="pb-1.5 text-right font-medium">Against p50</th>
+            </tr>
+          </thead>
+          <tbody>
+            {breakdown.stages.map((stage) => {
+              const pastP90 = stage.past_p90;
+              return (
+                <tr key={stage.stage} className="border-b border-border/60 last:border-b-0">
+                  <td className="py-1.5 pr-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        aria-hidden="true"
+                        className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                        style={{ background: PHASE_COLOR[stage.phase] }}
+                      />
+                      {formatStageName(stage.stage)}
+                    </span>
+                  </td>
+                  {/* The bar and the time sit in cells of their own: the
+                      table gives the time column its longest time's width,
+                      so every bar has the same width and bars compare. */}
+                  <td className="w-[40%] py-1.5 pr-2">
+                    <span className="relative h-2 block rounded-sm bg-muted/40">
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-y-0 left-0 rounded-sm"
+                        style={{
+                          width: `${Math.max(1, (stage.ms / longest) * 100)}%`,
+                          background: stage.status === "failed" ? FAILED_COLOR : PHASE_COLOR[stage.phase],
+                        }}
+                      />
+                      {stage.typical_ms != null ? (
+                        <span
+                          aria-hidden="true"
+                          title={`p50: ${fmtDuration(stage.typical_ms)}`}
+                          className="absolute -inset-y-0.5 w-0.5 bg-foreground/70"
+                          style={{ left: `${(stage.typical_ms / longest) * 100}%` }}
+                        />
+                      ) : null}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap py-1.5 pr-3">
+                    <ThisRunCell stage={stage} />
+                  </td>
+                  <td className="py-1.5 text-right">{share(stage.share)}</td>
+                  <td className="whitespace-nowrap py-1.5 pl-3 text-right">
+                    {stage.typical_ms != null
+                      ? `${fmtDuration(stage.typical_ms)}${
+                          stage.typical_runs < P90_MIN_RUNS
+                            ? ` · ${stage.typical_runs} run${stage.typical_runs === 1 ? "" : "s"}`
+                            : ""
+                        }`
+                      : "—"}
+                  </td>
+                  <td className="whitespace-nowrap py-1.5 pl-3 text-right">
+                    {stage.typical_p90_ms != null && stage.typical_runs >= P90_MIN_RUNS
+                      ? fmtDuration(stage.typical_p90_ms)
+                      : "—"}
+                  </td>
+                  <td className="whitespace-nowrap py-1.5 pl-3 text-right">
+                    {stage.typical_max_ms != null ? fmtDuration(stage.typical_max_ms) : "—"}
+                  </td>
+                  <td
+                    className={`whitespace-nowrap py-1.5 pl-3 text-right ${pastP90 ? "font-medium tone-neg" : "text-muted-foreground"}`}
+                  >
+                    {againstTypical(stage)}
+                    {pastP90 ? <span className="sr-only"> past the 90th percentile</span> : null}
+                  </td>
+                </tr>
+              );
+            })}
+            {breakdown.between_stages_ms >= 60_000 ? (
+              <tr className="text-muted-foreground">
+                <td className="py-1.5 pr-3">Between stages</td>
+                <td />
+                <td className="whitespace-nowrap py-1.5 pr-3">{fmtDuration(breakdown.between_stages_ms)}</td>
+                <td className="py-1.5 text-right">
+                  {share(breakdown.total_ms ? breakdown.between_stages_ms / breakdown.total_ms : null)}
+                </td>
+                <td />
+                <td />
+                <td />
+                <td />
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
 }
 
 function ThisRunCell({ stage }: { stage: RunStage | undefined }) {
@@ -1218,7 +1554,7 @@ function TimeBudgetCard({
   totals: PhaseTotals[];
 }) {
   const [expanded, setExpanded] = useState(false);
-  const thisRun = useMemo(() => runStages(run, nowMs), [run, nowMs]);
+  const thisRun = useMemo(() => runStageTimes(run, nowMs), [run, nowMs]);
   // Every stage a compared run reached, plus any this run is in that none
   // has finished yet (its open stage). Longest typical time first; stages
   // without one follow by this run's time in them.
@@ -1406,11 +1742,13 @@ function RunHistoryCard({
   runs,
   selected,
   nowMs,
+  zone,
   onSelect,
 }: {
   runs: BuildTimeline[];
   selected: BuildTimeline;
   nowMs: number;
+  zone: ViewerZone | null;
   onSelect: (runId: string) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
@@ -1437,6 +1775,7 @@ function RunHistoryCard({
       longest={longest}
       selected={run.run_id === selected.run_id}
       onSelect={onSelect}
+      zone={zone}
     />
   );
 
@@ -1480,31 +1819,29 @@ function RunHistoryCard({
   );
 }
 
-function RunHistoryItem({
+export function RunHistoryItem({
   run,
   total,
   longest,
   selected,
   onSelect,
+  zone,
 }: {
   run: BuildTimeline;
   total: PhaseTotals;
   longest: number;
   selected: boolean;
   onSelect: (runId: string) => void;
+  zone: ViewerZone | null;
 }) {
   const ms = total.total_ms ?? 0;
   const running = run.state === "running";
   const where = runWhere(run);
-  const started = run.started_ms
-    ? new Date(run.started_ms).toLocaleString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : "Unknown start";
+  const started = run.started_ms ? (
+    <ViewerTime ms={run.started_ms}>{runStartTime(run.started_ms, zone, { weekday: true, zoneName: true })}</ViewerTime>
+  ) : (
+    "Unknown start"
+  );
   return (
     <button
       type="button"

@@ -10,6 +10,9 @@ const BASE_PATH =
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // @policyengine/calibration-tree ships TypeScript source, not compiled
+  // JavaScript, so Next.js has to compile it from node_modules.
+  transpilePackages: ["@policyengine/calibration-tree"],
   ...(BASE_PATH ? { basePath: BASE_PATH } : {}),
   async redirects() {
     const apiAliases = [
