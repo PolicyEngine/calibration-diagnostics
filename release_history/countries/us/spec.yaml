@@ -1,0 +1,63 @@
+# A minimal US trial spec: proves the machinery on a second country and tests
+# the cost design on the largest national file. Manual runs only; the US data
+# owners take it over and extend it.
+schema_version: 1
+country: us
+# Must equal the US registration in @policyengine/calibration-tree's countries.ts.
+release_repo: policyengine/populace-us
+series:
+  # Every default national release; local-area and receipt-candidate builds are left out.
+  releases: ["^populace-us-2024-"]
+  exclude: ["acs-local", "spm-receipts"]
+schedule: manual
+engine:
+  module: us
+  model_package: policyengine-us
+  simulation_options: {}
+household_entity: household
+periods: [2026]
+period_label: calendar_year
+currency: USD
+variables:
+  groups: {all: null}
+# The cheap level only: each reform computes its target's dependency chain and
+# nothing else, which is the lever for a 353k-household file.
+outputs: [targets]
+baseline:
+  - {id: income_tax, variable: income_tax, stat: sum, kind: tax}
+  - {id: eitc, variable: eitc, stat: sum, kind: other}
+  - {id: refundable_ctc, variable: refundable_ctc, stat: sum, kind: other}
+  - {id: snap, variable: snap, stat: sum, kind: benefit}
+  - {id: ssi, variable: ssi, stat: sum, kind: benefit}
+  - {id: households, stat: population, entity: household, kind: population}
+# Out-of-sample federal reforms with official scores, from Microcosm's US
+# reform-validation registry (packages/microcosm-build/src/microcosm/build/us/
+# state_reforms.json at 1d174fc7c9). The OBBBA rows need Microcosm's stacked
+# pre-OBBBA baseline, so they are not single reforms here.
+reforms:
+  - id: cbo_rates_plus_1pt
+    label: All individual income tax rates +1pt
+    add:
+      gov.irs.income.bracket.rates.1: 0.01
+      gov.irs.income.bracket.rates.2: 0.01
+      gov.irs.income.bracket.rates.3: 0.01
+      gov.irs.income.bracket.rates.4: 0.01
+      gov.irs.income.bracket.rates.5: 0.01
+      gov.irs.income.bracket.rates.6: 0.01
+      gov.irs.income.bracket.rates.7: 0.01
+    targets: [income_tax]
+    source: {repo: PolicyEngine/microcosm, path: packages/microcosm-build/src/microcosm/build/us/state_reforms.json, commit: 1d174fc7c9, id: federal.cbo_rates_plus_1pt}
+  - id: arpa_ctc_2021
+    label: ARPA 2021 Child Tax Credit expansion
+    parameters:
+      "gov.irs.credits.ctc.amount.arpa[0].amount": 3600
+      "gov.irs.credits.ctc.amount.arpa[1].amount": 3000
+      gov.irs.credits.ctc.refundable.fully_refundable: true
+      gov.irs.credits.ctc.phase_out.arpa.in_effect: true
+    targets: [income_tax]
+    source: {repo: PolicyEngine/microcosm, path: packages/microcosm-build/src/microcosm/build/us/state_reforms.json, commit: 1d174fc7c9, id: federal.arpa_ctc_2021}
+disclosure:
+  policy: none
+runner:
+  # Set from the trial: whether a 16 GB runner holds the 2.5 GB dense file.
+  max_dataset_bytes: 3000000000
