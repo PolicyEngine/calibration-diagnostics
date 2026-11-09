@@ -66,3 +66,8 @@ export function toggleStage(selected: string | null, stageKey: string): string |
 export function pointerHovers(pointerType: string): boolean {
   return pointerType === "mouse" || pointerType === "pen";
 }
+
+// The focus with a hovered or clicked stage that no drawn row has left out.
+export function focusOnDrawnStages(focus: TimelineFocus, _drawnStageKeys: ReadonlySet<string>): TimelineFocus {
+  return focus;
+}

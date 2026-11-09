@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 
 import type { BuildPhase } from "@/lib/microcosm/build-monitor";
 import {
+  focusOnDrawnStages,
   NO_FOCUS,
   pointerHovers,
   stageFocus,
@@ -80,4 +81,16 @@ test("a hovered stage type outranks a hovered stage, which outranks a clicked on
   const typeOverStage = { ...NO_FOCUS, hoveredPhase: "calibrate" as const, hoveredStage: "export-6" };
   expect(stageFocus(typeOverStage, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: false });
   expect(stageFocus(typeOverStage, "export", "export-6")).toEqual({ visible: true, dimmed: true });
+});
+
+// A refresh can drop a running run's expected stages, or renumber them when
+// the run starts a stage nobody expected, under a resting pointer.
+test("a hovered or clicked stage that no drawn row has any more dims nothing", () => {
+  const drawn = new Set(["calibrate-3", "export-6"]);
+  const stale = focusOnDrawnStages({ ...NO_FOCUS, hoveredStage: "expected-9", selectedStage: "expected-8" }, drawn);
+  expect(stageFocus(stale, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: false });
+  expect(stageFocus(stale, "export", "export-6")).toEqual({ visible: true, dimmed: false });
+  // A stage still drawn keeps its highlight.
+  const current = focusOnDrawnStages({ ...NO_FOCUS, hoveredStage: "export-6" }, drawn);
+  expect(stageFocus(current, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: true });
 });

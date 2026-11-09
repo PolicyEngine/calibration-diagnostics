@@ -32,6 +32,7 @@ import {
 } from "@/lib/microcosm/build-run-selection";
 import { filteredAxis, phasesByFirstAppearance } from "@/lib/microcosm/timeline-layout";
 import {
+  focusOnDrawnStages,
   NO_FOCUS,
   pointerHovers,
   stageFocus,
@@ -1194,7 +1195,9 @@ export function TimelineView({
     );
   }
   const totals = phaseTotals(run, nowMs).phases;
-  const focusOf = (row: TimelineRow) => stageFocus(focus, row.phase, row.stageKey);
+  // A refresh can drop or renumber the row a stage was hovered or clicked in.
+  const drawnFocus = focusOnDrawnStages(focus, new Set(rows.map((row) => row.stageKey)));
+  const focusOf = (row: TimelineRow) => stageFocus(drawnFocus, row.phase, row.stageKey);
 
   const barStyle = (row: TimelineRow): CSSProperties => {
     const onAxis = place(row) ?? { start: row.start, end: row.end };
