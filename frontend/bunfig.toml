@@ -1,6 +1,6 @@
 [install]
-# Keep the hoisted node_modules layout that Next.js and Vercel build against.
-# Bun otherwise installs a project with workspaces using its isolated linker.
+# Keep the hoisted node_modules layout that Next.js and Vercel build against,
+# whatever Bun's default linker is.
 linker = "hoisted"
 
 [test]

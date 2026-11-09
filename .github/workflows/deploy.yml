@@ -146,7 +146,7 @@ jobs:
           --check full
           --vercel-bypass-secret "$VERCEL_AUTOMATION_BYPASS_SECRET"
 
-      # The calibration checks import @policyengine/calibration-tree, a workspace
+      # The calibration checks import @policyengine/calibration-tree, an npm
       # package that resolves only through frontend/node_modules. Install after
       # the Vercel upload, which sends the repository root, so the uploaded
       # working tree never contains node_modules. This job holds Google Cloud

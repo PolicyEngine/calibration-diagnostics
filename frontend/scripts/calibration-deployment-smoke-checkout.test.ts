@@ -1,7 +1,8 @@
 // The production deploy job runs the calibration smoke script from a fresh
-// checkout of the tested commit. The script imports the frontend's workspace
-// packages, which Bun resolves only through frontend/node_modules, so the
-// job's own steps must install them before the script runs. These tests copy
+// checkout of the tested commit. The script imports the npm package
+// @policyengine/calibration-tree, which Bun resolves only through
+// frontend/node_modules, so the job's own steps must install it before the
+// script runs. These tests copy
 // the checkout's files (without node_modules) and replay the deploy job's
 // install steps and its smoke-script commands, with the flags the workflow
 // gives them. The job also holds Google Cloud credentials and can request
@@ -31,12 +32,13 @@ const SMOKE_INVOCATION =
 // What the script prints once its imports have loaded and it parses its
 // (here absent) arguments.
 const ARGUMENT_ERROR = "--url must name the mounted dashboard root.";
-const MISSING_WORKSPACE_PACKAGE = "Cannot find module '@policyengine/calibration-tree/countries'";
+const MISSING_PACKAGE = "Cannot find module '@policyengine/calibration-tree/countries'";
 const INSTALL_COMMAND = /(?<![\w-])bun\s+install\b/;
 // Planted only in the copy: install scripts that leave this file if they run.
+// The checkout's only package is the frontend; its dependencies come from npm.
 const LIFECYCLE_MARKER = "lifecycle-script-ran";
 const LIFECYCLE_SCRIPT_NAMES = ["preinstall", "install", "postinstall", "prepare"];
-const PACKAGES_WITH_PLANTED_SCRIPTS = ["frontend", "frontend/packages/calibration-tree"];
+const PACKAGES_WITH_PLANTED_SCRIPTS = ["frontend"];
 
 interface WorkflowStep {
   name?: string;
@@ -205,7 +207,7 @@ test(
   "the deploy job's calibration checks never install packages from a registry",
   async () => {
     const job = deployJob();
-    // No install steps are replayed: this is a job whose workspace install is missing.
+    // No install steps are replayed: this is a job whose dependency install is missing.
     const checkoutCopy = copyCheckout();
     const registry = startRecordingRegistry();
 
@@ -221,7 +223,7 @@ test(
       );
       smokeChecks.push({
         step: step.name ?? invocation,
-        missingPackage: smoke.output.includes(MISSING_WORKSPACE_PACKAGE),
+        missingPackage: smoke.output.includes(MISSING_PACKAGE),
         requestedPaths: [...registry.requestedPaths],
       });
     }
