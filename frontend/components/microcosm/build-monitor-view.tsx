@@ -19,6 +19,7 @@ import { StatusPill, type StatusTone } from "@/components/shared/status-pill";
 import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
+import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
 import {
   BUILD_GATE_CATALOG_SOURCE,
   GATE_POSITIONS,
@@ -250,24 +251,44 @@ export function BuildMonitorView({
   tabs,
   preferredRunId,
   onRunChange,
+  localRunsEnabled,
 }: {
   tabs?: ReactNode;
   preferredRunId?: string;
   onRunChange?: (runId: string) => void;
+  // Whether the server names a local runs folder; never on the hosted
+  // dashboard.
+  localRunsEnabled: boolean;
 }) {
   const [chosenSource, setChosenSource] = useState<BuildRunSource | null>(null);
-  // The local listing answers instantly and says whether local runs are on;
-  // hosted telemetry is read only once it is the chosen source.
-  const local = useBuildRuns("local");
+  // With a local runs folder, the local listing answers first and says
+  // whether this machine's runs are opened; hosted telemetry is read only
+  // once it is the chosen source. Without one it is read at once.
+  // A server started with a folder the prerendered page did not know of says
+  // so in its answer to the hosted list.
+  const [hostedListReportsLocalRuns, setHostedListReportsLocalRuns] = useState(false);
+  const [hostedListFailed, setHostedListFailed] = useState(false);
+  const local = useBuildRuns(
+    "local",
+    localListRequested(localRunsEnabled, hostedListReportsLocalRuns, hostedListFailed),
+  );
   const localEnabled = local.data?.local_enabled ?? false;
   const localRuns = local.data?.runs ?? [];
-  // Open local runs when this machine has them, unless the run carried over
-  // from the Candidate tab exists only in hosted telemetry.
-  const preferLocal =
-    localEnabled &&
-    (!preferredRunId || localRuns.some((run) => run.run_id === preferredRunId));
+  // Whether this machine's runs open by themselves: see `opensLocalRuns`.
+  const preferLocal = opensLocalRuns(
+    localRunsEnabled,
+    localEnabled,
+    localRuns.map((run) => run.run_id),
+    preferredRunId,
+  );
   const source: BuildRunSource = chosenSource ?? (preferLocal ? "local" : "staging");
-  const staging = useBuildRuns("staging", source === "staging" && !local.isLoading);
+  const staging = useBuildRuns("staging", hostedListRequested(localRunsEnabled, source, local.isLoading));
+  useEffect(() => {
+    if (staging.data?.local_enabled) setHostedListReportsLocalRuns(true);
+  }, [staging.data?.local_enabled]);
+  useEffect(() => {
+    if (staging.isError) setHostedListFailed(true);
+  }, [staging.isError]);
   const list = source === "local" ? local : staging;
   const runs = list.data?.runs ?? [];
   const [selected, setSelected] = useState("");
@@ -356,7 +377,9 @@ export function BuildMonitorView({
         }
       />
 
-      {(list.isLoading || local.isLoading) && !runs.length ? (
+      {/* The local list's first load decides the source only when the page knew
+          of a folder; a folder found later does not bring the loading back. */}
+      {(list.isLoading || (localRunsEnabled && local.isLoading)) && !runs.length ? (
         <LoadingBlock label="Loading build runs…" />
       ) : list.error ? (
         <EmptyState title="Build runs unavailable" description={String(list.error.message)} />

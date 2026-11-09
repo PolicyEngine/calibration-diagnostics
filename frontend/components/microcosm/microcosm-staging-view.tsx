@@ -948,7 +948,12 @@ function ScoreRow({
   );
 }
 
-export function MicrocosmStagingView() {
+export function MicrocosmStagingView({
+  localRunsEnabled,
+}: {
+  // Whether the server names a local runs folder for the build monitor.
+  localRunsEnabled: boolean;
+}) {
   const { country } = useCountry();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<StagingTab>(() => parseStagingTab(searchParams.get("view")));
@@ -977,7 +982,12 @@ export function MicrocosmStagingView() {
 
   const tabs = <StagingPageTabs value={tab} onChange={changeTab} />;
   return tab === "progress" ? (
-    <BuildMonitorView tabs={tabs} preferredRunId={runId || undefined} onRunChange={setRunId} />
+    <BuildMonitorView
+      tabs={tabs}
+      preferredRunId={runId || undefined}
+      onRunChange={setRunId}
+      localRunsEnabled={localRunsEnabled}
+    />
   ) : (
     <MicrocosmStagingRunsView tabs={tabs} preferredRunId={runId || undefined} onRunChange={setRunId} />
   );
