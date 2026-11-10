@@ -652,8 +652,10 @@ function spansFromLifecycle(events: JsonObject[]): {
         ? Math.max(0, time - reportedElapsed * 1000)
         : time;
     if (index >= 0 && recordedStarts.has(open[index])) {
+      const ending = open[index];
       for (const inner of open.splice(index + 1)) {
-        if (!recordedStarts.has(inner)) {
+        // Only a stage recorded inside the ending one ends with it.
+        if (!recordedStarts.has(inner) || inner.depth <= ending.depth) {
           open.push(inner);
           continue;
         }
