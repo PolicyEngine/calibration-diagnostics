@@ -1166,12 +1166,11 @@ export function readingSummary(
     );
   }
   if (reading.machine_cpu_share != null) lines.push(`Machine ${Math.round(reading.machine_cpu_share * 100)}% busy`);
-  if (machine) lines.push(machineName(machine));
   return lines;
 }
 
-// A machine as the Timeline names it: its label, and a Modal container's task
-// ID, which finds its logs.
+// A machine as the Whole run hover text names it: its label, and a Modal
+// container's task ID, which finds its logs.
 function machineName(machine: MachineSegment): string {
   return machine.modal_task_id ? `${machineLabel(machine)} · ${machine.modal_task_id}` : machineLabel(machine);
 }
@@ -1498,8 +1497,7 @@ export function TimelineView({
     forecast?.finish_p50_ms != null && run.started_ms != null && run.state === "running"
       ? forecast.finish_p50_ms - run.started_ms
       : null;
-  // The machines a stage ran on, for its Whole run hover text; a machine that
-  // sent no readings is named nowhere else.
+  // The machines a stage ran on, named in its Whole run hover text.
   const machinesOf = (row: TimelineRow): string[] => {
     const runStart = run.started_ms;
     if (runStart == null || row.status === "pending") return [];
@@ -1671,14 +1669,21 @@ export function TimelineView({
 
           {machine.rows}
 
-          <div />
-          <div className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground">
-            {ticks.map((tick) => (
-              <span key={tick} className="absolute -translate-x-1/2 pt-0.5 tabular-nums" style={{ left: pct(tick) }}>
-                {tickLabel(tick)}
-              </span>
-            ))}
-          </div>
+          {machine.chartsClosed ? null : (
+            <>
+              <div />
+              <div
+                data-time-axis=""
+                className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground"
+              >
+                {ticks.map((tick) => (
+                  <span key={tick} className="absolute -translate-x-1/2 pt-0.5 tabular-nums" style={{ left: pct(tick) }}>
+                    {tickLabel(tick)}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         <div className="mt-3">
           <PhaseLegend
@@ -1720,14 +1725,17 @@ function machineParts({
   axis: ReturnType<typeof filteredAxis> | null;
   chartsExpanded: boolean;
   onToggleCharts: () => void;
-}): { sleepBands: ReactNode; rows: ReactNode } {
+}): { sleepBands: ReactNode; rows: ReactNode; chartsClosed: boolean } {
   const runStart = run.started_ms;
   const readings = run.readings ?? [];
   const sleeps = run.sleeps ?? [];
   const machines = run.machines ?? [];
   if (runStart == null || (!readings.length && !sleeps.length)) {
-    return { sleepBands: null, rows: null };
+    return { sleepBands: null, rows: null, chartsClosed: false };
   }
+  // With the charts closed, their legend, the sleeps' too, and the time axis
+  // are hidden with them; a run without readings has no charts to open.
+  const chartsClosed = readings.length > 0 && !chartsExpanded;
   // A stretch of the run, and a moment in it, on the drawn axis.
   const intervals = (startMs: number, endMs: number) =>
     axis
@@ -1857,7 +1865,7 @@ function machineParts({
     </>
   ) : null;
   const legend =
-    charts || sleeps.length ? (
+    !chartsClosed && (charts || sleeps.length) ? (
       <>
         <div />
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
@@ -1888,6 +1896,7 @@ function machineParts({
         {legend}
       </>
     ),
+    chartsClosed,
   };
 }
 
