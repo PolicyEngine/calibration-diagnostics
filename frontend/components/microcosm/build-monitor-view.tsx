@@ -31,6 +31,7 @@ import {
   waitsForRunList,
 } from "@/lib/microcosm/build-run-selection";
 import { filteredAxis, phasesByFirstAppearance } from "@/lib/microcosm/timeline-layout";
+import type { MachineReading, MachineSegment } from "@/lib/microcosm/machine-readings";
 import {
   focusOnDrawnStages,
   NO_FOCUS,
@@ -1096,6 +1097,8 @@ export interface TimelineViewProps {
   run: BuildTimeline;
   forecast: BuildForecast | null;
   nowMs: number;
+  // The viewer's zone, for clock times; null for the runtime's default.
+  zone?: ViewerZone | null;
   // Whether the per-stage breakdown is open.
   expanded: boolean;
   focus: TimelineFocus;
@@ -1104,6 +1107,16 @@ export interface TimelineViewProps {
   onTogglePhase: (phase: BuildPhase) => void;
   onToggleStage: (stageKey: string, phase: BuildPhase) => void;
   onHoverStage: (stageKey: string | null) => void;
+}
+
+// What the Timeline's hover card says about one reading of the build machine.
+export function readingSummary(
+  _reading: MachineReading,
+  _machine: MachineSegment | null,
+  _nowMs: number,
+  _zone: ViewerZone | null,
+): string[] {
+  return [];
 }
 
 // A dimmed stage's opacity, while another stage type is hovered or another

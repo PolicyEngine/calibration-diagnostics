@@ -9,6 +9,8 @@ import {
   type BuildTimeline,
   buildTimeline,
   calibrationRate,
+  childSpans,
+  compactTimeline,
   comparableHistory,
   stopStatistics,
   failureReason,
@@ -1285,5 +1287,152 @@ describe("version 3 outcomes", () => {
     expect(run.failure?.message).toBe(
       "The gates refused the candidate at terminal (3 blocking failures: a, b, c, d, e and 1 more).",
     );
+  });
+});
+
+describe("the build machine (microcosm-emitter 0.14.0 and later)", () => {
+  const GIB = 1024 ** 3;
+  let sequence = 0;
+  function event(offset: number, stage: string, status: string, producer: string, details: Record<string, unknown> = {}) {
+    sequence += 1;
+    return {
+      schema_version: 2,
+      sequence,
+      run_id: "us-modal.run",
+      event_type: "stage",
+      stage,
+      stage_id: stage,
+      status,
+      time: at(offset),
+      timestamp: at(offset),
+      message: null,
+      details,
+      resources: null,
+      producer_id: producer,
+    };
+  }
+  function reading(memory: number, stages: string[]) {
+    return {
+      reading: {
+        interval_seconds: 30,
+        late_seconds: 0,
+        stages,
+        progress: null,
+        process_tree: {
+          processes: 2,
+          memory_bytes: memory,
+          memory_peak_bytes: memory,
+          interval_memory_peak_bytes: memory,
+          cpu_user_cores: 3,
+          cpu_system_cores: 1,
+          disk_read_bytes: 0,
+          disk_written_bytes: 0,
+        },
+        machine: { memory_available_bytes: 100 * GIB, cpu_busy_share: 0.1 },
+      },
+    };
+  }
+  const environment = {
+    kind: "modal_container",
+    os: "Linux",
+    os_version: "4.4.0",
+    architecture: "x86_64",
+    cpu_model: "AMD EPYC",
+    logical_cpus: 64,
+    memory_total_bytes: 512 * GIB,
+    cgroup_cpu_limit_cores: null,
+    cgroup_memory_limit_bytes: null,
+    modal: { task_id: "ta-01", region: "us-east", cloud_provider: "CLOUD_PROVIDER_AWS" },
+    emitter_version: "0.14.0",
+    python_version: "3.13.13",
+  };
+
+  function documents(): BuildRunDocuments {
+    sequence = 0;
+    const span = (parent: string | null, occurrence = 1) => ({ stage_span: { parent_stage_id: parent, occurrence } });
+    return {
+      run_id: "us-modal.run",
+      source: "staging",
+      country: "us",
+      progress: {
+        schema_version: 2,
+        run_id: "us-modal.run",
+        pipeline: { id: "us-acs-local-release", version: "collector-v1" },
+        started_at: at(0),
+        updated_at: at(min(90)),
+        heartbeat_at: at(min(90)),
+        status: "running",
+        current_stage: "calibrate",
+      },
+      run_manifest: null,
+      calibration_progress: null,
+      events: [
+        event(0, "created", "started", "p1", {
+          identity: { git_commit: "abc", modal_resources: { class: "heavy", cpu: 4, cpu_limit: null, memory_mib: 131072 } },
+          environment,
+        }),
+        event(0, "load", "started", "p1", span(null)),
+        event(min(1), "load", "progress", "p1", reading(2 * GIB, ["load"])),
+        event(min(2), "read_inputs", "started", "p1", span("load")),
+        // The end of `read_inputs` never arrived; `stage_pins` is recorded
+        // as `load`'s, not as nested in `read_inputs`.
+        event(min(3), "stage_pins", "started", "p1", span("load")),
+        event(min(4), "stage_pins", "completed", "p1"),
+        event(min(10), "load", "completed", "p1"),
+        event(min(10), "calibrate", "started", "p1", span(null)),
+        event(min(11), "calibrate", "progress", "p1", reading(8 * GIB, ["calibrate"])),
+        event(min(41), "calibrate", "progress", "p1", {
+          ...reading(9 * GIB, ["calibrate"]),
+          sleep: { started_at: at(min(12)), ended_at: at(min(41)), seconds: 29 * 60 },
+        }),
+        event(min(90), "calibrate", "progress", "p1", reading(10 * GIB, ["calibrate"])),
+      ],
+    };
+  }
+
+  test("a run's readings, sleeps and machines come from its events", () => {
+    const timeline = buildTimeline(documents(), T0 + min(91));
+
+    expect(timeline.readings.map((item) => [item.time_ms - T0, item.memory_bytes, item.cpu_cores])).toEqual([
+      [min(1), 2 * GIB, 4],
+      [min(11), 8 * GIB, 4],
+      [min(41), 9 * GIB, 4],
+      [min(90), 10 * GIB, 4],
+    ]);
+    expect(timeline.sleeps).toEqual([{ start_ms: T0 + min(12), end_ms: T0 + min(41), estimated: false, producer_id: "p1" }]);
+    expect(timeline.machines.map((machine) => [machine.kind, machine.modal_task_id, machine.request?.cpu])).toEqual([
+      ["modal_container", "ta-01", 4],
+    ]);
+  });
+
+  test("a stage nests in its recorded parent, even when an earlier stage's end is missing", () => {
+    const timeline = buildTimeline(documents(), T0 + min(91));
+    const depth = Object.fromEntries(timeline.spans.map((span) => [span.stage, span.depth]));
+
+    expect(depth).toEqual({ load: 0, read_inputs: 1, stage_pins: 1, calibrate: 0 });
+  });
+
+  test("a stage that ends closes the stages still open inside it", () => {
+    const timeline = buildTimeline(documents(), T0 + min(91));
+    const readInputs = timeline.spans.find((span) => span.stage === "read_inputs");
+
+    expect(readInputs?.end_ms).toBe(T0 + min(10));
+    expect(readInputs?.status).toBe("completed");
+  });
+
+  test("a top-level stage's nested stages are the ones that started inside it", () => {
+    const timeline = buildTimeline(documents(), T0 + min(91));
+    const [load, calibrate] = timeline.spans.filter((span) => span.depth === 0);
+
+    expect(childSpans(timeline, load).map((span) => span.stage)).toEqual(["read_inputs", "stage_pins"]);
+    expect(childSpans(timeline, calibrate)).toEqual([]);
+  });
+
+  test("the run list leaves the readings out and keeps the sleeps and machines", () => {
+    const compact = compactTimeline(buildTimeline(documents(), T0 + min(91)));
+
+    expect(compact.readings).toEqual([]);
+    expect(compact.sleeps).toHaveLength(1);
+    expect(compact.machines).toHaveLength(1);
   });
 });

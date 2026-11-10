@@ -13,6 +13,8 @@
 // - version 3 (UK): version 2 plus a `blocked` run status with the gate phase
 //   and gates that refused the candidate, and a class on every failure.
 
+import type { MachineReading, MachineSegment, SleepBand } from "@/lib/microcosm/machine-readings";
+
 type JsonObject = Record<string, unknown>;
 
 export type BuildRunSource = "local" | "staging";
@@ -195,6 +197,11 @@ export interface BuildTimeline {
   resources: ResourceSnapshot | null;
   identity: RunIdentity | null;
   delivery: RunDelivery | null;
+  // The build machine's readings (at most `READING_LIMIT`, and none in a run
+  // list), its sleeps and the machine each producer ran on.
+  readings: MachineReading[];
+  sleeps: SleepBand[];
+  machines: MachineSegment[];
 }
 
 function str(value: unknown): string | null {
@@ -980,7 +987,15 @@ export function buildTimeline(
     resources: latestResources,
     identity: runIdentity(documents.run_manifest),
     delivery: runDelivery(documents),
+    readings: [],
+    sleeps: [],
+    machines: [],
   };
+}
+
+// The stages nested in a top-level stage, in the order they started.
+export function childSpans(_timeline: BuildTimeline, _parent: StageSpan): StageSpan[] {
+  return [];
 }
 
 // Cores a stage kept busy on average: CPU seconds over wall seconds.

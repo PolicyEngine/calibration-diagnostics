@@ -1,7 +1,13 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import type { BuildPhase } from "@/lib/microcosm/build-monitor";
-import { filteredAxis, phasesByFirstAppearance, type StageExtent } from "@/lib/microcosm/timeline-layout";
+import {
+  axisIntervals,
+  axisOffset,
+  filteredAxis,
+  phasesByFirstAppearance,
+  type StageExtent,
+} from "@/lib/microcosm/timeline-layout";
 
 const MINUTE = 60_000;
 const stage = (key: string, phase: BuildPhase, start: number, end: number): StageExtent => ({
@@ -56,5 +62,34 @@ test("a stage the filter hides sits, with no length, where it falls between the 
   expect(Object.fromEntries([...collapsed].map(([key, at]) => [key, at / MINUTE]))).toEqual({
     "load-0": 0,
     "export-2": 60,
+  });
+});
+
+describe("readings and sleeps under a filter", () => {
+  const stages = [
+    stage("load-0", "setup", 0, 10),
+    stage("calibrate-1", "calibrate", 12, 72),
+    stage("export-2", "export", 72, 77),
+    stage("calibrate-3", "calibrate", 80, 90),
+  ];
+  const axis = filteredAxis(stages, new Set<BuildPhase>(["calibrate"]));
+
+  test("a time inside a shown stage keeps its place in that stage", () => {
+    expect(axisOffset(42 * MINUTE, stages, axis)).toBe(30 * MINUTE);
+    expect(axisOffset(85 * MINUTE, stages, axis)).toBe(65 * MINUTE);
+  });
+
+  test("a time in a hidden stage, or between stages, is not on the axis", () => {
+    expect(axisOffset(5 * MINUTE, stages, axis)).toBeNull();
+    expect(axisOffset(11 * MINUTE, stages, axis)).toBeNull();
+    expect(axisOffset(74 * MINUTE, stages, axis)).toBeNull();
+  });
+
+  test("a stretch keeps only its parts inside shown stages", () => {
+    expect(axisIntervals(60 * MINUTE, 85 * MINUTE, stages, axis)).toEqual([
+      { start: 48 * MINUTE, end: 60 * MINUTE },
+      { start: 60 * MINUTE, end: 65 * MINUTE },
+    ]);
+    expect(axisIntervals(1 * MINUTE, 11 * MINUTE, stages, axis)).toEqual([]);
   });
 });

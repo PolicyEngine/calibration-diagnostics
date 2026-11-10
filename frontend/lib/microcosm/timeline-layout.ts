@@ -45,3 +45,24 @@ export function filteredAxis(
   }
   return { starts, length, collapsed };
 }
+
+// Where a time in the run (milliseconds from its start) falls on the filtered
+// axis: inside a shown stage, at that stage's place; elsewhere, nowhere.
+export function axisOffset(
+  _offset: number,
+  _stages: readonly StageExtent[],
+  _axis: ReturnType<typeof filteredAxis>,
+): number | null {
+  return null;
+}
+
+// A stretch of the run on the filtered axis: the parts of it inside shown
+// stages, each at that stage's place.
+export function axisIntervals(
+  _start: number,
+  _end: number,
+  _stages: readonly StageExtent[],
+  _axis: ReturnType<typeof filteredAxis>,
+): { start: number; end: number }[] {
+  return [];
+}
