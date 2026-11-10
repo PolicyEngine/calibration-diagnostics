@@ -1420,6 +1420,25 @@ describe("the build machine (microcosm-emitter 0.14.0 and later)", () => {
     expect(readInputs?.status).toBe("completed");
   });
 
+  test("a stage that ends leaves open a later stage recorded at its own level", () => {
+    const span = (parent: string | null) => ({ stage_span: { parent_stage_id: parent, occurrence: 1 } });
+    sequence = 0;
+    const run = documents();
+    run.events = [
+      event(0, "sampling", "started", "p1", span(null)),
+      // The next stage's start reached the record before this one's end.
+      event(min(10), "construction", "started", "p1", span(null)),
+      event(min(10), "sampling", "completed", "p1"),
+      event(min(20), "construction", "completed", "p1"),
+    ];
+    const timeline = buildTimeline(run, T0 + min(91));
+
+    expect(timeline.spans.map((item) => [item.stage, item.depth, item.end_ms! - T0])).toEqual([
+      ["sampling", 0, min(10)],
+      ["construction", 0, min(20)],
+    ]);
+  });
+
   test("a top-level stage's nested stages are the ones that started inside it", () => {
     const timeline = buildTimeline(documents(), T0 + min(91));
     const [load, calibrate] = timeline.spans.filter((span) => span.depth === 0);
