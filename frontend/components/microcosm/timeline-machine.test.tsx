@@ -174,8 +174,16 @@ test("no Machine row is drawn; each reading's card names its machine instead", (
   const markup = timeline({ chartsOpen: true });
 
   expect(markup).not.toContain(">Machine<");
-  expect(markup).not.toContain("macOS 26.3 · Apple M1 Max");
-  expect(markup).not.toContain("Modal heavy · 4 CPU");
+  expect(markup).not.toMatch(/>[^<]*macOS 26\.3 · Apple M1 Max/);
+  expect(markup).not.toMatch(/>[^<]*Modal heavy · 4 CPU/);
+});
+
+test("a machine that sent no readings is still named, in the hover text of the stages it ran", () => {
+  // A Modal attempt that fails before its first reading, 30 seconds in.
+  const markup = timeline({ run: run({ readings: [], sleeps: [] }) });
+
+  expect(markup).toContain('title="Load inputs: 30 min\nmacOS 26.3 · Apple M1 Max · 10 CPU · 34 GB"');
+  expect(markup).toContain('title="Calibrate: 50 min\nModal heavy · 4 CPU · 137 GB · us-east · ta-01"');
 });
 
 test("Memory and CPU sit under a caret below the stages, closed until it is opened", () => {

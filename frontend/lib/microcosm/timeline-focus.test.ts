@@ -1,11 +1,14 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import type { BuildPhase } from "@/lib/microcosm/build-monitor";
 import {
   focusOnDrawnStages,
+  initialTimelineCard,
+  nextTimelineCard,
   NO_FOCUS,
   pointerHovers,
   stageFocus,
+  type TimelineCardState,
   togglePhase,
   toggleStage,
   wholeRunLabel,
@@ -61,6 +64,16 @@ test("with a filter on, hovering a type still dims rows of hidden types, and a c
   expect(stageFocus(clicked, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: false });
 });
 
+test("a stage left hovered that the clicked stage hides dims nothing", () => {
+  const focus = {
+    ...NO_FOCUS,
+    selectedStage: "calibrate-3",
+    selectedPhase: "calibrate" as const,
+    hoveredStage: "export-6",
+  };
+  expect(stageFocus(focus, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: false });
+});
+
 test("a clicked stage whose type the filter hides narrows nothing", () => {
   const focus = { ...NO_FOCUS, filter: phases("calibrate"), selectedStage: "load_inputs-0", selectedPhase: "setup" as const };
   expect(stageFocus(focus, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: false });
@@ -95,4 +108,71 @@ test("a hovered or clicked stage that no drawn row has any more dims nothing", (
   // A stage still drawn keeps its highlight.
   const current = focusOnDrawnStages({ ...NO_FOCUS, hoveredStage: "export-6" }, drawn);
   expect(stageFocus(current, "calibrate", "calibrate-3")).toEqual({ visible: true, dimmed: true });
+});
+
+describe("the Timeline card's state", () => {
+  const card = (overrides: Partial<TimelineCardState> = {}): TimelineCardState => ({
+    ...initialTimelineCard("run-a"),
+    ...overrides,
+  });
+  const clicked = { stageKey: "calibrate-3", phase: "calibrate" as const };
+
+  test("clicking a stage clears a stage left hovered, so the clicked stage is not drawn faded", () => {
+    const next = nextTimelineCard(card({ expanded: true, hoveredStage: "load_inputs-0" }), {
+      kind: "toggle_stage",
+      stageKey: "calibrate-3",
+      phase: "calibrate",
+    });
+    expect(next.selected).toEqual(clicked);
+    expect(next.hoveredStage).toBeNull();
+    // Clicking it again shows every stage.
+    expect(nextTimelineCard(next, { kind: "toggle_stage", stageKey: "calibrate-3", phase: "calibrate" }).selected).toBeNull();
+  });
+
+  test("picking or dropping a stage type clears the clicked stage", () => {
+    const next = nextTimelineCard(card({ expanded: true, selected: clicked }), { kind: "toggle_phase", phase: "calibrate" });
+    expect([...next.filter]).toEqual(["calibrate"]);
+    expect(next.selected).toBeNull();
+    const dropped = nextTimelineCard({ ...next, selected: clicked }, { kind: "toggle_phase", phase: "calibrate" });
+    expect(dropped.filter.size).toBe(0);
+    expect(dropped.selected).toBeNull();
+  });
+
+  test("closing the breakdown clears the clicked stage, whose row it hides", () => {
+    const closed = nextTimelineCard(card({ expanded: true, selected: clicked, hoveredStage: "calibrate-3" }), {
+      kind: "toggle_expanded",
+    });
+    expect(closed.expanded).toBe(false);
+    expect(closed.selected).toBeNull();
+    expect(closed.hoveredStage).toBeNull();
+    expect(nextTimelineCard(closed, { kind: "toggle_expanded" }).expanded).toBe(true);
+  });
+
+  test("the charts' caret opens and closes the charts, and leaves the rest alone", () => {
+    const open = nextTimelineCard(card({ selected: clicked }), { kind: "toggle_charts" });
+    expect(open.chartsExpanded).toBe(true);
+    expect(open.selected).toEqual(clicked);
+    expect(nextTimelineCard(open, { kind: "toggle_charts" }).chartsExpanded).toBe(false);
+  });
+
+  test("hovering a type or a stage is kept until the pointer leaves", () => {
+    expect(nextTimelineCard(card(), { kind: "hover_phase", phase: "setup" }).hoveredPhase).toBe("setup");
+    expect(nextTimelineCard(card(), { kind: "hover_stage", stageKey: "export-6" }).hoveredStage).toBe("export-6");
+  });
+
+  test("another run starts with nothing picked, clicked or hovered; the breakdown and charts stay as they were", () => {
+    const busy = card({
+      expanded: true,
+      chartsExpanded: true,
+      filter: phases("calibrate"),
+      hoveredPhase: "setup",
+      selected: clicked,
+      hoveredStage: "calibrate-3",
+    });
+    expect(nextTimelineCard(busy, { kind: "show_run", runId: "run-b" })).toEqual({
+      ...initialTimelineCard("run-b"),
+      expanded: true,
+      chartsExpanded: true,
+    });
+  });
 });

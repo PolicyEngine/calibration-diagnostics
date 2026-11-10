@@ -93,3 +93,42 @@ export function focusOnDrawnStages(focus: TimelineFocus, drawnStageKeys: Readonl
     selectedPhase: selectedDrawn ? focus.selectedPhase : null,
   };
 }
+
+// What the Timeline card keeps between renders: the run it is showing, what
+// is open, and what is picked, clicked and hovered.
+export interface TimelineCardState {
+  runId: string;
+  // Whether the per-stage breakdown is open.
+  expanded: boolean;
+  // Whether the Memory and CPU charts are open.
+  chartsExpanded: boolean;
+  filter: ReadonlySet<BuildPhase>;
+  hoveredPhase: BuildPhase | null;
+  selected: { stageKey: string; phase: BuildPhase } | null;
+  hoveredStage: string | null;
+}
+
+export type TimelineCardAction =
+  | { kind: "show_run"; runId: string }
+  | { kind: "toggle_expanded" }
+  | { kind: "toggle_charts" }
+  | { kind: "hover_phase"; phase: BuildPhase | null }
+  | { kind: "toggle_phase"; phase: BuildPhase }
+  | { kind: "hover_stage"; stageKey: string | null }
+  | { kind: "toggle_stage"; stageKey: string; phase: BuildPhase };
+
+export function initialTimelineCard(runId: string): TimelineCardState {
+  return {
+    runId,
+    expanded: false,
+    chartsExpanded: false,
+    filter: NO_FOCUS.filter,
+    hoveredPhase: null,
+    selected: null,
+    hoveredStage: null,
+  };
+}
+
+export function nextTimelineCard(state: TimelineCardState, _action: TimelineCardAction): TimelineCardState {
+  return state;
+}

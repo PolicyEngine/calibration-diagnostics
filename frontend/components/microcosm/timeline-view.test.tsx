@@ -48,15 +48,19 @@ const FORECAST = {
   })),
 } as unknown as BuildForecast;
 
-function timeline(expanded: boolean, focus: Partial<TimelineFocus> = {}): string {
+function timeline(
+  expanded: boolean,
+  focus: Partial<TimelineFocus> = {},
+  shown: { run: BuildTimeline; forecast: BuildForecast; nowMs: number } = { run: RUN, forecast: FORECAST, nowMs: at(90) },
+): string {
   return renderToStaticMarkup(
     createElement(TimelineView, {
-      run: RUN,
-      forecast: FORECAST,
-      nowMs: at(90),
+      ...shown,
       expanded,
+      chartsExpanded: false,
       focus: { ...NO_FOCUS, ...focus },
       onToggleExpanded: () => {},
+      onToggleCharts: () => {},
       onHoverPhase: () => {},
       onTogglePhase: () => {},
       onToggleStage: () => {},
@@ -141,6 +145,37 @@ test("under a stage-type filter, a clicked stage of a picked type narrows Whole 
   expect(segmentPlace(markup, "Calibrate")).toEqual({ left: 0, width: 100 });
   expect(wholeRunSegmentStyle(markup, "Export dataset")).toContain("width:0%");
   expect(markup).not.toContain(">Export dataset</");
+});
+
+test("in a running run, a clicked stage, expected ones too, leaves off the present and the forecast band", () => {
+  // 40 minutes in: loading done, calibrating, exporting expected.
+  const running = { ...RUN, state: "running", ended_ms: null, updated_ms: at(40) } as unknown as BuildTimeline;
+  const forecast = {
+    ...FORECAST,
+    elapsed_ms: 40 * 60_000,
+    finish_p50_ms: at(80),
+    finish_p90_ms: at(95),
+    stages: (FORECAST as unknown as { stages: Record<string, unknown>[] }).stages.map((stage, index) => ({
+      ...stage,
+      status: ["done", "running", "pending"][index],
+    })),
+  } as unknown as BuildForecast;
+  const shown = { run: running, forecast, nowMs: at(40) };
+
+  const whole = timeline(true, {}, shown);
+  expect(whole).toContain('title="Now"');
+  expect(whole).toContain("Finish between");
+
+  for (const [stageKey, phase] of [["calibrate-1", "calibrate"], ["export_dataset-2", "export"]] as const) {
+    const markup = timeline(true, { selectedStage: stageKey, selectedPhase: phase }, shown);
+    expect(markup).toContain(">Whole run (filtered)<");
+    expect(markup).not.toContain('title="Now"');
+    expect(markup).not.toContain("Finish between");
+  }
+  expect(segmentPlace(timeline(true, { selectedStage: "export_dataset-2", selectedPhase: "export" }, shown), "Export dataset")).toEqual({
+    left: 0,
+    width: 100,
+  });
 });
 
 test("each stage type has a colour of its own from the theme's stage-type tokens", () => {
