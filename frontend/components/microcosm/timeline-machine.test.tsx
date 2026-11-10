@@ -201,18 +201,24 @@ test("Memory and CPU sit under a caret below the stages, closed until it is open
   expect(open).toContain('aria-label="CPU"');
 });
 
-test("the sleep legend stays while the charts are closed; the charts' legend comes with them", () => {
-  const closed = timeline();
-  expect(closed).toContain(">Asleep<");
-  expect(closed).toContain(">Asleep (estimated)<");
-  expect(closed).not.toContain(">Build<");
-  expect(closed).not.toContain(">Machine CPU<");
-  expect(closed).not.toContain(">Limit<");
+test("with the charts closed, their legend and the time axis are hidden; opening them shows both", () => {
+  for (const expanded of [false, true]) {
+    const closed = timeline({ expanded });
+    expect(closed).not.toContain(">Asleep<");
+    expect(closed).not.toContain(">Asleep (estimated)<");
+    expect(closed).not.toContain(">Build<");
+    expect(closed).not.toContain(">Machine CPU<");
+    expect(closed).not.toContain(">Limit<");
+    expect(closed).not.toContain("data-time-axis");
+  }
 
   const open = timeline({ chartsOpen: true });
+  expect(open).toContain(">Asleep<");
+  expect(open).toContain(">Asleep (estimated)<");
   expect(open).toContain(">Build<");
   expect(open).toContain(">Machine CPU<");
   expect(open).toContain(">Limit<");
+  expect(open).toContain("data-time-axis");
 });
 
 test("Memory and CPU are charted on the stages' time axis, with the build's limits", () => {
@@ -230,7 +236,7 @@ test("Memory and CPU are charted on the stages' time axis, with the build's limi
   expect(markup.match(/data-limit="memory"/g)?.length).toBeGreaterThanOrEqual(1);
 });
 
-test("a run from before readings shows its estimated sleeps with their legend", () => {
+test("a run from before readings, with no charts to open, shows its estimated sleeps with their legend and the time axis", () => {
   const markup = timeline({
     run: run({ readings: [], machines: [], sleeps: [SLEEPS[0]] }),
   });
@@ -238,6 +244,7 @@ test("a run from before readings shows its estimated sleeps with their legend", 
   expect(markup).not.toContain('aria-label="Memory"');
   expect(sleepStyles(markup, "estimated")).toHaveLength(1);
   expect(markup).toContain(">Asleep (estimated)<");
+  expect(markup).toContain("data-time-axis");
 });
 
 test("each chart can be reached from the keyboard", () => {
