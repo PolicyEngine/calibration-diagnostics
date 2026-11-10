@@ -129,6 +129,7 @@ const HEAVY = { class: "heavy", cpu: 4, cpu_limit: null, memory_mib: 128 * 1024 
 function reading(minute: number, producer: string, memory: number, cores = 1): MachineReading {
   return {
     time_ms: at(minute),
+    first_reading_ms: at(minute),
     producer_id: producer,
     stages: ["calibrate"],
     memory_bytes: memory,
@@ -151,6 +152,7 @@ describe("machineReadings", () => {
     expect(machineReadings(events)).toEqual([
       {
         time_ms: at(1),
+        first_reading_ms: at(1),
         producer_id: "p1",
         stages: ["calibrate", "solver"],
         memory_bytes: 3 * GIB,
@@ -161,6 +163,7 @@ describe("machineReadings", () => {
       },
       {
         time_ms: at(2),
+        first_reading_ms: at(2),
         producer_id: "p1",
         stages: ["calibrate"],
         memory_bytes: 5 * GIB,

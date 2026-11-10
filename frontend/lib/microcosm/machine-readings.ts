@@ -7,6 +7,9 @@ type JsonObject = Record<string, unknown>;
 // One heartbeat's reading of the build's processes and the machine.
 export interface MachineReading {
   time_ms: number;
+  // The earliest reading this one stands for: its own time, or, for a reading
+  // that stands for several (`downsampleReadings`), the first one's.
+  first_reading_ms: number;
   producer_id: string | null;
   // The open stages, outermost first.
   stages: string[];
@@ -134,6 +137,7 @@ export function machineReadings(events: readonly JsonObject[]): MachineReading[]
     const machine = obj(reading.machine);
     readings.push({
       time_ms: time,
+      first_reading_ms: time,
       producer_id: producer(event),
       stages: stageList(reading.stages, eventStage(event)),
       memory_bytes: num(tree?.memory_bytes),
@@ -157,11 +161,13 @@ function smallest(values: (number | null)[]): number | null {
 }
 
 // One reading standing for a bucket of consecutive readings: the last one's
-// time and stages, and the bucket's peaks (and its least free memory).
+// time and stages, the first one's start, and the bucket's peaks (and its
+// least free memory).
 function merged(bucket: MachineReading[]): MachineReading {
   const last = bucket[bucket.length - 1];
   return {
     ...last,
+    first_reading_ms: bucket[0].first_reading_ms,
     memory_bytes: largest(bucket.map((item) => item.memory_bytes)),
     memory_peak_bytes: largest(bucket.map((item) => item.memory_peak_bytes ?? item.memory_bytes)),
     cpu_cores: largest(bucket.map((item) => item.cpu_cores)),
@@ -171,14 +177,21 @@ function merged(bucket: MachineReading[]): MachineReading {
 }
 
 // At most `limit` readings, each standing for a stretch of consecutive
-// readings of one producer and keeping its peaks.
+// readings of one producer, with no gap of `READING_GAP_MS` or more inside it,
+// and keeping its peaks.
 export function downsampleReadings(readings: MachineReading[], limit: number = READING_LIMIT): MachineReading[] {
   if (readings.length <= limit) return readings;
   const size = Math.ceil(readings.length / Math.max(1, Math.floor(limit / 2)));
   const kept: MachineReading[] = [];
   let bucket: MachineReading[] = [];
   for (const reading of readings) {
-    if (bucket.length && (bucket.length >= size || bucket[0].producer_id !== reading.producer_id)) {
+    const previous = bucket[bucket.length - 1];
+    if (
+      previous &&
+      (bucket.length >= size ||
+        previous.producer_id !== reading.producer_id ||
+        reading.first_reading_ms - previous.time_ms >= READING_GAP_MS)
+    ) {
       kept.push(merged(bucket));
       bucket = [];
     }
@@ -288,17 +301,19 @@ export function machineSegments(events: readonly JsonObject[]): MachineSegment[]
 }
 
 // The stretches a chart draws as one line: consecutive readings of one
-// producer, broken at a sleep and at a gap of `READING_GAP_MS` or more.
+// producer, broken at a sleep and at a gap of `READING_GAP_MS` or more. A gap
+// runs from a reading to the first reading the next one stands for.
 export function readingRuns(readings: readonly MachineReading[], sleeps: readonly SleepBand[]): MachineReading[][] {
   const runs: MachineReading[][] = [];
   let current: MachineReading[] = [];
   for (const reading of readings) {
     const previous = current[current.length - 1];
+    const gapEnd = reading.first_reading_ms;
     const breaks =
       previous != null &&
       (previous.producer_id !== reading.producer_id ||
-        reading.time_ms - previous.time_ms >= READING_GAP_MS ||
-        sleeps.some((sleep) => sleep.start_ms < reading.time_ms && sleep.end_ms > previous.time_ms));
+        gapEnd - previous.time_ms >= READING_GAP_MS ||
+        sleeps.some((sleep) => sleep.start_ms < gapEnd && sleep.end_ms > previous.time_ms));
     if (breaks) {
       runs.push(current);
       current = [];

@@ -1061,7 +1061,9 @@ function nestedRows(row: TimelineRow, run: BuildTimeline, runStart: number, nowO
     stageKey: row.key,
     stage: span.stage,
     label: formatStageName(span.stage),
-    phase: span.phase,
+    // The top-level stage's type, which the row's selection and the stage-type
+    // filter follow.
+    phase: row.phase,
     start: span.start_ms - runStart,
     end: Math.max(span.start_ms, span.end_ms ?? runStart + nowOffset) - runStart,
     status: span.status === "failed" ? "failed" : span.status === "running" ? "running" : "done",
@@ -1271,8 +1273,22 @@ function MachineChart({
   points: ChartPoint[];
   summary: (reading: MachineReading) => string[];
 }) {
-  const [hovered, setHovered] = useState<ChartPoint | null>(null);
+  // The hovered reading, by its time: a refresh that moves or drops it moves
+  // or closes the card with it.
+  const [hoveredTime, setHoveredTime] = useState<number | null>(null);
+  const tooltipId = useId();
+  const hoveredIndex = hoveredTime == null ? -1 : points.findIndex((point) => point.reading.time_ms === hoveredTime);
+  const hovered = hoveredIndex >= 0 ? points[hoveredIndex] : null;
   const y = (value: number) => CHART_HEIGHT - (Math.max(0, value) / scaleMax) * CHART_HEIGHT;
+  const pointAt = (event: { clientX: number; currentTarget: HTMLElement }) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    if (!box.width || !points.length) return null;
+    const fraction = (event.clientX - box.left) / box.width;
+    const nearest = points.reduce((best, point) =>
+      Math.abs(point.x - fraction) < Math.abs(best.x - fraction) ? point : best,
+    );
+    return Math.abs(nearest.x - fraction) * box.width <= 12 ? nearest : null;
+  };
   return (
     <>
       <div className="flex min-w-0 flex-col justify-center leading-tight text-muted-foreground">
@@ -1280,37 +1296,62 @@ function MachineChart({
         <span className="text-[10px] tabular-nums">{scaleLabel}</span>
       </div>
       <div
-        className="relative h-10 rounded bg-muted/40"
-        onPointerMove={(event) => {
-          const box = event.currentTarget.getBoundingClientRect();
-          if (!box.width || !points.length) return;
-          const fraction = (event.clientX - box.left) / box.width;
-          const nearest = points.reduce((best, point) =>
-            Math.abs(point.x - fraction) < Math.abs(best.x - fraction) ? point : best,
-          );
-          setHovered(Math.abs(nearest.x - fraction) * box.width <= 12 ? nearest : null);
+        role="group"
+        tabIndex={0}
+        aria-label={label}
+        aria-describedby={hovered ? tooltipId : undefined}
+        className="relative h-10 rounded bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        onPointerMove={(event) => setHoveredTime(pointAt(event)?.reading.time_ms ?? null)}
+        // A tap shows the reading under it; a touch does not hover.
+        onPointerDown={(event) => setHoveredTime(pointAt(event)?.reading.time_ms ?? null)}
+        onPointerLeave={() => setHoveredTime(null)}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(":focus-visible") && points.length) {
+            setHoveredTime(points[points.length - 1].reading.time_ms);
+          }
         }}
-        onPointerLeave={() => setHovered(null)}
+        onBlur={() => setHoveredTime(null)}
+        onKeyDown={(event) => {
+          if (!points.length) return;
+          const last = points.length - 1;
+          const current = hoveredIndex >= 0 ? hoveredIndex : last;
+          const next =
+            event.key === "ArrowLeft"
+              ? Math.max(0, current - 1)
+              : event.key === "ArrowRight"
+                ? Math.min(last, current + 1)
+                : event.key === "Home"
+                  ? 0
+                  : event.key === "End"
+                    ? last
+                    : null;
+          if (event.key === "Escape") {
+            setHoveredTime(null);
+            return;
+          }
+          if (next == null) return;
+          event.preventDefault();
+          setHoveredTime(points[next].reading.time_ms);
+        }}
       >
+        {shades.map((shade, index) => (
+          <div
+            key={`shade-${index}`}
+            data-sleep-shade={shade.estimated ? "estimated" : "recorded"}
+            className="pointer-events-none absolute top-0 h-full"
+            style={{
+              left: `${shade.start * 100}%`,
+              width: `${Math.max(0.05, (shade.end - shade.start) * 100)}%`,
+              background: shade.estimated ? ESTIMATED_SLEEP_FILL : SLEEP_FILL,
+            }}
+          />
+        ))}
         <svg
-          role="img"
-          aria-label={label}
+          aria-hidden="true"
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
           preserveAspectRatio="none"
           className="absolute inset-0 h-full w-full overflow-visible"
         >
-          {shades.map((shade, index) => (
-            <rect
-              key={`shade-${index}`}
-              data-sleep-shade={shade.estimated ? "estimated" : "recorded"}
-              x={shade.start * CHART_WIDTH}
-              y={0}
-              width={Math.max(0.5, (shade.end - shade.start) * CHART_WIDTH)}
-              height={CHART_HEIGHT}
-              fill={SLEEP_FILL}
-              opacity={shade.estimated ? 0.5 : 1}
-            />
-          ))}
           {limits.map((limit, index) => (
             <line
               key={`limit-${index}`}
@@ -1349,6 +1390,7 @@ function MachineChart({
               style={{ left: `${hovered.x * 100}%` }}
             />
             <div
+              id={tooltipId}
               role="tooltip"
               className={`pointer-events-none absolute bottom-full z-20 mb-1 whitespace-nowrap rounded border border-border bg-popover px-2 py-1 text-[10px] leading-4 text-popover-foreground shadow-sm ${
                 hovered.x > 0.6 ? "-translate-x-full" : ""
@@ -1776,21 +1818,30 @@ function machineParts({
         points={points}
         summary={summary}
       />
-      <div />
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-        <LegendSwatch background={BUILD_COLOR} label="Build" />
-        <LegendSwatch background={MACHINE_COLOR} label="Machine CPU" />
-        <LegendSwatch
-          background="repeating-linear-gradient(90deg, var(--muted-foreground) 0 4px, transparent 4px 7px)"
-          label="Limit"
-        />
-        {sleeps.length ? <LegendSwatch background={SLEEP_FILL} label="Asleep" /> : null}
-        {sleeps.some((sleep) => sleep.estimated) ? (
-          <LegendSwatch background={ESTIMATED_SLEEP_FILL} label="Asleep (estimated)" />
-        ) : null}
-      </div>
     </>
   ) : null;
+  const legend =
+    readings.length || sleeps.length ? (
+      <>
+        <div />
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+          {readings.length ? (
+            <>
+              <LegendSwatch background={BUILD_COLOR} label="Build" />
+              <LegendSwatch background={MACHINE_COLOR} label="Machine CPU" />
+              <LegendSwatch
+                background="repeating-linear-gradient(90deg, var(--muted-foreground) 0 4px, transparent 4px 7px)"
+                label="Limit"
+              />
+            </>
+          ) : null}
+          {sleeps.some((sleep) => !sleep.estimated) ? <LegendSwatch background={SLEEP_FILL} label="Asleep" /> : null}
+          {sleeps.some((sleep) => sleep.estimated) ? (
+            <LegendSwatch background={ESTIMATED_SLEEP_FILL} label="Asleep (estimated)" />
+          ) : null}
+        </div>
+      </>
+    ) : null;
 
   return {
     sleepBands,
@@ -1798,6 +1849,7 @@ function machineParts({
       <>
         {machineRow}
         {charts}
+        {legend}
       </>
     ),
   };

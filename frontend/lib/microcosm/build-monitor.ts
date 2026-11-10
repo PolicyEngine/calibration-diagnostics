@@ -64,6 +64,9 @@ export interface BuildRunDocuments {
 export interface StageSpan {
   stage: string;
   depth: number;
+  // False for a completion that arrived with no start, such as a graph
+  // node's: it has a span, but is not a stage nested in the open one.
+  start_recorded?: boolean;
   start_ms: number;
   // null while the stage is still running.
   end_ms: number | null;
@@ -591,16 +594,22 @@ function spansFromTransitions(events: JsonObject[]): {
   return { spans, terminal };
 }
 
-// How deep a starting stage sits: under its recorded parent (microcosm-emitter
-// 0.14.0 and later record it as `details.stage_span.parent_stage_id`, null at
-// the top), else under every stage still open.
-function startDepth(event: JsonObject, open: StageSpan[]): { depth: number; recorded: boolean } {
+// How deep a starting stage sits, and in which open stage: under its recorded
+// parent (microcosm-emitter 0.14.0 and later record it as
+// `details.stage_span.parent_stage_id`, null at the top), else under every
+// stage still open.
+function startDepth(
+  event: JsonObject,
+  open: StageSpan[],
+): { depth: number; recorded: boolean; parent: StageSpan | null } {
   const recorded = obj(obj(event.details)?.stage_span);
-  if (!recorded || !("parent_stage_id" in recorded)) return { depth: open.length, recorded: false };
+  if (!recorded || !("parent_stage_id" in recorded)) {
+    return { depth: open.length, recorded: false, parent: null };
+  }
   const parentId = str(recorded.parent_stage_id);
-  if (parentId == null) return { depth: 0, recorded: true };
-  const parent = [...open].reverse().find((candidate) => candidate.stage === parentId);
-  return { depth: parent ? parent.depth + 1 : open.length, recorded: true };
+  if (parentId == null) return { depth: 0, recorded: true, parent: null };
+  const parent = [...open].reverse().find((candidate) => candidate.stage === parentId) ?? null;
+  return { depth: parent ? parent.depth + 1 : open.length, recorded: true, parent };
 }
 
 // Version 2 and later: explicit, nestable started/completed/failed events.
@@ -610,10 +619,16 @@ function spansFromLifecycle(events: JsonObject[]): {
 } {
   const spans: StageSpan[] = [];
   const open: StageSpan[] = [];
-  // Stages whose start recorded its parent. The emitter that records parents
-  // ends a stage's nested stages before it, so one still open when its parent
-  // ends lost its own end.
-  const recordedStarts = new Set<StageSpan>();
+  // Stages whose start recorded its parent, each with that open parent. The
+  // emitter that records parents ends a stage's nested stages before it, so
+  // one still open when an enclosing stage ends lost its own end.
+  const recordedStarts = new Map<StageSpan, StageSpan | null>();
+  const nestedIn = (inner: StageSpan, outer: StageSpan): boolean => {
+    for (let parent = recordedStarts.get(inner) ?? null; parent; parent = recordedStarts.get(parent) ?? null) {
+      if (parent === outer) return true;
+    }
+    return false;
+  };
   let terminal: { stage: string; event: JsonObject; time: number } | null = null;
   for (const event of events) {
     if (str(event.event_type) === "calibration") continue;
@@ -631,9 +646,9 @@ function spansFromLifecycle(events: JsonObject[]): {
       continue;
     }
     if (status === "started") {
-      const { depth, recorded } = startDepth(event, open);
+      const { depth, recorded, parent } = startDepth(event, open);
       const span = newSpan(stage, depth, time, event);
-      if (recorded) recordedStarts.add(span);
+      if (recorded) recordedStarts.set(span, parent);
       spans.push(span);
       open.push(span);
       continue;
@@ -655,7 +670,7 @@ function spansFromLifecycle(events: JsonObject[]): {
       const ending = open[index];
       for (const inner of open.splice(index + 1)) {
         // Only a stage recorded inside the ending one ends with it.
-        if (!recordedStarts.has(inner) || inner.depth <= ending.depth) {
+        if (!nestedIn(inner, ending)) {
           open.push(inner);
           continue;
         }
@@ -671,6 +686,7 @@ function spansFromLifecycle(events: JsonObject[]): {
         : newSpan(stage, open.length, inferredStart, event);
     if (index < 0) {
       span.resources_start = null;
+      span.start_recorded = false;
       spans.push(span);
     }
     span.end_ms = time;
@@ -1032,14 +1048,15 @@ export function buildTimeline(
 }
 
 // The stages nested in a stage, in the order they started: the spans after it
-// that sit deeper, up to the next one that does not.
+// that sit deeper, up to the next one that does not, leaving out completions
+// that arrived with no start.
 export function childSpans(timeline: BuildTimeline, parent: StageSpan): StageSpan[] {
   const index = timeline.spans.indexOf(parent);
   if (index < 0) return [];
   const children: StageSpan[] = [];
   for (const span of timeline.spans.slice(index + 1)) {
     if (span.depth <= parent.depth) break;
-    children.push(span);
+    if (span.start_recorded !== false) children.push(span);
   }
   return children;
 }

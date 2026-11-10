@@ -75,6 +75,7 @@ const MODAL: MachineSegment = {
 
 const reading = (minute: number, producer: string, memory: number, cores: number, stages: string[]): MachineReading => ({
   time_ms: at(minute),
+  first_reading_ms: at(minute),
   producer_id: producer,
   stages,
   memory_bytes: memory,
