@@ -189,12 +189,31 @@ order they ran so together they fill the bar (the other stages shrink to no
 width, over 0.2 seconds unless the viewer asks for less motion); its axis then
 counts time in those types, and the forecast band and the present are left
 off. Hovering a
-stage in the breakdown dims every other stage in the bar, and clicking it
-keeps that until it is clicked again. Each stage type has its own colour
+stage in the breakdown dims every other stage in the bar. Clicking a stage
+narrows the Timeline to it in the same way, until it is clicked again; a
+nested stage or solver pass narrows it to its top-level stage, and picking a
+stage type or closing the breakdown shows every stage again. Each stage type has its own colour
 (`--phase-*` in `app/globals.css`), and red marks a failed stage. In the UK candidate
 run of 2026-10-05, that showed a 41-minute setup, a 2-hour stretch with no
 epochs after the first pass, and passes at 4.1–5.1 s per epoch against 1.8 in
 September.
+
+From microcosm-emitter 0.14.0 the Timeline also shows the build machine, all
+on the stages' axis (narrowed with them):
+
+- the breakdown nests each stage under its recorded parent
+  (`details.stage_span.parent_stage_id`);
+- the Whole run bar shades each stretch the machine slept (`details.sleep` on
+  the heartbeat sent on waking); for a run from an older emitter that sent
+  heartbeats, a gap of 5 minutes or more between them is shaded as an
+  estimated sleep;
+- a "Memory and CPU" caret below the stages opens charts of the build's memory
+  against its limit and its CPU against its cores, beside the whole machine's
+  busy share. Hovering a chart, focusing it and pressing the arrow keys, or
+  tapping it shows a reading's time, open stages, memory, CPU and machine;
+- the Whole run hover text of each stage names the machine it ran on, from
+  its run start's `details.environment` and, for a Modal container, the
+  request in `details.identity.modal_resources` and the task ID.
 
 ## Process telemetry
 

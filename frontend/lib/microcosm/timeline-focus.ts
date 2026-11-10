@@ -43,7 +43,9 @@ export function wholeRunLabel(focus: TimelineFocus): string {
 
 // How one stage is drawn: hidden when a filter leaves its type out or
 // another stage is clicked; dimmed while another type is hovered, else while
-// another stage is hovered in the breakdown.
+// another shown stage is hovered in the breakdown. A row the clicked stage
+// hides never reports the pointer leaving it, so a stage it left hovered
+// dims nothing.
 export function stageFocus(
   focus: TimelineFocus,
   phase: BuildPhase,
@@ -51,10 +53,11 @@ export function stageFocus(
 ): { visible: boolean; dimmed: boolean } {
   const clicked = narrowedToStage(focus);
   const visible = (!focus.filter.size || focus.filter.has(phase)) && (clicked == null || stageKey === clicked);
+  const hoveredStage = clicked == null || focus.hoveredStage === clicked ? focus.hoveredStage : null;
   const dimmed = focus.hoveredPhase
     ? phase !== focus.hoveredPhase
-    : focus.hoveredStage
-      ? stageKey !== focus.hoveredStage
+    : hoveredStage
+      ? stageKey !== hoveredStage
       : false;
   return { visible, dimmed };
 }
@@ -129,6 +132,35 @@ export function initialTimelineCard(runId: string): TimelineCardState {
   };
 }
 
-export function nextTimelineCard(state: TimelineCardState, _action: TimelineCardAction): TimelineCardState {
-  return state;
+// The card's state after one action. A row that closes, or that a filter or
+// a clicked stage hides, under the pointer never reports the pointer leaving
+// it, so each of those clears the hovered stage. Picking a stage type, or
+// closing the breakdown that holds its row, clears the clicked stage, so the
+// Timeline is never narrowed to a stage without its pressed row in view.
+// Another run starts with nothing picked, clicked or hovered; the breakdown
+// and the charts stay open or closed.
+export function nextTimelineCard(state: TimelineCardState, action: TimelineCardAction): TimelineCardState {
+  switch (action.kind) {
+    case "show_run":
+      return { ...initialTimelineCard(action.runId), expanded: state.expanded, chartsExpanded: state.chartsExpanded };
+    case "toggle_expanded":
+      return {
+        ...state,
+        expanded: !state.expanded,
+        selected: state.expanded ? null : state.selected,
+        hoveredStage: null,
+      };
+    case "toggle_charts":
+      return { ...state, chartsExpanded: !state.chartsExpanded };
+    case "hover_phase":
+      return { ...state, hoveredPhase: action.phase };
+    case "toggle_phase":
+      return { ...state, filter: togglePhase(state.filter, action.phase), selected: null, hoveredStage: null };
+    case "hover_stage":
+      return { ...state, hoveredStage: action.stageKey };
+    case "toggle_stage": {
+      const stageKey = toggleStage(state.selected?.stageKey ?? null, action.stageKey);
+      return { ...state, selected: stageKey ? { stageKey, phase: action.phase } : null, hoveredStage: null };
+    }
+  }
 }

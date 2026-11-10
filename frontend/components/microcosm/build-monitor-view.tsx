@@ -7,6 +7,7 @@ import {
   useId,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
@@ -55,13 +56,12 @@ import {
 import {
   focusNarrows,
   focusOnDrawnStages,
+  initialTimelineCard,
   narrowedToStage,
-  NO_FOCUS,
+  nextTimelineCard,
   pointerHovers,
   stageFocus,
   type TimelineFocus,
-  togglePhase,
-  toggleStage,
   wholeRunLabel,
 } from "@/lib/microcosm/timeline-focus";
 import {
@@ -1094,54 +1094,31 @@ function TimelineCard({
   nowMs: number;
   zone: ViewerZone | null;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [chartsExpanded, setChartsExpanded] = useState(false);
-  const [filter, setFilter] = useState<ReadonlySet<BuildPhase>>(NO_FOCUS.filter);
-  const [hoveredPhase, setHoveredPhase] = useState<BuildPhase | null>(null);
-  const [selected, setSelected] = useState<{ stageKey: string; phase: BuildPhase } | null>(null);
-  const [hoveredStage, setHoveredStage] = useState<string | null>(null);
-  // Another run starts with nothing filtered or selected; the breakdown and
-  // the charts stay open or closed.
-  useEffect(() => {
-    setFilter(NO_FOCUS.filter);
-    setHoveredPhase(null);
-    setSelected(null);
-    setHoveredStage(null);
-  }, [run.run_id]);
+  const [card, dispatch] = useReducer(nextTimelineCard, run.run_id, initialTimelineCard);
+  // Another run is reset while it renders, before anything is drawn, so it
+  // never shows the last run's filter or clicked stage.
+  if (card.runId !== run.run_id) dispatch({ kind: "show_run", runId: run.run_id });
   return (
     <TimelineView
       run={run}
       forecast={forecast}
       nowMs={nowMs}
       zone={zone}
-      expanded={expanded}
-      chartsExpanded={chartsExpanded}
+      expanded={card.expanded}
+      chartsExpanded={card.chartsExpanded}
       focus={{
-        filter,
-        hoveredPhase,
-        selectedStage: selected?.stageKey ?? null,
-        selectedPhase: selected?.phase ?? null,
-        hoveredStage,
+        filter: card.filter,
+        hoveredPhase: card.hoveredPhase,
+        selectedStage: card.selected?.stageKey ?? null,
+        selectedPhase: card.selected?.phase ?? null,
+        hoveredStage: card.hoveredStage,
       }}
-      // A row that closes or is filtered out under the pointer never reports
-      // the pointer leaving it.
-      onToggleExpanded={() => {
-        setExpanded((open) => !open);
-        setHoveredStage(null);
-      }}
-      onToggleCharts={() => setChartsExpanded((open) => !open)}
-      onHoverPhase={setHoveredPhase}
-      onTogglePhase={(phase) => {
-        setFilter((current) => togglePhase(current, phase));
-        setHoveredStage(null);
-      }}
-      onHoverStage={setHoveredStage}
-      onToggleStage={(stageKey, phase) =>
-        setSelected((current) => {
-          const next = toggleStage(current?.stageKey ?? null, stageKey);
-          return next ? { stageKey: next, phase } : null;
-        })
-      }
+      onToggleExpanded={() => dispatch({ kind: "toggle_expanded" })}
+      onToggleCharts={() => dispatch({ kind: "toggle_charts" })}
+      onHoverPhase={(phase) => dispatch({ kind: "hover_phase", phase })}
+      onTogglePhase={(phase) => dispatch({ kind: "toggle_phase", phase })}
+      onHoverStage={(stageKey) => dispatch({ kind: "hover_stage", stageKey })}
+      onToggleStage={(stageKey, phase) => dispatch({ kind: "toggle_stage", stageKey, phase })}
     />
   );
 }
@@ -1154,11 +1131,11 @@ export interface TimelineViewProps {
   zone?: ViewerZone | null;
   // Whether the per-stage breakdown is open.
   expanded: boolean;
-  // Whether the Memory and CPU charts are open; closed when not given.
-  chartsExpanded?: boolean;
+  // Whether the Memory and CPU charts are open.
+  chartsExpanded: boolean;
   focus: TimelineFocus;
   onToggleExpanded: () => void;
-  onToggleCharts?: () => void;
+  onToggleCharts: () => void;
   onHoverPhase: (phase: BuildPhase | null) => void;
   onTogglePhase: (phase: BuildPhase) => void;
   onToggleStage: (stageKey: string, phase: BuildPhase) => void;
@@ -1189,10 +1166,14 @@ export function readingSummary(
     );
   }
   if (reading.machine_cpu_share != null) lines.push(`Machine ${Math.round(reading.machine_cpu_share * 100)}% busy`);
-  if (machine) {
-    lines.push(machine.modal_task_id ? `${machineLabel(machine)} · ${machine.modal_task_id}` : machineLabel(machine));
-  }
+  if (machine) lines.push(machineName(machine));
   return lines;
+}
+
+// A machine as the Timeline names it: its label, and a Modal container's task
+// ID, which finds its logs.
+function machineName(machine: MachineSegment): string {
+  return machine.modal_task_id ? `${machineLabel(machine)} · ${machine.modal_task_id}` : machineLabel(machine);
 }
 
 // "4", or "0.5": a CPU count as a request names it.
@@ -1206,9 +1187,8 @@ function osName(machine: MachineSegment): string | null {
   return machine.os_version ? `${name} ${machine.os_version}` : name;
 }
 
-// A reading's machine as its hover card names it: a Modal container by its
-// resource class, request and region; any other by its system, processor,
-// CPUs and memory.
+// A machine's label: a Modal container by its resource class, request and
+// region; any other by its system, processor, CPUs and memory.
 function machineLabel(machine: MachineSegment): string {
   const parts =
     machine.kind === "modal_container"
@@ -1429,10 +1409,13 @@ function MachineChart({
             />
             <div
               role="tooltip"
-              className={`pointer-events-none absolute bottom-full z-20 mb-1 whitespace-nowrap rounded border border-border bg-popover px-2 py-1 text-[10px] leading-4 text-popover-foreground shadow-sm ${
-                hovered.x > 0.6 ? "-translate-x-full" : ""
-              }`}
-              style={{ left: `${hovered.x * 100}%` }}
+              className="pointer-events-none absolute bottom-full z-20 mb-1 w-56 rounded border border-border bg-popover px-2 py-1 text-[10px] leading-4 text-popover-foreground shadow-sm [overflow-wrap:anywhere]"
+              // Centred on the reading, kept inside the chart's track; on a
+              // track narrower than the card (a phone), ending at the track's
+              // right edge and reaching over the labels.
+              style={{
+                left: `clamp(min(0px, calc(100% - 14rem)), calc(${hovered.x * 100}% - 7rem), calc(100% - 14rem))`,
+              }}
             >
               {summary(hovered.reading).map((line, index) => (
                 <div key={index} className={index === 1 ? "font-medium" : "tabular-nums"}>
@@ -1471,10 +1454,10 @@ export function TimelineView({
   nowMs,
   zone = null,
   expanded,
-  chartsExpanded = false,
+  chartsExpanded,
   focus,
   onToggleExpanded,
-  onToggleCharts = () => {},
+  onToggleCharts,
   onHoverPhase,
   onTogglePhase,
   onToggleStage,
@@ -1515,6 +1498,15 @@ export function TimelineView({
     forecast?.finish_p50_ms != null && run.started_ms != null && run.state === "running"
       ? forecast.finish_p50_ms - run.started_ms
       : null;
+  // The machines a stage ran on, for its Whole run hover text; a machine that
+  // sent no readings is named nowhere else.
+  const machinesOf = (row: TimelineRow): string[] => {
+    const runStart = run.started_ms;
+    if (runStart == null || row.status === "pending") return [];
+    return (run.machines ?? [])
+      .filter((machine) => machine.start_ms < runStart + row.end && machine.end_ms > runStart + row.start)
+      .map(machineName);
+  };
   // A refresh can drop or renumber the row a stage was hovered or clicked in.
   const drawnFocus = focusOnDrawnStages(focus, new Set(rows.map((row) => row.stageKey)));
   // Under a stage-type filter the picked types' stages, and with a stage
@@ -1640,7 +1632,7 @@ export function TimelineView({
                   key={`whole-${row.key}`}
                   className={`absolute top-0 h-full ${SEGMENT_MOTION} ${row.status === "running" ? "bar-running" : ""}`}
                   style={style}
-                  title={`${row.label}: ${fmtDuration(row.end - row.start)}`}
+                  title={[`${row.label}: ${fmtDuration(row.end - row.start)}`, ...machinesOf(row)].join("\n")}
                 />
               );
             })}
