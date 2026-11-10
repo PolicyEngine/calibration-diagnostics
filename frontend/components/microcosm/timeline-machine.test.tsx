@@ -227,9 +227,11 @@ test("Memory and CPU are charted on the stages' time axis, with the build's limi
 
   expect(markup).toContain('aria-label="Memory"');
   expect(markup).toContain('aria-label="CPU"');
-  // The chart's scale tops out at the largest limit, the Modal request.
-  expect(markup).toContain(">137 GB<");
-  expect(markup).toContain(">100%<");
+  // Each chart has a value axis with ticks: memory in GB up to the largest
+  // limit, the Modal request (137 GB); CPU in percent of the build's cores.
+  const tickLabels = [...markup.matchAll(/<span[^>]*data-y-tick=""[^>]*>([^<]+)</g)].map((match) => match[1]);
+  expect(tickLabels).toEqual(["0 GB", "50 GB", "100 GB", "0%", "25%", "50%", "75%", "100%"]);
+  expect(markup.match(/<line[^>]*data-grid=""/g)).toHaveLength(8);
   // A line per stretch of readings: the workstation's, then the container's
   // before and after its sleep (35 to 55).
   expect(markup.match(/<polyline[^>]*data-series="build-memory"/g)).toHaveLength(3);
