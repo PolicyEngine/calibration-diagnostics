@@ -324,6 +324,18 @@ describe("downsampleReadings", () => {
 });
 
 describe("readingRuns", () => {
+  test("a long run's kept readings still draw as one line, and a real gap still breaks it", () => {
+    // 4,000 readings 30 s apart, with a 20-minute gap halfway.
+    const readings = Array.from({ length: 4_000 }, (_, index) =>
+      reading(index * 0.5 + (index >= 2_000 ? 20 : 0), "p1", GIB),
+    );
+
+    const kept = downsampleReadings(readings);
+
+    expect(kept.length).toBeLessThanOrEqual(READING_LIMIT);
+    expect(readingRuns(kept, []).map((run) => run.length > 1)).toEqual([true, true]);
+  });
+
   test("a chart's series breaks at a sleep, at another producer and at a gap of 5 minutes or more", () => {
     const readings = [
       reading(0, "p1", GIB),

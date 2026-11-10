@@ -90,7 +90,8 @@ const READINGS = [
 ];
 
 const SLEEPS: SleepBand[] = [
-  { start_ms: at(10), end_ms: at(20), estimated: true, producer_id: "workstation" },
+  // An earlier attempt, from before readings, whose sleep is estimated.
+  { start_ms: at(10), end_ms: at(20), estimated: true, producer_id: "earlier" },
   { start_ms: at(35), end_ms: at(55), estimated: false, producer_id: "container" },
 ];
 
@@ -185,6 +186,38 @@ test("Memory and CPU are charted on the stages' time axis, with the build's limi
   expect(markup.match(/<polyline[^>]*data-series="build-memory"/g)).toHaveLength(3);
   expect(markup.match(/<polyline[^>]*data-series="build-cpu"/g)).toHaveLength(3);
   expect(markup.match(/data-limit="memory"/g)?.length).toBeGreaterThanOrEqual(1);
+});
+
+test("a run from before readings shows its estimated sleeps with their legend", () => {
+  const markup = timeline({
+    run: run({ readings: [], machines: [], sleeps: [SLEEPS[0]] }),
+  });
+
+  expect(markup).not.toContain('aria-label="Memory"');
+  expect(sleepStyles(markup, "estimated")).toHaveLength(1);
+  expect(markup).toContain(">Asleep (estimated)<");
+});
+
+test("each chart can be reached from the keyboard", () => {
+  const markup = timeline();
+
+  expect(markup).toMatch(/<div[^>]*tabindex="0"[^>]*aria-label="Memory"/);
+  expect(markup).toMatch(/<div[^>]*tabindex="0"[^>]*aria-label="CPU"/);
+});
+
+test("a nested stage is drawn in its top-level stage's type, which its selection and filter follow", () => {
+  const markup = timeline({
+    expanded: true,
+    run: run({
+      spans: [
+        span("load_inputs", "setup", 0, 0, 30),
+        span("calibrate", "calibrate", 0, 30, 80),
+        span("load_weights", "setup", 1, 31, 34),
+      ] as unknown as BuildTimeline["spans"],
+    }),
+  });
+
+  expect(markup).toMatch(/background:var\(--phase-calibrate\)[^>]*><\/span><span[^>]*>Load weights</);
 });
 
 test("a run without readings has no Machine row or charts", () => {

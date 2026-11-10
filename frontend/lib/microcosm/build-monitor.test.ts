@@ -1439,6 +1439,45 @@ describe("the build machine (microcosm-emitter 0.14.0 and later)", () => {
     ]);
   });
 
+  test("an ending stage leaves open a stage nested in a later sibling", () => {
+    const span = (parent: string | null) => ({ stage_span: { parent_stage_id: parent, occurrence: 1 } });
+    sequence = 0;
+    const run = documents();
+    run.events = [
+      event(0, "first", "started", "p1", span(null)),
+      event(min(1), "second", "started", "p1", span(null)),
+      event(min(2), "second_part", "started", "p1", span("second")),
+      event(min(3), "first", "completed", "p1"),
+      event(min(4), "second_part", "completed", "p1"),
+      event(min(5), "second", "completed", "p1"),
+    ];
+    const timeline = buildTimeline(run, T0 + min(91));
+
+    expect(timeline.spans.map((item) => [item.stage, item.depth, item.end_ms! - T0])).toEqual([
+      ["first", 0, min(3)],
+      ["second", 0, min(5)],
+      ["second_part", 1, min(4)],
+    ]);
+  });
+
+  test("a completion with no start inside a stage is not one of its nested stages", () => {
+    sequence = 0;
+    const run = documents();
+    run.events = [
+      event(0, "target_compilation", "started", "p1"),
+      // A graph node's completion, which the UK full build reports while the
+      // stage runs, with no start of its own.
+      event(min(2), "household_weights", "completed", "p1"),
+      event(min(3), "solve_inputs", "started", "p1"),
+      event(min(4), "solve_inputs", "completed", "p1"),
+      event(min(5), "target_compilation", "completed", "p1"),
+    ];
+    const timeline = buildTimeline(run, T0 + min(91));
+    const [compilation] = timeline.spans.filter((item) => item.depth === 0);
+
+    expect(childSpans(timeline, compilation).map((item) => item.stage)).toEqual(["solve_inputs"]);
+  });
+
   test("a top-level stage's nested stages are the ones that started inside it", () => {
     const timeline = buildTimeline(documents(), T0 + min(91));
     const [load, calibrate] = timeline.spans.filter((span) => span.depth === 0);
