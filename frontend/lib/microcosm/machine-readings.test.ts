@@ -314,6 +314,19 @@ describe("downsampleReadings", () => {
     expect(kept.map((item) => item.time_ms)).toEqual([...kept.map((item) => item.time_ms)].sort((a, b) => a - b));
   });
 
+  test("a kept reading never mixes readings from different stages", () => {
+    // Loading peaks at 90 GiB just before calibration starts at 10 GiB.
+    const readings = Array.from({ length: 4_000 }, (_, index) => ({
+      ...reading(index * 0.5, "p1", index === 999 ? 90 * GIB : index < 1_000 ? 4 * GIB : 10 * GIB),
+      stages: [index < 1_000 ? "load_inputs" : "calibrate"],
+    }));
+
+    for (const item of downsampleReadings(readings)) {
+      if (item.stages[0] === "calibrate") expect(item.memory_bytes).toBe(10 * GIB);
+    }
+    expect(Math.max(...downsampleReadings(readings).map((item) => item.memory_bytes ?? 0))).toBe(90 * GIB);
+  });
+
   test("a kept reading never mixes two producers' readings", () => {
     const readings = [
       ...Array.from({ length: 1_001 }, (_, index) => reading(index * 0.5, "first", GIB)),
@@ -327,6 +340,14 @@ describe("downsampleReadings", () => {
 });
 
 describe("readingRuns", () => {
+  test("a short sleep inside a downsampled stretch still breaks the line", () => {
+    // 1,000 readings 30 s apart; a 2-minute sleep after the 402nd.
+    const readings = Array.from({ length: 1_000 }, (_, index) => reading(index * 0.5 + (index > 401 ? 2 : 0), "p1", GIB));
+    const sleeps = [{ start_ms: at(200.75), end_ms: at(202.75), estimated: false, producer_id: "p1" }];
+
+    expect(readingRuns(downsampleReadings(readings), sleeps)).toHaveLength(2);
+  });
+
   test("a long run's kept readings still draw as one line, and a real gap still breaks it", () => {
     // 4,000 readings 30 s apart, with a 20-minute gap halfway.
     const readings = Array.from({ length: 4_000 }, (_, index) =>

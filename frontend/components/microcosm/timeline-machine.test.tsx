@@ -204,6 +204,8 @@ test("each chart can be reached from the keyboard", () => {
 
   expect(markup).toMatch(/<div[^>]*tabindex="0"[^>]*aria-label="Memory"/);
   expect(markup).toMatch(/<div[^>]*tabindex="0"[^>]*aria-label="CPU"/);
+  // A reading the keyboard picks is read out.
+  expect(markup.match(/aria-live="polite"/g)).toHaveLength(2);
 });
 
 test("a nested stage is drawn in its top-level stage's type, which its selection and filter follow", () => {
