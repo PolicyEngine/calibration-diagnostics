@@ -65,6 +65,28 @@ test("a stage the filter hides sits, with no length, where it falls between the 
   });
 });
 
+test("a clicked stage alone fills the axis, with or without a stage-type filter", () => {
+  const stages = [
+    stage("load-0", "setup", 0, 10),
+    stage("calibrate-1", "calibrate", 12, 72),
+    stage("export-2", "export", 72, 77),
+    stage("calibrate-3", "calibrate", 80, 90),
+  ];
+  const inMinutes = (places: Map<string, number>) =>
+    Object.fromEntries([...places].map(([key, place]) => [key, place / MINUTE]));
+
+  const alone = filteredAxis(stages, new Set(), "calibrate-3");
+  expect(inMinutes(alone.starts)).toEqual({ "calibrate-3": 0 });
+  expect(alone.length).toBe(10 * MINUTE);
+  // The other stages sit, with no length, where they fall around it.
+  expect(inMinutes(alone.collapsed)).toEqual({ "load-0": 0, "calibrate-1": 0, "export-2": 0 });
+
+  const insideFilter = filteredAxis(stages, new Set<BuildPhase>(["calibrate"]), "calibrate-1");
+  expect(inMinutes(insideFilter.starts)).toEqual({ "calibrate-1": 0 });
+  expect(insideFilter.length).toBe(60 * MINUTE);
+  expect(inMinutes(insideFilter.collapsed)).toEqual({ "load-0": 0, "export-2": 60, "calibrate-3": 60 });
+});
+
 describe("readings and sleeps under a filter", () => {
   const stages = [
     stage("load-0", "setup", 0, 10),

@@ -117,13 +117,30 @@ test("hovering a stage type shows its total time and dims the other types", () =
   expect(wholeRunSegmentStyle(markup, "Load inputs")).toContain("opacity:0.25");
 });
 
-test("a clicked stage stays at full strength in Whole run and the others are dimmed", () => {
-  const markup = timeline(true, { selectedStage: "calibrate-1" });
+test("a clicked stage is all Whole run and the breakdown show, filling the bar, as a stage-type filter does", () => {
+  const markup = timeline(true, { selectedStage: "calibrate-1", selectedPhase: "calibrate" });
 
-  expect(wholeRunSegmentStyle(markup, "Calibrate")).toContain("opacity:1");
-  expect(wholeRunSegmentStyle(markup, "Load inputs")).toContain("opacity:0.25");
-  expect(wholeRunSegmentStyle(markup, "Export dataset")).toContain("opacity:0.25");
+  expect(markup).toContain(">Whole run (filtered)<");
+  expect(segmentPlace(markup, "Calibrate")).toEqual({ left: 0, width: 100 });
+  // The other stages shrink to no width, so the change can be animated.
+  expect(wholeRunSegmentStyle(markup, "Load inputs")).toContain("width:0%");
+  expect(wholeRunSegmentStyle(markup, "Export dataset")).toContain("width:0%");
+  expect(markup).not.toContain(">Load inputs</");
+  expect(markup).not.toContain(">Export dataset</");
+  // Its name stays pressed, so clicking it again shows every stage.
   expect(markup).toMatch(/<button[^>]*aria-pressed="true"[^>]*>(?:<[^>]+>)*Calibrate</);
+});
+
+test("under a stage-type filter, a clicked stage of a picked type narrows Whole run to it", () => {
+  const markup = timeline(true, {
+    filter: new Set(["calibrate", "export"]),
+    selectedStage: "calibrate-1",
+    selectedPhase: "calibrate",
+  });
+
+  expect(segmentPlace(markup, "Calibrate")).toEqual({ left: 0, width: 100 });
+  expect(wholeRunSegmentStyle(markup, "Export dataset")).toContain("width:0%");
+  expect(markup).not.toContain(">Export dataset</");
 });
 
 test("each stage type has a colour of its own from the theme's stage-type tokens", () => {

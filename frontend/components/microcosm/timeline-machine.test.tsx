@@ -8,8 +8,8 @@ import { NO_FOCUS, type TimelineFocus } from "@/lib/microcosm/timeline-focus";
 import { readingSummary, TimelineView } from "./build-monitor-view";
 
 // The Timeline's build machine parts (microcosm-emitter 0.14.0 and later):
-// sleeps, the machine each producer ran on, memory and CPU charts on the
-// stages' time axis, and stages nested in their recorded parent.
+// sleeps, memory and CPU charts on the stages' time axis with the machine
+// each reading came from, and stages nested in their recorded parent.
 
 const GIB = 1024 ** 3;
 const at = (minute: number) => Date.parse("2026-11-09T10:00:00Z") + minute * 60_000;
@@ -130,7 +130,9 @@ const FORECAST = {
   })),
 } as unknown as BuildForecast;
 
-function timeline(options: { run?: BuildTimeline; expanded?: boolean; focus?: Partial<TimelineFocus> } = {}): string {
+function timeline(
+  options: { run?: BuildTimeline; expanded?: boolean; chartsOpen?: boolean; focus?: Partial<TimelineFocus> } = {},
+): string {
   return renderToStaticMarkup(
     createElement(TimelineView, {
       run: options.run ?? run(),
@@ -138,8 +140,10 @@ function timeline(options: { run?: BuildTimeline; expanded?: boolean; focus?: Pa
       nowMs: at(90),
       zone: UTC,
       expanded: options.expanded ?? false,
+      chartsExpanded: options.chartsOpen ?? false,
       focus: { ...NO_FOCUS, ...options.focus },
       onToggleExpanded: () => {},
+      onToggleCharts: () => {},
       onHoverPhase: () => {},
       onTogglePhase: () => {},
       onToggleStage: () => {},
@@ -166,16 +170,45 @@ test("the Whole run bar shades each sleep where it happened, an estimated one dr
   expect(markup).toMatch(/title="Asleep \(estimated\): 10 min, 10:10 AM UTC to 10:20 AM UTC"/);
 });
 
-test("the Machine row names each producer's machine, a Modal container by its request and region", () => {
-  const markup = timeline();
+test("no Machine row is drawn; each reading's card names its machine instead", () => {
+  const markup = timeline({ chartsOpen: true });
 
-  expect(markup).toContain(">Machine<");
-  expect(markup).toContain(">macOS 26.3 · Apple M1 Max · 10 CPU · 34 GB<");
-  expect(markup).toContain(">Modal heavy · 4 CPU · 137 GB · us-east<");
+  expect(markup).not.toContain(">Machine<");
+  expect(markup).not.toContain("macOS 26.3 · Apple M1 Max");
+  expect(markup).not.toContain("Modal heavy · 4 CPU");
+});
+
+test("Memory and CPU sit under a caret below the stages, closed until it is opened", () => {
+  const closed = timeline();
+
+  expect(closed).toMatch(/<button[^>]*aria-expanded="false"[^>]*aria-label="Show memory and CPU"/);
+  expect(closed).toContain(">Memory and CPU<");
+  expect(closed).not.toContain('aria-label="Memory"');
+  expect(closed).not.toContain('aria-label="CPU"');
+  expect(closed).not.toContain("data-series=");
+
+  const open = timeline({ chartsOpen: true });
+  expect(open).toMatch(/<button[^>]*aria-expanded="true"[^>]*aria-label="Hide memory and CPU"/);
+  expect(open).toContain('aria-label="Memory"');
+  expect(open).toContain('aria-label="CPU"');
+});
+
+test("the sleep legend stays while the charts are closed; the charts' legend comes with them", () => {
+  const closed = timeline();
+  expect(closed).toContain(">Asleep<");
+  expect(closed).toContain(">Asleep (estimated)<");
+  expect(closed).not.toContain(">Build<");
+  expect(closed).not.toContain(">Machine CPU<");
+  expect(closed).not.toContain(">Limit<");
+
+  const open = timeline({ chartsOpen: true });
+  expect(open).toContain(">Build<");
+  expect(open).toContain(">Machine CPU<");
+  expect(open).toContain(">Limit<");
 });
 
 test("Memory and CPU are charted on the stages' time axis, with the build's limits", () => {
-  const markup = timeline();
+  const markup = timeline({ chartsOpen: true });
 
   expect(markup).toContain('aria-label="Memory"');
   expect(markup).toContain('aria-label="CPU"');
@@ -200,7 +233,7 @@ test("a run from before readings shows its estimated sleeps with their legend", 
 });
 
 test("each chart can be reached from the keyboard", () => {
-  const markup = timeline();
+  const markup = timeline({ chartsOpen: true });
 
   expect(markup).toMatch(/<div[^>]*tabindex="0"[^>]*aria-label="Memory"/);
   expect(markup).toMatch(/<div[^>]*tabindex="0"[^>]*aria-label="CPU"/);
@@ -223,10 +256,10 @@ test("a nested stage is drawn in its top-level stage's type, which its selection
   expect(markup).toMatch(/background:var\(--phase-calibrate\)[^>]*><\/span><span[^>]*>Load weights</);
 });
 
-test("a run without readings has no Machine row or charts", () => {
-  const markup = timeline({ run: run({ readings: [], machines: [], sleeps: [] }) });
+test("a run without readings has no charts and no caret for them", () => {
+  const markup = timeline({ chartsOpen: true, run: run({ readings: [], machines: [], sleeps: [] }) });
 
-  expect(markup).not.toContain(">Machine<");
+  expect(markup).not.toContain(">Memory and CPU<");
   expect(markup).not.toContain('aria-label="Memory"');
   expect(markup).not.toContain('aria-label="CPU"');
   expect(markup).not.toContain("data-sleep=");
@@ -249,7 +282,7 @@ test("the breakdown shows each stage's nested stages under it", () => {
 });
 
 test("under a stage-type filter, sleeps and readings keep their place in the shown stages", () => {
-  const markup = timeline({ focus: { filter: new Set(["calibrate"]) } });
+  const markup = timeline({ chartsOpen: true, focus: { filter: new Set(["calibrate"]) } });
 
   // Calibration alone fills the bar: 30 to 80 becomes 0 to 50.
   expect(sleepStyles(markup, "recorded")[0]).toContain("left:10%");
@@ -260,14 +293,26 @@ test("under a stage-type filter, sleeps and readings keep their place in the sho
   expect(markup.match(/<polyline[^>]*data-series="build-memory"/g)).toHaveLength(2);
 });
 
-test("hovering a reading says when it was, the stage and the build's memory and CPU against its limits", () => {
+test("a clicked stage narrows sleeps and readings to it, as a stage-type filter does", () => {
+  const markup = timeline({ chartsOpen: true, focus: { selectedStage: "calibrate-1", selectedPhase: "calibrate" } });
+
+  // Calibrate alone fills the bar: 30 to 80 becomes 0 to 50.
+  expect(sleepStyles(markup, "recorded")[0]).toContain("left:10%");
+  expect(sleepStyles(markup, "recorded")[0]).toContain("width:40%");
+  expect(sleepStyles(markup, "estimated")).toHaveLength(0);
+  expect(markup.match(/<polyline[^>]*data-series="build-memory"/g)).toHaveLength(2);
+});
+
+test("hovering a reading says when it was, the stage, the build's memory and CPU against its limits, and the machine", () => {
   expect(readingSummary(READINGS[5], MODAL, at(90), UTC)).toEqual([
     "10:31 AM UTC",
     "Calibrate › Solve weights",
     "Memory 43 GB of 137 GB",
     "CPU 4.0 cores, 100% of 4.0",
     "Machine 30% busy",
+    "Modal heavy · 4 CPU · 137 GB · us-east · ta-01",
   ]);
+  expect(readingSummary(READINGS[0], LOCAL, at(90), UTC).at(-1)).toBe("macOS 26.3 · Apple M1 Max · 10 CPU · 34 GB");
   expect(readingSummary({ ...READINGS[0], cpu_cores: null, machine_cpu_share: null }, null, at(90), UTC)).toEqual([
     "10:01 AM UTC",
     "Load inputs",
