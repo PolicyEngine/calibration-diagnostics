@@ -208,9 +208,11 @@ on the stages' axis (narrowed with them):
   heartbeats, a gap of 5 minutes or more between them is shaded as an
   estimated sleep;
 - a "Memory and CPU" caret below the stages opens charts of the build's memory
-  against its limit and its CPU against its cores, beside the whole machine's
-  busy share. Hovering a chart, focusing it and pressing the arrow keys, or
-  tapping it shows a reading's time, open stages, memory, CPU and machine;
+  (in GB) against its limit and its CPU (in percent of its cores), beside the
+  whole machine's busy share, each with a value axis; the legend and the time
+  axis show only while the charts are open, unless the run has no readings.
+  Hovering a chart, focusing it and pressing the arrow keys, or tapping it
+  shows a reading's time, open stages, memory and CPU;
 - the Whole run hover text of each stage names the machine it ran on, from
   its run start's `details.environment` and, for a Modal container, the
   request in `details.identity.modal_resources` and the task ID.

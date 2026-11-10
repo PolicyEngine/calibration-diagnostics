@@ -38,6 +38,7 @@ import {
   phasesByFirstAppearance,
   type StageExtent,
 } from "@/lib/microcosm/timeline-layout";
+import { scaleTicks } from "@/lib/microcosm/chart-scale";
 import {
   CHART_KEYS,
   type ChartHoverEvent,
@@ -1250,7 +1251,7 @@ interface ChartPoint {
 // reading nearest the pointer.
 function MachineChart({
   label,
-  scaleLabel,
+  ticks,
   scaleMax,
   lines,
   limits,
@@ -1260,7 +1261,8 @@ function MachineChart({
   summary,
 }: {
   label: string;
-  scaleLabel: string;
+  // The value axis's ticks, in the chart's own unit, with their labels.
+  ticks: { value: number; label: string }[];
   scaleMax: number;
   lines: ChartLine[];
   limits: ChartLimit[];
@@ -1304,15 +1306,25 @@ function MachineChart({
   };
   return (
     <>
-      <div className="flex min-w-0 flex-col justify-center leading-tight text-muted-foreground">
-        <span className="truncate font-medium">{label}</span>
-        <span className="text-[10px] tabular-nums">{scaleLabel}</span>
+      {/* The chart's name, and its value axis's tick labels against the chart. */}
+      <div className="relative mt-3 min-w-0 text-muted-foreground">
+        <span className="block truncate pr-12 font-medium leading-tight">{label}</span>
+        {ticks.map((tick) => (
+          <span
+            key={tick.value}
+            data-y-tick=""
+            className="absolute right-0 -translate-y-1/2 text-[10px] leading-none tabular-nums"
+            style={{ top: `${(1 - tick.value / scaleMax) * 100}%` }}
+          >
+            {tick.label}
+          </span>
+        ))}
       </div>
       <div
         role="group"
         tabIndex={0}
         aria-label={label}
-        className="relative h-10 rounded bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="relative mt-3 h-16 rounded bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-primary"
         onPointerMove={(event) =>
           update({
             kind: "pointer_move",
@@ -1369,6 +1381,19 @@ function MachineChart({
           preserveAspectRatio="none"
           className="absolute inset-0 h-full w-full overflow-visible"
         >
+          {ticks.map((tick) => (
+            <line
+              key={`grid-${tick.value}`}
+              data-grid=""
+              x1={0}
+              x2={CHART_WIDTH}
+              y1={y(tick.value)}
+              y2={y(tick.value)}
+              stroke="var(--border)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
           {limits.map((limit, index) => (
             <line
               key={`limit-${index}`}
@@ -1839,7 +1864,7 @@ function machineParts({
     <>
       <MachineChart
         label="Memory"
-        scaleLabel={fmtBytes(memoryMax)}
+        ticks={scaleTicks(memoryMax / 1e9).map((gigabytes) => ({ value: gigabytes * 1e9, label: `${gigabytes} GB` }))}
         scaleMax={memoryMax}
         lines={linesOf("build-memory", BUILD_COLOR, (reading) => reading.memory_bytes)}
         limits={memoryLimits}
@@ -1850,7 +1875,7 @@ function machineParts({
       />
       <MachineChart
         label="CPU"
-        scaleLabel={`${Math.round(cpuMax * 100)}%`}
+        ticks={scaleTicks(cpuMax * 100).map((percent) => ({ value: percent / 100, label: `${percent}%` }))}
         scaleMax={cpuMax}
         lines={[
           ...linesOf("machine-cpu", MACHINE_COLOR, (reading) => reading.machine_cpu_share),
