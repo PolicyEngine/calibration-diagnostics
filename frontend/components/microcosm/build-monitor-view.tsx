@@ -1335,7 +1335,7 @@ function MachineChart({
         onKeyDown={(event) => {
           if (!points.length || !CHART_KEYS.has(event.key)) return;
           event.preventDefault();
-          update({ kind: "key", key: event.key });
+          update({ kind: "key", key: event.key, modified: event.altKey || event.ctrlKey || event.metaKey });
         }}
       >
         {/* A reading the keyboard picks is read out. */}

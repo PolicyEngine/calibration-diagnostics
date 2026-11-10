@@ -22,10 +22,13 @@ export const NO_CHART_HOVER: ChartHover = { time_ms: null, opened_by: null };
 export type ChartHoverEvent =
   | { kind: "pointer_move"; pointer_type: string; time_ms: number | null }
   | { kind: "pointer_down"; pointer_type: string; time_ms: number | null }
+  | { kind: "pointer_up"; pointer_type: string; time_ms: number | null }
+  | { kind: "pointer_cancel"; pointer_type: string }
   | { kind: "pointer_leave"; pointer_type: string }
   | { kind: "focus_visible" }
   | { kind: "blur" }
-  | { kind: "key"; key: string };
+  // `modified`: Alt, Control or Meta was held.
+  | { kind: "key"; key: string; modified: boolean };
 
 // The drawn reading whose stretch holds the card's moment, or -1. A reading
 // that later readings join keeps the card; one a refresh drops closes it.
@@ -70,6 +73,9 @@ export function nextChartHover(
       return last < 0 ? hover : shown(stretches[last].last_ms, "keyboard");
     case "blur":
       return NO_CHART_HOVER;
+    case "pointer_up":
+    case "pointer_cancel":
+      return hover;
     case "key": {
       if (event.key === "Escape") return NO_CHART_HOVER;
       if (last < 0 || !CHART_KEYS.has(event.key)) return hover;

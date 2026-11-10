@@ -13,20 +13,38 @@ function after(...events: Parameters<typeof nextChartHover>[1][]): ChartHover {
   return events.reduce((hover, event) => nextChartHover(hover, event, STRETCHES), NO_CHART_HOVER);
 }
 
-test("a tap shows the reading under it, and lifting the finger keeps it shown", () => {
-  const hover = after(
-    { kind: "pointer_down", pointer_type: "touch", time_ms: 25 },
-    { kind: "pointer_leave", pointer_type: "touch" },
-  );
+// A finger landing, lifting at the reading at `time`, and the leave that
+// follows a lift.
+const tap = (time: number | null, pointer = "touch") =>
+  [
+    { kind: "pointer_down", pointer_type: pointer, time_ms: time },
+    { kind: "pointer_up", pointer_type: pointer, time_ms: time },
+    { kind: "pointer_leave", pointer_type: pointer },
+  ] as const;
 
-  expect(hoveredIndex(STRETCHES, hover)).toBe(1);
+test("a tap shows the reading under it, and lifting the finger keeps it shown", () => {
+  expect(hoveredIndex(STRETCHES, after(...tap(25)))).toBe(1);
 });
 
 test("a tap away from every reading, or the chart losing focus, closes a tapped card", () => {
-  const tapped = { kind: "pointer_down", pointer_type: "touch", time_ms: 25 } as const;
+  expect(after(...tap(25), ...tap(null))).toEqual(NO_CHART_HOVER);
+  expect(after(...tap(25), { kind: "blur" })).toEqual(NO_CHART_HOVER);
+});
 
-  expect(after(tapped, { kind: "pointer_down", pointer_type: "touch", time_ms: null })).toEqual(NO_CHART_HOVER);
-  expect(after(tapped, { kind: "blur" })).toEqual(NO_CHART_HOVER);
+test("a touch the browser takes over to scroll the page opens no card, and closes a tapped one", () => {
+  const scroll = [
+    { kind: "pointer_down", pointer_type: "touch", time_ms: 25 },
+    { kind: "pointer_move", pointer_type: "touch", time_ms: 30 },
+    { kind: "pointer_cancel", pointer_type: "touch" },
+    { kind: "pointer_leave", pointer_type: "touch" },
+  ] as const;
+
+  expect(after(...scroll)).toEqual(NO_CHART_HOVER);
+  expect(after(...tap(10), ...scroll)).toEqual(NO_CHART_HOVER);
+});
+
+test("a pen that cannot hover shows the reading it taps, as a finger does", () => {
+  expect(hoveredIndex(STRETCHES, after(...tap(25, "pen")))).toBe(1);
 });
 
 test("a mouse shows the reading it rests on and closes the card when it leaves", () => {
@@ -38,15 +56,22 @@ test("a mouse shows the reading it rests on and closes the card when it leaves",
 
 test("the keyboard opens the newest reading and steps through the rest", () => {
   const opened = after({ kind: "focus_visible" });
-  const stepped = nextChartHover(opened, { kind: "key", key: "ArrowLeft" }, STRETCHES);
+  const stepped = nextChartHover(opened, { kind: "key", key: "ArrowLeft", modified: false }, STRETCHES);
 
   expect(hoveredIndex(STRETCHES, opened)).toBe(2);
   expect(hoveredIndex(STRETCHES, stepped)).toBe(1);
-  expect(hoveredIndex(STRETCHES, nextChartHover(stepped, { kind: "key", key: "Home" }, STRETCHES))).toBe(0);
+  expect(hoveredIndex(STRETCHES, nextChartHover(stepped, { kind: "key", key: "Home", modified: false }, STRETCHES))).toBe(0);
+});
+
+test("a key pressed with a modifier is left to the browser", () => {
+  const opened = after({ kind: "focus_visible" });
+
+  expect(nextChartHover(opened, { kind: "key", key: "ArrowLeft", modified: true }, STRETCHES)).toEqual(opened);
+  expect(nextChartHover(opened, { kind: "key", key: "Escape", modified: true }, STRETCHES)).toEqual(opened);
 });
 
 test("after Escape, the Left arrow opens the newest reading rather than skipping it", () => {
-  const hover = after({ kind: "focus_visible" }, { kind: "key", key: "Escape" }, { kind: "key", key: "ArrowLeft" });
+  const hover = after({ kind: "focus_visible" }, { kind: "key", key: "Escape", modified: false }, { kind: "key", key: "ArrowLeft", modified: false });
 
   expect(hoveredIndex(STRETCHES, hover)).toBe(2);
 });
