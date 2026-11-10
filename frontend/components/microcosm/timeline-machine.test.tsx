@@ -170,12 +170,13 @@ test("the Whole run bar shades each sleep where it happened, an estimated one dr
   expect(markup).toMatch(/title="Asleep \(estimated\): 10 min, 10:10 AM UTC to 10:20 AM UTC"/);
 });
 
-test("no Machine row is drawn; each reading's card names its machine instead", () => {
+test("no Machine row is drawn; the Whole run hover text of each stage names its machine instead", () => {
   const markup = timeline({ chartsOpen: true });
 
   expect(markup).not.toContain(">Machine<");
   expect(markup).not.toMatch(/>[^<]*macOS 26\.3 · Apple M1 Max/);
   expect(markup).not.toMatch(/>[^<]*Modal heavy · 4 CPU/);
+  expect(markup).toContain('title="Calibrate: 50 min\nModal heavy · 4 CPU · 137 GB · us-east · ta-01"');
 });
 
 test("a machine that sent no readings is still named, in the hover text of the stages it ran", () => {
@@ -318,16 +319,15 @@ test("a clicked stage narrows sleeps and readings to it, as a stage-type filter 
   expect(markup.match(/<polyline[^>]*data-series="build-memory"/g)).toHaveLength(2);
 });
 
-test("hovering a reading says when it was, the stage, the build's memory and CPU against its limits, and the machine", () => {
+test("hovering a reading says when it was, the stage, and the build's memory and CPU against its limits, not the machine", () => {
   expect(readingSummary(READINGS[5], MODAL, at(90), UTC)).toEqual([
     "10:31 AM UTC",
     "Calibrate › Solve weights",
     "Memory 43 GB of 137 GB",
     "CPU 4.0 cores, 100% of 4.0",
     "Machine 30% busy",
-    "Modal heavy · 4 CPU · 137 GB · us-east · ta-01",
   ]);
-  expect(readingSummary(READINGS[0], LOCAL, at(90), UTC).at(-1)).toBe("macOS 26.3 · Apple M1 Max · 10 CPU · 34 GB");
+  expect(readingSummary(READINGS[0], LOCAL, at(90), UTC).at(-1)).toBe("Machine 30% busy");
   expect(readingSummary({ ...READINGS[0], cpu_cores: null, machine_cpu_share: null }, null, at(90), UTC)).toEqual([
     "10:01 AM UTC",
     "Load inputs",
