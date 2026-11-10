@@ -13,7 +13,15 @@
 // - version 3 (UK): version 2 plus a `blocked` run status with the gate phase
 //   and gates that refused the candidate, and a class on every failure.
 
-import type { MachineReading, MachineSegment, SleepBand } from "@/lib/microcosm/machine-readings";
+import {
+  downsampleReadings,
+  type MachineReading,
+  type MachineSegment,
+  machineReadings,
+  machineSegments,
+  type SleepBand,
+  sleepBands,
+} from "@/lib/microcosm/machine-readings";
 
 type JsonObject = Record<string, unknown>;
 
@@ -583,6 +591,18 @@ function spansFromTransitions(events: JsonObject[]): {
   return { spans, terminal };
 }
 
+// How deep a starting stage sits: under its recorded parent (microcosm-emitter
+// 0.14.0 and later record it as `details.stage_span.parent_stage_id`, null at
+// the top), else under every stage still open.
+function startDepth(event: JsonObject, open: StageSpan[]): { depth: number; recorded: boolean } {
+  const recorded = obj(obj(event.details)?.stage_span);
+  if (!recorded || !("parent_stage_id" in recorded)) return { depth: open.length, recorded: false };
+  const parentId = str(recorded.parent_stage_id);
+  if (parentId == null) return { depth: 0, recorded: true };
+  const parent = [...open].reverse().find((candidate) => candidate.stage === parentId);
+  return { depth: parent ? parent.depth + 1 : open.length, recorded: true };
+}
+
 // Version 2 and later: explicit, nestable started/completed/failed events.
 function spansFromLifecycle(events: JsonObject[]): {
   spans: StageSpan[];
@@ -590,6 +610,10 @@ function spansFromLifecycle(events: JsonObject[]): {
 } {
   const spans: StageSpan[] = [];
   const open: StageSpan[] = [];
+  // Stages whose start recorded its parent. The emitter that records parents
+  // ends a stage's nested stages before it, so one still open when its parent
+  // ends lost its own end.
+  const recordedStarts = new Set<StageSpan>();
   let terminal: { stage: string; event: JsonObject; time: number } | null = null;
   for (const event of events) {
     if (str(event.event_type) === "calibration") continue;
@@ -607,7 +631,9 @@ function spansFromLifecycle(events: JsonObject[]): {
       continue;
     }
     if (status === "started") {
-      const span = newSpan(stage, open.length, time, event);
+      const { depth, recorded } = startDepth(event, open);
+      const span = newSpan(stage, depth, time, event);
+      if (recorded) recordedStarts.add(span);
       spans.push(span);
       open.push(span);
       continue;
@@ -625,6 +651,16 @@ function spansFromLifecycle(events: JsonObject[]): {
       index < 0 && reportedElapsed != null && reportedElapsed >= 0
         ? Math.max(0, time - reportedElapsed * 1000)
         : time;
+    if (index >= 0 && recordedStarts.has(open[index])) {
+      for (const inner of open.splice(index + 1)) {
+        if (!recordedStarts.has(inner)) {
+          open.push(inner);
+          continue;
+        }
+        inner.end_ms = time;
+        if (inner.status === "running") inner.status = status === "failed" ? "failed" : "completed";
+      }
+    }
     // A completion without a start uses its reported elapsed time when the
     // graph observer provides one; otherwise it remains instantaneous.
     const span =
@@ -987,15 +1023,23 @@ export function buildTimeline(
     resources: latestResources,
     identity: runIdentity(documents.run_manifest),
     delivery: runDelivery(documents),
-    readings: [],
-    sleeps: [],
-    machines: [],
+    readings: downsampleReadings(machineReadings(events)),
+    sleeps: sleepBands(events),
+    machines: machineSegments(events),
   };
 }
 
-// The stages nested in a top-level stage, in the order they started.
-export function childSpans(_timeline: BuildTimeline, _parent: StageSpan): StageSpan[] {
-  return [];
+// The stages nested in a stage, in the order they started: the spans after it
+// that sit deeper, up to the next one that does not.
+export function childSpans(timeline: BuildTimeline, parent: StageSpan): StageSpan[] {
+  const index = timeline.spans.indexOf(parent);
+  if (index < 0) return [];
+  const children: StageSpan[] = [];
+  for (const span of timeline.spans.slice(index + 1)) {
+    if (span.depth <= parent.depth) break;
+    children.push(span);
+  }
+  return children;
 }
 
 // Cores a stage kept busy on average: CPU seconds over wall seconds.
@@ -1930,5 +1974,5 @@ export function phaseTotals(run: BuildTimeline, nowMs: number = Date.now()): Pha
 
 // The list view ships timelines without per-epoch calibration points.
 export function compactTimeline(timeline: BuildTimeline): BuildTimeline {
-  return { ...timeline, calibration: [] };
+  return { ...timeline, calibration: [], readings: [] };
 }

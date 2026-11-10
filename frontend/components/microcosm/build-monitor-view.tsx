@@ -30,8 +30,21 @@ import {
   runDetailLoading,
   waitsForRunList,
 } from "@/lib/microcosm/build-run-selection";
-import { filteredAxis, phasesByFirstAppearance } from "@/lib/microcosm/timeline-layout";
-import type { MachineReading, MachineSegment } from "@/lib/microcosm/machine-readings";
+import {
+  axisIntervals,
+  axisOffset,
+  filteredAxis,
+  phasesByFirstAppearance,
+  type StageExtent,
+} from "@/lib/microcosm/timeline-layout";
+import {
+  availableCores,
+  type MachineReading,
+  type MachineSegment,
+  memoryLimitBytes,
+  readingRuns,
+  type SleepBand,
+} from "@/lib/microcosm/machine-readings";
 import {
   focusOnDrawnStages,
   NO_FOCUS,
@@ -59,6 +72,7 @@ import {
   type SolverForecast,
   type SolverSegment,
   type StageForecast,
+  childSpans,
   formatStageName,
   phaseTotals,
   runDurationMs,
@@ -556,7 +570,7 @@ export function BuildMonitorView({
         <>
           <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />
           <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} zone={zone} />
-          <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
+          <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} zone={zone} />
           {list.data?.problems.length ? (
             <SectionCard title="Runs that could not be read">
               <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -930,6 +944,9 @@ interface TimelineRow {
   // A stretch inside a calibration stage (a solver pass, or time with no
   // epochs logged), shown indented under its stage.
   segment: SolverSegment | null;
+  // How deep a nested stage sits under its top-level stage; 0 for the
+  // top-level stage itself.
+  depth?: number;
 }
 
 // A pass's epochs and speed, most telling first: where a running pass is,
@@ -1036,14 +1053,35 @@ function solverRows(
   });
 }
 
+// The stages nested in a top-level row's stage, each a row indented under it.
+function nestedRows(row: TimelineRow, run: BuildTimeline, runStart: number, nowOffset: number): TimelineRow[] {
+  if (!row.span) return [];
+  return childSpans(run, row.span).map((span, index) => ({
+    key: `${row.key}-nested-${index}`,
+    stageKey: row.key,
+    stage: span.stage,
+    label: formatStageName(span.stage),
+    phase: span.phase,
+    start: span.start_ms - runStart,
+    end: Math.max(span.start_ms, span.end_ms ?? runStart + nowOffset) - runStart,
+    status: span.status === "failed" ? "failed" : span.status === "running" ? "running" : "done",
+    basis: "observed",
+    span,
+    segment: null,
+    depth: span.depth - row.span!.depth,
+  }));
+}
+
 function TimelineCard({
   run,
   forecast,
   nowMs,
+  zone,
 }: {
   run: BuildTimeline;
   forecast: BuildForecast | null;
   nowMs: number;
+  zone: ViewerZone | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [filter, setFilter] = useState<ReadonlySet<BuildPhase>>(NO_FOCUS.filter);
@@ -1063,6 +1101,7 @@ function TimelineCard({
       run={run}
       forecast={forecast}
       nowMs={nowMs}
+      zone={zone}
       expanded={expanded}
       focus={{
         filter,
@@ -1111,12 +1150,231 @@ export interface TimelineViewProps {
 
 // What the Timeline's hover card says about one reading of the build machine.
 export function readingSummary(
-  _reading: MachineReading,
-  _machine: MachineSegment | null,
-  _nowMs: number,
-  _zone: ViewerZone | null,
+  reading: MachineReading,
+  machine: MachineSegment | null,
+  nowMs: number,
+  zone: ViewerZone | null,
 ): string[] {
-  return [];
+  const lines = [
+    clockTime(reading.time_ms, nowMs, zone, { zoneName: true }),
+    reading.stages.length ? reading.stages.map(formatStageName).join(" › ") : "—",
+  ];
+  if (reading.memory_bytes != null) {
+    const limit = machine ? memoryLimitBytes(machine) : null;
+    lines.push(`Memory ${fmtBytes(reading.memory_bytes)}${limit != null ? ` of ${fmtBytes(limit)}` : ""}`);
+  }
+  if (reading.cpu_cores != null) {
+    const cores = machine ? availableCores(machine) : null;
+    lines.push(
+      `CPU ${fmtCores(reading.cpu_cores)} cores${
+        cores ? `, ${Math.round((reading.cpu_cores / cores) * 100)}% of ${fmtCores(cores)}` : ""
+      }`,
+    );
+  }
+  if (reading.machine_cpu_share != null) lines.push(`Machine ${Math.round(reading.machine_cpu_share * 100)}% busy`);
+  return lines;
+}
+
+// "4", or "0.5": a CPU count as a request names it.
+function fmtCount(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function osName(machine: MachineSegment): string | null {
+  const name = machine.os === "Darwin" ? "macOS" : machine.os;
+  if (!name) return null;
+  return machine.os_version ? `${name} ${machine.os_version}` : name;
+}
+
+// The Machine row's name for a producer's machine: a Modal container by its
+// resource class, request and region; any other by its system, processor,
+// CPUs and memory.
+function machineLabel(machine: MachineSegment): string {
+  const parts =
+    machine.kind === "modal_container"
+      ? [
+          machine.request ? `Modal ${machine.request.resource_class}` : "Modal",
+          machine.request
+            ? `${fmtCount(machine.request.cpu)} CPU`
+            : machine.logical_cpus != null
+              ? `${machine.logical_cpus} CPU`
+              : null,
+          memoryLimitBytes(machine) != null ? fmtBytes(memoryLimitBytes(machine)) : null,
+          machine.modal_region,
+        ]
+      : [
+          osName(machine),
+          machine.cpu_model,
+          machine.logical_cpus != null ? `${machine.logical_cpus} CPU` : null,
+          machine.memory_total_bytes != null ? fmtBytes(machine.memory_total_bytes) : null,
+        ];
+  return parts.filter((part): part is string => Boolean(part)).join(" · ");
+}
+
+function sleepTitle(sleep: SleepBand, nowMs: number, zone: ViewerZone | null): string {
+  const kind = sleep.estimated ? "Asleep (estimated)" : "Asleep";
+  const from = clockTime(sleep.start_ms, nowMs, zone, { zoneName: true });
+  const to = clockTime(sleep.end_ms, nowMs, zone, { zoneName: true });
+  return `${kind}: ${fmtDuration(sleep.end_ms - sleep.start_ms)}, ${from} to ${to}`;
+}
+
+const SLEEP_FILL = "color-mix(in srgb, var(--foreground) 16%, transparent)";
+const ESTIMATED_SLEEP_FILL =
+  "repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 20%, transparent) 0 3px, transparent 3px 6px)";
+const MEMORY_COLOR = "var(--chart-1)";
+const CPU_COLOR = "var(--chart-2)";
+const MACHINE_COLOR = "color-mix(in srgb, var(--muted-foreground) 70%, transparent)";
+// The charts' drawing box: 1000 wide, stretched to the track, and 40 high.
+const CHART_WIDTH = 1000;
+const CHART_HEIGHT = 40;
+
+interface ChartLine {
+  series: string;
+  color: string;
+  points: { x: number; value: number }[];
+}
+
+interface ChartLimit {
+  start: number;
+  end: number;
+  value: number;
+}
+
+// One reading's place on a chart, for the hover card.
+interface ChartPoint {
+  x: number;
+  reading: MachineReading;
+}
+
+// A chart of one measure on the Timeline's axis: its lines, its limits as
+// dashed rules, the machine's sleeps shaded, and a hover card naming the
+// reading nearest the pointer.
+function MachineChart({
+  label,
+  scaleLabel,
+  scaleMax,
+  lines,
+  limits,
+  limitKind,
+  shades,
+  points,
+  summary,
+}: {
+  label: string;
+  scaleLabel: string;
+  scaleMax: number;
+  lines: ChartLine[];
+  limits: ChartLimit[];
+  limitKind: string;
+  // Sleeps, as [start, end] fractions of the axis.
+  shades: { start: number; end: number; estimated: boolean }[];
+  points: ChartPoint[];
+  summary: (reading: MachineReading) => string[];
+}) {
+  const [hovered, setHovered] = useState<ChartPoint | null>(null);
+  const y = (value: number) => CHART_HEIGHT - (Math.max(0, value) / scaleMax) * CHART_HEIGHT;
+  return (
+    <>
+      <div className="flex min-w-0 flex-col justify-center leading-tight text-muted-foreground">
+        <span className="truncate font-medium">{label}</span>
+        <span className="text-[10px] tabular-nums">{scaleLabel}</span>
+      </div>
+      <div
+        className="relative h-10 rounded bg-muted/40"
+        onPointerMove={(event) => {
+          const box = event.currentTarget.getBoundingClientRect();
+          if (!box.width || !points.length) return;
+          const fraction = (event.clientX - box.left) / box.width;
+          const nearest = points.reduce((best, point) =>
+            Math.abs(point.x - fraction) < Math.abs(best.x - fraction) ? point : best,
+          );
+          setHovered(Math.abs(nearest.x - fraction) * box.width <= 12 ? nearest : null);
+        }}
+        onPointerLeave={() => setHovered(null)}
+      >
+        <svg
+          role="img"
+          aria-label={label}
+          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full overflow-visible"
+        >
+          {shades.map((shade, index) => (
+            <rect
+              key={`shade-${index}`}
+              data-sleep-shade={shade.estimated ? "estimated" : "recorded"}
+              x={shade.start * CHART_WIDTH}
+              y={0}
+              width={Math.max(0.5, (shade.end - shade.start) * CHART_WIDTH)}
+              height={CHART_HEIGHT}
+              fill={SLEEP_FILL}
+              opacity={shade.estimated ? 0.5 : 1}
+            />
+          ))}
+          {limits.map((limit, index) => (
+            <line
+              key={`limit-${index}`}
+              data-limit={limitKind}
+              x1={limit.start * CHART_WIDTH}
+              x2={limit.end * CHART_WIDTH}
+              y1={y(limit.value)}
+              y2={y(limit.value)}
+              stroke="var(--muted-foreground)"
+              strokeDasharray="4 3"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {lines.map((line, index) => (
+            <polyline
+              key={`${line.series}-${index}`}
+              data-series={line.series}
+              fill="none"
+              stroke={line.color}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              // A lone reading is drawn as a dot.
+              points={(line.points.length === 1 ? [line.points[0], line.points[0]] : line.points)
+                .map((point) => `${(point.x * CHART_WIDTH).toFixed(2)},${y(point.value).toFixed(2)}`)
+                .join(" ")}
+            />
+          ))}
+        </svg>
+        {hovered ? (
+          <>
+            <div
+              className="pointer-events-none absolute top-0 h-full w-px bg-foreground/50"
+              style={{ left: `${hovered.x * 100}%` }}
+            />
+            <div
+              role="tooltip"
+              className={`pointer-events-none absolute bottom-full z-20 mb-1 whitespace-nowrap rounded border border-border bg-popover px-2 py-1 text-[10px] leading-4 text-popover-foreground shadow-sm ${
+                hovered.x > 0.6 ? "-translate-x-full" : ""
+              }`}
+              style={{ left: `${hovered.x * 100}%` }}
+            >
+              {summary(hovered.reading).map((line, index) => (
+                <div key={index} className={index === 1 ? "font-medium" : "tabular-nums"}>
+                  {line}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function LegendSwatch({ background, label }: { background: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span aria-hidden="true" className="inline-block h-2 w-3 rounded-sm" style={{ background }} />
+      {label}
+    </span>
+  );
 }
 
 // A dimmed stage's opacity, while another stage type is hovered or another
@@ -1132,6 +1390,7 @@ export function TimelineView({
   run,
   forecast,
   nowMs,
+  zone = null,
   expanded,
   focus,
   onToggleExpanded,
@@ -1199,7 +1458,15 @@ export function TimelineView({
   // step the build went through. A stage that ran the solver is followed by
   // its passes and the stretches between them.
   const visible = rows
-    .flatMap((row) => (run.started_ms == null ? [row] : [row, ...solverRows(row, run, run.started_ms, elapsed)]))
+    .flatMap((row) =>
+      run.started_ms == null
+        ? [row]
+        : [
+            row,
+            ...nestedRows(row, run, run.started_ms, elapsed),
+            ...solverRows(row, run, run.started_ms, elapsed),
+          ],
+    )
     .filter((row) => place(row) != null);
   const ticks = axisTicks(domain);
 
@@ -1211,6 +1478,16 @@ export function TimelineView({
     );
   }
   const totals = phaseTotals(run, nowMs).phases;
+  const machine = machineParts({
+    run,
+    nowMs,
+    zone,
+    domain,
+    pct,
+    width,
+    extents,
+    axis,
+  });
   // A refresh can drop or renumber the row a stage was hovered or clicked in.
   const drawnFocus = focusOnDrawnStages(focus, new Set(rows.map((row) => row.stageKey)));
   const focusOf = (row: TimelineRow) => stageFocus(drawnFocus, row.phase, row.stageKey);
@@ -1291,6 +1568,7 @@ export function TimelineView({
               />
             ) : null}
             {!filtered && run.state === "running" ? <NowLine left={pct(elapsed)} /> : null}
+            {machine.sleepBands}
           </div>
 
           {expanded
@@ -1315,6 +1593,8 @@ export function TimelineView({
               })
             : null}
 
+          {machine.rows}
+
           <div />
           <div className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground">
             {ticks.map((tick) => (
@@ -1336,6 +1616,192 @@ export function TimelineView({
       </div>
     </SectionCard>
   );
+}
+
+// The Timeline's build machine parts: the sleep bands drawn in the Whole run
+// bar, and the Machine, Memory and CPU rows, all on the stages' axis (under a
+// stage-type filter, only what falls in the shown stages).
+function machineParts({
+  run,
+  nowMs,
+  zone,
+  domain,
+  pct,
+  width,
+  extents,
+  axis,
+}: {
+  run: BuildTimeline;
+  nowMs: number;
+  zone: ViewerZone | null;
+  domain: number;
+  pct: (ms: number) => string;
+  width: (start: number, end: number) => string;
+  extents: StageExtent[];
+  axis: ReturnType<typeof filteredAxis> | null;
+}): { sleepBands: ReactNode; rows: ReactNode } {
+  const runStart = run.started_ms;
+  const readings = run.readings ?? [];
+  const sleeps = run.sleeps ?? [];
+  const machines = run.machines ?? [];
+  if (runStart == null || (!readings.length && !sleeps.length && !machines.length)) {
+    return { sleepBands: null, rows: null };
+  }
+  // A stretch of the run, and a moment in it, on the drawn axis.
+  const intervals = (startMs: number, endMs: number) =>
+    axis
+      ? axisIntervals(startMs - runStart, endMs - runStart, extents, axis)
+      : [{ start: startMs - runStart, end: endMs - runStart }];
+  const offset = (ms: number) => (axis ? axisOffset(ms - runStart, extents, axis) : ms - runStart);
+  const fraction = (ms: number) => Math.min(1, Math.max(0, ms / domain));
+
+  const sleepBands = sleeps.flatMap((sleep, index) =>
+    intervals(sleep.start_ms, sleep.end_ms).map((part, partIndex) => (
+      <div
+        key={`sleep-${index}-${partIndex}`}
+        data-sleep={sleep.estimated ? "estimated" : "recorded"}
+        className="absolute top-0 h-full"
+        style={{
+          left: pct(part.start),
+          width: width(part.start, part.end),
+          background: sleep.estimated ? ESTIMATED_SLEEP_FILL : SLEEP_FILL,
+        }}
+        title={sleepTitle(sleep, nowMs, zone)}
+      />
+    )),
+  );
+  const shades = sleeps.flatMap((sleep) =>
+    intervals(sleep.start_ms, sleep.end_ms).map((part) => ({
+      start: fraction(part.start),
+      end: fraction(part.end),
+      estimated: sleep.estimated,
+    })),
+  );
+
+  const machineOf = (reading: MachineReading) =>
+    machines.find((candidate) => candidate.producer_id === reading.producer_id) ?? null;
+  // A line per stretch of readings, broken where a reading is off the axis.
+  const linesOf = (series: string, color: string, value: (reading: MachineReading) => number | null) =>
+    readingRuns(readings, sleeps).flatMap((stretch) => {
+      const lines: ChartLine[] = [];
+      let current: ChartLine["points"] = [];
+      for (const reading of stretch) {
+        const at = offset(reading.time_ms);
+        const measured = value(reading);
+        if (at == null || measured == null) {
+          if (current.length) lines.push({ series, color, points: current });
+          current = [];
+          continue;
+        }
+        current.push({ x: fraction(at), value: measured });
+      }
+      if (current.length) lines.push({ series, color, points: current });
+      return lines;
+    });
+  const points: ChartPoint[] = readings.flatMap((reading) => {
+    const at = offset(reading.time_ms);
+    return at == null ? [] : [{ x: fraction(at), reading }];
+  });
+  const summary = (reading: MachineReading) => readingSummary(reading, machineOf(reading), nowMs, zone);
+
+  const memoryLimits = machines.flatMap((candidate) => {
+    const value = memoryLimitBytes(candidate);
+    return value == null
+      ? []
+      : intervals(candidate.start_ms, candidate.end_ms).map((part) => ({
+          start: fraction(part.start),
+          end: fraction(part.end),
+          value,
+        }));
+  });
+  const memoryMax = Math.max(
+    1,
+    ...memoryLimits.map((limit) => limit.value),
+    ...readings.map((reading) => reading.memory_peak_bytes ?? reading.memory_bytes ?? 0),
+  );
+  const cpuShare = (reading: MachineReading) => {
+    const cores = machineOf(reading) ? availableCores(machineOf(reading)!) : null;
+    return reading.cpu_cores != null && cores ? reading.cpu_cores / cores : null;
+  };
+  const cpuMax = Math.max(1, ...readings.map((reading) => cpuShare(reading) ?? 0));
+
+  const machineRow = machines.length ? (
+    <>
+      <div className="truncate font-medium text-muted-foreground">Machine</div>
+      <div className="relative h-5 overflow-hidden rounded bg-muted/40">
+        {machines.flatMap((candidate, index) =>
+          intervals(candidate.start_ms, candidate.end_ms).map((part, partIndex) => (
+            <div
+              key={`machine-${index}-${partIndex}`}
+              className="absolute top-0 h-full overflow-hidden border-l-2 border-foreground/30 pl-1 text-[10px] leading-5"
+              style={{ left: pct(part.start), width: width(part.start, part.end) }}
+              title={
+                candidate.modal_task_id
+                  ? `${machineLabel(candidate)} · ${candidate.modal_task_id}`
+                  : machineLabel(candidate)
+              }
+            >
+              {partIndex === 0 ? <span className="whitespace-nowrap">{machineLabel(candidate)}</span> : null}
+            </div>
+          )),
+        )}
+      </div>
+    </>
+  ) : null;
+
+  const charts = readings.length ? (
+    <>
+      <MachineChart
+        label="Memory"
+        scaleLabel={fmtBytes(memoryMax)}
+        scaleMax={memoryMax}
+        lines={linesOf("build-memory", MEMORY_COLOR, (reading) => reading.memory_bytes)}
+        limits={memoryLimits}
+        limitKind="memory"
+        shades={shades}
+        points={points}
+        summary={summary}
+      />
+      <MachineChart
+        label="CPU"
+        scaleLabel={`${Math.round(cpuMax * 100)}%`}
+        scaleMax={cpuMax}
+        lines={[
+          ...linesOf("machine-cpu", MACHINE_COLOR, (reading) => reading.machine_cpu_share),
+          ...linesOf("build-cpu", CPU_COLOR, cpuShare),
+        ]}
+        limits={[]}
+        limitKind="cpu"
+        shades={shades}
+        points={points}
+        summary={summary}
+      />
+      <div />
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+        <LegendSwatch background={MEMORY_COLOR} label="Memory" />
+        <LegendSwatch background={CPU_COLOR} label="CPU" />
+        <LegendSwatch background={MACHINE_COLOR} label="Machine CPU" />
+        <LegendSwatch
+          background="repeating-linear-gradient(90deg, var(--muted-foreground) 0 4px, transparent 4px 7px)"
+          label="Limit"
+        />
+        {sleeps.length ? <LegendSwatch background={SLEEP_FILL} label="Asleep" /> : null}
+        {sleeps.some((sleep) => sleep.estimated) ? (
+          <LegendSwatch background={ESTIMATED_SLEEP_FILL} label="Asleep (estimated)" />
+        ) : null}
+      </div>
+    </>
+  ) : null;
+
+  return {
+    sleepBands,
+    rows: (
+      <>
+        {machineRow}
+        {charts}
+      </>
+    ),
+  };
 }
 
 function NowLine({ left }: { left: string }) {
@@ -1419,8 +1885,9 @@ function TimelineStageRow({
         }}
         onBlur={() => onHover(false)}
         className={`flex min-w-0 items-center gap-1.5 rounded text-left hover:bg-muted/60 ${
-          selected && !row.segment ? "bg-muted font-medium" : ""
-        } ${row.segment ? "pl-3.5 text-muted-foreground" : ""}`}
+          selected && !row.segment && !row.depth ? "bg-muted font-medium" : ""
+        } ${row.segment || row.depth ? "text-muted-foreground" : ""} ${row.segment ? "pl-3.5" : ""}`}
+        style={row.depth ? { paddingLeft: `${row.depth * 0.875}rem` } : undefined}
       >
         {running ? (
           // A pulsing dot marks what is running now.

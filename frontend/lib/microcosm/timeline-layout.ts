@@ -49,20 +49,32 @@ export function filteredAxis(
 // Where a time in the run (milliseconds from its start) falls on the filtered
 // axis: inside a shown stage, at that stage's place; elsewhere, nowhere.
 export function axisOffset(
-  _offset: number,
-  _stages: readonly StageExtent[],
-  _axis: ReturnType<typeof filteredAxis>,
+  offset: number,
+  stages: readonly StageExtent[],
+  axis: ReturnType<typeof filteredAxis>,
 ): number | null {
+  for (const stage of stages) {
+    const base = axis.starts.get(stage.key);
+    if (base != null && offset >= stage.start && offset <= stage.end) return base + (offset - stage.start);
+  }
   return null;
 }
 
 // A stretch of the run on the filtered axis: the parts of it inside shown
-// stages, each at that stage's place.
+// stages, each at that stage's place, in the order they ran.
 export function axisIntervals(
-  _start: number,
-  _end: number,
-  _stages: readonly StageExtent[],
-  _axis: ReturnType<typeof filteredAxis>,
+  start: number,
+  end: number,
+  stages: readonly StageExtent[],
+  axis: ReturnType<typeof filteredAxis>,
 ): { start: number; end: number }[] {
-  return [];
+  const parts: { start: number; end: number }[] = [];
+  for (const stage of inRunOrder(stages)) {
+    const base = axis.starts.get(stage.key);
+    const from = Math.max(start, stage.start);
+    const to = Math.min(end, stage.end);
+    if (base == null || to <= from) continue;
+    parts.push({ start: base + (from - stage.start), end: base + (to - stage.start) });
+  }
+  return parts;
 }
