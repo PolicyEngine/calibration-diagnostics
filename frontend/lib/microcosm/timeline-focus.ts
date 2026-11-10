@@ -21,29 +21,44 @@ export const NO_FOCUS: TimelineFocus = {
   hoveredStage: null,
 };
 
-// The Whole run bar's label.
-export function wholeRunLabel(filter: ReadonlySet<BuildPhase>): string {
-  return filter.size ? "Whole run (filtered)" : "Whole run";
+// The clicked stage, by its row key, when it narrows the Timeline to itself:
+// with no stage-type filter on, or with its type picked. A clicked stage
+// whose type the filter hides narrows nothing.
+export function narrowedToStage(focus: TimelineFocus): string | null {
+  if (focus.selectedStage == null) return null;
+  const phase = focus.selectedPhase;
+  return !focus.filter.size || phase == null || focus.filter.has(phase) ? focus.selectedStage : null;
 }
 
-// How one stage is drawn: hidden when a filter leaves its type out; dimmed
-// while another type is hovered, else while another stage is hovered in the
-// breakdown, else while another stage is clicked. A clicked stage whose type
-// the filter hides dims nothing.
+// Whether the Timeline shows only some stages: those of the picked types, or
+// the clicked stage.
+export function focusNarrows(focus: TimelineFocus): boolean {
+  return focus.filter.size > 0 || narrowedToStage(focus) != null;
+}
+
+// The Whole run bar's label.
+export function wholeRunLabel(focus: TimelineFocus): string {
+  return focusNarrows(focus) ? "Whole run (filtered)" : "Whole run";
+}
+
+// How one stage is drawn: hidden when a filter leaves its type out or
+// another stage is clicked; dimmed while another type is hovered, else while
+// another shown stage is hovered in the breakdown. A row the clicked stage
+// hides never reports the pointer leaving it, so a stage it left hovered
+// dims nothing.
 export function stageFocus(
   focus: TimelineFocus,
   phase: BuildPhase,
   stageKey: string,
 ): { visible: boolean; dimmed: boolean } {
-  const passesFilter = (candidate: BuildPhase | null | undefined) =>
-    !focus.filter.size || candidate == null || focus.filter.has(candidate);
-  const visible = !focus.filter.size || focus.filter.has(phase);
-  const selectionShown = focus.selectedStage != null && passesFilter(focus.selectedPhase);
+  const clicked = narrowedToStage(focus);
+  const visible = (!focus.filter.size || focus.filter.has(phase)) && (clicked == null || stageKey === clicked);
+  const hoveredStage = clicked == null || focus.hoveredStage === clicked ? focus.hoveredStage : null;
   const dimmed = focus.hoveredPhase
     ? phase !== focus.hoveredPhase
-    : focus.hoveredStage
-      ? stageKey !== focus.hoveredStage
-      : selectionShown && stageKey !== focus.selectedStage;
+    : hoveredStage
+      ? stageKey !== hoveredStage
+      : false;
   return { visible, dimmed };
 }
 
@@ -80,4 +95,72 @@ export function focusOnDrawnStages(focus: TimelineFocus, drawnStageKeys: Readonl
     selectedStage: selectedDrawn ? focus.selectedStage : null,
     selectedPhase: selectedDrawn ? focus.selectedPhase : null,
   };
+}
+
+// What the Timeline card keeps between renders: the run it is showing, what
+// is open, and what is picked, clicked and hovered.
+export interface TimelineCardState {
+  runId: string;
+  // Whether the per-stage breakdown is open.
+  expanded: boolean;
+  // Whether the Memory and CPU charts are open.
+  chartsExpanded: boolean;
+  filter: ReadonlySet<BuildPhase>;
+  hoveredPhase: BuildPhase | null;
+  selected: { stageKey: string; phase: BuildPhase } | null;
+  hoveredStage: string | null;
+}
+
+export type TimelineCardAction =
+  | { kind: "show_run"; runId: string }
+  | { kind: "toggle_expanded" }
+  | { kind: "toggle_charts" }
+  | { kind: "hover_phase"; phase: BuildPhase | null }
+  | { kind: "toggle_phase"; phase: BuildPhase }
+  | { kind: "hover_stage"; stageKey: string | null }
+  | { kind: "toggle_stage"; stageKey: string; phase: BuildPhase };
+
+export function initialTimelineCard(runId: string): TimelineCardState {
+  return {
+    runId,
+    expanded: false,
+    chartsExpanded: false,
+    filter: NO_FOCUS.filter,
+    hoveredPhase: null,
+    selected: null,
+    hoveredStage: null,
+  };
+}
+
+// The card's state after one action. A row that closes, or that a filter or
+// a clicked stage hides, under the pointer never reports the pointer leaving
+// it, so each of those clears the hovered stage. Picking a stage type, or
+// closing the breakdown that holds its row, clears the clicked stage, so the
+// Timeline is never narrowed to a stage without its pressed row in view.
+// Another run starts with nothing picked, clicked or hovered; the breakdown
+// and the charts stay open or closed.
+export function nextTimelineCard(state: TimelineCardState, action: TimelineCardAction): TimelineCardState {
+  switch (action.kind) {
+    case "show_run":
+      return { ...initialTimelineCard(action.runId), expanded: state.expanded, chartsExpanded: state.chartsExpanded };
+    case "toggle_expanded":
+      return {
+        ...state,
+        expanded: !state.expanded,
+        selected: state.expanded ? null : state.selected,
+        hoveredStage: null,
+      };
+    case "toggle_charts":
+      return { ...state, chartsExpanded: !state.chartsExpanded };
+    case "hover_phase":
+      return { ...state, hoveredPhase: action.phase };
+    case "toggle_phase":
+      return { ...state, filter: togglePhase(state.filter, action.phase), selected: null, hoveredStage: null };
+    case "hover_stage":
+      return { ...state, hoveredStage: action.stageKey };
+    case "toggle_stage": {
+      const stageKey = toggleStage(state.selected?.stageKey ?? null, action.stageKey);
+      return { ...state, selected: stageKey ? { stageKey, phase: action.phase } : null, hoveredStage: null };
+    }
+  }
 }

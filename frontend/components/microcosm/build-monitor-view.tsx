@@ -7,6 +7,7 @@ import {
   useId,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
@@ -30,15 +31,38 @@ import {
   runDetailLoading,
   waitsForRunList,
 } from "@/lib/microcosm/build-run-selection";
-import { filteredAxis, phasesByFirstAppearance } from "@/lib/microcosm/timeline-layout";
 import {
+  axisIntervals,
+  axisOffset,
+  filteredAxis,
+  phasesByFirstAppearance,
+  type StageExtent,
+} from "@/lib/microcosm/timeline-layout";
+import { scaleTicks } from "@/lib/microcosm/chart-scale";
+import {
+  CHART_KEYS,
+  type ChartHoverEvent,
+  hoveredIndex as chartHoveredIndex,
+  NO_CHART_HOVER,
+  nextChartHover,
+} from "@/lib/microcosm/chart-hover";
+import {
+  availableCores,
+  type MachineReading,
+  type MachineSegment,
+  memoryLimitBytes,
+  readingRuns,
+  type SleepBand,
+} from "@/lib/microcosm/machine-readings";
+import {
+  focusNarrows,
   focusOnDrawnStages,
-  NO_FOCUS,
+  initialTimelineCard,
+  narrowedToStage,
+  nextTimelineCard,
   pointerHovers,
   stageFocus,
   type TimelineFocus,
-  togglePhase,
-  toggleStage,
   wholeRunLabel,
 } from "@/lib/microcosm/timeline-focus";
 import {
@@ -58,6 +82,7 @@ import {
   type SolverForecast,
   type SolverSegment,
   type StageForecast,
+  childSpans,
   formatStageName,
   phaseTotals,
   runDurationMs,
@@ -555,7 +580,7 @@ export function BuildMonitorView({
         <>
           <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />
           <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} zone={zone} />
-          <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
+          <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} zone={zone} />
           {list.data?.problems.length ? (
             <SectionCard title="Runs that could not be read">
               <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -929,6 +954,9 @@ interface TimelineRow {
   // A stretch inside a calibration stage (a solver pass, or time with no
   // epochs logged), shown indented under its stage.
   segment: SolverSegment | null;
+  // How deep a nested stage sits under its top-level stage; 0 for the
+  // top-level stage itself.
+  depth?: number;
 }
 
 // A pass's epochs and speed, most telling first: where a running pass is,
@@ -1035,59 +1063,63 @@ function solverRows(
   });
 }
 
+// The stages nested in a top-level row's stage, each a row indented under it.
+function nestedRows(row: TimelineRow, run: BuildTimeline, runStart: number, nowOffset: number): TimelineRow[] {
+  if (!row.span) return [];
+  return childSpans(run, row.span).map((span, index) => ({
+    key: `${row.key}-nested-${index}`,
+    stageKey: row.key,
+    stage: span.stage,
+    label: formatStageName(span.stage),
+    // The top-level stage's type, which the row's selection and the stage-type
+    // filter follow.
+    phase: row.phase,
+    start: span.start_ms - runStart,
+    end: Math.max(span.start_ms, span.end_ms ?? runStart + nowOffset) - runStart,
+    status: span.status === "failed" ? "failed" : span.status === "running" ? "running" : "done",
+    basis: "observed",
+    span,
+    segment: null,
+    depth: span.depth - row.span!.depth,
+  }));
+}
+
 function TimelineCard({
   run,
   forecast,
   nowMs,
+  zone,
 }: {
   run: BuildTimeline;
   forecast: BuildForecast | null;
   nowMs: number;
+  zone: ViewerZone | null;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [filter, setFilter] = useState<ReadonlySet<BuildPhase>>(NO_FOCUS.filter);
-  const [hoveredPhase, setHoveredPhase] = useState<BuildPhase | null>(null);
-  const [selected, setSelected] = useState<{ stageKey: string; phase: BuildPhase } | null>(null);
-  const [hoveredStage, setHoveredStage] = useState<string | null>(null);
-  // Another run starts with nothing filtered or selected; the breakdown stays
-  // open or closed.
-  useEffect(() => {
-    setFilter(NO_FOCUS.filter);
-    setHoveredPhase(null);
-    setSelected(null);
-    setHoveredStage(null);
-  }, [run.run_id]);
+  const [card, dispatch] = useReducer(nextTimelineCard, run.run_id, initialTimelineCard);
+  // Another run is reset while it renders, before anything is drawn, so it
+  // never shows the last run's filter or clicked stage.
+  if (card.runId !== run.run_id) dispatch({ kind: "show_run", runId: run.run_id });
   return (
     <TimelineView
       run={run}
       forecast={forecast}
       nowMs={nowMs}
-      expanded={expanded}
+      zone={zone}
+      expanded={card.expanded}
+      chartsExpanded={card.chartsExpanded}
       focus={{
-        filter,
-        hoveredPhase,
-        selectedStage: selected?.stageKey ?? null,
-        selectedPhase: selected?.phase ?? null,
-        hoveredStage,
+        filter: card.filter,
+        hoveredPhase: card.hoveredPhase,
+        selectedStage: card.selected?.stageKey ?? null,
+        selectedPhase: card.selected?.phase ?? null,
+        hoveredStage: card.hoveredStage,
       }}
-      // A row that closes or is filtered out under the pointer never reports
-      // the pointer leaving it.
-      onToggleExpanded={() => {
-        setExpanded((open) => !open);
-        setHoveredStage(null);
-      }}
-      onHoverPhase={setHoveredPhase}
-      onTogglePhase={(phase) => {
-        setFilter((current) => togglePhase(current, phase));
-        setHoveredStage(null);
-      }}
-      onHoverStage={setHoveredStage}
-      onToggleStage={(stageKey, phase) =>
-        setSelected((current) => {
-          const next = toggleStage(current?.stageKey ?? null, stageKey);
-          return next ? { stageKey: next, phase } : null;
-        })
-      }
+      onToggleExpanded={() => dispatch({ kind: "toggle_expanded" })}
+      onToggleCharts={() => dispatch({ kind: "toggle_charts" })}
+      onHoverPhase={(phase) => dispatch({ kind: "hover_phase", phase })}
+      onTogglePhase={(phase) => dispatch({ kind: "toggle_phase", phase })}
+      onHoverStage={(stageKey) => dispatch({ kind: "hover_stage", stageKey })}
+      onToggleStage={(stageKey, phase) => dispatch({ kind: "toggle_stage", stageKey, phase })}
     />
   );
 }
@@ -1096,18 +1128,343 @@ export interface TimelineViewProps {
   run: BuildTimeline;
   forecast: BuildForecast | null;
   nowMs: number;
+  // The viewer's zone, for clock times; null for the runtime's default.
+  zone?: ViewerZone | null;
   // Whether the per-stage breakdown is open.
   expanded: boolean;
+  // Whether the Memory and CPU charts are open.
+  chartsExpanded: boolean;
   focus: TimelineFocus;
   onToggleExpanded: () => void;
+  onToggleCharts: () => void;
   onHoverPhase: (phase: BuildPhase | null) => void;
   onTogglePhase: (phase: BuildPhase) => void;
   onToggleStage: (stageKey: string, phase: BuildPhase) => void;
   onHoverStage: (stageKey: string | null) => void;
 }
 
-// A dimmed stage's opacity, while another stage type is hovered or another
-// stage is selected.
+// What the Timeline's hover card says about one reading of the build machine.
+export function readingSummary(
+  reading: MachineReading,
+  machine: MachineSegment | null,
+  nowMs: number,
+  zone: ViewerZone | null,
+): string[] {
+  const lines = [
+    clockTime(reading.time_ms, nowMs, zone, { zoneName: true }),
+    reading.stages.length ? reading.stages.map(formatStageName).join(" › ") : "—",
+  ];
+  if (reading.memory_bytes != null) {
+    const limit = machine ? memoryLimitBytes(machine) : null;
+    lines.push(`Memory ${fmtBytes(reading.memory_bytes)}${limit != null ? ` of ${fmtBytes(limit)}` : ""}`);
+  }
+  if (reading.cpu_cores != null) {
+    const cores = machine ? availableCores(machine) : null;
+    lines.push(
+      `CPU ${fmtCores(reading.cpu_cores)} cores${
+        cores ? `, ${Math.round((reading.cpu_cores / cores) * 100)}% of ${fmtCores(cores)}` : ""
+      }`,
+    );
+  }
+  if (reading.machine_cpu_share != null) lines.push(`Machine ${Math.round(reading.machine_cpu_share * 100)}% busy`);
+  return lines;
+}
+
+// A machine as the Whole run hover text names it: its label, and a Modal
+// container's task ID, which finds its logs.
+function machineName(machine: MachineSegment): string {
+  return machine.modal_task_id ? `${machineLabel(machine)} · ${machine.modal_task_id}` : machineLabel(machine);
+}
+
+// "4", or "0.5": a CPU count as a request names it.
+function fmtCount(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function osName(machine: MachineSegment): string | null {
+  const name = machine.os === "Darwin" ? "macOS" : machine.os;
+  if (!name) return null;
+  return machine.os_version ? `${name} ${machine.os_version}` : name;
+}
+
+// A machine's label: a Modal container by its resource class, request and
+// region; any other by its system, processor, CPUs and memory.
+function machineLabel(machine: MachineSegment): string {
+  const parts =
+    machine.kind === "modal_container"
+      ? [
+          machine.request ? `Modal ${machine.request.resource_class}` : "Modal",
+          machine.request
+            ? `${fmtCount(machine.request.cpu)} CPU`
+            : machine.logical_cpus != null
+              ? `${machine.logical_cpus} CPU`
+              : null,
+          memoryLimitBytes(machine) != null ? fmtBytes(memoryLimitBytes(machine)) : null,
+          machine.modal_region,
+        ]
+      : [
+          osName(machine),
+          machine.cpu_model,
+          machine.logical_cpus != null ? `${machine.logical_cpus} CPU` : null,
+          machine.memory_total_bytes != null ? fmtBytes(machine.memory_total_bytes) : null,
+        ];
+  return parts.filter((part): part is string => Boolean(part)).join(" · ");
+}
+
+function sleepTitle(sleep: SleepBand, nowMs: number, zone: ViewerZone | null): string {
+  const kind = sleep.estimated ? "Asleep (estimated)" : "Asleep";
+  const from = clockTime(sleep.start_ms, nowMs, zone, { zoneName: true });
+  const to = clockTime(sleep.end_ms, nowMs, zone, { zoneName: true });
+  return `${kind}: ${fmtDuration(sleep.end_ms - sleep.start_ms)}, ${from} to ${to}`;
+}
+
+const SLEEP_FILL = "color-mix(in srgb, var(--foreground) 16%, transparent)";
+const ESTIMATED_SLEEP_FILL =
+  "repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 20%, transparent) 0 3px, transparent 3px 6px)";
+// The build's own line, the same in both charts, and the whole machine's.
+const BUILD_COLOR = "var(--chart-1)";
+const MACHINE_COLOR = "color-mix(in srgb, var(--muted-foreground) 70%, transparent)";
+// The charts' drawing box: 1000 wide, stretched to the track, and 40 high.
+const CHART_WIDTH = 1000;
+const CHART_HEIGHT = 40;
+
+interface ChartLine {
+  series: string;
+  color: string;
+  points: { x: number; value: number }[];
+}
+
+interface ChartLimit {
+  start: number;
+  end: number;
+  value: number;
+}
+
+// One reading's place on a chart, for the hover card.
+interface ChartPoint {
+  x: number;
+  reading: MachineReading;
+}
+
+// A chart of one measure on the Timeline's axis: its lines, its limits as
+// dashed rules, the machine's sleeps shaded, and a hover card naming the
+// reading nearest the pointer.
+function MachineChart({
+  label,
+  ticks,
+  scaleMax,
+  lines,
+  limits,
+  limitKind,
+  shades,
+  points,
+  summary,
+}: {
+  label: string;
+  // The value axis's ticks, in the chart's own unit, with their labels.
+  ticks: { value: number; label: string }[];
+  scaleMax: number;
+  lines: ChartLine[];
+  limits: ChartLimit[];
+  limitKind: string;
+  // Sleeps, as [start, end] fractions of the axis.
+  shades: { start: number; end: number; estimated: boolean }[];
+  points: ChartPoint[];
+  summary: (reading: MachineReading) => string[];
+}) {
+  // The card's reading, by a moment in its stretch: a refresh that moves the
+  // reading moves the card, and one that drops it closes the card.
+  const [hover, setHover] = useState(NO_CHART_HOVER);
+  const stretches = points.map((point) => ({
+    first_ms: point.reading.first_reading_ms ?? point.reading.time_ms,
+    last_ms: point.reading.time_ms,
+  }));
+  const hoveredIndex = chartHoveredIndex(stretches, hover);
+  const hovered = hoveredIndex >= 0 ? points[hoveredIndex] : null;
+  // What the live region reads out: the reading the keyboard last picked,
+  // set only when the keyboard picks one, so a refresh does not repeat it.
+  const [announcement, setAnnouncement] = useState("");
+  const update = (event: ChartHoverEvent) => {
+    const next = nextChartHover(hover, event, stretches);
+    setHover(next);
+    if (event.kind === "key" || event.kind === "focus_visible") {
+      const index = chartHoveredIndex(stretches, next);
+      setAnnouncement(index >= 0 ? summary(points[index].reading).join(", ") : "");
+    } else if (event.kind === "blur") {
+      setAnnouncement("");
+    }
+  };
+  const y = (value: number) => CHART_HEIGHT - (Math.max(0, value) / scaleMax) * CHART_HEIGHT;
+  const pointAt = (event: { clientX: number; currentTarget: HTMLElement }) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    if (!box.width || !points.length) return null;
+    const fraction = (event.clientX - box.left) / box.width;
+    const nearest = points.reduce((best, point) =>
+      Math.abs(point.x - fraction) < Math.abs(best.x - fraction) ? point : best,
+    );
+    return Math.abs(nearest.x - fraction) * box.width <= 12 ? nearest : null;
+  };
+  return (
+    <>
+      {/* The chart's name, and its value axis's tick labels against the chart. */}
+      <div className="relative mt-3 min-w-0 text-muted-foreground">
+        <span className="block truncate pr-12 font-medium leading-tight">{label}</span>
+        {ticks.map((tick) => (
+          <span
+            key={tick.value}
+            data-y-tick=""
+            className="absolute right-0 -translate-y-1/2 text-[10px] leading-none tabular-nums"
+            style={{ top: `${(1 - tick.value / scaleMax) * 100}%` }}
+          >
+            {tick.label}
+          </span>
+        ))}
+      </div>
+      <div
+        role="group"
+        tabIndex={0}
+        aria-label={label}
+        className="relative mt-3 h-16 rounded bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        onPointerMove={(event) =>
+          update({
+            kind: "pointer_move",
+            pointer_type: event.pointerType,
+            time_ms: pointAt(event)?.reading.time_ms ?? null,
+          })
+        }
+        onPointerDown={(event) =>
+          update({
+            kind: "pointer_down",
+            pointer_type: event.pointerType,
+            time_ms: pointAt(event)?.reading.time_ms ?? null,
+          })
+        }
+        onPointerUp={(event) =>
+          update({
+            kind: "pointer_up",
+            pointer_type: event.pointerType,
+            time_ms: pointAt(event)?.reading.time_ms ?? null,
+          })
+        }
+        onPointerCancel={(event) => update({ kind: "pointer_cancel", pointer_type: event.pointerType })}
+        onPointerLeave={(event) => update({ kind: "pointer_leave", pointer_type: event.pointerType })}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(":focus-visible")) update({ kind: "focus_visible" });
+        }}
+        onBlur={() => update({ kind: "blur" })}
+        onKeyDown={(event) => {
+          const modified = event.altKey || event.ctrlKey || event.metaKey;
+          if (!points.length || !CHART_KEYS.has(event.key) || modified) return;
+          event.preventDefault();
+          update({ kind: "key", key: event.key, modified });
+        }}
+      >
+        {/* A reading the keyboard picks is read out. */}
+        <div aria-live="polite" className="sr-only">
+          {announcement}
+        </div>
+        {shades.map((shade, index) => (
+          <div
+            key={`shade-${index}`}
+            data-sleep-shade={shade.estimated ? "estimated" : "recorded"}
+            className="pointer-events-none absolute top-0 h-full"
+            style={{
+              left: `${shade.start * 100}%`,
+              width: `${Math.max(0.05, (shade.end - shade.start) * 100)}%`,
+              background: shade.estimated ? ESTIMATED_SLEEP_FILL : SLEEP_FILL,
+            }}
+          />
+        ))}
+        <svg
+          aria-hidden="true"
+          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full overflow-visible"
+        >
+          {ticks.map((tick) => (
+            <line
+              key={`grid-${tick.value}`}
+              data-grid=""
+              x1={0}
+              x2={CHART_WIDTH}
+              y1={y(tick.value)}
+              y2={y(tick.value)}
+              stroke="var(--border)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {limits.map((limit, index) => (
+            <line
+              key={`limit-${index}`}
+              data-limit={limitKind}
+              x1={limit.start * CHART_WIDTH}
+              x2={limit.end * CHART_WIDTH}
+              y1={y(limit.value)}
+              y2={y(limit.value)}
+              stroke="var(--muted-foreground)"
+              strokeDasharray="4 3"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {lines.map((line, index) => (
+            <polyline
+              key={`${line.series}-${index}`}
+              data-series={line.series}
+              fill="none"
+              stroke={line.color}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              // A lone reading is drawn as a dot.
+              points={(line.points.length === 1 ? [line.points[0], line.points[0]] : line.points)
+                .map((point) => `${(point.x * CHART_WIDTH).toFixed(2)},${y(point.value).toFixed(2)}`)
+                .join(" ")}
+            />
+          ))}
+        </svg>
+        {hovered ? (
+          <>
+            <div
+              className="pointer-events-none absolute top-0 h-full w-px bg-foreground/50"
+              style={{ left: `${hovered.x * 100}%` }}
+            />
+            <div
+              role="tooltip"
+              className="pointer-events-none absolute bottom-full z-20 mb-1 w-56 rounded border border-border bg-popover px-2 py-1 text-[10px] leading-4 text-popover-foreground shadow-sm [overflow-wrap:anywhere]"
+              // Centred on the reading, kept inside the chart's track; on a
+              // track narrower than the card (a phone), ending at the track's
+              // right edge and reaching over the labels.
+              style={{
+                left: `clamp(min(0px, calc(100% - 14rem)), calc(${hovered.x * 100}% - 7rem), calc(100% - 14rem))`,
+              }}
+            >
+              {summary(hovered.reading).map((line, index) => (
+                <div key={index} className={index === 1 ? "font-medium" : "tabular-nums"}>
+                  {line}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function LegendSwatch({ background, label }: { background: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span aria-hidden="true" className="inline-block h-2 w-3 rounded-sm" style={{ background }} />
+      {label}
+    </span>
+  );
+}
+
+// A dimmed stage's opacity, while another stage type, or another stage in
+// the breakdown, is hovered.
 const DIMMED_OPACITY = 0.25;
 // Bars move, resize and fade over 0.2 seconds when the focus or the filter
 // changes; not at all for viewers who ask for less motion.
@@ -1119,9 +1476,12 @@ export function TimelineView({
   run,
   forecast,
   nowMs,
+  zone = null,
   expanded,
+  chartsExpanded,
   focus,
   onToggleExpanded,
+  onToggleCharts,
   onHoverPhase,
   onTogglePhase,
   onToggleStage,
@@ -1162,12 +1522,23 @@ export function TimelineView({
     forecast?.finish_p50_ms != null && run.started_ms != null && run.state === "running"
       ? forecast.finish_p50_ms - run.started_ms
       : null;
-  // Under a stage-type filter the picked types' stages are laid end to end
-  // and fill the bar, so the axis counts time in those types, not time since
-  // the start; the forecast band and the present are left off it.
-  const filtered = focus.filter.size > 0;
+  // The machines a stage ran on, named in its Whole run hover text.
+  const machinesOf = (row: TimelineRow): string[] => {
+    const runStart = run.started_ms;
+    if (runStart == null || row.status === "pending") return [];
+    return (run.machines ?? [])
+      .filter((machine) => machine.start_ms < runStart + row.end && machine.end_ms > runStart + row.start)
+      .map(machineName);
+  };
+  // A refresh can drop or renumber the row a stage was hovered or clicked in.
+  const drawnFocus = focusOnDrawnStages(focus, new Set(rows.map((row) => row.stageKey)));
+  // Under a stage-type filter the picked types' stages, and with a stage
+  // clicked that stage alone, are laid end to end and fill the bar, so the
+  // axis counts time in those stages, not time since the start; the forecast
+  // band and the present are left off it.
+  const filtered = focusNarrows(drawnFocus);
   const extents = rows.map((row) => ({ key: row.stageKey, phase: row.phase, start: row.start, end: row.end }));
-  const axis = filtered ? filteredAxis(extents, focus.filter) : null;
+  const axis = filtered ? filteredAxis(extents, drawnFocus.filter, narrowedToStage(drawnFocus)) : null;
   const stageStart = new Map(rows.map((row) => [row.stageKey, row.start]));
   // Where a row sits on the bar's axis; null when the filter hides it.
   const place = (row: TimelineRow): { start: number; end: number } | null => {
@@ -1186,7 +1557,15 @@ export function TimelineView({
   // step the build went through. A stage that ran the solver is followed by
   // its passes and the stretches between them.
   const visible = rows
-    .flatMap((row) => (run.started_ms == null ? [row] : [row, ...solverRows(row, run, run.started_ms, elapsed)]))
+    .flatMap((row) =>
+      run.started_ms == null
+        ? [row]
+        : [
+            row,
+            ...nestedRows(row, run, run.started_ms, elapsed),
+            ...solverRows(row, run, run.started_ms, elapsed),
+          ],
+    )
     .filter((row) => place(row) != null);
   const ticks = axisTicks(domain);
 
@@ -1198,8 +1577,18 @@ export function TimelineView({
     );
   }
   const totals = phaseTotals(run, nowMs).phases;
-  // A refresh can drop or renumber the row a stage was hovered or clicked in.
-  const drawnFocus = focusOnDrawnStages(focus, new Set(rows.map((row) => row.stageKey)));
+  const machine = machineParts({
+    run,
+    nowMs,
+    zone,
+    domain,
+    pct,
+    width,
+    extents,
+    axis,
+    chartsExpanded,
+    onToggleCharts,
+  });
   const focusOf = (row: TimelineRow) => stageFocus(drawnFocus, row.phase, row.stageKey);
 
   const barStyle = (row: TimelineRow): CSSProperties => {
@@ -1248,7 +1637,7 @@ export function TimelineView({
                 className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-90" : ""}`}
               />
             </button>
-            <span className="truncate">{wholeRunLabel(focus.filter)}</span>
+            <span className="truncate">{wholeRunLabel(drawnFocus)}</span>
           </div>
           <div ref={measureArea} className="relative h-6 rounded bg-muted/40">
             {rows.map((row) => {
@@ -1266,7 +1655,7 @@ export function TimelineView({
                   key={`whole-${row.key}`}
                   className={`absolute top-0 h-full ${SEGMENT_MOTION} ${row.status === "running" ? "bar-running" : ""}`}
                   style={style}
-                  title={`${row.label}: ${fmtDuration(row.end - row.start)}`}
+                  title={[`${row.label}: ${fmtDuration(row.end - row.start)}`, ...machinesOf(row)].join("\n")}
                 />
               );
             })}
@@ -1278,6 +1667,7 @@ export function TimelineView({
               />
             ) : null}
             {!filtered && run.state === "running" ? <NowLine left={pct(elapsed)} /> : null}
+            {machine.sleepBands}
           </div>
 
           {expanded
@@ -1302,14 +1692,23 @@ export function TimelineView({
               })
             : null}
 
-          <div />
-          <div className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground">
-            {ticks.map((tick) => (
-              <span key={tick} className="absolute -translate-x-1/2 pt-0.5 tabular-nums" style={{ left: pct(tick) }}>
-                {tickLabel(tick)}
-              </span>
-            ))}
-          </div>
+          {machine.rows}
+
+          {machine.chartsClosed ? null : (
+            <>
+              <div />
+              <div
+                data-time-axis=""
+                className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground"
+              >
+                {ticks.map((tick) => (
+                  <span key={tick} className="absolute -translate-x-1/2 pt-0.5 tabular-nums" style={{ left: pct(tick) }}>
+                    {tickLabel(tick)}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         <div className="mt-3">
           <PhaseLegend
@@ -1323,6 +1722,207 @@ export function TimelineView({
       </div>
     </SectionCard>
   );
+}
+
+// The Timeline's build machine parts: the sleep bands drawn in the Whole run
+// bar, and the Memory and CPU charts under a caret of their own, all on the
+// stages' axis (under a stage-type filter or with a stage clicked, only what
+// falls in the shown stages).
+function machineParts({
+  run,
+  nowMs,
+  zone,
+  domain,
+  pct,
+  width,
+  extents,
+  axis,
+  chartsExpanded,
+  onToggleCharts,
+}: {
+  run: BuildTimeline;
+  nowMs: number;
+  zone: ViewerZone | null;
+  domain: number;
+  pct: (ms: number) => string;
+  width: (start: number, end: number) => string;
+  extents: StageExtent[];
+  axis: ReturnType<typeof filteredAxis> | null;
+  chartsExpanded: boolean;
+  onToggleCharts: () => void;
+}): { sleepBands: ReactNode; rows: ReactNode; chartsClosed: boolean } {
+  const runStart = run.started_ms;
+  const readings = run.readings ?? [];
+  const sleeps = run.sleeps ?? [];
+  const machines = run.machines ?? [];
+  if (runStart == null || (!readings.length && !sleeps.length)) {
+    return { sleepBands: null, rows: null, chartsClosed: false };
+  }
+  // With the charts closed, their legend, the sleeps' too, and the time axis
+  // are hidden with them; a run without readings has no charts to open.
+  const chartsClosed = readings.length > 0 && !chartsExpanded;
+  // A stretch of the run, and a moment in it, on the drawn axis.
+  const intervals = (startMs: number, endMs: number) =>
+    axis
+      ? axisIntervals(startMs - runStart, endMs - runStart, extents, axis)
+      : [{ start: startMs - runStart, end: endMs - runStart }];
+  const offset = (ms: number) => (axis ? axisOffset(ms - runStart, extents, axis) : ms - runStart);
+  const fraction = (ms: number) => Math.min(1, Math.max(0, ms / domain));
+
+  const sleepBands = sleeps.flatMap((sleep, index) =>
+    intervals(sleep.start_ms, sleep.end_ms).map((part, partIndex) => (
+      <div
+        key={`sleep-${index}-${partIndex}`}
+        data-sleep={sleep.estimated ? "estimated" : "recorded"}
+        className="absolute top-0 h-full"
+        style={{
+          left: pct(part.start),
+          width: width(part.start, part.end),
+          background: sleep.estimated ? ESTIMATED_SLEEP_FILL : SLEEP_FILL,
+        }}
+        title={sleepTitle(sleep, nowMs, zone)}
+      />
+    )),
+  );
+  const shades = sleeps.flatMap((sleep) =>
+    intervals(sleep.start_ms, sleep.end_ms).map((part) => ({
+      start: fraction(part.start),
+      end: fraction(part.end),
+      estimated: sleep.estimated,
+    })),
+  );
+
+  const machineOf = (reading: MachineReading) =>
+    machines.find((candidate) => candidate.producer_id === reading.producer_id) ?? null;
+  // A line per stretch of readings, broken where a reading is off the axis.
+  const linesOf = (series: string, color: string, value: (reading: MachineReading) => number | null) =>
+    readingRuns(readings, sleeps).flatMap((stretch) => {
+      const lines: ChartLine[] = [];
+      let current: ChartLine["points"] = [];
+      for (const reading of stretch) {
+        const at = offset(reading.time_ms);
+        const measured = value(reading);
+        if (at == null || measured == null) {
+          if (current.length) lines.push({ series, color, points: current });
+          current = [];
+          continue;
+        }
+        current.push({ x: fraction(at), value: measured });
+      }
+      if (current.length) lines.push({ series, color, points: current });
+      return lines;
+    });
+  const points: ChartPoint[] = readings.flatMap((reading) => {
+    const at = offset(reading.time_ms);
+    return at == null ? [] : [{ x: fraction(at), reading }];
+  });
+  const summary = (reading: MachineReading) => readingSummary(reading, machineOf(reading), nowMs, zone);
+
+  const memoryLimits = machines.flatMap((candidate) => {
+    const value = memoryLimitBytes(candidate);
+    return value == null
+      ? []
+      : intervals(candidate.start_ms, candidate.end_ms).map((part) => ({
+          start: fraction(part.start),
+          end: fraction(part.end),
+          value,
+        }));
+  });
+  const memoryMax = Math.max(
+    1,
+    ...memoryLimits.map((limit) => limit.value),
+    ...readings.map((reading) => reading.memory_peak_bytes ?? reading.memory_bytes ?? 0),
+  );
+  const cpuShare = (reading: MachineReading) => {
+    const cores = machineOf(reading) ? availableCores(machineOf(reading)!) : null;
+    return reading.cpu_cores != null && cores ? reading.cpu_cores / cores : null;
+  };
+  const cpuMax = Math.max(1, ...readings.map((reading) => cpuShare(reading) ?? 0));
+
+  const chartsToggle = readings.length ? (
+    <>
+      <div className="flex min-w-0 items-center gap-1 font-medium text-muted-foreground">
+        <button
+          type="button"
+          aria-expanded={chartsExpanded}
+          aria-label={chartsExpanded ? "Hide memory and CPU" : "Show memory and CPU"}
+          onClick={onToggleCharts}
+          className="-ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-muted"
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={`h-3.5 w-3.5 transition-transform ${chartsExpanded ? "rotate-90" : ""}`}
+          />
+        </button>
+        <span className="truncate">Memory and CPU</span>
+      </div>
+      <div />
+    </>
+  ) : null;
+
+  const charts = readings.length && chartsExpanded ? (
+    <>
+      <MachineChart
+        label="Memory"
+        ticks={scaleTicks(memoryMax / 1e9).map((gigabytes) => ({ value: gigabytes * 1e9, label: `${gigabytes} GB` }))}
+        scaleMax={memoryMax}
+        lines={linesOf("build-memory", BUILD_COLOR, (reading) => reading.memory_bytes)}
+        limits={memoryLimits}
+        limitKind="memory"
+        shades={shades}
+        points={points}
+        summary={summary}
+      />
+      <MachineChart
+        label="CPU"
+        ticks={scaleTicks(cpuMax * 100).map((percent) => ({ value: percent / 100, label: `${percent}%` }))}
+        scaleMax={cpuMax}
+        lines={[
+          ...linesOf("machine-cpu", MACHINE_COLOR, (reading) => reading.machine_cpu_share),
+          ...linesOf("build-cpu", BUILD_COLOR, cpuShare),
+        ]}
+        limits={[]}
+        limitKind="cpu"
+        shades={shades}
+        points={points}
+        summary={summary}
+      />
+    </>
+  ) : null;
+  const legend =
+    !chartsClosed && (charts || sleeps.length) ? (
+      <>
+        <div />
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+          {charts ? (
+            <>
+              <LegendSwatch background={BUILD_COLOR} label="Build" />
+              <LegendSwatch background={MACHINE_COLOR} label="Machine CPU" />
+              <LegendSwatch
+                background="repeating-linear-gradient(90deg, var(--muted-foreground) 0 4px, transparent 4px 7px)"
+                label="Limit"
+              />
+            </>
+          ) : null}
+          {sleeps.some((sleep) => !sleep.estimated) ? <LegendSwatch background={SLEEP_FILL} label="Asleep" /> : null}
+          {sleeps.some((sleep) => sleep.estimated) ? (
+            <LegendSwatch background={ESTIMATED_SLEEP_FILL} label="Asleep (estimated)" />
+          ) : null}
+        </div>
+      </>
+    ) : null;
+
+  return {
+    sleepBands,
+    rows: (
+      <>
+        {chartsToggle}
+        {charts}
+        {legend}
+      </>
+    ),
+    chartsClosed,
+  };
 }
 
 function NowLine({ left }: { left: string }) {
@@ -1348,11 +1948,10 @@ function TimelineStageRow({
 }: {
   row: TimelineRow;
   barStyle: CSSProperties;
-  // Drawn faint while another stage type is hovered or another stage is
-  // selected.
+  // Drawn faint while another stage type, or another stage, is hovered.
   dimmed: boolean;
-  // This stage is the one selected; clicking its name selects it or clears
-  // the selection.
+  // This stage is the one clicked; clicking its name narrows the Timeline to
+  // its stage, or shows every stage again.
   selected: boolean;
   onSelect: () => void;
   // The pointer, or keyboard focus, entering (true) or leaving (false) the row.
@@ -1406,8 +2005,9 @@ function TimelineStageRow({
         }}
         onBlur={() => onHover(false)}
         className={`flex min-w-0 items-center gap-1.5 rounded text-left hover:bg-muted/60 ${
-          selected && !row.segment ? "bg-muted font-medium" : ""
-        } ${row.segment ? "pl-3.5 text-muted-foreground" : ""}`}
+          selected && !row.segment && !row.depth ? "bg-muted font-medium" : ""
+        } ${row.segment || row.depth ? "text-muted-foreground" : ""} ${row.segment ? "pl-3.5" : ""}`}
+        style={row.depth ? { paddingLeft: `${row.depth * 0.875}rem` } : undefined}
       >
         {running ? (
           // A pulsing dot marks what is running now.
