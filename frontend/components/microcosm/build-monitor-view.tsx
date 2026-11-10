@@ -1283,14 +1283,25 @@ function MachineChart({
   // The card's reading, by a moment in its stretch: a refresh that moves the
   // reading moves the card, and one that drops it closes the card.
   const [hover, setHover] = useState(NO_CHART_HOVER);
-  const tooltipId = useId();
   const stretches = points.map((point) => ({
     first_ms: point.reading.first_reading_ms ?? point.reading.time_ms,
     last_ms: point.reading.time_ms,
   }));
   const hoveredIndex = chartHoveredIndex(stretches, hover);
   const hovered = hoveredIndex >= 0 ? points[hoveredIndex] : null;
-  const update = (event: ChartHoverEvent) => setHover((current) => nextChartHover(current, event, stretches));
+  // What the live region reads out: the reading the keyboard last picked,
+  // set only when the keyboard picks one, so a refresh does not repeat it.
+  const [announcement, setAnnouncement] = useState("");
+  const update = (event: ChartHoverEvent) => {
+    const next = nextChartHover(hover, event, stretches);
+    setHover(next);
+    if (event.kind === "key" || event.kind === "focus_visible") {
+      const index = chartHoveredIndex(stretches, next);
+      setAnnouncement(index >= 0 ? summary(points[index].reading).join(", ") : "");
+    } else if (event.kind === "blur") {
+      setAnnouncement("");
+    }
+  };
   const y = (value: number) => CHART_HEIGHT - (Math.max(0, value) / scaleMax) * CHART_HEIGHT;
   const pointAt = (event: { clientX: number; currentTarget: HTMLElement }) => {
     const box = event.currentTarget.getBoundingClientRect();
@@ -1311,7 +1322,6 @@ function MachineChart({
         role="group"
         tabIndex={0}
         aria-label={label}
-        aria-describedby={hovered ? tooltipId : undefined}
         className="relative h-10 rounded bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-primary"
         onPointerMove={(event) =>
           update({
@@ -1327,20 +1337,29 @@ function MachineChart({
             time_ms: pointAt(event)?.reading.time_ms ?? null,
           })
         }
+        onPointerUp={(event) =>
+          update({
+            kind: "pointer_up",
+            pointer_type: event.pointerType,
+            time_ms: pointAt(event)?.reading.time_ms ?? null,
+          })
+        }
+        onPointerCancel={(event) => update({ kind: "pointer_cancel", pointer_type: event.pointerType })}
         onPointerLeave={(event) => update({ kind: "pointer_leave", pointer_type: event.pointerType })}
         onFocus={(event) => {
           if (event.currentTarget.matches(":focus-visible")) update({ kind: "focus_visible" });
         }}
         onBlur={() => update({ kind: "blur" })}
         onKeyDown={(event) => {
-          if (!points.length || !CHART_KEYS.has(event.key)) return;
+          const modified = event.altKey || event.ctrlKey || event.metaKey;
+          if (!points.length || !CHART_KEYS.has(event.key) || modified) return;
           event.preventDefault();
-          update({ kind: "key", key: event.key, modified: event.altKey || event.ctrlKey || event.metaKey });
+          update({ kind: "key", key: event.key, modified });
         }}
       >
         {/* A reading the keyboard picks is read out. */}
         <div aria-live="polite" className="sr-only">
-          {hovered && hover.opened_by === "keyboard" ? summary(hovered.reading).join(", ") : ""}
+          {announcement}
         </div>
         {shades.map((shade, index) => (
           <div
@@ -1398,7 +1417,6 @@ function MachineChart({
               style={{ left: `${hovered.x * 100}%` }}
             />
             <div
-              id={tooltipId}
               role="tooltip"
               className={`pointer-events-none absolute bottom-full z-20 mb-1 whitespace-nowrap rounded border border-border bg-popover px-2 py-1 text-[10px] leading-4 text-popover-foreground shadow-sm ${
                 hovered.x > 0.6 ? "-translate-x-full" : ""

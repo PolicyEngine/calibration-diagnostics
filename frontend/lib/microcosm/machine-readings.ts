@@ -58,7 +58,9 @@ export interface MachineSegment {
   request: ModalRequest | null;
 }
 
-// The most readings a run response carries.
+// The number of readings a run response's readings are downsampled toward:
+// about half this, plus one for each gap, producer change and change of open
+// stages, which in a long run adds a few hundred at most.
 export const READING_LIMIT = 600;
 // A gap at least this long between a producer's heartbeats is a sleep (for a
 // producer from before readings) or a break in the charts.

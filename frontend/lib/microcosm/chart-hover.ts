@@ -1,7 +1,7 @@
 import { pointerHovers } from "@/lib/microcosm/timeline-focus";
 
 // Which reading a Timeline chart's hover card shows, and who opened it: a
-// hovering pointer (mouse or pen), a touch, or the keyboard. Kept apart from
+// hovering pointer (mouse or pen), a tap (finger or pen), or the keyboard. Kept apart from
 // the component so each change can be checked without a browser.
 
 // One drawn reading, by the stretch of time it stands for: a single reading's
@@ -14,7 +14,7 @@ export interface ChartStretch {
 export interface ChartHover {
   // A moment inside the shown reading's stretch; null when no card is open.
   time_ms: number | null;
-  opened_by: "pointer" | "touch" | "keyboard" | null;
+  opened_by: "pointer" | "tap" | "keyboard" | null;
 }
 
 export const NO_CHART_HOVER: ChartHover = { time_ms: null, opened_by: null };
@@ -48,11 +48,14 @@ export const CHART_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End", "Es
 // The card after one event:
 // - a hovering pointer shows the reading it rests near, and closes a card it
 //   opened when it rests away from every reading or leaves;
-// - a touch shows the reading it lands on and keeps it after the finger
-//   lifts, until a tap away from every reading or the chart losing focus;
+// - a tap (a finger or pen lifting where it landed) shows the reading it
+//   lifts at and keeps it, until a tap away from every reading or the chart
+//   losing focus; a touch the browser takes over to scroll opens nothing and
+//   closes a tapped card, since the chart never gets focus to lose;
 // - keyboard focus shows the newest reading, the arrows, Home and End step
 //   through them (from the newest when no card is open), and Escape closes
-//   the card; a pointer leaving does not close a card the keyboard opened.
+//   the card; a pointer leaving does not close a card the keyboard opened. A
+//   key pressed with Alt, Control or Meta is left to the browser.
 export function nextChartHover(
   hover: ChartHover,
   event: ChartHoverEvent,
@@ -61,22 +64,25 @@ export function nextChartHover(
   const last = stretches.length - 1;
   switch (event.kind) {
     case "pointer_move":
-      if (!pointerHovers(event.pointer_type)) return event.time_ms == null ? hover : shown(event.time_ms, "touch");
+      // A finger's movement is a scroll or a tap still in progress.
+      if (!pointerHovers(event.pointer_type)) return hover;
       if (event.time_ms != null) return shown(event.time_ms, "pointer");
       return hover.opened_by === "pointer" ? NO_CHART_HOVER : hover;
     case "pointer_down":
-      if (pointerHovers(event.pointer_type)) return hover;
-      return shown(event.time_ms, "touch");
+      return hover;
+    case "pointer_up":
+      // A mouse button adds nothing to its hover.
+      return event.pointer_type === "mouse" ? hover : shown(event.time_ms, "tap");
+    case "pointer_cancel":
+      return hover.opened_by === "tap" ? NO_CHART_HOVER : hover;
     case "pointer_leave":
       return pointerHovers(event.pointer_type) && hover.opened_by === "pointer" ? NO_CHART_HOVER : hover;
     case "focus_visible":
       return last < 0 ? hover : shown(stretches[last].last_ms, "keyboard");
     case "blur":
       return NO_CHART_HOVER;
-    case "pointer_up":
-    case "pointer_cancel":
-      return hover;
     case "key": {
+      if (event.modified) return hover;
       if (event.key === "Escape") return NO_CHART_HOVER;
       if (last < 0 || !CHART_KEYS.has(event.key)) return hover;
       const current = hoveredIndex(stretches, hover);
