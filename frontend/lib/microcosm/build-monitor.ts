@@ -66,7 +66,7 @@ export interface StageSpan {
   depth: number;
   // False for a completion that arrived with no start, such as a graph
   // node's: it has a span, but is not a stage nested in the open one.
-  start_recorded?: boolean;
+  start_recorded: boolean;
   start_ms: number;
   // null while the stage is still running.
   end_ms: number | null;
@@ -208,8 +208,8 @@ export interface BuildTimeline {
   resources: ResourceSnapshot | null;
   identity: RunIdentity | null;
   delivery: RunDelivery | null;
-  // The build machine's readings (at most `READING_LIMIT`, and none in a run
-  // list), its sleeps and the machine each producer ran on.
+  // The build machine's readings (downsampled to about `READING_LIMIT`, and
+  // none in a run list), its sleeps and the machine each producer ran on.
   readings: MachineReading[];
   sleeps: SleepBand[];
   machines: MachineSegment[];
@@ -504,6 +504,7 @@ function newSpan(
   return {
     stage,
     depth,
+    start_recorded: true,
     start_ms: startMs,
     end_ms: null,
     status: "running",
@@ -1056,6 +1057,7 @@ export function childSpans(timeline: BuildTimeline, parent: StageSpan): StageSpa
   const children: StageSpan[] = [];
   for (const span of timeline.spans.slice(index + 1)) {
     if (span.depth <= parent.depth) break;
+    // A response from a server older than the field has none.
     if (span.start_recorded !== false) children.push(span);
   }
   return children;

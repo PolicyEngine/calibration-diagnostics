@@ -176,9 +176,10 @@ function merged(bucket: MachineReading[]): MachineReading {
   };
 }
 
-// At most `limit` readings, each standing for a stretch of consecutive
-// readings of one producer, with no gap of `READING_GAP_MS` or more inside it,
-// and keeping its peaks.
+// At most about `limit` readings, each standing for a stretch of consecutive
+// readings of one producer and one set of open stages, with no gap of
+// `READING_GAP_MS` or more inside it, and keeping its peaks. A run with more
+// such stretches than `limit` keeps one reading for each.
 export function downsampleReadings(readings: MachineReading[], limit: number = READING_LIMIT): MachineReading[] {
   if (readings.length <= limit) return readings;
   const size = Math.ceil(readings.length / Math.max(1, Math.floor(limit / 2)));
@@ -190,6 +191,7 @@ export function downsampleReadings(readings: MachineReading[], limit: number = R
       previous &&
       (bucket.length >= size ||
         previous.producer_id !== reading.producer_id ||
+        previous.stages.join("\u0000") !== reading.stages.join("\u0000") ||
         reading.first_reading_ms - previous.time_ms >= READING_GAP_MS)
     ) {
       kept.push(merged(bucket));
@@ -301,19 +303,19 @@ export function machineSegments(events: readonly JsonObject[]): MachineSegment[]
 }
 
 // The stretches a chart draws as one line: consecutive readings of one
-// producer, broken at a sleep and at a gap of `READING_GAP_MS` or more. A gap
-// runs from a reading to the first reading the next one stands for.
+// producer, broken at a gap of `READING_GAP_MS` or more (from a reading to the
+// first reading the next one stands for) and before a reading whose stretch
+// holds or follows a sleep.
 export function readingRuns(readings: readonly MachineReading[], sleeps: readonly SleepBand[]): MachineReading[][] {
   const runs: MachineReading[][] = [];
   let current: MachineReading[] = [];
   for (const reading of readings) {
     const previous = current[current.length - 1];
-    const gapEnd = reading.first_reading_ms;
     const breaks =
       previous != null &&
       (previous.producer_id !== reading.producer_id ||
-        gapEnd - previous.time_ms >= READING_GAP_MS ||
-        sleeps.some((sleep) => sleep.start_ms < gapEnd && sleep.end_ms > previous.time_ms));
+        reading.first_reading_ms - previous.time_ms >= READING_GAP_MS ||
+        sleeps.some((sleep) => sleep.start_ms < reading.time_ms && sleep.end_ms > previous.time_ms));
     if (breaks) {
       runs.push(current);
       current = [];

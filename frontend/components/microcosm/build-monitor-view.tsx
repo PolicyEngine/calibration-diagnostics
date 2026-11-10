@@ -38,6 +38,13 @@ import {
   type StageExtent,
 } from "@/lib/microcosm/timeline-layout";
 import {
+  CHART_KEYS,
+  type ChartHoverEvent,
+  hoveredIndex as chartHoveredIndex,
+  NO_CHART_HOVER,
+  nextChartHover,
+} from "@/lib/microcosm/chart-hover";
+import {
   availableCores,
   type MachineReading,
   type MachineSegment,
@@ -1273,12 +1280,17 @@ function MachineChart({
   points: ChartPoint[];
   summary: (reading: MachineReading) => string[];
 }) {
-  // The hovered reading, by its time: a refresh that moves or drops it moves
-  // or closes the card with it.
-  const [hoveredTime, setHoveredTime] = useState<number | null>(null);
+  // The card's reading, by a moment in its stretch: a refresh that moves the
+  // reading moves the card, and one that drops it closes the card.
+  const [hover, setHover] = useState(NO_CHART_HOVER);
   const tooltipId = useId();
-  const hoveredIndex = hoveredTime == null ? -1 : points.findIndex((point) => point.reading.time_ms === hoveredTime);
+  const stretches = points.map((point) => ({
+    first_ms: point.reading.first_reading_ms ?? point.reading.time_ms,
+    last_ms: point.reading.time_ms,
+  }));
+  const hoveredIndex = chartHoveredIndex(stretches, hover);
   const hovered = hoveredIndex >= 0 ? points[hoveredIndex] : null;
+  const update = (event: ChartHoverEvent) => setHover((current) => nextChartHover(current, event, stretches));
   const y = (value: number) => CHART_HEIGHT - (Math.max(0, value) / scaleMax) * CHART_HEIGHT;
   const pointAt = (event: { clientX: number; currentTarget: HTMLElement }) => {
     const box = event.currentTarget.getBoundingClientRect();
@@ -1301,39 +1313,35 @@ function MachineChart({
         aria-label={label}
         aria-describedby={hovered ? tooltipId : undefined}
         className="relative h-10 rounded bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        onPointerMove={(event) => setHoveredTime(pointAt(event)?.reading.time_ms ?? null)}
-        // A tap shows the reading under it; a touch does not hover.
-        onPointerDown={(event) => setHoveredTime(pointAt(event)?.reading.time_ms ?? null)}
-        onPointerLeave={() => setHoveredTime(null)}
+        onPointerMove={(event) =>
+          update({
+            kind: "pointer_move",
+            pointer_type: event.pointerType,
+            time_ms: pointAt(event)?.reading.time_ms ?? null,
+          })
+        }
+        onPointerDown={(event) =>
+          update({
+            kind: "pointer_down",
+            pointer_type: event.pointerType,
+            time_ms: pointAt(event)?.reading.time_ms ?? null,
+          })
+        }
+        onPointerLeave={(event) => update({ kind: "pointer_leave", pointer_type: event.pointerType })}
         onFocus={(event) => {
-          if (event.currentTarget.matches(":focus-visible") && points.length) {
-            setHoveredTime(points[points.length - 1].reading.time_ms);
-          }
+          if (event.currentTarget.matches(":focus-visible")) update({ kind: "focus_visible" });
         }}
-        onBlur={() => setHoveredTime(null)}
+        onBlur={() => update({ kind: "blur" })}
         onKeyDown={(event) => {
-          if (!points.length) return;
-          const last = points.length - 1;
-          const current = hoveredIndex >= 0 ? hoveredIndex : last;
-          const next =
-            event.key === "ArrowLeft"
-              ? Math.max(0, current - 1)
-              : event.key === "ArrowRight"
-                ? Math.min(last, current + 1)
-                : event.key === "Home"
-                  ? 0
-                  : event.key === "End"
-                    ? last
-                    : null;
-          if (event.key === "Escape") {
-            setHoveredTime(null);
-            return;
-          }
-          if (next == null) return;
+          if (!points.length || !CHART_KEYS.has(event.key)) return;
           event.preventDefault();
-          setHoveredTime(points[next].reading.time_ms);
+          update({ kind: "key", key: event.key });
         }}
       >
+        {/* A reading the keyboard picks is read out. */}
+        <div aria-live="polite" className="sr-only">
+          {hovered && hover.opened_by === "keyboard" ? summary(hovered.reading).join(", ") : ""}
+        </div>
         {shades.map((shade, index) => (
           <div
             key={`shade-${index}`}
