@@ -53,7 +53,9 @@ import {
   type SleepBand,
 } from "@/lib/microcosm/machine-readings";
 import {
+  focusNarrows,
   focusOnDrawnStages,
+  narrowedToStage,
   NO_FOCUS,
   pointerHovers,
   stageFocus,
@@ -1093,12 +1095,13 @@ function TimelineCard({
   zone: ViewerZone | null;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [chartsExpanded, setChartsExpanded] = useState(false);
   const [filter, setFilter] = useState<ReadonlySet<BuildPhase>>(NO_FOCUS.filter);
   const [hoveredPhase, setHoveredPhase] = useState<BuildPhase | null>(null);
   const [selected, setSelected] = useState<{ stageKey: string; phase: BuildPhase } | null>(null);
   const [hoveredStage, setHoveredStage] = useState<string | null>(null);
-  // Another run starts with nothing filtered or selected; the breakdown stays
-  // open or closed.
+  // Another run starts with nothing filtered or selected; the breakdown and
+  // the charts stay open or closed.
   useEffect(() => {
     setFilter(NO_FOCUS.filter);
     setHoveredPhase(null);
@@ -1112,6 +1115,7 @@ function TimelineCard({
       nowMs={nowMs}
       zone={zone}
       expanded={expanded}
+      chartsExpanded={chartsExpanded}
       focus={{
         filter,
         hoveredPhase,
@@ -1125,6 +1129,7 @@ function TimelineCard({
         setExpanded((open) => !open);
         setHoveredStage(null);
       }}
+      onToggleCharts={() => setChartsExpanded((open) => !open)}
       onHoverPhase={setHoveredPhase}
       onTogglePhase={(phase) => {
         setFilter((current) => togglePhase(current, phase));
@@ -1149,8 +1154,11 @@ export interface TimelineViewProps {
   zone?: ViewerZone | null;
   // Whether the per-stage breakdown is open.
   expanded: boolean;
+  // Whether the Memory and CPU charts are open; closed when not given.
+  chartsExpanded?: boolean;
   focus: TimelineFocus;
   onToggleExpanded: () => void;
+  onToggleCharts?: () => void;
   onHoverPhase: (phase: BuildPhase | null) => void;
   onTogglePhase: (phase: BuildPhase) => void;
   onToggleStage: (stageKey: string, phase: BuildPhase) => void;
@@ -1181,6 +1189,9 @@ export function readingSummary(
     );
   }
   if (reading.machine_cpu_share != null) lines.push(`Machine ${Math.round(reading.machine_cpu_share * 100)}% busy`);
+  if (machine) {
+    lines.push(machine.modal_task_id ? `${machineLabel(machine)} · ${machine.modal_task_id}` : machineLabel(machine));
+  }
   return lines;
 }
 
@@ -1195,7 +1206,7 @@ function osName(machine: MachineSegment): string | null {
   return machine.os_version ? `${name} ${machine.os_version}` : name;
 }
 
-// The Machine row's name for a producer's machine: a Modal container by its
+// A reading's machine as its hover card names it: a Modal container by its
 // resource class, request and region; any other by its system, processor,
 // CPUs and memory.
 function machineLabel(machine: MachineSegment): string {
@@ -1445,8 +1456,8 @@ function LegendSwatch({ background, label }: { background: string; label: string
   );
 }
 
-// A dimmed stage's opacity, while another stage type is hovered or another
-// stage is selected.
+// A dimmed stage's opacity, while another stage type, or another stage in
+// the breakdown, is hovered.
 const DIMMED_OPACITY = 0.25;
 // Bars move, resize and fade over 0.2 seconds when the focus or the filter
 // changes; not at all for viewers who ask for less motion.
@@ -1460,8 +1471,10 @@ export function TimelineView({
   nowMs,
   zone = null,
   expanded,
+  chartsExpanded = false,
   focus,
   onToggleExpanded,
+  onToggleCharts = () => {},
   onHoverPhase,
   onTogglePhase,
   onToggleStage,
@@ -1502,12 +1515,15 @@ export function TimelineView({
     forecast?.finish_p50_ms != null && run.started_ms != null && run.state === "running"
       ? forecast.finish_p50_ms - run.started_ms
       : null;
-  // Under a stage-type filter the picked types' stages are laid end to end
-  // and fill the bar, so the axis counts time in those types, not time since
-  // the start; the forecast band and the present are left off it.
-  const filtered = focus.filter.size > 0;
+  // A refresh can drop or renumber the row a stage was hovered or clicked in.
+  const drawnFocus = focusOnDrawnStages(focus, new Set(rows.map((row) => row.stageKey)));
+  // Under a stage-type filter the picked types' stages, and with a stage
+  // clicked that stage alone, are laid end to end and fill the bar, so the
+  // axis counts time in those stages, not time since the start; the forecast
+  // band and the present are left off it.
+  const filtered = focusNarrows(drawnFocus);
   const extents = rows.map((row) => ({ key: row.stageKey, phase: row.phase, start: row.start, end: row.end }));
-  const axis = filtered ? filteredAxis(extents, focus.filter) : null;
+  const axis = filtered ? filteredAxis(extents, drawnFocus.filter, narrowedToStage(drawnFocus)) : null;
   const stageStart = new Map(rows.map((row) => [row.stageKey, row.start]));
   // Where a row sits on the bar's axis; null when the filter hides it.
   const place = (row: TimelineRow): { start: number; end: number } | null => {
@@ -1555,9 +1571,9 @@ export function TimelineView({
     width,
     extents,
     axis,
+    chartsExpanded,
+    onToggleCharts,
   });
-  // A refresh can drop or renumber the row a stage was hovered or clicked in.
-  const drawnFocus = focusOnDrawnStages(focus, new Set(rows.map((row) => row.stageKey)));
   const focusOf = (row: TimelineRow) => stageFocus(drawnFocus, row.phase, row.stageKey);
 
   const barStyle = (row: TimelineRow): CSSProperties => {
@@ -1606,7 +1622,7 @@ export function TimelineView({
                 className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-90" : ""}`}
               />
             </button>
-            <span className="truncate">{wholeRunLabel(focus.filter)}</span>
+            <span className="truncate">{wholeRunLabel(drawnFocus)}</span>
           </div>
           <div ref={measureArea} className="relative h-6 rounded bg-muted/40">
             {rows.map((row) => {
@@ -1687,8 +1703,9 @@ export function TimelineView({
 }
 
 // The Timeline's build machine parts: the sleep bands drawn in the Whole run
-// bar, and the Machine, Memory and CPU rows, all on the stages' axis (under a
-// stage-type filter, only what falls in the shown stages).
+// bar, and the Memory and CPU charts under a caret of their own, all on the
+// stages' axis (under a stage-type filter or with a stage clicked, only what
+// falls in the shown stages).
 function machineParts({
   run,
   nowMs,
@@ -1698,6 +1715,8 @@ function machineParts({
   width,
   extents,
   axis,
+  chartsExpanded,
+  onToggleCharts,
 }: {
   run: BuildTimeline;
   nowMs: number;
@@ -1707,12 +1726,14 @@ function machineParts({
   width: (start: number, end: number) => string;
   extents: StageExtent[];
   axis: ReturnType<typeof filteredAxis> | null;
+  chartsExpanded: boolean;
+  onToggleCharts: () => void;
 }): { sleepBands: ReactNode; rows: ReactNode } {
   const runStart = run.started_ms;
   const readings = run.readings ?? [];
   const sleeps = run.sleeps ?? [];
   const machines = run.machines ?? [];
-  if (runStart == null || (!readings.length && !sleeps.length && !machines.length)) {
+  if (runStart == null || (!readings.length && !sleeps.length)) {
     return { sleepBands: null, rows: null };
   }
   // A stretch of the run, and a moment in it, on the drawn axis.
@@ -1793,31 +1814,28 @@ function machineParts({
   };
   const cpuMax = Math.max(1, ...readings.map((reading) => cpuShare(reading) ?? 0));
 
-  const machineRow = machines.length ? (
+  const chartsToggle = readings.length ? (
     <>
-      <div className="truncate font-medium text-muted-foreground">Machine</div>
-      <div className="relative h-5 overflow-hidden rounded bg-muted/40">
-        {machines.flatMap((candidate, index) =>
-          intervals(candidate.start_ms, candidate.end_ms).map((part, partIndex) => (
-            <div
-              key={`machine-${index}-${partIndex}`}
-              className="absolute top-0 h-full overflow-hidden border-l-2 border-foreground/30 pl-1 text-[10px] leading-5"
-              style={{ left: pct(part.start), width: width(part.start, part.end) }}
-              title={
-                candidate.modal_task_id
-                  ? `${machineLabel(candidate)} · ${candidate.modal_task_id}`
-                  : machineLabel(candidate)
-              }
-            >
-              {partIndex === 0 ? <span className="whitespace-nowrap">{machineLabel(candidate)}</span> : null}
-            </div>
-          )),
-        )}
+      <div className="flex min-w-0 items-center gap-1 font-medium text-muted-foreground">
+        <button
+          type="button"
+          aria-expanded={chartsExpanded}
+          aria-label={chartsExpanded ? "Hide memory and CPU" : "Show memory and CPU"}
+          onClick={onToggleCharts}
+          className="-ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-muted"
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={`h-3.5 w-3.5 transition-transform ${chartsExpanded ? "rotate-90" : ""}`}
+          />
+        </button>
+        <span className="truncate">Memory and CPU</span>
       </div>
+      <div />
     </>
   ) : null;
 
-  const charts = readings.length ? (
+  const charts = readings.length && chartsExpanded ? (
     <>
       <MachineChart
         label="Memory"
@@ -1847,11 +1865,11 @@ function machineParts({
     </>
   ) : null;
   const legend =
-    readings.length || sleeps.length ? (
+    charts || sleeps.length ? (
       <>
         <div />
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-          {readings.length ? (
+          {charts ? (
             <>
               <LegendSwatch background={BUILD_COLOR} label="Build" />
               <LegendSwatch background={MACHINE_COLOR} label="Machine CPU" />
@@ -1873,7 +1891,7 @@ function machineParts({
     sleepBands,
     rows: (
       <>
-        {machineRow}
+        {chartsToggle}
         {charts}
         {legend}
       </>
@@ -1904,11 +1922,10 @@ function TimelineStageRow({
 }: {
   row: TimelineRow;
   barStyle: CSSProperties;
-  // Drawn faint while another stage type is hovered or another stage is
-  // selected.
+  // Drawn faint while another stage type, or another stage, is hovered.
   dimmed: boolean;
-  // This stage is the one selected; clicking its name selects it or clears
-  // the selection.
+  // This stage is the one clicked; clicking its name narrows the Timeline to
+  // its stage, or shows every stage again.
   selected: boolean;
   onSelect: () => void;
   // The pointer, or keyboard focus, entering (true) or leaving (false) the row.

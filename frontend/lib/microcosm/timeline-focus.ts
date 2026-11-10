@@ -21,29 +21,41 @@ export const NO_FOCUS: TimelineFocus = {
   hoveredStage: null,
 };
 
-// The Whole run bar's label.
-export function wholeRunLabel(filter: ReadonlySet<BuildPhase>): string {
-  return filter.size ? "Whole run (filtered)" : "Whole run";
+// The clicked stage, by its row key, when it narrows the Timeline to itself:
+// with no stage-type filter on, or with its type picked. A clicked stage
+// whose type the filter hides narrows nothing.
+export function narrowedToStage(focus: TimelineFocus): string | null {
+  if (focus.selectedStage == null) return null;
+  const phase = focus.selectedPhase;
+  return !focus.filter.size || phase == null || focus.filter.has(phase) ? focus.selectedStage : null;
 }
 
-// How one stage is drawn: hidden when a filter leaves its type out; dimmed
-// while another type is hovered, else while another stage is hovered in the
-// breakdown, else while another stage is clicked. A clicked stage whose type
-// the filter hides dims nothing.
+// Whether the Timeline shows only some stages: those of the picked types, or
+// the clicked stage.
+export function focusNarrows(focus: TimelineFocus): boolean {
+  return focus.filter.size > 0 || narrowedToStage(focus) != null;
+}
+
+// The Whole run bar's label.
+export function wholeRunLabel(focus: TimelineFocus): string {
+  return focusNarrows(focus) ? "Whole run (filtered)" : "Whole run";
+}
+
+// How one stage is drawn: hidden when a filter leaves its type out or
+// another stage is clicked; dimmed while another type is hovered, else while
+// another stage is hovered in the breakdown.
 export function stageFocus(
   focus: TimelineFocus,
   phase: BuildPhase,
   stageKey: string,
 ): { visible: boolean; dimmed: boolean } {
-  const passesFilter = (candidate: BuildPhase | null | undefined) =>
-    !focus.filter.size || candidate == null || focus.filter.has(candidate);
-  const visible = !focus.filter.size || focus.filter.has(phase);
-  const selectionShown = focus.selectedStage != null && passesFilter(focus.selectedPhase);
+  const clicked = narrowedToStage(focus);
+  const visible = (!focus.filter.size || focus.filter.has(phase)) && (clicked == null || stageKey === clicked);
   const dimmed = focus.hoveredPhase
     ? phase !== focus.hoveredPhase
     : focus.hoveredStage
       ? stageKey !== focus.hoveredStage
-      : selectionShown && stageKey !== focus.selectedStage;
+      : false;
   return { visible, dimmed };
 }
 
