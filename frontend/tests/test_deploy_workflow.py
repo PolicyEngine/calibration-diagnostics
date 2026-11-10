@@ -219,9 +219,8 @@ def test_dashboard_checks_read_secret_metadata_before_deployment():
         if step.get("name") == "Check collector read secret exists"
     )
     check = steps[check_index]
-    assert (
-        check["run"]
-        == 'bash telemetry-service/scripts/check-secrets-exist.sh "$READ_SECRET_NAME"'
+    assert check["run"] == (
+        "bash .github/scripts/deploy-dashboard.sh check-read-secret-exists"
     )
     assert check["env"]["PROJECT_ID"] == "${{ vars.TELEMETRY_GCP_PROJECT_ID }}"
     assert check["env"]["READ_SECRET_NAME"] == "${{ vars.TELEMETRY_READ_SECRET_NAME }}"
