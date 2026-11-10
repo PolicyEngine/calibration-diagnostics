@@ -1221,8 +1221,8 @@ function sleepTitle(sleep: SleepBand, nowMs: number, zone: ViewerZone | null): s
 const SLEEP_FILL = "color-mix(in srgb, var(--foreground) 16%, transparent)";
 const ESTIMATED_SLEEP_FILL =
   "repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 20%, transparent) 0 3px, transparent 3px 6px)";
-const MEMORY_COLOR = "var(--chart-1)";
-const CPU_COLOR = "var(--chart-2)";
+// The build's own line, the same in both charts, and the whole machine's.
+const BUILD_COLOR = "var(--chart-1)";
 const MACHINE_COLOR = "color-mix(in srgb, var(--muted-foreground) 70%, transparent)";
 // The charts' drawing box: 1000 wide, stretched to the track, and 40 high.
 const CHART_WIDTH = 1000;
@@ -1755,7 +1755,7 @@ function machineParts({
         label="Memory"
         scaleLabel={fmtBytes(memoryMax)}
         scaleMax={memoryMax}
-        lines={linesOf("build-memory", MEMORY_COLOR, (reading) => reading.memory_bytes)}
+        lines={linesOf("build-memory", BUILD_COLOR, (reading) => reading.memory_bytes)}
         limits={memoryLimits}
         limitKind="memory"
         shades={shades}
@@ -1768,7 +1768,7 @@ function machineParts({
         scaleMax={cpuMax}
         lines={[
           ...linesOf("machine-cpu", MACHINE_COLOR, (reading) => reading.machine_cpu_share),
-          ...linesOf("build-cpu", CPU_COLOR, cpuShare),
+          ...linesOf("build-cpu", BUILD_COLOR, cpuShare),
         ]}
         limits={[]}
         limitKind="cpu"
@@ -1778,8 +1778,7 @@ function machineParts({
       />
       <div />
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-        <LegendSwatch background={MEMORY_COLOR} label="Memory" />
-        <LegendSwatch background={CPU_COLOR} label="CPU" />
+        <LegendSwatch background={BUILD_COLOR} label="Build" />
         <LegendSwatch background={MACHINE_COLOR} label="Machine CPU" />
         <LegendSwatch
           background="repeating-linear-gradient(90deg, var(--muted-foreground) 0 4px, transparent 4px 7px)"
