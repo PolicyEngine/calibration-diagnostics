@@ -8,6 +8,21 @@ from pathlib import Path
 import modal
 
 ROOT = Path(__file__).resolve().parents[1]
+# Modal's cached debian_slim base for Python 3.12 carries pip 26.1.2, whose
+# bundled certifi (2026.02.25) still contains the compromised eMudhra root
+# "emSign ECC Root CA - G3"; --cert or PIP_CERT only add to that trust. The
+# image replaces it with pip 26.2.2, whose bundled certifi (2026.10.19) drops
+# the root, before it installs anything else. --require-hashes accepts only
+# the wheel with the sha256 PyPI publishes, whatever certificate the
+# connection presents.
+PIP_VERSION = "26.2.2"
+PIP_WHEEL_SHA256 = "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
+PIP_BOOTSTRAP_COMMAND = (
+    f"printf '%s\\n' 'pip=={PIP_VERSION} --hash=sha256:{PIP_WHEEL_SHA256}'"
+    " > /tmp/pip-bootstrap.txt"
+    " && python -m pip install --require-hashes --no-deps -r /tmp/pip-bootstrap.txt"
+    " && rm /tmp/pip-bootstrap.txt"
+)
 
 
 def deployment_identity() -> tuple[str, str]:
@@ -41,6 +56,9 @@ if modal.is_local():
         # operating-system CA store, such as hf-xet, stop trusting roots Debian
         # has since removed. Modal caches this step; force a rebuild to refresh it.
         .apt_install("ca-certificates")
+        # pip reads that store as well as its own certifi, so it is replaced
+        # after the upgrade and before it downloads any package.
+        .run_commands(PIP_BOOTSTRAP_COMMAND)
         .pip_install_from_requirements(str(ROOT / "backend/requirements.lock"))
         .add_local_dir(
             str(ROOT / "frontend/scripts"),

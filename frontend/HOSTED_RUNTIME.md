@@ -28,10 +28,12 @@ The Modal runtime uses Python 3.12 and the hashed `backend/requirements.lock`.
 Regenerate that lock from the repository root with `uv pip compile
 backend/requirements.txt --python-version 3.12 --generate-hashes --output-file
 backend/requirements.lock`. The Modal image also installs Debian's current
-`ca-certificates` package. When the Next.js server starts, it removes two root
-certificates from Node's default list (`frontend/instrumentation.ts`): the compromised
-eMudhra root "emSign ECC Root CA - G3", and Sectigo's "AAA Certificate Services",
-which cross-signed the affected intermediates.
+`ca-certificates` package, then replaces the base image's pip with pip 26.2.2, pinned
+by its wheel's SHA-256, before it installs the lock: the base's pip trusts "emSign
+ECC Root CA - G3" through its own bundled certifi. When the Next.js server starts, it
+removes two root certificates from Node's default list (`frontend/instrumentation.ts`):
+the compromised eMudhra root "emSign ECC Root CA - G3", and Sectigo's "AAA Certificate
+Services", which cross-signed the affected intermediates.
 
 ## Model and data identity
 
