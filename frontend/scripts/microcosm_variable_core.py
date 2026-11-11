@@ -24,7 +24,7 @@ from scripts.hosted_release import (
 from scripts.runtime_identity import host_resources
 
 # Deprecated upstream identifiers: Microcosm's current HF repository and H5
-# filename still use the former Populace names.
+# filename retain their published identifiers.
 _REVIEWED = reviewed_release()
 DEFAULT_REPO = _REVIEWED["repo"]
 DEFAULT_REVISION = _REVIEWED["hf_revision"]

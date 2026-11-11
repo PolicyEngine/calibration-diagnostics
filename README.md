@@ -7,7 +7,7 @@ repositories require a server-side Hugging Face token.
 
 > Deprecated upstream identifiers: Microcosm's current Hugging Face slugs,
 > release/file names, deployment variables, and Chronicle wire contracts still
-> use `populace`/`ledger`; see
+> retain their published spellings; see
 > [upstream identifier compatibility](docs/upstream-identifier-compatibility.md).
 
 Release metadata and diagnostics are read from exact Hugging Face commits. The

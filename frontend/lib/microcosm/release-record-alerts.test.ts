@@ -172,17 +172,17 @@ test("a publication time is escaped for Slack's formatted text", () => {
 });
 
 const originalFetch = globalThis.fetch;
-const priorWebhook = process.env.SLACK_WEBHOOK_POPULACE_UK;
+const priorWebhook = process.env.SLACK_WEBHOOK_MICROCOSM_UK;
 afterEach(() => {
   globalThis.fetch = originalFetch;
-  if (priorWebhook == null) delete process.env.SLACK_WEBHOOK_POPULACE_UK;
-  else process.env.SLACK_WEBHOOK_POPULACE_UK = priorWebhook;
+  if (priorWebhook == null) delete process.env.SLACK_WEBHOOK_MICROCOSM_UK;
+  else process.env.SLACK_WEBHOOK_MICROCOSM_UK = priorWebhook;
 });
 
 test("a tag name is escaped in its release alert", async () => {
   const placeholderWebhook = "https://hooks.slack.example/services/uk-placeholder";
   const posted: string[] = [];
-  process.env.SLACK_WEBHOOK_POPULACE_UK = placeholderWebhook;
+  process.env.SLACK_WEBHOOK_MICROCOSM_UK = placeholderWebhook;
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     if (String(input) !== placeholderWebhook) throw new Error(`Unexpected URL ${String(input)}`);
     posted.push(String(init?.body));

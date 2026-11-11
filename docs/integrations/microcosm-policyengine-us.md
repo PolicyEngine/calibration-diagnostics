@@ -1,7 +1,7 @@
 # Microcosm / PolicyEngine-US integration overview
 
 > Deprecated upstream identifiers: the current Microcosm HF release, files,
-> diagnostics metadata, and Chronicle fact keys still use `populace`/`ledger`.
+> diagnostics metadata, and Chronicle fact keys retain their published spellings.
 
 Status: **adapter implemented; the full evaluation was verified against the Build P
 release with policyengine-us 1.764.6 and has not yet been re-run on the pair below**
