@@ -56,6 +56,33 @@ def test_each_country_panel_id_moves_only_with_its_own_inputs(installed):
     )
 
 
+def test_edits_that_change_no_number_keep_the_panel(installed):
+    uk = load_spec("uk")
+    base = panel_id(uk, engine_identity(uk, BUNDLE))
+    reforms = [
+        {**reform, "label": "Renamed", "source": {"repo": "elsewhere"}}
+        for reform in uk.raw["reforms"]
+    ]
+    kept = parse_spec(
+        {
+            **uk.raw,
+            "series": {**uk.raw["series"], "exclude": ["-0000000a$"]},
+            "schedule": "manual",
+            "runner": {"max_dataset_bytes": 1},
+            "reforms": reforms,
+        },
+        expected_country="uk",
+    )
+    assert panel_id(kept, engine_identity(kept, BUNDLE)) == base
+    # A reform's delta does change numbers, so it moves the panel.
+    first = dict(uk.raw["reforms"][0])
+    first["add"] = {path: 2 * delta for path, delta in first["add"].items()}
+    moved = parse_spec(
+        {**uk.raw, "reforms": [first, *uk.raw["reforms"][1:]]}, expected_country="uk"
+    )
+    assert panel_id(moved, engine_identity(moved, BUNDLE)) != base
+
+
 def test_the_engine_must_be_the_bundle_s_own_pins(installed):
     installed["policyengine-core"] = "3.34.0"
     with pytest.raises(EngineMismatch):

@@ -32,7 +32,7 @@ release_history/
                                    measure, disclosure, local_store, export, cli
   tests/                           run on a fake model; no data, no engine
   countries/<code>/
-    spec.yaml                      what to compute (part of the panel id)
+    spec.yaml                      what to compute (its number-changing part is in the panel id)
     references.yaml                official references (not part of the panel id)
     references.lock.json           references resolved from Chronicle (generated)
     pyproject.toml, uv.lock        the country's reference engine
@@ -51,7 +51,14 @@ inventory.
 branches on a country code. Its main parts:
 
 - `series.releases`: release names (a build folder `<release>/<build>` counts
-  as its release) or `^` regular expressions; `series.exclude` drops matches.
+  as its release) or `^` regular expressions. `series.exclude` holds regular
+  expressions matched against each build's release folder and its release id, so
+  a pattern can drop a whole release or a single build (the UK series leaves out
+  its 2 Oct and 14 Oct 2026 cuts, whose 14-digit household ids overflow the
+  engine's 32-bit integers).
+- The panel id hashes the spec without the parts that change no number: the
+  series, the schedule, the runner limits, and each reform's label and source.
+  Editing those keeps the panel and its points; any other edit starts a new panel.
 - `engine.module` (`policyengine.<module>.managed_microsimulation`) and
   `engine.model_package`.
 - `periods`, `period_label` (`fiscal_year` labels 2026 as 2026-27).

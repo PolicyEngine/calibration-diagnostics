@@ -73,6 +73,18 @@ def test_series_match_names_their_build_folders_and_regexes():
     assert not spec.matches_series("zz-national-dense")
 
 
+def test_an_exclude_on_a_release_id_drops_that_build_alone():
+    spec = parse_spec(
+        fake_spec_dict(series={"releases": ["zz-national"], "exclude": ["-5c6b3f68$"]})
+    )
+    assert not spec.matches_series("zz-national", "zz-national-20261002T230158Z-5c6b3f68")
+    assert spec.matches_series("zz-national", "zz-national-20261019T083323Z-6cba5d71")
+    # The build-folder layout carries the same suffix in the folder.
+    assert not spec.matches_series(
+        "zz-national/uk-frs-calibration-attempt-20261002T230158Z-5c6b3f68"
+    )
+
+
 def test_bracket_paths_walk_into_brackets():
     parameters = fake_parameters()
     assert parameter_node(parameters, "gov.tax.rates[1].rate")("2026-06-01") == 0.4

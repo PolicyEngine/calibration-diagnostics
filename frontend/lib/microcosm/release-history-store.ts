@@ -305,9 +305,15 @@ export interface SeriesSpec {
   exclude: string[];
 }
 
-/** The Python spec's `matches_series`: a release name, its build folders, or a ^regex. */
-export function seriesMatches(series: SeriesSpec, releaseDirectory: string): boolean {
-  if (series.exclude.some((pattern) => new RegExp(pattern).test(releaseDirectory))) return false;
+/**
+ * The Python spec's `matches_series`: a release name, its build folders, or a ^regex. An
+ * exclude pattern drops a build when it matches the build's folder or its release id.
+ */
+export function seriesMatches(series: SeriesSpec, releaseDirectory: string, releaseId?: string): boolean {
+  const names = releaseId ? [releaseDirectory, releaseId] : [releaseDirectory];
+  if (series.exclude.some((pattern) => names.some((name) => new RegExp(pattern).test(name)))) {
+    return false;
+  }
   return series.releases.some((name) =>
     name.startsWith("^")
       ? new RegExp(name).test(releaseDirectory)

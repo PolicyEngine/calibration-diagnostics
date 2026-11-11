@@ -5,9 +5,12 @@ engine module, the periods, the variable names the fixed output vocabulary
 needs, the baseline variables list and the reform definitions. No code here or
 elsewhere in the producer branches on a country code.
 
-The spec's digest is part of the panel id, so any edit gives that country (and
-only that country) a new panel. References live in a separate file
-(`references.yaml`) and are not part of the digest.
+The spec's digest is part of the panel id, so an edit that can change a number
+gives that country (and only that country) a new panel. The digest leaves out
+what changes no number: which releases are in the series, the schedule, the
+runner limits, and reform labels and sources (`measurement_definition`).
+References live in a separate file (`references.yaml`) and are not part of the
+digest either.
 """
 
 from __future__ import annotations
@@ -34,6 +37,24 @@ DISCLOSURE_POLICIES = ("none", "source_household_small_cells")
 MIN_SOURCE_HOUSEHOLD_FLOOR = 3
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 _DEFAULT_UNIT = {"sum": "currency", "count": "count", "mean": "rate", "population": "count"}
+# Spec keys that change no measured number, so editing them keeps the panel (and
+# its points): which releases are in the series, when it runs, runner limits.
+_UNHASHED_KEYS = ("series", "schedule", "runner")
+# Per reform: its display label and where it was taken from.
+_UNHASHED_REFORM_KEYS = ("label", "source")
+
+
+def measurement_definition(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """The part of a spec that decides the numbers; the panel id hashes this."""
+    definition = {key: value for key, value in raw.items() if key not in _UNHASHED_KEYS}
+    if isinstance(definition.get("reforms"), list):
+        definition["reforms"] = [
+            {key: value for key, value in reform.items() if key not in _UNHASHED_REFORM_KEYS}
+            if isinstance(reform, Mapping)
+            else reform
+            for reform in definition["reforms"]
+        ]
+    return definition
 
 
 class SpecError(ValueError):
@@ -133,9 +154,14 @@ class Spec:
     def household_id_variable(self) -> str:
         return f"{self.household_entity}_id"
 
-    def matches_series(self, release_directory: str) -> bool:
-        """Whether a release folder belongs to this country's series."""
-        if any(re.search(pattern, release_directory) for pattern in self.series_exclude):
+    def matches_series(self, release_directory: str, release_id: str | None = None) -> bool:
+        """Whether a release build belongs to this country's series.
+
+        An exclude pattern drops a build when it matches the build's release
+        folder or its release id, so single builds of a release can be left out.
+        """
+        names = (release_directory,) + ((release_id,) if release_id else ())
+        if any(re.search(pattern, name) for pattern in self.series_exclude for name in names):
             return False
         return any(
             release_directory == name or release_directory.startswith(f"{name}/")
@@ -362,7 +388,7 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
         min_source_households=floor,
         source_id_columns=source_id_columns,
         max_dataset_bytes=int(max_bytes) if max_bytes is not None else None,
-        digest=json_sha256(raw),
+        digest=json_sha256(measurement_definition(raw)),
     )
     return spec
 

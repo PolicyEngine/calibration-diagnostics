@@ -112,6 +112,11 @@ test("series match the Python spec's rule", () => {
   expect(seriesMatches(series, "zz-national-dense")).toBe(false);
   expect(seriesMatches(series, "zz-2024-x")).toBe(true);
   expect(seriesMatches(series, "zz-2024-acs-local-1")).toBe(false);
+  // A pattern on a build's release id drops that build alone.
+  const one = { releases: ["zz-national"], exclude: ["-5c6b3f68$"] };
+  expect(seriesMatches(one, "zz-national", "zz-national-20261002T230158Z-5c6b3f68")).toBe(false);
+  expect(seriesMatches(one, "zz-national", "zz-national-20261019T083323Z-6cba5d71")).toBe(true);
+  expect(seriesMatches(one, "zz-national/uk-frs-calibration-attempt-20261002T230158Z-5c6b3f68")).toBe(false);
 });
 
 test("stored file kinds follow their names", () => {
