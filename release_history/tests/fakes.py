@@ -148,7 +148,6 @@ def fake_spec_dict(**overrides: Any) -> dict[str, Any]:
         "country": "zz",
         "release_repo": "policyengine/zz",
         "series": {"releases": ["zz-national"]},
-        "schedule": "manual",
         "engine": {"module": "zz", "model_package": "policyengine-zz"},
         "periods": [2026],
         "currency": "XXX",

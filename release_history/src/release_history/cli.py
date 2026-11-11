@@ -216,7 +216,6 @@ def cmd_identity(args: argparse.Namespace) -> int:
             "command": "identity",
             "country": spec.country,
             "panel_id": panel["panel_id"],
-            "schedule": spec.schedule,
             "release_repo": spec.release_repo,
             "series": panel["series"],
             "spec_sha256": spec.digest,

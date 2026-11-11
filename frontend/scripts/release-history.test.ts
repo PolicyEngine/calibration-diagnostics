@@ -78,7 +78,7 @@ test("a run plans, uploads, and finalizes a panel; a second build stays pending"
 
   // The finalize job reads the panel back from the store by its id.
   expect((await readStoredPanel(store, "uk", PANEL_ID)).panel_id).toBe(PANEL_ID);
-  const summary = await finalize({ store, panel: panelDocument, plan: planned, at: "2026-11-09T01:00:00Z" });
+  const summary = await finalize({ store, panel: panelDocument, plan: planned, pin: true, at: "2026-11-09T01:00:00Z" });
   expect(summary).toMatchObject({ complete: false, current: false });
   expect(summary.points.find((p) => p.releaseId === builds[1].releaseId)).toMatchObject({ state: "pending", attempts: 1 });
   const manifest = await readJson<ReleaseHistoryManifest>(store, "release-history/manifest.json");

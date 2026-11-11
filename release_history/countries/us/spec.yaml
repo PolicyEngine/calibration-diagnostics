@@ -1,6 +1,7 @@
 # A minimal US trial spec: proves the machinery on a second country and tests
-# the cost design on the largest national file. Manual runs only; the US data
-# owners take it over and extend it.
+# the cost design on the largest national file. The US data owners take it over
+# and extend it. Weekly top-ups are switched on by the repository variable
+# RELEASE_HISTORY_WEEKLY, not here.
 schema_version: 1
 country: us
 # Must equal the US registration in @policyengine/calibration-tree's countries.ts.
@@ -9,7 +10,6 @@ series:
   # Every default national release; local-area and receipt-candidate builds are left out.
   releases: ["^populace-us-2024-"]
   exclude: ["acs-local", "spm-receipts"]
-schedule: manual
 engine:
   module: us
   model_package: policyengine-us

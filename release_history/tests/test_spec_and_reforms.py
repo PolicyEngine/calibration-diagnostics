@@ -41,7 +41,8 @@ def test_the_digest_follows_the_document_not_its_formatting():
     [
         ({"schema_version": 2}, "schema_version"),
         ({"periods": []}, "periods"),
-        ({"schedule": "daily"}, "schedule"),
+        # When a country runs is a repository variable, never a spec key.
+        ({"schedule": "weekly"}, "RELEASE_HISTORY_WEEKLY"),
         (
             {
                 "disclosure": {

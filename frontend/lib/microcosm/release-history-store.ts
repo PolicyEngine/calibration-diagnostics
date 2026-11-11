@@ -432,13 +432,21 @@ export interface MeasurementDocument {
   cells: MeasurementCell[];
 }
 
-/** The country's manifest entry after a run: points, attempts, completeness, current. */
+/**
+ * The country's manifest entry after a run: points, attempts, completeness, current.
+ *
+ * Every panel a run touches is kept, with its engine, so a page can offer each engine's
+ * timeline. Only a pinning run (`pin`: one of the default branch's engine) moves the pinned
+ * panel, and the served (current) panel once that panel is complete. A run dispatched from a
+ * ref that pins another engine fills that engine's panel and leaves both where they are.
+ */
 export function finalizeCountry(options: {
   entry: ManifestCountry | undefined;
   panel: PanelSummary;
   builds: ReleaseBuild[];
   planned: PlannedPoint[];
   stored: MeasurementDocument[];
+  pin: boolean;
   maxAttempts?: number;
 }): ManifestCountry {
   const maxAttempts = options.maxAttempts ?? MAX_ATTEMPTS;
@@ -499,8 +507,10 @@ export function finalizeCountry(options: {
     complete,
     points,
   };
-  entry.pinnedPanelId = options.panel.panelId;
-  if (complete) entry.currentPanelId = options.panel.panelId;
+  if (options.pin) {
+    entry.pinnedPanelId = options.panel.panelId;
+    if (complete) entry.currentPanelId = options.panel.panelId;
+  }
   return entry;
 }
 

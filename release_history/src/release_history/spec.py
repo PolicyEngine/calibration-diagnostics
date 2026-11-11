@@ -7,10 +7,13 @@ elsewhere in the producer branches on a country code.
 
 The spec's digest is part of the panel id, so an edit that can change a number
 gives that country (and only that country) a new panel. The digest leaves out
-what changes no number: which releases are in the series, the schedule, the
-runner limits, and reform labels and sources (`measurement_definition`).
-References live in a separate file (`references.yaml`) and are not part of the
-digest either.
+what changes no number: which releases are in the series, the runner limits,
+and reform labels and sources (`measurement_definition`). References live in a
+separate file (`references.yaml`) and are not part of the digest either.
+
+When a country runs is not in the spec: weekly top-ups are switched on per
+country by the repository variable `RELEASE_HISTORY_WEEKLY`, so turning one on
+or off needs no pull request.
 """
 
 from __future__ import annotations
@@ -30,7 +33,6 @@ OUTPUT_LEVELS = ("targets", "budget", "distribution", "poverty")
 STATS = ("sum", "count", "mean", "population")
 KINDS = ("tax", "benefit", "caseload", "input", "population", "rate", "income", "other")
 UNITS = ("currency", "count", "rate", "ratio")
-SCHEDULES = ("weekly", "manual")
 PERIOD_LABELS = ("fiscal_year", "calendar_year")
 DISCLOSURE_POLICIES = ("none", "source_household_small_cells")
 # CD171's absolute floor; a spec may raise it, never lower it.
@@ -38,8 +40,8 @@ MIN_SOURCE_HOUSEHOLD_FLOOR = 3
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 _DEFAULT_UNIT = {"sum": "currency", "count": "count", "mean": "rate", "population": "count"}
 # Spec keys that change no measured number, so editing them keeps the panel (and
-# its points): which releases are in the series, when it runs, runner limits.
-_UNHASHED_KEYS = ("series", "schedule", "runner")
+# its points): which releases are in the series, and runner limits.
+_UNHASHED_KEYS = ("series", "runner")
 # Per reform: its display label and where it was taken from.
 _UNHASHED_REFORM_KEYS = ("label", "source")
 
@@ -117,7 +119,6 @@ class Spec:
     release_repo: str
     series_releases: tuple[str, ...]
     series_exclude: tuple[str, ...]
-    schedule: str
     engine_module: str
     model_package: str
     simulation_options: Mapping[str, Any]
@@ -301,9 +302,11 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
     series_releases = _names(series.get("releases"), "series.releases")
     if not series_releases:
         raise SpecError("series.releases must name at least one release.")
-    schedule = raw.get("schedule", "manual")
-    if schedule not in SCHEDULES:
-        raise SpecError(f"schedule '{schedule}' must be one of {SCHEDULES}.")
+    if "schedule" in raw:
+        raise SpecError(
+            "schedule: weekly top-ups are switched on per country by the repository variable "
+            "RELEASE_HISTORY_WEEKLY, not by the spec; remove the key."
+        )
     engine = _require(raw, "engine", "spec")
     periods = raw.get("periods")
     if (
@@ -365,7 +368,6 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
         release_repo=str(_require(raw, "release_repo", "spec")),
         series_releases=series_releases,
         series_exclude=_names(series.get("exclude"), "series.exclude"),
-        schedule=schedule,
         engine_module=_identifier(_require(engine, "module", "engine"), "engine.module"),
         model_package=str(_require(engine, "model_package", "engine")),
         simulation_options=dict(engine.get("simulation_options") or {}),

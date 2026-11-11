@@ -123,7 +123,6 @@ def panel_document(
         "engine": engine,
         "environment": env,
         "producer": {"version": PRODUCER_VERSION, "commit": producer_commit},
-        "schedule": spec.schedule,
         "series": {"releases": list(spec.series_releases), "exclude": list(spec.series_exclude)},
         "release_repo": spec.release_repo,
         "spec_sha256": spec.digest,

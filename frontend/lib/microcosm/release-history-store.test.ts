@@ -144,6 +144,7 @@ test("a top-up on the current panel measures only builds it lacks", () => {
     builds: [build("b1")],
     planned: [],
     stored: [measurement("m1", "b1", "2026-11-01T00:00:00Z", [])],
+    pin: true,
   });
   expect(entry.currentPanelId).toBe(PANEL);
   expect(entry.panels[PANEL].points.b1).toMatchObject({ measurementId: "m1", measurementStatus: "ok" });
@@ -160,14 +161,34 @@ test("finalize counts attempts, fails a point after three, and switches current 
   let entry = finalizeCountry({
     entry: undefined, panel, builds, planned,
     stored: [measurement("m1", "b1", "2026-11-01T00:00:00Z", [])],
+    pin: true,
   });
   expect(entry.panels[PANEL].points.b2).toMatchObject({ state: "pending", attempts: 1 });
   expect(entry.currentPanelId).toBeNull();
   for (let run = 0; run < 2; run += 1) {
-    entry = finalizeCountry({ entry, panel, builds, planned: [planned[1]], stored: [measurement("m1", "b1", "2026-11-01T00:00:00Z", [])] });
+    entry = finalizeCountry({ entry, panel, builds, planned: [planned[1]], stored: [measurement("m1", "b1", "2026-11-01T00:00:00Z", [])], pin: true });
   }
   expect(entry.panels[PANEL].points.b2).toMatchObject({ state: "failed", attempts: 3 });
   expect(entry.panels[PANEL].complete).toBe(true);
+  expect(entry.currentPanelId).toBe(PANEL);
+});
+
+test("a run on another engine keeps its own panel and moves neither the pin nor the served panel", () => {
+  const builds = [build("b1"), build("b2")];
+  const pinned = { panelId: PANEL, createdAt: "t", engine: { model: "policyengine-uk==2.174.1" }, specSha256: "s", producerVersion: "1" };
+  const other = { ...pinned, panelId: "e".repeat(64), engine: { model: "policyengine-uk==2.180.0" } };
+  const both = [measurement("m1", "b1", "2026-11-01T00:00:00Z", []), measurement("m2", "b2", "2026-11-02T00:00:00Z", [])];
+  let entry = finalizeCountry({ entry: undefined, panel: pinned, builds, planned: [], stored: both, pin: true });
+  expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: PANEL });
+  // One release measured on demand on another engine: a partial panel of its own.
+  entry = finalizeCountry({ entry, panel: other, builds, planned: [], stored: [both[1]], pin: false });
+  expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: PANEL });
+  expect(Object.keys(entry.panels).sort()).toEqual([other.panelId, PANEL].sort());
+  expect(entry.panels[other.panelId]).toMatchObject({ complete: false, engine: { model: "policyengine-uk==2.180.0" } });
+  expect(Object.keys(entry.panels[other.panelId].points)).toEqual(["b2"]);
+  // Completing it still leaves the served panel alone until a pinning run picks it.
+  entry = finalizeCountry({ entry, panel: other, builds, planned: [], stored: both, pin: false });
+  expect(entry.panels[other.panelId].complete).toBe(true);
   expect(entry.currentPanelId).toBe(PANEL);
 });
 

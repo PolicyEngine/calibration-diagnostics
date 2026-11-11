@@ -72,7 +72,6 @@ def test_edits_that_change_no_number_keep_the_panel(installed):
         {
             **uk.raw,
             "series": {**uk.raw["series"], "exclude": ["-0000000a$"]},
-            "schedule": "manual",
             "runner": {"max_dataset_bytes": 1},
             "reforms": reforms,
         },

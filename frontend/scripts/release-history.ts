@@ -214,6 +214,8 @@ export async function finalize(options: {
   store: ReleaseHistoryStore;
   panel: PanelDocument;
   plan: Plan & { builds: ReleaseBuild[] };
+  /** A run of the default branch's engine: it may move the pinned and served panels. */
+  pin: boolean;
   at?: string;
 }) {
   const { store, panel } = options;
@@ -236,6 +238,7 @@ export async function finalize(options: {
       builds: options.plan.builds,
       planned: options.plan.points,
       stored,
+      pin: options.pin,
     }), at);
   const references = await readJson<ReferencesLock>(store, `${panelPrefix(panel.country, panel.panel_id)}references.json`);
   const timeline = buildTimeline({
@@ -322,6 +325,8 @@ async function main(argv: string[]): Promise<void> {
       panel: { type: "string" },
       "plan-out": { type: "string" },
       "panel-id": { type: "string" },
+      // finalize: set only for a run of the default branch's engine.
+      pin: { type: "boolean", default: false },
     },
   });
   if (command === "plan") {
@@ -355,7 +360,7 @@ async function main(argv: string[]): Promise<void> {
       ? await readLocalPanel(values.root, values.country!)
       : await readStoredPanel(store, values.country!, values["panel-id"]!);
     const planned = JSON.parse(await readFile(values.plan!, "utf8"));
-    const summary = await finalize({ store, panel, plan: planned });
+    const summary = await finalize({ store, panel, plan: planned, pin: values.pin === true });
     const rows = summary.points
       .map((p) => `| ${p.releaseId} | ${p.state} | ${p.measurementStatus ?? ""} | ${p.attempts} |`)
       .join("\n");

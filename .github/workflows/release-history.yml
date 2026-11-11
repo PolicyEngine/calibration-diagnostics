@@ -4,11 +4,15 @@ name: Release history
 # country's pinned reference engine (calibration-diagnostics#224). See
 # docs/release-history.md.
 #
-# - Weekly (Mondays): a top-up run for each country whose spec says
-#   `schedule: weekly`. It measures only builds the country's complete panel
-#   lacks, and waits while a new panel awaits its backfill.
+# - Weekly (Mondays): a top-up run for each country listed in the repository
+#   variable RELEASE_HISTORY_WEEKLY (country codes, space- or comma-separated;
+#   unset or empty runs nothing). It measures only builds the country's
+#   complete panel lacks, and waits while a new panel awaits its backfill.
 # - Manual: `topup`, `backfill` (builds a new panel after an engine, spec or
-#   producer bump) or `release` (one build).
+#   producer bump) or `release` (one build). Dispatched from a ref that pins
+#   another engine, a run measures into that engine's panel and leaves the
+#   pinned and served panels as they are: only runs of the default branch's
+#   engine move them.
 #
 # The repository is public and the UK data are licensed: logs carry ids,
 # statuses and timings only, library output goes to a private file that is
@@ -45,7 +49,7 @@ concurrency:
 
 jobs:
   weekly:
-    if: ${{ github.event_name == 'schedule' && vars.RELEASE_HISTORY_ENABLED != 'FALSE' }}
+    if: ${{ github.event_name == 'schedule' && vars.RELEASE_HISTORY_ENABLED != 'FALSE' && vars.RELEASE_HISTORY_WEEKLY != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -53,17 +57,22 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Dispatch a top-up for each weekly country
+      - name: Dispatch a top-up for each country switched on
         env:
           GH_TOKEN: ${{ github.token }}
+          WEEKLY: ${{ vars.RELEASE_HISTORY_WEEKLY }}
         run: |
           set -euo pipefail
-          for spec in release_history/countries/*/spec.yaml; do
-            country="$(basename "$(dirname "$spec")")"
-            if grep -qE '^schedule:[[:space:]]*weekly' "$spec"; then
-              gh workflow run release-history.yml --ref "$GITHUB_REF_NAME" -f country="$country" -f mode=topup
-              echo "Dispatched a top-up for $country." >> "$GITHUB_STEP_SUMMARY"
+          for country in $(printf '%s' "$WEEKLY" | tr ',' ' '); do
+            case "$country" in
+              *[!a-z]*) echo "Skipped '$country': not a country code." >> "$GITHUB_STEP_SUMMARY"; continue ;;
+            esac
+            if [ ! -f "release_history/countries/$country/spec.yaml" ]; then
+              echo "Skipped $country: no release_history/countries/$country folder." >> "$GITHUB_STEP_SUMMARY"
+              continue
             fi
+            gh workflow run release-history.yml --ref "$GITHUB_REF_NAME" -f country="$country" -f mode=topup
+            echo "Dispatched a top-up for $country." >> "$GITHUB_STEP_SUMMARY"
           done
 
   plan:
@@ -161,5 +170,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' "$PLAN" > "$RUNNER_TEMP/plan.json"
+          # Only the default branch's engine moves the pinned and served panels.
           bun run scripts/release-history.ts finalize --country "$COUNTRY" \
-            --panel-id "${{ needs.plan.outputs.panel_id }}" --plan "$RUNNER_TEMP/plan.json"
+            --panel-id "${{ needs.plan.outputs.panel_id }}" --plan "$RUNNER_TEMP/plan.json" \
+            ${{ github.ref_name == github.event.repository.default_branch && '--pin' || '' }}

@@ -64,8 +64,11 @@ branches on a country code. Its main parts:
   its 2 Oct and 14 Oct 2026 cuts, whose 14-digit household ids overflow the
   engine's 32-bit integers).
 - The panel id hashes the spec without the parts that change no number: the
-  series, the schedule, the runner limits, and each reform's label and source.
-  Editing those keeps the panel and its points; any other edit starts a new panel.
+  series, the runner limits, and each reform's label and source. Editing those
+  keeps the panel and its points; any other edit starts a new panel.
+- When a country runs is not in the spec (a `schedule` key is refused): the
+  repository variable `RELEASE_HISTORY_WEEKLY` switches weekly top-ups on per
+  country, with no pull request.
 - `engine.module` (`policyengine.<module>.managed_microsimulation`) and
   `engine.model_package`.
 - `periods`, `period_label` (`fiscal_year` labels 2026 as 2026-27).
@@ -84,7 +87,7 @@ branches on a country code. Its main parts:
   `targets` names the variables whose change is reported.
 - `outputs`: the output levels (`targets`, `budget`, `distribution`,
   `poverty`); a reform may narrow them.
-- `disclosure`, `runner.max_dataset_bytes`, `schedule` (`weekly` or `manual`).
+- `disclosure`, `runner.max_dataset_bytes`.
 
 ### What a measurement holds
 
@@ -147,7 +150,8 @@ registry entries that map them.
 3. Run `resolve-references`, then `validate-spec`, which checks every
    variable, entity and parameter path against the reference model.
 4. Measure one release locally (below), then dispatch the workflow with
-   `mode=backfill`. Set `schedule: weekly` once the numbers look right.
+   `mode=backfill`. Add the country's code to `RELEASE_HISTORY_WEEKLY` once
+   the numbers look right.
 
 ## Local runs
 
@@ -189,9 +193,16 @@ release-history/<country>/<panel-id>/timeline.json            every number in re
 ```
 
 The manifest holds each country's pinned and current panel and, per panel, its
-points (state, measurement status, attempts, withdrawn). Every manifest write
-is conditional on the version read, re-applied on a lost race, and never
-unconditional; a country's run touches only its own entry.
+engine and its points (state, measurement status, attempts, withdrawn). Every
+panel ever filled stays listed with its engine, so a page can offer each
+engine's timeline and say which releases an engine has no point for. Every
+manifest write is conditional on the version read, re-applied on a lost race,
+and never unconditional; a country's run touches only its own entry.
+
+Only a run of the default branch's engine (the workflow passes `--pin` to
+`finalize` on the default branch) moves the pinned panel, and the current
+(served) panel once that panel is complete. A run dispatched from another ref
+fills the panel of the engine that ref pins and leaves both where they are.
 
 `timeline.json` holds, for each output and period, its values in release
 order, the change from the nearest earlier release that has the cell
@@ -202,9 +213,15 @@ summaries (typical and 1-in-10 revisions, windows, floors) belong to the page.
 
 ## Regeneration
 
-- **New release**: the weekly run (Mondays, for `schedule: weekly` specs)
-  measures builds the country's complete panel lacks. A manual `topup` does
-  the same at any time; `release` measures one build.
+- **New release**: the weekly run (Mondays, for each country listed in the
+  repository variable `RELEASE_HISTORY_WEEKLY`) measures builds the country's
+  complete panel lacks, on the default branch's engine. A manual `topup` does
+  the same at any time; `release` measures one build. Weekly runs are off for
+  every country while the variable is unset or empty.
+- **The same release on another engine**: never automatic. Dispatch `release`
+  (one build) or `backfill` from a ref whose country folder pins that engine,
+  or run `measure` locally with that engine installed. The point lands in that
+  engine's panel, and the pinned and served panels don't move.
 - **Engine bump**: a PR bumps one country's `pyproject.toml` and `uv.lock`,
   typically when policyengine.py changes that country's model or core pin or a
   model fix matters. Only that country's panel id changes. Its backfill runs
@@ -283,5 +300,8 @@ The repository is public and the UK data are licensed. The workflow runs only
 on `workflow_dispatch` and its weekly schedule, never on pull requests. Logs
 carry ids, statuses and timings; library output goes to a private file that
 is never printed or uploaded; nothing is stored as an Actions artifact or
-cache; points go straight to private Blob. The repository variable
-`RELEASE_HISTORY_ENABLED=FALSE` stops it.
+cache; points go straight to private Blob. Two repository variables control
+it without a pull request: `RELEASE_HISTORY_WEEKLY` lists the countries whose
+weekly top-ups run (space- or comma-separated codes, for example `uk us`;
+unset runs none), and `RELEASE_HISTORY_ENABLED=FALSE` stops every run, manual
+ones included.

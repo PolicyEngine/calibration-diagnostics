@@ -1,7 +1,8 @@
 # What a UK release-history measurement computes. Its digest is part of the UK
 # panel id, so an edit that can change a number gives the UK a new panel (and no
-# other country). The series, schedule, runner and reform labels are outside the
-# digest, and so are the references to official figures (references.yaml).
+# other country). The series, runner and reform labels are outside the digest, and
+# so are the references to official figures (references.yaml). Weekly top-ups are
+# switched on by the repository variable RELEASE_HISTORY_WEEKLY, not here.
 schema_version: 1
 country: uk
 # Must equal the UK registration in @policyengine/calibration-tree's countries.ts.
@@ -15,7 +16,6 @@ series:
   # households with 14-digit ids, which overflow the engine's 32-bit integers, so
   # the disclosure check cannot match them to their survey households.
   exclude: ["-5c6b3f68$", "-d12ff9b3$"]
-schedule: weekly
 engine:
   module: uk
   model_package: policyengine-uk
