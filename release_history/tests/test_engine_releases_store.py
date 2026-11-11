@@ -1,15 +1,20 @@
 import json
+from pathlib import Path
 
 import pytest
 
 from release_history import engine
 from release_history.engine import EngineMismatch, engine_identity, panel_id
-from release_history.export import export_csv
+from release_history.export import TIMELINE_COLUMNS, export_csv, timeline_rows
 from release_history.local_store import ImmutableConflict, write_immutable, write_once
 from release_history.releases import (
+    NationalArtifact,
+    OpenedRelease,
+    Point,
     ReleaseRefused,
     compatibility,
     national_artifact,
+    point_provenance,
     release_directory_for,
     release_role,
 )
@@ -127,6 +132,75 @@ def test_national_artifact_resolves_both_layouts():
     assert refused.value.reason == "not_default_national"
 
 
+def _opened(manifest: dict, build_manifest: dict | None, directory: str) -> OpenedRelease:
+    point = Point(
+        release_id=directory, release_directory=directory, hf_repo="org/repo", hf_commit="c" * 40
+    )
+    return OpenedRelease(
+        point,
+        manifest,
+        f"releases/{directory}/release_manifest.json",
+        SHA,
+        build_manifest,
+        f"releases/{directory}/build_manifest.json" if build_manifest else None,
+        SHA if build_manifest else None,
+        NationalArtifact(key="n", path=f"releases/{directory}/n.h5", sha256=SHA),
+        100,
+    )
+
+
+def test_provenance_reads_both_manifest_layouts():
+    model = {"name": "policyengine-uk", "version": "2.174.1"}
+    common = {
+        "default_datasets": {"national": "n"},
+        "compatible_model_packages": [{"name": "policyengine-uk", "specifier": "==2.174.1"}],
+    }
+    tagged = {
+        **common,
+        "build": {
+            "build_id": "line",
+            "cut_tag": "line-20261107T020434Z-eeb6093e",
+            "built_at": "2026-11-07T03:22:40+00:00",
+            "built_with_model_package": model,
+        },
+    }
+    # A build folder (microcosm#1534) names its build as a string and keeps the facts on top.
+    folder = {
+        **common,
+        "release": "line",
+        "build": "attempt-20261107T020434Z-eeb6093e",
+        "built_at": "2026-11-07T03:22:40+00:00",
+        "built_with_model_package": model,
+        "migrated_from": {"tag": "line-20261107T020434Z-eeb6093e", "commit": "d" * 40},
+    }
+    build_manifest = {
+        "release": "line",
+        "build": "attempt-20261107T020434Z-eeb6093e",
+        "code": {"repository": "PolicyEngine/microcosm", "git_commit": "e" * 40},
+        "calibration": {"target_surface": {"sha256": SHA, "n_targets": 1214}},
+    }
+    old = point_provenance(_opened(tagged, None, "line"), "policyengine-uk", "2.174.1")
+    new = point_provenance(
+        _opened(folder, build_manifest, "line/attempt-20261107T020434Z-eeb6093e"),
+        "policyengine-uk",
+        "2.174.1",
+    )
+    assert (old["build_id"], old["cut_tag"], old["migrated_from"]) == (
+        "line",
+        "line-20261107T020434Z-eeb6093e",
+        None,
+    )
+    assert new["build_id"] == "attempt-20261107T020434Z-eeb6093e"
+    assert new["cut_tag"] == "line-20261107T020434Z-eeb6093e"
+    assert new["migrated_from"]["commit"] == "d" * 40
+    for provenance in (old, new):
+        assert provenance["built_with_model"] == model
+        assert provenance["built_at"] == "2026-11-07T03:22:40+00:00"
+        assert provenance["reference_model_compatibility"] == "inside"
+    assert new["build"]["attempt_id"] == "attempt-20261107T020434Z-eeb6093e"
+    assert new["build"]["n_targets"] == 1214
+
+
 def test_compatibility_reads_the_declared_range():
     manifest = {
         "compatible_model_packages": [{"name": "policyengine-uk", "specifier": "==2.174.1"}]
@@ -179,3 +253,24 @@ def test_export_flattens_stored_points(tmp_path):
     text = export_csv(tmp_path, spec.country)
     assert text.splitlines()[0].startswith("release_id,published_at,measurement_id")
     assert "zz-national-1" in text and "baseline/income_tax" in text
+
+
+def test_export_reads_the_timeline_the_typescript_side_writes(tmp_path):
+    # Written by frontend/scripts/release-history.test.ts from the measurement fixture.
+    timeline = json.loads((Path(__file__).parent / "fixtures" / "timeline.json").read_text())
+    rows = timeline_rows(timeline)
+    points = timeline["points"]
+    assert len(rows) == len(timeline["series"]) * len(points)
+    by_id = {p["measurementId"]: p["releaseId"] for p in points}
+    assert all(row["measurement_id"] in by_id for row in rows)
+    assert all(row["release_id"] == by_id[row["measurement_id"]] for row in rows)
+    later = [row for row in rows if row["measurement_id"] == points[1]["measurementId"]]
+    assert {row["change_status"] for row in later} <= {"ok", "withheld", "none"}
+    assert any(row["change"] is not None for row in later)
+    assert all(row["value"] is None for row in rows if row["status"] == "withheld")
+    # The CLI's export reads the same document from a panel folder.
+    folder = tmp_path / "release-history" / "zz" / "p1"
+    write_once(folder / "panel.json", {"panel_id": "p1"})
+    (folder / "timeline.json").write_text(json.dumps(timeline))
+    header = export_csv(tmp_path, "zz").splitlines()[0]
+    assert header == ",".join(TIMELINE_COLUMNS)

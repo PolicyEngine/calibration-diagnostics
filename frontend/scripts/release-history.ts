@@ -15,10 +15,13 @@ import { dirname, join, relative } from "node:path";
 import { parseArgs } from "node:util";
 
 import { readCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-blob";
-import { releaseDirectoryOf } from "@policyengine/calibration-tree/calibration-tree-manifest";
+import {
+  releaseDirectoryOf,
+  type CalibrationTreeManifestEntry,
+} from "@policyengine/calibration-tree/calibration-tree-manifest";
 import { isCountry } from "@policyengine/calibration-tree/countries";
 import { loadReleasesRecord } from "@policyengine/calibration-tree/latest-artifact";
-import { recordedBuilds } from "@policyengine/calibration-tree/release-record";
+import { recordedBuilds, type ReleasesRecord } from "@policyengine/calibration-tree/release-record";
 
 import {
   buildTimeline,
@@ -96,34 +99,65 @@ export async function readStoredPanel(
   return panel;
 }
 
-/** The country's published release builds in the panel's series, as the release picker lists them. */
-export async function seriesBuilds(panel: PanelDocument, options: { token?: string } = {}): Promise<ReleaseBuild[]> {
-  if (!isCountry(panel.country)) throw new Error(`${panel.country} is not a registered country.`);
-  const { manifest } = await readCalibrationTreeManifest({ token: options.token, consistent: true });
-  const country = manifest.countries[panel.country];
-  let withdrawn = new Set<string>();
-  try {
-    const record = await loadReleasesRecord(0, panel.country);
-    if (record) {
-      withdrawn = new Set(recordedBuilds(record).filter((b) => b.withdrawn).map((b) => b.id));
-    }
-  } catch (error) {
-    // A repository without a readable releases.json has no withdrawn builds to skip.
-    console.error(`releases.json not read: ${error instanceof Error ? error.name : "error"}`);
-  }
+/**
+ * The panel's series, as the dashboard's release picker lists releases.
+ *
+ * - **A repository with releases.json** (the UK since Microcosm's build folders): every build the
+ *   record lists under the series' releases, named and read by its folder (`<release>/<build>`),
+ *   dated by the record's `published_at`, at the commit the dashboard's tree manifest pins for
+ *   it. A recorded build with no tree entry yet waits for a later run. The tree manifest also
+ *   holds the cut tags each build was moved from and the bare release folder; they are not
+ *   listed, because the record is Microcosm's own list of what is published.
+ * - **A repository without one** (the US): the tree manifest's release entries by name.
+ */
+export function listSeries(
+  panel: PanelDocument,
+  entries: readonly CalibrationTreeManifestEntry[],
+  latestBuildArtifactId: string | null,
+  record: ReleasesRecord | null,
+): ReleaseBuild[] {
   const repo = panel.release_repo.toLowerCase();
-  return (country?.builds ?? [])
-    .filter((entry) => entry.kind === "release" && entry.releaseId && entry.hfRepo.toLowerCase() === repo)
+  const releases = entries.filter(
+    (entry) => entry.kind === "release" && entry.releaseId && entry.hfRepo.toLowerCase() === repo,
+  );
+  if (record) {
+    const byId = new Map(releases.map((entry) => [entry.releaseId as string, entry]));
+    return recordedBuilds(record).flatMap((build): ReleaseBuild[] => {
+      const entry = byId.get(build.id);
+      if (!entry || !seriesMatches(panel.series, build.id, build.id)) return [];
+      return [{
+        releaseId: build.id,
+        releaseDirectory: build.id,
+        hfRepo: entry.hfRepo,
+        hfCommitSha: entry.hfCommitSha,
+        publishedAt: build.publishedAt,
+        current: build.current && build.inDefaultRelease,
+        withdrawn: build.withdrawn,
+      }];
+    });
+  }
+  return releases
     .map((entry): ReleaseBuild => ({
       releaseId: entry.releaseId as string,
       releaseDirectory: releaseDirectoryOf(entry) ?? (entry.releaseId as string),
       hfRepo: entry.hfRepo,
       hfCommitSha: entry.hfCommitSha,
       publishedAt: entry.updatedAt ?? entry.createdAt,
-      current: entry.buildArtifactId === country?.latestReleaseBuildArtifactId,
-      withdrawn: withdrawn.has(entry.releaseId as string),
+      current: entry.buildArtifactId === latestBuildArtifactId,
+      withdrawn: false,
     }))
-    .filter((build) => seriesMatches(panel.series, build.releaseDirectory));
+    .filter((build) => seriesMatches(panel.series, build.releaseDirectory, build.releaseId));
+}
+
+/** The country's published release builds in the panel's series, as the release picker lists them. */
+export async function seriesBuilds(panel: PanelDocument, options: { token?: string } = {}): Promise<ReleaseBuild[]> {
+  if (!isCountry(panel.country)) throw new Error(`${panel.country} is not a registered country.`);
+  const { manifest } = await readCalibrationTreeManifest({ token: options.token, consistent: true });
+  const country = manifest.countries[panel.country];
+  // Null only when the repository has no releases.json. A record that can't be read stops the
+  // plan: falling back to the tree manifest's names would list every moved cut twice.
+  const record = await loadReleasesRecord(0, panel.country);
+  return listSeries(panel, country?.builds ?? [], country?.latestReleaseBuildArtifactId ?? null, record);
 }
 
 export async function plan(options: {

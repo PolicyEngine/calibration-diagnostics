@@ -140,10 +140,13 @@ def build_provenance(build_manifest: Mapping[str, Any] | None) -> dict[str, Any]
         return {}
     calibration = build_manifest.get("calibration") or {}
     code = build_manifest.get("code") or {}
+    # A build folder's build manifest names its build in "build"; a tagged one has "attempt_id".
+    build_name = build_manifest.get("build")
     return {
         "code_repository": code.get("repository"),
         "code_commit": code.get("git_commit"),
-        "attempt_id": build_manifest.get("attempt_id"),
+        "attempt_id": build_manifest.get("attempt_id")
+        or (build_name if isinstance(build_name, str) else None),
         "target_surface_sha256": (calibration.get("target_surface") or {}).get("sha256"),
         "n_targets": (calibration.get("target_surface") or {}).get("n_targets"),
         "target_registry_version": (calibration.get("target_registry") or {}).get("version"),
@@ -280,7 +283,13 @@ def download_verified(hub: HubClient, opened: OpenedRelease, workdir: Path) -> P
 
 def point_provenance(opened: OpenedRelease, model_package: str, model_version: str) -> dict:
     manifest = opened.manifest
-    build = manifest.get("build") or {}
+    # A tagged release's manifest nests its build facts in a "build" object. A build-folder
+    # release (microcosm#1534, #1537) names its build there as a string, keeps the facts at the
+    # top level, and records the tag it was moved from, if any, in "migrated_from".
+    named = manifest.get("build")
+    build = named if isinstance(named, Mapping) else {}
+    migrated = manifest.get("migrated_from")
+    migrated = dict(migrated) if isinstance(migrated, Mapping) else None
     return {
         **opened.point.to_json(),
         "release_manifest": {
@@ -299,8 +308,9 @@ def point_provenance(opened: OpenedRelease, model_package: str, model_version: s
             "sha256": opened.artifact.sha256,
             "bytes": opened.size_bytes,
         },
-        "build_id": build.get("build_id"),
-        "cut_tag": build.get("cut_tag"),
+        "build_id": build.get("build_id") or (named if isinstance(named, str) else None),
+        "cut_tag": build.get("cut_tag") or (migrated or {}).get("tag"),
+        "migrated_from": migrated,
         "built_at": build.get("built_at") or manifest.get("built_at"),
         "built_with_model": build.get("built_with_model_package")
         or manifest.get("built_with_model_package"),

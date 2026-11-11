@@ -9,9 +9,16 @@ regenerated, and how to add a country. The dashboard page is a later PR.
 ## Concepts
 
 - **Series**: one country's published release builds of the releases its spec
-  names, in release order, as the dashboard's release picker lists them (the
-  calibration-tree manifest's release entries, each pinned to a Hugging Face
-  commit), less builds `releases.json` marks withdrawn.
+  names, in release order, as the dashboard's release picker lists them. Where
+  the repository has a `releases.json` (the UK, since Microcosm's build folders),
+  that record is the list: each build it records under the spec's releases,
+  read from its folder `<release>/<build>`, dated by the record's
+  `published_at`, at the commit the calibration-tree manifest pins for it. A
+  recorded build with no tree entry yet waits for a later run, and withdrawn
+  builds are dropped. The tree manifest also still holds the cut tags each build
+  was moved from and the bare release folder; they are not listed. Where there
+  is no record (the US), the series is the tree manifest's release entries,
+  matched by name.
 - **Point**: one build of the series. Its release manifest is re-read at the
   pinned commit; only a default national release with
   `default_datasets.national` is measured, and its national H5 is checked
@@ -153,7 +160,13 @@ uv run release-history export --country uk --dir <dir> --output panel.csv
 ```
 
 `measure` writes the same layout as the Blob store; `--h5` reuses a local copy
-of the national file, still checked against the manifest. With access to the
+of the national file, still checked against the manifest. `--revision` takes a
+cut tag; for a build folder pass `--point` with its `release_id` and
+`release_directory` set to `<release>/<build>`. `export` reads the panel's
+`timeline.json` when there is one (the document the TypeScript side writes, in
+camelCase; `tests/fixtures/timeline.json` is that side's output and the Python
+tests read it), adding each value's change from the previous release, in
+percentage points for rates, and the official reference. With access to the
 `policy-engine/calibration-diagnostics` Vercel project, the store can be read
 in its Storage tab, or pulled with the project's `BLOB_READ_WRITE_TOKEN`:
 
@@ -251,7 +264,8 @@ ids is refused.
 
 ## Provenance kept for later
 
-Each point records the release id, build or cut tag, publication time,
+Each point records the release id, build or cut tag (for a build folder, the
+build name and the tag it was moved from, under `migrated_from`), publication time,
 repository and commit, the release and build manifests' paths and digests,
 the H5's path, digest and size, the release's built-with model and declared
 compatible range (and whether the reference model is inside it), and from the

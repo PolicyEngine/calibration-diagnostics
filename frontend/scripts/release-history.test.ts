@@ -3,8 +3,13 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildTimeline, memoryStore, readJson, type ReleaseBuild, type ReleaseHistoryManifest } from "../lib/microcosm/release-history-store";
-import { finalize, localTimeline, plan, pull, readLocalPanel, readStoredPanel, uploadDirectory, type PanelDocument } from "./release-history";
+import type { CalibrationTreeManifestEntry } from "@policyengine/calibration-tree/calibration-tree-manifest";
+import type { ReleasesRecord } from "@policyengine/calibration-tree/release-record";
+
+import { buildTimeline, encodeDocument, memoryStore, readJson, type ReleaseBuild, type ReleaseHistoryManifest } from "../lib/microcosm/release-history-store";
+import { finalize, listSeries, localTimeline, plan, pull, readLocalPanel, readStoredPanel, uploadDirectory, type PanelDocument } from "./release-history";
+
+const FIXTURES = join(import.meta.dir, "..", "..", "release_history", "tests", "fixtures");
 
 const PANEL_ID = "a".repeat(64);
 const MEASUREMENT = "b".repeat(64);
@@ -94,6 +99,105 @@ test("a run plans, uploads, and finalizes a panel; a second build stays pending"
   expect(local.panelId).toBe(PANEL_ID);
 });
 
+function treeEntry(releaseId: string, releaseDirectory?: string): CalibrationTreeManifestEntry {
+  return {
+    buildArtifactId: `artifact-${releaseId}`,
+    kind: "release",
+    sourceId: releaseId,
+    label: releaseId,
+    releaseId,
+    ...(releaseDirectory ? { releaseDirectory } : {}),
+    stagingRunId: null,
+    hfRepo: "PolicyEngine/populace-uk-private",
+    hfCommitSha: `commit-${releaseId}`,
+    createdAt: "2026-11-01T00:00:00Z",
+    updatedAt: "2026-11-01T00:00:00Z",
+  } as CalibrationTreeManifestEntry;
+}
+
+test("the series follows releases.json where a repository has one", () => {
+  const line = "microcosm-uk-2024-25-national";
+  const cut = (stamp: string, hash: string) => `uk-frs-calibration-attempt-${stamp}-${hash}`;
+  const [early, a, b, waiting] = [
+    cut("20261002T230158Z", "5c6b3f68"),
+    cut("20261019T083323Z", "6cba5d71"),
+    cut("20261107T020434Z", "eeb6093e"),
+    cut("20261112T000000Z", "0000aaaa"),
+  ];
+  // The tree manifest holds each moved cut twice (its tag and its build folder), the bare
+  // line folder, and another line's build; the newest recorded build has no tree entry yet.
+  const entries = [
+    treeEntry(`${line}-20261019T083323Z-6cba5d71`, line),
+    treeEntry(`${line}-20261107T020434Z-eeb6093e`, line),
+    treeEntry(`${line}/${early}`),
+    treeEntry(`${line}/${a}`),
+    treeEntry(`${line}/${b}`),
+    treeEntry(line),
+    treeEntry("microcosm-uk-2024-25-dense/uk-local-candidate-1"),
+  ];
+  const record: ReleasesRecord = {
+    default: line,
+    releases: {
+      [line]: {
+        role: "national",
+        current: b,
+        builds: {
+          [early]: { publishedAt: "2026-10-04T18:57:08+00:00", withdrawn: false },
+          [a]: { publishedAt: "2026-10-19T10:21:04+00:00", withdrawn: false },
+          [b]: { publishedAt: "2026-11-07T04:00:00+00:00", withdrawn: false },
+          [waiting]: { publishedAt: "2026-11-12T01:00:00+00:00", withdrawn: false },
+        },
+      },
+      "microcosm-uk-2024-25-dense": {
+        role: "local_area",
+        current: "uk-local-candidate-1",
+        builds: { "uk-local-candidate-1": { publishedAt: "2026-11-07T19:36:08+00:00", withdrawn: false } },
+      },
+    },
+  };
+  const panel = { ...panelDocument, series: { releases: [line], exclude: ["-5c6b3f68$"] } };
+  const series = listSeries(panel, entries, null, record);
+  expect(series).toEqual([
+    {
+      releaseId: `${line}/${a}`,
+      releaseDirectory: `${line}/${a}`,
+      hfRepo: "PolicyEngine/populace-uk-private",
+      hfCommitSha: `commit-${line}/${a}`,
+      publishedAt: "2026-10-19T10:21:04+00:00",
+      current: false,
+      withdrawn: false,
+    },
+    {
+      releaseId: `${line}/${b}`,
+      releaseDirectory: `${line}/${b}`,
+      hfRepo: "PolicyEngine/populace-uk-private",
+      hfCommitSha: `commit-${line}/${b}`,
+      publishedAt: "2026-11-07T04:00:00+00:00",
+      current: true,
+      withdrawn: false,
+    },
+  ]);
+
+  // Without a record (the US), the tree manifest's names are the series.
+  const byName = listSeries(
+    { ...panel, series: { releases: [line], exclude: [] } },
+    entries,
+    `artifact-${line}-20261107T020434Z-eeb6093e`,
+    null,
+  );
+  expect(byName.map((build) => build.releaseId)).toEqual([
+    `${line}-20261019T083323Z-6cba5d71`,
+    `${line}-20261107T020434Z-eeb6093e`,
+    `${line}/${early}`,
+    `${line}/${a}`,
+    `${line}/${b}`,
+    line,
+  ]);
+  expect(byName.filter((build) => build.current).map((build) => build.releaseId)).toEqual([
+    `${line}-20261107T020434Z-eeb6093e`,
+  ]);
+});
+
 test("a local folder builds its own timeline", async () => {
   const root = await localStore();
   const path = await localTimeline(root, "uk", PANEL_ID);
@@ -103,10 +207,15 @@ test("a local folder builds its own timeline", async () => {
 
 test("the Python producer's measurement document builds a timeline", async () => {
   // release_history/tests/test_document_fixture.py writes this file from a fake model world.
-  const path = join(import.meta.dir, "..", "..", "release_history", "tests", "fixtures", "measurement.json");
+  const path = join(FIXTURES, "measurement.json");
   const document = JSON.parse(await readFile(path, "utf8"));
   const later = { ...document, measurement_id: "c".repeat(64), point: { ...document.point, published_at: "2026-11-02T00:00:00Z" } };
   const timeline = buildTimeline({ country: "zz", panelId: document.panel_id, points: [later, document], references: null, builtAt: "t" });
+  // release_history/tests/test_export.py reads the timeline exactly as this side writes it.
+  // Regenerate with UPDATE_FIXTURES=1.
+  const text = new TextDecoder().decode(encodeDocument(timeline));
+  if (process.env.UPDATE_FIXTURES) await writeFile(join(FIXTURES, "timeline.json"), text);
+  expect(await readFile(join(FIXTURES, "timeline.json"), "utf8")).toBe(text);
   expect(timeline.points.map((p) => p.measurementId)).toEqual([document.measurement_id, "c".repeat(64)]);
   const outputs = new Set(document.cells.map((cell: { output: string; period: number }) => `${cell.output}@${cell.period}`));
   expect(timeline.series).toHaveLength(outputs.size);

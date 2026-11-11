@@ -1,0 +1,1644 @@
+{
+  "schemaVersion": 1,
+  "kind": "release_history.timeline",
+  "country": "zz",
+  "panelId": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "builtAt": "t",
+  "points": [
+    {
+      "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+      "releaseId": "zz-national-20261101T000000Z-00000000",
+      "releaseDirectory": "zz-national",
+      "publishedAt": "2026-11-01T00:00:00Z",
+      "status": "ok"
+    },
+    {
+      "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "releaseId": "zz-national-20261101T000000Z-00000000",
+      "releaseDirectory": "zz-national",
+      "publishedAt": "2026-11-02T00:00:00Z",
+      "status": "ok"
+    }
+  ],
+  "series": [
+    {
+      "output": "baseline/benefit",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 70000,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 70000,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "baseline/benefit_caseload",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 700,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 700,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "baseline/households",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 1000,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 1000,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "baseline/income_tax",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 4700000,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 4700000,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_10",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_1",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_2",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_3",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_4",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_5",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_6",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_7",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_8",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/net_income_mean/decile_9",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "baseline/poverty_children",
+      "period": 2026,
+      "unit": "rate",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": 0,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/budgetary_impact",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": -70000,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": -70000,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_10",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_1",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": 0,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_2",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_3",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_4",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_5",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_6",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_7",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_8",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/decile_relative_change/decile_9",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/households_gaining",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 700,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 700,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/households_losing",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/net_income_change_pct",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0.37095919448860626,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0.37095919448860626,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": 0,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/people_gaining",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 1500,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 1500,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/people_losing",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/poverty/poverty/all",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/poverty/poverty/children",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/programme/benefit",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 70000,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 70000,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/programme/income_tax",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/benefit_up/target/benefit",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 70000,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 70000,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/budgetary_impact",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 2350000.000000001,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 2350000.000000001,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_10",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_1",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_2",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_3",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_4",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_5",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_6",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_7",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_8",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/decile_relative_change/decile_9",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": null,
+          "status": "withheld",
+          "reason": "small_cell",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "withheld"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/households_gaining",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/households_losing",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 1000,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 1000,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/net_income_change_pct",
+      "period": 2026,
+      "unit": "ratio",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": -12.453630100688924,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": -12.453630100688924,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": 0,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/people_gaining",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/people_losing",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 1800,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 1800,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/poverty/poverty/all",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/poverty/poverty/children",
+      "period": 2026,
+      "unit": "count",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/programme/benefit",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 0,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/programme/income_tax",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 2350000.000000001,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 2350000.000000001,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    },
+    {
+      "output": "reform/tax_up/target/income_tax",
+      "period": 2026,
+      "unit": "currency",
+      "reference": null,
+      "values": [
+        {
+          "measurementId": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "value": 2350000.000000001,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "measurementId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "value": 2350000.000000001,
+          "status": "ok",
+          "comparedWith": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        }
+      ]
+    }
+  ],
+  "chronicle": null
+}

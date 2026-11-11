@@ -4,6 +4,10 @@ With a `timeline.json` (pulled from Blob, or built by `bun run
 scripts/release-history.ts timeline`), each row carries the change from the
 previous release and the output's official reference. Without one, rows come
 straight from the stored points.
+
+`timeline.json` is written by the TypeScript side (`buildTimeline`), so its keys
+are camelCase; `tests/fixtures/timeline.json` is that side's output, and the
+tests read it here so the two languages can't drift apart.
 """
 
 from __future__ import annotations
@@ -40,6 +44,8 @@ TIMELINE_COLUMNS = [
     "reason",
     "change",
     "relative_change",
+    "change_points",
+    "change_status",
     "reference_status",
     "reference_value",
     "reference_basis",
@@ -76,17 +82,20 @@ def point_rows(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def timeline_rows(timeline: dict[str, Any]) -> list[dict[str, Any]]:
+    """One row per release and output, from the TypeScript side's camelCase timeline."""
     rows = []
-    points = {p["measurement_id"]: p for p in timeline.get("points") or []}
+    points = {p["measurementId"]: p for p in timeline.get("points") or []}
     for series in timeline.get("series") or []:
         reference = series.get("reference") or {}
+        # The official figure in the model's sign convention, when it has a value.
+        reference_value = reference.get("modelSignValue", reference.get("value"))
         for entry in series.get("values") or []:
-            point = points.get(entry.get("measurement_id"), {})
+            point = points.get(entry.get("measurementId"), {})
             rows.append(
                 {
-                    "release_id": point.get("release_id"),
-                    "published_at": point.get("published_at"),
-                    "measurement_id": entry.get("measurement_id"),
+                    "release_id": point.get("releaseId"),
+                    "published_at": point.get("publishedAt"),
+                    "measurement_id": entry.get("measurementId"),
                     "period": series.get("period"),
                     "output": series.get("output"),
                     "unit": series.get("unit"),
@@ -94,9 +103,11 @@ def timeline_rows(timeline: dict[str, Any]) -> list[dict[str, Any]]:
                     "status": entry.get("status"),
                     "reason": entry.get("reason"),
                     "change": entry.get("change"),
-                    "relative_change": entry.get("relative_change"),
+                    "relative_change": entry.get("relativeChange"),
+                    "change_points": entry.get("changePoints"),
+                    "change_status": entry.get("changeStatus"),
                     "reference_status": reference.get("status"),
-                    "reference_value": reference.get("value"),
+                    "reference_value": reference_value,
                     "reference_basis": reference.get("basis"),
                 }
             )
