@@ -122,7 +122,7 @@ describe("the Build progress tab with Hugging Face run files off", () => {
     expect(huggingFaceRequests).toEqual([]);
   });
 
-  test("with the Vercel OIDC token too, the list comes from read API v2 alone", async () => {
+  test("with the Vercel OIDC token too, the list and a run's detail come from read API v2 alone", async () => {
     process.env.MICROCOSM_TELEMETRY_VERCEL_OIDC = "1";
     delete process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION;
     const tokenSpy = spyOn(vercelOidc, "token").mockResolvedValue("oidc-token");
@@ -152,6 +152,10 @@ describe("the Build progress tab with Hugging Face run files off", () => {
         listed.map((run) => run.run_id as string).toSorted(),
       );
       expect(sentPaths[0]).toBe("/v2/runs");
+
+      const detail = await loadBuildRun("staging", "us", "us-run-failed");
+
+      expect(detail?.run.run_id).toBe("us-run-failed");
       expect(huggingFaceRequests).toEqual([]);
       expect(readSecret).not.toHaveBeenCalled();
     } finally {
@@ -205,6 +209,19 @@ describe("the Build progress tab with Hugging Face run files off", () => {
 });
 
 describe("the Build progress tab with the setting off", () => {
+  test("a run id the collector refuses is not found in a country without a staging repository", async () => {
+    process.env[SETTING] = "0";
+    const collector = fakeTelemetryCollector({ countryCode: "BE", runCount: 2 });
+    globalThis.fetch = collector.fetch;
+
+    const detail = await loadBuildRun("staging", "be", "not/a-run").catch(
+      (error: unknown) => error,
+    );
+
+    expect(detail).toBeNull();
+  });
+
+
   for (const off of [undefined, "", "0"]) {
     test(`still reads the Hugging Face run files when the setting is ${JSON.stringify(off ?? null)}`, async () => {
       const { huggingFaceRequests } = serveUsCollector(1);

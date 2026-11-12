@@ -298,7 +298,9 @@ does not read the provider setting. The server sends the credential only to the
 collector, as the `X-Telemetry-Read-Token` header; it never reaches the browser and
 never passes through GitHub Actions. Unless the collector is configured (the address
 and the secret version, or the address with `MICROCOSM_TELEMETRY_VERCEL_OIDC=1`), the
-build monitor shows only the Hugging Face staging history. If a collector request fails,
+build monitor shows only the Hugging Face staging history, or, with
+`MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY=1`, no hosted runs and "The telemetry collector is
+not configured on this server." If a collector request fails,
 the build monitor reports `collector` among the runs that could not be read, and still
 shows the Hugging Face runs unless `MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY=1`.
 
