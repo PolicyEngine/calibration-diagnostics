@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
+import {
+  recordedBody,
+  withInstants,
+} from "@/lib/microcosm/test-support/collector-read-api/recorded-answers";
 import { secretManager } from "@/lib/server/secret-manager";
 import {
   CollectorRequestError,
@@ -21,10 +24,6 @@ const SETTINGS = [
   "MICROCOSM_TELEMETRY_READ_SECRET_VERSION",
   SETTING,
 ] as const;
-const RECORDED_ANSWERS = new URL(
-  "../../microcosm/test-support/collector-read-api/",
-  import.meta.url,
-);
 
 type JsonObject = Record<string, unknown>;
 
@@ -73,20 +72,6 @@ interface SentRequest {
   headers: Headers;
 }
 
-function recordedV2Body(name: string): JsonObject {
-  const recorded = JSON.parse(
-    readFileSync(new URL(`v2/${name}.json`, RECORDED_ANSWERS), "utf8"),
-  ) as { response: { body: JsonObject } };
-  return recorded.response.body;
-}
-
-function recordedV1Body(name: string): JsonObject {
-  const recorded = JSON.parse(
-    readFileSync(new URL(`v1/${name}.json`, RECORDED_ANSWERS), "utf8"),
-  ) as { response: { body: JsonObject } };
-  return recorded.response.body;
-}
-
 // A collector that answers each request with the next answer given, and
 // records what was sent.
 function serveAnswers(answers: Response[]): SentRequest[] {
@@ -103,26 +88,8 @@ function serveAnswers(answers: Response[]): SentRequest[] {
   return sent;
 }
 
-// Version 2 writes every time in UTC as `...Z`; version 1 keeps the
-// `+00:00` that times nested in a run's work or reading had when stored. The
-// build monitor parses both, so the comparison is by instant.
-const ZONED_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
-
-function withInstants(value: unknown): unknown {
-  if (typeof value === "string" && ZONED_TIME.test(value)) {
-    return new Date(value).toISOString();
-  }
-  if (Array.isArray(value)) return value.map(withInstants);
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, withInstants(item)]),
-    );
-  }
-  return value;
-}
-
 function runSummary(runId: string, countryCode = "US"): JsonObject {
-  const listed = (recordedV2Body("list-runs").runs as JsonObject[])[0];
+  const listed = (recordedBody("v2", "list-runs").runs as JsonObject[])[0];
   return { ...listed, run_id: runId, country_code: countryCode };
 }
 
@@ -225,7 +192,7 @@ describe("reading through the client with the Vercel OIDC token", () => {
     const tokenSpy = await serveVercelOidcToken(() => `token-${(issued += 1)}`);
     const sent = serveAnswers([
       Response.json({ runs: [runSummary("run-1")], next_before: null }),
-      Response.json(recordedV2Body("get-run-us-run-completed")),
+      Response.json(recordedBody("v2", "get-run-us-run-completed")),
     ]);
 
     await loadCollectorRuns("us", 60);
@@ -241,9 +208,9 @@ describe("reading through the client with the Vercel OIDC token", () => {
   test("gives a run the documents version 1 gives for it", async () => {
     await serveVercelOidcToken(VERCEL_OIDC_TOKEN);
     const sent = serveAnswers([
-      Response.json(recordedV2Body("get-run-us-run-completed")),
+      Response.json(recordedBody("v2", "get-run-us-run-completed")),
     ]);
-    const version1 = recordedV1Body("get-run-us-run-completed");
+    const version1 = recordedBody("v1", "get-run-us-run-completed");
 
     const run = await loadCollectorRun("us-run-completed", "us");
 
@@ -303,11 +270,28 @@ describe("reading through the client with the Vercel OIDC token", () => {
 
   test("refuses a run of another country", async () => {
     await serveVercelOidcToken(VERCEL_OIDC_TOKEN);
-    serveAnswers([Response.json(recordedV2Body("get-run-gb-run-blocked"))]);
+    serveAnswers([Response.json(recordedBody("v2", "get-run-gb-run-blocked"))]);
 
     await expect(loadCollectorRun("gb-run-blocked", "us")).rejects.toThrow(
       "Telemetry collector returned a run for another country.",
     );
+  });
+
+  test("sends each request to the collector address set when it is made", async () => {
+    await serveVercelOidcToken(VERCEL_OIDC_TOKEN);
+    const sent = serveAnswers([
+      Response.json({ runs: [runSummary("first")], next_before: null }),
+      Response.json({ runs: [runSummary("second")], next_before: null }),
+    ]);
+
+    await loadCollectorRuns("us", 60);
+    process.env.MICROCOSM_TELEMETRY_COLLECTOR_URL = "https://other-telemetry.example";
+    await loadCollectorRuns("us", 60);
+
+    expect(sent.map((request) => request.url.origin)).toEqual([
+      COLLECTOR_URL,
+      "https://other-telemetry.example",
+    ]);
   });
 
   test("sends nothing without a token", async () => {

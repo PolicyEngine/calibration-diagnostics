@@ -9,7 +9,9 @@ import {
   FAKE_COLLECTOR_URL,
   fakeTelemetryCollector,
 } from "@/lib/microcosm/test-support/fake-telemetry-collector";
+import { recordedBody } from "@/lib/microcosm/test-support/collector-read-api/recorded-answers";
 import { secretManager } from "@/lib/server/secret-manager";
+import { vercelOidc } from "@/lib/server/vercel-oidc";
 
 // With MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY=1 the Build progress tab reads
 // build telemetry only from the collector: neither its run list nor a run's
@@ -101,6 +103,56 @@ describe("the Build progress tab with Hugging Face run files off", () => {
 
     expect(detail).toBeNull();
     expect(huggingFaceRequests).toEqual([]);
+  });
+
+  test("a run id the collector refuses is not found, without asking Hugging Face", async () => {
+    const { collector, huggingFaceRequests } = serveUsCollector(3);
+
+    for (const malformed of ["not/a-run", "-starts-with-a-dash"]) {
+      const detail = await loadBuildRun("staging", "us", malformed).catch(
+        (error: unknown) => error,
+      );
+      expect(detail).toBeNull();
+    }
+    expect(collector.documentRequests).toEqual([]);
+    expect(huggingFaceRequests).toEqual([]);
+  });
+
+  test("with the Vercel OIDC token too, the list comes from read API v2 alone", async () => {
+    process.env.MICROCOSM_TELEMETRY_VERCEL_OIDC = "1";
+    delete process.env.MICROCOSM_TELEMETRY_READ_SECRET_VERSION;
+    const tokenSpy = spyOn(vercelOidc, "token").mockResolvedValue("oidc-token");
+    const listed = (recordedBody("v2", "list-runs").runs as Record<string, unknown>[])
+      .filter((run) => run.country_code === "US");
+    const sentPaths: string[] = [];
+    const huggingFaceRequests: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.origin === HUGGING_FACE) {
+        huggingFaceRequests.push(url.toString());
+        return Response.json({ error: "Entry not found" }, { status: 404 });
+      }
+      expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer oidc-token");
+      sentPaths.push(url.pathname);
+      if (url.pathname === "/v2/runs") {
+        return Response.json({ runs: listed, next_before: null });
+      }
+      const runId = decodeURIComponent(url.pathname.replace("/v2/runs/", ""));
+      return Response.json(recordedBody("v2", `get-run-${runId}`));
+    }) as typeof fetch;
+    try {
+      const response = await loadBuildRuns("staging", "us");
+
+      expect(response.problems).toEqual([]);
+      expect(response.runs.map((run) => run.run_id).toSorted()).toEqual(
+        listed.map((run) => run.run_id as string).toSorted(),
+      );
+      expect(sentPaths[0]).toBe("/v2/runs");
+      expect(huggingFaceRequests).toEqual([]);
+      expect(readSecret).not.toHaveBeenCalled();
+    } finally {
+      tokenSpy.mockRestore();
+    }
   });
 
   test("without a configured collector the hosted runs are unavailable and Hugging Face is not asked", async () => {
