@@ -259,7 +259,11 @@ chooses:
   Vercel team, and this project with the deployment's environment (the production
   collector, `production`; the staging collector, `preview`). Otherwise it answers
   401 or 403, and the build monitor reports `collector` among the runs it could not
-  read. Any other value of the setting is refused as invalid.
+  read. Any other value of the setting is refused as invalid. On Vercel the token is
+  read from the request being served. Locally, `@vercel/oidc` reads `VERCEL_OIDC_TOKEN`
+  (from `vercel env pull`) or `VERCEL_OIDC_TOKEN_FILE`, and refreshes an expired token
+  through the Vercel CLI's login before the request; that refresh is outside the
+  client's 30-second limit.
 
 A second server-only setting, `MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY=1`, makes the
 Build progress tab read build telemetry only from the collector, without the run files
@@ -292,10 +296,11 @@ provider, reads the secret version from the Secret Manager API, and keeps the va
 memory for up to one minute. Locally it uses Google Application Default Credentials and
 does not read the provider setting. The server sends the credential only to the
 collector, as the `X-Telemetry-Read-Token` header; it never reaches the browser and
-never passes through GitHub Actions. Unless both the address and the secret version
-are set, the build monitor shows only the Hugging Face staging history. If a collector
-request fails, the build monitor still shows the Hugging Face runs and reports
-`collector` among the runs that could not be read.
+never passes through GitHub Actions. Unless the collector is configured (the address
+and the secret version, or the address with `MICROCOSM_TELEMETRY_VERCEL_OIDC=1`), the
+build monitor shows only the Hugging Face staging history. If a collector request fails,
+the build monitor reports `collector` among the runs that could not be read, and still
+shows the Hugging Face runs unless `MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY=1`.
 
 The Vercel project has OIDC turned on with the team issuer (read 2026-10-26). The
 Google side, the provider's trust in that issuer and audience and each identity's

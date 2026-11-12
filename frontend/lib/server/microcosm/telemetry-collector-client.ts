@@ -7,6 +7,7 @@ import {
 } from "@policyengine/microcosm-collector-client";
 import type { BuildRunDocuments } from "@/lib/microcosm/build-monitor";
 import { runDocuments } from "@/lib/microcosm/collector-run-documents";
+import { onOffSetting } from "@/lib/microcosm/on-off-setting";
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 import { secretManager, validSecretVersion } from "@/lib/server/secret-manager";
 import { vercelOidc } from "@/lib/server/vercel-oidc";
@@ -33,6 +34,15 @@ export interface CollectorRunSummary extends JsonObject {
   current_stage?: string | null;
   ended_at?: string | null;
   heartbeat_at?: string | null;
+}
+
+// A run id the collector would refuse, so no collector holds such a run; it
+// is refused before any request.
+export class InvalidCollectorRunIdError extends Error {
+  constructor() {
+    super("Telemetry collector run id is invalid.");
+    this.name = "InvalidCollectorRunIdError";
+  }
 }
 
 // A collector request that answered with an HTTP error, such as 404 for a
@@ -67,19 +77,10 @@ type CollectorConfiguration =
   | { baseUrl: string; credential: "read-secret"; secretVersion: string }
   | { baseUrl: string; credential: "vercel-oidc" };
 
-function readsWithVercelOidc(
-  environment: Record<string, string | undefined>,
-): boolean {
-  const value = environment[TELEMETRY_VERCEL_OIDC_ENV]?.trim() ?? "";
-  if (value === "1") return true;
-  if (value === "" || value === "0") return false;
-  throw new Error(`${TELEMETRY_VERCEL_OIDC_ENV} must be 1 or 0.`);
-}
-
 function collectorConfiguration(
   environment: Record<string, string | undefined> = process.env,
 ): CollectorConfiguration | null {
-  const withVercelOidc = readsWithVercelOidc(environment);
+  const withVercelOidc = onOffSetting(TELEMETRY_VERCEL_OIDC_ENV, environment);
   const rawUrl = environment[TELEMETRY_COLLECTOR_URL_ENV]?.trim();
   const secretVersion = environment[TELEMETRY_READ_SECRET_VERSION_ENV]?.trim();
   if (!rawUrl || (!withVercelOidc && !secretVersion)) return null;
@@ -247,7 +248,7 @@ export async function loadCollectorRun(
   country: MicrocosmCountry,
 ): Promise<BuildRunDocuments> {
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$/.test(runId)) {
-    throw new Error("Telemetry collector run id is invalid.");
+    throw new InvalidCollectorRunIdError();
   }
   const configuration = requireConfiguration();
   if (configuration.credential === "vercel-oidc") {
@@ -306,6 +307,6 @@ async function loadCollectorRunThroughClient(
     run_id: runId,
     source: "staging",
     country,
-    ...runDocuments(detail as unknown as JsonObject),
+    ...runDocuments(detail),
   };
 }

@@ -37,9 +37,11 @@ import {
   loadStagingRuns,
   loadStagingRunTelemetry,
 } from "@policyengine/calibration-tree/staging-artifact";
+import { onOffSetting } from "@/lib/microcosm/on-off-setting";
 import {
   CollectorRequestError,
   type CollectorRunSummary,
+  InvalidCollectorRunIdError,
   collectorConfigured,
   loadCollectorRun,
   loadCollectorRuns,
@@ -82,13 +84,8 @@ const EARLIER_COLLECTOR_LIST_MAX_AGE_MS = 60_000;
 // reads both.
 export const COLLECTOR_ONLY_ENV = "MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY";
 
-function collectorOnly(
-  environment: Record<string, string | undefined> = process.env,
-): boolean {
-  const value = environment[COLLECTOR_ONLY_ENV]?.trim() ?? "";
-  if (value === "1") return true;
-  if (value === "" || value === "0") return false;
-  throw new Error(`${COLLECTOR_ONLY_ENV} must be 1 or 0.`);
+function collectorOnly(): boolean {
+  return onOffSetting(COLLECTOR_ONLY_ENV);
 }
 
 export interface BuildRunProblem {
@@ -689,8 +686,9 @@ function recordsAnything(documents: BuildRunDocuments): boolean {
 
 // What a run detail falls back to when neither source has a usable record:
 // the listed run; else, when the collector said it has no record of the run
-// (404) or was not asked, nothing, so the route answers "not found"; else the
-// collector's failure, which a missing Hugging Face copy does not explain.
+// (404), was not asked, or could not hold a run with that id, nothing, so the
+// route answers "not found"; else the collector's failure, which a missing
+// Hugging Face copy does not explain.
 function withoutAnyRecord(
   current: BuildTimeline | null,
   collectorError: unknown,
@@ -700,6 +698,7 @@ function withoutAnyRecord(
   if (collectorError instanceof CollectorRequestError && collectorError.status === 404) {
     return null;
   }
+  if (collectorError instanceof InvalidCollectorRunIdError) return null;
   throw collectorError;
 }
 

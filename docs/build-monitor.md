@@ -27,9 +27,11 @@ silent run that resumed, the run is asked for again.
   socket; that service samples the build process tree, stores unsent events in
   a bounded SQLite retry queue, authenticates with the ambient Hugging Face
   credential, and delivers events to the hosted collector. The dashboard
-  server receives the collector address and its independent read credential
-  from the deployment environment. Neither value belongs in documentation or
-  browser-visible configuration.
+  server receives the collector address from the deployment environment, and
+  authenticates with either the collector's independent read credential or
+  the deployment's own Vercel OIDC token (`MICROCOSM_TELEMETRY_VERCEL_OIDC`,
+  see `frontend/HOSTED_RUNTIME.md`). None of these values belongs in
+  documentation or browser-visible configuration.
 
   A missing credential, a user outside the PolicyEngine Hugging Face
   organization, or an unavailable network does not stop a build. Events remain

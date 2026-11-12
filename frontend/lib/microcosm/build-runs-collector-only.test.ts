@@ -108,13 +108,17 @@ describe("the Build progress tab with Hugging Face run files off", () => {
   test("a run id the collector refuses is not found, without asking Hugging Face", async () => {
     const { collector, huggingFaceRequests } = serveUsCollector(3);
 
-    for (const malformed of ["not/a-run", "-starts-with-a-dash"]) {
+    const malformedIds = ["not/a-run", "-starts-with-a-dash"];
+    for (const malformed of malformedIds) {
       const detail = await loadBuildRun("staging", "us", malformed).catch(
         (error: unknown) => error,
       );
       expect(detail).toBeNull();
     }
-    expect(collector.documentRequests).toEqual([]);
+    // The list reads its own runs' records, but nothing asks for these ids.
+    expect(
+      collector.documentRequests.filter((runId) => malformedIds.includes(runId)),
+    ).toEqual([]);
     expect(huggingFaceRequests).toEqual([]);
   });
 
