@@ -76,6 +76,21 @@ const COLLECTOR_LIST_WAIT_MS = 5_000;
 // next poll, and that poll's own request may be as slow.
 const EARLIER_COLLECTOR_LIST_MAX_AGE_MS = 60_000;
 
+// `1` makes the Build progress tab read build telemetry only from the
+// collector: neither its run list nor a run's detail reads the run files
+// builds wrote to the Hugging Face staging repositories. Unset, empty or `0`
+// reads both.
+export const COLLECTOR_ONLY_ENV = "MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY";
+
+function collectorOnly(
+  environment: Record<string, string | undefined> = process.env,
+): boolean {
+  const value = environment[COLLECTOR_ONLY_ENV]?.trim() ?? "";
+  if (value === "1") return true;
+  if (value === "" || value === "0") return false;
+  throw new Error(`${COLLECTOR_ONLY_ENV} must be 1 or 0.`);
+}
+
 export interface BuildRunProblem {
   run_id: string;
   detail: string;
@@ -262,7 +277,8 @@ export interface HostedRunLoaders {
 
 const hostedRunLoaders: HostedRunLoaders = {
   collectorConfigured,
-  hasStagingHistory: (country) => hasCapability(country, "staging"),
+  hasStagingHistory: (country) =>
+    !collectorOnly() && hasCapability(country, "staging"),
   loadCollector: loadCollectorRecord,
   loadHistory: async (runId, country) => ({
     ...(await loadStagingRunTelemetry(runId, 0, country)),
@@ -573,15 +589,27 @@ export function mergeHostedDocuments(
   return [...byId.values()];
 }
 
+const COLLECTOR_NOT_CONFIGURED =
+  "The telemetry collector is not configured on this server.";
+
 async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
+  const withoutRunFiles = collectorOnly();
   const hosted: LoadedRuns[] = [];
   const sourceProblems: BuildRunProblem[] = [];
   let collectorRunDocuments: BuildRunDocuments[] = [];
   let huggingFaceRunDocuments: BuildRunDocuments[] = [];
+  if (withoutRunFiles && !collectorConfigured()) {
+    return {
+      available: false,
+      detail: COLLECTOR_NOT_CONFIGURED,
+      documents: [],
+      problems: [],
+    };
+  }
   // The two sources are read at the same time.
   const [collector, huggingFace] = await Promise.allSettled([
     collectorConfigured() ? loadCollector(country) : Promise.resolve(null),
-    loadHuggingFaceStaging(country),
+    withoutRunFiles ? Promise.resolve(null) : loadHuggingFaceStaging(country),
   ]);
   if (collector.status === "rejected") {
     sourceProblems.push({
@@ -597,7 +625,7 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
       run_id: "hugging-face-history",
       detail: message(huggingFace.reason),
     });
-  } else {
+  } else if (huggingFace.value) {
     hosted.push(huggingFace.value);
     huggingFaceRunDocuments = huggingFace.value.documents;
   }

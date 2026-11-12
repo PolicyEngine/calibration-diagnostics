@@ -43,7 +43,14 @@ silent run that resumed, the run is asked for again.
   run documents, from the Hugging Face staging repository or a local run folder.
 - **Historical Hugging Face telemetry.** During migration, the hosted view also
   reads version 1, 2 and 3 run documents from each country's Hugging Face
-  staging repository. A collector record replaces a historical record with the
+  staging repository, unless the server-only setting
+  `MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY` is `1`. Then the Build progress tab
+  reads only the collector: its run list asks Hugging Face nothing, a run the
+  collector has no record of is not found, and without a configured collector
+  the hosted runs are unavailable. The Candidate tab still lists runs from the
+  Hugging Face staging repository and falls back to their Hugging Face states,
+  whatever the setting. Unset, empty or `0` reads both sources; any other value
+  is refused. A collector record replaces a historical record with the
   same run id, except that a collector record that stopped before the run
   ended never hides an end the Hugging Face copy recorded after the record's
   latest update. The Candidate tab applies the same rule to the runs it lists.
@@ -68,8 +75,10 @@ silent run that resumed, the run is asked for again.
   in flight is shared only for 5 seconds after it was made, and a later call
   makes its own request: once the Candidate tab has stopped waiting for a
   request, nothing keeps it running, and Vercel can suspend the instance
-  with it in flight. Every collector request needs the collector's read
-  credential from Google Secret Manager, and that read follows the same
+  with it in flight. Unless the collector is read with the deployment's
+  Vercel OIDC token (`MICROCOSM_TELEMETRY_VERCEL_OIDC=1`, see
+  `frontend/HOSTED_RUNTIME.md`), every collector request needs the collector's
+  read credential from Google Secret Manager, and that read follows the same
   rule: a read still in flight is shared for 5 seconds after it began, and a
   read that answered is reused for 60 seconds after it began. A run's own
   record is read again only when its row in the collector's list changes

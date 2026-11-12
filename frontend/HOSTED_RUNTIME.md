@@ -218,7 +218,9 @@ present when listed on 2026-10-26; no value was read.
 The candidate also uses settings stored in the Vercel project's Production
 environment, which the workflow neither supplies nor changes:
 `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` and
-`MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER` (the collector),
+`MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER` (the collector, and
+`MICROCOSM_TELEMETRY_VERCEL_OIDC` and `MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY` once
+they are set; see [Reading the telemetry collector](#reading-the-telemetry-collector)),
 `POPULACE_UK_STAGING_HF_TOKEN` (UK staging), `BLOB_STORE_ID` and
 `BLOB_READ_WRITE_TOKEN` (Blob storage), `HF_WEBHOOK_SECRET` and
 `GITHUB_ACTIONS_DISPATCH_TOKEN` (the Hugging Face webhook),
@@ -237,7 +239,35 @@ deployment are in
 which has deployed it since 2026-10-21. A merge to this repository's `main` deploys only
 the dashboard and its Modal backend, never the collector. The dashboard only reads the
 collector, from server code (`frontend/lib/server/microcosm/telemetry-collector-client.ts`),
-with three server-only settings:
+in one of two ways, which the server-only setting `MICROCOSM_TELEMETRY_VERCEL_OIDC`
+chooses:
+
+- **Unset, empty or `0` (the default):** read API v1 with the collector's read
+  credential from Google Secret Manager, as described below.
+- **`1`:** read API v2 through the collector's typed client,
+  [`@policyengine/microcosm-collector-client`](https://github.com/PolicyEngine/microcosm-collector/tree/main/packages/collector-client),
+  authenticated with the deployment's own Vercel OIDC token
+  (`frontend/lib/server/vercel-oidc.ts`, `getVercelOidcToken()` from `@vercel/oidc`),
+  which the client asks for before every request and sends as
+  `Authorization: Bearer <token>`. Only `MICROCOSM_TELEMETRY_COLLECTOR_URL` is needed;
+  the server reads neither Secret Manager nor the Google identity provider setting.
+  Each run comes back as version 2's state and events, and
+  `frontend/lib/microcosm/collector-run-documents.ts` turns it into the documents
+  version 1 gives for it, so the build monitor reads the same documents either way.
+  The collector must accept the token: its `TELEMETRY_VERCEL_OIDC_TEAM_SLUG`,
+  `TELEMETRY_VERCEL_OIDC_TEAM_ID` and `TELEMETRY_VERCEL_OIDC_READERS` must name this
+  Vercel team, and this project with the deployment's environment (the production
+  collector, `production`; the staging collector, `preview`). Otherwise it answers
+  401 or 403, and the build monitor reports `collector` among the runs it could not
+  read. Any other value of the setting is refused as invalid.
+
+A second server-only setting, `MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY=1`, makes the
+Build progress tab read build telemetry only from the collector, without the run files
+builds wrote to the Hugging Face staging repositories
+([docs/build-monitor.md](../docs/build-monitor.md#sources)). The two settings are
+independent.
+
+The default way uses three server-only settings:
 
 - `MICROCOSM_TELEMETRY_COLLECTOR_URL`: the collector address. It must use HTTPS, except
   on `localhost` or `127.0.0.1`. The workflow passes production deployments the GitHub
