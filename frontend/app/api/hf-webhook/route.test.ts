@@ -1218,6 +1218,69 @@ test("a network failure or a timeout reaching the collector is a failed tree bui
   }
 });
 
+/** A 202 whose body read fails with `error`. */
+function bodyReadFailure(error: Error): CollectorAnswer {
+  return () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(error);
+        },
+      }),
+      { status: 202 },
+    );
+}
+
+test("a network failure's log names its cause, never the request's headers or the token", async () => {
+  // Node's fetch throws TypeError("fetch failed"), or "terminated" while it
+  // reads a body, and names what failed only in the error's cause.
+  const failures: Array<{ collector: CollectorAnswer; detail: string; cause: string }> = [
+    {
+      collector: () => {
+        throw new TypeError("fetch failed", {
+          cause: Object.assign(new Error("getaddrinfo ENOTFOUND collector.example"), {
+            code: "ENOTFOUND",
+          }),
+        });
+      },
+      detail: "The collector could not be reached.",
+      cause: "getaddrinfo ENOTFOUND collector.example",
+    },
+    {
+      // A connection refused at every address: an AggregateError without a
+      // message, whose code names the failure.
+      collector: () => {
+        throw new TypeError("fetch failed", {
+          cause: Object.assign(new AggregateError([], ""), { code: "ECONNREFUSED" }),
+        });
+      },
+      detail: "The collector could not be reached.",
+      cause: "ECONNREFUSED",
+    },
+    {
+      collector: bodyReadFailure(
+        new TypeError("terminated", { cause: new Error("other side closed") }),
+      ),
+      detail: "The collector's HTTP 202 answer could not be read.",
+      cause: "other side closed",
+    },
+  ];
+  for (const failure of failures) {
+    const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(71))]), {
+      collector: failure.collector,
+    });
+
+    expectFailedTreeBuild(result);
+    expect(result.body.tree_build.detail).toBe(failure.detail);
+    const logged = result.logged.join("\n");
+    expect(logged).toContain(failure.cause);
+    expect(logged.toLowerCase()).not.toContain("authorization");
+    expect(logged).not.toContain("Bearer");
+    // The answer keeps its fixed sentence.
+    expect(result.text).not.toContain(failure.cause);
+  }
+});
+
 test("a 202 whose body is not the collector's queued answer is a failed tree build", async () => {
   const unreadable: CollectorAnswer[] = [
     () => new Response(COLLECTOR_REFUSAL, { status: 202 }),
@@ -1254,15 +1317,7 @@ test("the collector's answer is logged with at most 200 characters of its body",
 
 test("a 202 whose body cannot be read is a failed tree build", async () => {
   const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(68))]), {
-    collector: () =>
-      new Response(
-        new ReadableStream({
-          start(controller) {
-            controller.error(new TypeError("terminated"));
-          },
-        }),
-        { status: 202 },
-      ),
+    collector: bodyReadFailure(new TypeError("terminated")),
   });
 
   expectFailedTreeBuild(result);
