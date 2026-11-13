@@ -1,4 +1,4 @@
-import { expect, spyOn, test } from "bun:test";
+import { expect, jest, spyOn, test } from "bun:test";
 
 import {
   resolveHfWebhookConfig,
@@ -822,7 +822,8 @@ const NOT_BEFORE = "2026-11-13T12:10:00+00:00";
 // Text of a collector error answer, which must never reach the webhook's answer.
 const COLLECTOR_REFUSAL = "collector-refusal-detail";
 
-type CollectorAnswer = () => Response | Promise<Response>;
+/** The collector's answer to one request, given the request's options. */
+type CollectorAnswer = (init: RequestInit) => Response | Promise<Response>;
 
 interface CapturedRequest {
   url: string;
@@ -844,7 +845,7 @@ function queuedTreeBuild(
   outcome: "queued" | "already_queued" = "queued",
   country = "us",
   kind = "staging",
-): CollectorAnswer {
+): () => Response {
   return () =>
     Response.json(
       {
@@ -898,7 +899,7 @@ function treeBuildWebhook(options: {
     }
     if (url.startsWith(`${COLLECTOR_URL}/`)) {
       collectorRequests.push({ url, init: init ?? {} });
-      return (options.collector ?? queuedTreeBuild())();
+      return (options.collector ?? queuedTreeBuild())(init ?? {});
     }
     throw new Error(`Unexpected URL ${url}`);
   };
@@ -1230,6 +1231,151 @@ test("a 202 whose body is not the collector's queued answer is a failed tree bui
 
     expectFailedTreeBuild(result);
   }
+});
+
+test("the collector's answer is logged with at most 200 characters of its body", async () => {
+  const longBody = "z".repeat(1_000);
+  const answers: CollectorAnswer[] = [
+    () => new Response(longBody, { status: 422 }),
+    () => new Response(longBody, { status: 202 }),
+  ];
+  for (const answer of answers) {
+    const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(67))]), {
+      collector: answer,
+    });
+
+    expectFailedTreeBuild(result);
+    const logged = result.logged.join("\n");
+    expect(logged).toContain("z".repeat(200));
+    expect(logged).not.toContain("z".repeat(201));
+    expect(result.text).not.toContain("z".repeat(10));
+  }
+});
+
+test("a 202 whose body cannot be read is a failed tree build", async () => {
+  const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(68))]), {
+    collector: () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new TypeError("terminated"));
+          },
+        }),
+        { status: 202 },
+      ),
+  });
+
+  expectFailedTreeBuild(result);
+  expect(result.body.tree_build.detail).toBe("The collector's HTTP 202 answer could not be read.");
+  expect(result.logged.some((entry) => entry.includes("terminated"))).toBe(true);
+});
+
+const TREE_BUILD_TIME_LIMIT_MS = 15_000;
+
+/**
+ * A response body that never arrives. As with fetch, aborting the request's
+ * signal errors the body being read, with the signal's reason.
+ */
+function bodyThatNeverArrives(signal: AbortSignal | null | undefined): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      signal?.addEventListener("abort", () => controller.error(signal.reason), { once: true });
+    },
+  });
+}
+
+async function runPendingContinuations() {
+  for (let turn = 0; turn < 50; turn += 1) await Promise.resolve();
+}
+
+/**
+ * One delivery on Bun's fake clock, which also moves AbortSignal.timeout.
+ * The collector request's time limit starts with its token read. From the
+ * moment `readToken` is called, the clock moves one second at a time to 1 ms
+ * before the limit, where the answer must still be pending, and then to the
+ * limit.
+ */
+async function deliverAtTimeLimit(
+  payload: unknown,
+  options: { readToken: () => Promise<string>; collector?: CollectorAnswer },
+) {
+  let markTokenReadStarted!: () => void;
+  const tokenReadStarted = new Promise<void>((resolve) => {
+    markTokenReadStarted = resolve;
+  });
+  const webhook = treeBuildWebhook({
+    collector: options.collector,
+    vercelOidcToken: () => {
+      markTokenReadStarted();
+      return options.readToken();
+    },
+  });
+  const logged = spyOn(console, "error").mockImplementation(() => {});
+  jest.useFakeTimers();
+  try {
+    let answered = false;
+    const answer = webhook.POST(request(payload));
+    void answer.then(() => {
+      answered = true;
+    });
+    await tokenReadStarted;
+    for (let elapsed = 0; elapsed < TREE_BUILD_TIME_LIMIT_MS - 1; ) {
+      const step = Math.min(1_000, TREE_BUILD_TIME_LIMIT_MS - 1 - elapsed);
+      jest.advanceTimersByTime(step);
+      elapsed += step;
+      await runPendingContinuations();
+    }
+    const answeredBeforeLimit = answered;
+    jest.advanceTimersByTime(1);
+    const response = await answer;
+    const text = await response.text();
+    return {
+      answeredBeforeLimit,
+      status: response.status,
+      text,
+      body: JSON.parse(text),
+      collectorRequests: webhook.collectorRequests,
+      dispatches: webhook.dispatches,
+      tokenReads: webhook.tokenReads(),
+      logged: logged.mock.calls.map((call) => call.map(String).join(" ")),
+    };
+  } finally {
+    jest.useRealTimers();
+    logged.mockRestore();
+  }
+}
+
+test("the 15-second time limit covers the Vercel OIDC token read: a read that never settles is a failed tree build, and the dispatch still answers 200", async () => {
+  const result = await deliverAtTimeLimit(
+    delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(69))]),
+    { readToken: () => new Promise<string>(() => {}) },
+  );
+
+  expect(result.answeredBeforeLimit).toBe(false);
+  expectFailedTreeBuild(result);
+  expect(result.body.tree_build.detail).toBe("The Vercel OIDC token could not be read.");
+  expect(result.collectorRequests).toEqual([]);
+});
+
+test("one 15-second time limit covers the token read and the collector's 202 answer together: after a 5-second token read, a body that never arrives is a failed tree build", async () => {
+  const result = await deliverAtTimeLimit(
+    delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(70))]),
+    {
+      readToken: () => new Promise<string>((resolve) => setTimeout(() => resolve(OIDC_TOKEN), 5_000)),
+      collector: (init) =>
+        new Response(bodyThatNeverArrives(init.signal), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        }),
+    },
+  );
+
+  // The answer comes 15 seconds after the token read began, not 15 seconds
+  // after the request was sent.
+  expect(result.answeredBeforeLimit).toBe(false);
+  expectFailedTreeBuild(result);
+  expect(result.body.tree_build.detail).toBe("The collector did not answer within 15 seconds.");
+  expect(result.collectorRequests).toHaveLength(1);
 });
 
 test("a failed Vercel OIDC token read is a failed tree build: no collector request, and the dispatch still answers 200", async () => {
