@@ -19,8 +19,10 @@ const ROUTES_IMPORTED = {
 };
 const NOT_ALLOWLISTED =
   '200:{"ok":true,"dispatched":[],"alerted":[]}';
+// Without a collector address, a delivery that dispatches reports its
+// calibration-tree build request as not configured.
 const DISPATCHED_TAG =
-  '200:{"ok":true,"country":"uk","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"alerted":[]}';
+  '200:{"ok":true,"country":"uk","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"tree_build":{"status":"not_configured"},"alerted":[]}';
 
 function importedUnder(
   overrides: Partial<Record<(typeof OVERRIDES)[number], string>>,
@@ -85,7 +87,7 @@ test("the default deployment discovers releases from each registered branch", ()
     be_geography: `ok:${COUNTRY_REGISTRY.be.geography}`,
     route_imports: ROUTES_IMPORTED,
     reviewed_us_tag:
-      '200:{"ok":true,"country":"us","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"alerted":[]}',
+      '200:{"ok":true,"country":"us","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"tree_build":{"status":"not_configured"},"alerted":[]}',
     uk_tag: DISPATCHED_TAG,
   });
 });
