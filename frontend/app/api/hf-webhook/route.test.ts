@@ -1,4 +1,4 @@
-import { expect, jest, spyOn, test } from "bun:test";
+import { afterEach, expect, jest, spyOn, test } from "bun:test";
 
 import {
   resolveHfWebhookConfig,
@@ -1344,6 +1344,20 @@ async function runPendingContinuations() {
 }
 
 /**
+ * Turns the real clock back on and restores console.error after a
+ * deliverAtTimeLimit call, or null when none is pending. The call's finally
+ * block runs it when the test's wait settles. A test that waits until Bun's
+ * per-test timeout never reaches that block, so the afterEach below runs it
+ * instead, and the tests after it in the same process see the real clock and
+ * the real console.error.
+ */
+let restoreAfterTimeLimitDelivery: (() => void) | null = null;
+
+afterEach(() => {
+  restoreAfterTimeLimitDelivery?.();
+});
+
+/**
  * One delivery on Bun's fake clock, which also moves AbortSignal.timeout.
  * The collector request's time limit starts with its token read. From the
  * moment `readToken` is called, the clock moves one second at a time to 1 ms
@@ -1367,6 +1381,17 @@ async function deliverAtTimeLimit(
   });
   const logged = spyOn(console, "error").mockImplementation(() => {});
   jest.useFakeTimers();
+  let restored = false;
+  // Runs once, from the finally block or from afterEach, whichever comes
+  // first, so a timed-out call's late finally never undoes a later call.
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    if (restoreAfterTimeLimitDelivery === restore) restoreAfterTimeLimitDelivery = null;
+    jest.useRealTimers();
+    logged.mockRestore();
+  };
+  restoreAfterTimeLimitDelivery = restore;
   try {
     let answered = false;
     const answer = webhook.POST(request(payload));
@@ -1395,8 +1420,7 @@ async function deliverAtTimeLimit(
       logged: logged.mock.calls.map((call) => call.map(String).join(" ")),
     };
   } finally {
-    jest.useRealTimers();
-    logged.mockRestore();
+    restore();
   }
 }
 
