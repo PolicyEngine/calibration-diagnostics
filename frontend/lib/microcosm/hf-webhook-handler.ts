@@ -302,6 +302,27 @@ function failedTreeBuild(detail: string, cause: string): TreeBuildOutcome {
   return { status: "failed", detail };
 }
 
+/**
+ * An error's message, followed by its cause's. Node's fetch throws
+ * TypeError("fetch failed"), or "terminated" while it reads a body, and
+ * names what failed (DNS resolution, the connection or TLS) only in its
+ * cause; a cause without a message, such as the AggregateError of a
+ * connection refused at every address, is named by its code. Only messages
+ * and codes are used, never the request's headers.
+ */
+function messageWithCause(error: unknown): string {
+  const message = errorMessage(error);
+  const cause = error instanceof Error ? error.cause : undefined;
+  let causeText = "";
+  if (cause instanceof Error) {
+    const { code } = cause as { code?: unknown };
+    causeText = cause.message || (typeof code === "string" ? code : cause.name);
+  } else if (typeof cause === "string") {
+    causeText = cause;
+  }
+  return causeText ? `${message} (cause: ${causeText})` : message;
+}
+
 const isTimeout = (error: unknown) =>
   typeof error === "object" &&
   error !== null &&
@@ -381,7 +402,7 @@ async function requestTreeBuild(
   } catch (error) {
     return failedTreeBuild(
       isTimeout(error) ? COLLECTOR_TIMEOUT_DETAIL : "The collector could not be reached.",
-      errorMessage(error),
+      messageWithCause(error),
     );
   }
   // The deadline also covers the answer's body.
@@ -393,7 +414,7 @@ async function requestTreeBuild(
       isTimeout(error)
         ? COLLECTOR_TIMEOUT_DETAIL
         : `The collector's HTTP ${response.status} answer could not be read.`,
-      `the collector's ${response.status} answer could not be read: ${errorMessage(error)}`,
+      `the collector's ${response.status} answer could not be read: ${messageWithCause(error)}`,
     );
   }
   if (response.status !== 202) {
