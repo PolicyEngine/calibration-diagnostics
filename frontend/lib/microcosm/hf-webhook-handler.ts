@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 
+import { getVercelOidcToken } from "@vercel/oidc";
 import { NextResponse } from "next/server";
 
 import { postReleaseAlert, postReleaseRecordAlert } from "@/lib/slack";
@@ -11,7 +12,11 @@ import {
   releasesRecordFromResponse,
   type ReleasesRecord,
 } from "@policyengine/calibration-tree/release-record";
-import type { HfWebhookConfig } from "./hf-webhook-config";
+import type {
+  HfWebhookConfig,
+  TreeBuildCollectorAddress,
+  WebhookRepositoryRegistration,
+} from "./hf-webhook-config";
 import {
   releaseRecordAlerts,
   unannouncedRecordChanges,
@@ -43,13 +48,46 @@ type FetchImplementation = (
 ) => Promise<Response>;
 
 export interface HfWebhookHandlerDependencies {
-  /** GitHub dispatches and Hugging Face reads of releases.json. */
+  /**
+   * GitHub dispatches, Hugging Face reads of releases.json and the
+   * collector's calibration-tree build requests.
+   */
   fetch: FetchImplementation;
   postReleaseAlert: typeof postReleaseAlert;
   postReleaseRecordAlert: typeof postReleaseRecordAlert;
+  /**
+   * The deployment's Vercel OIDC token, which the collector checks. Called
+   * inside the request handler for each collector request, never when the
+   * handler is created; getVercelOidcToken (@vercel/oidc) unless given.
+   */
+  vercelOidcToken: () => Promise<string>;
 }
 
+/**
+ * The body of the collector's POST /v1/calibration-tree-builds
+ * (microcosm-collector#66, TreeBuildRequestBody).
+ */
+interface TreeBuildRequestBody {
+  country: MicrocosmCountry;
+  kind: WebhookRepositoryRegistration["kind"];
+  hf_repo: string;
+  hf_ref?: string;
+  hf_commit?: string;
+}
+
+/** The answer's tree_build: what became of the collector request. */
+type TreeBuildOutcome =
+  | { status: "queued" | "already_queued"; task_id: string; not_before: string }
+  | { status: "failed"; detail: string }
+  | { status: "not_configured" };
+
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
+const TREE_BUILDS_PATH = "/v1/calibration-tree-builds";
+// The collector's pattern for hf_ref. It only records hf_ref and hf_commit,
+// and refuses the whole request when either breaks its pattern (COMMIT_SHA
+// for hf_commit), so a value that does is left out instead.
+const COLLECTOR_HF_REF = /^refs\/(heads|tags)\/[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/;
+const COLLECTOR_TIMEOUT_DETAIL = "The collector did not answer within 15 seconds.";
 const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 /**
@@ -237,6 +275,163 @@ async function dispatchTreeBuild(
   }
 }
 
+function treeBuildRequestBody(
+  registration: WebhookRepositoryRegistration,
+  trigger: UpdatedRef,
+): TreeBuildRequestBody {
+  return {
+    country: registration.country,
+    kind: registration.kind,
+    // As configured: the delivery's spelling may differ in letter case, and
+    // the collector compares names exactly.
+    hf_repo: registration.repo,
+    ...(COLLECTOR_HF_REF.test(trigger.ref) ? { hf_ref: trigger.ref } : {}),
+    ...(trigger.newSha && COMMIT_SHA.test(trigger.newSha)
+      ? { hf_commit: trigger.newSha }
+      : {}),
+  };
+}
+
+/**
+ * Logs a failed collector request and gives its tree_build. `detail` is a
+ * fixed sentence for the answer; only the log carries the cause, which never
+ * includes the token.
+ */
+function failedTreeBuild(detail: string, cause: string): TreeBuildOutcome {
+  console.error(`Calibration tree build request to the collector failed: ${cause}`);
+  return { status: "failed", detail };
+}
+
+/**
+ * An error's message, followed by its cause's. Node's fetch throws
+ * TypeError("fetch failed"), or "terminated" while it reads a body, and
+ * names what failed (DNS resolution, the connection or TLS) only in its
+ * cause; a cause without a message, such as the AggregateError of a
+ * connection refused at every address, is named by its code. Only messages
+ * and codes are used, never the request's headers.
+ */
+function messageWithCause(error: unknown): string {
+  const message = errorMessage(error);
+  const cause = error instanceof Error ? error.cause : undefined;
+  let causeText = "";
+  if (cause instanceof Error) {
+    const { code } = cause as { code?: unknown };
+    causeText = cause.message || (typeof code === "string" ? code : cause.name);
+  } else if (typeof cause === "string") {
+    causeText = cause;
+  }
+  return causeText ? `${message} (cause: ${causeText})` : message;
+}
+
+const isTimeout = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  (error as { name?: unknown }).name === "TimeoutError";
+
+/** The tree_build of the collector's 202 answer, or null when it is not one. */
+function queuedTreeBuild(text: string): TreeBuildOutcome | null {
+  let answer: unknown;
+  try {
+    answer = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!answer || typeof answer !== "object" || Array.isArray(answer)) return null;
+  const { status, task_id: taskId, not_before: notBefore } = answer as Record<string, unknown>;
+  if (status !== "queued" && status !== "already_queued") return null;
+  if (typeof taskId !== "string" || !taskId) return null;
+  if (typeof notBefore !== "string" || !notBefore) return null;
+  return { status, task_id: taskId, not_before: notBefore };
+}
+
+/** A promise that rejects with the signal's reason once it aborts. */
+function rejectionOnAbort(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    if (signal.aborted) reject(signal.reason);
+    else signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  });
+}
+
+/**
+ * Asks the collector to queue a calibration-tree build of the delivery's
+ * country and kind, with the deployment's Vercel OIDC token, read for this
+ * request. One 15-second deadline covers the token read, the request and its
+ * answer, so a token read that never settles holds the webhook's answer no
+ * longer than a slow collector would.
+ * Never throws: a request that cannot be sent or is not answered 202 is
+ * logged and gives a failed tree_build.
+ */
+async function requestTreeBuild(
+  body: TreeBuildRequestBody,
+  collector: TreeBuildCollectorAddress | undefined,
+  readVercelOidcToken: () => Promise<string>,
+  fetchImplementation: FetchImplementation,
+): Promise<TreeBuildOutcome> {
+  if (!collector) return { status: "not_configured" };
+  if ("problem" in collector) {
+    return failedTreeBuild(
+      "MICROCOSM_TELEMETRY_COLLECTOR_URL is invalid.",
+      `MICROCOSM_TELEMETRY_COLLECTOR_URL is invalid, so no request was sent: ${collector.problem}`,
+    );
+  }
+  const deadline = AbortSignal.timeout(15_000);
+  const tokenDetail = "The Vercel OIDC token could not be read.";
+  let token: string;
+  try {
+    token = await Promise.race([readVercelOidcToken(), rejectionOnAbort(deadline)]);
+  } catch (error) {
+    return failedTreeBuild(
+      tokenDetail,
+      `the Vercel OIDC token could not be read, so no request was sent: ${errorMessage(error)}`,
+    );
+  }
+  if (!token) {
+    return failedTreeBuild(tokenDetail, "the Vercel OIDC token is empty, so no request was sent.");
+  }
+  let response: Response;
+  try {
+    response = await fetchImplementation(`${collector.baseUrl}${TREE_BUILDS_PATH}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: deadline,
+    });
+  } catch (error) {
+    return failedTreeBuild(
+      isTimeout(error) ? COLLECTOR_TIMEOUT_DETAIL : "The collector could not be reached.",
+      messageWithCause(error),
+    );
+  }
+  // The deadline also covers the answer's body.
+  let text: string;
+  try {
+    text = await response.text();
+  } catch (error) {
+    return failedTreeBuild(
+      isTimeout(error)
+        ? COLLECTOR_TIMEOUT_DETAIL
+        : `The collector's HTTP ${response.status} answer could not be read.`,
+      `the collector's ${response.status} answer could not be read: ${messageWithCause(error)}`,
+    );
+  }
+  if (response.status !== 202) {
+    return failedTreeBuild(
+      `The collector answered HTTP ${response.status}.`,
+      `the collector answered ${response.status}: ${text.slice(0, 200)}`,
+    );
+  }
+  return (
+    queuedTreeBuild(text) ??
+    failedTreeBuild(
+      "The collector's HTTP 202 answer is not a queued build.",
+      `the collector's 202 answer is not a queued build: ${text.slice(0, 200)}`,
+    )
+  );
+}
+
 export function createHfWebhookHandler(
   config: HfWebhookConfig,
   dependencies: Partial<HfWebhookHandlerDependencies> = {},
@@ -249,6 +444,8 @@ export function createHfWebhookHandler(
     dependencies.postReleaseAlert ?? postReleaseAlert;
   const sendReleaseRecordAlert =
     dependencies.postReleaseRecordAlert ?? postReleaseRecordAlert;
+  const readVercelOidcToken =
+    dependencies.vercelOidcToken ?? (() => getVercelOidcToken());
 
   return async function handleHfWebhook(request: Request) {
     if (!secretOk(request, config.secret)) {
@@ -287,35 +484,29 @@ export function createHfWebhookHandler(
     }
 
     const { country } = registration;
-    const dispatches: TreeBuildDispatch[] = registration.kind === "staging"
-      ? mainUpdates.slice(-1).map((updatedRef) => ({
-          country,
-          eventKind: "staging" as const,
-          hfCommitSha: updatedRef.newSha!,
-        }))
-      : (() => {
-          const tagUpdate = newTagRefs.at(-1);
-          const mainUpdate = mainUpdates.at(-1);
-          const trigger = tagUpdate ?? mainUpdate;
-          if (!trigger) return [];
-          return [
-            {
-              country,
-              eventKind: tagUpdate ? ("tag" as const) : ("branch" as const),
-              ...(tagUpdate
-                ? { releaseId: tagUpdate.ref.slice(TAG_PREFIX.length) }
-                : {}),
-              hfCommitSha: trigger.newSha!,
-            },
-          ];
-        })();
+    // The update that starts this delivery's calibration-tree builds, the
+    // GitHub dispatch and the collector request: a staging repository's last
+    // main update; a release repository's newest new tag, else its last main
+    // update. Without one, the delivery starts neither.
+    const mainUpdate = mainUpdates.at(-1);
+    const tagUpdate = registration.kind === "release" ? newTagRefs.at(-1) : undefined;
+    const trigger = registration.kind === "staging" ? mainUpdate : tagUpdate ?? mainUpdate;
+    const dispatches: TreeBuildDispatch[] = trigger
+      ? [
+          {
+            country,
+            eventKind: registration.kind === "staging" ? "staging" : tagUpdate ? "tag" : "branch",
+            ...(tagUpdate ? { releaseId: tagUpdate.ref.slice(TAG_PREFIX.length) } : {}),
+            hfCommitSha: trigger.newSha!,
+          },
+        ]
+      : [];
 
     // releases.json is read before anything is dispatched or posted. A
     // transient failure then answers 503 with nothing done, and Hugging
     // Face's retry of the delivery does everything once.
     // Only a release repository whose country has a Slack channel can get
     // record alerts, so only its record is read and only it risks a 503.
-    const mainUpdate = mainUpdates.at(-1);
     const comparison =
       registration.kind === "release" && mainUpdate && config.releaseAlertCountries.has(country)
         ? await compareReleaseRecords(repo, mainUpdate, config, fetchImplementation)
@@ -327,14 +518,38 @@ export function createHfWebhookHandler(
       );
     }
 
-    try {
-      for (const dispatch of dispatches) {
-        await dispatchTreeBuild(dispatch, config, fetchImplementation);
-      }
-    } catch (error) {
-      console.error("Calibration tree workflow dispatch failed:", error);
+    // The GitHub dispatch and the collector's calibration-tree build request
+    // run at the same time, each with its own 15-second timeout, and neither
+    // failing stops the other. The dispatch alone decides the answer's status;
+    // the collector request's outcome is reported as tree_build.
+    const [dispatched, treeBuildRequested] = await Promise.allSettled([
+      (async () => {
+        for (const dispatch of dispatches) {
+          await dispatchTreeBuild(dispatch, config, fetchImplementation);
+        }
+      })(),
+      trigger
+        ? requestTreeBuild(
+            treeBuildRequestBody(registration, trigger),
+            config.treeBuildCollector,
+            readVercelOidcToken,
+            fetchImplementation,
+          )
+        : Promise.resolve(null),
+    ]);
+    const treeBuild =
+      treeBuildRequested.status === "fulfilled"
+        ? treeBuildRequested.value
+        : failedTreeBuild(
+            "The collector request failed.",
+            errorMessage(treeBuildRequested.reason),
+          );
+    // A delivery that starts no build answers as before, without tree_build.
+    const treeBuildAnswer = treeBuild ? { tree_build: treeBuild } : {};
+    if (dispatched.status === "rejected") {
+      console.error("Calibration tree workflow dispatch failed:", dispatched.reason);
       return NextResponse.json(
-        { detail: "Unable to start calibration tree publication." },
+        { detail: "Unable to start calibration tree publication.", ...treeBuildAnswer },
         { status: 502 },
       );
     }
@@ -381,6 +596,7 @@ export function createHfWebhookHandler(
         release_id: dispatch.releaseId ?? null,
         hf_commit_sha: dispatch.hfCommitSha,
       })),
+      ...treeBuildAnswer,
       alerted,
       ...(recordAlerted ? { release_record_alerted: recordAlerted } : {}),
       // A record that could not be read for a lasting reason, so that the

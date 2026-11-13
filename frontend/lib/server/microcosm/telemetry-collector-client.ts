@@ -3,6 +3,7 @@ import "server-only";
 import type { BuildRunDocuments } from "@/lib/microcosm/build-monitor";
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 import { secretManager, validSecretVersion } from "@/lib/server/secret-manager";
+import { telemetryCollectorBaseUrl } from "@/lib/server/microcosm/telemetry-collector-url";
 
 type JsonObject = Record<string, unknown>;
 
@@ -60,20 +61,8 @@ function collectorConfiguration(
   if (!validSecretVersion(secretVersion)) {
     throw new Error("Invalid telemetry read credential resource.");
   }
-  const url = new URL(rawUrl);
-  const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-  if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
-    throw new Error(
-      "Telemetry collector URL must use HTTPS except on localhost.",
-    );
-  }
-  if (url.username || url.password || url.search || url.hash) {
-    throw new Error(
-      "Telemetry collector URL must not contain credentials or query data.",
-    );
-  }
   return {
-    baseUrl: url.toString().replace(/\/$/, ""),
+    baseUrl: telemetryCollectorBaseUrl(rawUrl),
     secretVersion,
   };
 }

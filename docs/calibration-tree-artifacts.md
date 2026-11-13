@@ -151,7 +151,10 @@ removed targets read only the source side that exists.
 ```text
 release repository update
   -> POST <basePath>/api/hf-webhook
-  -> one GitHub workflow_dispatch per webhook delivery
+  -> per webhook delivery, at the same time:
+     - one GitHub workflow_dispatch, which runs the steps below
+     - one POST /v1/calibration-tree-builds to the telemetry collector, kind
+       release (see "Calibration-tree builds in the collector" below)
   -> read releases.json at the head of main; with it, enumerate the builds it
      lists; without it, the union of release directories and immutable
      repository tags
@@ -351,7 +354,11 @@ revision). No country registration names the layout.
 ```text
 staging repository main-branch update
   -> POST <basePath>/api/hf-webhook
-  -> GitHub workflow_dispatch with event_kind=staging
+  -> per webhook delivery, at the same time:
+     - one GitHub workflow_dispatch with event_kind=staging, which runs the
+       steps below
+     - one POST /v1/calibration-tree-builds to the telemetry collector, kind
+       staging (see "Calibration-tree builds in the collector" below)
   -> scan the exact webhook commit for passed, published, and completed runs
   -> audit the existing Blob build for each finalized run
   -> skip complete builds before reading their diagnostics
@@ -559,7 +566,8 @@ Require one `Publish calibration tree` workflow dispatch for the expected
 country and a successful workflow. Then send one authenticated staging
 `main`-update payload and require a successful `event_kind=staging` workflow.
 Both reconciliations are idempotent: complete Blob builds are audited and
-skipped.
+skipped. With `MICROCOSM_TELEMETRY_COLLECTOR_URL` set, also require each
+answer's `tree_build.status` to be `queued` or `already_queued`.
 
 Failure meanings and recovery:
 
@@ -568,7 +576,33 @@ Failure meanings and recovery:
   instead of the public production domain.
 - `502` from the application means GitHub rejected or did not receive the
   workflow dispatch; check `GITHUB_ACTIONS_DISPATCH_TOKEN` and its Actions
-  permission.
+  permission. Its `tree_build` still reports the collector request.
+- A `tree_build` with `status: "failed"` (see "Calibration-tree builds in the
+  collector" below) means the collector did not queue the build; the dispatch
+  went ahead, and the function log names the cause. A 401
+  or 403 from the collector means it refused the deployment's Vercel OIDC
+  token or does not list the deployment as a tree-build caller; a 404 means
+  its tree-build endpoint is not enabled; a 422 `repo_not_registered` means
+  the dashboard's configured repository differs from the collector's; a 503
+  means it could not queue the build then (its worker queue or Vercel's token
+  signing keys were unavailable, or it was being deployed). Don't replay a
+  delivery answered 200 to retry its collector request: a replay posts its
+  Slack alerts again, the alert for each new tag and, for a US or UK release
+  repository's `main` update, its `releases.json` record alerts. Once the
+  cause is corrected, any of these queues a build of everything the
+  collector's store lacks for that country and kind, without a repeated
+  alert:
+  1. Wait for the next delivery for that country and kind.
+  2. For a staging repository, replay one of its `main`-update deliveries. A
+     staging delivery posts no Slack alert.
+  3. For a release repository, send one authenticated release payload whose
+     only entry is a `refs/heads/main` update with the repository's current
+     head commit as both `oldSha` and `newSha`. It dispatches one
+     reconciliation (`event_kind=branch`) and queues a release build. It posts
+     no alert: it has no new tag, and `releases.json` is the same before and
+     after the update.
+
+  Steps 2 and 3 also repeat the GitHub dispatch, which is idempotent.
 - `503` from the application means a release repository's `releases.json`
   could not be read for a reason that may pass (a Hugging Face 5xx or 429, or
   a failed or timed-out request or body). Nothing was dispatched or posted,
@@ -630,7 +664,81 @@ Failure meanings and recovery:
 There is no scheduled reconciliation. A later webhook delivery inventories all
 eligible versions and repairs a missed publication. Set the GitHub repository
 variable `CALIBRATION_TREE_BUILD_ENABLED=FALSE` to leave the webhook active but
-skip publication jobs intentionally.
+skip publication jobs intentionally. That variable does not affect the
+collector request; the collector's own settings decide whether it queues
+builds.
+
+#### Calibration-tree builds in the collector
+
+For each delivery that dispatches the publisher, under the same rules (a
+staging repository's last `main` update; a release repository's newest new
+tag, else its last `main` update), the webhook also asks the telemetry
+collector to queue a calibration-tree build of that country and kind:
+
+```text
+POST <MICROCOSM_TELEMETRY_COLLECTOR_URL>/v1/calibration-tree-builds
+Authorization: Bearer <the deployment's Vercel OIDC token>
+Content-Type: application/json
+
+{"country": "uk", "kind": "staging", "hf_repo": "policyengine/populace-uk-staging",
+ "hf_ref": "refs/heads/main", "hf_commit": "<40 lower-case hex>"}
+```
+
+- `country` is the dashboard's country code (`us`, `uk` or `be`), and `kind`
+  is the repository's registration, `release` or `staging`.
+- `hf_repo` is the repository's name as the dashboard is configured with it
+  (the registration's name, or its `repo_env` override), not the delivery's
+  spelling, whose letter case may differ. The collector accepts only its own
+  repository for the country and kind and refuses any other name with 422
+  `repo_not_registered`.
+- `hf_ref` is the triggering ref (`refs/heads/main` or `refs/tags/<tag>`) and
+  `hf_commit` its new commit. The collector only records them, and refuses the
+  whole request for a malformed one, so each is left out when it breaks the
+  collector's pattern.
+- The token is read with `getVercelOidcToken()` (`@vercel/oidc`) for each
+  request, never when the server starts.
+- The request runs at the same time as the GitHub dispatch, after the
+  `releases.json` reads, so a delivery answered 503 sends neither. One
+  15-second deadline covers the token read, the request and its answer.
+- The collector queues one build of everything its store lacks for the country
+  and kind, and answers 202 with `queued`, or with `already_queued` when the
+  build of that country and kind for the current 10-minute window is already
+  queued.
+
+The address is `MICROCOSM_TELEMETRY_COLLECTOR_URL`, the build monitor's
+setting, read when the server starts, with the build monitor's rules: HTTPS,
+except on `localhost` or `127.0.0.1`, no credentials, query or fragment, and
+any trailing slash removed. The webhook needs no read credential. Unset, the
+webhook sends no request. An invalid value does not stop the webhook: each
+delivery reports it as a failed request, and the dispatch runs as before.
+
+The answer's `tree_build` reports the request:
+
+- `{"status": "queued" | "already_queued", "task_id", "not_before"}`, copied
+  from the collector's 202 answer;
+- `{"status": "failed", "detail"}` for any other answer, a timeout, a network
+  failure, a token that could not be read, or an invalid address. `detail` is
+  a fixed sentence naming the collector's HTTP status or the kind of failure;
+  it never holds the collector's answer, the address or the token. The cause
+  is logged as "Calibration tree build request to the collector failed", with
+  the collector's status and at most 200 characters of its answer or, when
+  the request or its answer's body failed, the error and its cause (such as
+  a failed DNS lookup, connection or TLS handshake), never the request's
+  headers;
+- `{"status": "not_configured"}` when `MICROCOSM_TELEMETRY_COLLECTOR_URL` is
+  unset.
+
+A delivery that dispatches nothing has no `tree_build` and answers as before.
+Until the publisher is removed, the GitHub dispatch alone decides the status:
+200, or 502 when the dispatch fails, whose answer also carries `tree_build`. A
+failed collector request is logged and never changes the status, so Hugging
+Face does not retry the delivery for it.
+
+The collector accepts the request only with a valid Vercel OIDC token from a
+project and environment it lists as a tree-build caller. Those settings belong
+to the collector's deployment
+([PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector)),
+not to this repository.
 
 ## Historical reconciliation
 

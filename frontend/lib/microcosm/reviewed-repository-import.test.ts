@@ -9,6 +9,19 @@ import { COUNTRY_REGISTRY } from "@policyengine/calibration-tree/countries";
 const FIXTURE = `${import.meta.dir}/reviewed-repository-import.fixture.ts`;
 const SECRET = "fixture-webhook-secret";
 const OVERRIDES = ["POPULACE_HF_REPO", "POPULACE_HF_REVISION"] as const;
+// The Slack incoming webhook addresses that lib/slack.ts reads for release
+// alerts.
+const SLACK_WEBHOOK_SETTINGS = [
+  "SLACK_WEBHOOK_POPULACE_US",
+  "SLACK_WEBHOOK_POPULACE_UK",
+] as const;
+// The collector address, and the variables @vercel/oidc reads its token from
+// when no request header carries one.
+const COLLECTOR_REQUEST_SETTINGS = [
+  "MICROCOSM_TELEMETRY_COLLECTOR_URL",
+  "VERCEL_OIDC_TOKEN",
+  "VERCEL_OIDC_TOKEN_FILE",
+] as const;
 
 const ROUTES_IMPORTED = {
   "hf-webhook": "ok",
@@ -19,8 +32,10 @@ const ROUTES_IMPORTED = {
 };
 const NOT_ALLOWLISTED =
   '200:{"ok":true,"dispatched":[],"alerted":[]}';
+// Without a collector address, a delivery that dispatches reports its
+// calibration-tree build request as not configured.
 const DISPATCHED_TAG =
-  '200:{"ok":true,"country":"uk","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"alerted":[]}';
+  '200:{"ok":true,"country":"uk","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"tree_build":{"status":"not_configured"},"alerted":[]}';
 
 function importedUnder(
   overrides: Partial<Record<(typeof OVERRIDES)[number], string>>,
@@ -28,9 +43,19 @@ function importedUnder(
   const env: Record<string, string | undefined> = { ...process.env };
   for (const name of OVERRIDES) delete env[name];
   // Never let a configured Slack webhook turn this fixture into a real post.
+  // Every SLACK_WEBHOOK_* variable is removed, and the two that lib/slack.ts
+  // reads are then set empty, which it treats as no channel. Empty rather
+  // than removed, so that Bun's loading of a .env file in the child cannot
+  // set them either.
   for (const name of Object.keys(env)) {
     if (name.startsWith("SLACK_WEBHOOK_")) delete env[name];
   }
+  for (const name of SLACK_WEBHOOK_SETTINGS) env[name] = "";
+  // Never let a configured collector address or Vercel OIDC token turn this
+  // fixture into a real calibration-tree build request. An empty address means
+  // not configured, so no token is read. Empty rather than removed, so that
+  // Bun's loading of a .env file in the child cannot set them either.
+  for (const name of COLLECTOR_REQUEST_SETTINGS) env[name] = "";
   const child = Bun.spawnSync({
     cmd: [process.execPath, "run", FIXTURE],
     cwd: `${import.meta.dir}/../..`,
@@ -85,7 +110,7 @@ test("the default deployment discovers releases from each registered branch", ()
     be_geography: `ok:${COUNTRY_REGISTRY.be.geography}`,
     route_imports: ROUTES_IMPORTED,
     reviewed_us_tag:
-      '200:{"ok":true,"country":"us","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"alerted":[]}',
+      '200:{"ok":true,"country":"us","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"tree_build":{"status":"not_configured"},"alerted":[]}',
     uk_tag: DISPATCHED_TAG,
   });
 });
