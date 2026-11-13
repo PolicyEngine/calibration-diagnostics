@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 
 import {
+  attemptPath,
   buildTimeline,
   encodeDocument,
   finalizeCountry,
@@ -15,6 +16,7 @@ import {
   storedFileKind,
   updateManifestCountry,
   WriteConflict,
+  type AttemptReport,
   type ManifestCountry,
   type MeasurementCell,
   type MeasurementDocument,
@@ -150,6 +152,10 @@ test("stored file kinds follow where a file sits", () => {
   expect(storedFileKind(`release-history/uk/${PANEL}/panel.json`)).toBe("panel");
   expect(storedFileKind(`release-history/uk/${PANEL}/timeline.json`)).toBe("timeline");
   expect(storedFileKind(`release-history/uk/${PANEL}/${"b".repeat(64)}.json`)).toBe("measurement");
+  // An attempt report has a point's name but sits in its own folder: never a measurement.
+  expect(storedFileKind(attemptPath("uk", PANEL, "b".repeat(64)))).toBe("attempt");
+  expect(storedFileKind(`release-history/uk/${PANEL}/attempts/notes.json`)).toBeNull();
+  expect(storedFileKind(`release-history/uk/${PANEL}/other/${"b".repeat(64)}.json`)).toBeNull();
   // References and labels are the country's, never a panel's; the manifest is never uploaded.
   expect(storedFileKind(`release-history/uk/${PANEL}/references.json`)).toBeNull();
   expect(storedFileKind("release-history/manifest.json")).toBeNull();
@@ -413,7 +419,7 @@ test("a step joins series neighbours only; withdrawn builds and orphan points ne
   const states = {
     [file(2)]: {
       digest: file(2), state: "retrying" as const, measurementId: null, measurementStatus: null,
-      attempts: 1, lastError: "no_measurement_written", lastBuildId: `${LINE}/b2`,
+      attempts: 1, lastError: "no_measurement_written", lastStage: null, lastBuildId: `${LINE}/b2`,
     },
   };
   const timeline = timelineOf(listed, points, { states });
@@ -489,4 +495,86 @@ test("the axis drops builds without a file and withdrawn builds", () => {
   const listed = series([build("b1", file(1)), build("b2", null), build("b3", file(3), { withdrawn: true })]);
   expect(seriesAxis(listed).map((b) => b.build_id)).toEqual([`${LINE}/b1`]);
   expect(seriesAxis(null)).toEqual([]);
+});
+
+function report(digest: string, attempt: number, reason: string, stage = "open", status: AttemptReport["status"] = "failed"): AttemptReport {
+  return {
+    format_version: 1, kind: "release_history.attempt", country: "zz", panel_id: PANEL, digest,
+    build_id: `${LINE}/b1`, attempt, last_attempt: attempt >= 3, status, stage, reason, error_class: null,
+    at: "t",
+  };
+}
+
+test("a failure is a state from the file's attempt report, charged once per planned attempt", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2)), build("b3", file(3))]);
+  const plan = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry: undefined });
+  const finalize = (entry: ManifestCountry | undefined, reports: Record<string, AttemptReport>, cancelled = false) =>
+    finalizeCountry({
+      mode: "backfill", entry, panel: summary(PANEL), series: listed, planned: plan.points,
+      stored: [point(file(1))], reports, cancelled, pin: true, at: "t",
+    });
+  const reports = {
+    [file(2)]: report(file(2), 1, "interrupted", "reform:basic_rate", "interrupted"),
+    // A report left from another attempt says nothing about this one.
+    [file(3)]: report(file(3), 7, "sha256_mismatch", "download"),
+  };
+  const once = finalize(undefined, reports);
+  expect(once.panels[PANEL].points[file(2)]).toMatchObject({
+    state: "retrying", attempts: 1, lastError: "interrupted", lastStage: "reform:basic_rate",
+  });
+  expect(once.panels[PANEL].points[file(3)]).toMatchObject({
+    state: "retrying", attempts: 1, lastError: "no_measurement_written", lastStage: null,
+  });
+  // Finalizing the same run again (a re-run of its failed jobs) charges nothing more.
+  expect(finalize(once, reports).panels[PANEL].points).toEqual(once.panels[PANEL].points);
+  // A cancelled run charges only the files whose leg left a report of its attempt.
+  const cancelled = finalize(undefined, reports, true);
+  expect(Object.keys(cancelled.panels[PANEL].points).sort()).toEqual([file(1), file(2)].sort());
+});
+
+test("a file over the runner's budget fails at once, and retry frees it with fresh attempts", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2))]);
+  const plan = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry: undefined });
+  let entry = finalizeCountry({
+    mode: "backfill", entry: undefined, panel: summary(PANEL), series: listed, planned: plan.points,
+    stored: [point(file(1))], reports: { [file(2)]: report(file(2), 1, "exceeds_runner_budget") }, pin: true, at: "t1",
+  });
+  expect(entry.panels[PANEL].points[file(2)]).toMatchObject({ state: "failed", attempts: 1, lastError: "exceeds_runner_budget" });
+  expect(entry.panels[PANEL].complete).toBe(true);
+  // Neither a backfill nor a top-up plans a failed file again; retry does, from attempt 1.
+  expect(planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry }))
+    .toMatchObject({ action: "skip", reason: "nothing_missing" });
+  const retry = planPanel({ country: "zz", panelId: PANEL, mode: "retry", pin: true, series: listed, entry });
+  expect(retry.points.map((p) => [p.digest, p.attempt, p.last_attempt])).toEqual([[file(2), 1, false]]);
+  entry = finalizeCountry({
+    mode: "retry", entry, panel: summary(PANEL), series: listed, planned: retry.points,
+    stored: [point(file(1)), point(file(2))], pin: true, at: "t2",
+  });
+  expect(entry.panels[PANEL].points[file(2)]).toMatchObject({ state: "measured", attempts: 1, lastError: null });
+  expect(planPanel({ country: "zz", panelId: PANEL, mode: "retry", pin: true, series: listed, entry }))
+    .toMatchObject({ action: "skip", reason: "nothing_failed" });
+  expect(planPanel({ country: "zz", panelId: PANEL, mode: "retry", pin: true, buildId: `${LINE}/b2`, series: listed, entry }))
+    .toMatchObject({ action: "skip", reason: "release_not_failed" });
+});
+
+test("the states tell measured, gap, retrying, failed and never run apart", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2)), build("b3", file(3)), build("b4", file(4)), build("b5", file(5))]);
+  const plan = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry: undefined });
+  const entry = finalizeCountry({
+    mode: "backfill", entry: undefined, panel: summary(PANEL), series: listed,
+    planned: plan.points.filter((p) => p.digest !== file(5)),
+    stored: [point(file(1)), point(file(2), [], "refused")],
+    reports: { [file(4)]: report(file(4), 1, "exceeds_runner_budget") }, pin: true, at: "t",
+  });
+  const states = (digest: string): string => entry.panels[PANEL].points[digest]?.state ?? "never run";
+  expect([1, 2, 3, 4, 5].map((n) => states(file(n)))).toEqual(["measured", "gap", "retrying", "failed", "never run"]);
+  expect(entry.panels[PANEL].coverage).toEqual({ builds: 5, files: 5, measured: 1, gap: 1, retrying: 1, failed: 1, missing: 1 });
+  const timeline = timelineOf(listed, [point(file(1)), point(file(2), [], "refused")], { states: entry.panels[PANEL].points });
+  expect(timeline.builds.map((b) => [b.state, b.reason])).toEqual([
+    ["measured", null],
+    ["gap", "disclosure_source_ids_missing"],
+    ["retrying", "no_measurement_written"],
+    ["failed", "exceeds_runner_budget"],
+    ["missing", null],
+  ]);
 });

@@ -10,6 +10,7 @@ import {
   readJson,
   type MeasurementDocument,
   type ReleaseHistoryManifest,
+  type ReleaseHistoryStore,
   type SeriesRecord,
   type Timeline,
 } from "../lib/microcosm/release-history-store";
@@ -221,6 +222,46 @@ test("a run that pins rebuilds every panel's timeline; a run from another ref to
   }
   const manifest = await readJson<ReleaseHistoryManifest>(store, "release-history/manifest.json");
   expect(manifest?.countries.uk).toMatchObject({ pinnedPanelId: PANEL_ID });
+});
+
+test("attempt reports go up first, one failed file stops no other, and finalize reads the report", async () => {
+  const root = await localStore();
+  // The second file's leg failed at its download: its report sits in the panel's attempts folder.
+  const attempts = join(root, "release-history", "uk", PANEL_ID, "attempts");
+  await mkdir(attempts, { recursive: true });
+  await writeFile(join(attempts, `${FILES[1]}.json`), JSON.stringify({
+    format_version: 1, kind: "release_history.attempt", country: "uk", panel_id: PANEL_ID,
+    digest: FILES[1], build_id: `${LINE}/build-2`, attempt: 1, last_attempt: false, status: "failed",
+    stage: "download", reason: "sha256_mismatch", error_class: null, at: "2026-11-09T00:30:00Z",
+    producer: { version: "1", commit: null },
+  }));
+  const inner = memoryStore();
+  const order: string[] = [];
+  const flaky: ReleaseHistoryStore = {
+    ...inner,
+    async write(path, body, mode, immutable) {
+      order.push(path);
+      if (path.endsWith("/labels.json")) throw new Error("service unavailable");
+      return inner.write(path, body, mode, immutable);
+    },
+  };
+  await expect(uploadDirectory(flaky, root, { countryFiles: true })).rejects.toThrow(
+    "release-history/uk/labels.json",
+  );
+  expect(order[0]).toBe(`release-history/uk/${PANEL_ID}/attempts/${FILES[1]}.json`);
+  for (const path of [`release-history/uk/${PANEL_ID}/panel.json`, "release-history/uk/series.json"]) {
+    expect(await inner.read(path)).not.toBeNull();
+  }
+  // The first file's point is stored, so only the second is planned; its report is its state.
+  const planned = await plan({ store: inner, panel: panelDocument(), series, mode: "backfill", pin: true });
+  expect(planned.points.map((p) => p.digest)).toEqual([FILES[1]]);
+  const summary = await finalize({
+    store: inner, panel: panelDocument(), plan: planned, pin: true, measureResult: "failure", at: "2026-11-09T01:00:00Z",
+  });
+  expect(summary.points.find((p) => p.digest === FILES[1])).toMatchObject({
+    state: "retrying", attempts: 1, lastError: "sha256_mismatch", lastStage: "download",
+  });
+  expect(summary.points.find((p) => p.digest === FILES[0])).toMatchObject({ state: "measured" });
 });
 
 test("a local folder builds its own timeline from its series record", async () => {

@@ -11,7 +11,11 @@ name: Release history
 #   engine measured, so the first new build has a step. A country's first
 #   panel waits for its backfill.
 # - Manual: `topup`, `backfill` (every file a panel lacks, as after an engine,
-#   spec or producer bump) or `release` (one build). Only runs of the default
+#   spec or producer bump), `release` (one build) or `retry` (the files that
+#   ran out of attempts, or one build's, with fresh attempts). A failure a run
+#   causes stores no point: the leg uploads the file's attempt report, and
+#   finalize keeps the file as retrying (failed after three attempts, or at
+#   once when it is over the runner's budget). Only runs of the default
 #   branch's engine pin: they move the pinned and served panels, replace the
 #   country's series record, references and labels, and rebuild every panel's
 #   timeline. A run dispatched from another ref measures into its own engine's
@@ -30,13 +34,13 @@ on:
         required: true
         type: string
       mode:
-        description: topup (new builds on a complete panel), backfill (a new panel) or release (one build)
+        description: topup (new builds), backfill (every file a panel lacks), release (one build) or retry (failed files)
         required: true
         default: topup
         type: choice
-        options: [topup, backfill, release]
+        options: [topup, backfill, release, retry]
       build_id:
-        description: For mode release, the build as releases.json names it, <release>/<build>
+        description: For mode release (or retry of one build), the build as releases.json names it, <release>/<build>
         required: false
         type: string
   schedule:
@@ -144,7 +148,12 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Install the country's reference engine
         run: uv sync --frozen --project "release_history/countries/$COUNTRY"
-      - name: Measure one release build
+      # Before the measurement, so the upload below can run after a failed one.
+      - run: bun install --frozen-lockfile
+        working-directory: frontend
+      - name: Measure one data file
+        # Below the job's limit, so a slow file fails this step and its report still goes up.
+        timeout-minutes: 110
         env:
           POINT: ${{ toJson(matrix.point) }}
         run: |
@@ -152,9 +161,8 @@ jobs:
           uv run --frozen --project "release_history/countries/$COUNTRY" release-history measure \
             --country "$COUNTRY" --point "$POINT" --out "$RUNNER_TEMP/out" \
             --log "$RUNNER_TEMP/private/measure.log"
-      - run: bun install --frozen-lockfile
-        working-directory: frontend
-      - name: Upload the point
+      - name: Upload the point, or the file's attempt report
+        if: ${{ !cancelled() }}
         working-directory: frontend
         run: bun run scripts/release-history.ts upload --root "$RUNNER_TEMP/out"
 
@@ -169,6 +177,11 @@ jobs:
       BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       PLAN: ${{ needs.plan.outputs.plan }}
+      PANEL_ID: ${{ needs.plan.outputs.panel_id }}
+      # cancelled: a planned file whose leg left no report never ran, so no attempt is charged.
+      MEASURE_RESULT: ${{ needs.measure.result }}
+      # Only the default branch's engine pins.
+      PIN: ${{ github.ref_name == github.event.repository.default_branch && '--pin' || '' }}
     defaults:
       run:
         working-directory: frontend
@@ -180,7 +193,6 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' "$PLAN" > "$RUNNER_TEMP/plan.json"
-          # Only the default branch's engine moves the pinned and served panels.
           bun run scripts/release-history.ts finalize --country "$COUNTRY" \
-            --panel-id "${{ needs.plan.outputs.panel_id }}" --plan "$RUNNER_TEMP/plan.json" \
-            ${{ github.ref_name == github.event.repository.default_branch && '--pin' || '' }}
+            --panel-id "$PANEL_ID" --plan "$RUNNER_TEMP/plan.json" \
+            --measure-result "$MEASURE_RESULT" $PIN

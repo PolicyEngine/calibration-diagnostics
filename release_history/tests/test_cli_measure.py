@@ -1,13 +1,14 @@
 """The measure command end to end, on the fake model world and a fake release repository.
 
 Only results and the refusals a file itself causes are stored: a failure the run causes
-writes no point, so a later attempt can still measure the file.
+writes no point, only the file's attempt report, so a later attempt can still measure it.
 """
 
 import contextlib
 import hashlib
 import json
 import re
+from pathlib import Path
 
 import pytest
 
@@ -52,6 +53,7 @@ def world(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "dataset_columns", lambda path: ["household_id"])
     monkeypatch.setattr(cli, "quiet", lambda path: contextlib.nullcontext())
     out = tmp_path / "out"
+    state["out"] = out
 
     def run(capsys, **point):
         planned = {
@@ -78,7 +80,11 @@ def world(monkeypatch, tmp_path):
             ]
         )
         printed = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-        stored = sorted(p for p in out.rglob("*.json") if POINT_NAME.match(p.name))
+        files = [p for p in out.rglob("*.json") if POINT_NAME.match(p.name)]
+        stored = sorted(p for p in files if p.parent.name != "attempts")
+        state["reports"] = {
+            p.stem: json.loads(p.read_text()) for p in files if p.parent.name == "attempts"
+        }
         return code, printed, stored
 
     state["run"] = run
@@ -89,6 +95,8 @@ def test_a_measured_file_is_one_immutable_point(world, capsys):
     code, printed, stored = world["run"](capsys)
     assert code == 0 and printed["status"] == "ok"
     assert len(stored) == 1
+    # The interrupted report written before each stage is gone once the point is written.
+    assert world["reports"] == {}
     document = json.loads(stored[0].read_text())
     assert document["measurement_id"] == stored[0].stem == printed["measurement_id"]
     assert document["measurement_id"] == measurement_id(document["panel_id"], H5_SHA)
@@ -126,10 +134,16 @@ def test_a_failure_the_run_causes_stores_nothing(world, capsys, case, stage, rea
         world["backend"] = FakeBackend(fail_on=lambda reform: True)
     elif case == "reform_crash":
         world["backend"] = FakeBackend(fail_on=lambda reform: bool(reform))
-    code, printed, stored = world["run"](capsys, **point)
+    code, printed, stored = world["run"](capsys, **point, attempt=2)
     assert code == cli.EXIT_RUN_FAILED
     assert (printed["status"], printed["stage"], printed["reason"]) == ("run_failed", stage, reason)
     assert stored == []
+    # The attempt report names the planned file, the attempt, the stage and the reason.
+    planned = point.get("digest", H5_SHA)
+    report = world["reports"][planned]
+    assert report["kind"] == "release_history.attempt"
+    assert (report["status"], report["stage"], report["reason"]) == ("failed", stage, reason)
+    assert (report["attempt"], report["last_attempt"], report["build_id"]) == (2, False, BUILD)
 
 
 def test_an_unexpected_error_prints_its_class_only_and_stores_nothing(world, capsys, monkeypatch):
@@ -208,6 +222,31 @@ def test_a_transient_failure_stores_nothing_and_says_so(world, capsys, monkeypat
     code, printed, stored = world["run"](capsys)
     assert (code, printed["status"]) == (cli.EXIT_TRANSIENT, "transient")
     assert stored == []
+    assert world["reports"][H5_SHA]["reason"] == "transient"
+
+
+def test_a_run_killed_mid_simulation_leaves_an_interrupted_report(world, capsys):
+    # A kill (out of memory, a step timeout) runs no handler: the report written before the
+    # simulation is what reaches the store. Read it while each simulation runs.
+    seen = []
+    report_path = []
+
+    class Watching(FakeBackend):
+        def build(self, reform):
+            path = next(Path(report_path[0]).rglob("attempts/*.json"))
+            report = json.loads(path.read_text())
+            seen.append((report["status"], report["stage"]))
+            return super().build(reform)
+
+    world["backend"] = Watching()
+    report_path.append(world["out"])
+    code, _, _ = world["run"](capsys)
+    assert code == 0
+    assert seen == [
+        ("interrupted", "baseline"),
+        ("interrupted", "reform:tax_up"),
+        ("interrupted", "reform:benefit_up"),
+    ]
 
 
 def test_stdout_carries_no_figure(world, capsys):
@@ -231,7 +270,8 @@ def test_stdout_carries_no_figure(world, capsys):
 
 def test_points_never_land_outside_the_panel_folder(world, capsys, tmp_path):
     world["run"](capsys)
-    stored = [p.relative_to(tmp_path / "out") for p in (tmp_path / "out").rglob("*") if p.is_file()]
+    root = tmp_path / "out"
+    stored = [p.relative_to(root) for p in root.rglob("*") if p.is_file()]
     stored = [p for p in stored if p.parts[0] != ".logs"]
     assert {p.parts[:2] for p in stored} == {("release-history", "zz")}
     assert sorted(p.name for p in stored if len(p.parts) == 4)[-1] == "panel.json"

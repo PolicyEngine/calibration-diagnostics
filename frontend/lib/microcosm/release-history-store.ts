@@ -11,14 +11,17 @@
  *   release-history/<country>/labels.json                  replaced each run
  *   release-history/<country>/<panel>/panel.json           written once
  *   release-history/<country>/<panel>/<measurement>.json   immutable
+ *   release-history/<country>/<panel>/attempts/<file>.json replaced at each attempt
  *   release-history/<country>/<panel>/timeline.json        rebuilt by finalize
  *
  * A point is one data file measured on one panel, named by a hash of the
  * panel id and the file's sha256. The series record (the Python `series`
  * command) lists the country's builds from its release repository's
  * releases.json and maps each build to its file; the manifest keys each
- * panel's points by file. Countries never touch each other's manifest
- * entries, so one country's new panel never moves another's.
+ * panel's points by file. Only results and refusals a file itself causes are
+ * points; a failure a run causes is a state in the manifest, read from the
+ * file's attempt report. Countries never touch each other's manifest entries,
+ * so one country's new panel never moves another's.
  */
 import { BlobPreconditionFailedError, get, list, put } from "@vercel/blob";
 
@@ -213,7 +216,14 @@ export function countryFilePath(country: string, name: "series" | "references" |
   return `${countryPrefix(country)}${name}.json`;
 }
 
-export type StoredFileKind = "series" | "references" | "labels" | "panel" | "timeline" | "measurement";
+export type StoredFileKind =
+  | "series"
+  | "references"
+  | "labels"
+  | "panel"
+  | "timeline"
+  | "measurement"
+  | "attempt";
 
 const COUNTRY_FILES = new Map<string, StoredFileKind>([
   ["series.json", "series"],
@@ -233,7 +243,15 @@ export function storedFileKind(path: string): StoredFileKind | null {
   if (parts.length === 4 && PANEL_ID.test(parts[2])) {
     return PANEL_FILES.get(parts[3]) ?? (MEASUREMENT_FILE.test(parts[3]) ? "measurement" : null);
   }
+  if (parts.length === 5 && PANEL_ID.test(parts[2]) && parts[3] === "attempts") {
+    return MEASUREMENT_FILE.test(parts[4]) ? "attempt" : null;
+  }
   return null;
+}
+
+/** Where a file's attempt report sits on a panel. */
+export function attemptPath(country: string, panelId: string, digest: string): string {
+  return `${panelPrefix(country, panelId)}attempts/${digest}.json`;
 }
 
 function own<T>(record: Record<string, T> | undefined, key: string): T | undefined {
@@ -323,6 +341,8 @@ export interface ManifestPoint {
   measurementStatus: string | null;
   attempts: number;
   lastError: string | null;
+  /** Where the last failed attempt stopped (open, download, baseline, reform:<id>, ...). */
+  lastStage: string | null;
   /** The build the file was last planned under, when a plan named it. */
   lastBuildId: string | null;
 }
@@ -436,8 +456,8 @@ export interface PlannedPoint {
   last_attempt: boolean;
 }
 
-export type PlanMode = "topup" | "backfill" | "release";
-export const PLAN_MODES: readonly PlanMode[] = ["topup", "backfill", "release"];
+export type PlanMode = "topup" | "backfill" | "release" | "retry";
+export const PLAN_MODES: readonly PlanMode[] = ["topup", "backfill", "release", "retry"];
 
 export interface Plan {
   country: string;
@@ -496,6 +516,7 @@ function oneBuildPerFile(builds: SeriesBuild[]): SeriesBuild[] {
  *   panel was pinned before, the latest build that panel measured, so the first new build has a
  *   step. A country's first panel waits for its backfill.
  * - `release`: one build, by its `<release>/<build>` id.
+ * - `retry`: the files that ran out of attempts (or one build's), with fresh attempts.
  *
  * `stored` names the files whose point is already in the store, as a fallback for a run whose
  * finalize never folded them into the manifest. A run plans at most MAX_PLANNED_POINTS files.
@@ -537,16 +558,31 @@ export function planPanel(options: {
     };
   };
 
-  if (mode === "release") {
+  const named = () => {
     const build = series.builds.find((candidate) => candidate.build_id === options.buildId);
-    if (!build) return skip("release_not_in_series");
-    if (build.withdrawn) return skip("release_withdrawn");
+    if (!build) return "release_not_in_series";
+    if (build.withdrawn) return "release_withdrawn";
     if (build.listing_status !== "ok" || build.digest === null) {
-      return skip(build.listing_reason ?? "release_not_measurable");
+      return build.listing_reason ?? "release_not_measurable";
     }
+    return build;
+  };
+  if (mode === "release") {
+    const build = named();
+    if (typeof build === "string") return skip(build);
     if (stateOf(build)?.state === "failed") return skip("release_failed");
     if (heldHere(build)) return skip("already_measured");
     return measure([build]);
+  }
+  if (mode === "retry") {
+    // A failed file starts again at attempt 1 (plannedPoint counts on from retrying files only).
+    if (options.buildId) {
+      const build = named();
+      if (typeof build === "string") return skip(build);
+      return stateOf(build)?.state === "failed" ? measure([build]) : skip("release_not_failed");
+    }
+    const failed = axis.filter((build) => stateOf(build)?.state === "failed");
+    return failed.length > 0 ? measure(failed) : skip("nothing_failed");
   }
   if (mode === "backfill") return measure(axis.filter((build) => !heldHere(build)));
   // A top-up follows the pinned engine: a run from another ref fills its panel with a backfill or
@@ -589,6 +625,27 @@ export interface MeasurementCell {
   status: string;
   reason?: string | null;
 }
+
+/** A file's attempt report, as the Python producer writes it (`cli.AttemptReport`). */
+export interface AttemptReport {
+  format_version: number;
+  kind: "release_history.attempt";
+  country: string;
+  panel_id: string;
+  digest: string;
+  build_id: string;
+  attempt: number;
+  last_attempt: boolean;
+  /** `interrupted`: written before a stage and never replaced, so the run died there. */
+  status: "interrupted" | "failed";
+  stage: string;
+  reason: string;
+  error_class: string | null;
+  at: string;
+}
+
+/** A failure no later attempt can fix: the file is over the runner's budget. */
+export const FAILS_AT_ONCE: ReadonlySet<string> = new Set(["exceeds_runner_budget"]);
 
 /** A stored point, as the Python producer writes it (snake_case; `document.py`). */
 export interface MeasurementDocument {
@@ -637,6 +694,10 @@ export function finalizeCountry(options: {
   mode: PlanMode;
   planned: PlannedPoint[];
   stored: MeasurementDocument[];
+  /** The planned files' attempt reports in the store, by file sha256. */
+  reports?: Record<string, AttemptReport>;
+  /** The run was cancelled: a planned file with no point and no report of its attempt never ran. */
+  cancelled?: boolean;
   pin: boolean;
   at: string;
   maxAttempts?: number;
@@ -650,15 +711,23 @@ export function finalizeCountry(options: {
   const points: Record<string, ManifestPoint> = { ...(previous?.points ?? {}) };
   const stored = new Map(options.stored.map((document) => [document.file.sha256, document]));
   const planned = new Map(options.planned.map((point) => [point.digest, point]));
+  // The attempt counts are the plan's, so finalizing one run twice (a re-run of failed jobs)
+  // charges each file once; a report from another attempt says nothing about this one.
   for (const point of options.planned) {
     if (stored.has(point.digest)) continue;
+    const found = own(options.reports, point.digest);
+    const report = found?.attempt === point.attempt ? found : undefined;
+    if (!report && options.cancelled) continue;
+    const reason = report ? report.reason : "no_measurement_written";
+    const failed = point.last_attempt || point.attempt >= maxAttempts || FAILS_AT_ONCE.has(reason);
     points[point.digest] = {
       digest: point.digest,
-      state: point.attempt >= maxAttempts ? "failed" : "retrying",
+      state: failed ? "failed" : "retrying",
       measurementId: null,
       measurementStatus: null,
       attempts: point.attempt,
-      lastError: "no_measurement_written",
+      lastError: reason,
+      lastStage: report?.stage ?? null,
       lastBuildId: point.build_id,
     };
   }
@@ -673,6 +742,7 @@ export function finalizeCountry(options: {
       measurementStatus: document.status,
       attempts: point?.attempt ?? Math.max(before?.attempts ?? 0, 1),
       lastError: refused ? document.reason : null,
+      lastStage: null,
       lastBuildId: point?.build_id ?? before?.lastBuildId ?? null,
     };
   }

@@ -14,6 +14,7 @@ import datetime as dt
 import importlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -23,7 +24,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from release_history import LABELS_FORMAT_VERSION, PRODUCER_VERSION
+from release_history import ATTEMPT_FORMAT_VERSION, LABELS_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import document_bytes, file_sha256, write_atomic
 from release_history.disclosure import apply_policy
 from release_history.document import measurement_document, measurement_id, refused_document
@@ -66,6 +67,7 @@ EXIT_TRANSIENT = 75
 EXIT_RUN_FAILED = 3
 # The only refusals a file itself causes: stored, so the file shows as a gap.
 FILE_REFUSALS = frozenset({"disclosure_source_ids_missing", "disclosure_source_ids_misaligned"})
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _now() -> str:
@@ -377,9 +379,68 @@ def _point_from_args(args: argparse.Namespace, spec: Spec, hub: HubClient) -> Po
     )
 
 
-def _run_failed(stage: str, reason: str, point: Point | None, **extra: Any) -> int:
-    """A failure the run caused, not the file: nothing immutable is written, and a later
-    attempt may succeed."""
+class AttemptReport:
+    """`<panel>/attempts/<digest>.json`: how the latest attempt at a file ended, when it stored
+    nothing. It is written as `interrupted` before each stage (opening the release, the
+    download, each simulation), so a run killed mid-way (out of memory, a step timeout) still
+    leaves one; rewritten as `failed` on a handled failure; removed once the point or a stored
+    gap is written. Replaced at each attempt, never a point: finalize reads it into the
+    manifest's state for the file."""
+
+    def __init__(self, folder: Path, country: str, panel_id: str, commit: str | None) -> None:
+        self.folder = folder / "attempts"
+        self.country = country
+        self.panel_id = panel_id
+        self.commit = commit
+        self.point: Point | None = None
+        self.digest: str | None = None
+
+    def bind(self, point: Point, digest: str | None) -> None:
+        self.point = point
+        if digest and _DIGEST.match(digest):
+            self.digest = digest
+
+    @property
+    def path(self) -> Path | None:
+        return self.folder / f"{self.digest}.json" if self.digest else None
+
+    def write(self, status: str, stage: str, reason: str, error_class: str | None = None) -> None:
+        if self.path is None or self.point is None:
+            return
+        write_replace(
+            self.path,
+            {
+                "format_version": ATTEMPT_FORMAT_VERSION,
+                "kind": "release_history.attempt",
+                "country": self.country,
+                "panel_id": self.panel_id,
+                "digest": self.digest,
+                "build_id": self.point.build_id,
+                "attempt": self.point.attempt,
+                "last_attempt": self.point.last_attempt,
+                "status": status,
+                "stage": stage,
+                "reason": reason,
+                "error_class": error_class,
+                "at": _now(),
+                "producer": {"version": PRODUCER_VERSION, "commit": self.commit},
+            },
+        )
+
+    def started(self, stage: str) -> None:
+        self.write("interrupted", stage, "interrupted")
+
+    def clear(self) -> None:
+        if self.path is not None:
+            self.path.unlink(missing_ok=True)
+
+
+def _run_failed(
+    report: AttemptReport, stage: str, reason: str, point: Point | None, **extra: Any
+) -> int:
+    """A failure the run caused, not the file: no point is written, only the attempt report,
+    and a later attempt may succeed."""
+    report.write("failed", stage, reason, extra.get("error_class"))
     _emit(
         {
             "command": "measure",
@@ -411,6 +472,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
     env = environment(_lockfile(spec.country))
     producer_commit = _producer_commit()
     hub = HubClient()
+    report = AttemptReport(folder, spec.country, panel_id, producer_commit)
     workdir = Path(args.workdir) if args.workdir else Path(tempfile.mkdtemp(prefix="rh-"))
     log_path = Path(args.log) if args.log else root / ".logs" / f"{spec.country}-{int(clock)}.log"
     point: Point | None = None
@@ -426,37 +488,43 @@ def cmd_measure(args: argparse.Namespace) -> int:
 
     try:
         point = _point_from_args(args, spec, hub)
+        report.bind(point, point.digest)
+        report.started("open")
         try:
             opened = open_release(hub, point, workdir)
         except ReleaseRefused as refusal:
             # Before the file is known there is no digest, so there is no point to store.
             # A plan never names such a build: the series record keeps the reason.
-            return _run_failed("open", refusal.reason, point)
+            return _run_failed(report, "open", refusal.reason, point)
         if point.digest is not None and opened.artifact.sha256 != point.digest:
-            return _run_failed("open", "planned_file_changed", point)
+            return _run_failed(report, "open", "planned_file_changed", point)
+        report.bind(point, opened.artifact.sha256)
         provenance = point_provenance(opened, engine["model"]["name"], engine["model"]["version"])
         h5_sha = opened.artifact.sha256
         measurement = measurement_id(panel_id, h5_sha)
         target = folder / f"{measurement}.json"
         if target.exists():
+            report.clear()
             _emit({"command": "measure", "status": "exists", "measurement_id": measurement})
             return 0
         if spec.max_dataset_bytes and (opened.size_bytes or 0) > spec.max_dataset_bytes:
-            return _run_failed("open", "exceeds_runner_budget", point)
+            # Fails at once: no later attempt fits a file over the runner's budget.
+            return _run_failed(report, "open", "exceeds_runner_budget", point)
+        report.started("download")
         if args.h5:
             h5_path = Path(args.h5)
             if file_sha256(h5_path) != h5_sha:
-                return _run_failed("download", "sha256_mismatch", point)
+                return _run_failed(report, "download", "sha256_mismatch", point)
         else:
             try:
                 h5_path = download_verified(hub, opened, workdir)
             except ReleaseRefused as refusal:
-                return _run_failed("download", refusal.reason, point)
+                return _run_failed(report, "download", refusal.reason, point)
         columns = dataset_columns(h5_path)
         backend = PolicyEngineBackend(spec.engine_module, str(h5_path), spec.simulation_options)
         try:
             with quiet(log_path):
-                result = measure(spec, backend)
+                result = measure(spec, backend, on_progress=report.started)
                 source_ids = None
                 if spec.disclosure_policy != "none":
                     source_ids = source_ids_for(spec, h5_path, result.household_ids)
@@ -469,7 +537,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
                 )
         except ReleaseRefused as refusal:
             if refusal.reason not in FILE_REFUSALS:
-                return _run_failed("measure", refusal.reason, point)
+                return _run_failed(report, "measure", refusal.reason, point)
             # The file's own source ids are missing or misaligned: the file causes it, so
             # it is stored and shows as a gap.
             document = refused_document(
@@ -482,6 +550,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
                 runtime=runtime(),
             )
             write_immutable(target, document)
+            report.clear()
             _emit(
                 {
                     "command": "measure",
@@ -493,7 +562,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
             return 0
         if result.status != "ok" and not point.last_attempt:
             failed = sorted(k for k, v in result.reforms.items() if v.get("status") != "ok")
-            return _run_failed("reform", "reform_failed", point, reforms=failed)
+            return _run_failed(report, "reform", "reform_failed", point, reforms=failed)
         document = measurement_document(
             spec=spec,
             panel_id=panel_id,
@@ -506,6 +575,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
             runtime=runtime(),
         )
         write_immutable(target, document)
+        report.clear()
         _emit(
             {
                 "command": "measure",
@@ -524,18 +594,19 @@ def cmd_measure(args: argparse.Namespace) -> int:
     except MeasurementError as failure:
         record = error_record(failure.stage, failure.error)
         return _run_failed(
-            failure.stage, f"{failure.stage}_failed", point, error_class=record["class"]
+            report, failure.stage, f"{failure.stage}_failed", point, error_class=record["class"]
         )
     except ReleaseRefused as refusal:
-        return _run_failed("open", refusal.reason, point)
+        return _run_failed(report, "open", refusal.reason, point)
     except TransientError as error:
+        report.write("failed", "transient", "transient", str(error))
         _emit({"command": "measure", "status": "transient", "class": str(error)})
         return EXIT_TRANSIENT
     except Exception as error:  # noqa: BLE001 - the class name only, never the message
         # An unexpected error's message or traceback could carry a figure into the public
         # log, so only its class is printed.
         return _run_failed(
-            "unexpected", "unexpected_error", point, error_class=type(error).__name__
+            report, "unexpected", "unexpected_error", point, error_class=type(error).__name__
         )
     finally:
         if h5_path is not None and not args.h5 and not args.keep_h5:

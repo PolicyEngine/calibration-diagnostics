@@ -26,6 +26,7 @@ import { dirname, join, relative } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
+  attemptPath,
   buildTimeline,
   countryFilePath,
   encodeDocument,
@@ -43,6 +44,7 @@ import {
   storedFileKind,
   updateManifestCountry,
   vercelBlobStore,
+  type AttemptReport,
   type LabelsDocument,
   type ManifestPoint,
   type MeasurementDocument,
@@ -152,6 +154,9 @@ export async function plan(options: {
   if (options.mode === "release" && !BUILD_ID.test(options.buildId ?? "")) {
     throw new Error("Mode release needs --build-id <release>/<build>, as releases.json names it.");
   }
+  if (options.mode === "retry" && options.buildId && !BUILD_ID.test(options.buildId)) {
+    throw new Error("--build-id names a build as releases.json does: <release>/<build>.");
+  }
   const manifest = await readJson<ReleaseHistoryManifest>(store, RELEASE_HISTORY_MANIFEST_PATH);
   // Points already in the store, in case a run's finalize never folded them in.
   const names = new Set(
@@ -180,7 +185,8 @@ const COUNTRY_FILE_KINDS = new Set(["series", "references", "labels"]);
 
 /**
  * Upload a local store folder: points immutable, panel.json once, the rest replaced. The
- * country's files go up only from a run that pins (`countryFiles`).
+ * country's files go up only from a run that pins (`countryFiles`). Attempt reports go first,
+ * and one file that fails to upload does not stop the others: the error comes at the end.
  */
 export async function uploadDirectory(
   store: ReleaseHistoryStore,
@@ -188,25 +194,35 @@ export async function uploadDirectory(
   options: { countryFiles: boolean },
 ): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
-  const files = (await walk(join(root, RELEASE_HISTORY_PREFIX))).filter((f) => f.endsWith(".json")).sort();
-  for (const file of files) {
-    const path = relative(root, file).split("\\").join("/");
-    const kind = storedFileKind(path);
+  const failed: string[] = [];
+  const files = (await walk(join(root, RELEASE_HISTORY_PREFIX)))
+    .filter((f) => f.endsWith(".json"))
+    .map((file) => ({ file, path: relative(root, file).split("\\").join("/") }))
+    .map((entry) => ({ ...entry, kind: storedFileKind(entry.path) }))
+    .sort((left, right) =>
+      Number(right.kind === "attempt") - Number(left.kind === "attempt") || (left.path < right.path ? -1 : 1)
+    );
+  for (const { file, path, kind } of files) {
     if (!kind) continue;
     if (COUNTRY_FILE_KINDS.has(kind) && !options.countryFiles) {
       counts[`${kind}:held_back`] = (counts[`${kind}:held_back`] ?? 0) + 1;
       continue;
     }
-    const body = encodeDocument(JSON.parse(await readFile(file, "utf8")));
-    let outcome: string;
-    if (kind === "measurement") outcome = await putImmutable(store, path, body);
-    else if (kind === "panel") outcome = await putWriteOnce(store, path, body);
-    else {
-      await putReplace(store, path, body);
-      outcome = "replaced";
+    try {
+      const body = encodeDocument(JSON.parse(await readFile(file, "utf8")));
+      let outcome: string;
+      if (kind === "measurement") outcome = await putImmutable(store, path, body);
+      else if (kind === "panel") outcome = await putWriteOnce(store, path, body);
+      else {
+        await putReplace(store, path, body);
+        outcome = "replaced";
+      }
+      counts[`${kind}:${outcome}`] = (counts[`${kind}:${outcome}`] ?? 0) + 1;
+    } catch (error) {
+      failed.push(`${path} (${error instanceof Error ? error.constructor.name : "error"})`);
     }
-    counts[`${kind}:${outcome}`] = (counts[`${kind}:${outcome}`] ?? 0) + 1;
   }
+  if (failed.length > 0) throw new Error(`Upload failed for ${failed.join(", ")}.`);
   return counts;
 }
 
@@ -244,6 +260,8 @@ export async function finalize(options: {
   plan: Plan;
   /** A run of the default branch's engine: it may move the pinned and served panels. */
   pin: boolean;
+  /** The measure job's result: `cancelled` charges no attempt to a file without a report. */
+  measureResult?: string;
   at?: string;
 }) {
   const { store, panel } = options;
@@ -251,6 +269,11 @@ export async function finalize(options: {
   const at = options.at ?? now();
   const series = await readJson<SeriesRecord>(store, countryFilePath(country, "series"));
   const stored = await storedMeasurements(store, country, panel.panel_id);
+  const reports: Record<string, AttemptReport> = {};
+  for (const point of options.plan.points) {
+    const report = await readJson<AttemptReport>(store, attemptPath(country, panel.panel_id, point.digest));
+    if (report) reports[point.digest] = report;
+  }
   const manifest = await updateManifestCountry(store, country, (entry) =>
     finalizeCountry({
       entry,
@@ -259,6 +282,8 @@ export async function finalize(options: {
       mode: options.plan.mode,
       planned: options.plan.points,
       stored,
+      reports,
+      cancelled: options.measureResult === "cancelled",
       pin: options.pin,
       at,
     }), at);
@@ -300,6 +325,7 @@ export async function finalize(options: {
       measurementStatus: point.measurementStatus,
       attempts: point.attempts,
       lastError: point.lastError,
+      lastStage: point.lastStage,
     })),
   };
 }
@@ -384,8 +410,10 @@ async function main(argv: string[]): Promise<void> {
       root: { type: "string" },
       out: { type: "string" },
       mode: { type: "string", default: "topup" },
-      // mode release: the build as releases.json names it, <release>/<build>.
+      // modes release and retry: the build as releases.json names it, <release>/<build>.
       "build-id": { type: "string" },
+      // finalize: the measure job's result (cancelled charges no attempt to a leg that never ran).
+      "measure-result": { type: "string" },
       plan: { type: "string" },
       panel: { type: "string" },
       "plan-out": { type: "string" },
@@ -426,9 +454,11 @@ async function main(argv: string[]): Promise<void> {
       ? await readLocalPanel(values.root, values.country!)
       : await readStoredPanel(store, values.country!, values["panel-id"]!);
     const planned = JSON.parse(await readFile(values.plan!, "utf8")) as Plan;
-    const summary = await finalize({ store, panel, plan: planned, pin: values.pin === true });
+    const summary = await finalize({
+      store, panel, plan: planned, pin: values.pin === true, measureResult: values["measure-result"],
+    });
     const rows = summary.points
-      .map((p) => `| ${p.buildId ?? ""} | \`${p.digest.slice(0, 12)}\` | ${p.state} | ${p.measurementStatus ?? ""} | ${p.attempts} | ${p.lastError ?? ""} |`)
+      .map((p) => `| ${p.buildId ?? ""} | \`${p.digest.slice(0, 12)}\` | ${p.state} | ${p.measurementStatus ?? ""} | ${p.attempts} | ${[p.lastError, p.lastStage].filter(Boolean).join(" at ")} |`)
       .join("\n");
     const { coverage } = summary;
     await stepSummary(
