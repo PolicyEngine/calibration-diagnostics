@@ -70,7 +70,7 @@ def engine_identity(spec: Spec, bundle: dict[str, Any] | None = None) -> dict[st
         "model": {
             "name": spec.model_package,
             "version": model["version"],
-            **({"wheel_sha256": model["sha256"]} if model.get("sha256") else {}),
+            "wheel_sha256": model.get("sha256"),
         },
         "core": {"name": CORE_PACKAGE, "version": core["version"]},
     }

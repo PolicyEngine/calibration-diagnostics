@@ -21,6 +21,7 @@ from typing import Any
 
 from release_history import POINT_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import json_sha256
+from release_history.disclosure import apply_policy
 from release_history.measure import Measurement
 from release_history.spec import Spec
 
@@ -77,6 +78,64 @@ def _point(
     }
 
 
+def _error(record: dict[str, Any] | None) -> dict[str, Any] | None:
+    if record is None:
+        return None
+    return {key: record.get(key) for key in ("stage", "class", "name", "where")}
+
+
+def _reform(record: dict[str, Any]) -> dict[str, Any]:
+    """A reform's status, with every key present: `applied` is null for a reform whose
+    definition failed, `error` is null for one that ran."""
+    return {
+        "status": record["status"],
+        "definition_sha256": record.get("definition_sha256"),
+        "applied": record.get("applied"),
+        "error": _error(record.get("error")),
+    }
+
+
+def _bundle(bundle: dict[str, Any] | None) -> dict[str, Any]:
+    bundle = bundle or {}
+    return {key: bundle.get(key) for key in ("bundle_id", "capital_gains_responses")}
+
+
+def measured_point(
+    *,
+    spec: Spec,
+    panel_id: str,
+    provenance: dict[str, Any],
+    result: Measurement,
+    source_ids: Any,
+    columns: list[str],
+    env: dict[str, Any],
+    producer_commit: str | None,
+    runtime: dict[str, Any],
+) -> tuple[dict[str, Any], int]:
+    """The spec's disclosure policy, then the stored document, with the number of cells
+    withheld: what `release-history measure` writes for a measured file, and what the
+    fixtures are made with."""
+    withheld = apply_policy(
+        spec.disclosure_policy,
+        result.cells,
+        result.tables,
+        source_ids=source_ids,
+        floor=spec.min_source_households,
+    )
+    document = measurement_document(
+        spec=spec,
+        panel_id=panel_id,
+        provenance=provenance,
+        result=result,
+        columns=columns,
+        withheld=withheld,
+        env=env,
+        producer_commit=producer_commit,
+        runtime=runtime,
+    )
+    return document, withheld
+
+
 def measurement_document(
     *,
     spec: Spec,
@@ -110,11 +169,11 @@ def measurement_document(
                 "unknown_columns": sorted(c for c in columns if known and c not in known),
                 "warnings": sorted(result.warnings),
             },
-            "baseline": result.baseline_status,
-            "reforms": result.reforms,
+            "baseline": {"status": result.baseline_status["status"]},
+            "reforms": {reform_id: _reform(record) for reform_id, record in result.reforms.items()},
             # Every key always present: a cell with no reason holds a null one.
             "cells": [{"reason": None, **cell.to_json()} for cell in result.cells],
-            "engine_bundle": result.engine_bundle,
+            "engine_bundle": _bundle(result.engine_bundle),
         }
     )
     document["disclosure"]["withheld_cells"] = withheld

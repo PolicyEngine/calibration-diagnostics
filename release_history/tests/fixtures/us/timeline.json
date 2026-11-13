@@ -1,0 +1,649 @@
+{
+  "formatVersion": 1,
+  "kind": "release_history.timeline",
+  "country": "us",
+  "panelId": "af711588eb3ec1f0bde0fdb0e3383b0b3680b3bf9bf21ce667466b9341dbea16",
+  "builtAt": "2026-11-12T00:00:00Z",
+  "listing": {
+    "commit": "cccccccccccccccccccccccccccccccccccccccc",
+    "listedAt": "2026-11-12T00:00:00Z",
+    "rule": {
+      "releases": [
+        "microcosm-us-2024-national"
+      ],
+      "since": null
+    }
+  },
+  "labels": {
+    "arpa_ctc_2021": {
+      "label": "ARPA 2021 Child Tax Credit expansion",
+      "source": {
+        "commit": "1d174fc7c9",
+        "id": "federal.arpa_ctc_2021",
+        "path": "packages/microcosm-build/src/microcosm/build/us/state_reforms.json",
+        "repo": "PolicyEngine/microcosm"
+      }
+    },
+    "cbo_rates_plus_1pt": {
+      "label": "All individual income tax rates +1pt",
+      "source": {
+        "commit": "1d174fc7c9",
+        "id": "federal.cbo_rates_plus_1pt",
+        "path": "packages/microcosm-build/src/microcosm/build/us/state_reforms.json",
+        "repo": "PolicyEngine/microcosm"
+      }
+    }
+  },
+  "builds": [
+    {
+      "buildId": "microcosm-us-2024-national/synthetic-build-1",
+      "release": "microcosm-us-2024-national",
+      "build": "synthetic-build-1",
+      "publishedAt": "2026-10-02T09:00:00+00:00",
+      "current": false,
+      "withdrawn": false,
+      "digest": "0a6940c20582e29d071f2b480a40b65e1ba0f8c0b2b7dbb77fd52f48e64ea76e",
+      "sameFileAs": null,
+      "state": "measured",
+      "measurementId": "30f31d7bc337c069111d29f90f3c5a5c945c93547d44f6513d178e7bf92d4cf7",
+      "status": "ok",
+      "reason": null
+    },
+    {
+      "buildId": "microcosm-us-2024-national/synthetic-build-2",
+      "release": "microcosm-us-2024-national",
+      "build": "synthetic-build-2",
+      "publishedAt": "2026-10-04T09:00:00+00:00",
+      "current": false,
+      "withdrawn": false,
+      "digest": "0a6940c20582e29d071f2b480a40b65e1ba0f8c0b2b7dbb77fd52f48e64ea76e",
+      "sameFileAs": "microcosm-us-2024-national/synthetic-build-1",
+      "state": "measured",
+      "measurementId": "30f31d7bc337c069111d29f90f3c5a5c945c93547d44f6513d178e7bf92d4cf7",
+      "status": "ok",
+      "reason": null
+    },
+    {
+      "buildId": "microcosm-us-2024-national/synthetic-build-3",
+      "release": "microcosm-us-2024-national",
+      "build": "synthetic-build-3",
+      "publishedAt": "2026-10-06T09:00:00+00:00",
+      "current": true,
+      "withdrawn": false,
+      "digest": "6ab60e9c12413574e8cd93d12a4c1d69c253fd5cd6ae98dd4202e585acaeda5e",
+      "sameFileAs": null,
+      "state": "measured",
+      "measurementId": "352e929da0bdd56f59b09e495ba4bf62fa95cb8e9187204bda3db3d73553aaa1",
+      "status": "ok",
+      "reason": null
+    },
+    {
+      "buildId": "microcosm-us-2024-national/synthetic-build-4",
+      "release": "microcosm-us-2024-national",
+      "build": "synthetic-build-4",
+      "publishedAt": "2026-10-08T09:00:00+00:00",
+      "current": false,
+      "withdrawn": true,
+      "digest": "67333aac1bd574a59cea7ded45b57fd7a117ff385104175a567eabbd3764cc38",
+      "sameFileAs": null,
+      "state": "missing",
+      "measurementId": null,
+      "status": null,
+      "reason": null
+    },
+    {
+      "buildId": "microcosm-us-2024-national/synthetic-build-5",
+      "release": "microcosm-us-2024-national",
+      "build": "synthetic-build-5",
+      "publishedAt": "2026-10-10T09:00:00+00:00",
+      "current": false,
+      "withdrawn": false,
+      "digest": "234b2ef452a2dfe0518166299199178d2a876587689b8a81e96914159863e2b1",
+      "sameFileAs": null,
+      "state": "missing",
+      "measurementId": null,
+      "status": null,
+      "reason": null
+    }
+  ],
+  "outputs": [
+    {
+      "output": "baseline/eitc",
+      "period": 2026,
+      "unit": "currency",
+      "reference": {
+        "basis": null,
+        "output": null,
+        "reason": "US baseline references are for the US data owners to choose (trial spec).",
+        "sign": 1,
+        "status": "none"
+      },
+      "values": [
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-1",
+          "value": 29723626.374524675,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-2",
+          "value": 29723626.374524675,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-3",
+          "value": 39550396.17676331,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
+          "change": 9826769.802238636,
+          "relativeChange": 0.33060467381802705,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-4",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-5",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/households",
+      "period": 2026,
+      "unit": "count",
+      "reference": {
+        "basis": null,
+        "output": null,
+        "reason": "US baseline references are for the US data owners to choose (trial spec).",
+        "sign": 1,
+        "status": "none"
+      },
+      "values": [
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-1",
+          "value": 6097.11198624267,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-2",
+          "value": 6097.11198624267,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-3",
+          "value": 6097.11198624267,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-4",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-5",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/income_tax",
+      "period": 2026,
+      "unit": "currency",
+      "reference": {
+        "basis": null,
+        "output": null,
+        "reason": "US baseline references are for the US data owners to choose (trial spec).",
+        "sign": 1,
+        "status": "none"
+      },
+      "values": [
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-1",
+          "value": 27116833.525199946,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-2",
+          "value": 27116833.525199946,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-3",
+          "value": 31384548.967782933,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
+          "change": 4267715.442582987,
+          "relativeChange": 0.1573825143933917,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-4",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-5",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/refundable_ctc",
+      "period": 2026,
+      "unit": "currency",
+      "reference": {
+        "basis": null,
+        "output": null,
+        "reason": "US baseline references are for the US data owners to choose (trial spec).",
+        "sign": 1,
+        "status": "none"
+      },
+      "values": [
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-1",
+          "value": 44480977.81545046,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-2",
+          "value": 44480977.81545046,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-3",
+          "value": 31503833.90658127,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
+          "change": -12977143.908869188,
+          "relativeChange": -0.29174592255392323,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-4",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-5",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/snap",
+      "period": 2026,
+      "unit": "currency",
+      "reference": {
+        "basis": null,
+        "output": null,
+        "reason": "US baseline references are for the US data owners to choose (trial spec).",
+        "sign": 1,
+        "status": "none"
+      },
+      "values": [
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-1",
+          "value": 37485880.90618627,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-2",
+          "value": 37485880.90618627,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-3",
+          "value": 38387765.66401107,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
+          "change": 901884.7578248009,
+          "relativeChange": 0.02405931876276018,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-4",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-5",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "baseline/ssi",
+      "period": 2026,
+      "unit": "currency",
+      "reference": {
+        "basis": null,
+        "output": null,
+        "reason": "US baseline references are for the US data owners to choose (trial spec).",
+        "sign": 1,
+        "status": "none"
+      },
+      "values": [
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-1",
+          "value": 33477128.073918976,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-2",
+          "value": 33477128.073918976,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-3",
+          "value": 40270647.52357505,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
+          "change": 6793519.449656077,
+          "relativeChange": 0.20293017473469308,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-4",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-5",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/arpa_ctc_2021/target/income_tax",
+      "period": 2026,
+      "unit": "currency",
+      "reference": {
+        "basis": "approximation",
+        "citation": {
+          "document": "JCX-14-21, H.R. 1319 as amended",
+          "edition": "9 March 2021",
+          "period": "FY2021 and FY2022 (tax year 2021)",
+          "publisher": "Joint Committee on Taxation",
+          "row": "Child Tax Credit improvements for 2021"
+        },
+        "output": "target/income_tax",
+        "registry": {
+          "commit": "1d174fc7c9",
+          "id": "federal.arpa_ctc_2021",
+          "path": "packages/microcosm-build/src/microcosm/build/us/state_reforms.json",
+          "repo": "PolicyEngine/microcosm"
+        },
+        "sign": 1,
+        "status": "citation"
+      },
+      "values": [
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-1",
+          "value": 250754.15829877506,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-2",
+          "value": 250754.15829877506,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-3",
+          "value": 273682.9829933081,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
+          "change": 22928.824694533047,
+          "relativeChange": 0.0914394594693549,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-4",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-5",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    },
+    {
+      "output": "reform/cbo_rates_plus_1pt/target/income_tax",
+      "period": 2026,
+      "unit": "currency",
+      "reference": {
+        "basis": "approximation",
+        "citation": {
+          "document": "Options for Reducing the Deficit: 2025 to 2034",
+          "edition": "December 2024",
+          "note": "Scored on a pre-OBBBA baseline with TCJA rates in effect.",
+          "period": "FY2026",
+          "publisher": "Congressional Budget Office (Joint Committee on Taxation staff estimate)",
+          "row": "Increase Individual Income Tax Rates on Ordinary Income, alternative 1"
+        },
+        "output": "target/income_tax",
+        "registry": {
+          "commit": "1d174fc7c9",
+          "id": "federal.cbo_rates_plus_1pt",
+          "path": "packages/microcosm-build/src/microcosm/build/us/state_reforms.json",
+          "repo": "PolicyEngine/microcosm"
+        },
+        "sign": 1,
+        "status": "citation"
+      },
+      "values": [
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-1",
+          "value": 108073.12828897694,
+          "status": "ok",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-2",
+          "value": 108073.12828897694,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
+          "change": 0,
+          "relativeChange": 0,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-3",
+          "value": 221242.1203655357,
+          "status": "ok",
+          "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
+          "change": 113168.99207655876,
+          "relativeChange": 1.0471519966920546,
+          "changePoints": null,
+          "changeStatus": "ok"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-4",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        },
+        {
+          "buildId": "microcosm-us-2024-national/synthetic-build-5",
+          "value": null,
+          "status": "unmeasured",
+          "comparedWith": null,
+          "change": null,
+          "relativeChange": null,
+          "changePoints": null,
+          "changeStatus": "none"
+        }
+      ]
+    }
+  ],
+  "chronicle": {}
+}

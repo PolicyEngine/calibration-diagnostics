@@ -342,9 +342,12 @@ def test_export_flattens_stored_points_onto_the_series_builds(tmp_path):
     assert [row.split(",")[0] for row in rows] == ["zz-national/b1", "zz-national/b2"]
 
 
-def test_export_reads_the_timeline_the_typescript_side_writes(tmp_path):
-    # Written by frontend/scripts/release-history.test.ts from the series and point fixtures.
-    timeline = json.loads((Path(__file__).parent / "fixtures" / "timeline.json").read_text())
+@pytest.mark.parametrize("country", ["uk", "us"])
+def test_export_reads_the_timeline_the_typescript_side_writes(tmp_path, country):
+    # Written by frontend/scripts/release-history.test.ts from each country's fixtures.
+    timeline = json.loads(
+        (Path(__file__).parent / "fixtures" / country / "timeline.json").read_text()
+    )
     rows = timeline_rows(timeline)
     builds = timeline["builds"]
     assert len(rows) == len(timeline["outputs"]) * len(builds)
@@ -356,8 +359,8 @@ def test_export_reads_the_timeline_the_typescript_side_writes(tmp_path):
     # No step reaches a withdrawn build.
     assert all(row["compared_with"] is None for row in rows if row["withdrawn"])
     # The CLI's export reads the same document from a panel folder.
-    folder = tmp_path / "release-history" / "zz" / ("p" * 64)
+    folder = tmp_path / "release-history" / country / ("p" * 64)
     write_once(folder / "panel.json", {"panel_id": "p" * 64})
     (folder / "timeline.json").write_text(json.dumps(timeline))
-    header = export_csv(tmp_path, "zz").splitlines()[0]
+    header = export_csv(tmp_path, country).splitlines()[0]
     assert header == ",".join(TIMELINE_COLUMNS)

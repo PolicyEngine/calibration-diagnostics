@@ -1,0 +1,125 @@
+{
+  "builds": [
+    {
+      "build": "synthetic-build-1",
+      "build_id": "microcosm-uk-2024-25-national/synthetic-build-1",
+      "current": false,
+      "dataset_path": "releases/microcosm-uk-2024-25-national/synthetic-build-1/national.h5",
+      "digest": "02ac5d90214519b59775271630005d94563c71388aad2d6ee9cf1ee16dde207a",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-20T09:00:00+00:00",
+      "release": "microcosm-uk-2024-25-national",
+      "release_directory": "microcosm-uk-2024-25-national/synthetic-build-1",
+      "release_manifest_sha256": "7549bb9874de123ca9546a9b6443ca98b8b04022291c48c2b11d3f4ee5eba91c",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "synthetic-build-2",
+      "build_id": "microcosm-uk-2024-25-national/synthetic-build-2",
+      "current": false,
+      "dataset_path": "releases/microcosm-uk-2024-25-national/synthetic-build-2/national.h5",
+      "digest": "02ac5d90214519b59775271630005d94563c71388aad2d6ee9cf1ee16dde207a",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-22T09:00:00+00:00",
+      "release": "microcosm-uk-2024-25-national",
+      "release_directory": "microcosm-uk-2024-25-national/synthetic-build-2",
+      "release_manifest_sha256": "7549bb9874de123ca9546a9b6443ca98b8b04022291c48c2b11d3f4ee5eba91c",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "synthetic-build-3",
+      "build_id": "microcosm-uk-2024-25-national/synthetic-build-3",
+      "current": true,
+      "dataset_path": "releases/microcosm-uk-2024-25-national/synthetic-build-3/national.h5",
+      "digest": "23a83081349adee648369ada97a7873f30ef7486aa4f158243b04392f6b843b8",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-24T09:00:00+00:00",
+      "release": "microcosm-uk-2024-25-national",
+      "release_directory": "microcosm-uk-2024-25-national/synthetic-build-3",
+      "release_manifest_sha256": "f55cb2b5310cd91402eb08993f119833cbbb05f5bb3de6607e264bc056263076",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "synthetic-build-4",
+      "build_id": "microcosm-uk-2024-25-national/synthetic-build-4",
+      "current": false,
+      "dataset_path": "releases/microcosm-uk-2024-25-national/synthetic-build-4/national.h5",
+      "digest": "e692ef39b8de4605d5dee7c531a9f87d7a6da0d8f2d2e060dacdd28196eb335d",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-26T09:00:00+00:00",
+      "release": "microcosm-uk-2024-25-national",
+      "release_directory": "microcosm-uk-2024-25-national/synthetic-build-4",
+      "release_manifest_sha256": "f3d752ba9a67fa70740b68300a2367f9b893c4f35439a62d957c239af3209c80",
+      "role": "national",
+      "withdrawn": true
+    },
+    {
+      "build": "synthetic-build-5",
+      "build_id": "microcosm-uk-2024-25-national/synthetic-build-5",
+      "current": false,
+      "dataset_path": "releases/microcosm-uk-2024-25-national/synthetic-build-5/national.h5",
+      "digest": "b827e52a4ab9fa84946b7d653c29e1faaac510d3e045e06c5854ef553f62e2c4",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-28T09:00:00+00:00",
+      "release": "microcosm-uk-2024-25-national",
+      "release_directory": "microcosm-uk-2024-25-national/synthetic-build-5",
+      "release_manifest_sha256": "f53e66fb12635db7acf9e0965131305b1cea3c600908b95da8a8092b6e42d7a8",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "synthetic-build-6",
+      "build_id": "microcosm-uk-2024-25-national/synthetic-build-6",
+      "current": false,
+      "dataset_path": null,
+      "digest": null,
+      "in_default_release": true,
+      "listing_reason": "release_manifest_missing",
+      "listing_status": "refused",
+      "published_at": "2026-10-30T09:00:00+00:00",
+      "release": "microcosm-uk-2024-25-national",
+      "release_directory": "microcosm-uk-2024-25-national/synthetic-build-6",
+      "release_manifest_sha256": null,
+      "role": "national",
+      "withdrawn": false
+    }
+  ],
+  "commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "country": "uk",
+  "format_version": 1,
+  "kind": "release_history.series",
+  "lines": [
+    {
+      "present": true,
+      "release": "microcosm-uk-2024-25-national",
+      "role": "national"
+    }
+  ],
+  "listed_at": "2026-11-12T00:00:00Z",
+  "record": {
+    "default": "microcosm-uk-2024-25-national",
+    "present": true,
+    "sha256": "f556b1079ad8910155e781810effac83b0beb7ee9e7faea6789f7ca0c78364b9"
+  },
+  "release_repo": "policyengine/populace-uk-private",
+  "revision": "main",
+  "rule": {
+    "releases": [
+      "microcosm-uk-2024-25-national"
+    ],
+    "since": "2026-10-19"
+  }
+}

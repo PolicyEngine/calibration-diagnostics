@@ -1,18 +1,14 @@
-"""The measurement document both languages read, made from the fake world.
+"""The stored point, made from the fake world: its id, its keys, what it holds and what not.
 
-`tests/fixtures/measurement.json` is the point of the first file in
-`tests/fixtures/series.json`; `frontend/scripts/release-history.test.ts` builds
-`tests/fixtures/timeline.json` from the two, so a change to either shape fails
-one suite or the other. Regenerate them with `UPDATE_FIXTURES=1`.
+The documents both languages read are each country's fixtures
+(`test_country_fixtures.py`).
 """
 
 import json
-import os
-from pathlib import Path
 
 import numpy as np
 
-from release_history.canonical import document_bytes, json_sha256
+from release_history.canonical import json_sha256
 from release_history.disclosure import apply_policy
 from release_history.document import measurement_document, measurement_id, refused_document
 from release_history.measure import measure
@@ -28,7 +24,6 @@ from .fakes import (
     release_manifest,
 )
 
-FIXTURE = Path(__file__).parent / "fixtures" / "measurement.json"
 PANEL = "f" * 64
 BUILD = f"{FIXTURE_LINE}/zz-build-20261101"
 PACKAGES = ["policyengine-core==3.33.3", "policyengine-zz==1.0.0"]
@@ -107,16 +102,8 @@ def fixture_document() -> dict:
     )
 
 
-def test_the_shared_fixture_is_what_the_producer_writes():
-    produced = document_bytes(fixture_document())
-    if os.environ.get("UPDATE_FIXTURES") or not FIXTURE.exists():
-        FIXTURE.parent.mkdir(parents=True, exist_ok=True)
-        FIXTURE.write_bytes(produced)
-    assert FIXTURE.read_bytes() == produced
-
-
-def test_the_fixture_withholds_without_storing_support():
-    document = json.loads(FIXTURE.read_text())
+def test_withheld_cells_store_a_status_and_a_reason_never_a_support():
+    document = fixture_document()
     withheld = [cell for cell in document["cells"] if cell["status"] == "withheld"]
     assert withheld and all(cell["value"] is None and cell["reason"] for cell in withheld)
     assert document["disclosure"]["withheld_cells"] == len(withheld)

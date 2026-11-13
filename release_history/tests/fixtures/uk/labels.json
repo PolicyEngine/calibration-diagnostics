@@ -1,0 +1,70 @@
+{
+  "country": "uk",
+  "format_version": 1,
+  "kind": "release_history.labels",
+  "reforms": {
+    "additional_rate_plus_1p": {
+      "label": "Additional rate +1p",
+      "source": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__income_tax__increase_additional_rate_by_1p_yield",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      }
+    },
+    "basic_rate_plus_1p": {
+      "label": "Basic rate +1p",
+      "source": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__income_tax__change_basic_rate_by_1p",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      }
+    },
+    "child_benefit_subsequent_child_plus_1": {
+      "label": "Child Benefit subsequent child +£1 a week",
+      "source": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__child_benefit__increase_subsequent_child_rate_by_1_per_week_cost",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      }
+    },
+    "employee_nics_main_rate_plus_1pp": {
+      "label": "Class 1 employee main NICs rate +1pp",
+      "source": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__national_insurance__change_class_1_employee_main_rate_by_1_percentage_point",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      }
+    },
+    "higher_rate_plus_1p": {
+      "label": "Higher rate +1p",
+      "source": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__income_tax__change_higher_rate_by_1p",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      }
+    },
+    "personal_allowance_plus_100": {
+      "label": "Personal allowance +£100",
+      "source": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__income_tax__change_personal_allowance_by_100",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      }
+    },
+    "vat_standard_rate_plus_1pp": {
+      "label": "VAT standard rate +1pp",
+      "source": {
+        "id": "vat_standard_plus_2pp",
+        "note": "same path at a 1pp step",
+        "path": "policyengine_uk/utils/aggregate_impact/standard_reforms.yaml",
+        "repo": "PolicyEngine/policyengine-uk"
+      }
+    }
+  }
+}

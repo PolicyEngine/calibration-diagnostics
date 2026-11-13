@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PolicyEngine/calibration-diagnostics/release_history/schemas/panel.schema.json",
+  "title": "Release history panel",
+  "description": "A panel's panel.json (`release_history/engine.py`): what its id hashes, and the engine it names. Written once. Version 1: every key listed here is required and no other key is allowed. A key added later is declared here with the version that added it, and is not required, so the points already stored stay valid and no format version moves.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "kind",
+    "panel_id",
+    "panel_key",
+    "digest_algorithm",
+    "country",
+    "engine",
+    "producer_version",
+    "point_format_version",
+    "spec_sha256",
+    "definition"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "release_history.panel"
+    },
+    "panel_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 of the canonical JSON of panel_key."
+    },
+    "panel_key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "country",
+        "policyengine",
+        "model",
+        "core",
+        "producer_version",
+        "point_format_version",
+        "spec_sha256"
+      ],
+      "properties": {
+        "country": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "policyengine": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "core": {
+          "type": "string"
+        },
+        "producer_version": {
+          "type": "string"
+        },
+        "point_format_version": {
+          "type": "integer"
+        },
+        "spec_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "digest_algorithm": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyengine",
+        "bundle_sha256",
+        "model",
+        "core"
+      ],
+      "properties": {
+        "policyengine": {
+          "type": "string"
+        },
+        "bundle_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version",
+            "wheel_sha256"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "wheel_sha256": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              ]
+            }
+          }
+        },
+        "core": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "producer_version": {
+      "type": "string"
+    },
+    "point_format_version": {
+      "type": "integer"
+    },
+    "spec_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "definition": {
+      "type": "object",
+      "description": "The spec as written, less what changes no number; parse_spec checks it."
+    }
+  }
+}

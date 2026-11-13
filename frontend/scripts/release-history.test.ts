@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,7 +8,9 @@ import {
   encodeDocument,
   memoryStore,
   readJson,
+  type LabelsDocument,
   type MeasurementDocument,
+  type ReferencesLock,
   type ReleaseHistoryManifest,
   type ReleaseHistoryStore,
   type SeriesRecord,
@@ -272,50 +274,39 @@ test("a local folder builds its own timeline from its series record", async () =
   expect(timeline.builds.map((b) => b.state)).toEqual(["measured", "missing"]);
 });
 
-test("the Python producer's series record and point build the shared timeline", async () => {
-  // release_history/tests/test_series.py and test_document_fixture.py write these two files from a
-  // fake release repository and a fake model world.
-  const listed = JSON.parse(await readFile(join(FIXTURES, "series.json"), "utf8")) as SeriesRecord;
-  const document = JSON.parse(await readFile(join(FIXTURES, "measurement.json"), "utf8")) as MeasurementDocument;
-  // The series' second file: the same world with every published number 10% higher.
-  const secondFile = listed.builds.find((b) => b.current)!.digest!;
-  // Both languages name a point alike.
-  expect(measurementIdFor(document.panel_id, document.file.sha256)).toBe(document.measurement_id);
-  const later: MeasurementDocument = {
-    ...document,
-    measurement_id: measurementIdFor(document.panel_id, secondFile),
-    file: { ...document.file, sha256: secondFile },
-    cells: document.cells.map((cell) => ({ ...cell, value: cell.value === null ? null : cell.value * 1.1 })),
-  };
-  const timeline = buildTimeline({
-    country: "zz", panelId: document.panel_id, series: listed, points: [later, document],
-    references: null, labels: null, builtAt: "t",
-  });
-  // release_history/tests/test_engine_releases_store.py reads the timeline exactly as this side
-  // writes it. Regenerate with UPDATE_FIXTURES=1.
-  const text = new TextDecoder().decode(encodeDocument(timeline));
-  if (process.env.UPDATE_FIXTURES) await writeFile(join(FIXTURES, "timeline.json"), text);
-  expect(await readFile(join(FIXTURES, "timeline.json"), "utf8")).toBe(text);
-  // Four builds with a file: one file twice, a current one, a withdrawn one never measured.
-  expect(timeline.builds.map((b) => [b.state, b.sameFileAs !== null, b.current, b.withdrawn])).toEqual([
-    ["measured", false, false, false],
-    ["measured", true, false, false],
-    ["measured", false, true, false],
-    ["missing", false, false, true],
-  ]);
-  const outputs = new Set(document.cells.map((cell) => `${cell.output}@${cell.period}`));
-  expect(timeline.outputs).toHaveLength(outputs.size);
-  for (const output of timeline.outputs) {
-    const [first, same, current, withdrawn] = output.values;
-    expect(withdrawn).toMatchObject({ status: "unmeasured", changeStatus: "none" });
-    if (first.status === "withheld") {
-      expect(first.value).toBeNull();
-      expect(same.changeStatus).toBe("withheld");
-      expect(current.changeStatus).toBe("withheld");
-    } else {
-      expect(same.changeStatus).toBe(first.value === null ? "none" : "ok");
-      if (first.value !== null) expect(same.change).toBe(0);
+const COUNTRY_FIXTURES = join(FIXTURES, "..", "..", "countries");
+
+for (const country of (await readdir(FIXTURES, { withFileTypes: true })).filter((e) => e.isDirectory()).map((e) => e.name).sort()) {
+  test(`${country}: the producer's fixtures build the timeline the schemas check`, async () => {
+    // release_history/tests/test_country_fixtures.py writes these from the country's real spec on
+    // a synthetic world; the Python tests check this side's timeline against its schema.
+    const folder = join(FIXTURES, country);
+    const read = async <T>(path: string) => JSON.parse(await readFile(path, "utf8")) as T;
+    const panel = await read<PanelDocument>(join(folder, "panel.json"));
+    const listed = await read<SeriesRecord>(join(folder, "series.json"));
+    const labels = await read<LabelsDocument>(join(folder, "labels.json"));
+    const references = await read<ReferencesLock>(join(COUNTRY_FIXTURES, country, "references.lock.json"));
+    const points: MeasurementDocument[] = [];
+    for (const name of (await readdir(join(folder, "points"))).sort()) {
+      points.push(await read<MeasurementDocument>(join(folder, "points", name)));
     }
-    for (const value of output.values) expect(Object.keys(value)).not.toContain("reason");
-  }
-});
+    // Both languages name a point alike.
+    for (const point of points) {
+      expect(measurementIdFor(point.panel_id, point.file.sha256)).toBe(point.measurement_id);
+    }
+    const timeline = buildTimeline({
+      country, panelId: panel.panel_id, series: listed, points, references, labels, builtAt: "2026-11-12T00:00:00Z",
+    });
+    const text = new TextDecoder().decode(encodeDocument(timeline));
+    if (process.env.UPDATE_FIXTURES) await writeFile(join(folder, "timeline.json"), text);
+    expect(await readFile(join(folder, "timeline.json"), "utf8")).toBe(text);
+    // One file under two builds, a current build, a withdrawn one never measured.
+    expect(timeline.builds.filter((b) => b.sameFileAs !== null)).toHaveLength(1);
+    expect(timeline.builds.filter((b) => b.current)).toHaveLength(1);
+    expect(timeline.builds.find((b) => b.withdrawn)).toMatchObject({ state: "missing" });
+    expect(timeline.labels).toEqual(labels.reforms);
+    for (const output of timeline.outputs) {
+      for (const value of output.values) expect(Object.keys(value)).not.toContain("reason");
+    }
+  });
+}

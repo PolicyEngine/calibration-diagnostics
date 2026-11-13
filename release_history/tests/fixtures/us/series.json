@@ -1,0 +1,125 @@
+{
+  "builds": [
+    {
+      "build": "synthetic-build-1",
+      "build_id": "microcosm-us-2024-national/synthetic-build-1",
+      "current": false,
+      "dataset_path": "releases/microcosm-us-2024-national/synthetic-build-1/national.h5",
+      "digest": "0a6940c20582e29d071f2b480a40b65e1ba0f8c0b2b7dbb77fd52f48e64ea76e",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-02T09:00:00+00:00",
+      "release": "microcosm-us-2024-national",
+      "release_directory": "microcosm-us-2024-national/synthetic-build-1",
+      "release_manifest_sha256": "34dae467e7f309f97f71d4db22cee66ac2abb0cb6c77f6f6ac881aa44c7168e7",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "synthetic-build-2",
+      "build_id": "microcosm-us-2024-national/synthetic-build-2",
+      "current": false,
+      "dataset_path": "releases/microcosm-us-2024-national/synthetic-build-2/national.h5",
+      "digest": "0a6940c20582e29d071f2b480a40b65e1ba0f8c0b2b7dbb77fd52f48e64ea76e",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-04T09:00:00+00:00",
+      "release": "microcosm-us-2024-national",
+      "release_directory": "microcosm-us-2024-national/synthetic-build-2",
+      "release_manifest_sha256": "34dae467e7f309f97f71d4db22cee66ac2abb0cb6c77f6f6ac881aa44c7168e7",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "synthetic-build-3",
+      "build_id": "microcosm-us-2024-national/synthetic-build-3",
+      "current": true,
+      "dataset_path": "releases/microcosm-us-2024-national/synthetic-build-3/national.h5",
+      "digest": "6ab60e9c12413574e8cd93d12a4c1d69c253fd5cd6ae98dd4202e585acaeda5e",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-06T09:00:00+00:00",
+      "release": "microcosm-us-2024-national",
+      "release_directory": "microcosm-us-2024-national/synthetic-build-3",
+      "release_manifest_sha256": "9068b647c18ac98bd02d7dc308da127514ece071353e0702b8d52a48ea13cfb7",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "synthetic-build-4",
+      "build_id": "microcosm-us-2024-national/synthetic-build-4",
+      "current": false,
+      "dataset_path": "releases/microcosm-us-2024-national/synthetic-build-4/national.h5",
+      "digest": "67333aac1bd574a59cea7ded45b57fd7a117ff385104175a567eabbd3764cc38",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-08T09:00:00+00:00",
+      "release": "microcosm-us-2024-national",
+      "release_directory": "microcosm-us-2024-national/synthetic-build-4",
+      "release_manifest_sha256": "4f86164ea44ccbe79bf644051288274bdc060db53ed8627f626d03cb5b4a4552",
+      "role": "national",
+      "withdrawn": true
+    },
+    {
+      "build": "synthetic-build-5",
+      "build_id": "microcosm-us-2024-national/synthetic-build-5",
+      "current": false,
+      "dataset_path": "releases/microcosm-us-2024-national/synthetic-build-5/national.h5",
+      "digest": "234b2ef452a2dfe0518166299199178d2a876587689b8a81e96914159863e2b1",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-10-10T09:00:00+00:00",
+      "release": "microcosm-us-2024-national",
+      "release_directory": "microcosm-us-2024-national/synthetic-build-5",
+      "release_manifest_sha256": "c3bbf8ca4a62dbb084e8c41279f556f8d33130d423e7869182f8821619485fcb",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "synthetic-build-6",
+      "build_id": "microcosm-us-2024-national/synthetic-build-6",
+      "current": false,
+      "dataset_path": null,
+      "digest": null,
+      "in_default_release": true,
+      "listing_reason": "release_manifest_missing",
+      "listing_status": "refused",
+      "published_at": "2026-10-12T09:00:00+00:00",
+      "release": "microcosm-us-2024-national",
+      "release_directory": "microcosm-us-2024-national/synthetic-build-6",
+      "release_manifest_sha256": null,
+      "role": "national",
+      "withdrawn": false
+    }
+  ],
+  "commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "country": "us",
+  "format_version": 1,
+  "kind": "release_history.series",
+  "lines": [
+    {
+      "present": true,
+      "release": "microcosm-us-2024-national",
+      "role": "national"
+    }
+  ],
+  "listed_at": "2026-11-12T00:00:00Z",
+  "record": {
+    "default": "microcosm-us-2024-national",
+    "present": true,
+    "sha256": "fc601e097fbc8b7adcc57c8afd3a6fe08c0c2edf27b99f18c8118fc261c7aa71"
+  },
+  "release_repo": "policyengine/populace-us",
+  "revision": "main",
+  "rule": {
+    "releases": [
+      "microcosm-us-2024-national"
+    ],
+    "since": null
+  }
+}

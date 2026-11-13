@@ -26,8 +26,7 @@ from typing import Any
 
 from release_history import ATTEMPT_FORMAT_VERSION, LABELS_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import document_bytes, file_sha256, write_atomic
-from release_history.disclosure import apply_policy
-from release_history.document import measurement_document, measurement_id, refused_document
+from release_history.document import measured_point, measurement_id, refused_document
 from release_history.engine import EngineMismatch, engine_identity, environment, panel_document
 from release_history.export import export_csv
 from release_history.local_store import (
@@ -528,13 +527,6 @@ def cmd_measure(args: argparse.Namespace) -> int:
                 source_ids = None
                 if spec.disclosure_policy != "none":
                     source_ids = source_ids_for(spec, h5_path, result.household_ids)
-                withheld = apply_policy(
-                    spec.disclosure_policy,
-                    result.cells,
-                    result.tables,
-                    source_ids=source_ids,
-                    floor=spec.min_source_households,
-                )
         except ReleaseRefused as refusal:
             if refusal.reason not in FILE_REFUSALS:
                 return _run_failed(report, "measure", refusal.reason, point)
@@ -563,13 +555,13 @@ def cmd_measure(args: argparse.Namespace) -> int:
         if result.status != "ok" and not point.last_attempt:
             failed = sorted(k for k, v in result.reforms.items() if v.get("status") != "ok")
             return _run_failed(report, "reform", "reform_failed", point, reforms=failed)
-        document = measurement_document(
+        document, withheld = measured_point(
             spec=spec,
             panel_id=panel_id,
             provenance=provenance,
             result=result,
+            source_ids=source_ids,
             columns=columns,
-            withheld=withheld,
             env=env,
             producer_commit=producer_commit,
             runtime=runtime(),

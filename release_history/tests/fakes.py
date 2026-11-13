@@ -244,7 +244,13 @@ class FakeHub:
         return local
 
 
-def release_manifest(sha256: str, *, path: str = "zz.h5", national: bool = True) -> dict[str, Any]:
+def release_manifest(
+    sha256: str,
+    *,
+    path: str = "zz.h5",
+    national: bool = True,
+    model: str = "policyengine-zz",
+) -> dict[str, Any]:
     """A build folder's release_manifest.json naming one national file (or none)."""
     if not national:
         return {"dataset_role": "non_default_local_area", "default_datasets": {}, "artifacts": {}}
@@ -252,7 +258,7 @@ def release_manifest(sha256: str, *, path: str = "zz.h5", national: bool = True)
         "default_datasets": {"national": "national"},
         "artifacts": {"national": {"kind": "microdata", "path": path, "sha256": sha256}},
         "built_at": "2026-11-01T00:00:00+00:00",
-        "compatible_model_packages": [{"name": "policyengine-zz", "specifier": ">=1"}],
+        "compatible_model_packages": [{"name": model, "specifier": ">=1"}],
     }
 
 

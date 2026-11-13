@@ -19,7 +19,11 @@ dependencies = [
 release-history = "release_history.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8.3,<9", "ruff>=0.6,<1"]
+dev = [
+    "jsonschema>=4.21,<5",
+    "pytest>=8.3,<9",
+    "ruff>=0.6,<1",
+]
 
 [build-system]
 requires = ["hatchling"]

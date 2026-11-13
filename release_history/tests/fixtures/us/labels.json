@@ -1,0 +1,25 @@
+{
+  "country": "us",
+  "format_version": 1,
+  "kind": "release_history.labels",
+  "reforms": {
+    "arpa_ctc_2021": {
+      "label": "ARPA 2021 Child Tax Credit expansion",
+      "source": {
+        "commit": "1d174fc7c9",
+        "id": "federal.arpa_ctc_2021",
+        "path": "packages/microcosm-build/src/microcosm/build/us/state_reforms.json",
+        "repo": "PolicyEngine/microcosm"
+      }
+    },
+    "cbo_rates_plus_1pt": {
+      "label": "All individual income tax rates +1pt",
+      "source": {
+        "commit": "1d174fc7c9",
+        "id": "federal.cbo_rates_plus_1pt",
+        "path": "packages/microcosm-build/src/microcosm/build/us/state_reforms.json",
+        "repo": "PolicyEngine/microcosm"
+      }
+    }
+  }
+}

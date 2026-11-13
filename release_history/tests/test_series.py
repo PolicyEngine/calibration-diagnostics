@@ -1,13 +1,11 @@
 """The series record: the builds `releases.json` lists, each mapped to its data file."""
 
 import json
-import os
 from pathlib import Path
 
 import pytest
 
 from release_history import cli
-from release_history.canonical import document_bytes
 from release_history.releases import ReleaseRefused
 from release_history.series import MAX_RECORD_BYTES, SeriesError, build_series, parse_record
 from release_history.spec import parse_spec
@@ -22,7 +20,6 @@ from .fakes import (
     release_repo,
 )
 
-FIXTURE = Path(__file__).parent / "fixtures" / "series.json"
 LISTED_AT = "2026-11-12T00:00:00Z"
 
 
@@ -192,16 +189,6 @@ def test_a_repository_fault_fails_the_listing_rather_than_refusing_every_build(t
     hub.resolve_revision = lambda repo, revision: "e" * 40
     with pytest.raises(ReleaseRefused):
         build_series(spec, hub, listed_at=LISTED_AT, workdir=tmp_path)
-
-
-def test_the_shared_series_fixture_is_what_the_producer_writes(tmp_path):
-    # frontend/scripts/release-history.test.ts builds tests/fixtures/timeline.json from this
-    # record and tests/fixtures/measurement.json. Regenerate with UPDATE_FIXTURES=1.
-    produced = document_bytes(fixture_series(tmp_path))
-    if os.environ.get("UPDATE_FIXTURES") or not FIXTURE.exists():
-        FIXTURE.parent.mkdir(parents=True, exist_ok=True)
-        FIXTURE.write_bytes(produced)
-    assert FIXTURE.read_bytes() == produced
 
 
 def test_the_series_command_writes_the_record_and_prints_only_counts(tmp_path, monkeypatch, capsys):
