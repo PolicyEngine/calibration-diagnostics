@@ -873,17 +873,20 @@ function newTag(name: string, newSha: string): UpdatedRefPayload {
 
 /**
  * A webhook whose fetch serves the GitHub dispatch (204 unless `dispatch` is
- * given), releases.json (Hugging Face's 404 unless `releasesRecord` is given)
- * and the collector (a 202 "queued" unless `collector` is given), and records
- * the dispatches and collector requests. The collector address is configured
- * unless `config` overrides it.
+ * given), releases.json (Hugging Face's 404 unless `releasesRecord` is given,
+ * which receives the read's URL) and the collector (a 202 "queued" unless
+ * `collector` is given), and records the dispatches and collector requests.
+ * The collector address is configured unless `config` overrides it. The
+ * Slack alert senders post nothing and return false unless given.
  */
 function treeBuildWebhook(options: {
   collector?: CollectorAnswer;
   dispatch?: () => Response | Promise<Response>;
-  releasesRecord?: () => Response;
+  releasesRecord?: (url: string) => Response;
   config?: Partial<HfWebhookConfig>;
   vercelOidcToken?: () => Promise<string>;
+  postReleaseAlert?: HfWebhookHandlerDependencies["postReleaseAlert"];
+  postReleaseRecordAlert?: HfWebhookHandlerDependencies["postReleaseRecordAlert"];
 } = {}) {
   const collectorRequests: CapturedRequest[] = [];
   const dispatches: CapturedRequest[] = [];
@@ -895,7 +898,7 @@ function treeBuildWebhook(options: {
       return options.dispatch?.() ?? new Response(null, { status: 204 });
     }
     if (url.endsWith("/releases.json")) {
-      return options.releasesRecord?.() ?? missingReleasesRecord();
+      return options.releasesRecord?.(url) ?? missingReleasesRecord();
     }
     if (url.startsWith(`${COLLECTOR_URL}/`)) {
       collectorRequests.push({ url, init: init ?? {} });
@@ -907,8 +910,8 @@ function treeBuildWebhook(options: {
     webhookConfig({ treeBuildCollector: { baseUrl: COLLECTOR_URL }, ...options.config }),
     {
       fetch: fetchImplementation,
-      postReleaseAlert: async () => false,
-      postReleaseRecordAlert: async () => false,
+      postReleaseAlert: options.postReleaseAlert ?? (async () => false),
+      postReleaseRecordAlert: options.postReleaseRecordAlert ?? (async () => false),
       vercelOidcToken:
         options.vercelOidcToken ??
         (async () => {
@@ -1215,6 +1218,66 @@ test("a network failure or a timeout reaching the collector is a failed tree bui
     expect(result.body.tree_build.detail).toContain(detail);
     expect(result.collectorRequests).toHaveLength(1);
     expect(result.collectorRequests[0].init.signal).toBeInstanceOf(AbortSignal);
+  }
+});
+
+// A collector that answers an error status, one that cannot be reached, and
+// one that does not answer within the time limit.
+const COLLECTOR_FAILURES: CollectorAnswer[] = [
+  () => Response.json({ detail: COLLECTOR_REFUSAL }, { status: 503 }),
+  () => {
+    throw new TypeError("fetch failed");
+  },
+  () => {
+    throw new DOMException("The operation timed out.", "TimeoutError");
+  },
+];
+
+test("a failed collector request still lets a release repository's new tag post its Slack alert: the answer is 200, names the tag in alerted and reports a failed tree build", async () => {
+  const tag = "microcosm-us-2026-11-14";
+  for (const collector of COLLECTOR_FAILURES) {
+    const posted: string[] = [];
+    const result = await deliver(delivery(REPOSITORIES.usRelease, [newTag(tag, testSha(72))]), {
+      collector,
+      postReleaseAlert: async ({ releaseId }) => {
+        posted.push(releaseId);
+        return true;
+      },
+    });
+
+    expectFailedTreeBuild(result);
+    expect(result.collectorRequests).toHaveLength(1);
+    expect(posted).toEqual([tag]);
+    expect(result.body.alerted).toEqual([tag]);
+  }
+});
+
+test("a failed collector request still lets a UK main update post its releases.json alerts: the answer is 200, names them in release_record_alerted and reports a failed tree build", async () => {
+  const before = testSha(73);
+  const after = testSha(74);
+  const records: Record<string, Record<string, unknown>> = {
+    [before]: nationalRecord(CURRENT, [OLDER, CURRENT]),
+    [after]: nationalRecord(CURRENT, [OLDER, CURRENT], [OLDER]),
+  };
+  for (const collector of COLLECTOR_FAILURES) {
+    const posted: string[] = [];
+    const result = await deliver(delivery(REPOSITORIES.ukRelease, [mainUpdate(after, before)]), {
+      collector,
+      releasesRecord: (url) => {
+        const revision = /\/resolve\/([0-9a-f]{40})\/releases\.json$/.exec(url)?.[1];
+        if (!revision || !(revision in records)) throw new Error(`Unexpected URL ${url}`);
+        return Response.json(records[revision]);
+      },
+      postReleaseRecordAlert: async ({ alert }) => {
+        posted.push(alert.kind);
+        return true;
+      },
+    });
+
+    expectFailedTreeBuild(result);
+    expect(result.collectorRequests).toHaveLength(1);
+    expect(posted).toEqual(["withdrawn"]);
+    expect(result.body.release_record_alerted).toEqual([`withdrawn ${NATIONAL}/${OLDER}`]);
   }
 });
 
