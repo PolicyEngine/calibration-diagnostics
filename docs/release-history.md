@@ -5,6 +5,8 @@ country on one fixed reference model, so a move between two releases comes
 from the data, not the model (calibration-diagnostics#224). This document
 covers the backend: what is measured, where it is stored, when it is
 regenerated, and how to add a country. The dashboard page is a later PR.
+For a short overview, and the discussion points for what comes next, see
+[release-history-roadmap.md](release-history-roadmap.md).
 
 ## Concepts
 
